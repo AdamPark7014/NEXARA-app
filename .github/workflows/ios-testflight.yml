@@ -1,264 +1,616 @@
-name: iOS · TestFlight
-
-# Construye, firma y sube la app iOS a TestFlight sin que nadie toque una Mac.
-# La Mac existe —es el runner de GitHub— pero se alquila por minutos y en un
-# repositorio público no cuesta nada.
-#
-# ┌─ POR QUÉ SOLO `workflow_dispatch` ────────────────────────────────────────┐
-# │ Este repositorio es PÚBLICO. Un disparador `pull_request` dejaría que     │
-# │ cualquiera abriera un PR desde una bifurcación con un paso que imprime    │
-# │ el certificado de distribución. Con `workflow_dispatch` el flujo solo lo  │
-# │ lanza quien tiene permiso de escritura, desde la pestaña Actions.         │
-# │ NO añadir `push:` ni `pull_request:` aquí.                                │
-# └───────────────────────────────────────────────────────────────────────────┘
+name: iOS TestFlight (Free GHA)
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Versión visible en la tienda (CFBundleShortVersionString), ej. 1.0.0'
-        required: true
-        default: '1.0.0'
-      build:
-        description: 'Número de construcción. Vacío = número de ejecución. Apple EXIGE que suba en cada envío.'
+      releaseNotes:
+        description: "TestFlight release notes (optional)"
         required: false
-        default: ''
-      subir:
-        description: 'Subir a TestFlight. Desmárcalo para solo compilar y firmar.'
+        default: ""
+      version:
+        description: "App Store version (CFBundleShortVersionString), e.g. 1.0.0"
+        required: false
+        default: ""
+      build:
+        description: "Build number (CFBundleVersion). Empty = unchanged."
+        required: false
+        default: ""
+      upload:
+        description: "Upload to TestFlight (uncheck to only build/sign)"
         type: boolean
         required: true
         default: true
-
-concurrency:
-  group: ios-testflight
-  cancel-in-progress: false
-
-permissions:
-  contents: read
+  push:
+    tags:
+      - "ios-testflight-*"
 
 jobs:
-  testflight:
-    name: Compilar, firmar y subir
+  build-and-upload:
     runs-on: macos-15
-    timeout-minutes: 60
-
     env:
-      IOS_DIR: apps/mobile-native/ios
+      XCODE_PROJECT_PATH: apps/mobile-native/ios/NexaraApp.xcodeproj
+      XCODE_SCHEME: NexaraApp
+      ARCHIVE_PATH: ${{ github.workspace }}/build/NexaraApp.xcarchive
+      EXPORT_DIR: ${{ github.workspace }}/build/export
+      EXPORT_PLIST: ${{ github.workspace }}/build/ExportOptions.plist
       BUNDLE_ID: mx.nexara.mobile.NexaraApp
-
+      TEAM_ID: AHNW9K8745
+      # Preferred secrets to build .p12 on runner:
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}             # PEM (PKCS#8)
+      DISTRIBUTION_CERT_CER_BASE64: ${{ secrets.DISTRIBUTION_CERT_CER_BASE64 }}   # Apple .cer (DER) base64
+      # Optional fallback if above not provided:
+      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}           # base64 .p12
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}                                   # password for .p12
+      BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Select latest available Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
 
-      # Un secreto que falta se manifiesta mucho más tarde como un error de
-      # firma ilegible ("No signing certificate found"). Esto lo dice de frente
-      # y en el primer medio minuto.
-      - name: Comprobar que están los seis secretos
-        env:
-          P12: ${{ secrets.IOS_DIST_CERT_P12 }}
-          P12_PASS: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
-          TEAM: ${{ secrets.IOS_TEAM_ID }}
-          KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
-          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      - name: Ensure iOS 26 SDK (switch if multiple Xcodes available)
         run: |
-          faltan=""
-          [ -n "$P12" ]      || faltan="$faltan IOS_DIST_CERT_P12"
-          [ -n "$P12_PASS" ] || faltan="$faltan IOS_DIST_CERT_PASSWORD"
-          [ -n "$TEAM" ]     || faltan="$faltan IOS_TEAM_ID"
-          [ -n "$KEY_ID" ]   || faltan="$faltan ASC_KEY_ID"
-          [ -n "$ISSUER" ]   || faltan="$faltan ASC_ISSUER_ID"
-          [ -n "$KEY" ]      || faltan="$faltan ASC_PRIVATE_KEY"
-          if [ -n "$faltan" ]; then
-            echo "::error::Faltan secretos:$faltan"
-            echo "Créalos con: apps/mobile-native/ios/scripts/subir-secretos.ps1"
+          set -euo pipefail
+          echo "Initial Xcode: $(xcode-select -p)"
+          echo "::group::Installed Xcodes"
+          ls -1 /Applications | sed -n 's/^/ - /p' || true
+          echo "::endgroup::"
+          # Try to find an installed Xcode that reports iPhoneOS SDK >= 26
+          bestPath=""
+          bestVer=""
+          for X in /Applications/Xcode*.app; do
+            if [ -d "$X/Contents/Developer" ]; then
+              sudo xcode-select -s "$X/Contents/Developer" || true
+              SDK_VER="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || true)"
+              if [ -n "$SDK_VER" ]; then
+                echo "Xcode at $X has iPhoneOS SDK $SDK_VER"
+                if [ -z "$bestVer" ] || [ "$(printf '%s\n' "$bestVer" "$SDK_VER" | sort -V | tail -n1)" = "$SDK_VER" ]; then
+                  bestVer="$SDK_VER"
+                  bestPath="$X/Contents/Developer"
+                fi
+              fi
+            fi
+          done
+          if [ -n "$bestPath" ]; then
+            echo "Selecting Xcode with highest iPhoneOS SDK ($bestVer): $bestPath"
+            sudo xcode-select -s "$bestPath"
+          fi
+          SEL_VER="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || true)"
+          echo "Selected iPhoneOS SDK version: ${SEL_VER:-<unknown>}"
+          if [ -z "$SEL_VER" ] || [ "$(printf '%s\n' "26.0" "${SEL_VER}" | sort -V | tail -n1)" != "${SEL_VER}" ]; then
+            echo "WARNING: Could not confirm iOS 26 SDK. Proceeding, but App Store validation may fail if SDK < 26."
+          fi
+
+      - name: Initialize Xcode platforms (ensure iOS device SDK is available)
+        run: |
+          set -euo pipefail
+          echo "Xcode path: $(xcode-select -p)"
+          sudo xcodebuild -license accept || true
+          sudo xcodebuild -runFirstLaunch || true
+          # Retry iOS platform download up to 3 times
+          n=0
+          until [ $n -ge 3 ]; do
+            echo "Attempt $((n+1)) to download iOS platform SDK…"
+            if xcodebuild -downloadPlatform iOS; then
+              break
+            fi
+            n=$((n+1)); sleep 30
+          done
+          echo "Installed SDKs:"
+          xcodebuild -showsdks || true
+          IOS_PLATFORM_DIR="$(xcode-select -p)/Platforms/iPhoneOS.platform"
+          if [ ! -d "$IOS_PLATFORM_DIR" ]; then
+            echo "ERROR: iPhoneOS.platform not found at $IOS_PLATFORM_DIR"; exit 1
+          fi
+          echo "Found iPhoneOS.platform at $IOS_PLATFORM_DIR"
+
+      - name: Show macOS and Xcode
+        run: |
+          sw_vers
+          xcodebuild -version
+          which xcodebuild
+
+      - name: Ensure required AppIcon sizes (120, 152, 1024)
+        run: |
+          set -euo pipefail
+          ICONSET="${GITHUB_WORKSPACE}/apps/mobile-native/ios/Resources/Assets.xcassets/AppIcon.appiconset"
+          mkdir -p "$ICONSET"
+          SRC_1024_TMP="$RUNNER_TEMP/src-1024.png"
+          if [ ! -f "$ICONSET/icon-1024.png" ]; then
+            echo "icon-1024.png not found; attempting to derive from existing icons or brand mark…"
+            CANDIDATE="$(ls -1 "$ICONSET"/*.png 2>/dev/null | head -n 1 || true)"
+            if [ -n "$CANDIDATE" ]; then
+              echo "Using existing candidate image: $CANDIDATE"
+              sips -s format png -z 1024 1024 "$CANDIDATE" --out "$SRC_1024_TMP" >/dev/null
+            else
+              echo "No local candidate; fetching brand mark…"
+              TMP_SRC="$RUNNER_TEMP/brand-src.png"
+              curl -fsSL "https://nexara.com.mx/brand/nexara-mark-v4-512.png" -o "$TMP_SRC"
+              sips -s format png -z 1024 1024 "$TMP_SRC" --out "$SRC_1024_TMP" >/dev/null
+            fi
+          else
+            cp "$ICONSET/icon-1024.png" "$SRC_1024_TMP"
+          fi
+          # Generate required iPhone/iPad sizes from source 1024
+          sips -s format png -z 120 120 "$SRC_1024_TMP" --out "$ICONSET/icon-120.png" >/dev/null
+          sips -s format png -z 152 152 "$SRC_1024_TMP" --out "$ICONSET/icon-152.png" >/dev/null
+          cp "$SRC_1024_TMP" "$ICONSET/icon-1024.png"
+          # Aggressively flatten all AppIcon PNGs to RGB (no alpha) using Swift/AppKit (no pip)
+          echo "::group::Flatten AppIcon PNGs to RGB with Swift/AppKit"
+          swift "$GITHUB_WORKSPACE/scripts/flatten_app_icons.swift" "$ICONSET"
+          echo "::endgroup::"
+          # Verify no alpha remains
+          echo "AppIcon contents:"
+          ls -lah "$ICONSET" || true
+          echo "::group::Verify hasAlpha=no for all AppIcon PNGs"
+          fail=0
+          for f in "$ICONSET"/*.png; do
+            a=$(sips -g hasAlpha "$f" 2>/dev/null | awk -F': ' '/hasAlpha/ {print $2}')
+            echo "$f hasAlpha: ${a:-unknown}"
+            if [ "$a" != "no" ]; then fail=$((fail+1)); fi
+          done
+          echo "::endgroup::"
+          if [ $fail -ne 0 ]; then
+            echo "ERROR: Some AppIcon PNGs still report alpha"; exit 1
+          fi
+
+      - name: Install XcodeGen
+        run: |
+          brew update
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate Xcode project from XcodeGen spec
+        working-directory: apps/mobile-native/ios
+        run: |
+          if [ -f project.yml ]; then SPEC_FILE=project.yml; elif [ -f project.yaml ]; then SPEC_FILE=project.yaml; else echo "XcodeGen spec not found"; exit 1; fi
+          echo "Using XcodeGen spec: ${SPEC_FILE}"
+          xcodegen generate --spec "${SPEC_FILE}"
+          test -d NexaraApp.xcodeproj
+      - name: Verify pbxproj uses explicit Info.plist
+        run: |
+          set -euo pipefail
+          PBX="apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj"
+          if ! grep -qE 'INFOPLIST_FILE *= *Resources/Info.plist' "$PBX"; then
+            echo "ERROR: INFOPLIST_FILE not set to Resources/Info.plist in pbxproj"; exit 1
+          fi
+          if ! grep -qE 'GENERATE_INFOPLIST_FILE *= *NO' "$PBX"; then
+            echo "ERROR: GENERATE_INFOPLIST_FILE is not NO in pbxproj"; exit 1
+          fi
+      - name: Verify iOS device destination is available (post-project)
+        run: |
+          set -euo pipefail
+          echo "Available destinations for scheme NexaraApp:"
+          xcodebuild -showdestinations -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release || true
+          # Not all Xcode versions list generic destinations here; fallback to SDK path check as gate
+          IOS_PLATFORM_DIR="$(xcode-select -p)/Platforms/iPhoneOS.platform"
+          if [ ! -d "$IOS_PLATFORM_DIR" ]; then
+            echo "ERROR: iPhoneOS.platform missing after initialization step: $IOS_PLATFORM_DIR"; exit 1
+          fi
+      # Removed fragile regex patch; a structured patch runs later to bind app and disable others
+
+      - name: Prepare App Store Connect API key
+        run: |
+          set -euo pipefail
+          if [ -z "${ASC_KEY_ID}" ] || [ -z "${ASC_ISSUER_ID}" ] || [ -z "${ASC_PRIVATE_KEY}" ]; then
+            echo "Missing App Store Connect API secrets"; exit 1
+          fi
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          umask 177
+          printf "%s" "${ASC_PRIVATE_KEY}" > "${KEY_PATH}"
+          echo "ASC key written to ${KEY_PATH}"
+          echo "ASC_KEY_PATH=${KEY_PATH}" >> $GITHUB_ENV
+          # Point altool to the temp directory containing AuthKey_<KEYID>.p8
+          echo "API_PRIVATE_KEYS_DIR=$RUNNER_TEMP" >> $GITHUB_ENV
+
+      - name: Install provisioning profile (dual paths)
+        run: |
+          set -euo pipefail
+          if [ -z "${BUILD_PROVISION_PROFILE_BASE64}" ]; then
+            echo "Missing provisioning profile secret (BUILD_PROVISION_PROFILE_BASE64)"; exit 1
+          fi
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          TMP_PROFILE="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$TMP_PROFILE"
+          PLIST_OUT="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$TMP_PROFILE" > "$PLIST_OUT"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PLIST_OUT")
+          DEST_MOBILE="$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          DEST_USERDATA="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          cp "$TMP_PROFILE" "$DEST_MOBILE"
+          cp "$TMP_PROFILE" "$DEST_USERDATA"
+          echo "Installed provisioning profile UUID=$PROFILE_UUID at:"
+          echo " - $DEST_MOBILE"
+          echo " - $DEST_USERDATA"
+          # Expose UUID for subsequent steps
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+
+      - name: Build and import Distribution signing certificate (.p12)
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/codesign.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 12)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -s "$KEYCHAIN_PATH"
+          if [ -n "${CERTIFICATE_PRIVATE_KEY:-}" ] && [ -n "${DISTRIBUTION_CERT_CER_BASE64:-}" ]; then
+            echo "Building .p12 from CERTIFICATE_PRIVATE_KEY and DISTRIBUTION_CERT_CER_BASE64"
+            KEY_PEM="$RUNNER_TEMP/dist.key.pem"
+            CERT_DER="$RUNNER_TEMP/dist.cer"
+            CERT_PEM="$RUNNER_TEMP/dist.pem"
+            printf '%s' "${CERTIFICATE_PRIVATE_KEY}" > "$KEY_PEM"
+            echo "${DISTRIBUTION_CERT_CER_BASE64}" | base64 --decode > "$CERT_DER"
+            openssl x509 -inform DER -in "$CERT_DER" -out "$CERT_PEM"
+            P12_PATH="$RUNNER_TEMP/dist.p12"
+            P12_PASS="$(openssl rand -hex 16)"
+            (openssl pkcs12 -export -inkey "$KEY_PEM" -in "$CERT_PEM" \
+              -out "$P12_PATH" -passout pass:"$P12_PASS" \
+              -macalg sha1 -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES) || \
+            (openssl pkcs12 -export -legacy -inkey "$KEY_PEM" -in "$CERT_PEM" \
+              -out "$P12_PATH" -passout pass:"$P12_PASS")
+            security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$P12_PASS" -A -T /usr/bin/codesign -T /usr/bin/security
+          elif [ -n "${BUILD_CERTIFICATE_BASE64:-}" ] && [ -n "${P12_PASSWORD:-}" ]; then
+            echo "Falling back to provided .p12"
+            P12_PATH="$RUNNER_TEMP/certificate.p12"
+            echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$P12_PATH"
+            security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -A -T /usr/bin/codesign -T /usr/bin/security
+          else
+            echo "No signing certificate provided. Provide CERTIFICATE_PRIVATE_KEY + DISTRIBUTION_CERT_CER_BASE64 or BUILD_CERTIFICATE_BASE64 + P12_PASSWORD."
             exit 1
           fi
-          echo "Los seis secretos están presentes."
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "::group::Available code signing identities"
+          security find-identity -v -p codesigning || true
+          echo "::endgroup::"
 
-      - name: Versión de Xcode del runner
-        run: xcodebuild -version && swift --version
-
-      - name: Instalar XcodeGen
-        run: brew install xcodegen
-
-      # Resolver SocketIO desde cero cuesta ~1 min por construcción. Cachearlo
-      # es la diferencia entre gastar minutos de runner en compilar o en clonar.
-      - name: Caché de paquetes Swift
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.IOS_DIR }}/.spm-cache
-          key: spm-${{ runner.os }}-${{ hashFiles('apps/mobile-native/ios/project.yml') }}
-          restore-keys: spm-${{ runner.os }}-
-
-      - name: Generar NexaraApp.xcodeproj
-        working-directory: ${{ env.IOS_DIR }}
-        run: |
-          xcodegen generate
-          echo "--- esquemas compartidos generados ---"
-          ls -1 NexaraApp.xcodeproj/xcshareddata/xcschemes/
-
-      # El llavero temporal muere con el runner. `set-key-partition-list` es
-      # imprescindible: sin él `codesign` se queda esperando una autorización
-      # gráfica que en un runner sin sesión nunca llega, y el trabajo agota el
-      # tiempo sin decir por qué.
-      - name: Importar el certificado de distribución
-        env:
-          P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12 }}
-          P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+      - name: Debug provisioning profile metadata
         run: |
           set -euo pipefail
-          LLAVERO="$RUNNER_TEMP/firma.keychain-db"
-          CLAVE="$(uuidgen)"
-          echo "LLAVERO=$LLAVERO" >> "$GITHUB_ENV"
+          PLIST_OUT="$RUNNER_TEMP/profile-debug.plist"
+          security cms -D -i "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision" > "$PLIST_OUT"
+          echo "Profile Name: $(/usr/libexec/PlistBuddy -c 'Print Name' "$PLIST_OUT" || true)"
+          echo "Profile UUID: $(/usr/libexec/PlistBuddy -c 'Print UUID' "$PLIST_OUT" || true)"
+          echo "Team ID(s): $(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "$PLIST_OUT" || true)"
+          echo "Entitlements aps-environment: $(/usr/libexec/PlistBuddy -c 'Print Entitlements:aps-environment' "$PLIST_OUT" || true)"
+          echo "Listing profiles directories:"
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" || true
+          ls -la "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/" || true
 
-          security create-keychain -p "$CLAVE" "$LLAVERO"
-          security set-keychain-settings -lut 21600 "$LLAVERO"
-          security unlock-keychain -p "$CLAVE" "$LLAVERO"
-
-          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
-          security import "$RUNNER_TEMP/dist.p12" \
-            -k "$LLAVERO" -P "$P12_PASSWORD" \
-            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
-          rm -f "$RUNNER_TEMP/dist.p12"
-
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CLAVE" "$LLAVERO" >/dev/null
-          security list-keychains -d user -s "$LLAVERO" login.keychain-db
-
-          echo "--- identidades de firma disponibles ---"
-          security find-identity -v -p codesigning "$LLAVERO"
-
-      # `xcodebuild` y `altool` buscan la clave .p8 en esta ruta por convención.
-      - name: Colocar la clave de App Store Connect
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      - name: Verify entitlements and bundle id in build settings
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          RUTA="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-          echo "$ASC_PRIVATE_KEY" | base64 --decode > "$RUTA"
-          chmod 600 "$RUTA"
-          echo "ASC_KEY_PATH=$RUTA" >> "$GITHUB_ENV"
-          head -1 "$RUTA" | grep -q "BEGIN PRIVATE KEY" \
-            || { echo "::error::ASC_PRIVATE_KEY no es un .p8 válido en base64"; exit 1; }
+          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -target NexaraApp -configuration Release > "$RUNNER_TEMP/buildsettings.txt"
+          echo "::group::Build Settings (filtered)"
+          grep -E "PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS" "$RUNNER_TEMP/buildsettings.txt" || true
+          echo "::endgroup::"
+          ENT_PATH=$(grep -E "CODE_SIGN_ENTITLEMENTS =" "$RUNNER_TEMP/buildsettings.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
+          PROJ_DIR="$(cd "$(dirname "$XCODE_PROJECT_PATH")" && pwd)"
+          if [ -z "$ENT_PATH" ]; then
+            echo "ERROR: CODE_SIGN_ENTITLEMENTS is not set in build settings"; exit 1
+          fi
+          case "$ENT_PATH" in
+            /*) ENT_ABS="$ENT_PATH" ;;
+            *)  ENT_ABS="$PROJ_DIR/$ENT_PATH" ;;
+          esac
+          echo "Resolved entitlements path: $ENT_ABS"
+          test -f "$ENT_ABS" || { echo "ERROR: Entitlements file missing at $ENT_ABS"; exit 1; }
+          echo "aps-environment in entitlements:"
+          /usr/libexec/PlistBuddy -c 'Print aps-environment' "$ENT_ABS" || true
 
-      - name: Fijar número de construcción
-        run: |
-          BUILD="${{ inputs.build }}"
-          [ -n "$BUILD" ] || BUILD="${{ github.run_number }}"
-          echo "BUILD_NUMBER=$BUILD" >> "$GITHUB_ENV"
-          echo "Versión ${{ inputs.version }} · construcción $BUILD"
-
-      # `-allowProvisioningUpdates` con la clave de App Store Connect hace que
-      # Xcode registre el identificador, active la capacidad de notificaciones
-      # y descargue el perfil de aprovisionamiento él solo. Es lo que sustituye
-      # a los clics en "Signing & Capabilities".
-      - name: Archivar (Release)
-        working-directory: ${{ env.IOS_DIR }}
-        env:
-          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      - name: Bind manual signing for NexaraApp (pbxproj)
         run: |
           set -euo pipefail
-          xcodebuild archive \
-            -project NexaraApp.xcodeproj \
-            -scheme NexaraApp \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/NexaraApp.xcarchive" \
-            -clonedSourcePackagesDirPath .spm-cache \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-            MARKETING_VERSION="${{ inputs.version }}" \
-            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            CODE_SIGN_STYLE=Automatic
+          python3 "$GITHUB_WORKSPACE/scripts/ios_bind_app_signing.py" \
+            "apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj" \
+            "NexaraApp" "AHNW9K8745" "$PROFILE_UUID" "NEXARA App Store" "Apple Distribution"
+          PBXPROJ="apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj"
+          grep -q "PROVISIONING_PROFILE = \\\"${PROFILE_UUID}\\\";" "$PBXPROJ" || { echo "ERROR: PROVISIONING_PROFILE UUID not found in pbxproj"; exit 1; }
 
-      - name: Exportar el .ipa
-        working-directory: ${{ env.IOS_DIR }}
-        env:
-          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      - name: Create ExportOptions.plist (App Store, manual)
         run: |
-          set -euo pipefail
-          # Se genera aquí y no se versiona: lleva el identificador de equipo.
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          mkdir -p "$(dirname "$EXPORT_PLIST")"
+          cat > "$EXPORT_PLIST" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
-          <dict>
+            <dict>
               <key>method</key>
               <string>app-store-connect</string>
-              <key>teamID</key>
-              <string>${TEAM_ID}</string>
               <key>signingStyle</key>
-              <string>automatic</string>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                <key>mx.nexara.mobile.NexaraApp</key>
+                <string>NEXARA App Store</string>
+              </dict>
+              <key>teamID</key>
+              <string>AHNW9K8745</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
               <key>uploadSymbols</key>
               <true/>
-              <key>destination</key>
-              <string>export</string>
-          </dict>
+            </dict>
           </plist>
           PLIST
+          cat "$EXPORT_PLIST"
 
+      - name: Apply version/build inputs to Info.plist (optional)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          PLIST_ABS="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist"
+          VERSION_INPUT="${{ inputs.version }}"
+          BUILD_INPUT="${{ inputs.build }}"
+          if [ -n "${VERSION_INPUT}" ]; then
+            /usr/libexec/PlistBuddy -c "Set CFBundleShortVersionString ${VERSION_INPUT}" "$PLIST_ABS" || \
+              /usr/libexec/PlistBuddy -c "Add CFBundleShortVersionString string ${VERSION_INPUT}" "$PLIST_ABS"
+          fi
+          if [ -n "${BUILD_INPUT}" ]; then
+            /usr/libexec/PlistBuddy -c "Set CFBundleVersion ${BUILD_INPUT}" "$PLIST_ABS" || \
+              /usr/libexec/PlistBuddy -c "Add CFBundleVersion string ${BUILD_INPUT}" "$PLIST_ABS"
+          fi
+          /usr/bin/plutil -lint "$PLIST_ABS" || exit 1
+          echo "CFBundleShortVersionString: $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$PLIST_ABS" || true)"
+          echo "CFBundleVersion: $(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$PLIST_ABS" || true)"
+
+      - name: Verify Info.plist config before archive
+        run: |
+          set -euo pipefail
+          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release | grep -E 'INFOPLIST_FILE|GENERATE_INFOPLIST_FILE|PRODUCT_BUNDLE_IDENTIFIER' || true
+          PLIST_REL="apps/mobile-native/ios/Resources/Info.plist"
+          PLIST_ABS="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist"
+          echo "Intended Info.plist (relative): $PLIST_REL"
+          echo "Intended Info.plist (absolute): $PLIST_ABS"
+          if [ ! -f "$PLIST_ABS" ]; then echo "ERROR: Intended Info.plist not found at $PLIST_ABS"; exit 1; fi
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$PLIST_ABS" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$PLIST_ABS" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$PLIST_ABS" || true
+          /usr/bin/plutil -lint "$PLIST_ABS" || true
+
+      - name: Archive (Release, iOS Device) — Manual signing from pbxproj
+        run: |
+          set -euo pipefail
+          DERIVED="$RUNNER_TEMP/DerivedData"
+          mkdir -p "$DERIVED"
+          set +e
+          ARCH_LOG="$RUNNER_TEMP/archive.log"
+          xcodebuild \
+            -project "$XCODE_PROJECT_PATH" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/codesign.keychain-db" \
+            -derivedDataPath "$DERIVED" \
+            -resultBundlePath "$RUNNER_TEMP/BuildResult" \
+            INFOPLIST_FILE="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist" \
+            GENERATE_INFOPLIST_FILE=NO \
+            archive -archivePath "$ARCHIVE_PATH" 2>&1 | tee "$ARCH_LOG"
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -ne 0 ]; then
+            echo "::group::Last 200 lines of latest xcactivitylog"
+            LATEST_LOG=$(ls -t "$DERIVED/Logs/Build"/*.xcactivitylog 2>/dev/null | head -n 1 || true)
+            if [ -n "$LATEST_LOG" ] && [ -f "$LATEST_LOG" ]; then
+              echo "Log file: $LATEST_LOG"
+              strings "$LATEST_LOG" | tail -n 200 || true
+            else
+              echo "No xcactivitylog found under $DERIVED/Logs/Build"
+            fi
+            echo "::endgroup::"
+            exit $STATUS
+          fi
+          echo "::group::Archive Info.plist diagnostics"
+          grep -E "ProcessInfoPlistFile|Info\\.plist|INFOPLIST" "$ARCH_LOG" || true
+          echo "::endgroup::"
+
+      - name: Patch embedded Info.plist (launch/orientations/icons)
+        run: |
+          set -euo pipefail
+          if [ ! -d "$ARCHIVE_PATH" ]; then
+            echo "ERROR: Archive directory missing at $ARCHIVE_PATH"; exit 1
+          fi
+          APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
+          fi
+          PLIST="$APP_DIR/Info.plist"
+          if [ ! -f "$PLIST" ]; then
+            echo "ERROR: Info.plist not found at $PLIST"; ls -R "$APP_DIR" || true; exit 1
+          fi
+          SRC_PLIST="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist"
+          echo "Patching $PLIST"
+          echo "::group::Before patch (plutil -p)"
+          /usr/bin/plutil -p "$PLIST" | head -n 100 || true
+          echo "::endgroup::"
+          # Ensure UILaunchScreen dict and safe area inset flag
+          /usr/libexec/PlistBuddy -c 'Print :UILaunchScreen' "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Add :UILaunchScreen dict' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Print :UILaunchScreen:UILaunchScreenRespectsSafeAreaInsets' "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Add :UILaunchScreen:UILaunchScreenRespectsSafeAreaInsets bool true' "$PLIST"
+          # iPhone orientations
+          /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations' "$PLIST" 2>/dev/null || {
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations array' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:1 string UIInterfaceOrientationLandscapeLeft' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:2 string UIInterfaceOrientationLandscapeRight' "$PLIST"
+          }
+          # iPad orientations (tilde key)
+          /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations~ipad' "$PLIST" 2>/dev/null || {
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad array' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:0 string UIInterfaceOrientationPortrait' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:1 string UIInterfaceOrientationPortraitUpsideDown' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:2 string UIInterfaceOrientationLandscapeLeft' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:3 string UIInterfaceOrientationLandscapeRight' "$PLIST"
+          }
+          # CFBundleIconName
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Add :CFBundleIconName string AppIcon' "$PLIST"
+          # Propagate privacy usage descriptions from source Info.plist
+          if [ -f "$SRC_PLIST" ]; then
+            echo "::group::Propagating privacy usage descriptions from source Info.plist"
+            KEYS=(
+              NSLocationWhenInUseUsageDescription
+              NSLocationAlwaysAndWhenInUseUsageDescription
+              NSCameraUsageDescription
+              NSPhotoLibraryUsageDescription
+              NSPhotoLibraryAddUsageDescription
+              NSMicrophoneUsageDescription
+              NSUserTrackingUsageDescription
+            )
+            for K in "${KEYS[@]}"; do
+              SRC_VAL="$(/usr/libexec/PlistBuddy -c "Print :$K" "$SRC_PLIST" 2>/dev/null || true)"
+              if [ -n "$SRC_VAL" ]; then
+                if ! /usr/libexec/PlistBuddy -c "Print :$K" "$PLIST" >/dev/null 2>&1; then
+                  /usr/libexec/PlistBuddy -c "Add :$K string $SRC_VAL" "$PLIST"
+                fi
+                echo "$K: $(/usr/libexec/PlistBuddy -c "Print :$K" "$PLIST" || true)"
+              fi
+            done
+            echo "::endgroup::"
+          else
+            echo "WARN: Source Info.plist not found at $SRC_PLIST; skipping usage descriptions propagation."
+          fi
+          # Bump CFBundleVersion to 2 if still 1 (avoid duplicate build number)
+          CUR_VER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$PLIST" 2>/dev/null || echo '')"
+          if [ "$CUR_VER" = "1" ]; then
+            /usr/libexec/PlistBuddy -c 'Set CFBundleVersion 2' "$PLIST"
+            echo "CFBundleVersion updated from 1 to 2 in embedded Info.plist"
+          fi
+          /usr/bin/plutil -lint "$PLIST" || { echo "ERROR: Patched Info.plist failed lint"; exit 1; }
+          echo "::group::After patch (plutil -p)"
+          /usr/bin/plutil -p "$PLIST" | head -n 100 || true
+          echo "::endgroup::"
+
+      - name: Neutralize Starscream resource bundles
+        run: |
+          set -euo pipefail
+          APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          echo "Scanning for Starscream bundles in: $APP_DIR"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
+          fi
+          echo "::group::All .bundle paths"
+          /usr/bin/find "$APP_DIR" -type d -name '*.bundle' -print || true
+          echo "::endgroup::"
+          removed=0
+          while IFS= read -r -d '' bundle; do
+            id=""
+            if [ -f "$bundle/Info.plist" ]; then
+              id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$bundle/Info.plist" 2>/dev/null || echo "")
+            fi
+            name="$(basename "$bundle")"
+            if echo "$name" | grep -qi 'Starscream' || echo "$id" | grep -qi '^starscream\\.' ; then
+              echo "Removing Starscream bundle: $bundle (CFBundleIdentifier='$id')"
+              rm -rf "$bundle"
+              removed=$((removed+1))
+            fi
+          done < <(/usr/bin/find "$APP_DIR" -type d -name '*.bundle' -print0)
+          echo "REMOVED_COUNT=$removed"
+      - name: Inspect built Info.plist in archive (launch/orientations)
+        run: |
+          set -euo pipefail
+          if [ ! -d "$ARCHIVE_PATH" ]; then
+            echo "ERROR: Archive directory missing at $ARCHIVE_PATH"; ls -l "$(dirname "$ARCHIVE_PATH")" || true; exit 1
+          fi
+          APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
+          fi
+          echo "::group::Assets.car AppIcon inspection"
+          if [ -f "$APP_DIR/Assets.car" ]; then
+            xcrun --sdk iphoneos assetutil --info "$APP_DIR/Assets.car" 2>/dev/null | grep -i -E 'AppIcon|icon|alpha' | head -n 200 || true
+          else
+            echo "No Assets.car found at $APP_DIR"
+          fi
+          echo "::endgroup::"
+          APP_INFO_PLIST="$APP_DIR/Info.plist"
+          if [ ! -f "$APP_INFO_PLIST" ]; then
+            echo "ERROR: Info.plist not found at $APP_INFO_PLIST"; ls -R "$APP_DIR" || true; exit 1
+          fi
+          echo "::group::Embedded Info.plist keys"
+          echo "Found .app: $APP_DIR"
+          /usr/libexec/PlistBuddy -c 'Print CFBundleIconName' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" || true
+          echo "::group::Embedded Info.plist (plutil -p)"
+          /usr/bin/plutil -p "$APP_INFO_PLIST" | head -n 200 || true
+          echo "::endgroup::"
+          echo "::group::Embedded Info.plist (filtered dump)"
+          if command -v rg >/dev/null 2>&1; then
+            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | rg -i 'orientation|launch|icon' || true
+          else
+            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | grep -iE 'orientation|launch|icon' || true
+          fi
+          echo "::endgroup::"
+          echo "::endgroup::"
+          if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
+          fi
+          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: UILaunchScreen missing in embedded Info.plist"; exit 1
+          fi
+
+      - name: Export signed IPA (App Store)
+        run: |
+          set -euo pipefail
+          mkdir -p "$EXPORT_DIR"
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/NexaraApp.xcarchive" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$EXPORT_PLIST" \
+            -exportPath "$EXPORT_DIR"
+          ls -lah "$EXPORT_DIR"
 
-          IPA="$(ls "$RUNNER_TEMP/export"/*.ipa | head -1)"
-          echo "IPA=$IPA" >> "$GITHUB_ENV"
-          ls -lh "$IPA"
-
-      # Validar antes de subir. Detecta casi todos los rechazos (icono con
-      # alfa, permisos sin descripción, entitlements que el perfil no cubre)
-      # sin consumir un número de construcción en App Store Connect.
-      - name: Validar contra App Store Connect
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      - name: Upload to TestFlight (Transporter API key)
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload }}
         run: |
-          xcrun altool --validate-app \
-            --type ios \
+          set -euo pipefail
+          IPA="$(ls -1 "$EXPORT_DIR"/*.ipa | head -n 1)"
+          if [ ! -f "$IPA" ]; then echo "IPA not found"; ls -R "$EXPORT_DIR"; exit 1; fi
+          echo "IPA found at: $IPA"
+          ls -lah "$IPA" || true
+          echo "Uploading to TestFlight via altool (API key)…"
+          LOG="$RUNNER_TEMP/altool-upload.log"
+          echo "altool path: $(xcrun -f altool || true)"
+          set +e
+          xcrun altool --upload-app --type ios \
             --file "$IPA" \
             --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID"
+            --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$LOG"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          # Fail on any ERROR or known failure lines regardless of exit code
+          if grep -qiE '^ERROR:|UPLOAD FAILED|Cannot determine the Apple ID' "$LOG"; then
+            echo "altool reported upload ERROR"; exit 1
+          fi
+          # Require definitive success marker
+          if ! grep -qiE 'UPLOAD SUCCEEDED|No errors uploading package|Delivery has finished|bytes uploaded' "$LOG"; then
+            echo "No definitive altool success marker detected — attempting Xcode-bundled iTMSTransporter fallback..."
+            FBLOG="$RUNNER_TEMP/transporter-fallback.log"
+            set +e
+            TX="$((dirname $(xcode-select -p)))/SharedFrameworks/ContentDeliveryServices.framework/Versions/A/usr/bin/iTMSTransporter"
+            if [ -x "$TX" ]; then
+              "$TX" -m upload -assetFile "$IPA" -apiKey "$ASC_KEY_ID" -apiIssuer "$ASC_ISSUER_ID" -v informational -t Upload 2>&1 | tee "$FBLOG"
+              FBSTATUS=${PIPESTATUS[0]}
+              set -e
+              if grep -qi '^ERROR:' "$FBLOG"; then
+                echo "Fallback iTMSTransporter reported ERROR"; exit 1
+              fi
+              if ! grep -qiE 'has been uploaded successfully|No errors uploading|Transporter transfer successful|Delivery UUID' "$FBLOG"; then
+                echo "No definitive Transporter success marker in fallback"; exit 1
+              fi
+              exit $FBSTATUS
+            else
+              echo "Fallback iTMSTransporter not found at $TX"; exit 1
+            fi
+          fi
+          exit $STATUS
 
-      - name: Subir a TestFlight
-        if: ${{ inputs.subir }}
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file "$IPA" \
-            --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID"
-          echo "Subido. El procesado en App Store Connect tarda de 5 a 30 min."
-
-      - name: Guardar el .ipa como artefacto
-        if: always() && env.IPA != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: NexaraApp-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
-          path: ${{ env.IPA }}
-          retention-days: 14
-
-      # El llavero vive en RUNNER_TEMP y se destruye con la máquina, pero
-      # borrarlo explícitamente evita que quede en un volcado si el trabajo se
-      # cancela a medias.
-      - name: Limpiar material de firma
-        if: always()
-        run: |
-          security delete-keychain "$LLAVERO" 2>/dev/null || true
-          rm -rf "$HOME/.appstoreconnect/private_keys" || true
