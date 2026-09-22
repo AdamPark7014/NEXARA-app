@@ -1,26 +1,26 @@
 # RELEVO
 
-- **Último turno:** cursor
-- **Fecha:** 2026-09-22
-- **Rama:** cursor/relocate-integra-shared-a46f
+- Último turno: cursor
+- Fecha: 2026-09-22
+- Rama: cursor/nexara-public-home-ux-7ae7
 
 ## Hecho
 
-### ERP-only en producción (web) y paridad móvil
-- Verificado móvil: Android e iOS ya son Core-only (ERP) para personal; iOS sin selector de paneles, igual que Android.
-- ERP web ya no depende de `components/crm`: Compras usa `components/erp/erp-chrome.module.css`.
-- `.dockerignore` ahora excluye:
-  - `apps/web/app/(panels)/{finance,hr,integra}/**`
-  - `apps/web/components/{studio,crm}/**`
-- Doc de despliegue: `deploy/SERVER-ERP-ONLY.md` (qué entra, qué se excluye, riesgos).
- - FIX urgente: se movieron los helpers compartidos de Integra fuera de `app/(panels)/integra/**`:
-   - Nuevos: `apps/web/lib/integra-shared/_lib.ts`, `apps/web/lib/integra-shared/_caps.ts`
-   - Nuevo comp: `apps/web/components/presence/_PersonFace.tsx`
-   - Importadores actualizados (`AppShell`, `presence/*`, `lib/presence-api.ts`).
-   - Build verificado: `npm run build --workspace=apps/web` OK.
+### Web pública NEXARA — ordenar home y navegación (sin vender paneles)
+- Navegación compacta (5 ítems): Soluciones, Servicios, Proyectos, Cobertura, Contacto. Inicio vive en el logo; Nosotros queda en footer.
+- Home enfocada en 4 capacidades (CCTV, Redes/Wi‑Fi, Infraestructura, Soporte). Se retira “Plataformas a medida” del bloque principal (queda sólo como oferta secundaria en footer).
+- Cookie banner menos intrusivo: copy breve; botón primario “Solo necesarias”; secundario “Aceptar todas”; tamaños reducidos.
+- Footer: acceso discreto a login mediante link “Acceso”.
+- Build y typecheck web verificados: `npm run typecheck:web` y `npm run build:web` OK.
+
+Rutas/archivos claves:
+- `apps/web/components/Header.tsx`
+- `apps/web/app/(public)/nexara/page.tsx`
+- `apps/web/components/CookieConsentBanner.tsx` y `.module.css`
+- `apps/web/app/components/Footer.tsx`
 
 ## A medias
-- Sin cambios pendientes de esta tarea.
+- Nada pendiente de esta intervención.
 
 ## No tocar
-Puente NAS · keystore Play · `NO TOCAR LIBREMENTE`.
+Puente NAS · keystore Play · credenciales. `NO TOCAR LIBREMENTE`.
