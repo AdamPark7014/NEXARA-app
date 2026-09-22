@@ -117,14 +117,15 @@ jobs:
 
       - name: Instalar Android SDK (manual)
         run: |
-          set -euo pipefail
+          set -euo errexit
           export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
           SDKM="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKM" ]; then
             echo "::error::No se encontró sdkmanager en $SDKM"
             exit 1
           fi
-          yes | "$SDKM" --licenses >/dev/null
+          # Aceptar licencias; ignorar SIGPIPE de `yes` cuando sdkmanager termina antes.
+          ( yes | "$SDKM" --licenses ) >/dev/null 2>&1 || true
           "$SDKM" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Assemble debug + unit tests
