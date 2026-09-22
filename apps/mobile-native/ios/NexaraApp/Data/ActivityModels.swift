@@ -111,6 +111,4 @@ enum ActivityParse {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+// String.nilIfEmpty is provided globally in Support/String+NilIfEmpty.swift

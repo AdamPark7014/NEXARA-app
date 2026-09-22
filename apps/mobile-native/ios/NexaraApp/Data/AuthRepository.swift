@@ -353,9 +353,7 @@ actor SessionRefresher {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+// String.nilIfEmpty is provided globally in Support/String+NilIfEmpty.swift
 
 private extension ISO8601DateFormatter {
     static let withFractional: ISO8601DateFormatter = {
