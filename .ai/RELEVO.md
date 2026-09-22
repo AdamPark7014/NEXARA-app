@@ -1,28 +1,28 @@
 # RELEVO
 
-- **Último turno:** cursor
-- **Fecha:** 2026-08-29
-- **Rama:** mejora/calidad-y-web
+- Último turno: cursor
+- Fecha: 2026-09-22
+- Rama: cursor/ios-erp-parity-push-3975
 
-## Hecho en este turno
+## Hecho en este turno (iOS parity con Android/web ERP)
+- ERP como UX primaria en iOS:
+  - `NexaraApp.swift`: al iniciar sesión navega directo a `portal(.erp)`; el back de notificaciones regresa a ERP.
+  - Eliminado botón "Paneles" del dashboard ERP y la opción "Cambiar panel" en «Más».
+- Sidebar/IA: iOS ya reflejaba el sidebar ERP como Android (reglas en `ConsoleAccessRules`), sin cambios funcionales.
+- Notificaciones push (paridad estilo WhatsApp donde APNs lo permite):
+  - Nuevo target `NexaraNotificationService` (Notification Service Extension) para enriquecer contenido (subtitle=sender, threadIdentifier, imagen adjunta).
+  - `PushManager`: registro de categorías `chat`, `tickets`, `alerts`.
+- Versionado iOS para TestFlight:
+  - `CURRENT_PROJECT_VERSION` → 2 (project.yml) y `CFBundleVersion` → 2 (Info.plist).
+- Verificación PR #5: `Info.plist` incluye descripciones de uso (ubicación, cámara, fotos, micrófono, tracking).
 
-### Fix crítico: build web roto (por eso prod seguía “ineficiente”)
-- `AppShell.module.scss` tenía CSS huérfano tras `.contentInnerFullBleed` → SassError → deploy `--force-all` fallaba; **nexara-web seguía con imagen vieja**.
-- SCSS reparado; redeploy pendiente en este cierre.
-
-### Integra full-bleed (código ya en main d274214 + fix)
-- Sin sidebar ERP, topbar fino, main full-bleed, rutas Ig*.
-
-## A medias
-- Confirmar deploy web OK en droplet tras este fix.
+## Pendiente / riesgos
+- Backend APNs: para que la extensión se active, el payload debe incluir `mutable-content: 1` y, si aplica, `category`/`chatId`/`image`. Revisar y ajustar envío si hiciera falta.
+- Captura de screenshots App Store: se documentan rutas ERP actuales en el PR (sin multipanel).
 
 ## No tocar
-- tickets layout, seed-demo-users, package-lock, xlsx
-- Oficinas ACS
+- Android: sin cambios.
+- Web ERP: sin cambios en IA/colores.
 
 ## Siguiente paso
-1. Verificar build web en `/tmp/integra-bleed2.log` sin SassError.
-2. Hard-refresh Integra.
-
-## Estado
-- Fix listo para cerrar + redeploy.
+1) Validar build XcodeGen con el nuevo target de extensión. 2) Probar push con `mutable-content:1` y `category=chat`. 3) Capturar screenshots definidos en el PR.

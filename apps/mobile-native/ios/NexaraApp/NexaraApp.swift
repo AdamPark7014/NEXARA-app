@@ -40,11 +40,8 @@ final class AppState: ObservableObject {
     @Published var route: Route
 
     init() {
-        if let single = PanelAccessResolver.singlePanelRoute(user: SessionStore.shared.currentUser) {
-            self.route = .portal(single)
-        } else {
-            self.route = SessionStore.shared.currentUser != nil ? .panels : .login
-        }
+        // Producto ERP-only: entrar directo a ERP si hay sesión
+        self.route = SessionStore.shared.currentUser != nil ? .portal(.erp) : .login
     }
 }
 
@@ -59,11 +56,8 @@ struct RootView: View {
                 switch app.route {
             case .login:
                 LoginView(onLoggedIn: {
-                    if let single = PanelAccessResolver.singlePanelRoute(user: session.currentUser) {
-                        app.route = .portal(single)
-                    } else {
-                        app.route = .panels
-                    }
+                    // ERP-only como UX primaria
+                    app.route = .portal(.erp)
                     applyDeepLinkAfterLogin(app: app)
                 })
             case .panels:
@@ -77,12 +71,14 @@ struct RootView: View {
                 )
             case .notifications:
                 NavigationStack {
-                    NotificationsCenterView(onBack: { app.route = .panels })
+                    // Volver a ERP (no hub multipanel)
+                    NotificationsCenterView(onBack: { app.route = .portal(.erp) })
                 }
             case .portal(let panel):
                 switch panel {
                 case .erp, .ops:
-                    ConsoleTabView(panel: panel, onExit: { app.route = .panels })
+                    // Sin opción de «Cambiar panel» — ERP como shell principal
+                    ConsoleTabView(panel: panel, onExit: { })
                 case .crm:
                     CrmTabView(onExit: { app.route = .panels })
                 case .portal:
