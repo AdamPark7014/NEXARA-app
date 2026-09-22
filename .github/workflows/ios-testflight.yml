@@ -512,19 +512,20 @@ jobs:
             #  - Well-known third-party prefixes: firebase, google, com.google, googleutilities, googledatatransport, promises
             #  - Only applies to .bundle directories (never touches frameworks)
             if \
-              echo "$name" | grep -qiE 'Starscream|Firebase|Google|GoogleUtilities|GoogleDataTransport|Promises|FBLPromises' || \
-              echo "$name" | grep -qi '\\.resources' || \
+              echo "$name" | grep -qiE 'Starscream|Firebase|Google|GoogleUtilities|GoogleDataTransport|Promises|FBLPromises|nanopb' || \
+              echo "$name" | grep -qiE '[.]resources' || \
               \
               # CFBundleIdentifier-based patterns
-              echo "$id"   | grep -qi '^starscream\\.' || \
-              echo "$id"   | grep -qi '\\.resources$' || \
+              echo "$id"   | grep -qiE '^starscream[.]' || \
+              echo "$id"   | grep -qiE '[.]resources$' || \
               echo "$id"   | grep -qi '^firebase' || \
               echo "$id"   | grep -qi '^firebase-ios-sdk' || \
-              echo "$id"   | grep -qi '^com\\.google\\.' || \
-              echo "$id"   | grep -qi '^google\\.' || \
+              echo "$id"   | grep -qiE '^com[.]google[.]' || \
+              echo "$id"   | grep -qiE '^google[.]' || \
               echo "$id"   | grep -qi 'googleutilities' || \
               echo "$id"   | grep -qi 'googledatatransport' || \
-              echo "$id"   | grep -qi 'promises' \
+              echo "$id"   | grep -qi 'promises' || \
+              echo "$id"   | grep -qi 'nanopb' \
             ; then
               echo "Removing third-party resource bundle: $bundle (name='$name', CFBundleIdentifier='$id')"
               rm -rf "$bundle"
