@@ -21,7 +21,7 @@ import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
 import { updateWholesaleTerms } from "@/lib/wholesale-api";
-import chrome from "@/components/crm/crm-chrome.module.css";
+import chrome from "@/components/erp/erp-chrome.module.css";
 
 type ProcTab = "orders" | "requisitions" | "receipts" | "rfq" | "mayoristas";
 

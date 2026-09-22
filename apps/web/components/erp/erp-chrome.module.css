@@ -1,3 +1,97 @@
+/* ERP shared chrome styles — extracted from CRM chrome to avoid cross-panel dependency */
+
+.folioLink {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.folioLink:hover {
+  text-decoration: underline;
+}
+
+.poDetail {
+  background: var(--surface);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--nx-panel-elev-1, 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.poDetailHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.poDetailTitle {
+  margin: 0;
+  font-weight: 750;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.poMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.poMetaItem {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--nx-panel-hairline-soft, var(--border));
+}
+
+.poMetaLabel {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+.poMetaValue {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+.poTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.poTable th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.poTable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--nx-panel-hairline-soft, var(--border));
+}
+
+.poTable tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 35%, transparent);
+}
 /* ERP shared production chrome — denso, ops-first, sin marketing */
 
 .moduleGrid {
