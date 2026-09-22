@@ -13,6 +13,18 @@ export type PushPayload = {
   tag?: string;
   /** ID de fila Notification para dedupe / trazabilidad en cliente. */
   notificationId?: number;
+  /** Categoría lógica (chat, tickets, alerts, etc.) */
+  category?: string;
+  /** Identificador de hilo/conversación (chatId / channelId) para agrupar notificaciones. */
+  chatId?: string | number;
+  /** Nombre del remitente (p. ej. autor del mensaje de chat). */
+  senderName?: string;
+  /** Título de la conversación (p. ej. nombre del canal o del contacto). */
+  conversationTitle?: string;
+  /** Tipo de entidad relacionada (p. ej. chat_message, activity, etc.). */
+  entityType?: string;
+  /** ID de entidad relacionada (p. ej. messageId). */
+  relatedEntityId?: number;
 };
 
 @Injectable()
@@ -63,6 +75,12 @@ export class PushDispatchService {
     const priority = payload.priority || 'normal';
     const tag = payload.tag || (payload.notificationId ? `nexara-${payload.notificationId}` : `nexara-${userId}-${Date.now()}`);
     const nid = payload.notificationId != null ? String(payload.notificationId) : '';
+    const category = (payload.category || '').trim().toLowerCase();
+    const chatId = payload.chatId != null ? String(payload.chatId) : extractChatIdFromUrl(payload.relatedUrl);
+    const sender = payload.senderName || '';
+    const convTitle = payload.conversationTitle || '';
+    const entityType = payload.entityType || '';
+    const relatedEntityId = payload.relatedEntityId != null ? String(payload.relatedEntityId) : '';
 
     const data: Record<string, string> = {
       title: payload.title,
@@ -71,6 +89,12 @@ export class PushDispatchService {
       priority,
       tag,
       nexara_notification_id: nid,
+      ...(category ? { category } : {}),
+      ...(chatId ? { chatId } : {}),
+      ...(sender ? { sender: sender } : {}),
+      ...(convTitle ? { conversationTitle: convTitle } : {}),
+      ...(entityType ? { entityType } : {}),
+      ...(relatedEntityId ? { relatedEntityId } : {}),
     };
 
     const fcmOk = this.tryInitFirebase();
@@ -89,6 +113,12 @@ export class PushDispatchService {
               priority,
               tag,
               nexara_notification_id: nid,
+              ...(category ? { category } : {}),
+              ...(chatId ? { chatId } : {}),
+              ...(sender ? { sender: sender } : {}),
+              ...(convTitle ? { conversationTitle: convTitle } : {}),
+              ...(entityType ? { entityType } : {}),
+              ...(relatedEntityId ? { relatedEntityId } : {}),
             },
             android: {
               priority: priority === 'high' ? 'high' : 'normal',
@@ -98,6 +128,9 @@ export class PushDispatchService {
                 aps: {
                   sound: 'default',
                   ...(priority === 'high' ? { contentAvailable: true } : {}),
+                  // iOS: activar NSE para estilo conversación cuando aplique
+                  ...(category === 'chat' || chatId ? { 'mutable-content': 1 as any } : {}),
+                  ...(category ? { category } : {}),
                 },
               },
             },
@@ -122,6 +155,20 @@ export class PushDispatchService {
           this.logger.warn(`Web push fallo: ${e instanceof Error ? e.message : e}`);
         }
       }
+    }
+  }
+
+  /**
+   * Extrae chatId del relatedUrl si viene en query (?channel=123 o ?chatId=123)
+   */
+  private extractChatIdFromUrl(url?: string | null): string | undefined {
+    if (!url) return undefined;
+    try {
+      const u = new URL(url, 'https://dummy.local');
+      const c = u.searchParams.get('channel') || u.searchParams.get('chatId') || u.searchParams.get('channelId');
+      return c ?? undefined;
+    } catch {
+      return undefined;
     }
   }
 }

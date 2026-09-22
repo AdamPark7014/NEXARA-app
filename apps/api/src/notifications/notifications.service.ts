@@ -288,6 +288,10 @@ export class NotificationsService {
           priority: payload.priority || 'normal',
           notificationId: notification.id,
           tag: `nexara-${notification.id}`,
+          category: String(payload.category || notification.category || '').toLowerCase(),
+          entityType: String(payload.entityType || notification.entityType || ''),
+          relatedEntityId: notification.relatedEntityId ?? undefined,
+          senderName: notification.triggerUser?.nombre || undefined,
         })
         .catch((err) => this.logger.warn(`Push dispatch: ${err instanceof Error ? err.message : err}`));
 
