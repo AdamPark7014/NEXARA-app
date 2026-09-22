@@ -1127,7 +1127,7 @@ struct ChatView: View {
         guard parentId > 0, let channelId = selectedChannelId else { return }
         threadLoading = true
         do {
-            let page = try await ChatRepository.shared.listMessages(channelId: channelId, parentId: parentId, limit: 100)
+            let page = try await ChatRepository.shared.listMessages(channelId: channelId, limit: 100, parentId: parentId)
             threadReplies = page.messages
         } catch {
             self.error = error.toUserMessage()
@@ -1539,9 +1539,7 @@ private enum ChatMessageFormat {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+// String.nilIfEmpty is provided globally in Support/String+NilIfEmpty.swift
 
 /// Ítem del sheet "quién reaccionó" (`.sheet(item:)` exige `Identifiable`).
 private struct ChatReactorsSheetItem: Identifiable {
