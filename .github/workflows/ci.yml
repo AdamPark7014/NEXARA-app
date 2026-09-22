@@ -54,6 +54,8 @@ jobs:
       # sobrescribirlo desde fuera hace que ts-jest busque `apps/tsconfig.json`
       # —que no existe— y la suite entera falle al arrancar.
       - name: Tests · API
+        env:
+          TZ: America/Mexico_City
         run: npx jest --config apps/api/jest.config.js --runInBand --ci
 
       # La web pasó mucho tiempo con `tsc --noEmit` como única red: los tipos
@@ -113,14 +115,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          # Evita instalar el paquete obsoleto "tools" que ya no existe en ubuntu-latest.
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
+      - name: Instalar Android SDK (manual)
+        run: |
+          set -euo pipefail
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          SDKM="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then
+            echo "::error::No se encontró sdkmanager en $SDKM"
+            exit 1
+          fi
+          yes | "$SDKM" --licenses >/dev/null
+          "$SDKM" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Assemble debug + unit tests
         working-directory: apps/mobile-native/android
