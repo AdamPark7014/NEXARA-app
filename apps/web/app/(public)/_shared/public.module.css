@@ -177,7 +177,8 @@
   gap: 10px;
   padding: clamp(22px, 2.8vw, 28px) clamp(16px, 2vw, 24px);
   border: 1px solid var(--ds-line);
-  border-radius: var(--ds-radius-lg);
+  border-radius: 16px;
+  overflow: hidden;
   background: var(--ds-panel);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
   height: 100%;
@@ -230,7 +231,8 @@
   gap: clamp(14px, 2.5vw, 22px);
   align-items: center;
   padding: clamp(18px, 2.2vw, 22px) clamp(16px, 2vw, 20px);
-  border-radius: var(--ds-radius-lg);
+  border-radius: 16px;
+  overflow: hidden;
   border: 1px solid var(--ds-line);
   background: var(--ds-panel);
   text-decoration: none;
@@ -365,7 +367,8 @@
   color: inherit;
   min-height: 160px;
   border: 1px solid var(--ds-line);
-  border-radius: var(--ds-radius-lg);
+  border-radius: 16px;
+  overflow: hidden;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
   transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }

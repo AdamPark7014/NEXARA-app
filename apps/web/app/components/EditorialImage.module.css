@@ -13,7 +13,7 @@
  */
 
 .figure {
-  --ei-radius: 18px;
+  --ei-radius: 16px;
   --ei-bg: #050a14;
   --ei-ink: #eef4ff;
   --ei-muted: #9bb0cc;
@@ -265,7 +265,7 @@
 }
 
 .framedWide:not(.composeSplit) .frame {
-  --ei-radius: 20px;
+  --ei-radius: 16px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 18px 48px rgba(0, 0, 0, 0.28);
@@ -281,7 +281,7 @@
 }
 
 .framedWide.composeSplit .frame {
-  --ei-radius: 18px;
+  --ei-radius: 16px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 16px 40px rgba(0, 0, 0, 0.26);
@@ -297,7 +297,7 @@
 }
 
 .framedSquare .frame {
-  --ei-radius: 22px;
+  --ei-radius: 16px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 16px 40px rgba(0, 0, 0, 0.26);
@@ -314,7 +314,7 @@
 }
 
 .portraitFeatured.composeSplit .frame {
-  --ei-radius: 20px;
+  --ei-radius: 16px;
   max-width: min(100%, calc(var(--ei-maxh) * var(--ei-ar)));
   margin-inline: auto;
   box-shadow:
@@ -350,7 +350,7 @@
 }
 
 .portraitFeatured .frame {
-  --ei-radius: 24px;
+  --ei-radius: 16px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 20px 50px rgba(0, 0, 0, 0.3);
@@ -393,7 +393,7 @@
 }
 
 .insetOffset .frame {
-  --ei-radius: 20px;
+  --ei-radius: 16px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 18px 44px rgba(0, 0, 0, 0.26);
