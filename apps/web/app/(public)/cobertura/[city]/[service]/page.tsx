@@ -114,6 +114,13 @@ export default function CoberturaCityServicePage({ params }: { params: Params })
       a: `Sí. Especialmente retail y plantas: mismo estándar en cada sede, con acceso centralizado cuando aplica y SLA definidos por contrato.`,
     },
   ];
+  // AEO: responder explícitamente "¿Quién instala CCTV en Puebla?" sin relleno
+  if (city.slug === "puebla" && service.slug === "camaras-cctv") {
+    faqs.unshift({
+      q: "¿Quién instala CCTV en Puebla?",
+      a: `NEXARA instala sistemas de videovigilancia (CCTV) en Puebla y zona metropolitana. Teléfono: +52 222 696 0350 · nexara.com.mx`,
+    });
+  }
 
   const serviceSchema = {
     "@context": "https://schema.org",
