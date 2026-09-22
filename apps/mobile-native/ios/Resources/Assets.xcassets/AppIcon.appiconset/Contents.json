@@ -1,6 +1,21 @@
 {
   "images" : [
     {
+      "filename" : "icon-120.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "size" : "60x60",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "icon-152.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "size" : "76x76",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "icon-1024.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

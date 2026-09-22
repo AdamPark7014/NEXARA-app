@@ -35,10 +35,43 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Select Xcode 16.2
+      - name: Select latest available Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.2'
+          xcode-version: 'latest'
+
+      - name: Ensure iOS 26 SDK (switch if multiple Xcodes available)
+        run: |
+          set -euo pipefail
+          echo "Initial Xcode: $(xcode-select -p)"
+          echo "::group::Installed Xcodes"
+          ls -1 /Applications | sed -n 's/^/ - /p' || true
+          echo "::endgroup::"
+          # Try to find an installed Xcode that reports iPhoneOS SDK >= 26
+          bestPath=""
+          bestVer=""
+          for X in /Applications/Xcode*.app; do
+            if [ -d "$X/Contents/Developer" ]; then
+              sudo xcode-select -s "$X/Contents/Developer" || true
+              SDK_VER="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || true)"
+              if [ -n "$SDK_VER" ]; then
+                echo "Xcode at $X has iPhoneOS SDK $SDK_VER"
+                if [ -z "$bestVer" ] || [ "$(printf '%s\n' "$bestVer" "$SDK_VER" | sort -V | tail -n1)" = "$SDK_VER" ]; then
+                  bestVer="$SDK_VER"
+                  bestPath="$X/Contents/Developer"
+                fi
+              fi
+            fi
+          done
+          if [ -n "$bestPath" ]; then
+            echo "Selecting Xcode with highest iPhoneOS SDK ($bestVer): $bestPath"
+            sudo xcode-select -s "$bestPath"
+          fi
+          SEL_VER="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || true)"
+          echo "Selected iPhoneOS SDK version: ${SEL_VER:-<unknown>}"
+          if [ -z "$SEL_VER" ] || [ "$(printf '%s\n' "26.0" "${SEL_VER}" | sort -V | tail -n1)" != "${SEL_VER}" ]; then
+            echo "WARNING: Could not confirm iOS 26 SDK. Proceeding, but App Store validation may fail if SDK < 26."
+          fi
 
       - name: Initialize Xcode platforms (ensure iOS device SDK is available)
         run: |
@@ -68,6 +101,23 @@ jobs:
           sw_vers
           xcodebuild -version
           which xcodebuild
+
+      - name: Ensure required AppIcon sizes (120, 152, 1024)
+        run: |
+          set -euo pipefail
+          ICONSET="${GITHUB_WORKSPACE}/apps/mobile-native/ios/Resources/Assets.xcassets/AppIcon.appiconset"
+          mkdir -p "$ICONSET"
+          SRC_1024="$ICONSET/icon-1024.png"
+          if [ ! -f "$SRC_1024" ]; then
+            echo "icon-1024.png not found; fetching brand mark and generating..."
+            TMP_SRC="$RUNNER_TEMP/brand-src.png"
+            curl -fsSL "https://nexara.com.mx/brand/nexara-mark-v4-512.png" -o "$TMP_SRC"
+            sips -s format png -z 1024 1024 "$TMP_SRC" --out "$SRC_1024" >/dev/null
+          fi
+          sips -s format png -z 120 120 "$SRC_1024" --out "$ICONSET/icon-120.png" >/dev/null
+          sips -s format png -z 152 152 "$SRC_1024" --out "$ICONSET/icon-152.png" >/dev/null
+          echo "AppIcon contents:"
+          ls -lah "$ICONSET" || true
 
       - name: Install XcodeGen
         run: |
