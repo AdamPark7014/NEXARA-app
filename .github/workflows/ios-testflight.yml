@@ -145,6 +145,16 @@ jobs:
           echo "Using XcodeGen spec: ${SPEC_FILE}"
           xcodegen generate --spec "${SPEC_FILE}"
           test -d NexaraApp.xcodeproj
+      - name: Verify pbxproj uses explicit Info.plist
+        run: |
+          set -euo pipefail
+          PBX="apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj"
+          if ! grep -qE 'INFOPLIST_FILE *= *Resources/Info.plist' "$PBX"; then
+            echo "ERROR: INFOPLIST_FILE not set to Resources/Info.plist in pbxproj"; exit 1
+          fi
+          if ! grep -qE 'GENERATE_INFOPLIST_FILE *= *NO' "$PBX"; then
+            echo "ERROR: GENERATE_INFOPLIST_FILE is not NO in pbxproj"; exit 1
+          fi
       - name: Verify iOS device destination is available (post-project)
         run: |
           set -euo pipefail
@@ -305,6 +315,20 @@ jobs:
           PLIST
           cat "$EXPORT_PLIST"
 
+      - name: Verify Info.plist config before archive
+        run: |
+          set -euo pipefail
+          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release | grep -E 'INFOPLIST_FILE|GENERATE_INFOPLIST_FILE|PRODUCT_BUNDLE_IDENTIFIER' || true
+          PLIST_REL="apps/mobile-native/ios/Resources/Info.plist"
+          PLIST_ABS="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist"
+          echo "Intended Info.plist (relative): $PLIST_REL"
+          echo "Intended Info.plist (absolute): $PLIST_ABS"
+          if [ ! -f "$PLIST_ABS" ]; then echo "ERROR: Intended Info.plist not found at $PLIST_ABS"; exit 1; fi
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$PLIST_ABS" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$PLIST_ABS" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$PLIST_ABS" || true
+          /usr/bin/plutil -lint "$PLIST_ABS" || true
+
       - name: Archive (Release, iOS Device) — Manual signing from pbxproj
         run: |
           set -euo pipefail
@@ -319,6 +343,8 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/codesign.keychain-db" \
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$RUNNER_TEMP/BuildResult" \
+            INFOPLIST_FILE="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist" \
+            GENERATE_INFOPLIST_FILE=NO \
             archive -archivePath "$ARCHIVE_PATH"
           STATUS=$?
           if [ $STATUS -ne 0 ]; then
@@ -349,11 +375,15 @@ jobs:
             echo "ERROR: Info.plist not found at $APP_INFO_PLIST"; ls -R "$APP_DIR" || true; exit 1
           fi
           echo "::group::Embedded Info.plist keys"
+          echo "Found .app: $APP_DIR"
           /usr/libexec/PlistBuddy -c 'Print CFBundleIconName' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" || true
+          echo "::group::Embedded Info.plist (plutil -p)"
+          /usr/bin/plutil -p "$APP_INFO_PLIST" | head -n 200 || true
+          echo "::endgroup::"
           echo "::group::Embedded Info.plist (filtered dump)"
           if command -v rg >/dev/null 2>&1; then
             /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | rg -i 'orientation|launch|icon' || true
