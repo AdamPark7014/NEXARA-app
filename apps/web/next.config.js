@@ -216,7 +216,9 @@ const nextConfig = {
       "media-src 'self' blob: https: http://localhost:* http://127.0.0.1:* http://*.localhost:*",
       "object-src 'none'",
       "base-uri 'self'",
-      "frame-ancestors 'none'",
+      isDev
+        ? "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com http://localhost:* http://*.localhost:*"
+        : "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com",
       "form-action 'self'",
       'upgrade-insecure-requests',
     ].join('; ');
@@ -234,7 +236,6 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-DNS-Prefetch-Control', value: 'off' },

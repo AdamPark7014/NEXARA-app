@@ -162,14 +162,15 @@ const buildCsp = () => {
       : "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
-    "frame-ancestors 'none'",
+    isDev
+      ? "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com http://localhost:* http://*.localhost:*"
+      : "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com",
     "form-action 'self'",
     'upgrade-insecure-requests',
   ].join('; ');
 };
 
 const applySecurityHeaders = (response: NextResponse) => {
-  response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
