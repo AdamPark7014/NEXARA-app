@@ -54,6 +54,10 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
     robots: { index: true, follow: true },
     title: { absolute: title },
     description,
+    robots:
+      industry.slug === "hospitalidad" && service.slug === "redes-y-conectividad"
+        ? { index: false, follow: true }
+        : undefined,
     keywords: [
       ...pageKeywords,
       `${service.name} para ${industry.name}`,
@@ -149,8 +153,8 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
       telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
       address: {
         "@type": "PostalAddress",
-        streetAddress: "Explanada Puebla, Santiago Momoxpan",
-        addressLocality: "Puebla",
+        streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+        addressLocality: "San Pedro Cholula",
         addressRegion: "Puebla",
         addressCountry: "MX",
       },
