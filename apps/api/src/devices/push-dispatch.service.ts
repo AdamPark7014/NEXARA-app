@@ -163,11 +163,15 @@ export class PushDispatchService {
             apns: {
               headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
               payload: {
+                // iOS Notification Service Extension requiere `mutable-content: 1` para ejecutar
+                // y poder fijar `threadIdentifier`, categoría e imagen desde los campos `data`.
                 aps: {
                   alert: { title: payload.title, body: payload.body },
                   sound: 'default',
-                  threadId,
-                },
+                  'mutable-content': 1 as unknown as any,
+                } as unknown as admin.messaging.ApnsAps,
+                // Los campos de navegación/conversación viajan en `data` para que la extensión los lea.
+                data,
               },
             },
           });
