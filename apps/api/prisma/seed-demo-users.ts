@@ -17,6 +17,22 @@ const prisma = new PrismaClient();
 const PLACEHOLDER_PASSWORD_HASH =
   '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p6ez6kxOEfRkNpDlHlOYIi';
 
+/**
+ * Obtiene la contraseña desde variables de entorno, evitando literales en el repo.
+ * Nombre: SEED_PASSWORD_<EMAIL_SLUG>, p. ej. SEED_PASSWORD_GERENCIA_NEXARA_COM_MX
+ * Si falta, devuelve 'x' (login inservible en la práctica) y avisa por consola.
+ */
+function seedPassword(email: string): string {
+  const varName =
+    'SEED_PASSWORD_' + email.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+  const value = process.env[varName]?.trim();
+  if (!value) {
+    console.warn(`   ⚠️  Falta ${varName} para ${email} — usando marcador local 'x'`);
+    return 'x';
+  }
+  return value;
+}
+
 type DemoUser = {
   nombre: string;
   email: string;
@@ -40,7 +56,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-010',
     puesto: 'Tester de plataforma',
-    password: 'Nexara!NX010',
+    password: seedPassword('claudia.bernal@nexara.com.mx'),
   },
   {
     nombre: 'Christian Eduardo Del Pozo Sánchez',
@@ -49,7 +65,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-001',
     puesto: 'Director General',
-    password: 'Nexara!NX001',
+    password: seedPassword('gerencia@nexara.com.mx'),
   },
   {
     nombre: 'Adam Del Pozo',
@@ -58,7 +74,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-002',
     puesto: 'Developer / Super Admin',
-    password: 'Nexara!NX002',
+    password: seedPassword('developer@nexara.com.mx'),
   },
   {
     nombre: 'Josué Teodulo Cervantes Arellano',
@@ -67,7 +83,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Arquitectura',
     employeeNumber: 'JT90072601',
     puesto: 'Encargado de Obra',
-    password: 'Nexara!NX003',
+    password: seedPassword('infraestructura@nexara.com.mx'),
   },
   {
     nombre: 'Paulina Tlapaltotoli Álvarez',
@@ -76,7 +92,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Administración',
     employeeNumber: 'PT81062607',
     puesto: 'Contador(a) General',
-    password: 'Fosati-Raruke-4213$',
+    password: seedPassword('finanzas@nexara.com.mx'),
   },
   {
     nombre: 'Daniela Galindo Almazán',
@@ -85,7 +101,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Área Creativa',
     employeeNumber: 'DG04082605',
     puesto: 'Diseñadora',
-    password: 'Nexara!NX201',
+    password: seedPassword('redes@nexara.com.mx'),
   },
   {
     nombre: 'Luis Joel Aguilar Castillo',
@@ -94,7 +110,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Operaciones',
     employeeNumber: 'LJ75100126',
     puesto: 'Encargado de servicios',
-    password: 'Nexara!NX301',
+    password: seedPassword('direccion.operaciones@nexara.com.mx'),
   },
   {
     nombre: 'David Morales Zenón',
@@ -103,7 +119,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Operaciones',
     employeeNumber: 'DM91030125',
     puesto: 'Encargado de instalación',
-    password: 'Nexara!NX302',
+    password: seedPassword('operaciones@nexara.com.mx'),
   },
   {
     nombre: 'Iván Camargo Cañete',
@@ -112,7 +128,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'IC91052710',
     puesto: 'Técnico Instalador',
-    password: 'Nexara!NX402',
+    password: seedPassword('administracion.ventas@nexara.com.mx'),
   },
   {
     nombre: 'Joan Sebastián Sánchez Espinoza',
@@ -121,7 +137,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'JS03052901',
     puesto: 'Técnico Instalador',
-    password: 'Nexara!NX404',
+    password: seedPassword('joan.sanchez@nexara.com.mx'),
   },
   {
     nombre: 'Carolina Juárez Álvarez',
@@ -130,7 +146,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'CJ26210822',
     puesto: 'Ingeniero de Campo / Técnico de Campo',
-    password: 'Nexara!NX405',
+    password: seedPassword('soporte@nexara.com.mx'),
   },
   {
     nombre: 'Alejandro González Bustamante',
@@ -139,7 +155,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'AG78051905',
     puesto: 'Ingeniero de Campo / Técnico de Campo',
-    password: 'Nexara!NX407',
+    password: seedPassword('alejandro.gonzalez@nexara.com.mx'),
   },
   {
     nombre: 'Israel Ramos Lima',
@@ -148,7 +164,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'IR93050000',
     puesto: 'Técnico Instalador',
-    password: 'Nexara!NX408',
+    password: seedPassword('israel.ramos@nexara.com.mx'),
   },
   {
     nombre: 'José Antonio Ramírez Salazar',
@@ -157,7 +173,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'JA91091706',
     puesto: 'Encargado de soporte',
-    password: 'Nokede-Gasulo-1678!',
+    password: seedPassword('jose.ramirez@nexara.com.mx'),
   },
   {
     nombre: 'Juan José González Rojas',
@@ -166,7 +182,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'JJ00092606',
     puesto: 'Técnico Instalador',
-    password: 'Fogoca-Rezole-7140%',
+    password: seedPassword('juan.gonzalez@nexara.com.mx'),
   },
   {
     nombre: 'Roberto Paul Vivanco López',
@@ -175,7 +191,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'RP95042606',
     puesto: 'Ingeniero de Campo / Técnico de Campo',
-    password: 'Salave-Gisotu-6905!',
+    password: seedPassword('roberto.vivanco@nexara.com.mx'),
   },
 ];
 
