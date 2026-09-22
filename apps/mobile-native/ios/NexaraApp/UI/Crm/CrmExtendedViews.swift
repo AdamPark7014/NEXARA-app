@@ -1150,4 +1150,11 @@ struct CrmClientDetailView: View {
     }
 }
 
+extension [String: Any] {
+    var crmKey: String {
+        if let n = self["id"] as? Int { return "crm-\(n)" }
+        if let s = self["id"] as? String { return "crm-\(s)" }
+        return UUID().uuidString
+    }
+}
 // Use global String.ifEmpty from ConsoleHelpers

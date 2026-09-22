@@ -647,9 +647,7 @@ private func whIsLow(_ m: [String: Any]) -> Bool {
     return reorder > 0 && qty <= reorder
 }
 
-private extension String {
-    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
-}
+// Uses global String.ifEmpty from ConsoleHelpers.swift
 
 private extension Dictionary where Key == String, Value == Any {
     var whKey: String {

@@ -607,9 +607,7 @@ private func dashViaticColor(_ s: String) -> Color {
     return Color.secondary
 }
 
-extension String {
-    fileprivate func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
-}
+// Uses global String.ifEmpty from ConsoleHelpers.swift
 
 extension [String: Any] {
     fileprivate var dashId: String {
