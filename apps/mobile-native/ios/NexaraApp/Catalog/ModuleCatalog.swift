@@ -159,19 +159,21 @@ enum ModuleCatalog {
     ]
 
     static func modules(for panel: PanelId) -> [ModuleEntry] {
-        let base: [ModuleEntry] = switch panel {
+        switch panel {
         case .erp, .ops:
-            let keys = ModulePanelMap.consoleKeys(for: panel)
-            if let keys {
-                console.filter { keys.contains($0.key) }
+            if let keys = ModulePanelMap.consoleKeys(for: panel) {
+                return console.filter { keys.contains($0.key) }
             } else {
-                console
+                return console
             }
-        case .crm: return ventas
-        case .studio: return studio
-        case .portal: return tickets
-        case .lab: return lab
+        case .crm:
+            return ventas
+        case .studio:
+            return studio
+        case .portal:
+            return tickets
+        case .lab:
+            return lab
         }
-        return base
     }
 }

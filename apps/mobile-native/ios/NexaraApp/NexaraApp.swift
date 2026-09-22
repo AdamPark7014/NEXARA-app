@@ -73,7 +73,7 @@ struct RootView: View {
                     onLogout: {
                         session.clear()
                         app.route = .login
-                    },
+                    }
                 )
             case .notifications:
                 NavigationStack {

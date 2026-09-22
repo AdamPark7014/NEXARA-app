@@ -22,7 +22,7 @@ final class GpsMapVM: ObservableObject {
                     latitude: lat,
                     longitude: lng,
                     title: name.ifBlankGps(nil),
-                    subtitle: gpsStr(loc, "capturedAt", "createdAt").prefix(10).map(String.init)
+                    subtitle: String(gpsStr(loc, "capturedAt", "createdAt").prefix(10))
                 )
             }
             isLoading = false

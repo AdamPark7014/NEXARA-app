@@ -225,7 +225,6 @@ struct PortalBranchEditView: View {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
     func ifBlank(_ fallback: () -> String) -> String { isEmpty ? fallback() : self }
 }
 
