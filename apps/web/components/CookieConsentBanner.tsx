@@ -65,8 +65,7 @@ export default function CookieConsentBanner() {
         Cookies y privacidad
       </h2>
       <p id="nexara-cookie-consent-desc" className={styles.text}>
-        Usamos cookies necesarias para el sitio y, solo con tu permiso, cookies de analítica
-        para mejorar NEXARA. Consulta el{" "}
+        Solo usamos cookies necesarias. Con tu permiso activamos analítica para mejorar el sitio. Consulta el{" "}
         <Link href="/legal/privacidad">Aviso de Privacidad</Link> y la{" "}
         <Link href="/legal/cookies">Política de Cookies</Link>.
       </p>
@@ -76,16 +75,16 @@ export default function CookieConsentBanner() {
           <button
             type="button"
             className={styles.btnPrimary}
-            onClick={() => persist(acceptAllConsent())}
+            onClick={() => persist(necessaryOnlyConsent())}
           >
-            Aceptar todas
+            Solo necesarias
           </button>
           <button
             type="button"
             className={styles.btnSecondary}
-            onClick={() => persist(necessaryOnlyConsent())}
+            onClick={() => persist(acceptAllConsent())}
           >
-            Solo necesarias
+            Aceptar todas
           </button>
           <button
             type="button"

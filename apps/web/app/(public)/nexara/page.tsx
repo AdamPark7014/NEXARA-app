@@ -51,11 +51,6 @@ const CAPABILITIES = [
     title: "Soporte y Gestión TI",
     text: "Servicio de soporte remoto y en sitio con tiempos de respuesta definidos, mantenimiento preventivo y correctivo, monitoreo y acompañamiento continuo para mantener la operación sin interrupciones.",
   },
-  {
-    id: "software",
-    title: "Desarrollo de Plataformas",
-    text: "Desarrollo de portales web, aplicaciones e integraciones adaptadas a los procesos de cada organización. Proyectos ejecutados por fases, con objetivos claros, entregables definidos y alcance controlado.",
-  },
 ];
 
 const METRICS = [

@@ -110,12 +110,11 @@ import { usePathname } from 'next/navigation';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const navLinks = [
-  { name: 'Inicio', href: '/' },
+  // Menú compacto (máx. 5): Inicio vive en el logo; "Nosotros" se alcanza por footer.
   { name: 'Soluciones', href: '/soluciones' },
   { name: 'Servicios', href: '/servicios' },
   { name: 'Proyectos', href: '/proyectos' },
   { name: 'Cobertura', href: '/cobertura' },
-  { name: 'Nosotros', href: '/nosotros' },
   { name: 'Contacto', href: '/contacto' },
 ];
 

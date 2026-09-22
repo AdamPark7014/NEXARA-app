@@ -162,6 +162,7 @@ export default function Footer() {
             © {new Date().getUTCFullYear()} NEXARA · NEW ENGINEERING EXPERTISE AND RESOURCE ADVANCEMENT S.A. DE C.V.
           </p>
           <nav className={styles.legalLinks} aria-label="Legal">
+            <Link href="/login">Acceso</Link>
             <Link href="/legal/privacidad">Privacidad</Link>
             <Link href="/legal/terminos">Términos</Link>
             <Link href="/legal/cookies">Cookies</Link>
