@@ -46,7 +46,7 @@ struct LocationPermissionBanner: View {
                 }
             }
         }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase) { phase in
             if phase == .active { refresh() }
         }
     }

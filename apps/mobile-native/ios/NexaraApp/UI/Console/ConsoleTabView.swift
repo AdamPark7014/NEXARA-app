@@ -52,9 +52,9 @@ struct ConsoleTabView: View {
             syncSelectedTab()
             applyDeepLinkIfNeeded()
         }
-        .onChange(of: user?.id) { _, _ in syncSelectedTab() }
-        .onChange(of: bottomTabs.map(\.id)) { _, _ in syncSelectedTab() }
-        .onChange(of: deepLink.pending) { _, _ in applyDeepLinkIfNeeded() }
+        .onChange(of: user?.id) { _ in syncSelectedTab() }
+        .onChange(of: bottomTabs.map(\.id)) { _ in syncSelectedTab() }
+        .onChange(of: deepLink.pending) { _ in applyDeepLinkIfNeeded() }
     }
 
     @ViewBuilder

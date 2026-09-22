@@ -76,7 +76,7 @@ struct PortalNavView: View {
             }
         }
         .onAppear { consumePortalDeepLink() }
-        .onChange(of: deepLink.pending) { _, _ in consumePortalDeepLink() }
+        .onChange(of: deepLink.pending) { _ in consumePortalDeepLink() }
     }
 
     private func consumePortalDeepLink() {

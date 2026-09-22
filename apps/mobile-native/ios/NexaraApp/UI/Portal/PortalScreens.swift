@@ -90,7 +90,7 @@ struct PortalBranchesView: View {
             }
         }
         .navigationTitle("Sucursales")
-        .toolbar { ToolbarItem(placement: .primaryAction) { Button { onNew() } label: { Image(systemName: "plus") } } } }
+        .toolbar { ToolbarItem(placement: .primaryAction) { Button { onNew() } label: { Image(systemName: "plus") } } }
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -169,7 +169,7 @@ struct PortalBranchEditView: View {
         }
         .navigationTitle(branchId == nil ? "Nueva sucursal" : "Editar sucursal")
         .task { await load() }
-        .onChange(of: logoItem) { _, item in
+        .onChange(of: logoItem) { item in
             Task {
                 if let data = try? await item?.loadTransferable(type: Data.self) { logoData = data }
             }
@@ -594,23 +594,23 @@ struct PortalFeedbackView: View {
         FeedbackDraftBinding(
             rating: Binding(
                 get: { drafts[id]?.rating ?? "5" },
-                set: { updateDraft(id) { $0.rating = $1 } }
+                set: { newValue in updateDraft(id) { $0.rating = newValue } }
             ),
             wasOnTime: Binding(
                 get: { drafts[id]?.wasOnTime ?? "YES" },
-                set: { updateDraft(id) { $0.wasOnTime = $1 } }
+                set: { newValue in updateDraft(id) { $0.wasOnTime = newValue } }
             ),
             wasFriendly: Binding(
                 get: { drafts[id]?.wasFriendly ?? "YES" },
-                set: { updateDraft(id) { $0.wasFriendly = $1 } }
+                set: { newValue in updateDraft(id) { $0.wasFriendly = newValue } }
             ),
             wasSolved: Binding(
                 get: { drafts[id]?.wasSolved ?? "YES" },
-                set: { updateDraft(id) { $0.wasSolved = $1 } }
+                set: { newValue in updateDraft(id) { $0.wasSolved = newValue } }
             ),
             comments: Binding(
                 get: { drafts[id]?.comments ?? "" },
-                set: { updateDraft(id) { $0.comments = $1 } }
+                set: { newValue in updateDraft(id) { $0.comments = newValue } }
             )
         )
     }

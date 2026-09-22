@@ -79,9 +79,9 @@ struct WarehouseHubView: View {
 
             if tab == 1 && !stock.isEmpty {
                 HStack(spacing: 0) {
-                    whKpi("SKUs", "\(stock.count)", .primary)
+                    whKpi(label: "SKUs", value: "\(stock.count)", color: .primary)
                     Divider().frame(height: 32)
-                    whKpi("Bajo mínimo", "\(lowStock)", lowStock > 0 ? .red : .green)
+                    whKpi(label: "Bajo mínimo", value: "\(lowStock)", color: lowStock > 0 ? .red : .green)
                 }
                 .padding(.horizontal).padding(.bottom, 8)
             }
