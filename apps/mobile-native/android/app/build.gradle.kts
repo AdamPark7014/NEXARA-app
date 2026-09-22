@@ -231,11 +231,17 @@ gradle.taskGraph.whenReady {
     // Ejecuta el preflight SOLO cuando se han solicitado tareas de release.
     // Usar los nombres de tareas pedidas evita falsos positivos por tareas de
     // release presentes en el grafo pero no ejecutadas (Gradle 8/9 config avoidance).
-    val requested = gradle.startParameter.taskNames
+    val requestedRaw = gradle.startParameter.taskNames
+    val requested = requestedRaw.map { it.lowercase() }
     val buildsReleaseArtifact = requested.any { name ->
-        val n = name.lowercase()
-        n.contains("bundlerelease") || n.contains("assemblerelease") || n.contains("packagerelease")
+        name.contains("bundlerelease") || name.contains("assemblerelease") || name.contains("packagerelease")
+                || name.endsWith(":app:bundlerelease") || name.endsWith(":app:assemblerelease") || name.endsWith(":app:packagerelease")
     }
+    // Si solo se pidieron tareas de Debug/Tests, no se aplica el preflight.
+    val isDebugOnly = requested.isNotEmpty()
+            && requested.any { it.contains("assembledebug") || it == "test" || it.endsWith(":app:assembledebug") }
+            && !requested.any { it.contains("release") }
+    if (isDebugOnly) return@whenReady
     if (!buildsReleaseArtifact) return@whenReady
 
     val problems = mutableListOf<String>()
