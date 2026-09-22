@@ -31,6 +31,7 @@ class AuthRepository(
     suspend fun login(email: String, password: String): SessionUser {
         val headers = deviceIdentityProvider.headers().asHeaders()
         val trimmedEmail = email.trim()
+        val trimmedPassword = password.trim()
         // El primer intento (personal interno) es el que le importa a la
         // mayoría: si se pisa con el error del portal de clientes, un 404 de
         // «ese cliente no existe» se le enseña al empleado como «contraseña
@@ -41,7 +42,7 @@ class AuthRepository(
         try {
             val response = ApiClient.auth.login(
                 headers = headers,
-                body = LoginRequest(email = trimmedEmail, password = password),
+                body = LoginRequest(email = trimmedEmail, password = trimmedPassword),
             )
 
             val dto = response.user
@@ -77,7 +78,7 @@ class AuthRepository(
         try {
             val response = ApiClient.portalAuth.portalLogin(
                 headers = headers,
-                body = PortalLoginRequest(email = trimmedEmail, password = password),
+                body = PortalLoginRequest(email = trimmedEmail, password = trimmedPassword),
             )
             val user = when {
                 response.client != null -> {
@@ -128,7 +129,7 @@ class AuthRepository(
         try {
             val response = ApiClient.portalAuth.clientLogin(
                 headers = headers,
-                body = PortalLoginRequest(email = trimmedEmail, password = password),
+                body = PortalLoginRequest(email = trimmedEmail, password = trimmedPassword),
             )
 
             val user = SessionUser(
@@ -157,7 +158,7 @@ class AuthRepository(
         try {
             val response = ApiClient.portalAuth.branchLogin(
                 headers = headers,
-                body = PortalLoginRequest(email = trimmedEmail, password = password),
+                body = PortalLoginRequest(email = trimmedEmail, password = trimmedPassword),
             )
             val user = SessionUser(
                 id = response.branch.id,

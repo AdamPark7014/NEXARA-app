@@ -6,18 +6,18 @@
 
 ## Hecho
 
-### Deploy prod (Hetzner)
-- `011969f5` en servidor; `nexara-api` healthy + `nexara-web` up.
-- https://core.nexara.com.mx/erp/vehiculos y `/erp/finance/viatics` → 200.
-- Incluye: Agregar flotilla, Asignar viático (lote), FormField UX.
+### Login app «incorrectas» (emulador)
+- Causa: debug por defecto apunta a `http://10.0.2.2:3001/api` (API local apagada / otra firma).
+- Las claves `play.review@nexara.com.mx` / `NexaraPlayReview2026!` y `gerencia` / `Nexara!NX001` **sí** pasan en `api.nexara.com.mx`.
+- Reinstalado emulador con `-PSCREENSHOT_API=true` → BuildConfig = prod.
+- Trim de password en `AuthRepository.login` (espacios al pegar).
 
-### Fix build
-- Tipado `puedeGestionarInventarioVehiculos` (`permissions: null` → `undefined`).
+### Deploy prod web
+`011969f5` en Hetzner (flotilla, viáticos lote, FormField).
 
 ## A medias
-- Play Console (AAB/capturas).
-- Más FormField: OpsActivity, VehicleCheckout, proyectos/procurement.
-- Documentos nativos / tope cotizaciones / tools.manage.
+- Play Console AAB.
+- Más FormField / docs nativos.
 
 ## No tocar
 Puente NAS · keystore Play · `NO TOCAR LIBREMENTE`.
