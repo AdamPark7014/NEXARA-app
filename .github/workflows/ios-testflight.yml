@@ -3,6 +3,18 @@ name: iOS TestFlight (Free GHA)
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: "Marketing version (e.g., 1.0.0)"
+        required: false
+        default: ""
+      build:
+        description: "Build number (e.g., 3)"
+        required: false
+        default: ""
+      upload:
+        description: "Upload IPA to TestFlight (true/false)"
+        required: false
+        default: "true"
       releaseNotes:
         description: "TestFlight release notes (optional)"
         required: false
