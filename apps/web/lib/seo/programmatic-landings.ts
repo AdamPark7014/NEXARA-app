@@ -64,6 +64,16 @@ export const INDUSTRY_LANDINGS: IndustryLanding[] = [
     ],
   },
   {
+    slug: "hospitalidad",
+    name: "Hospitalidad",
+    painPoint: "Alta densidad de dispositivos y zonas públicas donde una mala red afecta la reputacion.",
+    outcomes: [
+      "Wi‑Fi de alta densidad por zonas",
+      "Cobertura CCTV en lobby, estacionamiento y BOH",
+      "Operacion y soporte unificados por propiedad",
+    ],
+  },
+  {
     slug: "salud",
     name: "Salud",
     painPoint: "Procesos criticos que exigen continuidad, seguridad y cumplimiento.",
