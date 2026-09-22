@@ -2,28 +2,29 @@
 
 - Último turno: cursor
 - Fecha: 2026-09-22
-- Rama: cursor/ios-erp-parity-push-3975
+- Rama: cursor/erp-ia-push-homologation-7670
 
-## Hecho en este turno (ERP-first + color web core + TestFlight plist)
-- Android ERP-first:
-  - `ui/NexaraApp.kt`: post-login siempre a `Routes.Erp`; `DeepLinkDestination.PanelHub` redirige a ERP.
-  - `ui/console/ConsoleNavHost.kt`: `onExitToPanels` ahora opcional; se oculta \"Salir a paneles\" (ERP como shell).
-  - Tema: tokens de marca a azul web `#2563EB` (`NxColors.Teal = #2563EB`, `TealSoft = #DBEAFE`); Material3 secundario/oscuro ajustados.
-- iOS marca/ERP:
-  - `Resources/Assets.xcassets/AccentColor`: `#2563EB`; `.tint(Color(\"AccentColor\"))` en `NexaraApp.swift`.
-  - Vistas ERP clave (Activities, Evidences, Attendance, GPS, Warehouse, ERP dashboard): `.teal` → `AccentColor`.
-  - iOS ya entra ERP-first (como en PR #6 previo).
-- TestFlight (PR #5 integrado aquí):
-  - Workflow patcha Info.plist embebido para copiar descripciones de privacidad desde `Resources/Info.plist`
-    (Location, Camera, PhotoLibrary, Microphone, Tracking) y asegura `CFBundleVersion=2` si venía `1`.
+## Hecho en este turno (IA ERP + push WhatsApp-like)
+- IA «Más» homologada a core (HOY / RECURSOS / MI CUENTA / FINANZAS)
+  - Android `ui/console/ConsoleAccessRules.kt`: `consoleSidebarGroups` ahora agrupa:
+    - HOY: Chat, Actividades, Asistencia, KPIs del equipo, Clientes, Cotizaciones, Proyectos
+    - RECURSOS: Almacén, Herramientas, Vehículos, Organigrama
+    - MI CUENTA: Mi perfil
+    - FINANZAS (rol alto): Contabilidad, Facturación, Bancos, Viáticos, Gastos, Pagos a empleados, Exportaciones
+  - iOS `Access/ConsoleAccessRules.swift`: mismo agrupamiento y orden.
+- Push estilo conversación (WhatsApp-like)
+  - Android: `push/NexaraNotifications.kt` añade canal `nexara_chat` y `MessagingStyle` con `Person`, agrupado por `chatId` (notificationId estable) y `CATEGORY_MESSAGE`. Auto-detección por `category=chat`/`entityType=chat*`/`chatId`.
+  - iOS: `NotificationService` ya mapea `subtitle=sender`, `threadIdentifier=chatId/category`; se mantiene y se asegura `category=chat` desde backend cuando aplica.
+  - Backend:
+    - `devices/push-dispatch.service.ts`: payload amplía `category`, `chatId`, `senderName`, `conversationTitle`, `entityType`, `relatedEntityId`; en APNs añade `aps['mutable-content']=1` y `category` cuando es chat; datos extra en `data` para FCM.
+    - `notifications/notifications.service.ts`: pasa `category`, `entityType`, `relatedEntityId`, `senderName` al dispatcher.
+- iOS build: `CFBundleVersion` y `CURRENT_PROJECT_VERSION` a `3`.
 
-## Pendiente / riesgos
-- Backend APNs: payload con `mutable-content: 1` y opcional `category`/`chatId`/`image` para estilo «chat».
-- Disparar TestFlight: requiere merge a `main` y tag `ios-testflight-*` (secrets en repo).
-- Capturas App Store: tomar desde ERP (sidebar IA par web; sin multipanel).
+## Pendiente / notas
+- SiriKit/INSendMessageIntent no integrado (opcional); la UI de conversación funciona con NSE + `threadIdentifier`.
+- La detección de hilo en backend extrae `chatId` de `relatedUrl` si no se pasa explícito.
 
-## No tocar
-- Web ERP: IA/colores son la referencia (core.nexara.com.mx).
-
-## Siguiente paso
-1) Merge PR #6 a `main` (PR #5 queda subsumido). 2) Ejecutar workflow TestFlight en `main`. 3) Verificar notificaciones iOS con payloads reales.
+## Verificación sugerida
+- Enviar notificación `category=chat` con `sender`, `body`, `chatId` y verificar:
+  - Android: burbuja de conversación, título de conversación y agrupación por hilo.
+  - iOS: banner con `subtitle=sender`, agrupación por `threadIdentifier`, apertura al chat.

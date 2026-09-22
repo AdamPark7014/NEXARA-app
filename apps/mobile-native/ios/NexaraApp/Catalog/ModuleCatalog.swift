@@ -57,6 +57,7 @@ enum ModuleCatalog {
         ModuleEntry("dispatch", "Despacho OT", "🗺️", "/ops/dispatch"),
         ModuleEntry("approvals", "Aprobaciones", "🛡️", "/erp/approvals"),
         ModuleEntry("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center"),
+        ModuleEntry("chat", "Chat", "💬", "/erp/chat"),
         ModuleEntry("bi", "Business Intelligence", "📈", "/erp/analytics/bi"),
         ModuleEntry("analytics", "Analítica", "📈", "/console/analytics"),
         ModuleEntry("audit", "Auditoría", "🔍", "/console/audit"),
