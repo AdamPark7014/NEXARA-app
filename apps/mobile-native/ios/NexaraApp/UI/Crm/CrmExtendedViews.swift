@@ -511,23 +511,7 @@ struct CrmSalesTeamView: View {
     }
 }
 
-private extension ConsoleHelpers {
-    static func mapStr(_ m: [String: Any], _ k1: String, _ k2: String = "", default def: String = "") -> String {
-        let a = mapStr(m, k1)
-        if !a.isEmpty { return a }
-        if !k2.isEmpty { let b = mapStr(m, k2); if !b.isEmpty { return b } }
-        return def
-    }
-
-    static func mapDouble(_ m: [String: Any], _ k1: String, _ k2: String = "") -> Double {
-        for k in [k1, k2] where !k.isEmpty {
-            if let n = m[k] as? Double { return n }
-            if let n = m[k] as? Int { return Double(n) }
-            if let s = m[k] as? String, let n = Double(s) { return n }
-        }
-        return 0
-    }
-}
+// Use ConsoleHelpers.mapStr/mapDouble from shared helpers
 
 private func fmtMxn(_ v: Double) -> String {
     if v >= 1_000_000 { return String(format: "$%.1fM", v / 1_000_000) }
@@ -649,11 +633,11 @@ private struct CrmClientDatosFormState {
         taxId = ConsoleHelpers.mapStr(client, "taxId", "rfc")
         billingEmail = ConsoleHelpers.mapStr(client, "billingEmail", "email")
         billingPhone = ConsoleHelpers.mapStr(client, "billingPhone", "phone", "telefono")
-        industry = ConsoleHelpers.mapStr(client, "industry").ifEmptyExt("PyME")
-        status = ConsoleHelpers.mapStr(client, "status", "estatus").ifEmptyExt("Prospecto")
+        industry = ConsoleHelpers.mapStr(client, "industry").ifEmpty("PyME")
+        status = ConsoleHelpers.mapStr(client, "status", "estatus").ifEmpty("Prospecto")
         fiscalAddress = ConsoleHelpers.mapStr(client, "fiscalAddress")
         fiscalZipCode = ConsoleHelpers.mapStr(client, "fiscalZipCode")
-        fiscalRegime = ConsoleHelpers.mapStr(client, "fiscalRegime").ifEmptyExt("601")
+        fiscalRegime = ConsoleHelpers.mapStr(client, "fiscalRegime").ifEmpty("601")
         website = ConsoleHelpers.mapStr(client, "website")
         notes = ConsoleHelpers.mapStr(client, "notes", "notas")
     }
@@ -945,7 +929,7 @@ struct CrmClientDetailView: View {
                 }
             }
             Section("Datos del cliente") {
-                infoRow("Estado comercial", ConsoleHelpers.mapStr(client, "status", "estatus").ifEmptyExt("Prospecto"))
+                infoRow("Estado comercial", ConsoleHelpers.mapStr(client, "status", "estatus").ifEmpty("Prospecto"))
                 infoRow("Industria", ConsoleHelpers.mapStr(client, "industry"))
                 infoRow("Nombre comercial", ConsoleHelpers.mapStr(client, "name", "nombre"))
                 infoRow("Razón social", ConsoleHelpers.mapStr(client, "legalName", "razonSocial"))
@@ -1166,6 +1150,4 @@ struct CrmClientDetailView: View {
     }
 }
 
-private extension String {
-    func ifBlankExt(_ fallback: String) -> String { isEmpty ? fallback : self }
-}
+// Use global String.ifEmpty from ConsoleHelpers

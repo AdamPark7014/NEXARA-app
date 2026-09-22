@@ -84,7 +84,14 @@ enum DeepLinkParser {
             moduleParts = segments
         }
 
-        if let activityDetail = parseActivityDetailPath(moduleParts) {
+        var params: [String: String] = [:]
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.queryItems?.forEach { item in
+                if let value = item.value { params[item.name] = value }
+            }
+        }
+
+        if let activityDetail = parseActivityDetailPath(moduleParts: moduleParts) {
             var merged = params
             merged["tab"] = activityDetail.tab
             return .module(panel: panel, key: activityDetail.key, entityId: activityDetail.entityId, params: merged)
@@ -105,13 +112,6 @@ enum DeepLinkParser {
         let key = segmentAliases[rawKey.lowercased()] ?? rawKey
 
         if key == "notifications-center" { return .notifications }
-
-        var params: [String: String] = [:]
-        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            components.queryItems?.forEach { item in
-                if let value = item.value { params[item.name] = value }
-            }
-        }
 
         return .module(panel: panel, key: key, entityId: pathEntityId, params: params)
     }

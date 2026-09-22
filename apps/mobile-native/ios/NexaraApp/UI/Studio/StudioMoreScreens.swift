@@ -204,7 +204,7 @@ struct StudioPagesView: View {
     private func reload() async {
         isLoading = true; defer { isLoading = false }
         do { sections = try await StudioRepository.shared.pageSections() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 
     private func openSection(_ section: String) async {

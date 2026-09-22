@@ -217,7 +217,8 @@ final class CrmRepository {
     }
 
     func downloadAssetBytes(_ relativeOrAbsoluteUrl: String) async throws -> Data {
-        let url = ApiUrls.absoluteAsset(relativeOrAbsoluteUrl)
+        let abs = ApiUrls.absoluteAsset(relativeOrAbsoluteUrl)
+        guard let url = URL(string: abs) else { throw ApiError.invalidURL }
         var req = URLRequest(url: url)
         if let token = SessionStore.shared.token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

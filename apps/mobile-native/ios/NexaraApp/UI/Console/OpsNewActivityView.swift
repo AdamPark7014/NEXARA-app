@@ -151,26 +151,26 @@ struct OpsNewActivityView: View {
             return
         }
         let project = activeProjects.first { Int($0.id) == projectId }
-        var body: [String: Any] = [
-            "titulo": titulo.trimmingCharacters(in: .whitespacesAndNewlines),
-            "prioridad": prioridad,
-            "projectId": projectId,
-            "responsableId": responsableId,
-            "creadoPorId": creadoPorId,
-            "estatus": "Pendiente",
-            "activityType": "INTERNAL",
-            "ticketType": "PREVENTIVO",
-            "workType": "ISSUE",
-        ]
-        if let clientId = project?.clientId { body["clientId"] = Int(clientId) }
-        if let indicaciones = indicaciones.nilIfEmpty { body["indicaciones"] = indicaciones }
-        if let mins = Int(tiempoEstimado) { body["tiempoEstimadoMin"] = mins }
-        if !fecha.isEmpty { body["fechaInicio"] = "\(fecha)T08:00:00.000Z" }
-        if let branchName = branchName.nilIfEmpty { body["branchName"] = branchName }
+        let payload = ConsoleRepository.CreateActivityBody(
+            titulo: titulo.trimmingCharacters(in: .whitespacesAndNewlines),
+            prioridad: prioridad,
+            projectId: projectId,
+            responsableId: responsableId,
+            creadoPorId: creadoPorId,
+            estatus: "Pendiente",
+            activityType: "INTERNAL",
+            ticketType: "PREVENTIVO",
+            workType: "ISSUE",
+            clientId: project?.clientId.map { Int($0) },
+            indicaciones: indicaciones.nilIfEmpty,
+            tiempoEstimadoMin: Int(tiempoEstimado),
+            fechaInicio: fecha.isEmpty ? nil : "\(fecha)T08:00:00.000Z",
+            branchName: branchName.nilIfEmpty
+        )
         saving = true
         error = nil
         do {
-            let newId = try await ConsoleRepository.shared.createActivity(body: body)
+            let newId = try await ConsoleRepository.shared.createActivity(body: payload)
             if let pendingRequestId {
                 try await OpsRepository.shared.assignClientTicket(requestId: pendingRequestId, activityId: newId)
             }
