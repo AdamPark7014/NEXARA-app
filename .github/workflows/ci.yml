@@ -130,7 +130,9 @@ jobs:
 
       - name: Assemble debug + unit tests
         working-directory: apps/mobile-native/android
-        run: ./gradlew :app:assembleDebug test --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:assembleDebug test --no-daemon
 
       # Un `e.message` de Retrofit es literalmente "HTTP 403 Forbidden". Puesto
       # en un `Text(...)` eso es lo que lee el usuario --y lo que acabo en las
