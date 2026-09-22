@@ -448,6 +448,4 @@ func crmMxn(_ v: Double) -> String {
     return f.string(from: NSNumber(value: v)) ?? "$\(Int(v))"
 }
 
-extension [String: Any] {
-    fileprivate var crmKey: String { "crm-\(self["id"] ?? UUID().uuidString)" }
-}
+// crmKey helper is defined once in CrmExtendedViews.swift
