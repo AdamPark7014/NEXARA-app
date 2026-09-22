@@ -1,28 +1,29 @@
 # RELEVO
 
 - **Último turno:** cursor
-- **Fecha:** 2026-08-29
-- **Rama:** mejora/calidad-y-web
+- **Fecha:** 2026-09-22
+- **Rama:** cursor/asc-usage-descriptions-dcf0
 
 ## Hecho en este turno
 
-### Fix crítico: build web roto (por eso prod seguía “ineficiente”)
-- `AppShell.module.scss` tenía CSS huérfano tras `.contentInnerFullBleed` → SassError → deploy `--force-all` fallaba; **nexara-web seguía con imagen vieja**.
-- SCSS reparado; redeploy pendiente en este cierre.
-
-### Integra full-bleed (código ya en main d274214 + fix)
-- Sin sidebar ERP, topbar fino, main full-bleed, rutas Ig*.
+### iOS TestFlight: evitar warning 90683 (NSLocationWhenInUseUsageDescription faltante)
+- Ampliado el paso de PlistBuddy post-archive en `.github/workflows/ios-testflight.yml` para copiar desde `apps/mobile-native/ios/Resources/Info.plist` a la Info.plist embebida del `.app` las claves:
+  - `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`
+  - `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription`, `NSMicrophoneUsageDescription`, `NSUserTrackingUsageDescription`
+- Se mantiene el parche existente de `UILaunchScreen`, orientaciones y `CFBundleIconName`.
+- Validación extra imprime estas claves en el dump de la Info.plist embebida.
+- Bump opcional: si `CFBundleVersion` es `1` en el `.app`, se ajusta a `2` antes del export.
+- No se tocan Starscream strip, flatten de iconos ni firma manual.
 
 ## A medias
-- Confirmar deploy web OK en droplet tras este fix.
+- Esperar próxima corrida del workflow para confirmar ausencia del warning en ASC.
 
 ## No tocar
-- tickets layout, seed-demo-users, package-lock, xlsx
-- Oficinas ACS
+- Starscream strip, scripts de íconos, firma manual.
 
 ## Siguiente paso
-1. Verificar build web en `/tmp/integra-bleed2.log` sin SassError.
-2. Hard-refresh Integra.
+1. Disparar `iOS TestFlight (Free GHA)` y verificar que `NSLocationWhenInUseUsageDescription` esté presente en la Info.plist embebida y que ASC no emita 90683.
+2. Confirmar que el upload marca éxito con altool/iTMSTransporter.
 
 ## Estado
-- Fix listo para cerrar + redeploy.
+- Cambio listo en rama, pendiente de ejecución de pipeline.

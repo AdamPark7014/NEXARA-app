@@ -419,6 +419,47 @@ jobs:
           # CFBundleIconName
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c 'Add :CFBundleIconName string AppIcon' "$PLIST"
+          # Propagate usage description keys from source Resources/Info.plist (avoid ASC 90683)
+          SRC_PLIST="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist"
+          if [ -f "$SRC_PLIST" ]; then
+            echo "::group::Propagating privacy usage descriptions from source Info.plist"
+            KEYS=(
+              "NSLocationWhenInUseUsageDescription"
+              "NSLocationAlwaysAndWhenInUseUsageDescription"
+              "NSCameraUsageDescription"
+              "NSPhotoLibraryUsageDescription"
+              "NSPhotoLibraryAddUsageDescription"
+              "NSMicrophoneUsageDescription"
+              "NSUserTrackingUsageDescription"
+            )
+            for K in "${KEYS[@]}"; do
+              set +e
+              VAL=$(/usr/libexec/PlistBuddy -c "Print :$K" "$SRC_PLIST" 2>/dev/null)
+              STATUS=$?
+              set -e
+              if [ $STATUS -eq 0 ] && [ -n "${VAL// }" ]; then
+                echo "Ensuring key $K exists in embedded Info.plist (value from source)"
+                if /usr/libexec/PlistBuddy -c "Print :$K" "$PLIST" >/dev/null 2>&1; then
+                  /usr/libexec/PlistBuddy -c "Set :$K $VAL" "$PLIST" || true
+                else
+                  /usr/libexec/PlistBuddy -c "Add :$K string $VAL" "$PLIST" || true
+                fi
+              else
+                echo "Source key $K not present; skipping"
+              fi
+            done
+            echo "::endgroup::"
+          else
+            echo "WARNING: Source Info.plist not found at $SRC_PLIST; cannot propagate usage descriptions"
+          fi
+          # Optionally bump build number if still 1 (avoid reusing consumed build)
+          set +e
+          CUR_BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST" 2>/dev/null)
+          set -e
+          if [ "${CUR_BUILD:-}" = "1" ]; then
+            echo "CFBundleVersion is 1; bumping to 2 for TestFlight upload"
+            /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 2' "$PLIST" || true
+          fi
           /usr/bin/plutil -lint "$PLIST" || { echo "ERROR: Patched Info.plist failed lint"; exit 1; }
           echo "::group::After patch (plutil -p)"
           /usr/bin/plutil -p "$PLIST" | head -n 100 || true
@@ -477,14 +518,21 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print NSLocationWhenInUseUsageDescription' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print NSLocationAlwaysAndWhenInUseUsageDescription' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print NSCameraUsageDescription' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print NSPhotoLibraryUsageDescription' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print NSPhotoLibraryAddUsageDescription' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print NSMicrophoneUsageDescription' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print NSUserTrackingUsageDescription' "$APP_INFO_PLIST" || true
           echo "::group::Embedded Info.plist (plutil -p)"
           /usr/bin/plutil -p "$APP_INFO_PLIST" | head -n 200 || true
           echo "::endgroup::"
           echo "::group::Embedded Info.plist (filtered dump)"
           if command -v rg >/dev/null 2>&1; then
-            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | rg -i 'orientation|launch|icon' || true
+            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | rg -i 'orientation|launch|icon|NSLocation|Camera|Photo|Microphone|Tracking' || true
           else
-            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | grep -iE 'orientation|launch|icon' || true
+            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | grep -iE 'orientation|launch|icon|NSLocation|Camera|Photo|Microphone|Tracking' || true
           fi
           echo "::endgroup::"
           echo "::endgroup::"
