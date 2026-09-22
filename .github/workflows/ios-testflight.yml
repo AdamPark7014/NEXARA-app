@@ -105,6 +105,10 @@ jobs:
           printf "%s" "${ASC_PRIVATE_KEY}" > "${KEY_PATH}"
           echo "ASC key written to ${KEY_PATH}"
           echo "ASC_KEY_PATH=${KEY_PATH}" >> $GITHUB_ENV
+          # altool expects the key at ~/private_keys/AuthKey_<KEYID>.p8
+          mkdir -p "$HOME/private_keys"
+          cp "$KEY_PATH" "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "Copied ASC key to $HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8 for altool"
 
       - name: Install provisioning profile (dual paths)
         run: |
@@ -284,7 +288,12 @@ jobs:
           set -euo pipefail
           IPA="$(ls -1 "$EXPORT_DIR"/*.ipa | head -n 1)"
           if [ ! -f "$IPA" ]; then echo "IPA not found"; ls -R "$EXPORT_DIR"; exit 1; fi
-          echo "Uploading $IPA to TestFlight..."
-          xcrun iTMSTransporter -m upload -assetFile "$IPA" -apiKey "$ASC_KEY_ID" -apiIssuer "$ASC_ISSUER_ID" -v informative
+          echo "IPA found at: $IPA"
+          ls -lah "$IPA" || true
+          echo "Uploading to TestFlight via altool (API key)…"
+          xcrun altool --upload-app --type ios \
+            --file "$IPA" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
           echo "Upload requested. Processing may take several minutes on App Store Connect."
 
