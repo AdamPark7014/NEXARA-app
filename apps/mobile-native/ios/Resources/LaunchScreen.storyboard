@@ -1,36 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard" version="3.0" toolsVersion="20037" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" initialViewController="LaunchScreenVC">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" launchScreen="YES" initialViewController="VC-1">
+    <device id="retina6_1" orientation="portrait" appearance="light"/>
     <scenes>
         <!--Launch Screen-->
-        <scene sceneID="LaunchScreenScene">
+        <scene sceneID="SCENE-1">
             <objects>
-                <viewController id="LaunchScreenVC" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="LaunchScreenView">
-                        <rect key="frame" x="0.0" y="0.0" width="390" height="844"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" translatesAutoresizingMaskIntoConstraints="NO" id="LogoImage">
-                                <rect key="frame" x="95" y="312" width="200" height="220"/>
-                                <constraints>
-                                    <constraint firstAttribute="height" constant="220" id="logoHeight"/>
-                                    <constraint firstAttribute="width" constant="200" id="logoWidth"/>
-                                </constraints>
-                            </imageView>
-                        </subviews>
-                        <viewLayoutGuide key="safeArea" id="SafeArea"/>
+                <viewController id="VC-1" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="VIEW-1">
+                        <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <viewLayoutGuide key="safeArea" id="SAFE-1"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
-                        <constraints>
-                            <constraint firstItem="LogoImage" firstAttribute="centerX" secondItem="SafeArea" secondAttribute="centerX" id="centerX"/>
-                            <constraint firstItem="LogoImage" firstAttribute="centerY" secondItem="SafeArea" secondAttribute="centerY" id="centerY"/>
-                        </constraints>
                     </view>
                 </viewController>
-                <placeholder placeholderIdentifier="IBFirstResponder" id="FirstResponder" sceneMemberID="firstResponder"/>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="FR-1" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
             <point key="canvasLocation" x="0.0" y="0.0"/>
         </scene>
     </scenes>
-    <resources>
-        <!-- Intentionally no launch image; plain background to satisfy ASC -->
-    </resources>
 </document>
