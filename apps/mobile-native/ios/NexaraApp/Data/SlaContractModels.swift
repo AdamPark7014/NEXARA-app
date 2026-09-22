@@ -36,7 +36,7 @@ struct SlaBreach: Hashable, Identifiable {
     }
 }
 
-struct SlaStats: Hashable {
+struct SlaStats {
     let total: Int
     let stillOpen: Int
     let response: SlaBucket

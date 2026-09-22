@@ -100,7 +100,7 @@ struct KbView: View {
             }
         }
         .searchable(text: $vm.query, prompt: "Buscar artículo…")
-        .onChange(of: vm.query) { _, _ in vm.load() }
+        .onChange(of: vm.query) { _ in vm.load() }
         .navigationTitle("Knowledge Base")
         .task { vm.load() }
         .sheet(item: $vm.selected) { article in
@@ -265,7 +265,7 @@ struct ErpCalendarView: View {
         List {
             Picker("Rango", selection: $vm.rangeDays) {
                 Text("7 días").tag(7); Text("30 días").tag(30); Text("90 días").tag(90)
-            }.onChange(of: vm.rangeDays) { _, _ in vm.load() }
+            }.onChange(of: vm.rangeDays) { _ in vm.load() }
             if vm.isLoading { ProgressView() }
             ForEach(vm.events) { ev in
                 VStack(alignment: .leading) {

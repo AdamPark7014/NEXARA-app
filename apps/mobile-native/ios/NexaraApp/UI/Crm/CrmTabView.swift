@@ -68,7 +68,7 @@ struct CrmTabView: View {
             }
         }
         .onAppear { consumeCrmDeepLink() }
-        .onChange(of: deepLink.pending) { _, _ in consumeCrmDeepLink() }
+        .onChange(of: deepLink.pending) { _ in consumeCrmDeepLink() }
     }
 
     private func consumeCrmDeepLink() {

@@ -123,7 +123,7 @@ struct SmartQuoteView: View {
                     TextField("Buscar SKU, modelo…", text: $query)
                     if loading { ProgressView() }
                 }
-                .onChange(of: query) { _, _ in Task { await searchDebounced() } }
+                .onChange(of: query) { _ in Task { await searchDebounced() } }
             }
             if !brands.isEmpty {
                 Section("Marca") {

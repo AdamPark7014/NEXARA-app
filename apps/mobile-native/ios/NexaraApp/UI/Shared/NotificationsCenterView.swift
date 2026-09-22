@@ -107,7 +107,7 @@ struct NotificationsCenterView: View {
             await load()
             await NotificationsBadgeStore.shared.refresh()
         }
-        .onChange(of: showFeed) { _, newValue in
+        .onChange(of: showFeed) { newValue in
             if newValue { Task { await loadFeed() } }
         }
         .onReceive(RealtimeBus.shared.events) { event in

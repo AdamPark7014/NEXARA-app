@@ -23,8 +23,8 @@ final class CrmRepository {
         return ConsoleHelpers.decodeMap(data)
     }
 
-    func downloadCotizacionPdf(id: Int, internal: Bool = false) async throws -> Data {
-        let path = internal ? "cotizaciones/\(id)/pdf/internal" : "cotizaciones/\(id)/pdf"
+    func downloadCotizacionPdf(id: Int, internal internalPdf: Bool = false) async throws -> Data {
+        let path = internalPdf ? "cotizaciones/\(id)/pdf/internal" : "cotizaciones/\(id)/pdf"
         return try await api.getBinary(path)
     }
 
