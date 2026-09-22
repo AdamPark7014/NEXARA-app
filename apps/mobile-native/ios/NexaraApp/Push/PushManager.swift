@@ -28,7 +28,19 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
     private let registrationLock = NSLock()
 
     func configure() {
-        UNUserNotificationCenter.current().delegate = self
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        // Categorías para agrupar y enriquecer avisos (extensión de notificación)
+        let chat = UNNotificationCategory(identifier: "chat", actions: [], intentIdentifiers: [], options: [.customDismissAction])
+        let tickets = UNNotificationCategory(identifier: "tickets", actions: [], intentIdentifiers: [], options: [])
+        let alerts = UNNotificationCategory(identifier: "alerts", actions: [], intentIdentifiers: [], options: [.customDismissAction])
+        let ops = UNNotificationCategory(identifier: "ops", actions: [], intentIdentifiers: [], options: [])
+        let approvals = UNNotificationCategory(identifier: "approvals", actions: [], intentIdentifiers: [], options: [])
+        let attendance = UNNotificationCategory(identifier: "attendance", actions: [], intentIdentifiers: [], options: [])
+        let quotes = UNNotificationCategory(identifier: "quotes", actions: [], intentIdentifiers: [], options: [])
+        let finance = UNNotificationCategory(identifier: "finance", actions: [], intentIdentifiers: [], options: [])
+        let security = UNNotificationCategory(identifier: "security", actions: [], intentIdentifiers: [], options: [])
+        center.setNotificationCategories([chat, tickets, alerts, ops, approvals, attendance, quotes, finance, security])
         #if canImport(FirebaseCore) && canImport(FirebaseMessaging)
         if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
             if FirebaseApp.app() == nil {
