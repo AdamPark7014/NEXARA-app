@@ -266,7 +266,7 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
       <div className={styles.mediaScrim} aria-hidden />
 
       <div className={styles.stage}>
-        <p className={styles.kicker}>Conectamos tecnología, impulsamos el futuro</p>
+        <p className={styles.kicker}>NEXARA · CCTV y redes en Puebla — nexara.com.mx</p>
         <h1 className={styles.title}>
           Soluciones inteligentes para un{" "}
           <span className={styles.titleAccent}>mundo conectado</span>

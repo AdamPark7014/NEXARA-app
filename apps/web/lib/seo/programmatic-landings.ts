@@ -66,11 +66,11 @@ export const INDUSTRY_LANDINGS: IndustryLanding[] = [
   {
     slug: "hospitalidad",
     name: "Hospitalidad",
-    painPoint: "Alta densidad de dispositivos y zonas públicas donde una mala red afecta la reputacion.",
+    painPoint: "Alta densidad de dispositivos y áreas públicas donde un mal Wi‑Fi parece mal hotel.",
     outcomes: [
-      "Wi‑Fi de alta densidad por zonas",
-      "Cobertura CCTV en lobby, estacionamiento y BOH",
-      "Operacion y soporte unificados por propiedad",
+      "Cobertura por zona con diseno RF",
+      "VLAN para huesped, staff y CCTV",
+      "Ventanas de trabajo sin romper ocupacion",
     ],
   },
   {
