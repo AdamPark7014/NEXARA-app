@@ -103,6 +103,11 @@
   line-height: 1.6;
   color: var(--ds-muted);
   max-width: 42ch;
+  /* Más visual, menos párrafos: recorta a 3 líneas en home */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 /* Buttons — editorial, not Linear-clone uppercase spam */
@@ -262,6 +267,10 @@
   line-height: 1.55;
   color: var(--ds-muted);
   max-width: 48ch;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .capGo {
@@ -329,6 +338,10 @@
   font-size: 0.94rem;
   line-height: 1.55;
   color: var(--ds-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 /* Industry board (soluciones / home highlight) */
@@ -390,6 +403,10 @@
   line-height: 1.5;
   color: var(--ds-muted);
   max-width: 36ch;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .industryCellLink {

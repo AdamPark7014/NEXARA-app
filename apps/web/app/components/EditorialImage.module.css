@@ -260,7 +260,8 @@
   --ei-ar: 1.78;
   --ei-min-ar: 1.3;
   --ei-max-ar: 1.9;
-  --ei-maxh: clamp(240px, 32vw, 400px);
+  /* Más presencia visual en home: un poco más alto */
+  --ei-maxh: clamp(280px, 36vw, 460px);
 }
 
 .framedWide:not(.composeSplit) .frame {
@@ -276,7 +277,7 @@
      dentro de la columna del split (letterbox con blur si hace falta) */
   --ei-min-ar: 0.85;
   --ei-max-ar: 1.8;
-  --ei-maxh: clamp(240px, 34vw, 430px);
+  --ei-maxh: clamp(280px, 38vw, 480px);
 }
 
 .framedWide.composeSplit .frame {
