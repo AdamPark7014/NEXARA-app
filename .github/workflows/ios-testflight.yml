@@ -105,10 +105,8 @@ jobs:
           printf "%s" "${ASC_PRIVATE_KEY}" > "${KEY_PATH}"
           echo "ASC key written to ${KEY_PATH}"
           echo "ASC_KEY_PATH=${KEY_PATH}" >> $GITHUB_ENV
-          # altool expects the key at ~/private_keys/AuthKey_<KEYID>.p8
-          mkdir -p "$HOME/private_keys"
-          cp "$KEY_PATH" "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-          echo "Copied ASC key to $HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8 for altool"
+          # Point altool to the temp directory containing AuthKey_<KEYID>.p8
+          echo "API_PRIVATE_KEYS_DIR=$RUNNER_TEMP" >> $GITHUB_ENV
 
       - name: Install provisioning profile (dual paths)
         run: |
