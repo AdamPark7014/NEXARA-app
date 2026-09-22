@@ -127,22 +127,24 @@ jobs:
           sips -s format png -z 120 120 "$SRC_1024_TMP" --out "$ICONSET/icon-120.png" >/dev/null
           sips -s format png -z 152 152 "$SRC_1024_TMP" --out "$ICONSET/icon-152.png" >/dev/null
           cp "$SRC_1024_TMP" "$ICONSET/icon-1024.png"
-          # Aggressively flatten all AppIcon PNGs to RGB (no alpha) using sips-only (no pip installs)
-          echo "::group::Flatten AppIcon PNGs to RGB with sips (round-trip via BMP)"
-          for f in "$ICONSET"/*.png; do
-            bmp="$(mktemp -t iconbmpXXXX).bmp"
-            sips -s format bmp "$f" --out "$bmp" >/dev/null
-            sips -s format png "$bmp" --out "$f" >/dev/null
-            rm -f "$bmp"
-            alpha=$(sips -g hasAlpha "$f" 2>/dev/null | awk -F': ' '/hasAlpha/ {print $2}')
-            echo "$f hasAlpha=$alpha"
-            if [ "$alpha" != "no" ]; then
-              echo "alpha remains in $f"; exit 1
-            fi
-          done
+          # Aggressively flatten all AppIcon PNGs to RGB (no alpha) using Swift/AppKit (no pip)
+          echo "::group::Flatten AppIcon PNGs to RGB with Swift/AppKit"
+          swift "$GITHUB_WORKSPACE/scripts/flatten_app_icons.swift" "$ICONSET"
           echo "::endgroup::"
+          # Verify no alpha remains
           echo "AppIcon contents:"
           ls -lah "$ICONSET" || true
+          echo "::group::Verify hasAlpha=no for all AppIcon PNGs"
+          fail=0
+          for f in "$ICONSET"/*.png; do
+            a=$(sips -g hasAlpha "$f" 2>/dev/null | awk -F': ' '/hasAlpha/ {print $2}')
+            echo "$f hasAlpha: ${a:-unknown}"
+            if [ "$a" != "no" ]; then fail=$((fail+1)); fi
+          done
+          echo "::endgroup::"
+          if [ $fail -ne 0 ]; then
+            echo "ERROR: Some AppIcon PNGs still report alpha"; exit 1
+          fi
 
       - name: Install XcodeGen
         run: |
