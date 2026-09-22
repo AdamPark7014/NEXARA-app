@@ -178,19 +178,16 @@ jobs:
           echo "aps-environment in entitlements:"
           /usr/libexec/PlistBuddy -c 'Print aps-environment' "$ENT_ABS" || true
 
-      - name: Skip pbxproj signing patch (use XcodeGen Automatic + CLI team)
-        run: echo "Skipping pbxproj signing patch; relying on XcodeGen CODE_SIGN_STYLE=Automatic and CLI DEVELOPMENT_TEAM."
-
-      - name: Verify Team ID via showBuildSettings (target-based)
+      - name: Bind manual signing for NexaraApp (pbxproj)
         run: |
           set -euo pipefail
-          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -target NexaraApp -configuration Release > "$RUNNER_TEMP/buildsettings_after_patch.txt"
-          TEAM_VAL=$(grep -E "^ *DEVELOPMENT_TEAM =" "$RUNNER_TEMP/buildsettings_after_patch.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
-          if [ "$TEAM_VAL" != "AHNW9K8745" ]; then
-            echo "ERROR: DEVELOPMENT_TEAM is $TEAM_VAL, expected AHNW9K8745"; exit 1
-          fi
+          python3 "$GITHUB_WORKSPACE/scripts/ios_bind_app_signing.py" \
+            "apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj" \
+            "NexaraApp" "AHNW9K8745" "$PROFILE_UUID" "NEXARA App Store" "Apple Distribution"
+          PBXPROJ="apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj"
+          grep -q "PROVISIONING_PROFILE = \\\"${PROFILE_UUID}\\\";" "$PBXPROJ" || { echo "ERROR: PROVISIONING_PROFILE UUID not found in pbxproj"; exit 1; }
 
-      - name: Create ExportOptions.plist (App Store, Automatic)
+      - name: Create ExportOptions.plist (App Store, manual)
         run: |
           mkdir -p "$(dirname "$EXPORT_PLIST")"
           cat > "$EXPORT_PLIST" <<'PLIST'
@@ -201,7 +198,12 @@ jobs:
               <key>method</key>
               <string>app-store</string>
               <key>signingStyle</key>
-              <string>automatic</string>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                <key>mx.nexara.mobile.NexaraApp</key>
+                <string>NEXARA App Store</string>
+              </dict>
               <key>teamID</key>
               <string>AHNW9K8745</string>
               <key>stripSwiftSymbols</key>
@@ -213,7 +215,7 @@ jobs:
           PLIST
           cat "$EXPORT_PLIST"
 
-      - name: Archive (Release, iOS Device) — Automatic signing with ASC
+      - name: Archive (Release, iOS Device) — Manual signing from pbxproj
         run: |
           set -euo pipefail
           DERIVED="$RUNNER_TEMP/DerivedData"
@@ -224,12 +226,6 @@ jobs:
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
             OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/codesign.keychain-db" \
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$RUNNER_TEMP/BuildResult" \
