@@ -166,6 +166,10 @@
   line-height: 1.55;
   color: rgba(238, 244, 255, 0.82);
   max-width: 36ch;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .actions {
