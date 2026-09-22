@@ -32,3 +32,13 @@ Thumbs.db
 # Runtime volumes and uploads
 uploads
 apps/api/logs
+
+# Exclude non-ERP web panels and non-prod components from production web image
+# Keep ERP-only surface: apps/web/app/(panels)/erp/**
+apps/web/app/(panels)/finance/**
+apps/web/app/(panels)/hr/**
+apps/web/app/(panels)/integra/**
+
+# Components used only by non-ERP panels
+apps/web/components/studio/**
+apps/web/components/crm/**
