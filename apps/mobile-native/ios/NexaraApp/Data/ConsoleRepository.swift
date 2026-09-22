@@ -57,7 +57,24 @@ final class ConsoleRepository {
         try await activities(scope: scope).map { ActivityItem(raw: $0) }
     }
 
-    func createActivity(body: [String: Any]) async throws -> Int64 {
+    struct CreateActivityBody: Encodable {
+        let titulo: String
+        let prioridad: String
+        let projectId: Int
+        let responsableId: Int
+        let creadoPorId: Int
+        let estatus: String
+        let activityType: String
+        let ticketType: String
+        let workType: String
+        let clientId: Int?
+        let indicaciones: String?
+        let tiempoEstimadoMin: Int?
+        let fechaInicio: String?
+        let branchName: String?
+    }
+
+    func createActivity(body: CreateActivityBody) async throws -> Int64 {
         let data = try await api.postJSON("activities", body: body)
         let map = ConsoleHelpers.decodeMap(data)
         return Int64(ConsoleHelpers.mapInt(map, "id"))

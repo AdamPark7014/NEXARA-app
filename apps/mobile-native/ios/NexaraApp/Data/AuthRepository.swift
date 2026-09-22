@@ -126,6 +126,4 @@ final class AuthRepository {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+// Uses global String.nilIfEmpty from ConsoleHelpers.swift

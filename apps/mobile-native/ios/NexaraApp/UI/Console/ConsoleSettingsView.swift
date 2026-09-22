@@ -92,7 +92,7 @@ struct ConsoleSettingsView: View {
     }
 }
 
-private struct SettingRow: Identifiable {
+struct SettingRow: Identifiable {
     let key: String
     let label: String
     let category: String
@@ -192,6 +192,4 @@ final class ConsoleSettingsVM: ObservableObject {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+// Uses global String.nilIfEmpty

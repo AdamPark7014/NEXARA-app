@@ -51,10 +51,10 @@ struct ChatView: View {
                     let id = ConsoleHelpers.mapInt64(root, "id") ?? 0
                     return id > 0 ? ChatThreadItem(id: id, message: root) : nil
                 },
-                set: { item in
-                    if item == nil { threadRoot = nil; threadReplies = [] }
+                set: { (value: ChatThreadItem?) in
+                    if value == nil { threadRoot = nil; threadReplies = [] }
                 }
-            )) { item in
+            )) { (item: ChatThreadItem) in
                 threadSheet(root: item.message)
             }
         }

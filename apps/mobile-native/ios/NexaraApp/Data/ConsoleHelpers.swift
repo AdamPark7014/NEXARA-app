@@ -44,7 +44,7 @@ enum ConsoleHelpers {
     }
 
     static func mapInt(_ m: [String: Any], _ keys: String...) -> Int {
-        Int(mapInt64(m, keys) ?? 0)
+        Int(mapInt64(m, keys...) ?? 0)
     }
 
     static func mapDouble(_ m: [String: Any], _ keys: String...) -> Double {
@@ -63,6 +63,7 @@ enum ConsoleHelpers {
 
 extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
+    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
 
 extension CapturedMedia {

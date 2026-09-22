@@ -43,11 +43,11 @@ struct ClientTicketsModuleView: View {
                 }
                 if !items.isEmpty {
                     HStack(spacing: 0) {
-                        opsKpi("Total", "\(items.count)", .primary)
+                        opsKpi(label: "Total", value: "\(items.count)", color: .primary)
                         Divider().frame(height: 36)
-                        opsKpi("Nuevos", "\(kpiNew)", .orange)
+                        opsKpi(label: "Nuevos", value: "\(kpiNew)", color: .orange)
                         Divider().frame(height: 36)
-                        opsKpi("Asignados", "\(kpiAssigned)", .blue)
+                        opsKpi(label: "Asignados", value: "\(kpiAssigned)", color: .blue)
                     }
                     .padding(.horizontal).padding(.vertical, 6)
                     .background(Color(.secondarySystemGroupedBackground))

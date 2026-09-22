@@ -79,6 +79,22 @@ struct ExecutiveCLevel: Hashable {
         alerts = (raw["alerts"] as? [[String: Any]] ?? []).map { ExecutiveAlert(raw: $0) }
         topAccounts = (raw["topAccounts"] as? [[String: Any]] ?? []).map { ExecutiveTopAccount(raw: $0) }
     }
+
+    static func == (lhs: ExecutiveCLevel, rhs: ExecutiveCLevel) -> Bool {
+        lhs.headline == rhs.headline &&
+        lhs.operations == rhs.operations &&
+        lhs.finance == rhs.finance &&
+        lhs.alerts == rhs.alerts &&
+        lhs.topAccounts == rhs.topAccounts
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(headline)
+        hasher.combine(operations)
+        hasher.combine(finance)
+        hasher.combine(alerts)
+        hasher.combine(topAccounts)
+    }
 }
 
 struct Company: Hashable, Identifiable {
