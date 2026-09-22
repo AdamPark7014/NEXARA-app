@@ -120,27 +120,8 @@ jobs:
           sips -s format png -z 120 120 "$SRC_1024_TMP" --out "$ICONSET/icon-120.png" >/dev/null
           sips -s format png -z 152 152 "$SRC_1024_TMP" --out "$ICONSET/icon-152.png" >/dev/null
           cp "$SRC_1024_TMP" "$ICONSET/icon-1024.png"
-          # Aggressively flatten all AppIcon PNGs to RGB (no alpha) using Pillow; install if missing
-          python3 - <<'PY'
-from pathlib import Path
-import subprocess, sys
-try:
-    from PIL import Image
-except Exception:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "pillow"])
-    from PIL import Image
-iconset = Path(sys.argv[1])
-for p in iconset.glob("*.png"):
-    try:
-        im = Image.open(p).convert("RGBA")
-        bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
-        out = Image.alpha_composite(bg, im).convert("RGB")
-        out.save(p, format="PNG")
-        print(f"Flattened {p.name} -> RGB {out.size}")
-    except Exception as e:
-        print(f"WARNING: failed to process {p}: {e}")
-PY
-          "$ICONSET"
+          # Aggressively flatten all AppIcon PNGs to RGB (no alpha) using Pillow helper script
+          python3 "$GITHUB_WORKSPACE/scripts/flatten_app_icons.py" "$ICONSET"
           # Verify no alpha remains
           echo "::group::Verify hasAlpha=no for all AppIcon PNGs"
           fail=0
