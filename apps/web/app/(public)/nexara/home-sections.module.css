@@ -4,16 +4,12 @@
   max-width: none;
   margin: 0;
   padding: 0;
-  background:
-    radial-gradient(50% 40% at 100% 0%, rgba(45, 216, 242, 0.07), transparent 55%),
-    radial-gradient(40% 35% at 0% 55%, rgba(176, 107, 255, 0.05), transparent 50%),
-    #050a14;
+  /* Fondo simple — sin brillos recargados */
+  background: #050a14;
 }
 
 .band {
-  background:
-    radial-gradient(60% 70% at 0% 50%, rgba(45, 216, 242, 0.08), transparent 55%),
-    #07111f;
+  background: #07111f;
   border-top: 1px solid rgba(140, 190, 255, 0.12);
   border-bottom: 1px solid rgba(140, 190, 255, 0.12);
 }
