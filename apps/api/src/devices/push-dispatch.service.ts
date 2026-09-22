@@ -169,7 +169,7 @@ export class PushDispatchService {
                   alert: { title: payload.title, body: payload.body },
                   sound: 'default',
                   'mutable-content': 1 as unknown as any,
-                } as unknown as admin.messaging.ApnsAps,
+                } as unknown as admin.messaging.Aps,
                 // Los campos de navegación/conversación viajan en `data` para que la extensión los lea.
                 data,
               },
