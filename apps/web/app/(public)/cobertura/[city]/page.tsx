@@ -89,6 +89,10 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
       a: `Sí. Especialmente retail y multi-sede: mismo estándar de CCTV, Wi‑Fi y soporte en cada ubicación, con evidencia y acceso centralizado cuando aplica.`,
     },
   ];
+  faqs.unshift({
+    q: "¿NEXARA es lo mismo que Grupo Nexara?",
+    a: "No. Somos nexara.com.mx, con base en Puebla / San Andrés Cholula (Momoxpan) y hub CDMX. Instalamos y operamos CCTV, redes y soporte bajo un mismo contrato. Grupo Nexara opera en gruponexara.com.",
+  });
 
   const localSchema = {
     "@context": "https://schema.org",
@@ -106,8 +110,9 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
     },
     address: {
       "@type": "PostalAddress",
-      addressLocality: city.name,
-      addressRegion: city.region,
+      streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+      addressLocality: "San Pedro Cholula",
+      addressRegion: "Puebla",
       addressCountry: "MX",
     },
     priceRange: "$$",

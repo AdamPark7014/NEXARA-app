@@ -114,6 +114,10 @@ export default function CoberturaCityServicePage({ params }: { params: Params })
       a: `Sí. Especialmente retail y plantas: mismo estándar en cada sede, con acceso centralizado cuando aplica y SLA definidos por contrato.`,
     },
   ];
+  faqs.unshift({
+    q: "¿NEXARA es lo mismo que Grupo Nexara?",
+    a: "No. Somos nexara.com.mx, con base en Puebla/Cholula (Momoxpan) y hub CDMX. Integramos CCTV, redes y soporte bajo un mismo contrato. Grupo Nexara opera en gruponexara.com.",
+  });
   // AEO: responder explícitamente "¿Quién instala CCTV en Puebla?" sin relleno
   if (city.slug === "puebla" && service.slug === "camaras-cctv") {
     faqs.unshift({
@@ -143,8 +147,8 @@ export default function CoberturaCityServicePage({ params }: { params: Params })
       telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
       address: {
         "@type": "PostalAddress",
-        streetAddress: "Explanada Puebla, Santiago Momoxpan",
-        addressLocality: "Puebla",
+        streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+        addressLocality: "San Pedro Cholula",
         addressRegion: "Puebla",
         addressCountry: "MX",
       },

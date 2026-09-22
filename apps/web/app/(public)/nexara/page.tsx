@@ -199,6 +199,27 @@ export default async function NexaraPage() {
           },
         }}
       />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "NEXARA",
+          url: siteBaseUrl(),
+          telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
+          email: "gerencia@nexara.com.mx",
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+            addressLocality: "San Pedro Cholula",
+            addressRegion: "Puebla",
+            addressCountry: "MX",
+          },
+          areaServed: [
+            { "@type": "City", name: "Puebla" },
+            { "@type": "City", name: "Ciudad de México" },
+          ],
+        }}
+      />
       {heroBootstrap.posterUrl ? (
         <link rel="preload" as="image" href={heroBootstrap.posterUrl} fetchPriority="high" />
       ) : null}
