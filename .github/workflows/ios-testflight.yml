@@ -358,8 +358,9 @@ jobs:
           if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
             echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
           fi
-          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" >/dev/null 2>&1; then
-            echo "ERROR: UILaunchStoryboardName missing in embedded Info.plist"; exit 1
+          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" >/dev/null 2>&1 && \
+             ! /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: Neither UILaunchStoryboardName nor UILaunchScreen present in embedded Info.plist"; exit 1
           fi
 
       - name: Export signed IPA (App Store)
