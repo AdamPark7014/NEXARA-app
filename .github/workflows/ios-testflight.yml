@@ -518,8 +518,8 @@ jobs:
               # CFBundleIdentifier-based patterns
               echo "$id"   | grep -qi '^starscream\\.' || \
               echo "$id"   | grep -qi '\\.resources$' || \
-              echo "$id"   | grep -qi '^firebase\\b' || \
-              echo "$id"   | grep -qi '^firebase-ios-sdk\\b' || \
+              echo "$id"   | grep -qi '^firebase' || \
+              echo "$id"   | grep -qi '^firebase-ios-sdk' || \
               echo "$id"   | grep -qi '^com\\.google\\.' || \
               echo "$id"   | grep -qi '^google\\.' || \
               echo "$id"   | grep -qi 'googleutilities' || \
