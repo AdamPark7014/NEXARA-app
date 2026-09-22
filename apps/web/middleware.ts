@@ -163,21 +163,22 @@ const buildCsp = () => {
       : "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
-    "frame-ancestors 'none'",
+    isDev
+      ? "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com http://localhost:* http://*.localhost:*"
+      : "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com",
     "form-action 'self'",
     'upgrade-insecure-requests',
   ].join('; ');
 };
 
 const applySecurityHeaders = (response: NextResponse) => {
-  response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
   response.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
   response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(self)');
-  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-  response.headers.set('Cross-Origin-Resource-Policy', 'same-site');
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
   response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
   response.headers.set('Origin-Agent-Cluster', '?1');
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');

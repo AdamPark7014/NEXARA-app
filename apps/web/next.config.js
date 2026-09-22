@@ -216,7 +216,9 @@ const nextConfig = {
       "media-src 'self' blob: https: http://localhost:* http://127.0.0.1:* http://*.localhost:*",
       "object-src 'none'",
       "base-uri 'self'",
-      "frame-ancestors 'none'",
+      isDev
+        ? "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com http://localhost:* http://*.localhost:*"
+        : "frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com",
       "form-action 'self'",
       'upgrade-insecure-requests',
     ].join('; ');
@@ -234,14 +236,13 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-DNS-Prefetch-Control', value: 'off' },
           { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=()' },
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-          { key: 'Cross-Origin-Resource-Policy', value: 'same-site' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
           { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
           { key: 'Origin-Agent-Cluster', value: '?1' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
