@@ -127,7 +127,7 @@ struct StudioHeroView: View {
         isLoading = true; error = nil
         defer { isLoading = false }
         do { slides = try await StudioRepository.shared.heroSlides() }
-        catch { self.error = (error as Error).localizedDescription }
+        catch let e { self.error = e.localizedDescription }
     }
 
     private func save() async {
@@ -162,7 +162,7 @@ struct StudioHeroView: View {
         Task {
             do {
                 try await StudioRepository.shared.reorderHeroSlides(ids: slides.map(\.id))
-            } catch { self.error = (error as Error).localizedDescription }
+            } catch let e { self.error = e.localizedDescription }
         }
     }
 }
@@ -267,7 +267,7 @@ struct StudioCasesView: View {
     private func reload() async {
         isLoading = true; defer { isLoading = false }
         do { items = try await StudioRepository.shared.caseStudies() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 
     private func save() async {
@@ -297,17 +297,17 @@ struct StudioCasesView: View {
                 ))
             }
             showEditor = false; await reload()
-        } catch { error = (error as Error).localizedDescription }
+        } catch let e { error = e.localizedDescription }
     }
 
     private func toggle(_ id: Int64) async {
         do { _ = try await StudioRepository.shared.toggleCasePublicado(id: id); await reload() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 
     private func delete(_ id: Int64) async {
         do { try await StudioRepository.shared.deleteCaseStudy(id: id); await reload() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 }
 
@@ -392,7 +392,7 @@ struct StudioNewsView: View {
     private func reload() async {
         isLoading = true; defer { isLoading = false }
         do { items = try await StudioRepository.shared.news() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 
     private func save() async {
@@ -411,12 +411,12 @@ struct StudioNewsView: View {
                 ))
             }
             showEditor = false; await reload()
-        } catch { error = (error as Error).localizedDescription }
+        } catch let e { error = e.localizedDescription }
     }
 
     private func delete(_ id: Int64) async {
         do { try await StudioRepository.shared.deleteNews(id: id); await reload() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 }
 
@@ -511,7 +511,7 @@ struct StudioSocialView: View {
     private func reload() async {
         isLoading = true; defer { isLoading = false }
         do { items = try await StudioRepository.shared.socialPosts() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 
     private func save() async {
@@ -533,16 +533,16 @@ struct StudioSocialView: View {
                 ))
             }
             showEditor = false; await reload()
-        } catch { error = (error as Error).localizedDescription }
+        } catch let e { error = e.localizedDescription }
     }
 
     private func publish(_ id: Int64) async {
         do { _ = try await StudioRepository.shared.setSocialEstado(id: id, estado: "Publicado"); await reload() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 
     private func delete(_ id: Int64) async {
         do { try await StudioRepository.shared.deleteSocialPost(id: id); await reload() }
-        catch { error = (error as Error).localizedDescription }
+        catch let e { error = e.localizedDescription }
     }
 }
