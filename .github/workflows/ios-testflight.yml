@@ -305,27 +305,6 @@ jobs:
           PLIST
           cat "$EXPORT_PLIST"
 
-      - name: Inspect built Info.plist in archive (launch/orientations)
-        run: |
-          set -euo pipefail
-          APP_INFO_PLIST="$ARCHIVE_PATH/Products/Applications/NexaraApp.app/Info.plist"
-          if [ ! -f "$APP_INFO_PLIST" ]; then
-            echo "ERROR: Info.plist not found in archive at $APP_INFO_PLIST"; ls -R "$ARCHIVE_PATH"; exit 1
-          fi
-          echo "::group::Embedded Info.plist keys"
-          /usr/libexec/PlistBuddy -c 'Print CFBundleIconName' "$APP_INFO_PLIST" || true
-          /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" || true
-          /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" || true
-          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$APP_INFO_PLIST" || true
-          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" || true
-          echo "::endgroup::"
-          if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
-            echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
-          fi
-          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" >/dev/null 2>&1; then
-            echo "ERROR: UILaunchStoryboardName missing in embedded Info.plist"; exit 1
-          fi
-
       - name: Archive (Release, iOS Device) — Manual signing from pbxproj
         run: |
           set -euo pipefail
@@ -353,6 +332,34 @@ jobs:
             fi
             echo "::endgroup::"
             exit $STATUS
+          fi
+
+      - name: Inspect built Info.plist in archive (launch/orientations)
+        run: |
+          set -euo pipefail
+          if [ ! -d "$ARCHIVE_PATH" ]; then
+            echo "ERROR: Archive directory missing at $ARCHIVE_PATH"; ls -l "$(dirname "$ARCHIVE_PATH")" || true; exit 1
+          fi
+          APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
+          fi
+          APP_INFO_PLIST="$APP_DIR/Info.plist"
+          if [ ! -f "$APP_INFO_PLIST" ]; then
+            echo "ERROR: Info.plist not found at $APP_INFO_PLIST"; ls -R "$APP_DIR" || true; exit 1
+          fi
+          echo "::group::Embedded Info.plist keys"
+          /usr/libexec/PlistBuddy -c 'Print CFBundleIconName' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" || true
+          echo "::endgroup::"
+          if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
+          fi
+          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: UILaunchStoryboardName missing in embedded Info.plist"; exit 1
           fi
 
       - name: Export signed IPA (App Store)
