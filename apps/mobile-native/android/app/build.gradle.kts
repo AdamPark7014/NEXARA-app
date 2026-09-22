@@ -228,10 +228,13 @@ dependencies {
 // Solo se aplica a tareas de release: `assembleDebug` y los tests no se tocan.
 // ===========================================================================
 gradle.taskGraph.whenReady {
-    val buildsReleaseArtifact = allTasks.any { task ->
-        task.name.startsWith("bundleRelease") ||
-            task.name.startsWith("assembleRelease") ||
-            task.name.startsWith("packageRelease")
+    // Ejecuta el preflight SOLO cuando se han solicitado tareas de release.
+    // Usar los nombres de tareas pedidas evita falsos positivos por tareas de
+    // release presentes en el grafo pero no ejecutadas (Gradle 8/9 config avoidance).
+    val requested = gradle.startParameter.taskNames
+    val buildsReleaseArtifact = requested.any { name ->
+        val n = name.lowercase()
+        n.contains("bundlerelease") || n.contains("assemblerelease") || n.contains("packagerelease")
     }
     if (!buildsReleaseArtifact) return@whenReady
 
