@@ -146,6 +146,9 @@ export default function Header() {
   const isFlushHero = isFlushHeroRoute(pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const links = navLinks.some((l) => l.href === '/')
+    ? navLinks
+    : ([{ name: 'Inicio', href: '/' }, ...navLinks] as typeof navLinks);
 
   useEffect(() => {
     if (!isFlushHero) {
@@ -228,7 +231,7 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className={styles.navLinks}>
-          {navLinks.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.name}
               href={link.href}
@@ -270,7 +273,7 @@ export default function Header() {
       {mobileMenuOpen && (
         <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu}>
           <nav id="mobile-main-menu" className={styles.mobileMenu} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Menú principal móvil">
-            {navLinks.map((link) => (
+            {links.map((link) => (
               <Link 
                 key={link.name} 
                 href={link.href} 
