@@ -252,35 +252,32 @@ enum ConsoleAccessRules {
                 .filter { canAccessConsoleModule(user: user, module: $0) }
         }
 
+        // IA homologada con core: HOY / RECURSOS / MI CUENTA / FINANZAS
         let groups: [ConsoleSidebarGroup] = [
-            ConsoleSidebarGroup(id: "profile", title: "Cuenta personal", modules: pick(["my-profile", "offline-queue", "calendar"])),
-            ConsoleSidebarGroup(id: "employee", title: "Mi espacio de trabajo", modules: pick([
-                "dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks",
+            ConsoleSidebarGroup(id: "hoy", title: "HOY", modules: pick([
+                "chat",          // Conversaciones
+                "activities",    // Actividades
+                "attendance",    // Asistencias
+                "kpis-hr",       // KPIs del equipo
+                "clients",       // Clientes
+                "cotizaciones",  // Cotizaciones
+                "projects",      // Proyectos
             ])),
-            ConsoleSidebarGroup(id: "operations", title: "Supervisión operativa", modules: pick([
-                "activities", "evidences", "viatics", "vehicles", "gps", "service-clients",
-                "maintenance", "assets", "service-sheets",
+            ConsoleSidebarGroup(id: "recursos", title: "RECURSOS", modules: pick([
+                "stock",       // Almacén
+                "tools",       // Herramientas
+                "vehicles",    // Vehículos
+                "orgchart",    // Organigrama
             ])),
-            ConsoleSidebarGroup(id: "people", title: "RRHH y control de personal", modules: pick([
-                "attendance", "lunch-breaks", "fines", "cvs", "users", "hr", "orgchart", "kpis-hr",
-            ])),
-            ConsoleSidebarGroup(id: "commercial", title: "Clientes y comercial", modules: pick([
-                "clients", "projects", "cotizaciones", "gestion-vendedores", "contact-messages",
-            ])),
-            ConsoleSidebarGroup(id: "system", title: "Administración interna", modules: pick([
-                "tools", "news", "newsletter", "settings", "companies", "kb", "architecture",
-            ])),
-            ConsoleSidebarGroup(id: "inventory", title: "Inventario y compras", modules: pick([
-                "warehouse", "stock", "procurement",
-            ])),
-            ConsoleSidebarGroup(id: "finance", title: "Finanzas y banca", modules: pick([
-                "accounting", "employee-payments", "expenses", "work-projects", "invoicing", "banking",
-            ])),
-            ConsoleSidebarGroup(id: "compliance", title: "Cumplimiento y BI", modules: pick([
-                "documents", "audit", "analytics", "bi", "executive", "approvals", "notifications-center", "exports",
-            ])),
-            ConsoleSidebarGroup(id: "ops-monitoring", title: "Monitoreo y soporte", modules: pick([
-                "noc", "client-tickets", "support", "support-sla", "maintenance-contracts",
+            ConsoleSidebarGroup(id: "mi-cuenta", title: "MI CUENTA", modules: pick(["my-profile"])),
+            ConsoleSidebarGroup(id: "finanzas", title: "FINANZAS", modules: pick([
+                "accounting",         // Contabilidad
+                "invoicing",          // Facturación CFDI
+                "banking",            // Bancos
+                "viatics",            // Viáticos
+                "expenses",           // Gastos
+                "employee-payments",  // Pagos a empleados
+                "exports",            // Exportaciones contables
             ])),
         ]
         return groups.filter { !$0.modules.isEmpty }

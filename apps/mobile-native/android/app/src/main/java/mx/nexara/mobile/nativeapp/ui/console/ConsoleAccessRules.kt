@@ -160,47 +160,50 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
             .filter { canAccessConsoleModule(user, it) }
             .filter { allowedKeys == null || it.key in allowedKeys }
 
+    // IA homologada con core.nexara.com.mx (HOY / RECURSOS / MI CUENTA / FINANZAS)
     val groups = listOf(
-        ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile", "calendar")),
         ConsoleSidebarGroup(
-            "employee", "Mi espacio de trabajo",
-            pick("dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks"),
+            "hoy", "HOY",
+            pick(
+                "chat",           // Conversaciones
+                "activities",     // Actividades
+                "attendance",     // Asistencias
+                "kpis-hr",        // KPIs del equipo
+                "clients",        // Clientes
+                "cotizaciones",   // Cotizaciones
+                "projects",       // Proyectos
+            ),
         ),
         ConsoleSidebarGroup(
-            "operations", "Supervisión operativa",
-            pick("activities", "evidences", "viatics", "vehicles", "gps", "service-clients", "maintenance", "assets", "service-sheets"),
+            "recursos", "RECURSOS",
+            pick(
+                "stock",       // Almacén
+                "tools",       // Herramientas
+                "vehicles",    // Vehículos
+                "orgchart",    // Organigrama
+            ),
         ),
+        ConsoleSidebarGroup("mi-cuenta", "MI CUENTA", pick("my-profile")),
         ConsoleSidebarGroup(
-            "people", "RRHH y control de personal",
-            pick("attendance", "lunch-breaks", "fines", "cvs", "users", "hr", "orgchart", "kpis-hr"),
-        ),
-        ConsoleSidebarGroup(
-            "commercial", "Clientes y comercial",
-            pick("clients", "projects", "cotizaciones", "gestion-vendedores", "contact-messages"),
-        ),
-        ConsoleSidebarGroup(
-            "system", "Administración interna",
-            pick("tools", "news", "newsletter", "settings", "companies", "kb", "architecture"),
-        ),
-        ConsoleSidebarGroup(
-            "inventory", "Inventario y compras",
-            pick("warehouse", "stock", "procurement"),
-        ),
-        ConsoleSidebarGroup(
-            "finance", "Finanzas y banca",
-            pick("accounting", "employee-payments", "expenses", "work-projects", "invoicing", "banking"),
-        ),
-        ConsoleSidebarGroup(
-            "compliance", "Cumplimiento y BI",
-            pick("documents", "audit", "analytics", "bi", "executive", "approvals", "notifications-center", "chat", "exports"),
-        ),
-        ConsoleSidebarGroup(
-            "ops-monitoring", "Monitoreo y soporte",
-            pick("noc", "client-tickets", "support", "support-sla", "maintenance-contracts"),
+            "finanzas", "FINANZAS",
+            pick(
+                "accounting",         // Contabilidad
+                "invoicing",          // Facturación CFDI
+                "banking",            // Bancos
+                "viatics",            // Viáticos
+                "expenses",           // Gastos
+                "employee-payments",  // Pagos a empleados
+                "exports",            // Exportaciones contables
+            ),
         ),
     )
 
-    return groups.filter { it.modules.isNotEmpty() }
+    return groups.map { g ->
+        // Aplicar filtro allowedKeys/canAccess y descartar grupos vacíos
+        g.copy(modules = g.modules.filter { m ->
+            (allowedKeys == null || m.key in allowedKeys) && canAccessConsoleModule(user, m)
+        })
+    }.filter { it.modules.isNotEmpty() }
 }
 
 /** Menú agrupado como sidebar web para rol Administrativo. */
