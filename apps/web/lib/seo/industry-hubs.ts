@@ -16,6 +16,9 @@ export const INDUSTRY_HUB_SLUGS = [
   "salud",
   "educacion",
   "gobierno",
+  "logistica",
+  "pymes-y-startups",
+  "seguridad-electronica",
 ] as const;
 
 export type IndustryHubSlug = (typeof INDUSTRY_HUB_SLUGS)[number];
