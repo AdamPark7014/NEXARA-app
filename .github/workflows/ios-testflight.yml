@@ -109,10 +109,17 @@ jobs:
           mkdir -p "$ICONSET"
           SRC_1024_TMP="$RUNNER_TEMP/src-1024.png"
           if [ ! -f "$ICONSET/icon-1024.png" ]; then
-            echo "icon-1024.png not found; fetching brand mark and generating..."
-            TMP_SRC="$RUNNER_TEMP/brand-src.png"
-            curl -fsSL "https://nexara.com.mx/brand/nexara-mark-v4-512.png" -o "$TMP_SRC"
-            sips -s format png -z 1024 1024 "$TMP_SRC" --out "$SRC_1024_TMP" >/dev/null
+            echo "icon-1024.png not found; attempting to derive from existing icons or brand mark…"
+            CANDIDATE="$(ls -1 "$ICONSET"/*.png 2>/dev/null | head -n 1 || true)"
+            if [ -n "$CANDIDATE" ]; then
+              echo "Using existing candidate image: $CANDIDATE"
+              sips -s format png -z 1024 1024 "$CANDIDATE" --out "$SRC_1024_TMP" >/dev/null
+            else
+              echo "No local candidate; fetching brand mark…"
+              TMP_SRC="$RUNNER_TEMP/brand-src.png"
+              curl -fsSL "https://nexara.com.mx/brand/nexara-mark-v4-512.png" -o "$TMP_SRC"
+              sips -s format png -z 1024 1024 "$TMP_SRC" --out "$SRC_1024_TMP" >/dev/null
+            fi
           else
             cp "$ICONSET/icon-1024.png" "$SRC_1024_TMP"
           fi
@@ -120,20 +127,20 @@ jobs:
           sips -s format png -z 120 120 "$SRC_1024_TMP" --out "$ICONSET/icon-120.png" >/dev/null
           sips -s format png -z 152 152 "$SRC_1024_TMP" --out "$ICONSET/icon-152.png" >/dev/null
           cp "$SRC_1024_TMP" "$ICONSET/icon-1024.png"
-          # Aggressively flatten all AppIcon PNGs to RGB (no alpha) using Pillow helper script
-          python3 "$GITHUB_WORKSPACE/scripts/flatten_app_icons.py" "$ICONSET"
-          # Verify no alpha remains
-          echo "::group::Verify hasAlpha=no for all AppIcon PNGs"
-          fail=0
+          # Aggressively flatten all AppIcon PNGs to RGB (no alpha) using sips-only (no pip installs)
+          echo "::group::Flatten AppIcon PNGs to RGB with sips (round-trip via BMP)"
           for f in "$ICONSET"/*.png; do
-            a=$(sips -g hasAlpha "$f" 2>/dev/null | awk -F': ' '/hasAlpha/ {print $2}')
-            echo "$f hasAlpha: ${a:-unknown}"
-            if [ "${a:-unknown}" != "no" ]; then fail=$((fail+1)); fi
+            bmp="$(mktemp -t iconbmpXXXX).bmp"
+            sips -s format bmp "$f" --out "$bmp" >/dev/null
+            sips -s format png "$bmp" --out "$f" >/dev/null
+            rm -f "$bmp"
+            alpha=$(sips -g hasAlpha "$f" 2>/dev/null | awk -F': ' '/hasAlpha/ {print $2}')
+            echo "$f hasAlpha=$alpha"
+            if [ "$alpha" != "no" ]; then
+              echo "alpha remains in $f"; exit 1
+            fi
           done
           echo "::endgroup::"
-          if [ $fail -ne 0 ]; then
-            echo "ERROR: Some AppIcon PNGs still report alpha"; exit 1
-          fi
           echo "AppIcon contents:"
           ls -lah "$ICONSET" || true
 
