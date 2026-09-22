@@ -6,20 +6,16 @@ import SolicitudesEquipoView from "./SolicitudesEquipoView";
 import type { PeerRequestItem } from "@/lib/peer-requests-api";
 
 const fetchPeerRequests = vi.hoisted(() => vi.fn());
+const fetchPeerCandidates = vi.hoisted(() => vi.fn());
 const createPeerRequest = vi.hoisted(() => vi.fn());
 const acceptPeerRequest = vi.hoisted(() => vi.fn());
 const rejectPeerRequest = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/peer-requests-api", () => ({
   fetchPeerRequests,
+  fetchPeerCandidates,
   createPeerRequest,
   acceptPeerRequest,
   rejectPeerRequest,
-}));
-
-const fetchTeamBoard = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/team-board-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/team-board-api")>()),
-  fetchTeamBoard,
 }));
 
 function persona(id: number, nombre: string) {
@@ -44,7 +40,7 @@ function solicitud(parcial: Partial<PeerRequestItem> & Pick<PeerRequestItem, "id
 
 function montar(datos: { sent?: PeerRequestItem[]; received?: PeerRequestItem[] } = {}) {
   fetchPeerRequests.mockResolvedValue({ sent: datos.sent ?? [], received: datos.received ?? [] });
-  fetchTeamBoard.mockResolvedValue({ users: [persona(7, "Ana Ruiz"), persona(9, "Luis Mora")] });
+  fetchPeerCandidates.mockResolvedValue([persona(7, "Ana Ruiz"), persona(9, "Luis Mora")]);
   return render(<SolicitudesEquipoView token="tok" />);
 }
 
@@ -62,7 +58,9 @@ describe("SolicitudesEquipoView", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
-    expect(await screen.findByText("Elige a quién le pides apoyo.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Elige al compañero a quien le pides la actividad."),
+    ).toBeInTheDocument();
     expect(createPeerRequest).not.toHaveBeenCalled();
 
     await userEvent.selectOptions(screen.getByLabelText("Para quién"), "7");
@@ -72,13 +70,32 @@ describe("SolicitudesEquipoView", () => {
     expect(createPeerRequest).not.toHaveBeenCalled();
   });
 
+  it("ofrece a todo el personal, no solo a la rama del organigrama", async () => {
+    montar();
+    await screen.findByText("Todavía no hay solicitudes");
+
+    const selector = screen.getByLabelText("Para quién") as HTMLSelectElement;
+    const opciones = Array.from(selector.options).map((o) => o.textContent);
+    expect(opciones).toEqual(["Elige a alguien…", "Ana Ruiz · Técnico", "Luis Mora · Técnico"]);
+    expect(fetchPeerCandidates).toHaveBeenCalledWith("tok");
+    expect(screen.getByText("Cualquier compañero de la empresa.")).toBeInTheDocument();
+  });
+
+  it("dice con todas sus letras que es pedirle una actividad a un compañero", async () => {
+    montar();
+    expect(
+      await screen.findByRole("heading", { name: "Pedirle una actividad a un compañero" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/le pides a cualquier compañero de la empresa/i)).toBeInTheDocument();
+  });
+
   it("envía la solicitud y limpia el formulario", async () => {
     montar();
     await screen.findByText("Todavía no hay solicitudes");
     createPeerRequest.mockResolvedValue(solicitud({ id: 1 }));
 
     await userEvent.selectOptions(screen.getByLabelText("Para quién"), "7");
-    await userEvent.type(screen.getByLabelText("¿Qué necesitas?"), "  Apoyo en la cámara 3  ");
+    await userEvent.type(screen.getByLabelText("¿Qué actividad le pides?"), "  Apoyo en la cámara 3  ");
     await userEvent.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
     await waitFor(() =>
@@ -89,7 +106,7 @@ describe("SolicitudesEquipoView", () => {
       }),
     );
     expect(await screen.findByText("Solicitud enviada")).toBeInTheDocument();
-    expect((screen.getByLabelText("¿Qué necesitas?") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("¿Qué actividad le pides?") as HTMLInputElement).value).toBe("");
   });
 
   it("un error al aceptar no borra lo que ya estaba en pantalla", async () => {

@@ -30,9 +30,25 @@ export type PeerRequestsResponse = {
   received: PeerRequestItem[];
 };
 
-/** API: GET/POST/PATCH /me/activity-requests (solicitudes entre pares). */
+/** A quién le puedo pedir una actividad. */
+export type PeerCandidate = {
+  id: number;
+  nombre: string;
+  puesto: string | null;
+  avatarUrl: string | null;
+};
+
+/** API: GET/POST/PATCH /me/activity-requests (pedirle una actividad a un compañero). */
 export function fetchPeerRequests(token: string) {
   return erpFetch<PeerRequestsResponse>("me/activity-requests", token);
+}
+
+/**
+ * Todo el personal de la empresa, sin recorte por organigrama. No se usa
+ * `me/board` (la pizarra) porque esa solo devuelve la rama de quien mira.
+ */
+export function fetchPeerCandidates(token: string) {
+  return erpFetch<PeerCandidate[]>("me/activity-requests/candidates", token);
 }
 
 export function createPeerRequest(
