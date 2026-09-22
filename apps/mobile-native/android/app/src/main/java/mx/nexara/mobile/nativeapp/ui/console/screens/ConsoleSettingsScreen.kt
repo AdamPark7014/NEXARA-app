@@ -249,7 +249,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsoleSettingsScreen(
-    onExitToPanels: () -> Unit,
+    onExitToPanels: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(16.dp),
     onOpenOfflineQueue: (() -> Unit)? = null,
 ) {
@@ -350,9 +350,11 @@ fun ConsoleSettingsScreen(
             state.isLoading -> item { NxLoadingBlock("Cargando configuraciones…") }
             !state.error.isNullOrBlank() -> {
                 item { NxErrorBlock(state.error!!) { vm.refresh() } }
-                item {
-                    OutlinedButton(onClick = onExitToPanels, modifier = Modifier.fillMaxWidth()) {
-                        Text("Salir a paneles")
+                if (onExitToPanels != null) {
+                    item {
+                        OutlinedButton(onClick = onExitToPanels, modifier = Modifier.fillMaxWidth()) {
+                            Text("Salir a paneles")
+                        }
                     }
                 }
             }
@@ -437,9 +439,11 @@ fun ConsoleSettingsScreen(
                     }
                 }
 
-                item {
-                    OutlinedButton(onClick = onExitToPanels, modifier = Modifier.fillMaxWidth()) {
-                        Text("Salir a paneles")
+                if (onExitToPanels != null) {
+                    item {
+                        OutlinedButton(onClick = onExitToPanels, modifier = Modifier.fillMaxWidth()) {
+                            Text("Salir a paneles")
+                        }
                     }
                 }
             }

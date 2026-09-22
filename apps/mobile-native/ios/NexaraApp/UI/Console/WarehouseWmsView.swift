@@ -191,7 +191,7 @@ struct WarehouseWmsView: View {
                             Button("+ Recibir") { open(.receive) }.buttonStyle(.borderedProminent).tint(.green)
                             Button("Despachar") { open(.issue) }.buttonStyle(.bordered)
                             Button("Transferir") { open(.transfer) }.buttonStyle(.bordered)
-                            Button("Conteo") { open(.count) }.buttonStyle(.borderedProminent).tint(.teal)
+                            Button("Conteo") { open(.count) }.buttonStyle(.borderedProminent).tint(Color(\"AccentColor\"))
                         }.padding(.horizontal)
                     }
                 }
@@ -272,7 +272,7 @@ struct WarehouseWmsView: View {
                     .font(.caption2).foregroundColor(.secondary).lineLimit(1)
             }
             Spacer()
-            Text("\(Int(qty))").font(.headline).bold().foregroundColor(low ? .red : .teal)
+            Text("\(Int(qty))").font(.headline).bold().foregroundColor(low ? Color.red : Color(\"AccentColor\"))
         }
         .padding(12)
         .background(low ? Color.red.opacity(0.08) : Color(.secondarySystemGroupedBackground))
@@ -320,7 +320,7 @@ struct WarehouseWmsView: View {
         }()
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(type).font(.subheadline).bold().foregroundColor(.teal)
+                Text(type).font(.subheadline).bold().foregroundColor(Color(\"AccentColor\"))
                 Spacer()
                 Text("\(qty) uds").font(.subheadline).bold()
             }
@@ -470,10 +470,10 @@ struct WarehouseWmsView: View {
                         Text(name.isEmpty ? "Producto" : name).bold()
                         Text(exact ? "✓ SKU \(sku)" : sku)
                             .font(.caption)
-                            .foregroundColor(exact ? .teal : .secondary)
+                            .foregroundColor(exact ? Color(\"AccentColor\") : Color.secondary)
                     }
                 }
-                .listRowBackground(exact ? Color.teal.opacity(0.12) : Color(.secondarySystemGroupedBackground))
+                .listRowBackground(exact ? Color(\"AccentColor\").opacity(0.12) : Color(.secondarySystemGroupedBackground))
             }
         }
     }

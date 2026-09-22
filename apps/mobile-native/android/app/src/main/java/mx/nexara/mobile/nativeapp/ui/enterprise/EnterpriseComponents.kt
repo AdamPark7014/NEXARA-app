@@ -71,8 +71,9 @@ import androidx.compose.ui.unit.sp
  * Uso: dashboards y pantallas de decisión (no CRUD genérico).
  */
 object NxColors {
-    val Teal = Color(0xFF0D9488)
-    val TealSoft = Color(0xFFCCFBF1)
+    // Brand color aligned with core.nexara.com.mx theme-color (#2563EB)
+    val Teal = Color(0xFF2563EB) // brand blue
+    val TealSoft = Color(0xFFDBEAFE) // light blue background
     val Slate = Color(0xFF0F172A)
     val Muted = Color(0xFF64748B)
     val Success = Color(0xFF10B981)
@@ -81,7 +82,7 @@ object NxColors {
     val WarningSoft = Color(0xFFFEF3C7)
     val Danger = Color(0xFFEF4444)
     val DangerSoft = Color(0xFFFEE2E2)
-    val Info = Color(0xFF3B82F6)
+    val Info = Color(0xFF2563EB)
     val InfoSoft = Color(0xFFDBEAFE)
     val Surface = Color(0xFFF8FAFC)
     val Card = Color.White
