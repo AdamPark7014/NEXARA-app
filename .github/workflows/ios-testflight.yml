@@ -40,13 +40,28 @@ jobs:
         with:
           xcode-version: '16.2'
 
-      - name: Initialize Xcode platforms (ensure iOS SDK is available)
+      - name: Initialize Xcode platforms (ensure iOS device SDK is available)
         run: |
           set -euo pipefail
-          xcodebuild -runFirstLaunch || true
-          xcodebuild -downloadPlatform iOS || true
-          xcodebuild -downloadAllPlatforms || true
+          echo "Xcode path: $(xcode-select -p)"
+          sudo xcodebuild -license accept || true
+          sudo xcodebuild -runFirstLaunch || true
+          # Retry iOS platform download up to 3 times
+          n=0
+          until [ $n -ge 3 ]; do
+            echo "Attempt $((n+1)) to download iOS platform SDK…"
+            if xcodebuild -downloadPlatform iOS; then
+              break
+            fi
+            n=$((n+1)); sleep 30
+          done
+          echo "Installed SDKs:"
           xcodebuild -showsdks || true
+          IOS_PLATFORM_DIR="$(xcode-select -p)/Platforms/iPhoneOS.platform"
+          if [ ! -d "$IOS_PLATFORM_DIR" ]; then
+            echo "ERROR: iPhoneOS.platform not found at $IOS_PLATFORM_DIR"; exit 1
+          fi
+          echo "Found iPhoneOS.platform at $IOS_PLATFORM_DIR"
 
       - name: Show macOS and Xcode
         run: |
@@ -67,6 +82,16 @@ jobs:
           echo "Using XcodeGen spec: ${SPEC_FILE}"
           xcodegen generate --spec "${SPEC_FILE}"
           test -d NexaraApp.xcodeproj
+      - name: Verify iOS device destination is available (post-project)
+        run: |
+          set -euo pipefail
+          echo "Available destinations for scheme NexaraApp:"
+          xcodebuild -showdestinations -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release || true
+          # Not all Xcode versions list generic destinations here; fallback to SDK path check as gate
+          IOS_PLATFORM_DIR="$(xcode-select -p)/Platforms/iPhoneOS.platform"
+          if [ ! -d "$IOS_PLATFORM_DIR" ]; then
+            echo "ERROR: iPhoneOS.platform missing after initialization step: $IOS_PLATFORM_DIR"; exit 1
+          fi
       # Removed fragile regex patch; a structured patch runs later to bind app and disable others
 
       - name: Prepare App Store Connect API key
