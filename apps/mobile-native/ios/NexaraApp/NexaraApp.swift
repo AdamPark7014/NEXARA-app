@@ -14,6 +14,7 @@ struct NexaraApp: App {
                     .environmentObject(appState)
             }
             .environmentObject(session)
+            .tint(Color("AccentColor"))
             .onOpenURL { url in
                 DeepLinkCoordinator.shared.ingest(url)
                 applyPendingDeepLink()

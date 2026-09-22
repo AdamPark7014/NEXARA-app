@@ -392,6 +392,7 @@ jobs:
           if [ ! -f "$PLIST" ]; then
             echo "ERROR: Info.plist not found at $PLIST"; ls -R "$APP_DIR" || true; exit 1
           fi
+          SRC_PLIST="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist"
           echo "Patching $PLIST"
           echo "::group::Before patch (plutil -p)"
           /usr/bin/plutil -p "$PLIST" | head -n 100 || true
@@ -419,6 +420,37 @@ jobs:
           # CFBundleIconName
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c 'Add :CFBundleIconName string AppIcon' "$PLIST"
+          # Propagate privacy usage descriptions from source Info.plist
+          if [ -f "$SRC_PLIST" ]; then
+            echo "::group::Propagating privacy usage descriptions from source Info.plist"
+            KEYS=(
+              NSLocationWhenInUseUsageDescription
+              NSLocationAlwaysAndWhenInUseUsageDescription
+              NSCameraUsageDescription
+              NSPhotoLibraryUsageDescription
+              NSPhotoLibraryAddUsageDescription
+              NSMicrophoneUsageDescription
+              NSUserTrackingUsageDescription
+            )
+            for K in "${KEYS[@]}"; do
+              SRC_VAL="$(/usr/libexec/PlistBuddy -c "Print :$K" "$SRC_PLIST" 2>/dev/null || true)"
+              if [ -n "$SRC_VAL" ]; then
+                if ! /usr/libexec/PlistBuddy -c "Print :$K" "$PLIST" >/dev/null 2>&1; then
+                  /usr/libexec/PlistBuddy -c "Add :$K string $SRC_VAL" "$PLIST"
+                fi
+                echo "$K: $(/usr/libexec/PlistBuddy -c "Print :$K" "$PLIST" || true)"
+              fi
+            done
+            echo "::endgroup::"
+          else
+            echo "WARN: Source Info.plist not found at $SRC_PLIST; skipping usage descriptions propagation."
+          fi
+          # Bump CFBundleVersion to 2 if still 1 (avoid duplicate build number)
+          CUR_VER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$PLIST" 2>/dev/null || echo '')"
+          if [ "$CUR_VER" = "1" ]; then
+            /usr/libexec/PlistBuddy -c 'Set CFBundleVersion 2' "$PLIST"
+            echo "CFBundleVersion updated from 1 to 2 in embedded Info.plist"
+          fi
           /usr/bin/plutil -lint "$PLIST" || { echo "ERROR: Patched Info.plist failed lint"; exit 1; }
           echo "::group::After patch (plutil -p)"
           /usr/bin/plutil -p "$PLIST" | head -n 100 || true

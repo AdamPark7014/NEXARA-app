@@ -59,8 +59,8 @@ fun NexaraApp() {
     val scope = rememberCoroutineScope()
     val session = remember { repo.loadSession() }
 
-    fun postAuthDestination(): String =
-        PanelAccessResolver.routeForSinglePanelUser(repo.loadSession()) ?: Routes.Panels
+    // ERP-first product: always land in ERP shell after login
+    fun postAuthDestination(): String = Routes.Erp
 
     if (session != null && onboardingCompleted == null) {
         Box(Modifier.fillMaxSize()) {
@@ -187,7 +187,7 @@ fun NexaraApp() {
         composable(Routes.Erp) {
             mx.nexara.mobile.nativeapp.ui.console.ConsoleNavHost(
                 panelId = PanelId.ERP,
-                onExitToPanels = { navController.navigate(Routes.Panels) { popUpTo(Routes.Erp) { inclusive = true } } },
+                onExitToPanels = null,
                 onLogout = {
                     repo.logout()
                     navController.navigate(Routes.Login) { popUpTo(0) { inclusive = true } }
@@ -198,7 +198,7 @@ fun NexaraApp() {
         composable(Routes.Ops) {
             mx.nexara.mobile.nativeapp.ui.console.ConsoleNavHost(
                 panelId = PanelId.OPS,
-                onExitToPanels = { navController.navigate(Routes.Panels) { popUpTo(Routes.Ops) { inclusive = true } } },
+                onExitToPanels = null,
                 onLogout = {
                     repo.logout()
                     navController.navigate(Routes.Login) { popUpTo(0) { inclusive = true } }
@@ -239,7 +239,8 @@ fun NexaraApp() {
                     when (dest) {
                         is DeepLinkDestination.Notifications -> Unit
                         DeepLinkDestination.PanelHub -> {
-                            navController.navigate(Routes.Panels) { launchSingleTop = true }
+                            // ERP-only: route hub requests to ERP
+                            navController.navigate(Routes.Erp) { launchSingleTop = true }
                         }
                         is DeepLinkDestination.Module -> {
                             PendingDeepLink.destination = dest
