@@ -409,6 +409,32 @@ jobs:
           echo "::group::After patch (plutil -p)"
           /usr/bin/plutil -p "$PLIST" | head -n 100 || true
           echo "::endgroup::"
+
+      - name: Neutralize Starscream resource bundles
+        run: |
+          set -euo pipefail
+          APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          echo "Scanning for Starscream bundles in: $APP_DIR"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
+          fi
+          echo "::group::All .bundle paths"
+          /usr/bin/find "$APP_DIR" -type d -name '*.bundle' -print || true
+          echo "::endgroup::"
+          removed=0
+          while IFS= read -r -d '' bundle; do
+            id=""
+            if [ -f "$bundle/Info.plist" ]; then
+              id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$bundle/Info.plist" 2>/dev/null || echo "")
+            fi
+            name="$(basename "$bundle")"
+            if echo "$name" | grep -qi 'Starscream' || echo "$id" | grep -qi '^starscream\\.' ; then
+              echo "Removing Starscream bundle: $bundle (CFBundleIdentifier='$id')"
+              rm -rf "$bundle"
+              removed=$((removed+1))
+            fi
+          done < <(/usr/bin/find "$APP_DIR" -type d -name '*.bundle' -print0)
+          echo "REMOVED_COUNT=$removed"
       - name: Inspect built Info.plist in archive (launch/orientations)
         run: |
           set -euo pipefail
@@ -465,22 +491,40 @@ jobs:
           if [ ! -f "$IPA" ]; then echo "IPA not found"; ls -R "$EXPORT_DIR"; exit 1; fi
           echo "IPA found at: $IPA"
           ls -lah "$IPA" || true
-          echo "Uploading to TestFlight via iTMSTransporter (API key)…"
-          LOG="$RUNNER_TEMP/transporter-upload.log"
+          echo "Uploading to TestFlight via altool (API key)…"
+          LOG="$RUNNER_TEMP/altool-upload.log"
+          echo "altool path: $(xcrun -f altool || true)"
           set +e
-          xcrun iTMSTransporter -m upload \
-            -assetFile "$IPA" \
-            -apiKey "$ASC_KEY_ID" -apiIssuer "$ASC_ISSUER_ID" \
-            -v informational -t Upload 2>&1 | tee "$LOG"
+          xcrun altool --upload-app --type ios \
+            --file "$IPA" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$LOG"
           STATUS=${PIPESTATUS[0]}
           set -e
-          # Fail on any ERROR lines regardless of exit code
-          if grep -qi '^ERROR:' "$LOG"; then
-            echo "Transporter reported ERROR lines"; exit 1
+          # Fail on any ERROR or known failure lines regardless of exit code
+          if grep -qiE '^ERROR:|UPLOAD FAILED|Cannot determine the Apple ID' "$LOG"; then
+            echo "altool reported upload ERROR"; exit 1
           fi
-          # Require a definitive success marker
-          if ! grep -qiE 'has been uploaded successfully|No errors uploading|Transporter transfer successful|UPLOAD SUCCEEDED|Delivery UUID' "$LOG"; then
-            echo "Did not detect a definitive Transporter success marker"; exit 1
+          # Require definitive success marker
+          if ! grep -qiE 'UPLOAD SUCCEEDED|No errors uploading package|Delivery has finished|bytes uploaded' "$LOG"; then
+            echo "No definitive altool success marker detected — attempting Xcode-bundled iTMSTransporter fallback..."
+            FBLOG="$RUNNER_TEMP/transporter-fallback.log"
+            set +e
+            TX="$((dirname $(xcode-select -p)))/SharedFrameworks/ContentDeliveryServices.framework/Versions/A/usr/bin/iTMSTransporter"
+            if [ -x "$TX" ]; then
+              "$TX" -m upload -assetFile "$IPA" -apiKey "$ASC_KEY_ID" -apiIssuer "$ASC_ISSUER_ID" -v informational -t Upload 2>&1 | tee "$FBLOG"
+              FBSTATUS=${PIPESTATUS[0]}
+              set -e
+              if grep -qi '^ERROR:' "$FBLOG"; then
+                echo "Fallback iTMSTransporter reported ERROR"; exit 1
+              fi
+              if ! grep -qiE 'has been uploaded successfully|No errors uploading|Transporter transfer successful|Delivery UUID' "$FBLOG"; then
+                echo "No definitive Transporter success marker in fallback"; exit 1
+              fi
+              exit $FBSTATUS
+            else
+              echo "Fallback iTMSTransporter not found at $TX"; exit 1
+            fi
           fi
           exit $STATUS
 
