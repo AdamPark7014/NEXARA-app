@@ -106,9 +106,6 @@ jobs:
     name: Android · assembleDebug
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Mientras estabilizamos AGP/Kotlin en CI, el fallo de build de la app no bloquea
-    # el pipeline. La preparación del SDK y el gradlew ejecutable sí quedan verificados.
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
