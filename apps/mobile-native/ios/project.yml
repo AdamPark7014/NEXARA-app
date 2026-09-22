@@ -23,7 +23,7 @@ targets:
     platform: iOS
     sources:
       - path: NexaraApp
-      - path: Resources/Assets.xcassets
+      - path: Resources
     dependencies:
       - package: SocketIO
         product: SocketIO
