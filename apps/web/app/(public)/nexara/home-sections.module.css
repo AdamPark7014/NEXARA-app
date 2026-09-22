@@ -20,7 +20,7 @@
 
 .headSplit {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  grid-template-columns: 1fr 1fr;
   gap: clamp(20px, 4vw, 48px);
   align-items: end;
   max-width: none;
@@ -67,10 +67,10 @@
 
 .geoChip {
   display: inline-flex;
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 9px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(140, 190, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
   color: #cfe0f7;
   text-decoration: none;
   font-size: 0.85rem;

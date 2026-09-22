@@ -136,10 +136,11 @@
   font-family: var(--font-ui);
   font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--nx-cyan);
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
+  /* Mantener sobriedad: sin brillos notables en tipografía */
+  text-shadow: none;
 }
 
 .title {
@@ -151,7 +152,8 @@
   letter-spacing: -0.038em;
   color: #fff;
   text-wrap: balance;
-  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.4);
+  /* Sin glow pesado: un leve antialias natural basta */
+  text-shadow: none;
 }
 
 .titleAccent {
@@ -162,7 +164,7 @@
   margin: 0 0 26px;
   font-size: clamp(1.02rem, 1.35vw, 1.12rem);
   line-height: 1.55;
-  color: rgba(238, 244, 255, 0.78);
+  color: rgba(238, 244, 255, 0.82);
   max-width: 36ch;
 }
 
