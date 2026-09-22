@@ -51,13 +51,12 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   const pageKeywords = getPageKeywords(category, "Puebla");
 
   return {
-    robots: { index: true, follow: true },
-    title: { absolute: title },
-    description,
     robots:
       industry.slug === "hospitalidad" && service.slug === "redes-y-conectividad"
         ? { index: false, follow: true }
-        : undefined,
+        : { index: true, follow: true },
+    title: { absolute: title },
+    description,
     keywords: [
       ...pageKeywords,
       `${service.name} para ${industry.name}`,
