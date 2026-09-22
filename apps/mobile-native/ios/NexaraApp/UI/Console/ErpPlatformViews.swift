@@ -170,7 +170,7 @@ struct ExecutiveView: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         ErpTile(label: "Ingresos MTD", value: platFmtMxn(h.revenueMtd), accent: .green)
                         ErpTile(label: "Pipeline", value: platFmtMxn(h.pipelineValue), accent: .blue)
-                        ErpTile(label: "Caja", value: platFmtMxn(h.cashOnHand), accent: .teal)
+                        ErpTile(label: "Caja", value: platFmtMxn(h.cashOnHand), accent: Color("AccentColor"))
                         ErpTile(label: "CxC", value: platFmtMxn(h.arOutstanding), accent: .orange)
                     }
                     Text("Operaciones").font(.headline).padding(.top, 8)
@@ -259,7 +259,7 @@ struct ExecutiveView: View {
             Spacer()
             Text(platFmtPct(acc.marginPercent))
                 .font(.subheadline.weight(.bold))
-                .foregroundColor(.teal)
+                .foregroundColor(Color("AccentColor"))
         }
         .padding(10)
         .background(Color(.secondarySystemBackground))
