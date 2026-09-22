@@ -63,11 +63,6 @@ struct ConsoleTabView: View {
         case "dashboard":
             ConsoleDashboardView(isOps: panel == .ops, panel: panel)
                 .navigationTitle("Inicio")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Paneles", action: onExit)
-                    }
-                }
         case "activities":
             ActivitiesView()
                 .navigationTitle("Operación")
@@ -187,11 +182,7 @@ private struct ConsoleMoreView: View {
                 }
             }
 
-            Section {
-                Button(role: .destructive) { onExit() } label: {
-                    Label("Cambiar panel", systemImage: "arrow.left.circle")
-                }
-            }
+            // Sin opción de «Cambiar panel»: ERP es el shell principal
         }
         .navigationDestination(for: String.self) { key in
             ModuleRouter.view(for: panel, key: key)

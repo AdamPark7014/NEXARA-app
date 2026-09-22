@@ -212,7 +212,7 @@ struct ConsoleDashboardView: View {
                 DashKpiCard(icon: "💰", label: "Ingresos", value: fmtMxn(revenue ?? 0), detail: "Acumulado", accent: .green)
                 DashKpiCard(icon: "🧩", label: "Proyectos", value: "\(projects ?? vm.activities.count)", detail: "Activos", accent: .blue)
                 DashKpiCard(icon: "👷", label: "Ingenieros", value: "\(engineers ?? Set(vm.attendance.map(\.userName)).count)", detail: "En campo", accent: .orange)
-                DashKpiCard(icon: "🤝", label: "Clientes", value: "\(clients ?? 0)", detail: "Activos", accent: .teal)
+                DashKpiCard(icon: "🤝", label: "Clientes", value: "\(clients ?? 0)", detail: "Activos", accent: Color(\"AccentColor\"))
             }
             .padding(.horizontal)
         }

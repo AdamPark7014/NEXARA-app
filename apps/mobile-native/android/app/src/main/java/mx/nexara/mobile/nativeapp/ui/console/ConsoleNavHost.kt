@@ -137,8 +137,8 @@ private fun routeForModuleKey(key: String): String {
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun ConsoleNavHost(
-    onExitToPanels: () -> Unit,
-    onLogout: () -> Unit = onExitToPanels,
+    onExitToPanels: (() -> Unit)? = null,
+    onLogout: () -> Unit,
     panelId: PanelId = PanelId.ERP,
 ) {
     val context = LocalContext.current
@@ -536,7 +536,7 @@ fun ConsoleNavHost(
                                             navController.navigate(routeForModuleKey(dest.key)) { launchSingleTop = true }
                                         } else {
                                             PendingDeepLink.destination = dest
-                                            onExitToPanels()
+                                            onExitToPanels?.invoke()
                                         }
                                     }
                                     else -> Unit

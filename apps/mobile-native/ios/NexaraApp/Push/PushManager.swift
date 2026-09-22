@@ -9,7 +9,13 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
     private var pendingDeviceToken: Data?
 
     func configure() {
-        UNUserNotificationCenter.current().delegate = self
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        // Registrar categorías para estilos tipo «chat» / «tickets» / «alertas»
+        let chat = UNNotificationCategory(identifier: "chat", actions: [], intentIdentifiers: [], options: [.customDismissAction])
+        let tickets = UNNotificationCategory(identifier: "tickets", actions: [], intentIdentifiers: [], options: [])
+        let alerts = UNNotificationCategory(identifier: "alerts", actions: [], intentIdentifiers: [], options: [.customDismissAction])
+        center.setNotificationCategories([chat, tickets, alerts])
     }
 
     func requestPermissionAndRegister() async {

@@ -191,7 +191,7 @@ struct ViaticsView: View {
                         Divider().frame(height: 36)
                         ViatKpi(label: "Pendientes",value: "\(vm.pendingCount)", color: .orange)
                         Divider().frame(height: 36)
-                        ViatKpi(label: "Monto",     value: fmtMxnV(vm.totalAmount), color: .teal)
+                        ViatKpi(label: "Monto",     value: fmtMxnV(vm.totalAmount), color: Color(\"AccentColor\"))
                     }
                     .padding(.horizontal).padding(.vertical, 6)
                     .background(Color(.secondarySystemGroupedBackground))
@@ -218,8 +218,8 @@ struct ViaticsView: View {
                             Button { vm.statusFilter = s } label: {
                                 Text(s.capitalized).font(.caption).bold()
                                     .padding(.horizontal, 12).padding(.vertical, 6)
-                                    .background(sel ? Color.teal : Color(.secondarySystemGroupedBackground))
-                                    .foregroundColor(sel ? .white : .primary)
+                                    .background(sel ? Color(\"AccentColor\") : Color(.secondarySystemGroupedBackground))
+                                    .foregroundColor(sel ? Color.white : Color.primary)
                                     .clipShape(Capsule())
                             }
                         }

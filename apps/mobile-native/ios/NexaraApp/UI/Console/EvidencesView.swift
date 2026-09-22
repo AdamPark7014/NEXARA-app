@@ -88,7 +88,7 @@ struct EvidencesView: View {
                                 } label: {
                                     Text(act.title.isEmpty ? "Actividad" : act.title)
                                         .font(.caption).padding(.horizontal, 10).padding(.vertical, 6)
-                                        .background(Color.teal.opacity(0.12)).foregroundColor(.teal)
+                                        .background(Color(\"AccentColor\").opacity(0.12)).foregroundColor(Color(\"AccentColor\"))
                                         .clipShape(Capsule())
                                 }
                             }
@@ -149,8 +149,8 @@ struct EvidencesView: View {
                     Button { statusFilter = s } label: {
                         Text(s).font(.caption).bold()
                             .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(statusFilter == s ? Color.teal : Color(.secondarySystemGroupedBackground))
-                            .foregroundColor(statusFilter == s ? .white : .primary)
+                            .background(statusFilter == s ? Color(\"AccentColor\") : Color(.secondarySystemGroupedBackground))
+                            .foregroundColor(statusFilter == s ? Color.white : Color.primary)
                             .clipShape(Capsule())
                     }
                 }

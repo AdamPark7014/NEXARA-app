@@ -236,7 +236,7 @@ private struct FilterChipView: View {
         Button(action: action) {
             Text(label).font(.caption.bold())
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(on ? Color.teal.opacity(0.2) : Color(.systemFill))
+                .background(on ? Color(\"AccentColor\").opacity(0.2) : Color(.systemFill))
                 .clipShape(Capsule())
         }.buttonStyle(.plain)
     }

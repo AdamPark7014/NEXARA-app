@@ -111,7 +111,7 @@ struct MyLunchBreaksView: View {
     private var todayCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Hoy — \(today)")
-                .font(.headline).foregroundColor(.teal)
+                .font(.headline).foregroundColor(Color(\"AccentColor\"))
 
             // Status
             if isCheckedOut {
@@ -148,7 +148,7 @@ struct MyLunchBreaksView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(.teal)
+                .tint(Color(\"AccentColor\"))
             }
             if pendingAction == nil && isCheckedIn && !isCheckedOut {
                 Button {
@@ -186,7 +186,7 @@ struct MyLunchBreaksView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(.teal)
+                            .tint(Color(\"AccentColor\"))
                             .disabled(vm.actionLoading)
 
                             Button {

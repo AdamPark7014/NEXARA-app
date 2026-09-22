@@ -163,7 +163,7 @@ struct AttendanceView: View {
                     HStack(spacing: 0) {
                         AttKpi(label: "Total", value: "\(s.total)", color: .primary)
                         Divider().frame(height: 36)
-                        AttKpi(label: "Entradas", value: "\(s.entries)", color: .teal)
+                        AttKpi(label: "Entradas", value: "\(s.entries)", color: Color(\"AccentColor\"))
                         Divider().frame(height: 36)
                         AttKpi(label: "Salidas", value: "\(s.exits)", color: .blue)
                         Divider().frame(height: 36)
@@ -248,7 +248,7 @@ struct AttendanceView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.teal)
+                .tint(Color(\"AccentColor\"))
                 .disabled(vm.checkInLoading || vm.isCheckedIn)
 
                 Button { vm.checkIn("salida") } label: {
@@ -316,7 +316,7 @@ private struct AttendanceRow: View {
     private func typeStyle(_ t: String) -> (String, Color) {
         let lower = t.lowercased()
         if lower.contains("entrada") || lower == "in" || lower == "checkin" {
-            return ("arrow.right.circle.fill", .teal)
+            return ("arrow.right.circle.fill", Color(\"AccentColor\"))
         } else if lower.contains("salida") || lower == "out" || lower == "checkout" {
             return ("arrow.left.circle.fill", .blue)
         } else {

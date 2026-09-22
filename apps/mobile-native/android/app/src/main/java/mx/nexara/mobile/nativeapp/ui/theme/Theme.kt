@@ -16,18 +16,18 @@ private val LightColors = lightColorScheme(
     primary = NxColors.Teal,
     onPrimary = Color.White,
     primaryContainer = NxColors.TealSoft,
-    secondary = Color(0xFF0F766E),
-    tertiary = Color(0xFF0EA5E9),
+    secondary = Color(0xFF1D4ED8), // blue-700
+    tertiary = Color(0xFF38BDF8), // sky-400
     surface = NxColors.Surface,
     background = NxColors.Surface,
     error = NxColors.Danger,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF2DD4BF),
+    primary = Color(0xFF60A5FA), // blue-400
     onPrimary = NxColors.Slate,
-    secondary = Color(0xFF14B8A6),
-    tertiary = Color(0xFF38BDF8),
+    secondary = Color(0xFF3B82F6), // blue-500
+    tertiary = Color(0xFF38BDF8),  // sky-400
     surface = NxColors.Slate,
     background = NxColors.Slate,
     error = NxColors.Danger,
