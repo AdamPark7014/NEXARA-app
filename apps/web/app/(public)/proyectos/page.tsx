@@ -16,6 +16,7 @@ import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import coverageStyles from "../cobertura/page.module.css";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 // Sin mosaicos decorativos — mantén evidencia real de casos
+import CatalogShowcase from "./CatalogShowcase";
 
 const resolveIndustriaSlug = (label: string) =>
   INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -142,6 +143,20 @@ async function fetchStudioProjects(): Promise<StudioProject[]> {
 
 export default async function ProyectosPage() {
   const studioProjects = await fetchStudioProjects();
+  const showcaseProjects = studioProjects.map((p) => ({
+    id: p.id,
+    slug: p.slug || String(p.id),
+    title: p.title,
+    sector: p.sector || "Proyecto",
+    summary: p.summary || "",
+    impact: p.impact || "",
+    services: p.services || [],
+    tags: p.tags || [],
+    highlights: p.highlights || [],
+    gallery: p.gallery || [],
+    mainImage: p.mainImage || null,
+    createdAt: p.createdAt,
+  }));
 
   return (
     <main className={`${shared.page} home-main-flush`}>
@@ -210,60 +225,7 @@ export default async function ProyectosPage() {
           
 
           {studioProjects.length ? (
-            <div className={styles.studioCasesList} data-reveal-stagger>
-              {studioProjects.map((p) => {
-                const sectorSlug = resolveIndustriaSlug(p.sector || "Proyecto");
-                return (
-                  <article key={p.id} className={styles.studioCaseCard} data-reveal="up">
-                    <div className={styles.studioCaseMedia}>
-                      <Image
-                        src={normalizeProjectImageUrl(p.mainImage)}
-                        alt={p.title}
-                        fill
-                        sizes="(max-width: 1024px) 100vw, 42vw"
-                        className={styles.studioCasePhoto}
-                        unoptimized
-                      />
-                      {p.impact ? <span className={styles.caseMetric}>{p.impact}</span> : null}
-                    </div>
-                    <div className={styles.studioCaseBody}>
-                      <span className={styles.caseSector}>{p.sector || "Proyecto"}</span>
-                      <h3 className={styles.studioCaseTitle}>{p.title}</h3>
-                      <p className={styles.studioCaseSummary}>{p.summary}</p>
-
-                      {p.services?.length > 0 && (
-                        <p className={styles.infoRow}>
-                          <strong>Servicios:</strong> {p.services.join(" · ")}
-                        </p>
-                      )}
-
-                      {p.highlights?.length > 0 && (
-                        <ul className={styles.highlights}>
-                          {p.highlights.slice(0, 4).map((h, idx) => (
-                            <li key={`${p.id}-h-${idx}`}>{h}</li>
-                          ))}
-                        </ul>
-                      )}
-
-                      <div className={styles.studioCaseActions}>
-                        <Link
-                          href={`/soluciones/${sectorSlug}`}
-                          className={`${shared.btn} ${shared.btnSecondary} ${styles.studioCaseBtn}`}
-                        >
-                          Ver vertical <span className={shared.btnArrow}>→</span>
-                        </Link>
-                        <Link
-                          href={`/contacto?industry=${sectorSlug}`}
-                          className={`${shared.btn} ${shared.btnPrimary} ${styles.studioCaseBtn}`}
-                        >
-                          Cotizar similar <span className={shared.btnArrow}>→</span>
-                        </Link>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            <CatalogShowcase projects={showcaseProjects as any} />
           ) : (
             <div className={shared.industryBoard} data-reveal-stagger>
               {casos.map((c) => (

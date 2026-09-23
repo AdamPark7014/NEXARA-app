@@ -225,9 +225,6 @@ export default async function NexaraPage() {
               { src: "/images/hero/hero-02.png", alt: "CCTV en sitio", label: "CCTV", href: "/servicios#cctv" },
               { src: "/images/hero/hero-04.png", alt: "Redes/wi‑fi", label: "Redes", href: "/servicios#redes" },
               { src: "/images/hero/hero-06.png", alt: "Racks/infra", label: "Infraestructura", href: "/servicios#computo" },
-              { src: "/images/hero/hero-07.png", alt: "Proyectos", label: "Proyectos", href: "/proyectos" },
-              { src: "/mapa-operaciones.png", alt: "Cobertura", label: "Cobertura", href: "/cobertura" },
-              { src: "/images/hero/hero-01.png", alt: "Soporte", label: "Soporte TI", href: "/servicios#soporte" },
             ]}
           />
         </section>
