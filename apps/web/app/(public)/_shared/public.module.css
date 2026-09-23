@@ -29,16 +29,15 @@
   --ds-cyan-strong: #0b7f99;
   --ds-cyan-bright: #2dd8f2;
   --ds-cyan-tint: rgba(18, 182, 212, 0.12);
-  --ds-orange: #ff9d3c;
-  --ds-purple: #7c4dff;
+  --ds-orange: #ff9d3c; /* solo estados de error */
   --ds-shadow: 0 18px 44px rgba(11, 26, 51, 0.1);
   --ds-shadow-sm: 0 8px 22px rgba(11, 26, 51, 0.08);
   --ds-font-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   --ds-font-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
   --ds-font-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
-  --ds-radius-sm: 10px;
-  --ds-radius: 14px;
-  --ds-radius-lg: 20px;
+  --ds-radius-sm: 8px;
+  --ds-radius: 12px;
+  --ds-radius-lg: 16px;
 
   position: relative;
   background: var(--ds-bg);
@@ -72,8 +71,7 @@
 
 .sectionNavy {
   background:
-    radial-gradient(60% 80% at 100% 0%, rgba(45, 216, 242, 0.14), transparent 60%),
-    radial-gradient(40% 60% at 0% 100%, rgba(124, 77, 255, 0.1), transparent 60%),
+    radial-gradient(60% 80% at 100% 0%, rgba(45, 216, 242, 0.12), transparent 60%),
     #0b1a33;
 }
 
@@ -174,7 +172,7 @@
   gap: 8px;
   padding: 12px 22px;
   min-height: 48px;
-  border-radius: 12px;
+  border-radius: 10px;
   font-family: var(--ds-font-ui);
   font-size: 0.94rem;
   font-weight: 600;
@@ -190,16 +188,17 @@
   outline-offset: 2px;
 }
 
+/* Un solo color de acción en todo el sitio: el cian de marca (igual que hero y header) */
 .btnPrimary {
-  background: #0b1a33;
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(11, 26, 51, 0.18);
+  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+  color: #04131a;
+  box-shadow: 0 10px 24px rgba(18, 182, 212, 0.22);
 }
 
 .btnPrimary:hover {
   transform: translateY(-1px);
-  background: #12264a;
-  box-shadow: 0 14px 30px rgba(11, 26, 51, 0.24);
+  background: linear-gradient(135deg, #4fe0f5, #1cc3e0);
+  box-shadow: 0 14px 30px rgba(18, 182, 212, 0.28);
 }
 
 .btnSecondary,
@@ -215,19 +214,7 @@
   border-color: #0b1a33;
 }
 
-/* Dentro de bandas oscuras los botones se invierten */
-.sectionNavy .btnPrimary,
-.ctaBand .btnPrimary {
-  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
-  color: #04131a;
-  box-shadow: 0 12px 30px rgba(45, 216, 242, 0.22);
-}
-
-.sectionNavy .btnPrimary:hover,
-.ctaBand .btnPrimary:hover {
-  background: linear-gradient(135deg, #4fe0f5, #1cc3e0);
-}
-
+/* Dentro de bandas oscuras el secundario se invierte; el primario es el mismo cian */
 .sectionNavy .btnSecondary,
 .ctaBand .btnSecondary {
   background: transparent;
@@ -267,16 +254,22 @@
   gap: 10px;
 }
 
-/* ── Banda de cifras (tarjeta que monta sobre el hero) ───── */
-.statsCard {
+/* ── Banda de cifras (franja blanca justo debajo del hero, sin montarse) ── */
+.statsBand {
   position: relative;
   z-index: 3;
-  margin-top: clamp(-64px, -4vw, -40px);
   background: #fff;
-  border-radius: var(--ds-radius-lg);
-  box-shadow: 0 28px 70px rgba(11, 26, 51, 0.16);
-  border: 1px solid var(--ds-line);
-  overflow: hidden;
+  border-bottom: 1px solid var(--ds-line);
+}
+
+.statsCard {
+  position: relative;
+  margin: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  border: 0;
+  overflow: visible;
 }
 
 .statsGrid {
@@ -1380,7 +1373,6 @@ a.iconCard:hover .iconCardLink {
   border-radius: var(--ds-radius-lg);
   background:
     radial-gradient(60% 90% at 100% 0%, rgba(45, 216, 242, 0.22), transparent 55%),
-    radial-gradient(40% 60% at 0% 100%, rgba(124, 77, 255, 0.14), transparent 55%),
     #0b1a33;
   overflow: hidden;
   box-shadow: 0 30px 70px rgba(11, 26, 51, 0.22);
@@ -1736,7 +1728,7 @@ a.iconCard:hover .iconCardLink {
   .statsGrid { grid-template-columns: 1fr; }
   .stat { border-left: none; }
   .stat:nth-child(n + 2) { border-top: 1px solid var(--ds-line); }
-  .statsCard { margin-top: -28px; }
+  .statsCard { margin-top: 0; }
   .tileRow { grid-template-columns: 1fr; }
   .tile { border-left: none; }
   .tile:nth-child(n + 2) { border-top: 1px solid var(--ds-line); }
