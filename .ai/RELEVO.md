@@ -2,7 +2,7 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-23
-- **Rama:** claude/web-publica-premium = mejora/calidad-y-web (fcfeaeb8), desplegada en nexara.com.mx
+- **Rama:** claude/web-publica-premium = mejora/calidad-y-web (f06433a0), desplegada en nexara.com.mx
 - **Checkout:** `C:\Users\adpoz\Projects\NEXARA-app` (el que sirve localhost:3000). `C:\dev\apps\NEXARA-app` sigue en `main`.
 
 ## Hecho
@@ -58,7 +58,30 @@ referencia ETEK: cuerpo claro, tarjetas con icono, cifras, fotos reales.
   Build web en intento 1 con revisión de tipos; sin migraciones pendientes; `nexara-web` y
   `nexara-api` arriba. nexara.com.mx sirve el diseño nuevo (fotos reales 200, tarjeta de cifras).
 
+## Tercera ronda (23-09, 16:00-16:25): mapa, cifras, colores
+- **Mapa gris en Contacto y footer (causa raíz):** la CSP no declaraba `frame-src` (caía en
+  `default-src 'self'`) y el header `Cross-Origin-Embedder-Policy: credentialless` bloqueaba
+  cualquier iframe externo; nada usa SharedArrayBuffer, se retiró. Además la clave
+  `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` NO tiene habilitada Maps Embed API (Google responde «not
+  authorized») y el embed sin clave contesta `X-Frame-Options: SAMEORIGIN`. Nueva ruta
+  `apps/web/app/mapa/proveedor/route.ts` (probar Google desde el servidor, caché 1 h, si no →
+  OpenStreetMap) y hook `useMapProvider` usado por `Map.tsx` y `Footer.tsx`. Hoy sirve OSM;
+  cuando Adam habilite Maps Embed API en la clave, cambia solo a Google.
+- **Cifras:** ya no se montan sobre el hero ni el video; franja blanca (`.statsBand`) debajo.
+- **Colores homologados:** un solo color de acción (cian de marca) en botones primarios y CTA
+  del header; sin morados; WhatsApp de Contacto dentro del sistema; radios 8/12/16.
+- Footer: columnas Sitio/Capacidades/Cobertura alineadas arriba.
+- Se integró el commit `1c913ec9` de otra sesión (frame-ancestors para zynoratek.com) que
+  llegó a `mejora/calidad-y-web` en paralelo; ojo: hay más de un agente sobre esa rama.
+- Deploys 2 y 3 hechos (`update.sh --force-all --with-migrate`, build web en intento 1 con
+  tipos). Producción verificada: `frame-src` presente, sin COEP, sin violaciones CSP en vivo,
+  iframes OSM cargando, cifras a ras del hero, CTA del header cian, columnas del footer alineadas.
+
 ## A medias / pendiente
+- **Google Maps:** habilitar «Maps Embed API» en la clave web (Google Cloud Console) para que
+  el mapa vuelva a ser de Google; hoy es OpenStreetMap.
+- **Adam sigue pidiendo más pulido "premium":** no pude ver capturas (el panel se cuelga);
+  pedirle capturas concretas de lo que no le convence.
 - **Studio en producción** guarda `heroDesktopUrl` de Soluciones (`/images/hero/hero-03.png`) y
   Contacto (`/images/hero/hero-01.png`): cambiarlos desde Studio o vaciarlos para que tomen los
   defaults nuevos. Sus slots ya tienen fotos reales.
