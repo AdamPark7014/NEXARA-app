@@ -24,6 +24,7 @@ import { fetchPublicHeroSlidesCached } from "@/lib/hero-slides-api";
 import { fetchPublicHeroVideoCached, resolveHeroVideoUrl } from "@/lib/hero-video-api";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 // Nota: evitamos bloques “IA landing kit” — icon strips/mosaicos se retiraron
+import VisualEvidenceGrid from "../../components/VisualEvidenceGrid";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("home");
@@ -218,7 +219,27 @@ export default async function NexaraPage() {
           </div>
         </section>
 
-        {/* (Se retiran strips/mosaicos decorativos para un look editorial más serio) */}
+        {/* Evidencia visual abierta (grid 3x2) — sin recuadros, copy mínimo */}
+        <section className={shared.sectionTight} aria-label="Evidencia en campo" data-reveal="up">
+          <div className={shared.inner}>
+            <header className={shared.sectionHead}>
+              <p className={shared.eyebrow}>En campo</p>
+              <h2 className={shared.sectionTitle}>
+                Instalamos, documentamos y <span className={shared.sectionTitleAccent}>operamos</span>
+              </h2>
+            </header>
+          </div>
+          <VisualEvidenceGrid
+            items={[
+              { src: "/images/hero/hero-02.png", alt: "CCTV en sitio", label: "CCTV", href: "/servicios#cctv" },
+              { src: "/images/hero/hero-04.png", alt: "Redes/wi‑fi", label: "Redes", href: "/servicios#redes" },
+              { src: "/images/hero/hero-06.png", alt: "Racks/infra", label: "Infraestructura", href: "/servicios#computo" },
+              { src: "/images/hero/hero-07.png", alt: "Proyectos", label: "Proyectos", href: "/proyectos" },
+              { src: "/mapa-operaciones.png", alt: "Cobertura", label: "Cobertura", href: "/cobertura" },
+              { src: "/images/hero/hero-01.png", alt: "Soporte", label: "Soporte TI", href: "/servicios#soporte" },
+            ]}
+          />
+        </section>
 
         <section className={shared.section} aria-label="Capacidades" data-reveal="up">
           <div className={shared.inner}>
