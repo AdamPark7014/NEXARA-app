@@ -227,22 +227,23 @@
 	gap: 8px;
 	padding: 10px 16px;
 	border-radius: 10px;
-	background: transparent;
-	color: #2dd8f2;
+	background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+	color: #04131a;
 	font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
 	font-size: 0.88rem;
 	font-weight: 600;
 	letter-spacing: -0.01em;
 	text-decoration: none;
-	border: 1px solid rgba(45, 216, 242, 0.5);
-	transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease;
+	border: 1px solid transparent;
+	box-shadow: 0 8px 22px rgba(18, 182, 212, 0.22);
+	transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
 }
 
 .contactCta:hover {
 	transform: translateY(-1px);
-	background: rgba(45, 216, 242, 0.1);
-	border-color: #2dd8f2;
-	color: #9fecfa;
+	background: linear-gradient(135deg, #4fe0f5, #1cc3e0);
+	border-color: transparent;
+	color: #04131a;
 }
 
 .contactArrow {
