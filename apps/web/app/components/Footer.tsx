@@ -10,6 +10,10 @@ const WA_LABEL = "+52 222 696 0350";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
 const COMPANY_PHONE_LABEL = "+52 222 696 0350";
 const COMPANY_TEL = "tel:+522226960350";
+// Coordenadas del footer (Explanada Puebla · Momoxpan)
+const MAP_EMBED_LAT = 19.073803;
+const MAP_EMBED_LNG = -98.277838;
+const MAPS_EMBED_SRC = `https://www.google.com/maps?q=${MAP_EMBED_LAT},${MAP_EMBED_LNG}&ll=${MAP_EMBED_LAT},${MAP_EMBED_LNG}&z=16&output=embed&hl=es`;
 
 const Icon = {
   Facebook: () => (
@@ -84,40 +88,58 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className={styles.navGrid}>
-          <nav className={styles.linkCol} aria-label="Sitio">
-            <h4 className={styles.colTitle}>Sitio</h4>
-            <ul className={styles.list}>
-              <li><Link href="/">Inicio</Link></li>
-              <li><Link href="/servicios">Servicios</Link></li>
-              <li><Link href="/proyectos">Proyectos</Link></li>
-              <li><Link href="/nosotros">Nosotros</Link></li>
-            </ul>
-          </nav>
+        <div className={styles.infoGrid}>
+          {/* Bloque de navegación (aprovecha ancho con 3 columnas) */}
+          <div className={styles.navBlock}>
+            <div className={styles.linkCols}>
+              <nav className={styles.linkCol} aria-label="Sitio">
+                <h4 className={styles.colTitle}>Sitio</h4>
+                <ul className={styles.list}>
+                  <li><Link href="/">Inicio</Link></li>
+                  <li><Link href="/servicios">Servicios</Link></li>
+                  <li><Link href="/proyectos">Proyectos</Link></li>
+                  <li><Link href="/nosotros">Nosotros</Link></li>
+                </ul>
+              </nav>
+              <nav className={styles.linkCol} aria-label="Capacidades">
+                <h4 className={styles.colTitle}>Capacidades</h4>
+                <ul className={styles.list}>
+                  <li><Link href="/servicios#cctv">Videovigilancia</Link></li>
+                  <li><Link href="/servicios#redes">Redes y Wi‑Fi</Link></li>
+                  <li><Link href="/servicios#computo">Cómputo</Link></li>
+                  <li><Link href="/servicios#soporte">Soporte TI</Link></li>
+                  <li><Link href="/servicios#software">Plataformas a medida</Link></li>
+                </ul>
+              </nav>
+              <nav className={styles.linkCol} aria-label="Cobertura">
+                <h4 className={styles.colTitle}>Cobertura</h4>
+                <ul className={styles.list}>
+                  <li><Link href="/cobertura/puebla">Puebla</Link></li>
+                  <li><Link href="/cobertura/cdmx">Ciudad de México</Link></li>
+                  <li><Link href="/cobertura/cholula">San Andrés Cholula</Link></li>
+                  <li><Link href="/cobertura/queretaro">Querétaro</Link></li>
+                  <li><Link href="/cobertura">Todas las ciudades</Link></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
 
-          <nav className={styles.linkCol} aria-label="Capacidades">
-            <h4 className={styles.colTitle}>Capacidades</h4>
-            <ul className={styles.list}>
-              <li><Link href="/servicios#cctv">Videovigilancia</Link></li>
-              <li><Link href="/servicios#redes">Redes y Wi‑Fi</Link></li>
-              <li><Link href="/servicios#computo">Cómputo</Link></li>
-              <li><Link href="/servicios#soporte">Soporte TI</Link></li>
-              <li><Link href="/servicios#software">Plataformas a medida</Link></li>
-            </ul>
-          </nav>
+          {/* Mapa central en rectángulo horizontal */}
+          <div className={styles.mapBlock}>
+            <h4 className={styles.colTitle}>Ubicación</h4>
+            <div className={styles.mapFrame} aria-label="Mapa — Nexara Explanada Puebla">
+              <iframe
+                className={styles.mapEmbed}
+                src={MAPS_EMBED_SRC}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Mapa Nexara — Explanada Puebla"
+              />
+            </div>
+          </div>
 
-          <nav className={styles.linkCol} aria-label="Cobertura">
-            <h4 className={styles.colTitle}>Cobertura</h4>
-            <ul className={styles.list}>
-              <li><Link href="/cobertura/puebla">Puebla</Link></li>
-              <li><Link href="/cobertura/cdmx">Ciudad de México</Link></li>
-              <li><Link href="/cobertura/cholula">San Andrés Cholula</Link></li>
-              <li><Link href="/cobertura/queretaro">Querétaro</Link></li>
-              <li><Link href="/cobertura">Todas las ciudades</Link></li>
-            </ul>
-          </nav>
-
-          <div className={styles.linkCol}>
+          {/* Contacto como card clara */}
+          <aside className={styles.contactCard}>
             <h4 className={styles.colTitle}>Contacto</h4>
             <ul className={styles.list}>
               <li>
@@ -151,7 +173,7 @@ export default function Footer() {
                 </span>
               </li>
             </ul>
-          </div>
+          </aside>
         </div>
 
         <div className={styles.bottomBar}>
