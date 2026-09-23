@@ -34,27 +34,27 @@ const CAPABILITIES = [
   {
     id: "cctv",
     title: "Videovigilancia Inteligente",
-    text: "Cobertura bien diseñada, grabación confiable y acceso seguro — evidencia que se opera.",
+    text: "Cobertura diseñada. Evidencia confiable.",
   },
   {
     id: "redes",
     title: "Redes Empresariales y Wi‑Fi",
-    text: "Cableado, switching y Wi‑Fi estable en una o muchas sedes — con documentación.",
+    text: "Cableado y RF estables, con documentación.",
   },
   {
     id: "computo",
     title: "Infraestructura Tecnológica",
-    text: "Equipos, servidores, racks y respaldos estandarizados para continuidad y crecimiento.",
+    text: "Racks, servidores y respaldos estandarizados.",
   },
   {
     id: "soporte",
     title: "Soporte y Gestión TI",
-    text: "Mesa de ayuda remota y en sitio con SLAs — mantenimiento y continuidad sin sorpresas.",
+    text: "Mesa de ayuda con SLA. Continuidad.",
   },
   {
     id: "software",
     title: "Desarrollo de Plataformas",
-    text: "Portales, apps e integraciones por fases — alcance claro y entregables revisables.",
+    text: "Portales y apps por fases.",
   },
 ];
 
@@ -348,30 +348,7 @@ export default async function NexaraPage() {
           </div>
         </section>
 
-        {slotInd?.desktopUrl ? (
-          <section className={shared.sectionTight} aria-label="Trabajo en campo" data-reveal="up">
-            <div className={shared.inner}>
-              <EditorialImage
-                desktopUrl={slotInd.desktopUrl}
-                mobileUrl={slotInd.mobileUrl}
-                alt={slotInd.alt}
-                kicker="En campo"
-                title="Antes de hablar de verticales"
-                caption={slotInd.caption || "Cada industria con su riesgo; cada sitio con su alcance."}
-                layout={
-                  slotInd.layout === "portrait_featured"
-                    ? "portrait_featured"
-                    : slotInd.layout === "bleed_cinema" || slotInd.layout === "bleed_landscape"
-                      ? "portrait_featured"
-                      : slotInd.layout
-                }
-                objectPosition={slotInd.objectPosition}
-                compose="split"
-                mediaSide="left"
-              />
-            </div>
-          </section>
-        ) : null}
+        {/* Se elimina un bloque editorial duplicado para evitar clumps visuales */}
 
         <section className={shared.section} aria-label="Industrias" data-reveal="up">
           <div className={shared.inner}>

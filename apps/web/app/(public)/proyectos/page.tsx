@@ -9,6 +9,7 @@ import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
+import EditorialImage from "../../components/EditorialImage";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { INDUSTRIA_SLUGS } from "@/lib/page-content-api";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
@@ -188,10 +189,25 @@ export default async function ProyectosPage() {
         </div>
       </section>
 
+      {/* Híbrido visual para romper bloques homogéneos */}
+      <section className={shared.sectionImageBand} aria-label="Diagnóstico y evidencia" data-reveal="up">
+        <div className={shared.inner}>
+          <EditorialImage
+            desktopUrl="/images/hero/hero-01.png"
+            alt="Foto de ejemplo — diagnóstico y montaje en sitio"
+            kicker="Campo"
+            title="Diagnóstico antes de la propuesta"
+            caption="Evidencia en sitio. Sin sorpresas."
+            compose="split"
+            mediaSide="left"
+          />
+        </div>
+      </section>
+
       {/* Categorías con fotografía breve para evitar solo texto */}
       <section className={shared.sectionTight} data-reveal="up" aria-label="Categorías">
         <div className={shared.inner}>
-          <div className={`${shared.grid4}`} data-reveal-stagger>
+          <div className={`${shared.grid2}`} data-reveal-stagger>
             <Link href="#casos" className={shared.imageCard} data-reveal="up">
               <div className={shared.imageCardImg}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -210,26 +226,6 @@ export default async function ProyectosPage() {
               <div className={shared.imageCardBody}>
                 <h3 className={shared.imageCardTitle}>Multi‑sede</h3>
                 <p className={shared.imageCardText}>Estándares repetibles por sucursal/campus.</p>
-              </div>
-            </Link>
-            <Link href="#casos" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/example/network-rack.jpg" alt="Foto de ejemplo — rack y cableado organizado" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>Soporte</h3>
-                <p className={shared.imageCardText}>Continuidad después del go‑live.</p>
-              </div>
-            </Link>
-            <Link href="/cobertura" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/example/wifi-ap.jpg" alt="Foto de ejemplo — red inalámbrica empresarial" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>Nacional</h3>
-                <p className={shared.imageCardText}>Base Puebla · CDMX, cobertura extendida.</p>
               </div>
             </Link>
           </div>
@@ -258,6 +254,7 @@ export default async function ProyectosPage() {
                 : "Referencias representativas. El detalle de cada vertical vive en Soluciones."}
             </p>
           </header>
+          
 
           {studioProjects.length ? (
             <div className={styles.studioCasesList} data-reveal-stagger>
