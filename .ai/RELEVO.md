@@ -7,6 +7,15 @@
 
 ## Hecho
 
+### Sitio público embebible desde zynoratek.com (23-09, tarde)
+`apps/web/middleware.ts`: el host apex (`nexara.com.mx` / `www`) responde con
+`Content-Security-Policy: frame-ancestors 'self' https://zynoratek.com https://*.zynoratek.com`
+y sin `X-Frame-Options`, para que zynoratek.com/proyectos muestre la portada en un iframe.
+Los paneles (core., admin, etc.) siguen con `frame-ancestors 'none'` + `DENY`. `next.config.js`
+no se tocó: el middleware sobrescribe la CSP (en producción solo se ve la del middleware).
+Deploy: `deploy/update.sh` en `/var/www/nexara-app` (rebuild de `nexara-web`).
+
+
 ### Sitio público: rediseño "premium tipo ETEK" (Adam rechazó el PR #39 tal cual)
 Diagnóstico: el sitio usaba las mismas 3 imágenes `/images/hero/hero-0x.png` (fotos de Puebla con
 tinte verde horneado) en Inicio/Servicios, Proyectos salía vacío (APIs de casos devuelven `[]`
