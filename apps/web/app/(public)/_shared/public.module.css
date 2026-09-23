@@ -76,9 +76,9 @@
   font-family: var(--ds-font-ui);
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ds-cyan);
+  color: var(--ds-cyan-soft);
 }
 
 .sectionTitle {

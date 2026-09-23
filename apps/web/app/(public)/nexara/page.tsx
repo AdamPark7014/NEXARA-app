@@ -263,28 +263,7 @@ export default async function NexaraPage() {
                 </div>
               </Link>
             </div>
-            <div className={shared.capList} data-reveal-stagger>
-              {CAPABILITIES.map((cap, i) => (
-                <Link
-                  key={cap.id}
-                  href={`/servicios#${cap.id}`}
-                  className={shared.capRow}
-                  data-reveal="up"
-                >
-                  <span className={shared.capNum}>0{i + 1}</span>
-                  <div>
-                    <h3 className={shared.capTitle}>{cap.title}</h3>
-                    <p className={shared.capText}>{cap.text}</p>
-                  </div>
-                  <span className={shared.capGo} aria-hidden>
-                    →
-                  </span>
-                </Link>
-              ))}
-            </div>
-            <p className={styles.sectionMore}>
-              <Link href="/servicios">Detalle por línea →</Link>
-            </p>
+            <p className={styles.sectionMore}><Link href="/servicios">Ver servicios →</Link></p>
           </div>
         </section>
 
@@ -301,98 +280,17 @@ export default async function NexaraPage() {
                   slotCaps.caption ||
                   "Campo y entrega — entre el diseño y el soporte. Fotografía de proyectos reales, no banco de imágenes."
                 }
-                layout={
-                  slotCaps.layout === "bleed_cinema" || slotCaps.layout === "bleed_landscape"
-                    ? "framed_wide"
-                    : slotCaps.layout
-                }
+                layout="bleed_landscape"
                 objectPosition={slotCaps.objectPosition}
-                compose="split"
-                mediaSide="right"
+                compose="caption-bar"
               />
             </div>
           </section>
         ) : null}
 
-        <section id="proceso" className={`${shared.section} ${styles.band}`} data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${styles.headSplit}`}>
-              <div>
-                <p className={shared.eyebrow}>Método</p>
-                <h2 className={shared.sectionTitle}>
-                  De diagnóstico a <span className={shared.sectionTitleAccent}>operación</span>
-                </h2>
-              </div>
-              <p className={`${shared.sectionLead} ${styles.headLead}`}>Tres fases, alcance cerrado. Instalación clara y soporte después.</p>
-            </header>
-            <div className={shared.stepsRow} data-reveal-stagger>
-              {proceso.map((p) => (
-                <div key={p.title} className={shared.stepItemOpen} data-reveal="up">
-                  <span className={shared.stepNumOpen}>{p.num}</span>
-                  <h3 className={shared.stepTitleOpen}>{p.title}</h3>
-                  <p className={shared.stepTextOpen}>{p.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        {/* Se eliminan Método y Métricas para una home más concisa */}
 
-        <section className={shared.sectionTight} aria-label="Cifras operativas" data-reveal="soft">
-          <div className={shared.inner}>
-            <div className={shared.metricsStrip}>
-              {METRICS.map((m) => (
-                <div key={m.value} className={shared.metric}>
-                  <span className={shared.metricValue}>{m.value}</span>
-                  <span className={shared.metricLabel}>{m.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Se elimina un bloque editorial duplicado para evitar clumps visuales */}
-
-        <section className={shared.section} aria-label="Industrias" data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${styles.headSplit}`}>
-              <div>
-                <p className={shared.eyebrow}>Sectores</p>
-                <h2 className={shared.sectionTitle}>
-                  Verticales con <span className={shared.sectionTitleAccent}>riesgo real</span>
-                </h2>
-              </div>
-              <p className={`${shared.sectionLead} ${styles.headLead}`}>Cada industria tiene su riesgo típico; la solución se arma a la medida.</p>
-            </header>
-            <div className={shared.industryBoard} data-reveal-stagger>
-              {industrias.map((ind) => {
-                const label = typeof ind === "string" ? ind : String(ind);
-                const blurb = INDUSTRIA_BLURBS[label];
-                return (
-                  <Link
-                    key={label}
-                    href={`/soluciones/${resolveIndustriaSlug(label)}`}
-                    className={shared.industryCell}
-                    data-reveal="up"
-                  >
-                    {blurb?.risk ? (
-                      <span className={shared.industryRisk}>{blurb.risk}</span>
-                    ) : null}
-                    <h3 className={shared.industryCellTitle}>{label}</h3>
-                    <p className={shared.industryCellText}>
-                      {blurb?.text || "Solución a la medida de tu operación."}
-                    </p>
-                    <span className={shared.industryCellLink}>Ver solución →</span>
-                  </Link>
-                );
-              })}
-            </div>
-            <p className={styles.sectionMore}>
-              <Link href="/servicios#verticales">Todas las industrias →</Link>
-              {" · "}
-              <Link href="/proyectos">Ver casos de campo →</Link>
-            </p>
-          </div>
-        </section>
+        {/* Se omite ‘Industrias’ en home (vive en Soluciones/Servicios) */}
 
         <section className={shared.section} data-reveal="up">
           <div className={shared.inner}>
