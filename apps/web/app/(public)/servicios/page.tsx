@@ -204,26 +204,6 @@ export default async function ServiciosPage() {
                 <p className={shared.imageCardText}>Cableado certificado y RF estable.</p>
               </div>
             </Link>
-            <Link href="#computo" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/hero/hero-06.png" alt="Infraestructura TI Nexara" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>Infraestructura</h3>
-                <p className={shared.imageCardText}>Racks, servidores y respaldos.</p>
-              </div>
-            </Link>
-            <Link href="#soporte" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/hero/hero-01.png" alt="Soporte TI Nexara" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>Soporte TI</h3>
-                <p className={shared.imageCardText}>Mesa de ayuda con SLA y visitas.</p>
-              </div>
-            </Link>
           </div>
         </div>
       </section>
