@@ -177,63 +177,13 @@ export default async function ProyectosPage() {
         imageAlt="Proyectos Nexara"
       />
 
-      <section className={shared.sectionTight} data-reveal="soft">
-        <div className={shared.inner}>
-          <div className={shared.metricsStrip}>
-            {METRICS.map((m) => (
-              <div key={m.value} className={shared.metric}>
-                <span className={shared.metricValue}>{m.value}</span>
-                <span className={shared.metricLabel}>{m.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* (Métricas eliminadas para un inicio más editorial) */}
 
       {/* (Se retira galería decorativa; prioridad al portafolio real/Studio) */}
 
-      {/* Híbrido visual para romper bloques homogéneos */}
-      <section className={shared.sectionImageBand} aria-label="Diagnóstico y evidencia" data-reveal="up">
-        <div className={shared.inner}>
-          <EditorialImage
-            desktopUrl="/images/hero/hero-01.png"
-            alt="Foto de ejemplo — diagnóstico y montaje en sitio"
-            kicker="Campo"
-            title="Diagnóstico antes de la propuesta"
-            caption="Evidencia en sitio. Sin sorpresas."
-            compose="caption-bar"
-            layout="bleed_landscape"
-          />
-        </div>
-      </section>
+      {/* (Banda editorial eliminada — directo a casos) */}
 
-      {/* Categorías con fotografía breve para evitar solo texto */}
-      <section className={shared.sectionTight} data-reveal="up" aria-label="Categorías">
-        <div className={shared.inner}>
-          <div className={`${shared.grid2}`} data-reveal-stagger>
-            <Link href="#casos" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/example/technicians-field.jpg" alt="Foto de ejemplo — técnicos en campo" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>Campo</h3>
-                <p className={shared.imageCardText}>Diagnóstico e instalación con evidencia.</p>
-              </div>
-            </Link>
-            <Link href="#casos" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/example/retail-multisite.jpg" alt="Foto de ejemplo — operación multi‑sede retail" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>Multi‑sede</h3>
-                <p className={shared.imageCardText}>Estándares repetibles por sucursal/campus.</p>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* (Categorías eliminadas) */}
 
       <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>

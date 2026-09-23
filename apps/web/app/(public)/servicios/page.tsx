@@ -168,19 +168,7 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
-      {/* S3 — Métricas (datos) */}
-      <section className={shared.sectionTight} data-reveal="soft" aria-label="Cifras operativas">
-        <div className={shared.inner}>
-          <div className={shared.metricsStrip}>
-            {METRICS.map((m) => (
-              <div key={m.value} className={shared.metric}>
-                <span className={shared.metricValue}>{m.value}</span>
-                <span className={shared.metricLabel}>{m.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* (Métricas eliminadas para composición más sobria) */}
 
       {/* (Se retiran strips/mosaicos — dejamos una sola banda visual honesta) */}
 
