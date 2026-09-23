@@ -11,8 +11,7 @@ import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import LogoStrip from "../../components/LogoStrip";
-import FeatureStrip from "../../components/FeatureStrip";
-import CinematicMosaic from "../../components/CinematicMosaic";
+// Se evitan strips/mosaicos decorativos — limpieza editorial
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
@@ -183,27 +182,7 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
-      {/* Momento de producto — capacidades como features compactas */}
-      <section className={shared.sectionTight} aria-label="Capacidades clave" data-reveal="up">
-        <FeatureStrip
-          items={[
-            { icon: "cctv", label: "CCTV IP con VMS/NVR y evidencia útil" },
-            { icon: "wifi", label: "Switching, VLAN y Wi‑Fi empresarial" },
-            { icon: "rack", label: "Racks ordenados, respaldos y puesta a punto" },
-            { icon: "support", label: "Soporte remoto y en sitio con SLA" },
-            { icon: "ai", label: "Analítica/IA cuando agrega valor" },
-          ]}
-        />
-      </section>
-
-      {/* Mosaico visual por línea de servicio */}
-      <section className={shared.sectionTight} data-reveal="up" aria-label="Evidencia por servicio">
-        <CinematicMosaic
-          left={{ src: "/images/hero/hero-02.png", alt: "CCTV en campo", badge: "CCTV" }}
-          topRight={{ src: "/images/hero/hero-04.png", alt: "Wi‑Fi y switching", badge: "Redes" }}
-          bottomRight={{ src: "/images/hero/hero-06.png", alt: "Racks/respaldos", badge: "Infraestructura" }}
-        />
-      </section>
+      {/* (Se retiran strips/mosaicos — dejamos una sola banda visual honesta) */}
 
       {/* Secciones con imagen alternada eliminadas: evitamos collages flotantes */}
 

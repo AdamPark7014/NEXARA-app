@@ -11,8 +11,7 @@ import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
-import FeatureStrip from "../../components/FeatureStrip";
-import CinematicMosaic from "../../components/CinematicMosaic";
+// Limpieza editorial; sin strips/mosaicos decorativos
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("nosotros");
@@ -227,29 +226,7 @@ export default async function NosotrosPage() {
         </div>
       </section>
 
-      {/* Banda de capacidades de operación — visual y breve */}
-      <section className={shared.sectionTight} data-reveal="up" aria-label="Cómo operamos">
-        <div className={shared.inner}>
-          <FeatureStrip
-            items={[
-              { icon: "cctv", label: "Instalación con evidencia en sitio" },
-              { icon: "wifi", label: "Redes documentadas y auditables" },
-              { icon: "rack", label: "Racks organizados y respaldos" },
-              { icon: "support", label: "Soporte continuo con SLA" },
-              { icon: "ai", label: "Mejora incremental con datos" },
-            ]}
-          />
-        </div>
-      </section>
-
-      {/* Mosaico humano/técnico */}
-      <section className={shared.sectionTight} data-reveal="up" aria-label="Equipo y campo">
-        <CinematicMosaic
-          left={{ src: "/images/hero/hero-05.png", alt: "Equipo Nexara", badge: "Equipo" }}
-          topRight={{ src: "/images/hero/hero-02.png", alt: "Campo", badge: "Campo" }}
-          bottomRight={{ src: "/images/hero/hero-04.png", alt: "Infraestructura", badge: "Infraestructura" }}
-        />
-      </section>
+      {/* (Se retiran strips/mosaicos; se mantiene historia, principios y equipo reales) */}
 
       {/* Split extra removido: mantenemos una sola visual fuerte por página */}
 
