@@ -116,7 +116,6 @@ const navLinks = [
   { name: 'Proyectos', href: '/proyectos' },
   { name: 'Cobertura', href: '/cobertura' },
   { name: 'Nosotros', href: '/nosotros' },
-  { name: 'Contacto', href: '/contacto' },
 ];
 
 const isHomeRoute = (pathname: string | null) =>
