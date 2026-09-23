@@ -192,9 +192,10 @@ export default async function NexaraPage() {
           areaServed: { "@type": "City", name: "Puebla", containedInPlace: { "@type": "AdministrativeArea", name: "Puebla" } },
           address: {
             "@type": "PostalAddress",
-            streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+            streetAddress: "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla",
             addressLocality: "San Pedro Cholula",
-            addressRegion: "Puebla",
+            addressRegion: "Pue.",
+            postalCode: "72774",
             addressCountry: "MX",
           },
         }}
@@ -209,9 +210,10 @@ export default async function NexaraPage() {
           email: "gerencia@nexara.com.mx",
           address: {
             "@type": "PostalAddress",
-            streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+            streetAddress: "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla",
             addressLocality: "San Pedro Cholula",
-            addressRegion: "Puebla",
+            addressRegion: "Pue.",
+            postalCode: "72774",
             addressCountry: "MX",
           },
           areaServed: [

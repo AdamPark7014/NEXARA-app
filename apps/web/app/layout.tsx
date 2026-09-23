@@ -212,9 +212,10 @@ export default function RootLayout({
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
     address: {
       "@type": "PostalAddress",
-      streetAddress: "Explanada Puebla, Santiago Momoxpan",
-      addressLocality: process.env.NEXT_PUBLIC_CITY || "Puebla",
-      addressRegion: process.env.NEXT_PUBLIC_STATE || "Puebla",
+      streetAddress: "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla",
+      addressLocality: "San Pedro Cholula",
+      addressRegion: "Pue.",
+      postalCode: "72774",
       addressCountry: "MX",
     },
     openingHoursSpecification: {

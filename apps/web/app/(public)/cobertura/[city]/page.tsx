@@ -110,9 +110,10 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
     },
     address: {
       "@type": "PostalAddress",
-      streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
-      addressLocality: "San Pedro Cholula",
-      addressRegion: "Puebla",
+    streetAddress: "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla",
+    addressLocality: "San Pedro Cholula",
+    addressRegion: "Pue.",
+    postalCode: "72774",
       addressCountry: "MX",
     },
     priceRange: "$$",
