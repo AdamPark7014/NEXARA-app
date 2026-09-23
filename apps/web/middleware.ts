@@ -422,6 +422,23 @@ export function middleware(request: NextRequest) {
   // bucle hacia `/login` y un 404 final. El sitio público de marketing es
   // independiente del CMS Studio (que sólo usan los diseñadores logueados).
 
+  // Redirecciones canónicas de marketing: consolidar secciones duplicadas
+  // - /soluciones → /servicios (contenido fusionado en Servicios)
+  // - /cobertura  → /proyectos (sección unificada Proyectos + Cobertura)
+  if ((request.method === 'GET' || request.method === 'HEAD') && !isMappedPanelSubdomain) {
+    const normalized = requestPathname.replace(/\/+$/, '') || '/';
+    if (normalized === '/soluciones') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/servicios';
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+    if (normalized === '/cobertura') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/proyectos';
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+  }
+
   const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
 
   // Si detectamos un subdominio conocido, reescribir a la ruta interna del
