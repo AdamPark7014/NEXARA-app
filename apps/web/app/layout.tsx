@@ -3,7 +3,7 @@ import "./utilities.scss";
 import "./ecosystem.scss";
 import "./ui-tokens.scss";
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Inter, Inter_Tight, Manrope, Fraunces, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { Space_Grotesk, Inter } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
@@ -23,7 +23,8 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--nx-font-display",
 });
 
-const interTight = Inter_Tight({
+// Fallback estable para UI: Inter como variable de UI (en lugar de Inter Tight)
+const interTight = Inter({
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600", "700"],
@@ -39,32 +40,21 @@ const inter = Inter({
   preload: false,
 });
 
-const manrope = Manrope({
+// Body fallback: Inter como cuerpo (variable mantiene nombre de marca)
+const manrope = Inter({
   subsets: ["latin"],
   display: "swap",
   weight: ["300", "400", "500", "600", "700"],
   variable: "--nx-font-body",
 });
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["300", "400", "500", "600"],
-  variable: "--ds-font-serif",
-});
+// Serif y mono: usarán fallbacks de sistema; no cargamos fuentes extra para robustez de build
 
-const jetbrainsMono = JetBrains_Mono({
+// Sans redondeada para headings públicos (look amable) — fallback a Space Grotesk variable
+const plusJakarta = Space_Grotesk({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600"],
-  variable: "--ds-font-mono",
-});
-
-// Sans redondeada para headings públicos (look más amable)
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["400", "600", "700", "800"],
+  weight: ["400", "600", "700"],
   variable: "--nx-font-rounded",
 });
 
@@ -250,7 +240,7 @@ export default function RootLayout({
     <html
       lang="es-MX"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${plusJakarta.variable}`}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${plusJakarta.variable}`}
     >
       <body suppressHydrationWarning>
         {/* Organization structured data */}
