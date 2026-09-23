@@ -421,6 +421,9 @@ export function middleware(request: NextRequest) {
   // privado (AppShell + auth gate) y el guard server-side acabaría en un
   // bucle hacia `/login` y un 404 final. El sitio público de marketing es
   // independiente del CMS Studio (que sólo usan los diseñadores logueados).
+  
+
+  const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
 
   // Redirecciones canónicas de marketing: consolidar secciones duplicadas
   // - /soluciones → /servicios (contenido fusionado en Servicios)
@@ -438,8 +441,6 @@ export function middleware(request: NextRequest) {
       return applySecurityHeaders(NextResponse.redirect(url, 308));
     }
   }
-
-  const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
 
   // Si detectamos un subdominio conocido, reescribir a la ruta interna del
   // panel consolidado correspondiente (single source of truth: access-matrix).
