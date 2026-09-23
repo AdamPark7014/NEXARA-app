@@ -330,19 +330,7 @@ export default async function NexaraPage() {
                   <Link href="/cobertura">Toda la cobertura →</Link>
                 </p>
               </div>
-              <figure className={styles.mapPanel} data-reveal="right">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/mapa-operaciones.png"
-                  alt="Mapa de cobertura NEXARA en México: zonas de operación por estado"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <figcaption className={styles.mapCaption}>
-                  <span>Geografía de operaciones NEXARA</span>
-                  <Link href="/cobertura">Ver detalle por ciudad →</Link>
-                </figcaption>
-              </figure>
+              {/* Mapa visual retirado para mantener home con pocas fotos */}
             </div>
             <SeoInterlinkHub
               title="Rutas que más convierten"
