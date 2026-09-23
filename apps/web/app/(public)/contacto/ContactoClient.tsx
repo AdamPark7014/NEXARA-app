@@ -19,7 +19,11 @@ const WA_LABEL = "+52 222 696 0350";
 const PHONE_LABEL = "+52 222 696 0350";
 const PHONE_TEL = "tel:+522226960350";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
-const MAPS_PLACE_URL = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
+const MAPS_PLACE_URL =
+  "https://www.google.com/maps/search/?api=1&query=" +
+  encodeURIComponent(
+    "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla, 72774 San Pedro Cholula, Pue."
+  );
 
 type Props = {
   visuals: PageVisualsContent;

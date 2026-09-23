@@ -4,7 +4,11 @@ import styles from "./Map.module.css";
 import { googleMapsMapId, isGoogleMapsConfigured, loadGoogleMaps, loadMapConstructor } from "@/lib/google-maps-loader";
 
 const NEXARA_LOCATION = { lat: 19.073802875589788, lng: -98.2778382565653 };
-const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
+const NEXARA_MAPS_LINK =
+  "https://www.google.com/maps/search/?api=1&query=" +
+  encodeURIComponent(
+    "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla, 72774 San Pedro Cholula, Pue."
+  );
 
 const NEXARA_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#07111f" }] },
