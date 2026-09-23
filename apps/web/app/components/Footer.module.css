@@ -38,7 +38,7 @@
 
 .footerInner {
   position: relative;
-  max-width: 1120px;
+  max-width: 1480px;
   margin: 0 auto;
   padding: clamp(40px, 5.5vw, 64px) clamp(20px, 4vw, 48px) clamp(24px, 3vw, 36px);
   z-index: 1;
@@ -230,6 +230,29 @@
   color: var(--f-papel);
 }
 
+.miniMapItem {
+  margin-top: 8px;
+}
+
+.miniMapWrap {
+  position: relative;
+  width: 100%;
+  height: clamp(160px, 20vw, 220px);
+  border-radius: 12px;
+  border: 1px solid var(--f-linea);
+  overflow: hidden;
+  background: #0a1628;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+}
+
+.miniMap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 .whatsappBtn {
   display: inline-flex;
   align-items: center;
@@ -306,6 +329,56 @@
   color: var(--f-acento);
 }
 
+/* Nueva composición: navegación + mapa central + contacto */
+.infoGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.2fr) minmax(0, 0.95fr);
+  gap: clamp(20px, 3.5vw, 44px);
+  align-items: start;
+}
+
+.navBlock {
+  display: block;
+}
+
+.linkCols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+}
+
+.mapBlock {
+  display: grid;
+  gap: 10px;
+}
+
+.mapFrame {
+  position: relative;
+  width: 100%;
+  height: clamp(180px, 24vw, 260px);
+  border-radius: 14px;
+  border: 1px solid var(--f-linea);
+  overflow: hidden;
+  background: #0a1628;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.mapEmbed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.contactCard {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--f-linea);
+  background:
+    linear-gradient(145deg, rgba(18, 36, 58, 0.9), rgba(10, 18, 32, 0.96));
+}
+
 .legalButton {
   appearance: none;
   border: 0;
@@ -354,6 +427,15 @@
 }
 
 @media (max-width: 800px) {
+  .infoGrid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .linkCols {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .brandRow {
     flex-direction: column;
     align-items: flex-start;
