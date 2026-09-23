@@ -11,7 +11,7 @@ export type MapProviderInfo = {
 const FALLBACK: MapProviderInfo = {
   provider: "osm",
   src: "https://www.openstreetmap.org/export/embed.html?bbox=-98.283838,19.070203,-98.271838,19.077403&layer=mapnik&marker=19.073803,-98.277838",
-  link: "https://maps.app.goo.gl/34XSHPwUSeMAB7x69",
+  link: "https://maps.app.goo.gl/uJBZyNeAApgAri536",
 };
 
 let cached: MapProviderInfo | null = null;

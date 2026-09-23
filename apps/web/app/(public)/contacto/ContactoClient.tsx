@@ -19,7 +19,7 @@ const WA_LABEL = "+52 222 696 0350";
 const PHONE_LABEL = "+52 222 696 0350";
 const PHONE_TEL = "tel:+522226960350";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
-const MAPS_PLACE_URL = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
+const MAPS_PLACE_URL = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
 
 type Props = {
   visuals: PageVisualsContent;
@@ -286,7 +286,7 @@ export default function ContactoClient({ visuals }: Props) {
                   openExternalUrl(MAPS_PLACE_URL);
                 }}
               >
-                Abrir en Google Maps
+                Cómo llegar
               </a>
             </div>
           </div>

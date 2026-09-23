@@ -11,27 +11,31 @@
   padding-left: 0 !important;
   padding-right: 0 !important;
 
-  --ds-bg: #f5f7fb;
-  --ds-bg-alt: #edf1f7;
-  --ds-surface: #ffffff;
+  /* Sistema tonal continuo: hero, cuerpo y footer en la misma familia navy.
+     La jerarquía se hace con capas de superficie, no con saltos claro/oscuro. */
+  --ds-bg: #070f1e;
+  --ds-bg-alt: #0a1628;
+  --ds-surface: #0e1a30;
+  --ds-surface-2: #132340;
   --ds-navy: #0b1a33;
-  --ds-navy-deep: #071226;
-  --ds-panel: #0b1a33;
-  --ds-ink: #0b1a33;
-  --ds-title: #0b1a33;
-  --ds-body: #33445c;
-  --ds-muted: #4f607a;
-  --ds-faint: #7b889c;
-  --ds-line: rgba(11, 26, 51, 0.1);
-  --ds-line-strong: rgba(11, 26, 51, 0.16);
-  --ds-cyan: #0e9ab8;
-  --ds-cyan-soft: #0e9ab8;
-  --ds-cyan-strong: #0b7f99;
+  --ds-navy-deep: #050a14;
+  --ds-panel: #0e1a30;
+  --ds-ink: #eef4ff;
+  --ds-title: #f3f6fb;
+  --ds-body: #c3cfe0;
+  --ds-muted: #9fb0c8;
+  --ds-faint: #7688a3;
+  --ds-line: rgba(140, 180, 230, 0.12);
+  --ds-line-strong: rgba(140, 180, 230, 0.22);
+  --ds-cyan: #2dd8f2;
+  --ds-cyan-soft: #7fe6f7;
+  --ds-cyan-strong: #12b6d4;
   --ds-cyan-bright: #2dd8f2;
-  --ds-cyan-tint: rgba(18, 182, 212, 0.12);
+  --ds-cyan-tint: rgba(45, 216, 242, 0.12);
+  --ds-cyan-line: rgba(45, 216, 242, 0.45);
   --ds-orange: #ff9d3c; /* solo estados de error */
-  --ds-shadow: 0 18px 44px rgba(11, 26, 51, 0.1);
-  --ds-shadow-sm: 0 8px 22px rgba(11, 26, 51, 0.08);
+  --ds-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+  --ds-shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.28);
   --ds-font-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   --ds-font-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
   --ds-font-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
@@ -48,39 +52,23 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Bandas oscuras dentro del cuerpo claro: mismo vocabulario, tokens invertidos */
-.sectionNavy,
-.ctaBand,
-.iconCardDark {
-  --ds-title: #ffffff;
-  --ds-ink: #ffffff;
-  --ds-body: #c6d3e6;
-  --ds-muted: #b4c3da;
-  --ds-faint: #8fa1bc;
-  --ds-line: rgba(255, 255, 255, 0.12);
-  --ds-line-strong: rgba(255, 255, 255, 0.2);
-  --ds-surface: rgba(255, 255, 255, 0.04);
-  --ds-bg: #0b1a33;
-  --ds-bg-alt: rgba(255, 255, 255, 0.06);
-  --ds-cyan: #2dd8f2;
-  --ds-cyan-soft: #7fe6f7;
-  --ds-cyan-strong: #12b6d4;
-  --ds-cyan-tint: rgba(45, 216, 242, 0.14);
-  color: var(--ds-body);
-}
-
+/* Capas de sección: pasos suaves dentro de la misma familia (sin saltos) */
 .sectionNavy {
   background:
-    radial-gradient(60% 80% at 100% 0%, rgba(45, 216, 242, 0.12), transparent 60%),
-    #0b1a33;
+    radial-gradient(60% 80% at 100% 0%, rgba(45, 216, 242, 0.1), transparent 60%),
+    var(--ds-bg-alt);
+  border-top: 1px solid var(--ds-line);
+  border-bottom: 1px solid var(--ds-line);
 }
 
 .sectionAlt {
   background: var(--ds-bg-alt);
+  border-top: 1px solid var(--ds-line);
+  border-bottom: 1px solid var(--ds-line);
 }
 
 .sectionWhite {
-  background: var(--ds-surface);
+  background: var(--ds-bg);
 }
 
 .inner {
@@ -203,15 +191,16 @@
 
 .btnSecondary,
 .btnSecondaryLight {
-  background: #fff;
-  color: #0b1a33;
-  border-color: rgba(11, 26, 51, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ds-title);
+  border-color: var(--ds-line-strong);
 }
 
 .btnSecondary:hover,
 .btnSecondaryLight:hover {
   transform: translateY(-1px);
-  border-color: #0b1a33;
+  border-color: var(--ds-cyan);
+  background: rgba(45, 216, 242, 0.06);
 }
 
 /* Dentro de bandas oscuras el secundario se invierte; el primario es el mismo cian */
@@ -258,8 +247,7 @@
 .statsBand {
   position: relative;
   z-index: 3;
-  background: #fff;
-  border-bottom: 1px solid var(--ds-line);
+  padding-top: clamp(28px, 4vw, 48px);
 }
 
 .statsCard {
@@ -370,7 +358,7 @@
   border-radius: var(--ds-radius-lg);
   color: inherit;
   text-decoration: none;
-  box-shadow: 0 1px 2px rgba(11, 26, 51, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 200ms ease, box-shadow 220ms ease, border-color 200ms ease;
 }
 
@@ -378,14 +366,14 @@ a.iconCard:hover,
 .iconCardHover:hover {
   transform: translateY(-3px);
   box-shadow: var(--ds-shadow);
-  border-color: rgba(14, 154, 184, 0.35);
+  border-color: var(--ds-cyan-line);
 }
 
 .iconCardDark {
   background:
-    radial-gradient(70% 90% at 100% 0%, rgba(45, 216, 242, 0.2), transparent 60%),
-    #0b1a33;
-  border-color: transparent;
+    radial-gradient(70% 90% at 100% 0%, rgba(45, 216, 242, 0.18), transparent 60%),
+    var(--ds-surface-2);
+  border-color: var(--ds-cyan-line);
 }
 
 .iconTile {
@@ -394,8 +382,8 @@ a.iconCard:hover,
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(18, 182, 212, 0.18), rgba(18, 182, 212, 0.06));
-  color: var(--ds-cyan-strong);
+  background: linear-gradient(135deg, rgba(45, 216, 242, 0.18), rgba(45, 216, 242, 0.06));
+  color: var(--ds-cyan);
   flex: 0 0 auto;
 }
 
@@ -535,6 +523,7 @@ a.iconCard:hover .iconCardLink {
   border-radius: var(--ds-radius-lg);
   overflow: hidden;
   background: var(--ds-bg-alt);
+  border: 1px solid var(--ds-line);
   box-shadow: var(--ds-shadow);
 }
 
@@ -665,7 +654,7 @@ a.iconCard:hover .iconCardLink {
 .industryCard:hover {
   transform: translateY(-3px);
   box-shadow: var(--ds-shadow);
-  border-color: rgba(14, 154, 184, 0.35);
+  border-color: var(--ds-cyan-line);
 }
 
 .industryCardHead {
@@ -736,7 +725,7 @@ a.iconCard:hover .iconCardLink {
 .industryPill:hover {
   transform: translateY(-2px);
   box-shadow: var(--ds-shadow-sm);
-  border-color: rgba(14, 154, 184, 0.35);
+  border-color: var(--ds-cyan-line);
 }
 
 /* ── Casos (proyectos) ───────────────────────────────────── */
@@ -761,7 +750,7 @@ a.iconCard:hover .iconCardLink {
 .caseCard:hover {
   transform: translateY(-3px);
   box-shadow: var(--ds-shadow);
-  border-color: rgba(14, 154, 184, 0.35);
+  border-color: var(--ds-cyan-line);
 }
 
 .caseMedia {
@@ -884,7 +873,7 @@ a.iconCard:hover .iconCardLink {
 .cityCard:hover {
   transform: translateY(-2px);
   box-shadow: var(--ds-shadow-sm);
-  border-color: rgba(14, 154, 184, 0.35);
+  border-color: var(--ds-cyan-line);
 }
 
 .cityMeta {
@@ -1062,7 +1051,7 @@ a.iconCard:hover .iconCardLink {
 }
 
 .industryCell:hover {
-  border-color: rgba(14, 154, 184, 0.35);
+  border-color: var(--ds-cyan-line);
   transform: translateY(-2px);
   box-shadow: var(--ds-shadow);
 }
@@ -1372,10 +1361,11 @@ a.iconCard:hover .iconCardLink {
   padding: clamp(40px, 5vw, 64px);
   border-radius: var(--ds-radius-lg);
   background:
-    radial-gradient(60% 90% at 100% 0%, rgba(45, 216, 242, 0.22), transparent 55%),
-    #0b1a33;
+    radial-gradient(60% 90% at 100% 0%, rgba(45, 216, 242, 0.18), transparent 55%),
+    var(--ds-surface-2);
+  border: 1px solid var(--ds-line-strong);
   overflow: hidden;
-  box-shadow: 0 30px 70px rgba(11, 26, 51, 0.22);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35);
 }
 
 .ctaBand > * {
@@ -1407,7 +1397,7 @@ a.iconCard:hover .iconCardLink {
   font-size: clamp(1.8rem, 3.4vw, 2.6rem);
   font-weight: 700;
   letter-spacing: -0.022em;
-  color: #fff;
+  color: var(--ds-title);
   max-width: 20ch;
   line-height: 1.1;
 }
@@ -1417,7 +1407,7 @@ a.iconCard:hover .iconCardLink {
   max-width: 52ch;
   font-size: 1.02rem;
   line-height: 1.62;
-  color: #c6d3e6;
+  color: var(--ds-body);
 }
 
 .ctaActions {
@@ -1444,7 +1434,7 @@ a.iconCard:hover .iconCardLink {
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 0.92rem;
   line-height: 1.45;
-  color: #e6eefb;
+  color: var(--ds-ink);
 }
 
 .ctaFacts svg {
@@ -1522,8 +1512,8 @@ a.iconCard:hover .iconCardLink {
   top: calc(0.12em + 5px);
   width: 8px;
   height: 4px;
-  border-left: 2px solid var(--ds-cyan-strong);
-  border-bottom: 2px solid var(--ds-cyan-strong);
+  border-left: 2px solid var(--ds-cyan);
+  border-bottom: 2px solid var(--ds-cyan);
   transform: rotate(-45deg);
 }
 
@@ -1655,7 +1645,7 @@ a.iconCard:hover .iconCardLink {
 
 .imageCard:hover {
   transform: translateY(-2px);
-  border-color: rgba(14, 154, 184, 0.35);
+  border-color: var(--ds-cyan-line);
   box-shadow: var(--ds-shadow);
 }
 
@@ -1728,7 +1718,6 @@ a.iconCard:hover .iconCardLink {
   .statsGrid { grid-template-columns: 1fr; }
   .stat { border-left: none; }
   .stat:nth-child(n + 2) { border-top: 1px solid var(--ds-line); }
-  .statsCard { margin-top: 0; }
   .tileRow { grid-template-columns: 1fr; }
   .tile { border-left: none; }
   .tile:nth-child(n + 2) { border-top: 1px solid var(--ds-line); }
@@ -1795,4 +1784,53 @@ a.iconCard:hover .iconCardLink {
 .caseMedia img,
 .serviceBlockMedia img {
   background: var(--ds-bg-alt);
+}
+
+/* Cifras discretas dentro de una sección (no como franja a plena vista) */
+.factsInline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 18px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--ds-line);
+}
+
+.factsInline li {
+  display: grid;
+  gap: 2px;
+}
+
+.factsInline strong {
+  font-family: var(--ds-font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ds-title);
+  line-height: 1.1;
+}
+
+.factsInline span {
+  font-size: 0.82rem;
+  color: var(--ds-muted);
+}
+
+/* Superficies con relieve sutil en el sistema tonal */
+.iconCard,
+.industryCard,
+.caseCard,
+.stepItemOpen,
+.principleItem,
+.teamCard,
+.serviceBlock,
+.serviceNav,
+.cityCard,
+.industryPill {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0));
+}
+
+@media (max-width: 640px) {
+  .factsInline { grid-template-columns: 1fr 1fr; }
 }

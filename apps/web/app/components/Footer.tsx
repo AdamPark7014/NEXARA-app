@@ -134,12 +134,21 @@ export default function Footer() {
               <iframe
                 className={styles.mapEmbed}
                 key={mapInfo?.provider || "osm"}
+                data-provider={mapInfo?.provider || "osm"}
                 src={mapInfo?.src || MAPS_EMBED_SRC}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 title="Mapa Nexara — Explanada Puebla"
               />
             </div>
+            <a
+              className={styles.mapDirections}
+              href="https://maps.app.goo.gl/uJBZyNeAApgAri536"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Cómo llegar →
+            </a>
           </div>
 
           {/* Contacto como card clara */}

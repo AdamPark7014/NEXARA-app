@@ -31,7 +31,7 @@ const osmSrc = () => {
 const googleSrc = (key: string) =>
   `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(key)}&q=${encodeURIComponent(PLACE_QUERY)}&zoom=16&language=es`;
 
-const MAPS_LINK = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
+const MAPS_LINK = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
 
 export async function GET() {
   const key = (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || "").trim();

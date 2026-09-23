@@ -14,10 +14,10 @@
 
 .figure {
   --ei-radius: 16px;
-  --ei-bg: #edf1f7;
-  --ei-ink: #0b1a33;
-  --ei-muted: #4f607a;
-  --ei-cyan: #0e9ab8;
+  --ei-bg: var(--ds-bg-alt, #0a1628);
+  --ei-ink: var(--ds-title, #f3f6fb);
+  --ei-muted: var(--ds-muted, #9fb0c8);
+  --ei-cyan: var(--ds-cyan, #2dd8f2);
   /* Ventana adaptativa por defecto (la sobreescribe cada layout) */
   --ei-ar: 1.66;
   --ei-min-ar: 1.25;
@@ -33,7 +33,7 @@
   overflow: hidden;
   border-radius: var(--ei-radius);
   background: var(--ei-bg);
-  box-shadow: inset 0 0 0 1px rgba(11, 26, 51, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   width: 100%;
   aspect-ratio: var(--ei-ar);
   max-height: var(--ei-maxh);
@@ -267,7 +267,7 @@
 .framedWide:not(.composeSplit) .frame {
   --ei-radius: 20px;
   box-shadow:
-    inset 0 0 0 1px rgba(11, 26, 51, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 18px 48px rgba(0, 0, 0, 0.28);
 }
 
@@ -283,7 +283,7 @@
 .framedWide.composeSplit .frame {
   --ei-radius: 16px;
   box-shadow:
-    inset 0 0 0 1px rgba(11, 26, 51, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 16px 40px rgba(0, 0, 0, 0.26);
 }
 
@@ -299,7 +299,7 @@
 .framedSquare .frame {
   --ei-radius: 22px;
   box-shadow:
-    inset 0 0 0 1px rgba(11, 26, 51, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 16px 40px rgba(0, 0, 0, 0.26);
 }
 
@@ -318,7 +318,7 @@
   max-width: min(100%, calc(var(--ei-maxh) * var(--ei-ar)));
   margin-inline: auto;
   box-shadow:
-    inset 0 0 0 1px rgba(11, 26, 51, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 20px 50px rgba(0, 0, 0, 0.3);
 }
 
@@ -352,7 +352,7 @@
 .portraitFeatured .frame {
   --ei-radius: 24px;
   box-shadow:
-    inset 0 0 0 1px rgba(11, 26, 51, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 20px 50px rgba(0, 0, 0, 0.3);
 }
 
@@ -368,7 +368,7 @@
 .asideCompact .frame {
   --ei-radius: 16px;
   box-shadow:
-    inset 0 0 0 1px rgba(11, 26, 51, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 12px 28px rgba(0, 0, 0, 0.22);
 }
 
@@ -395,7 +395,7 @@
 .insetOffset .frame {
   --ei-radius: 20px;
   box-shadow:
-    inset 0 0 0 1px rgba(11, 26, 51, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 18px 44px rgba(0, 0, 0, 0.26);
 }
 

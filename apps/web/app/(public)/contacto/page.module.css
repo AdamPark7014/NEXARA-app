@@ -22,7 +22,7 @@
   font-size: clamp(1.4rem, 2.2vw, 1.75rem);
   font-weight: 600;
   letter-spacing: -0.03em;
-  color: #0b1a33;
+  color: var(--ds-title);
   line-height: 1.15;
 }
 
@@ -32,10 +32,10 @@
   padding: 0;
   display: grid;
   gap: 2px;
-  border: 1px solid rgba(11, 26, 51, 0.1);
+  border: 1px solid var(--ds-line);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(11, 26, 51, 0.1);
+  background: var(--ds-line);
 }
 
 .directLink {
@@ -45,7 +45,7 @@
   width: 100%;
   padding: 14px 16px;
   border: none;
-  background: #ffffff;
+  background: var(--ds-surface);
   text-align: left;
   text-decoration: none;
   color: inherit;
@@ -59,23 +59,23 @@
 }
 
 .whatsappLink {
-  background: rgba(18, 182, 212, 0.12) !important;
-  color: #0b1a33 !important;
+  background: var(--ds-cyan-tint) !important;
+  color: var(--ds-title) !important;
 }
 
 .whatsappLink:hover {
-  background: rgba(18, 182, 212, 0.2) !important;
+  background: var(--ds-cyan-tint) !important;
 }
 
 .whatsappLabel {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #0b7f99 !important;
+  color: var(--ds-cyan-strong) !important;
 }
 
 .whatsappLink .directValue {
-  color: #0b1a33 !important;
+  color: var(--ds-title) !important;
   font-weight: 650;
 }
 
@@ -91,20 +91,20 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #0e9ab8;
+  color: var(--ds-cyan);
 }
 
 .directValue {
   font-size: 0.95rem;
   font-weight: 500;
-  color: #0b1a33;
+  color: var(--ds-title);
 }
 
 .expectNote {
   margin: 0 0 12px;
   font-size: 0.9rem;
   line-height: 1.55;
-  color: #4f607a;
+  color: var(--ds-muted);
 }
 
 .asideMedia {
@@ -114,14 +114,14 @@
 .locationNote {
   margin: 0;
   font-size: 0.85rem;
-  color: #7b889c;
+  color: var(--ds-faint);
 }
 
 .formCard {
   padding: clamp(22px, 3vw, 30px);
-  border: 1px solid rgba(11, 26, 51, 0.1);
+  border: 1px solid var(--ds-line);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--ds-surface);
 }
 
 .formCardHead {
@@ -129,7 +129,7 @@
   gap: 6px;
   margin-bottom: 18px;
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(11, 26, 51, 0.1);
+  border-bottom: 1px solid var(--ds-line);
 }
 
 .formCardTitle {
@@ -138,14 +138,14 @@
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   font-weight: 600;
   letter-spacing: -0.025em;
-  color: #0b1a33;
+  color: var(--ds-title);
   line-height: 1.15;
 }
 
 .formCardNote {
   margin: 0;
   font-size: 0.86rem;
-  color: #4f607a;
+  color: var(--ds-muted);
 }
 
 .form {
@@ -167,7 +167,7 @@
 .field span {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #4f607a;
+  color: var(--ds-muted);
 }
 
 .field input,
@@ -176,9 +176,9 @@
   width: 100%;
   padding: 11px 13px;
   border-radius: 12px;
-  border: 1px solid rgba(11, 26, 51, 0.1);
-  background: #ffffff;
-  color: #0b1a33;
+  border: 1px solid var(--ds-line);
+  background: var(--ds-surface);
+  color: var(--ds-title);
   font-family: inherit;
   font-size: 0.95rem;
   outline: none;
@@ -187,14 +187,14 @@
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #7b889c;
+  color: var(--ds-faint);
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: rgba(14, 154, 184, 0.6);
-  box-shadow: 0 0 0 3px rgba(14, 154, 184, 0.12);
+  border-color: var(--ds-cyan-line);
+  box-shadow: 0 0 0 3px var(--ds-cyan-tint);
 }
 
 .field textarea {
@@ -204,7 +204,7 @@
 
 .field select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%230e9ab8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%232dd8f2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 36px;
@@ -228,11 +228,11 @@
 .formNote {
   margin: 4px 0 0;
   font-size: 0.8rem;
-  color: #7b889c;
+  color: var(--ds-faint);
 }
 
 .formNote a {
-  color: #0e9ab8;
+  color: var(--ds-cyan);
 }
 
 .successBlock {
@@ -247,19 +247,19 @@
   font-family: var(--ds-font-display);
   font-size: 1.35rem;
   font-weight: 600;
-  color: #0b1a33;
+  color: var(--ds-title);
 }
 
 .successBlock p {
   margin: 0;
-  color: #4f607a;
+  color: var(--ds-muted);
   max-width: 36ch;
   line-height: 1.55;
 }
 
 .mapSection {
   padding: 0 0 clamp(64px, 8vw, 96px);
-  border-top: 1px solid rgba(11, 26, 51, 0.1);
+  border-top: 1px solid var(--ds-line);
   padding-top: clamp(48px, 6vw, 64px);
 }
 
@@ -273,7 +273,7 @@
   font-family: var(--ds-font-display);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   font-weight: 600;
-  color: #0b1a33;
+  color: var(--ds-title);
   letter-spacing: -0.02em;
 }
 
@@ -303,9 +303,9 @@
   gap: 20px;
   padding: 22px 24px;
   border-radius: 14px;
-  border: 1px solid rgba(11, 26, 51, 0.1);
+  border: 1px solid var(--ds-line);
   background:
-    #ffffff;
+    var(--ds-surface);
 }
 
 .locationCopy {
@@ -317,7 +317,7 @@
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #7b889c;
+  color: var(--ds-faint);
 }
 
 .locationAddress {
@@ -325,14 +325,14 @@
   font-family: var(--ds-font-display);
   font-size: 1.05rem;
   font-weight: 600;
-  color: #0b1a33;
+  color: var(--ds-title);
 }
 
 .locationHint {
   margin: 8px 0 0;
   font-size: 0.9rem;
   line-height: 1.45;
-  color: #4f607a;
+  color: var(--ds-muted);
 }
 
 @media (max-width: 900px) {
