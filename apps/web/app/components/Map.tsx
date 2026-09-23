@@ -83,7 +83,7 @@ export default function Map() {
             <div class="nexara-map-info">
               <img src="/logo-nexara-lockup.png" alt="NEXARA" class="nexara-map-logo" />
               <h3 class="nexara-map-title">NEXARA</h3>
-              <p class="nexara-map-subtitle">Explanada Puebla · Momoxpan</p>
+              <p class="nexara-map-subtitle">Auditorio Explanada Puebla · Momoxpan</p>
               <button type="button" class="nexara-map-btn" onclick="window.open('${NEXARA_MAPS_LINK}','_blank','noopener')">
                 Ver ubicación
               </button>
@@ -137,7 +137,7 @@ export default function Map() {
       <div className={styles.mapContainer}>
         <div className={styles.mapPlaceholder}>
           <p style={{ margin: 0, fontWeight: 600, color: "#eef4ff" }}>NEXARA</p>
-          <p style={{ margin: "4px 0 14px" }}>Explanada Puebla · Momoxpan</p>
+          <p style={{ margin: "4px 0 14px" }}>Auditorio Explanada Puebla · Momoxpan</p>
           {isGoogleMapsConfigured() ? (
             <button type="button" className="nexara-map-btn" onClick={() => setActive(true)}>
               Ver mapa
