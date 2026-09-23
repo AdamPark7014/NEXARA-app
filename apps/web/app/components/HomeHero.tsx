@@ -266,21 +266,21 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
       <div className={styles.mediaScrim} aria-hidden />
 
       <div className={styles.stage}>
-        <p className={styles.kicker}>CCTV · Redes · Cómputo · Soporte TI</p>
+        <p className={styles.kicker}>Videovigilancia · Infraestructura · Monitoreo inteligente</p>
         <h1 className={styles.title}>
-          Tecnología que{" "}
-          <span className={styles.titleAccent}>opera tu negocio</span>
+          Seguridad que{" "}
+          <span className={styles.titleAccent}>ve. Entiende. Responde.</span>
         </h1>
         <p className={styles.lead}>
-          Instalamos y sostenemos tu infraestructura — una sola firma responsable.
+          Videovigilancia, redes, cómputo y soporte TI bajo una sola responsabilidad técnica.
         </p>
         <div className={styles.actions}>
-          <Link href="/contacto" className={styles.ctaPrimary} data-track-conversion="home_hero_contact_cta">
-            Cotiza tu proyecto
+          <Link href="/servicios" className={styles.ctaPrimary} data-track-conversion="home_hero_primary_cta">
+            Conocer soluciones
             <span aria-hidden className={styles.ctaArrow}>→</span>
           </Link>
-          <Link href="/servicios" className={styles.ctaGhost} data-track-conversion="home_hero_primary_cta">
-            Ver capacidades
+          <Link href="/contacto" className={styles.ctaGhost} data-track-conversion="home_hero_contact_cta">
+            Hablar con un especialista
           </Link>
         </div>
         <p className={styles.tertiaryLink}>
