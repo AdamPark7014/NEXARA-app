@@ -52,7 +52,7 @@ export default function NexaraIngenierosPage() {
           </>
         }
         lead="La división técnica: diseñamos, instalamos y mantenemos la infraestructura que sostiene tu operación."
-        imageSrc="/images/hero/hero-03.png"
+        imageSrc="/fotos/campo-instalacion-rack.jpg"
         imageAlt="Ingenieros Nexara en sitio"
       />
 

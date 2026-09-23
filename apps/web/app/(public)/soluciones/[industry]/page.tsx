@@ -43,7 +43,7 @@ const INDUSTRY_HUBS: Record<
       { id: "redes", label: "Redes y Wi‑Fi", text: "Enlace estable para POS, inventarios y personal." },
       { id: "soporte", label: "Soporte TI", text: "Mesa de ayuda remota y visitas cuando la caja no puede esperar." },
     ],
-    image: "/images/hero/hero-01.png",
+    image: "/fotos/monitoreo-pantallas-cctv.jpg",
   },
   manufactura: {
     name: "Manufactura",
@@ -61,7 +61,7 @@ const INDUSTRY_HUBS: Record<
       { id: "cctv", label: "Perímetro y patio", text: "Cobertura de accesos, almacenes y zonas de riesgo." },
       { id: "computo", label: "Infraestructura", text: "Racks, energía y respaldos para sistemas críticos." },
     ],
-    image: "/images/hero/hero-02.png",
+    image: "/fotos/campo-enlace-antena-ciudad.jpg",
   },
   hospitalidad: {
     name: "Hospitalidad",
@@ -79,7 +79,7 @@ const INDUSTRY_HUBS: Record<
       { id: "cctv", label: "Videovigilancia", text: "Accesos, estacionamiento y zonas de operación." },
       { id: "soporte", label: "Soporte", text: "Respuesta remota primero; visita cuando la ocupación lo permite." },
     ],
-    image: "/images/hero/hero-03.png",
+    image: "/fotos/control-acceso-torniquetes.jpg",
   },
   salud: {
     name: "Salud",
@@ -97,7 +97,7 @@ const INDUSTRY_HUBS: Record<
       { id: "computo", label: "Respaldos e infraestructura", text: "Estaciones, servidores y respaldo acordados." },
       { id: "soporte", label: "Soporte prioritario", text: "Tiempos de respuesta alineados a la ventana clínica." },
     ],
-    image: "/images/hero/hero-04.png",
+    image: "/fotos/rack-servidores-led.jpg",
   },
   educacion: {
     name: "Educación",
@@ -115,7 +115,7 @@ const INDUSTRY_HUBS: Record<
       { id: "cctv", label: "Seguridad de campus", text: "Accesos, pasillos y estacionamientos con evidencia." },
       { id: "soporte", label: "Mesa de ayuda", text: "Atención a incidentes de aula y personal." },
     ],
-    image: "/images/hero/hero-05.png",
+    image: "/fotos/campo-instalacion-ap-altura.jpg",
   },
   gobierno: {
     name: "Gobierno",
@@ -133,7 +133,7 @@ const INDUSTRY_HUBS: Record<
       { id: "cctv", label: "Videovigilancia", text: "Cobertura perimetral y de instalaciones con registro." },
       { id: "soporte", label: "Soporte y continuidad", text: "Mesa de ayuda y visitas con tiempos acordados." },
     ],
-    image: "/images/hero/hero-06.png",
+    image: "/fotos/campo-instalacion-rack.jpg",
   },
 };
 

@@ -60,7 +60,7 @@ export default async function BlogPage() {
           </>
         }
         lead="Guías prácticas, tendencias y resultados de operación — publicadas desde Studio."
-        imageSrc="/images/hero/hero-04.png"
+        imageSrc="/fotos/monitoreo-pantallas-cctv.jpg"
         imageAlt="Equipo Nexara"
       />
 

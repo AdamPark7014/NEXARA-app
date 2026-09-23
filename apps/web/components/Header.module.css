@@ -148,10 +148,10 @@
 }
 
 .headerInner {
-	max-width: 1480px;
+	max-width: 1320px; /* mismo ancho y padding que .inner del sitio público: logo y CTA alineados con el contenido */
 	margin: 0 auto;
 	min-height: 76px;
-	padding: 0 clamp(20px, 4vw, 40px);
+	padding: 0 clamp(20px, 4vw, 48px);
 	display: grid;
 	grid-template-columns: auto 1fr auto;
 	align-items: center;

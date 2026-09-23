@@ -84,21 +84,21 @@
   height: 96px;
   z-index: 2;
   pointer-events: none;
-  background: linear-gradient(180deg, transparent, #050a14);
+  display: none;
 }
 
 .content {
   position: relative;
   z-index: 3;
   width: 100%;
-  max-width: 1120px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: calc(var(--public-header-height, 76px) + 28px) clamp(24px, 4vw, 48px) clamp(40px, 6vh, 64px);
+  padding: calc(var(--public-header-height, 76px) + 28px) clamp(24px, 4vw, 48px) calc(clamp(40px, 6vh, 64px) + 80px);
   animation: enter 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .compact .content {
-  padding: calc(var(--public-header-height, 76px) + 20px) clamp(24px, 4vw, 48px) clamp(32px, 5vh, 48px);
+  padding: calc(var(--public-header-height, 76px) + 20px) clamp(24px, 4vw, 48px) calc(clamp(32px, 5vh, 48px) + 80px);
 }
 
 .compact .title {
@@ -216,7 +216,7 @@
     padding:
       calc(var(--public-header-height, 66px) + 24px)
       18px
-      clamp(28px, 5vh, 40px);
+      calc(clamp(28px, 5vh, 40px) + 56px);
   }
 
   .title {
