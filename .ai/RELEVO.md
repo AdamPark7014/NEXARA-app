@@ -2,7 +2,7 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-23
-- **Rama:** claude/web-publica-premium (creada sobre `cursor/public-site-doctrine-b26c` @ 5cc5f126, PR #39)
+- **Rama:** claude/web-publica-premium = mejora/calidad-y-web (fcfeaeb8), desplegada en nexara.com.mx
 - **Checkout:** `C:\Users\adpoz\Projects\NEXARA-app` (el que sirve localhost:3000). `C:\dev\apps\NEXARA-app` sigue en `main`.
 
 ## Hecho
@@ -36,16 +36,28 @@ referencia ETEK: cuerpo claro, tarjetas con icono, cifras, fotos reales.
   `/qa`: sin solapes, sin desborde horizontal, sin imágenes rotas, sin texto con contraste < 3
   (salvo el botón verde de WhatsApp, que ya existía).
 
+## Segunda pasada, merge y deploy (23-09, tarde)
+- Nosotros reescrito en el nuevo sistema (datos operativos sobre el hero, split con foto real,
+  principios como tarjetas, banda navy "En campo", equipo, certificaciones). Mapa de Contacto en
+  claro. Foco visible homogéneo. Header, hero y footer alineados a 1320 px.
+- El servidor tenía commits propios en `mejora/calidad-y-web` (nav en caja normal, HomeHero sin
+  brillos, mapa por Maps Embed, footer "Acceso", cookies "Solo necesarias" primero). Se trajeron
+  con `git fetch ssh://root@5.78.215.109:2222/var/www/nexara-app HEAD`, se mergearon aquí
+  (`fcfeaeb8`, conservando el DS claro y el header alineado) y se hizo `git push origin
+  HEAD:mejora/calidad-y-web` (fast-forward). No existe rama `dev`; esa es la rama que despliega.
+- Deploy hecho: `./deploy/update.sh --force-all --with-migrate` (log `/root/deploy-web-premium-20260923-2148.log`).
+  Build web en intento 1 con revisión de tipos; sin migraciones pendientes; `nexara-web` y
+  `nexara-api` arriba. nexara.com.mx sirve el diseño nuevo (fotos reales 200, tarjeta de cifras).
+
 ## A medias / pendiente
-- **Adam debe dar el visto bueno visual** (recarga fuerte en localhost:3000). Las capturas del
-  navegador integrado se cuelgan en este sitio; la verificación fue por DOM.
-- **Sin desplegar.** Cuando apruebe: merge de esta rama (incluye todo el PR #39 + estos cambios;
-  ya no hace falta mergear el #39 por separado) y deploy al Hetzner desde la PC "Adam".
 - **Studio en producción** guarda `heroDesktopUrl` de Soluciones (`/images/hero/hero-03.png`) y
   Contacto (`/images/hero/hero-01.png`): cambiarlos desde Studio o vaciarlos para que tomen los
   defaults nuevos. Sus slots ya tienen fotos reales.
 - `case-studies/public` y `projects` vacíos en producción: Proyectos muestra galería fija y
   referencias por vertical hasta que se publiquen casos desde Studio.
+- `main` sigue en `756d66e8`: no se tocó. Si Adam quiere `main` al día, es un fast-forward de
+  `mejora/calidad-y-web`.
+- Disco del servidor al 85 %.
 
 ## Ojo (no es mío)
 - El dev server de Cursor (pid 41580) murió a media tarde; levanté el mío con la entrada
