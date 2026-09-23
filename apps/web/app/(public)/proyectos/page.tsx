@@ -197,7 +197,7 @@ export default async function ProyectosPage() {
             alt="Foto de ejemplo — diagnóstico y montaje en sitio"
             kicker="Campo"
             title="Diagnóstico antes de la propuesta"
-            caption="Evidencia en sitio; propuestas que se instalan sin sorpresas."
+            caption="Evidencia en sitio. Sin sorpresas."
             compose="split"
             mediaSide="left"
           />
@@ -254,18 +254,7 @@ export default async function ProyectosPage() {
                 : "Referencias representativas. El detalle de cada vertical vive en Soluciones."}
             </p>
           </header>
-          <div style={{ margin: "0 0 12px" }}>
-            <EditorialImage
-              desktopUrl="/images/hero/hero-02.png"
-              alt="Foto de ejemplo — cámaras y perímetro"
-              kicker="Caso"
-              title="Cobertura que sí genera evidencia"
-              caption="CCTV diseñado para tu riesgo — sin puntos ciegos."
-              compose="split"
-              mediaSide="right"
-              layout="framed_wide"
-            />
-          </div>
+          
 
           {studioProjects.length ? (
             <div className={styles.studioCasesList} data-reveal-stagger>
