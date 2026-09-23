@@ -9,14 +9,13 @@ import { formatApiError } from "@/lib/erp-api";
 import {
   acceptPeerRequest,
   createPeerRequest,
+  fetchPeerCandidates,
   fetchPeerRequests,
   rejectPeerRequest,
+  type PeerCandidate,
   type PeerRequestItem,
 } from "@/lib/peer-requests-api";
-import { fetchTeamBoard } from "@/lib/team-board-api";
 import s from "./SolicitudesEquipoView.module.css";
-
-type Peer = { id: number; nombre: string; puesto: string | null; avatarUrl: string | null };
 
 function estadoLabel(estado: PeerRequestItem["status"]): string {
   if (estado === "PENDING") return "Pendiente";
@@ -41,14 +40,17 @@ function fechaCorta(iso: string): string {
   return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 }
 
-/** Cuarta pestaña: solicitudes entre pares (no es el rechazo 403 de OT del jefe). */
+/**
+ * Cuarta pestaña: pedirle a un compañero que haga una actividad (no es el
+ * rechazo 403 de OT del jefe). Se le puede pedir a cualquiera de la empresa.
+ */
 export default function SolicitudesEquipoView({ token }: { token: string | null }) {
   const [sent, setSent] = useState<PeerRequestItem[]>([]);
   const [received, setReceived] = useState<PeerRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [primeraCarga, setPrimeraCarga] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [peers, setPeers] = useState<Peer[]>([]);
+  const [peers, setPeers] = useState<PeerCandidate[]>([]);
   const [toUserId, setToUserId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -72,24 +74,15 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
     setLoading(true);
     setError(null);
     try {
-      const [req, board] = await Promise.all([
+      const [req, candidatos] = await Promise.all([
         fetchPeerRequests(token),
-        fetchTeamBoard(token, {}).catch(() => null),
+        fetchPeerCandidates(token).catch(() => null),
       ]);
       setSent(Array.isArray(req?.sent) ? req.sent : []);
       setReceived(Array.isArray(req?.received) ? req.received : []);
-      // Si el tablero falla, se queda la lista de compañeros que ya teníamos:
-      // un error al refrescar no puede dejar el selector vacío.
-      if (board?.users) {
-        setPeers(
-          board.users.map((u) => ({
-            id: u.id,
-            nombre: u.nombre,
-            puesto: u.puesto,
-            avatarUrl: u.avatarUrl,
-          })),
-        );
-      }
+      // Si la lista falla, se queda la de compañeros que ya teníamos: un error
+      // al refrescar no puede dejar el selector vacío.
+      if (Array.isArray(candidatos)) setPeers(candidatos);
     } catch (e) {
       // Sin tocar `sent`/`received`: lo que ya estaba en pantalla sigue ahí.
       setError(formatApiError(e, "No se pudieron cargar las solicitudes"));
@@ -105,7 +98,8 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
 
   const faltaPersona = toUserId === "";
   const faltaTitulo = title.trim().length < 3;
-  const errPersona = intento && faltaPersona ? "Elige a quién le pides apoyo." : null;
+  const errPersona =
+    intento && faltaPersona ? "Elige al compañero a quien le pides la actividad." : null;
   const errTitulo = intento && faltaTitulo ? "Escríbelo en tres letras o más." : null;
   const cargandoCompaneros = primeraCarga && peers.length === 0;
 
@@ -266,8 +260,12 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
 
       <section className={s.bloque} aria-labelledby="pedir-apoyo">
         <h3 id="pedir-apoyo" className={s.titulo}>
-          Pedir apoyo
+          Pedirle una actividad a un compañero
         </h3>
+        <p className={s.intro}>
+          Aquí le pides a cualquier compañero de la empresa que haga una actividad. Si
+          acepta, la actividad queda a su nombre y tú la sigues en «Enviadas».
+        </p>
         <div className={s.formulario}>
           <div className={s.rejilla}>
             <div className={s.campo}>
@@ -296,13 +294,13 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
                 className={errPersona ? s.error : s.pista}
                 role={errPersona ? "alert" : undefined}
               >
-                {errPersona ?? "De tu mismo rango o superior."}
+                {errPersona ?? "Cualquier compañero de la empresa."}
               </span>
             </div>
 
             <div className={s.campo}>
               <label className={s.etiqueta} htmlFor="solicitud-titulo">
-                ¿Qué necesitas?
+                ¿Qué actividad le pides?
               </label>
               <input
                 id="solicitud-titulo"
@@ -363,8 +361,12 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
         <EmptyState
           icon={<HandshakeOutlinedIcon />}
           title="Todavía no hay solicitudes"
-          description="Aquí aparece el apoyo que pidas y el que te pidan tus compañeros."
-          action={<Button onClick={() => paraQuienRef.current?.focus()}>Pedir apoyo</Button>}
+          description="Aquí aparecen las actividades que les pides a tus compañeros y las que ellos te piden a ti."
+          action={
+            <Button onClick={() => paraQuienRef.current?.focus()}>
+              Pedirle una actividad a un compañero
+            </Button>
+          }
         />
       ) : (
         <>

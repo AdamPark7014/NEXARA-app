@@ -1,16 +1,13 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ActivitiesService } from '../activities/activities.service.js';
+import { isNonEmployeeEmail } from '../common/platform-accounts.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { canPeerRequestTarget } from './peer-org-rank.js';
 
 /**
- * Solicitudes de equipo entre pares.
- * Independiente de `me/activities/:id/rechazar` (esa ruta sigue en 403 para OT del jefe).
+ * Pedirle una actividad a un compañero.
+ * Cualquier persona de la empresa puede pedirle a cualquier otra: no se recorta por
+ * organigrama ni por rango (Adam, 22-09-2026). Independiente de
+ * `me/activities/:id/rechazar` (esa ruta sigue en 403 para OT del jefe).
  */
 export type PeerViewer = { id: number; email?: string | null };
 
@@ -41,6 +38,25 @@ export class PeerRequestsService {
       throw new BadRequestException('Se requiere empresa activa');
     }
     return companyId;
+  }
+
+  /**
+   * A quién le puedo pedir una actividad: **todo** el personal activo de la empresa,
+   * menos yo y menos las cuentas de plataforma. A propósito no se usa la pizarra
+   * (`me/board`): esa recorta por organigrama y dejaba el selector casi vacío.
+   */
+  async listCandidates(viewer: PeerViewer, companyId: number | null) {
+    const cid = this.requireCompany(companyId);
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        id: { not: viewer.id },
+        companyMemberships: { some: { companyId: cid } },
+      },
+      select: USER_SELECT,
+      orderBy: { nombre: 'asc' },
+    });
+    return users.filter((u) => !isNonEmployeeEmail(u.email));
   }
 
   async listMine(viewer: PeerViewer, companyId: number | null) {
@@ -92,13 +108,6 @@ export class PeerRequestsService {
     ]);
     if (!fromUser || !toUser || toUser.isActive === false) {
       throw new NotFoundException('No encontramos a esa persona');
-    }
-
-    // Destino: mismo rango org o superior (pares/jefes). Subordinados: vía OT normal.
-    if (!canPeerRequestTarget(fromUser, toUser)) {
-      throw new ForbiddenException(
-        'Solo puedes pedir ayuda a alguien de tu mismo rango o superior en la organización',
-      );
     }
 
     return this.prisma.activityPeerRequest.create({
