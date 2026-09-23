@@ -7,6 +7,7 @@ import styles from "./page.module.css";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
+import EditorialImage from "../../components/EditorialImage";
 
 export const revalidate = 1800;
 
@@ -138,6 +139,21 @@ export default function CoberturaPage() {
         </div>
       </section>
 
+      {/* Banda de mapa full‑bleed con caption corta */}
+      <section className={shared.sectionTight} data-reveal="up" aria-label="Mapa de operaciones">
+        <div className={shared.inner}>
+          <EditorialImage
+            desktopUrl="/maps/mexico_map.svg"
+            alt="Mapa de México — zonas de operación Nexara"
+            kicker="Geografía"
+            title="Operamos donde importa"
+            caption="Base en el centro; alcance nacional por fases, partners y remoto."
+            compose="caption-bar"
+            layout="bleed_landscape"
+            objectPosition="center"
+          />
+        </div>
+      </section>
       <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>
           <header className={shared.sectionHead}>
