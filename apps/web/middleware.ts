@@ -122,7 +122,12 @@ const buildDefaultAllowedHostPatterns = (): RegExp[] => {
   ];
 };
 
-const buildCsp = () => {
+// El sitio público (solo el host apex, p. ej. la portada) se muestra embebido en
+// zynoratek.com/proyectos. Los paneles (core., admin, etc.) no se pueden enmarcar.
+const PUBLIC_FRAME_ANCESTORS = "'self' https://zynoratek.com https://*.zynoratek.com";
+const PUBLIC_SITE_HOSTS = new Set(['nexara.com.mx', 'www.nexara.com.mx']);
+
+const buildCsp = (frameAncestors = "'none'") => {
   const isDev = process.env.NODE_ENV !== 'production';
   
   // Permitir scripts de servicios externos con API keys
@@ -162,7 +167,7 @@ const buildCsp = () => {
       : "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${frameAncestors}`,
     "form-action 'self'",
     'upgrade-insecure-requests',
   ].join('; ');
@@ -181,6 +186,12 @@ const applySecurityHeaders = (response: NextResponse) => {
   response.headers.set('Origin-Agent-Cluster', '?1');
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   response.headers.set('Content-Security-Policy', buildCsp());
+  return response;
+};
+
+const allowPortfolioFraming = (response: NextResponse) => {
+  response.headers.delete('X-Frame-Options');
+  response.headers.set('Content-Security-Policy', buildCsp(PUBLIC_FRAME_ANCESTORS));
   return response;
 };
 
@@ -599,6 +610,9 @@ export function middleware(request: NextRequest) {
   // `(public)/page.tsx` (re-export del componente de `nexara/page.tsx`).
 
   const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next()));
+  if (PUBLIC_SITE_HOSTS.has(hostWithoutPort)) {
+    allowPortfolioFraming(response);
+  }
   if (SENSITIVE_PATH_PATTERN.test(request.nextUrl.pathname)) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     response.headers.set('Pragma', 'no-cache');
