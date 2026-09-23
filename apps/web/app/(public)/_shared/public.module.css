@@ -39,7 +39,7 @@
 
 .inner {
   /* Público: ancho generoso (marketing) con padding lateral cómodo */
-  max-width: 1480px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 0 clamp(24px, 4vw, 48px);
 }
@@ -849,7 +849,7 @@
 }
 
 .imageCardImg {
-  aspect-ratio: 16/10;
+  aspect-ratio: 3/2;
   overflow: hidden;
   background: #071120;
   position: relative;

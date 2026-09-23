@@ -281,32 +281,7 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
-      {/* Use-cases por industria (mosaico ligero) */}
-      <section id="verticales" className={shared.section} data-reveal="up" aria-label="Industrias">
-        <div className={shared.inner}>
-          <header className={shared.sectionHead}>
-            <p className={shared.eyebrow}>Industrias</p>
-            <h2 className={shared.sectionTitle}>
-              Dónde <span className={shared.sectionTitleAccent}>aplica</span>
-            </h2>
-          </header>
-          <div className={shared.industryBoard} data-reveal-stagger>
-            {industrias.slice(0, 4).map((i) => (
-              <Link
-                key={i.slug}
-                href={`/soluciones/${i.slug}`}
-                className={shared.industryCell}
-                data-reveal="up"
-              >
-                <span className={shared.industryRisk}>{i.risk}</span>
-                <h2 className={shared.industryCellTitle}>{i.title}</h2>
-                <p className={shared.industryCellText}>{i.text}</p>
-                <span className={shared.industryCellLink}>Ver detalle →</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* (Se omite mosaico de industrias aquí; vive en /soluciones) */}
 
       {/* Banda breve de porqué (texto muy corto) */}
       <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Una sola firma">
