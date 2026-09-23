@@ -2,7 +2,7 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-23
-- **Rama:** claude/web-publica-premium = mejora/calidad-y-web (f06433a0), desplegada en nexara.com.mx
+- **Rama:** claude/web-publica-premium = mejora/calidad-y-web (f8616092), desplegada en nexara.com.mx
 - **Checkout:** `C:\Users\adpoz\Projects\NEXARA-app` (el que sirve localhost:3000). `C:\dev\apps\NEXARA-app` sigue en `main`.
 
 ## Hecho
@@ -76,6 +76,20 @@ referencia ETEK: cuerpo claro, tarjetas con icono, cifras, fotos reales.
 - Deploys 2 y 3 hechos (`update.sh --force-all --with-migrate`, build web en intento 1 con
   tipos). Producción verificada: `frame-src` presente, sin COEP, sin violaciones CSP en vivo,
   iframes OSM cargando, cifras a ras del hero, CTA del header cian, columnas del footer alineadas.
+
+## Cuarta ronda (23-09, 16:25-16:40): jerarquía de color tonal, cifras discretas, mapa al sitio
+- Adam: «de repente es muy claro y luego mega oscuro… no hay jerarquía de colores premium».
+  El cuerpo pasó de claro a un **sistema tonal navy continuo** (hero, cuerpo y footer en la
+  misma familia): `--ds-bg #070f1e`, `--ds-bg-alt #0a1628`, `--ds-surface #0e1a30`,
+  `--ds-surface-2 #132340`; jerarquía por capas y líneas finas. Todos los módulos públicos
+  quedaron en tokens `--ds-*` (sin hex claros fijos): cambiar el tema es tocar un bloque.
+- Cifras (+10, +200, Puebla·CDMX, <24 h): fila discreta `.factsInline` dentro de «Una sola
+  firma del diagnóstico al soporte»; la franja se eliminó (inner pages conservan su fila de
+  tiles como parte de la primera sección, sin fondo).
+- Mapa: OpenStreetMap llevado al navy con `filter: invert(0.92) hue-rotate(185deg)…` en
+  Contacto y footer; botón «Cómo llegar» → https://maps.app.goo.gl/uJBZyNeAApgAri536 (también en
+  la tarjeta de Contacto y en el footer).
+- Deploy 4 hecho y verificado en producción (fondo tonal, cifras inline, mapa filtrado, CTA).
 
 ## A medias / pendiente
 - **Google Maps:** habilitar «Maps Embed API» en la clave web (Google Cloud Console) para que
