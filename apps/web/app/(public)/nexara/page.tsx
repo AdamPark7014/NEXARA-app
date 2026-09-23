@@ -346,13 +346,12 @@ export default async function NexaraPage() {
               </div>
               <p className={`${shared.sectionLead} ${styles.headLead}`}>Tres fases, alcance cerrado. Instalación clara y soporte después.</p>
             </header>
-            <div className={shared.timeline} data-reveal-stagger>
+            <div className={shared.stepsRow} data-reveal-stagger>
               {proceso.map((p) => (
-                <div key={p.title} className={shared.timelineStep} data-reveal="up">
-                  <span className={shared.timelineDot} aria-hidden />
-                  <span className={shared.timelineNum}>{p.num}</span>
-                  <h3 className={shared.timelineTitle}>{p.title}</h3>
-                  <p className={shared.timelineText}>{p.text}</p>
+                <div key={p.title} className={shared.stepItemOpen} data-reveal="up">
+                  <span className={shared.stepNumOpen}>{p.num}</span>
+                  <h3 className={shared.stepTitleOpen}>{p.title}</h3>
+                  <p className={shared.stepTextOpen}>{p.text}</p>
                 </div>
               ))}
             </div>

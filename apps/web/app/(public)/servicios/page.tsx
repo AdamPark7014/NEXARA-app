@@ -169,23 +169,6 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
-      {/* S2 — Producto/evidencia + texto (alternado) */}
-      <section className={shared.sectionImageBand} aria-label="CCTV con evidencia" data-reveal="up">
-        <div className={shared.inner}>
-          <EditorialImage
-            desktopUrl="/images/hero/hero-02.png"
-            alt="Cobertura y montaje de CCTV en sitio"
-            kicker="CCTV"
-            title="Cobertura diseñada. Evidencia que sirve."
-            caption="Cámaras IP, VMS/NVR y acceso remoto con documentación de campo."
-            compose="split"
-            mediaSide="left"
-            layout="framed_wide"
-            objectPosition="center"
-          />
-        </div>
-      </section>
-
       {/* S3 — Métricas (datos) */}
       <section className={shared.sectionTight} data-reveal="soft" aria-label="Cifras operativas">
         <div className={shared.inner}>
@@ -222,22 +205,7 @@ export default async function ServiciosPage() {
         />
       </section>
 
-      {/* S4 — Producto/evidencia + texto (alternado inverso) */}
-      <section className={shared.sectionImageBand} aria-label="Redes y Wi‑Fi estable" data-reveal="up">
-        <div className={shared.inner}>
-          <EditorialImage
-            desktopUrl="/images/hero/hero-04.png"
-            alt="Redes y Wi‑Fi empresarial instalados y documentados"
-            kicker="Redes"
-            title="Conectividad estable. Documentada."
-            caption="Cableado, switching y Wi‑Fi empresarial con estándar repetible por sede."
-            compose="split"
-            mediaSide="right"
-            layout="framed_wide"
-            objectPosition="center"
-          />
-        </div>
-      </section>
+      {/* Secciones con imagen alternada eliminadas: evitamos collages flotantes */}
 
       {/* Use-cases con visual (tiles de servicio) */}
       <section className={shared.section} data-reveal="up" aria-label="Qué incluye">
@@ -293,7 +261,7 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
-      {/* Banda visual grande con texto corto (overlay/caption-bar) */}
+      {/* Banda visual grande única (limpia, sin overlaps) */}
       {mid?.desktopUrl ? (
         <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Campo">
           <div className={shared.inner}>
@@ -307,7 +275,7 @@ export default async function ServiciosPage() {
               }
               kicker="En sitio"
               title="Del diagnóstico a la operación"
-              layout={mid.layout === "bleed_cinema" || mid.layout === "bleed_landscape" ? mid.layout : "bleed_cinema"}
+              layout="bleed_landscape"
               objectPosition={mid.objectPosition}
               compose="caption-bar"
             />
