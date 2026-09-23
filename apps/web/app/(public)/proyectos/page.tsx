@@ -170,7 +170,7 @@ export default async function ProyectosPage() {
             <span className={heroStyles.titleAccent}>no demos bonitos</span>
           </>
         }
-        lead="Selección de trabajos donde CCTV, redes, cómputo o soporte cambiaron la operación del cliente."
+        lead="Casos donde CCTV, redes, cómputo o soporte cambiaron la operación."
         imageSrc="/images/hero/hero-07.png"
         imageAlt="Proyectos Nexara"
       />
@@ -184,6 +184,54 @@ export default async function ProyectosPage() {
                 <span className={shared.metricLabel}>{m.label}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Categorías con fotografía breve para evitar solo texto */}
+      <section className={shared.sectionTight} data-reveal="up" aria-label="Categorías">
+        <div className={shared.inner}>
+          <div className={`${shared.grid4}`} data-reveal-stagger>
+            <Link href="#casos" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/example/technicians-field.jpg" alt="Foto de ejemplo — técnicos en campo" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>Campo</h3>
+                <p className={shared.imageCardText}>Diagnóstico e instalación con evidencia.</p>
+              </div>
+            </Link>
+            <Link href="#casos" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/example/retail-multisite.jpg" alt="Foto de ejemplo — operación multi‑sede retail" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>Multi‑sede</h3>
+                <p className={shared.imageCardText}>Estándares repetibles por sucursal/campus.</p>
+              </div>
+            </Link>
+            <Link href="#casos" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/example/network-rack.jpg" alt="Foto de ejemplo — rack y cableado organizado" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>Soporte</h3>
+                <p className={shared.imageCardText}>Continuidad después del go‑live.</p>
+              </div>
+            </Link>
+            <Link href="/cobertura" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/example/wifi-ap.jpg" alt="Foto de ejemplo — red inalámbrica empresarial" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>Nacional</h3>
+                <p className={shared.imageCardText}>Base Puebla · CDMX, cobertura extendida.</p>
+              </div>
+            </Link>
           </div>
         </div>
       </section>
