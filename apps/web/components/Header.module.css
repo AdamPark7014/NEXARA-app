@@ -46,18 +46,17 @@
  * `.header` / `.navLinks` / `.link` base sin reescribir todo el archivo.
  */
 .headerPublic {
-	background: rgba(5, 10, 20, 0.78) !important;
+	background: rgba(5, 10, 20, 0.84) !important;
 	border-bottom: 1px solid rgba(45, 216, 242, 0.14) !important;
-	backdrop-filter: blur(16px) saturate(140%) !important;
-	-webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+	backdrop-filter: blur(12px) saturate(120%) !important;
+	-webkit-backdrop-filter: blur(12px) saturate(120%) !important;
 	box-shadow: none !important;
 }
 
 .headerPublic::before {
-	opacity: 0.5 !important;
-	background:
-		radial-gradient(100% 120% at 15% 0%, rgba(45, 216, 242, 0.12), transparent 60%),
-		radial-gradient(90% 100% at 90% 0%, rgba(176, 107, 255, 0.08), transparent 55%) !important;
+	/* Sin brillos ni gradientes decorativos */
+	opacity: 0 !important;
+	background: none !important;
 }
 
 .headerPublic .link,
@@ -94,12 +93,12 @@
 	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-  color: rgba(238, 244, 255, 0.86) !important;
-	text-transform: uppercase;
-  letter-spacing: 0.08em;
+	color: rgba(238, 244, 255, 0.9) !important;
+	text-transform: none;
+	letter-spacing: 0.01em;
 	font-weight: 600;
-	font-size: 0.74rem;
-	font-family: "Space Grotesk", sans-serif;
+	font-size: 0.9rem;
+	font-family: "Inter Tight", "Manrope", system-ui, sans-serif;
 	text-shadow: none;
 	padding: 0.5rem 0.85rem;
 }
@@ -127,10 +126,10 @@
 	bottom: 2px;
 	transform: translateX(-50%);
 	width: 18px;
-	height: 1px;
+	height: 2px;
 	background: #2dd8f2;
-	border-radius: 0;
-	box-shadow: 0 0 8px rgba(45, 216, 242, 0.6);
+	border-radius: 2px;
+	box-shadow: none;
 }
 
 /* ── Estado top de página: sin fondo, totalmente transparente ────────── */
@@ -227,7 +226,7 @@
 	align-items: center;
 	gap: 8px;
 	padding: 10px 16px;
-	border-radius: 12px;
+	border-radius: 10px;
 	background: transparent;
 	color: #2dd8f2;
 	font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
