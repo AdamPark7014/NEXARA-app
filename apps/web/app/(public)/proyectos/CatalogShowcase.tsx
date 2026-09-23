@@ -24,7 +24,9 @@ function normalizeProjectImageUrl(imageUrl?: string | null): string {
   }
   const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    if (imageUrl.startsWith("/projects/image/")) return `${origin}${imageUrl}`;
+    if (imageUrl.startsWith("/projects/image/") || imageUrl.startsWith("/case-studies/image/")) {
+      return `${origin}${imageUrl}`;
+    }
     return imageUrl;
   }
   return `${origin}/projects/image/${imageUrl}`;
