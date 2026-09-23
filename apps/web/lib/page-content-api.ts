@@ -343,7 +343,7 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
       {
         id: "nosotros_story",
         label: "Retrato junto a la historia",
-        desktopUrl: "/fotos/campo-instalacion-ap-altura.jpg",
+        desktopUrl: "/fotos/equipo-nexara-polos.jpg",
         mobileUrl: "",
         alt: "Equipo de campo Nexara",
         caption: "",

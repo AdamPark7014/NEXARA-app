@@ -8,10 +8,10 @@ const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
 
 const NEXARA_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#07111f" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#9bb0cc" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#4f607a" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#050a14" }] },
   { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#1a2a40" }] },
-  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0a1628" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
   { featureType: "poi", elementType: "geometry", stylers: [{ color: "#0d1a2e" }] },
   { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#0c1f2a" }] },
   { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a2f48" }] },
@@ -136,7 +136,7 @@ export default function Map() {
     return (
       <div className={styles.mapContainer}>
         <div className={styles.mapPlaceholder}>
-          <p style={{ margin: 0, fontWeight: 600, color: "#eef4ff" }}>NEXARA</p>
+          <p style={{ margin: 0, fontWeight: 600, color: "#0b1a33" }}>NEXARA</p>
           <p style={{ margin: "4px 0 14px" }}>Explanada Puebla · Momoxpan</p>
           {isGoogleMapsConfigured() ? (
             <button type="button" className="nexara-map-btn" onClick={() => setActive(true)}>
@@ -146,7 +146,7 @@ export default function Map() {
             <p style={{ fontSize: "0.85rem", opacity: 0.7 }}>Mapa no disponible.</p>
           )}
           <p style={{ marginTop: 12, fontSize: "0.8rem" }}>
-            <a href={NEXARA_MAPS_LINK} target="_blank" rel="noopener noreferrer" style={{ color: "#2dd8f2" }}>
+            <a href={NEXARA_MAPS_LINK} target="_blank" rel="noopener noreferrer" style={{ color: "#0e9ab8" }}>
               Abrir en Google Maps
             </a>
           </p>

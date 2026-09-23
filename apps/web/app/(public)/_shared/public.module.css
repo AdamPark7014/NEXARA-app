@@ -1784,3 +1784,23 @@ a.iconCard:hover .iconCardLink {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Accesibilidad: foco visible homogéneo en tarjetas y enlaces del DS */
+.iconCard:focus-visible,
+.industryCard:focus-visible,
+.caseCard:focus-visible,
+.cityCard:focus-visible,
+.industryPill:focus-visible,
+.linkArrow:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--ds-cyan);
+  outline-offset: 3px;
+}
+
+/* Imágenes del DS: nunca arrastran el fondo claro mientras cargan */
+.photoFrame img,
+.galleryItem img,
+.caseMedia img,
+.serviceBlockMedia img {
+  background: var(--ds-bg-alt);
+}
