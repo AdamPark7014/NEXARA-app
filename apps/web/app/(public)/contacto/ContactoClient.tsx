@@ -252,42 +252,56 @@ export default function ContactoClient({ visuals }: Props) {
 
       <section id="ubicacion" className={styles.mapSection} data-reveal="up">
         <div className={shared.inner}>
-          <div className={styles.mapHeader}>
-            <p className={shared.eyebrow}>Ubicación</p>
-            <h2 className={styles.mapTitle}>Explanada Puebla, Santiago Momoxpan</h2>
-            <p className={styles.expectNote}>
-              Cobertura{" "}
-              <Link href="/cobertura/puebla/camaras-cctv">CCTV Puebla</Link>
-              {" · "}
-              <Link href="/cobertura/cdmx/camaras-cctv">CCTV CDMX</Link>
-              {" · "}
-              <Link href="/cobertura">más ciudades</Link>
-            </p>
-          </div>
-          <div className={styles.mapFrame} data-reveal="up">
-            <Map />
-            <div className={styles.locationCard}>
-              <div className={styles.locationCopy}>
-                <p className={styles.locationLabel}>Base operativa</p>
-                <p className={styles.locationAddress}>
-                  Explanada Puebla · Santiago Momoxpan, Puebla
-                </p>
-                <p className={styles.locationHint}>
-                  Visitas con cita. Para llegar, usa el enlace de Google Maps.
-                </p>
+          <div className={styles.locationGrid}>
+            <div className={styles.locationCopy}>
+              <p className={shared.eyebrow}>Base de operación</p>
+              <h2 className={shared.sectionTitle}>
+                Puebla · <span className={shared.sectionTitleAccent}>CDMX</span>
+              </h2>
+              <p className={shared.sectionLead}>
+                Operamos desde Explanada Puebla, en Santiago Momoxpan, y atendemos proyectos en la Ciudad de
+                México y el resto del país.
+              </p>
+              <ul className={styles.locationMeta}>
+                <li>
+                  <span className={styles.locationLabel}>Dirección</span>
+                  <span className={styles.locationAddress}>Explanada Puebla · Santiago Momoxpan, San Pedro Cholula, Puebla</span>
+                </li>
+                <li>
+                  <span className={styles.locationLabel}>Visitas</span>
+                  <span className={styles.locationHint}>Con cita previa, de lunes a viernes de 9:00 a 18:00.</span>
+                </li>
+                <li>
+                  <span className={styles.locationLabel}>Cobertura</span>
+                  <span className={styles.locationHint}>
+                    <Link href="/cobertura/puebla/camaras-cctv">CCTV Puebla</Link>
+                    {" · "}
+                    <Link href="/cobertura/cdmx/camaras-cctv">CCTV CDMX</Link>
+                    {" · "}
+                    <Link href="/cobertura">más ciudades</Link>
+                  </span>
+                </li>
+              </ul>
+              <div className={styles.locationActions}>
+                <a
+                  className={`${shared.btn} ${shared.btnPrimary}`}
+                  href={MAPS_PLACE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    openExternalUrl(MAPS_PLACE_URL);
+                  }}
+                >
+                  Cómo llegar <span className={shared.btnArrow} aria-hidden>→</span>
+                </a>
+                <Link href="/cobertura" className={`${shared.btn} ${shared.btnSecondary}`}>
+                  Ver cobertura
+                </Link>
               </div>
-              <a
-                className={`${shared.btn} ${shared.btnSecondary}`}
-                href={MAPS_PLACE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  openExternalUrl(MAPS_PLACE_URL);
-                }}
-              >
-                Cómo llegar
-              </a>
+            </div>
+            <div className={styles.locationMedia} data-reveal="up">
+              <Map />
             </div>
           </div>
         </div>
