@@ -33,18 +33,16 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:isMonitoringTool="enterprise_management">
 
         <!--
           Declaración de herramienta de monitorización (política de stalkerware de
           Google Play). La app rastrea la ubicación del trabajador entre la checada
           de entrada y la de salida, así que Play la clasifica como herramienta de
           monitorización y exige declararlo aquí. Sin esta marca la revisión se
-          rechaza: es el motivo literal del rechazo del App bundle 10 el 18-09-2026.
+          rechaza: fue el motivo del rechazo del App Bundle 11 (22-09-2026).
         -->
-        <meta-data
-            android:name="isMonitoringTool"
-            android:value="true" />
 
         <!-- Google Maps API key. Reemplazar el placeholder con la key real. -->
         <meta-data
