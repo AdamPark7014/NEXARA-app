@@ -1,17 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
-import styles from "./page.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
-import EditorialImage from "../../components/EditorialImage";
 import LogoStrip from "../../components/LogoStrip";
+import PublicIcon, { type PublicIconName } from "../../components/PublicIcon";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
-// Limpieza editorial; sin strips/mosaicos decorativos
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("nosotros");
@@ -21,27 +19,37 @@ export const dynamic = "force-dynamic";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
-const principios = [
+const principios: { icon: PublicIconName; title: string; text: string }[] = [
   {
+    icon: "target",
     title: "Claridad",
-    text: "Construimos confianza mediante una comunicación transparente. Alcances, tiempos, costos y riesgos se definen desde el inicio para mantener expectativas claras y decisiones informadas.",
+    text: "Alcances, tiempos, costos y riesgos se definen desde el inicio. Expectativas claras y decisiones informadas, sin sorpresas a mitad del proyecto.",
   },
   {
+    icon: "hardhat",
     title: "Ingeniería basada en la realidad",
-    text: "Cada solución nace del análisis del entorno operativo. Diseñamos pensando en la implementación, la mantenibilidad y el desempeño, no únicamente en la teoría.",
+    text: "Cada solución nace del análisis del entorno operativo. Diseñamos pensando en la instalación, la mantenibilidad y el desempeño, no solo en la teoría.",
   },
   {
+    icon: "refresh",
     title: "Compromiso continuo",
-    text: "La entrega es el inicio de una relación, no el final del proyecto. Brindamos seguimiento, soporte técnico y mejora continua para garantizar la estabilidad y evolución de cada implementación.",
+    text: "La entrega es el inicio de la relación. Seguimiento, soporte técnico y mejora continua para que cada implementación se mantenga estable y evolucione.",
   },
 ];
 
 /** Datos operativos reales — mismos claims que la home. */
-const OPERACION = [
-  { label: "Sedes", value: "Puebla · Ciudad de México, con cobertura nacional" },
-  { label: "Modelo", value: "Diseño, instalación y soporte bajo una sola responsabilidad técnica" },
-  { label: "Respuesta", value: "Típicamente en menos de 24 horas en horario laboral" },
-  { label: "Método", value: "Diagnóstico en sitio antes de la propuesta; entrega documentada" },
+const OPERACION: { icon: PublicIconName; label: string; value: string }[] = [
+  { icon: "mapPin", label: "Sedes", value: "Puebla · Ciudad de México, con cobertura nacional" },
+  { icon: "shield", label: "Modelo", value: "Diseño, instalación y soporte bajo una sola responsabilidad técnica" },
+  { icon: "clock", label: "Respuesta", value: "Típicamente en menos de 24 horas en horario laboral" },
+  { icon: "search", label: "Método", value: "Diagnóstico en sitio antes de la propuesta; entrega documentada" },
+];
+
+const COMPROMISOS = [
+  "Un solo responsable técnico del diagnóstico al soporte",
+  "Propuesta con alcance cerrado y calendario visible",
+  "Instalación documentada: diagramas, etiquetado y evidencia",
+  "Soporte con SLA después del arranque",
 ];
 
 /** Certificaciones y alianzas técnicas — assets reales en /public/certificaciones. */
@@ -56,6 +64,31 @@ const CERTIFICACIONES = [
   { src: "/certificaciones/certificaciones-07.png", alt: "Sophos" },
   { src: "/certificaciones/certificaciones-08.png", alt: "Mimosa" },
   { src: "/certificaciones/certificaciones-09.png.jpeg", alt: "Dell Technologies Authorized Partner" },
+];
+
+/** Fotografías reales del equipo en campo (en /public/fotos). */
+const EN_CAMPO = [
+  {
+    src: "/fotos/campo-instalacion-ap-altura.jpg",
+    alt: "Técnico de NEXARA instalando un punto de acceso en altura",
+    kicker: "Instalación",
+    caption: "Punto de acceso exterior en campus",
+    tall: true,
+  },
+  {
+    src: "/fotos/campo-levantamiento-patio.jpg",
+    alt: "Levantamiento técnico en patio de maniobras",
+    kicker: "Diagnóstico",
+    caption: "Levantamiento en sitio antes de la propuesta",
+    tall: false,
+  },
+  {
+    src: "/fotos/equipo-nexara-espalda.jpg",
+    alt: "Equipo NEXARA en sitio",
+    kicker: "Equipo",
+    caption: "Ingeniería e instalación, el mismo equipo",
+    tall: false,
+  },
 ];
 
 const expertosFallback = [
@@ -90,6 +123,12 @@ const getInitials = (name: string) => {
 };
 
 const fetchPublicExperts = async (): Promise<ExpertCard[]> => {
+  const fallback = () =>
+    expertosFallback.map((expert, index) => ({
+      key: `fallback-${index}`,
+      name: expert.name,
+      role: expert.role,
+    }));
   try {
     const response = await fetch(buildApiUrl("users/public-team?limit=12"), {
       method: "GET",
@@ -97,26 +136,14 @@ const fetchPublicExperts = async (): Promise<ExpertCard[]> => {
       headers: { Accept: "application/json" },
     });
 
-    if (!response.ok) {
-      return expertosFallback.map((expert, index) => ({
-        key: `fallback-${index}`,
-        name: expert.name,
-        role: expert.role,
-      }));
-    }
+    if (!response.ok) return fallback();
 
     const raw = (await response.json()) as PublicTeamUser[];
     // Cuentas internas/de prueba no pertenecen al equipo público.
     const data = Array.isArray(raw)
       ? raw.filter((u) => !/revisor\s*google\s*play|reviewer|cuenta\s*de\s*prueba/i.test(u.nombre || ""))
       : raw;
-    if (!Array.isArray(data) || data.length === 0) {
-      return expertosFallback.map((expert, index) => ({
-        key: `fallback-${index}`,
-        name: expert.name,
-        role: expert.role,
-      }));
-    }
+    if (!Array.isArray(data) || data.length === 0) return fallback();
 
     return data.map((user, index) => ({
       key: String(user.id ?? `expert-${index}`),
@@ -125,11 +152,7 @@ const fetchPublicExperts = async (): Promise<ExpertCard[]> => {
       avatarUrl: resolveUserAvatarUrl(user.avatarUrl),
     }));
   } catch {
-    return expertosFallback.map((expert, index) => ({
-      key: `fallback-${index}`,
-      name: expert.name,
-      role: expert.role,
-    }));
+    return fallback();
   }
 };
 
@@ -141,6 +164,9 @@ export default async function NosotrosPage() {
   const storyImg = visuals.slots[0];
   const heroDesktop = resolvePageMediaUrl(visuals.heroDesktopUrl);
   const heroMobile = resolvePageMediaUrl(visuals.heroMobileUrl || visuals.heroDesktopUrl);
+  const storyPhoto = storyImg?.desktopUrl
+    ? { src: resolvePageMediaUrl(storyImg.desktopUrl), alt: storyImg.alt || "Equipo de campo NEXARA" }
+    : { src: "/fotos/equipo-nexara-polos.jpg", alt: "Equipo de campo NEXARA" };
 
   const aboutSchema = {
     "@context": "https://schema.org",
@@ -176,98 +202,131 @@ export default async function NosotrosPage() {
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}
+        actions={
+          <>
+            <Link href="/contacto" className={heroStyles.ctaPrimary} data-track-conversion="nosotros_hero_cta">
+              Cotiza tu proyecto <span className={heroStyles.ctaArrow} aria-hidden>→</span>
+            </Link>
+            <Link href="/proyectos" className={heroStyles.ctaSecondary}>
+              Ver casos de campo
+            </Link>
+          </>
+        }
       />
 
-      <section className={shared.section} data-reveal="up">
+      {/* Datos operativos: tarjeta que monta sobre el hero */}
+      <section aria-label="Datos operativos" style={{ position: "relative", zIndex: 3 }}>
         <div className={shared.inner}>
-          <div className={styles.storySplit}>
-            <div className={styles.storyBlock}>
-              <p className={shared.eyebrow}>Quiénes somos</p>
-              <h2 className={styles.storyTitle}>
-                Donde la tecnología{" "}
-                <span className={shared.sectionTitleAccent}>se convierte en resultados</span>
-              </h2>
-              <p className={styles.storyLead}>Soluciones que sostienen la operación.</p>
-              <p className={styles.storyLeadSecondary}>Diseño, instalación y soporte con disciplina de campo.</p>
-              <ul className={`${shared.factList} ${styles.storyFacts}`}>
-                {OPERACION.map((f) => (
-                  <li key={f.label} className={shared.factRow}>
-                    <span className={shared.factLabel}>{f.label}</span>
-                    <p className={shared.factValue}>{f.value}</p>
-                  </li>
-                ))}
-              </ul>
+          <div className={shared.statsCard}>
+            <div className={shared.tileRow}>
+              {OPERACION.map((f) => (
+                <div key={f.label} className={shared.tile}>
+                  <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
+                    <PublicIcon name={f.icon} />
+                  </span>
+                  <div>
+                    <h3 className={shared.tileTitle}>{f.label}</h3>
+                    <p className={shared.tileText}>{f.value}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            {storyImg?.desktopUrl ? (
-              <div className={styles.storyMedia}>
-                <EditorialImage
-                  desktopUrl={storyImg.desktopUrl}
-                  mobileUrl={storyImg.mobileUrl}
-                  alt={storyImg.alt}
-                  caption={storyImg.caption}
-                  layout={storyImg.layout}
-                  objectPosition={storyImg.objectPosition}
-                  compose="solo"
-                  priority
-                />
-              </div>
-            ) : null}
           </div>
-
-          <div className={styles.storyDetailGrid} data-reveal="up">
-            <p className={styles.storyLeadSecondary}>Puebla y CDMX · cobertura nacional.</p>
-            <p className={styles.storyLeadSecondary}>Una sola responsabilidad técnica del inicio al soporte.</p>
-          </div>
-          <p className={styles.storyCta}>
-            <Link href="/proyectos" data-track-conversion="nosotros_proyectos_link">
-              Ver casos de campo →
-            </Link>
-          </p>
         </div>
       </section>
 
-      {/* (Se retiran strips/mosaicos; se mantiene historia, principios y equipo reales) */}
-
-      {/* Split extra removido: mantenemos una sola visual fuerte por página */}
-
-      <section id="valores" className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
+      {/* Quiénes somos */}
+      <section className={shared.section} aria-label="Quiénes somos" data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead}>
+          <div className={shared.split}>
+            <figure className={`${shared.photoFrame} ${shared.ar43} ${shared.splitMedia}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={storyPhoto.src} alt={storyPhoto.alt} loading="lazy" decoding="async" />
+              <span className={shared.photoBadge}>Equipo NEXARA</span>
+            </figure>
+            <div className={shared.splitCopy}>
+              <header className={shared.sectionHead}>
+                <p className={shared.eyebrow}>Quiénes somos</p>
+                <h2 className={shared.sectionTitle}>
+                  Donde la tecnología{" "}
+                  <span className={shared.sectionTitleAccent}>se convierte en resultados</span>
+                </h2>
+                <p className={shared.sectionLead}>
+                  Somos un integrador con disciplina de campo: diseñamos, instalamos y sostenemos CCTV,
+                  redes, cómputo y soporte para empresas que no pueden detenerse.
+                </p>
+              </header>
+              <ul className={`${shared.checkList} ${shared.checkListSingle}`}>
+                {COMPROMISOS.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+              <div className={shared.splitActions}>
+                <Link href="/servicios" className={`${shared.btn} ${shared.btnPrimary}`}>
+                  Ver servicios <span className={shared.btnArrow} aria-hidden>→</span>
+                </Link>
+                <Link href="/proyectos" className={`${shared.btn} ${shared.btnSecondary}`} data-track-conversion="nosotros_proyectos_link">
+                  Casos de campo
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Principios */}
+      <section id="valores" className={`${shared.section} ${shared.sectionWhite}`} aria-label="Principios" data-reveal="up">
+        <div className={shared.inner}>
+          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
             <p className={shared.eyebrow}>Principios</p>
             <h2 className={shared.sectionTitle}>
               Cómo nos <span className={shared.sectionTitleAccent}>comportamos</span>
             </h2>
-          </div>
-          <div className={shared.principleGrid} data-reveal-stagger>
+            <p className={shared.sectionLead}>Tres compromisos que se notan en cada proyecto, del levantamiento al soporte.</p>
+          </header>
+          <div className={shared.iconGrid} data-reveal-stagger>
             {principios.map((v) => (
-              <div key={v.title} className={shared.principleItem} data-reveal="up">
-                <h3 className={shared.principleTitle}>{v.title}</h3>
-                <p className={shared.principleText}>{v.text}</p>
-              </div>
+              <article key={v.title} className={shared.iconCard} data-reveal="up">
+                <span className={shared.iconTile}>
+                  <PublicIcon name={v.icon} />
+                </span>
+                <h3 className={shared.iconCardTitle}>{v.title}</h3>
+                <p className={shared.iconCardText}>{v.text}</p>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section
-        id="certificaciones"
-        className={`${shared.sectionTight} ${shared.sectionDivider}`}
-        aria-label="Certificaciones"
-        data-reveal="soft"
-      >
+      {/* En campo (banda navy con fotos reales) */}
+      <section className={`${shared.section} ${shared.sectionNavy}`} aria-label="En campo" data-reveal="up">
         <div className={shared.inner}>
-          <LogoStrip
-            label="Certificaciones y alianzas técnicas"
-            items={CERTIFICACIONES}
-            display="marquee"
-            rows={1}
-          />
+          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+            <p className={shared.eyebrow}>En campo</p>
+            <h2 className={shared.sectionTitle}>
+              El mismo equipo que diseña, <span className={shared.sectionTitleAccent}>instala</span>
+            </h2>
+            <p className={shared.sectionLead}>Fotografía de proyectos reales de NEXARA, no banco de imágenes.</p>
+          </header>
+          <div className={shared.mosaic}>
+            {EN_CAMPO.map((e) => (
+              <figure key={e.src} className={`${shared.photoFrame} ${e.tall ? shared.mosaicTall : shared.mosaicWide}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={e.src} alt={e.alt} loading="lazy" decoding="async" />
+                <figcaption className={shared.photoCaption}>
+                  <span className={shared.photoCaptionKicker}>{e.kicker}</span>
+                  {e.caption}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section id="equipo" className={shared.section} data-reveal="up">
+      {/* Equipo */}
+      <section id="equipo" className={shared.section} aria-label="Equipo" data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead}>
+          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
             <p className={shared.eyebrow}>Equipo</p>
             <h2 className={shared.sectionTitle}>
               Quién hace <span className={shared.sectionTitleAccent}>el trabajo</span>
@@ -275,7 +334,7 @@ export default async function NosotrosPage() {
             <p className={shared.sectionLead}>
               Ingeniería, operaciones e instalación — las personas detrás de cada entrega.
             </p>
-          </div>
+          </header>
           <div className={shared.teamGrid} data-reveal-stagger>
             {expertos.slice(0, 8).map((ex) => (
               <article key={ex.key} className={shared.teamCard} data-reveal="up">
@@ -294,43 +353,71 @@ export default async function NosotrosPage() {
               </article>
             ))}
           </div>
-          <p className={styles.storyCta}>
-            <Link href="/contacto" data-track-conversion="nosotros_team_cta">
-              Platiquemos →
-            </Link>
-          </p>
+        </div>
+      </section>
+
+      {/* Certificaciones */}
+      <section
+        id="certificaciones"
+        className={`${shared.section} ${shared.sectionWhite}`}
+        aria-label="Certificaciones"
+        data-reveal="soft"
+      >
+        <div className={shared.inner}>
+          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+            <p className={shared.eyebrow}>Respaldo técnico</p>
+            <h2 className={shared.sectionTitle}>
+              Certificaciones y <span className={shared.sectionTitleAccent}>alianzas</span>
+            </h2>
+          </header>
+          <LogoStrip label="Certificaciones y alianzas técnicas" items={CERTIFICACIONES} display="grid" />
         </div>
       </section>
 
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
           <div className={shared.ctaBand}>
-            <p className={shared.ctaEyebrow}>Siguiente paso</p>
-            <h2 className={shared.ctaTitle}>¿Listo para trabajar juntos?</h2>
-            <p className={shared.ctaLead}>
-              Cuéntanos tu alcance y te respondemos con diagnóstico y propuesta — sin compromiso.
-            </p>
-            <div className={shared.ctaActions}>
-              <Link
-                href="/contacto"
-                className={`${shared.btn} ${shared.btnPrimary}`}
-                data-track-conversion="nosotros_footer_cta"
-              >
-                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
-              </Link>
-              <a
-                href={buildWhatsAppLeadUrl({
-                  industryName: "mi empresa",
-                  serviceName: "CCTV, redes o soporte",
-                  path: "/nosotros",
-                })}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${shared.btn} ${shared.btnSecondary}`}
-                data-track-conversion="nosotros_wa"
-              >
-                WhatsApp
-              </a>
+            <div className={shared.ctaBandGrid}>
+              <div>
+                <p className={shared.ctaEyebrow}>Siguiente paso</p>
+                <h2 className={shared.ctaTitle}>¿Listo para trabajar juntos?</h2>
+                <p className={shared.ctaLead}>
+                  Cuéntanos tu alcance y te respondemos con diagnóstico y propuesta — sin compromiso.
+                </p>
+                <div className={shared.ctaActions}>
+                  <Link
+                    href="/contacto"
+                    className={`${shared.btn} ${shared.btnPrimary}`}
+                    data-track-conversion="nosotros_footer_cta"
+                  >
+                    Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
+                  </Link>
+                  <a
+                    href={buildWhatsAppLeadUrl({
+                      industryName: "mi empresa",
+                      serviceName: "CCTV, redes o soporte",
+                      path: "/nosotros",
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${shared.btn} ${shared.btnSecondary}`}
+                    data-track-conversion="nosotros_wa"
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
+              <ul className={shared.ctaFacts}>
+                <li>
+                  <PublicIcon name="users" /> Equipo propio de ingeniería e instalación, sin subcontratar la responsabilidad.
+                </li>
+                <li>
+                  <PublicIcon name="clock" /> Primera respuesta típica en menos de 24 horas hábiles.
+                </li>
+                <li>
+                  <PublicIcon name="fileCheck" /> Entrega documentada y soporte con SLA.
+                </li>
+              </ul>
             </div>
           </div>
         </div>
