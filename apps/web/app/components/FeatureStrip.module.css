@@ -4,20 +4,13 @@
   width: 100%;
   max-width: 1480px;
   margin: 0 auto;
-  padding: clamp(28px, 4vw, 40px) clamp(24px, 4vw, 48px);
-  border-radius: 16px;
-  border: 1px solid rgba(140, 190, 255, 0.12);
-  background:
-    linear-gradient(170deg, rgba(12, 26, 44, 0.9), rgba(8, 18, 32, 0.96));
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 0 clamp(24px, 4vw, 48px);
 }
 
 .row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: clamp(10px, 2vw, 18px);
+  gap: clamp(14px, 2vw, 20px);
 }
 
 .item {
@@ -25,10 +18,7 @@
   grid-template-columns: 42px 1fr;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid rgba(140, 190, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 6px 0;
 }
 
 .icon {
@@ -37,8 +27,7 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  border: 1px solid rgba(45, 216, 242, 0.25);
-  background: rgba(45, 216, 242, 0.08);
+  background: rgba(45, 216, 242, 0.12);
   color: #2dd8f2;
 }
 
@@ -54,6 +43,7 @@
 @media (max-width: 900px) {
   .row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 14px;
   }
 }
 
