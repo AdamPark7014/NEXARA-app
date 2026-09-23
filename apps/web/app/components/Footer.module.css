@@ -485,3 +485,25 @@
     height: 40px;
   }
 }
+
+/* Mapa del footer: OSM llevado al navy del sitio + enlace "Cómo llegar" */
+.mapEmbed[data-provider="osm"] {
+  filter: invert(0.92) hue-rotate(185deg) saturate(0.55) brightness(0.9) contrast(1.02);
+}
+
+.mapDirections {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: var(--f-ui);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--f-acento);
+  text-decoration: none;
+}
+
+.mapDirections:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

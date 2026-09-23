@@ -14,7 +14,7 @@
   flex-wrap: wrap;
   gap: 6px 4px;
   font-size: 0.8rem;
-  color: #7b889c;
+  color: var(--ds-faint);
 }
 
 .breadcrumb li {
@@ -26,21 +26,21 @@
   content: "/";
   margin-left: 8px;
   margin-right: 4px;
-  color: rgba(11, 26, 51, 0.3);
+  color: var(--ds-line-strong);
 }
 
 .breadcrumb a {
-  color: #4f607a;
+  color: var(--ds-muted);
   text-decoration: none;
   transition: color 150ms ease;
 }
 
 .breadcrumb a:hover {
-  color: #0e9ab8;
+  color: var(--ds-cyan);
 }
 
 .breadcrumb li[aria-current="page"] {
-  color: #0b1a33;
+  color: var(--ds-title);
   font-weight: 500;
 }
 
@@ -59,9 +59,9 @@
 }
 
 .faqItem {
-  border: 1px solid rgba(11, 26, 51, 0.1);
+  border: 1px solid var(--ds-line);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--ds-surface);
   padding: 0 18px;
 }
 
@@ -72,7 +72,7 @@
   font-family: var(--nx-font-ui, "Inter Tight", sans-serif);
   font-size: 1rem;
   font-weight: 600;
-  color: #0b1a33;
+  color: var(--ds-title);
 }
 
 .faqQuestion::-webkit-details-marker {
@@ -84,7 +84,7 @@
   padding-top: 0;
   font-size: 0.95rem;
   line-height: 1.65;
-  color: #4f607a;
+  color: var(--ds-muted);
   max-width: 68ch;
 }
 

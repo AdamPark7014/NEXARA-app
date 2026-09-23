@@ -261,22 +261,6 @@ export default async function NexaraPage() {
       <HomeHero bootstrap={heroBootstrap} />
 
       <div className={styles.homeBody}>
-        {/* Cifras: tarjeta que monta sobre el hero */}
-        <section className={shared.statsBand} aria-label="Cifras de operación">
-          <div className={shared.inner}>
-            <div className={shared.statsCard}>
-              <div className={shared.statsGrid}>
-                {metricas.map((m) => (
-                  <div key={`${m.value}-${m.label}`} className={shared.stat}>
-                    <span className={shared.statValue}>{m.value}</span>
-                    <span className={shared.statLabel}>{m.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* Servicios */}
         <section className={shared.section} aria-label="Servicios" data-reveal="up">
           <div className={shared.inner}>
@@ -342,6 +326,14 @@ export default async function NexaraPage() {
                 <ul className={`${shared.checkList} ${shared.checkListSingle}`}>
                   {PROMISES.map((p) => (
                     <li key={p}>{p}</li>
+                  ))}
+                </ul>
+                <ul className={shared.factsInline} aria-label="Cifras de operación">
+                  {metricas.map((m) => (
+                    <li key={`${m.value}-${m.label}`}>
+                      <strong>{m.value}</strong>
+                      <span>{m.label}</span>
+                    </li>
                   ))}
                 </ul>
                 <div className={shared.splitActions}>

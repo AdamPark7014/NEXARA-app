@@ -3,7 +3,7 @@ import React from "react";
 import styles from "./Map.module.css";
 import { useMapProvider } from "./useMapProvider";
 
-const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
+const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
 
 /**
  * Mapa de Contacto — iframe embebido.
@@ -20,6 +20,7 @@ export default function Map() {
         {info ? (
           <iframe
             key={info.provider}
+            data-provider={info.provider}
             title="Mapa NEXARA — Explanada Puebla, Momoxpan"
             src={info.src}
             width="100%"
@@ -35,6 +36,16 @@ export default function Map() {
           </div>
         )}
       </div>
+      <a
+        className={styles.mapCta}
+        href={info?.link || NEXARA_MAPS_LINK}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Cómo llegar a NEXARA (abre Google Maps)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+        Cómo llegar
+      </a>
       <noscript>
         <p>
           Ver ubicación en{" "}

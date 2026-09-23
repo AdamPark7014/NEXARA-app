@@ -13,7 +13,7 @@
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ds-faint, #6f85a5);
+  color: var(--ds-faint, #7688a3);
 }
 
 /* Celda badge: fondo claro constante para que cualquier logo (a color,
@@ -28,13 +28,13 @@
   padding: 10px 16px;
   border-radius: 12px;
   background: #ffffff;
-  border: 1px solid var(--ds-line, rgba(11, 26, 51, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .cell:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 26px rgba(11, 26, 51, 0.12);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
 }
 
 .logo {
