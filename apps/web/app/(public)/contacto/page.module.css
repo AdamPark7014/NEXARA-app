@@ -22,7 +22,7 @@
   font-size: clamp(1.4rem, 2.2vw, 1.75rem);
   font-weight: 600;
   letter-spacing: -0.03em;
-  color: #fff;
+  color: #0b1a33;
   line-height: 1.15;
 }
 
@@ -32,10 +32,10 @@
   padding: 0;
   display: grid;
   gap: 2px;
-  border: 1px solid rgba(140, 190, 255, 0.14);
+  border: 1px solid rgba(11, 26, 51, 0.1);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(140, 190, 255, 0.1);
+  background: rgba(11, 26, 51, 0.1);
 }
 
 .directLink {
@@ -45,7 +45,7 @@
   width: 100%;
   padding: 14px 16px;
   border: none;
-  background: rgba(5, 10, 20, 0.88);
+  background: #ffffff;
   text-align: left;
   text-decoration: none;
   color: inherit;
@@ -55,12 +55,12 @@
 }
 
 .directLink:hover {
-  background: rgba(8, 18, 36, 0.98);
+  background: #f5f7fb;
 }
 
 .whatsappLink {
   background: #25d366 !important;
-  color: #fff;
+  color: #0b1a33;
 }
 
 .whatsappLink:hover {
@@ -91,20 +91,20 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #2dd8f2;
+  color: #0e9ab8;
 }
 
 .directValue {
   font-size: 0.95rem;
   font-weight: 500;
-  color: #eef4ff;
+  color: #0b1a33;
 }
 
 .expectNote {
   margin: 0 0 12px;
   font-size: 0.9rem;
   line-height: 1.55;
-  color: #9bb0cc;
+  color: #4f607a;
 }
 
 .asideMedia {
@@ -114,14 +114,14 @@
 .locationNote {
   margin: 0;
   font-size: 0.85rem;
-  color: #6f85a5;
+  color: #7b889c;
 }
 
 .formCard {
   padding: clamp(22px, 3vw, 30px);
-  border: 1px solid rgba(140, 190, 255, 0.16);
+  border: 1px solid rgba(11, 26, 51, 0.1);
   border-radius: 14px;
-  background: #0a1424;
+  background: #ffffff;
 }
 
 .formCardHead {
@@ -129,7 +129,7 @@
   gap: 6px;
   margin-bottom: 18px;
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(140, 190, 255, 0.12);
+  border-bottom: 1px solid rgba(11, 26, 51, 0.1);
 }
 
 .formCardTitle {
@@ -138,14 +138,14 @@
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   font-weight: 600;
   letter-spacing: -0.025em;
-  color: #fff;
+  color: #0b1a33;
   line-height: 1.15;
 }
 
 .formCardNote {
   margin: 0;
   font-size: 0.86rem;
-  color: #9bb0cc;
+  color: #4f607a;
 }
 
 .form {
@@ -167,7 +167,7 @@
 .field span {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #9bb0cc;
+  color: #4f607a;
 }
 
 .field input,
@@ -176,9 +176,9 @@
   width: 100%;
   padding: 11px 13px;
   border-radius: 12px;
-  border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(5, 10, 20, 0.65);
-  color: #eef4ff;
+  border: 1px solid rgba(11, 26, 51, 0.1);
+  background: #ffffff;
+  color: #0b1a33;
   font-family: inherit;
   font-size: 0.95rem;
   outline: none;
@@ -187,14 +187,14 @@
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #6f85a5;
+  color: #7b889c;
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: rgba(45, 216, 242, 0.5);
-  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.1);
+  border-color: rgba(14, 154, 184, 0.6);
+  box-shadow: 0 0 0 3px rgba(14, 154, 184, 0.12);
 }
 
 .field textarea {
@@ -204,7 +204,7 @@
 
 .field select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%232dd8f2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%230e9ab8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 36px;
@@ -215,10 +215,10 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255, 157, 60, 0.35);
-  background: rgba(255, 157, 60, 0.08);
+  background: rgba(255, 157, 60, 0.14);
   font-size: 0.88rem;
   line-height: 1.45;
-  color: #ffc98a;
+  color: #8a4300;
 }
 
 .submitBtn {
@@ -228,11 +228,11 @@
 .formNote {
   margin: 4px 0 0;
   font-size: 0.8rem;
-  color: #6f85a5;
+  color: #7b889c;
 }
 
 .formNote a {
-  color: #2dd8f2;
+  color: #0e9ab8;
 }
 
 .successBlock {
@@ -247,19 +247,19 @@
   font-family: var(--ds-font-display);
   font-size: 1.35rem;
   font-weight: 600;
-  color: #fff;
+  color: #0b1a33;
 }
 
 .successBlock p {
   margin: 0;
-  color: #9bb0cc;
+  color: #4f607a;
   max-width: 36ch;
   line-height: 1.55;
 }
 
 .mapSection {
   padding: 0 0 clamp(64px, 8vw, 96px);
-  border-top: 1px solid rgba(140, 190, 255, 0.12);
+  border-top: 1px solid rgba(11, 26, 51, 0.1);
   padding-top: clamp(48px, 6vw, 64px);
 }
 
@@ -273,7 +273,7 @@
   font-family: var(--ds-font-display);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   font-weight: 600;
-  color: #fff;
+  color: #0b1a33;
   letter-spacing: -0.02em;
 }
 
@@ -303,9 +303,9 @@
   gap: 20px;
   padding: 22px 24px;
   border-radius: 14px;
-  border: 1px solid rgba(140, 190, 255, 0.14);
+  border: 1px solid rgba(11, 26, 51, 0.1);
   background:
-    linear-gradient(145deg, rgba(18, 36, 58, 0.92), rgba(10, 18, 32, 0.96));
+    #ffffff;
 }
 
 .locationCopy {
@@ -317,7 +317,7 @@
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #7f9bb8;
+  color: #7b889c;
 }
 
 .locationAddress {
@@ -325,14 +325,14 @@
   font-family: var(--ds-font-display);
   font-size: 1.05rem;
   font-weight: 600;
-  color: #f4f8ff;
+  color: #0b1a33;
 }
 
 .locationHint {
   margin: 8px 0 0;
   font-size: 0.9rem;
   line-height: 1.45;
-  color: #9bb0cc;
+  color: #4f607a;
 }
 
 @media (max-width: 900px) {

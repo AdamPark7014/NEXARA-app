@@ -3,15 +3,14 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
-import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
+import PublicIcon, { type PublicIconName } from "../../components/PublicIcon";
+import LogoStrip from "../../components/LogoStrip";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
-import LogoStrip from "../../components/LogoStrip";
-// Se evitan strips/mosaicos decorativos — limpieza editorial
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
@@ -19,35 +18,30 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-// Verticales (de Soluciones) — tarjetas de uso (no texto largo)
-const industrias = [
-  { slug: "retail", title: "Retail", risk: "Multi-sede + merma", text: "Aperturas y operaciones con CCTV por sucursal, Wi‑Fi estable y soporte de punta de venta. Mismo estándar en cada tienda, sin reinventar el cableado cada vez." },
-  { slug: "manufactura", title: "Manufactura", risk: "Downtime de planta", text: "Redes de piso, perímetro y continuidad en equipos críticos. Cuando una caída detiene un turno, el diseño no puede ser “genérico de oficina”." },
-  { slug: "hospitalidad", title: "Hospitalidad", risk: "Densidad + reputación", text: "Wi‑Fi de alta densidad, CCTV y operación unificada por propiedad. El huésped no distingue “red saturada” de “mal hotel”." },
-  { slug: "salud", title: "Salud", risk: "Continuidad clínica", text: "Segmentación, respaldos y soporte prioritario. La red y el cómputo tienen que sostener flujos clínicos, no solo el Wi‑Fi de la sala de espera." },
-  { slug: "educacion", title: "Educación", risk: "Campus completo", text: "Wi‑Fi, CCTV y mesa de ayuda para aulas, labs y edificios administrativos. Cobertura que escala con el período escolar, no con el hotspot improvisado." },
-  { slug: "gobierno", title: "Gobierno", risk: "Fases + auditoría", text: "Modernización por etapas con documentación auditable. Entregables claros, sin cajas negras técnicas ni alcance que no se pueda defender." },
+const PROBLEMAS: { icon: PublicIconName; title: string; text: string }[] = [
+  { icon: "camera", title: "CCTV sin evidencia útil", text: "Cámaras mal ubicadas, grabación que falla justo cuando se necesita." },
+  { icon: "wifi", title: "Wi‑Fi inestable en horas pico", text: "Cobertura por “mejor esfuerzo”, sin diseño RF ni segmentación." },
+  { icon: "server", title: "Racks y cableado sin estándar", text: "Nadie sabe qué va a dónde; cada cambio es una apuesta." },
+  { icon: "headset", title: "Tickets sin SLA ni seguimiento", text: "Soporte reactivo, sin tiempos comprometidos ni historial." },
 ];
 
-const METRICS = [
-  { value: "Campo", label: "Diagnóstico y evidencia en sitio" },
-  { value: "1 firma", label: "Diseño, instalación y soporte" },
-  { value: "Puebla · CDMX", label: "Base con cobertura nacional" },
-  { value: "< 24 h", label: "Primera respuesta típica" },
-];
+type Servicio = {
+  id: string;
+  icon: PublicIconName;
+  nav: string;
+  title: string;
+  text: string;
+  points: string[];
+  photo?: { src: string; alt: string };
+};
 
-const PROBLEMAS = [
-  "Cobertura de CCTV sin evidencia útil",
-  "Wi‑Fi inestable en horas pico",
-  "Racks y cableado sin estándar",
-  "Tickets sin SLA ni seguimiento",
-];
-
-const servicios = [
+const servicios: Servicio[] = [
   {
     id: "cctv",
-    title: "Seguridad Inteligente",
-    text: "CCTV diseñado para tu riesgo.",
+    icon: "camera",
+    nav: "Videovigilancia",
+    title: "Videovigilancia Inteligente",
+    text: "CCTV diseñado para tu riesgo real: cobertura pensada por zona, grabación confiable y acceso remoto seguro. Evidencia cuando se necesita, no sorpresas.",
     points: [
       "Diseño estratégico de cobertura",
       "Cámaras IP y sistemas NVR/VMS",
@@ -55,49 +49,61 @@ const servicios = [
       "Mantenimiento preventivo y correctivo",
       "Evidencia técnica y documentación de servicio",
     ],
+    photo: { src: "/fotos/monitoreo-pantallas-cctv.jpg", alt: "Monitores de videovigilancia en un centro de monitoreo NEXARA" },
   },
   {
     id: "redes",
-    title: "Conectividad",
-    text: "Redes estables y documentadas.",
+    icon: "wifi",
+    nav: "Redes y Wi‑Fi",
+    title: "Redes Empresariales y Wi‑Fi",
+    text: "Cableado estructurado certificado, switching administrable y Wi‑Fi de alta densidad. Redes estables, segmentadas y documentadas para operar y crecer.",
     points: [
       "Cableado estructurado certificado",
       "Switching administrable y segmentación VLAN",
       "Redes Wi‑Fi empresariales",
-      "Optimización y documentación de infraestructura",
-      "Integración entre sedes y dispositivos",
+      "Enlaces entre sedes y radioenlaces",
+      "Documentación y optimización de la red",
     ],
+    photo: { src: "/fotos/campo-mastil-antenas.jpg", alt: "Mástil con antenas de radioenlace instalado por NEXARA" },
   },
   {
     id: "computo",
-    title: "Infraestructura TI",
-    text: "Racks, servidores y respaldos estandarizados.",
+    icon: "server",
+    nav: "Infraestructura",
+    title: "Infraestructura Tecnológica",
+    text: "Racks, servidores, respaldos y estaciones de trabajo estandarizadas. Hardware y software alineados a cómo trabaja tu equipo, listos desde el primer día.",
     points: [
       "Estaciones de trabajo y servidores",
       "Instalación y organización de racks",
       "Sistemas de respaldo y recuperación",
       "Configuración estandarizada de equipos",
-      "Optimización y administración de recursos",
+      "Administración y optimización de recursos",
     ],
+    photo: { src: "/fotos/rack-servidores-led.jpg", alt: "Rack de servidores y switching instalado por NEXARA" },
   },
   {
     id: "soporte",
-    title: "Soporte TI",
-    text: "Mesa de ayuda con SLA.",
+    icon: "headset",
+    nav: "Soporte TI",
+    title: "Soporte y Gestión TI",
+    text: "Mesa de ayuda con acuerdos de nivel de servicio, atención remota y visitas en sitio. Cuando algo falla hay un humano, un plan y un tiempo comprometido.",
     points: [
       "Mesa de ayuda especializada",
       "Soporte remoto y asistencia en sitio",
       "Mantenimiento preventivo y correctivo",
-      "Atención bajo acuerdos de nivel de servicio (SLA)",
+      "Atención bajo SLA",
       "Seguimiento y documentación de incidencias",
     ],
+    photo: { src: "/fotos/equipo-nexara-polos.jpg", alt: "Equipo técnico de NEXARA" },
   },
   {
     id: "software",
-    title: "Plataformas a Medida",
-    text: "Portales y apps por fases.",
+    icon: "code",
+    nav: "Plataformas",
+    title: "Desarrollo de Plataformas",
+    text: "Portales, automatización e indicadores construidos por fases, con objetivos medibles y sin depender de terceros para cada cambio.",
     points: [
-      "Desarrollo de portales empresariales",
+      "Portales empresariales",
       "Automatización de procesos",
       "Integración entre plataformas",
       "Dashboards e indicadores",
@@ -106,11 +112,42 @@ const servicios = [
   },
 ];
 
+const PASOS: { icon: PublicIconName; num: string; title: string; text: string }[] = [
+  { icon: "search", num: "01", title: "Diagnóstico", text: "Recorremos el sitio, levantamos riesgos y priorizamos lo que mueve la operación." },
+  { icon: "hardhat", num: "02", title: "Implementación", text: "Alcance cerrado, calendario visible e instalación con evidencia fotográfica." },
+  { icon: "refresh", num: "03", title: "Operación", text: "Soporte, monitoreo y mejoras. Seguimos cuando el proyecto ya está en producción." },
+];
+
+const CERTIFICACIONES = [
+  { src: "/certificaciones/certificaciones-06.png", alt: "HikVision" },
+  { src: "/certificaciones/certificaciones-09.png.jpeg", alt: "Dell Technologies Authorized Partner" },
+  { src: "/certificaciones/certificaciones-04.png", alt: "Lenovo SEG Silver Partner" },
+  { src: "/certificaciones/certificaciones-07.png", alt: "Sophos" },
+  { src: "/certificaciones/certificaciones-01.png", alt: "Linksys" },
+  { src: "/certificaciones/certificaciones-02.png", alt: "Belden" },
+  { src: "/certificaciones/certificaciones-03.png", alt: "Intellinet" },
+  { src: "/certificaciones/certificaciones-05.png.jpeg", alt: "Grandstream" },
+  { src: "/certificaciones/certificaciones-08.png", alt: "Mimosa" },
+  { src: "/certificaciones/certificaciones-04.1.png.webp", alt: "Lenovo SEG Authorized Solutions" },
+];
+
+const INDUSTRIAS: { slug: string; name: string; icon: PublicIconName }[] = [
+  { slug: "retail", name: "Retail", icon: "store" },
+  { slug: "manufactura", name: "Manufactura", icon: "factory" },
+  { slug: "hospitalidad", name: "Hospitalidad", icon: "hotel" },
+  { slug: "salud", name: "Salud", icon: "hospital" },
+  { slug: "educacion", name: "Educación", icon: "school" },
+  { slug: "gobierno", name: "Gobierno", icon: "landmark" },
+];
+
 export default async function ServiciosPage() {
   const visuals = await fetchPageVisuals("page_servicios");
   const mid = visuals.slots[0];
   const heroDesktop = resolvePageMediaUrl(visuals.heroDesktopUrl);
   const heroMobile = resolvePageMediaUrl(visuals.heroMobileUrl || visuals.heroDesktopUrl);
+  const midPhoto = mid?.desktopUrl
+    ? { src: resolvePageMediaUrl(mid.desktopUrl), alt: mid.alt || "Instalación NEXARA" }
+    : { src: "/fotos/monitoreo-videowall.jpg", alt: "Centro de monitoreo instalado por NEXARA" };
 
   return (
     <main className={`${shared.page} home-main-flush`}>
@@ -149,161 +186,236 @@ export default async function ServiciosPage() {
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}
+        actions={
+          <>
+            <Link href="/contacto" className={heroStyles.ctaPrimary} data-track-conversion="servicios_hero_cta">
+              Cotiza tu proyecto <span className={heroStyles.ctaArrow} aria-hidden>→</span>
+            </Link>
+            <a
+              href={buildWhatsAppLeadUrl({ industryName: "mi empresa", serviceName: "CCTV, redes o soporte", path: "/servicios" })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={heroStyles.ctaSecondary}
+            >
+              WhatsApp
+            </a>
+          </>
+        }
       />
 
-      {/* S1 — Problema (texto) */}
-      <section className={shared.sectionTight} data-reveal="up" aria-label="Problema típico">
+      {/* Problemas típicos: tarjeta que monta sobre el hero */}
+      <section aria-label="Lo que suele fallar" style={{ position: "relative", zIndex: 3 }}>
         <div className={shared.inner}>
-          <header className={shared.sectionHead}>
-            <p className={shared.eyebrow}>Problema</p>
-            <h2 className={shared.sectionTitle}>
-              Lo que suele <span className={shared.sectionTitleAccent}>fallar</span>
-            </h2>
-          </header>
-          <ul className={shared.bulletList}>
-            {PROBLEMAS.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
+          <div className={shared.statsCard}>
+            <div className={shared.tileRow}>
+              {PROBLEMAS.map((p) => (
+                <div key={p.title} className={shared.tile}>
+                  <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
+                    <PublicIcon name={p.icon} />
+                  </span>
+                  <div>
+                    <h3 className={shared.tileTitle}>{p.title}</h3>
+                    <p className={shared.tileText}>{p.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* (Métricas eliminadas para composición más sobria) */}
-
-      {/* (Se retiran strips/mosaicos — dejamos una sola banda visual honesta) */}
-
-      {/* Secciones con imagen alternada eliminadas: evitamos collages flotantes */}
-
-      {/* Use-cases con visual (tiles de servicio) */}
-      <section className={shared.section} data-reveal="up" aria-label="Qué incluye">
+      {/* Detalle de servicios */}
+      <section className={shared.section} aria-label="Servicios" data-reveal="up">
         <div className={shared.inner}>
-          <header className={shared.sectionHead}>
+          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
             <p className={shared.eyebrow}>Qué hacemos</p>
             <h2 className={shared.sectionTitle}>
-              Qué <span className={shared.sectionTitleAccent}>incluye</span>
+              Cinco líneas, <span className={shared.sectionTitleAccent}>una responsabilidad</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Cada servicio se entrega con diseño, instalación documentada y soporte. Elige por dónde empezar.
+            </p>
+          </header>
+
+          <div className={shared.serviceLayout}>
+            <nav className={shared.serviceNav} aria-label="Índice de servicios">
+              {servicios.map((s) => (
+                <a key={s.id} href={`#${s.id}`} className={shared.serviceNavLink}>
+                  <PublicIcon name={s.icon} /> {s.nav}
+                </a>
+              ))}
+              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary} ${shared.serviceNavCta}`}>
+                Cotizar
+              </Link>
+            </nav>
+
+            <div className={shared.serviceDetail}>
+              {servicios.map((s) => (
+                <article
+                  key={s.id}
+                  id={s.id}
+                  className={`${shared.serviceBlock} ${s.photo ? "" : shared.serviceBlockSolo}`}
+                  data-reveal="up"
+                >
+                  <div>
+                    <div className={shared.serviceBlockHead}>
+                      <span className={shared.iconTile}>
+                        <PublicIcon name={s.icon} />
+                      </span>
+                      <h3 className={shared.serviceBlockTitle}>{s.title}</h3>
+                    </div>
+                    <p className={shared.serviceBlockText}>{s.text}</p>
+                    <ul className={shared.checkList}>
+                      {s.points.map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                    <Link
+                      href={`/contacto?servicio=${s.id}`}
+                      className={shared.linkArrow}
+                      data-track-conversion={`servicios_${s.id}_cta`}
+                    >
+                      Cotizar {s.nav.toLowerCase()} <PublicIcon name="arrowRight" size={16} />
+                    </Link>
+                  </div>
+                  {s.photo ? (
+                    <figure className={shared.serviceBlockMedia}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={s.photo.src} alt={s.photo.alt} loading="lazy" decoding="async" />
+                    </figure>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Método con foto del CMS (banda navy) */}
+      <section className={`${shared.section} ${shared.sectionNavy}`} aria-label="Del diagnóstico a la operación" data-reveal="up">
+        <div className={shared.inner}>
+          <div className={`${shared.split} ${shared.splitReverse}`}>
+            <div className={shared.splitCopy}>
+              <header className={shared.sectionHead}>
+                <p className={shared.eyebrow}>Método</p>
+                <h2 className={shared.sectionTitle}>
+                  Del diagnóstico a la <span className={shared.sectionTitleAccent}>operación</span>
+                </h2>
+                <p className={shared.sectionLead}>
+                  {mid?.caption || "Instalación documentada y operable — evidencia, no promesas."}
+                </p>
+              </header>
+              <div style={{ display: "grid", gap: 14, width: "100%" }}>
+                {PASOS.map((p) => (
+                  <div key={p.num} className={shared.stepItemOpen}>
+                    <div className={shared.stepHead}>
+                      <h3 className={shared.stepTitleOpen}>
+                        <span className={shared.stepNumOpen} style={{ fontSize: "1rem", marginRight: 10 }}>{p.num}</span>
+                        {p.title}
+                      </h3>
+                      <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
+                        <PublicIcon name={p.icon} />
+                      </span>
+                    </div>
+                    <p className={shared.stepTextOpen}>{p.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <figure className={`${shared.photoFrame} ${shared.ar45} ${shared.splitMedia}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={midPhoto.src} alt={midPhoto.alt} loading="lazy" decoding="async" />
+              <span className={shared.photoBadge}>Proyecto real</span>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      {/* Certificaciones y fabricantes */}
+      <section className={`${shared.section} ${shared.sectionWhite}`} aria-label="Certificaciones" data-reveal="soft">
+        <div className={shared.inner}>
+          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+            <p className={shared.eyebrow}>Respaldo técnico</p>
+            <h2 className={shared.sectionTitle}>
+              Certificaciones y <span className={shared.sectionTitleAccent}>alianzas</span>
             </h2>
           </header>
-          <div className={`${shared.grid2}`} data-reveal-stagger>
-            <Link href="#cctv" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/hero/hero-02.png" alt="CCTV Nexara" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>CCTV</h3>
-                <p className={shared.imageCardText}>Cobertura, VMS/NVR y evidencia confiable.</p>
-              </div>
-            </Link>
-            <Link href="#redes" className={shared.imageCard} data-reveal="up">
-              <div className={shared.imageCardImg}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/hero/hero-04.png" alt="Redes y Wi‑Fi Nexara" loading="lazy" decoding="async" />
-              </div>
-              <div className={shared.imageCardBody}>
-                <h3 className={shared.imageCardTitle}>Redes y Wi‑Fi</h3>
-                <p className={shared.imageCardText}>Cableado certificado y RF estable.</p>
-              </div>
-            </Link>
-          </div>
+          <LogoStrip label="Certificaciones y alianzas técnicas" items={CERTIFICACIONES} display="grid" />
         </div>
       </section>
 
-      {/* Banda visual grande única (limpia, sin overlaps) */}
-      {mid?.desktopUrl ? (
-        <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Campo">
-          <div className={shared.inner}>
-            <EditorialImage
-              desktopUrl={mid.desktopUrl}
-              mobileUrl={mid.mobileUrl}
-              alt={mid.alt}
-              caption={
-                mid.caption ||
-                "Instalación documentada y operable — evidencia, no promesas."
-              }
-              kicker="En sitio"
-              title="Del diagnóstico a la operación"
-              layout="bleed_landscape"
-              objectPosition={mid.objectPosition}
-              compose="caption-bar"
+      {/* Industrias */}
+      <section className={shared.section} aria-label="Industrias" data-reveal="up">
+        <div className={shared.inner}>
+          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+            <p className={shared.eyebrow}>Industrias</p>
+            <h2 className={shared.sectionTitle}>
+              El mismo estándar, <span className={shared.sectionTitleAccent}>tu vertical</span>
+            </h2>
+            <p className={shared.sectionLead}>Soluciones armadas por industria, con su riesgo típico resuelto.</p>
+          </header>
+          <div className={shared.industryRow} data-reveal-stagger>
+            {INDUSTRIAS.map((i) => (
+              <Link key={i.slug} href={`/soluciones/${i.slug}`} className={shared.industryPill} data-reveal="up">
+                <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
+                  <PublicIcon name={i.icon} />
+                </span>
+                {i.name}
+              </Link>
+            ))}
+          </div>
+          <div style={{ marginTop: "clamp(28px, 4vw, 48px)" }}>
+            <SeoInterlinkHub
+              title="Soluciones que más cotizan"
+              subtitle="CCTV, redes y soporte por industria — listo para Google y para convertir."
+              currentPath="/servicios"
+              maxIndustries={4}
+              maxServicesPerIndustry={3}
             />
           </div>
-        </section>
-      ) : null}
-
-      {/* Social proof — certificaciones / fabricantes */}
-      <section className={shared.section} data-reveal="soft" aria-label="Prueba social">
-        <div className={shared.inner}>
-          <LogoStrip
-            label="Certificaciones y fabricantes"
-            items={[
-              { src: "/certificaciones/certificaciones-06.png", alt: "HikVision" },
-              { src: "/certificaciones/certificaciones-01.png", alt: "Linksys" },
-              { src: "/certificaciones/certificaciones-09.png.jpeg", alt: "Dell Technologies" },
-              { src: "/certificaciones/certificaciones-03.png", alt: "Intellinet" },
-              { src: "/certificaciones/certificaciones-04.png", alt: "Lenovo SEG" },
-              { src: "/certificaciones/certificaciones-05.png.jpeg", alt: "Grandstream" },
-            ]}
-            display="marquee"
-            rows={1}
-          />
-        </div>
-      </section>
-
-      {/* (Se omite mosaico de industrias aquí; vive en /soluciones) */}
-
-      {/* Banda breve de porqué (texto muy corto) */}
-      <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Una sola firma">
-        <div className={shared.inner}>
-          <div className={shared.sectionHead}>
-            <p className={shared.eyebrow}>Una sola empresa</p>
-            <h2 className={shared.sectionTitle}>
-              Una sola <span className={shared.sectionTitleAccent}>responsabilidad</span>
-            </h2>
-            <p className={shared.sectionLead}>Diseño, instalación y soporte bajo el mismo contrato.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className={shared.section} data-reveal="up">
-        <div className={shared.inner}>
-          <SeoInterlinkHub
-            title="Soluciones que más cotizan"
-            subtitle="CCTV, redes y soporte por industria — listo para Google y para convertir."
-            currentPath="/servicios"
-            maxIndustries={4}
-            maxServicesPerIndustry={3}
-          />
         </div>
       </section>
 
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
           <div className={shared.ctaBand}>
-            <p className={shared.ctaEyebrow}>Siguiente paso</p>
-            <h2 className={shared.ctaTitle}>Cotiza CCTV, redes o soporte</h2>
-            <p className={shared.ctaLead}>
-              Diagnóstico corto en Puebla o CDMX. Te decimos qué instalar, qué posponer y qué presupuesto tiene sentido.
-            </p>
-            <div className={shared.ctaActions}>
-              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`} data-track-conversion="servicios_footer_cta">
-                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
-              </Link>
-              <a
-                href={buildWhatsAppLeadUrl({
-                  industryName: "mi empresa",
-                  serviceName: "CCTV, redes o soporte",
-                  path: "/servicios",
-                })}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${shared.btn} ${shared.btnSecondary}`}
-                data-track-conversion="servicios_wa"
-              >
-                WhatsApp
-              </a>
-              <Link href="/cobertura/puebla" className={`${shared.btn} ${shared.btnSecondary}`}>
-                Cobertura Puebla
-              </Link>
+            <div className={shared.ctaBandGrid}>
+              <div>
+                <p className={shared.ctaEyebrow}>Siguiente paso</p>
+                <h2 className={shared.ctaTitle}>Cotiza CCTV, redes o soporte</h2>
+                <p className={shared.ctaLead}>
+                  Diagnóstico corto en Puebla o CDMX. Te decimos qué instalar, qué posponer y qué presupuesto tiene sentido.
+                </p>
+                <div className={shared.ctaActions}>
+                  <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`} data-track-conversion="servicios_footer_cta">
+                    Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
+                  </Link>
+                  <a
+                    href={buildWhatsAppLeadUrl({
+                      industryName: "mi empresa",
+                      serviceName: "CCTV, redes o soporte",
+                      path: "/servicios",
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${shared.btn} ${shared.btnSecondary}`}
+                    data-track-conversion="servicios_wa"
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
+              <ul className={shared.ctaFacts}>
+                <li>
+                  <PublicIcon name="clock" /> Primera respuesta típica en menos de 24 horas hábiles.
+                </li>
+                <li>
+                  <PublicIcon name="fileCheck" /> Propuesta con alcance cerrado, sin costos escondidos.
+                </li>
+                <li>
+                  <PublicIcon name="shield" /> Garantía de instalación y soporte con SLA.
+                </li>
+              </ul>
             </div>
           </div>
         </div>

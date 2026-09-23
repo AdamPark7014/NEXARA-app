@@ -36,11 +36,11 @@
 .storyTitle {
   margin: 12px 0 0;
   font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: clamp(1.85rem, 3.8vw, 2.85rem);
-  font-weight: 600;
-  line-height: 1.08;
-  letter-spacing: -0.035em;
-  color: #fff;
+  font-size: clamp(1.85rem, 3.3vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+  color: #0b1a33;
   text-wrap: balance;
 }
 
@@ -48,7 +48,7 @@
   margin: 0 0 14px;
   font-size: 1.05rem;
   line-height: 1.65;
-  color: #9bb0cc;
+  color: #4f607a;
   max-width: 42ch;
 }
 
@@ -56,7 +56,7 @@
   margin: 0;
   font-size: 0.98rem;
   line-height: 1.6;
-  color: #6f85a5;
+  color: #7b889c;
   max-width: 42ch;
 }
 
@@ -75,7 +75,7 @@
   gap: clamp(20px, 4vw, 48px);
   margin-top: clamp(32px, 5vw, 56px);
   padding-top: clamp(24px, 3.5vw, 36px);
-  border-top: 1px solid rgba(140, 190, 255, 0.12);
+  border-top: 1px solid rgba(11, 26, 51, 0.1);
 }
 
 .storyDetailGrid p {
@@ -90,12 +90,12 @@
   font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
   font-size: 0.95rem;
   font-weight: 600;
-  color: #2dd8f2;
+  color: #0e9ab8;
   text-decoration: none;
 }
 
 .storyCta a:hover {
-  color: #9fecfa;
+  color: #0b7f99;
 }
 
 @media (max-width: 900px) {

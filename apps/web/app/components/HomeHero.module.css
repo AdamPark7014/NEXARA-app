@@ -121,7 +121,7 @@
   width: 100%;
   max-width: min(560px, 100%);
   margin: 0;
-  margin-left: max(0px, calc((100% - 1120px) / 2));
+  margin-left: max(0px, calc((100% - 1224px) / 2)); /* 1320 de contenido menos el padding lateral del hero: alinea con .inner */
   padding-top: 0;
   animation: enter 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -240,7 +240,7 @@
   position: absolute;
   z-index: 4;
   left: clamp(24px, 4vw, 48px);
-  bottom: clamp(24px, 4vh, 40px);
+  bottom: calc(clamp(24px, 4vh, 40px) + 72px); /* deja libre la tarjeta de cifras que monta sobre el hero */
   display: flex;
   gap: 8px;
   margin: 0;

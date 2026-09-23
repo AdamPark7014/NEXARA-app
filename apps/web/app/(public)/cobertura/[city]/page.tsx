@@ -151,7 +151,7 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
           </>
         }
         lead={`CCTV, redes, cómputo y soporte TI — ${modeLabel.toLowerCase()}. ${city.blurb}`}
-        imageSrc="/images/hero/hero-06.png"
+        imageSrc="/fotos/campo-enlace-antena-ciudad.jpg"
         imageAlt={`Servicios Nexara en ${city.name}`}
         actions={
           <div className={styles.heroActions}>

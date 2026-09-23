@@ -2,6 +2,7 @@ import FAQ from "../../components/FAQ";
 import type { Metadata } from "next";
 import Link from "next/link";
 import styles from "./page.module.css";
+import shared from "../_shared/public.module.css";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
@@ -38,7 +39,8 @@ export const metadata: Metadata = {
 export default function QAPage() {
   // FAQ JSON-LD lo inyecta el componente FAQ (una sola fuente).
   return (
-    <main className={styles.container} aria-label="Página de preguntas y respuestas">
+    <main className={shared.page} aria-label="Página de preguntas y respuestas">
+      <div className={styles.container}>
       <section className={styles.hero}>
         <span className={styles.badge}>Q&A ESTRATÉGICO</span>
         <h1 className={styles.title}>Respuestas claras para tomar decisiones tecnológicas</h1>
@@ -52,7 +54,7 @@ export default function QAPage() {
       </section>
 
       <section style={{ marginTop: 22, display: "grid", gap: 12 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>¿Necesitas una respuesta para tu operación?</h2>
+        <h2 className={shared.sectionTitle} style={{ margin: 0 }}>¿Necesitas una respuesta para tu operación?</h2>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Link
             href="/contacto"
@@ -73,6 +75,7 @@ export default function QAPage() {
 
       <div style={{ marginTop: 26 }}>
         <SeoInterlinkHub title="Soluciones recomendadas" currentPath="/qa" maxItems={8} />
+      </div>
       </div>
     </main>
   );

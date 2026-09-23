@@ -100,7 +100,7 @@ export default function CoberturaPage() {
           </>
         }
         lead="Puebla y CDMX como ancla operativa. El resto del país con campo propio, partners y modelo remoto o híbrido."
-        imageSrc="/images/hero/hero-06.png"
+        imageSrc="/fotos/campo-enlace-antena-ciudad.jpg"
         imageAlt="Cobertura nacional Nexara"
         actions={
           <div className={styles.heroActions}>

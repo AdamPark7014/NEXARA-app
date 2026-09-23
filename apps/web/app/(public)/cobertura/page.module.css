@@ -15,9 +15,9 @@
 }
 
 .faqItem {
-  border: 1px solid rgba(140, 190, 255, 0.14);
+  border: 1px solid rgba(11, 26, 51, 0.1);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: #ffffff;
   padding: 0 18px;
 }
 
@@ -28,7 +28,7 @@
   font-family: var(--nx-font-ui, "Inter Tight", sans-serif);
   font-size: 1rem;
   font-weight: 600;
-  color: #e8f0ff;
+  color: #0b1a33;
 }
 
 .faqQuestion::-webkit-details-marker {
@@ -39,7 +39,7 @@
   margin: 0 0 16px;
   font-size: 0.95rem;
   line-height: 1.65;
-  color: #9bb0cc;
+  color: #4f607a;
   max-width: 68ch;
 }
 
@@ -57,22 +57,22 @@
   padding: 16px 18px;
   border-radius: 12px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.02);
+  background: #ffffff;
   text-decoration: none;
   color: inherit;
   transition: border-color 150ms ease, background 150ms ease;
 }
 
 .cityCard:hover {
-  border-color: rgba(45, 216, 242, 0.24);
-  background: rgba(45, 216, 242, 0.04);
+  border-color: rgba(14, 154, 184, 0.35);
+  background: rgba(14, 154, 184, 0.06);
 }
 
 .cityName {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #e8f0ff;
+  color: #0b1a33;
 }
 
 .cityMeta {
@@ -80,14 +80,14 @@
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #2dd8f2;
+  color: #0e9ab8;
 }
 
 .cityHint {
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.45;
-  color: #9bb0cc;
+  color: #4f607a;
 }
 
 .breadcrumbBar {
@@ -104,7 +104,7 @@
   flex-wrap: wrap;
   gap: 6px 4px;
   font-size: 0.8rem;
-  color: #6f85a5;
+  color: #7b889c;
 }
 
 .breadcrumb li {
@@ -116,20 +116,20 @@
   content: "/";
   margin-left: 8px;
   margin-right: 4px;
-  color: rgba(140, 190, 255, 0.35);
+  color: rgba(11, 26, 51, 0.3);
 }
 
 .breadcrumb a {
-  color: #9bb0cc;
+  color: #4f607a;
   text-decoration: none;
 }
 
 .breadcrumb a:hover {
-  color: #2dd8f2;
+  color: #0e9ab8;
 }
 
 .breadcrumb li[aria-current="page"] {
-  color: #eef4ff;
+  color: #0b1a33;
   font-weight: 500;
 }
 
@@ -144,14 +144,14 @@
   display: inline-flex;
   padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(140, 190, 255, 0.18);
-  color: #cfe0f7;
+  border: 1px solid rgba(11, 26, 51, 0.1);
+  color: #33445c;
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 600;
 }
 
 .serviceChip:hover {
-  border-color: rgba(45, 216, 242, 0.4);
-  color: #9fecfa;
+  border-color: rgba(14, 154, 184, 0.5);
+  color: #0b7f99;
 }

@@ -282,7 +282,7 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
       {
         id: "home_band_capabilities",
         label: "Franja cinema tras capacidades",
-        desktopUrl: "/images/hero/hero-06.png",
+        desktopUrl: "/fotos/campo-instalacion-rack.jpg",
         mobileUrl: "",
         alt: "Instalación Nexara en sitio",
         caption: "",
@@ -292,7 +292,7 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
       {
         id: "home_band_industrias",
         label: "Paisaje antes de industrias",
-        desktopUrl: "/images/hero/hero-04.png",
+        desktopUrl: "/fotos/campo-enlace-antena-ciudad.jpg",
         mobileUrl: "",
         alt: "Operación tecnológica Nexara",
         caption: "",
@@ -302,14 +302,14 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
     ],
   },
   page_servicios: {
-    heroDesktopUrl: "/images/hero/hero-08.png",
+    heroDesktopUrl: "/fotos/campo-enlace-antena-ciudad.jpg",
     heroMobileUrl: "",
     heroAlt: "Centro de monitoreo Nexara",
     slots: [
       {
         id: "servicios_mid",
         label: "Inset editorial (mitad de página)",
-        desktopUrl: "/images/hero/hero-02.png",
+        desktopUrl: "/fotos/monitoreo-videowall.jpg",
         mobileUrl: "",
         alt: "Redes e infraestructura Nexara",
         caption: "De la cobertura al soporte — una sola firma.",
@@ -319,14 +319,14 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
     ],
   },
   page_soluciones: {
-    heroDesktopUrl: "/images/hero/hero-03.png",
+    heroDesktopUrl: "/fotos/monitoreo-pantallas-cctv.jpg",
     heroMobileUrl: "",
     heroAlt: "Técnico Nexara en instalación",
     slots: [
       {
         id: "soluciones_mid",
         label: "Franja cinema antes del CTA",
-        desktopUrl: "/images/hero/hero-07.png",
+        desktopUrl: "/fotos/control-acceso-torniquetes.jpg",
         mobileUrl: "",
         alt: "Soluciones por industria",
         caption: "Cada vertical con su riesgo típico.",
@@ -336,14 +336,14 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
     ],
   },
   page_nosotros: {
-    heroDesktopUrl: "/images/hero/hero-05.png",
+    heroDesktopUrl: "/fotos/equipo-nexara-polos.jpg",
     heroMobileUrl: "",
     heroAlt: "Equipo Nexara en campo",
     slots: [
       {
         id: "nosotros_story",
         label: "Retrato junto a la historia",
-        desktopUrl: "/images/hero/hero-02.png",
+        desktopUrl: "/fotos/campo-instalacion-ap-altura.jpg",
         mobileUrl: "",
         alt: "Equipo de campo Nexara",
         caption: "",
@@ -353,14 +353,14 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
     ],
   },
   page_contacto: {
-    heroDesktopUrl: "/images/hero/hero-01.png",
+    heroDesktopUrl: "/fotos/monitoreo-videowall.jpg",
     heroMobileUrl: "",
     heroAlt: "Infraestructura Nexara",
     slots: [
       {
         id: "contacto_aside",
         label: "Compacta junto al formulario",
-        desktopUrl: "/images/hero/hero-04.png",
+        desktopUrl: "/fotos/control-acceso-terminal-facial.jpg",
         mobileUrl: "",
         alt: "Oficina y operación Nexara",
         caption: "",
@@ -391,7 +391,7 @@ export function resolvePageMediaUrl(url: string): string {
         host.endsWith(".internal")
       ) {
         const path = parsed.pathname.replace(/^\/api(?=\/)/, "") || "/";
-        if (path.startsWith("/uploads/") || path.startsWith("/images/")) return path;
+        if (path.startsWith("/uploads/") || path.startsWith("/images/") || path.startsWith("/fotos/")) return path;
         return `/api${path.startsWith("/") ? path : `/${path}`}`;
       }
     } catch {
@@ -399,7 +399,7 @@ export function resolvePageMediaUrl(url: string): string {
     }
     return url;
   }
-  if (url.startsWith("/images/") || url.startsWith("/uploads/")) return url;
+  if (url.startsWith("/images/") || url.startsWith("/uploads/") || url.startsWith("/fotos/")) return url;
   const path = url.replace(/^\//, "");
   // Rutas API relativas (hero-slides, studio/page-content/media, …)
   return `/api/${path}`;
