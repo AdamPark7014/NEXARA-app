@@ -4,6 +4,7 @@ import Link from "next/link";
 import styles from "./Footer.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { openCookiePreferences } from "@/lib/cookie-consent";
+import { useMapProvider } from "./useMapProvider";
 
 const WA_URL = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
 const WA_LABEL = "+52 222 696 0350";
@@ -13,7 +14,8 @@ const COMPANY_TEL = "tel:+522226960350";
 // Coordenadas del footer (Explanada Puebla · Momoxpan)
 const MAP_EMBED_LAT = 19.073803;
 const MAP_EMBED_LNG = -98.277838;
-const MAPS_EMBED_SRC = `https://www.google.com/maps?q=${MAP_EMBED_LAT},${MAP_EMBED_LNG}&ll=${MAP_EMBED_LAT},${MAP_EMBED_LNG}&z=16&output=embed&hl=es`;
+// Respaldo sin clave (OpenStreetMap) mientras /mapa/proveedor decide si Google Embed está autorizado.
+const MAPS_EMBED_SRC = `https://www.openstreetmap.org/export/embed.html?bbox=${MAP_EMBED_LNG - 0.006},${MAP_EMBED_LAT - 0.0036},${MAP_EMBED_LNG + 0.006},${MAP_EMBED_LAT + 0.0036}&layer=mapnik&marker=${MAP_EMBED_LAT},${MAP_EMBED_LNG}`;
 
 const Icon = {
   Facebook: () => (
@@ -39,6 +41,7 @@ const Icon = {
 };
 
 export default function Footer() {
+  const mapInfo = useMapProvider();
   const [showBackTop, setShowBackTop] = useState(false);
 
   useEffect(() => {
@@ -130,7 +133,8 @@ export default function Footer() {
             <div className={styles.mapFrame} aria-label="Mapa — Nexara Explanada Puebla">
               <iframe
                 className={styles.mapEmbed}
-                src={MAPS_EMBED_SRC}
+                key={mapInfo?.provider || "osm"}
+                src={mapInfo?.src || MAPS_EMBED_SRC}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 title="Mapa Nexara — Explanada Puebla"

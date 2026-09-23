@@ -213,7 +213,7 @@ export default async function ProyectosPage() {
       />
 
       {/* Cifras que montan sobre el hero */}
-      <section aria-label="Cómo trabajamos los proyectos" style={{ position: "relative", zIndex: 3 }}>
+      <section aria-label="Cómo trabajamos los proyectos" className={shared.statsBand}>
         <div className={shared.inner}>
           <div className={shared.statsCard}>
             <div className={shared.tileRow}>
