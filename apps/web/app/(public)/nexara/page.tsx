@@ -208,16 +208,7 @@ export default async function NexaraPage() {
       <HomeHero bootstrap={heroBootstrap} />
 
       <div className={styles.homeBody}>
-        <section className={styles.brandBand} aria-label="Fabricantes" data-reveal="soft">
-          <div className={shared.inner}>
-            <LogoStrip
-              label="Integramos tecnología de fabricantes líderes"
-              items={MARCAS}
-              display="marquee"
-              rows={2}
-            />
-          </div>
-        </section>
+        {/* Fabricantes (reubicado más abajo para no romper el hero) */}
 
         {/* Evidencia visual abierta (grid 3x2) — sin recuadros, copy mínimo */}
         <section className={shared.sectionTight} aria-label="Evidencia en campo" data-reveal="up">
@@ -363,6 +354,18 @@ export default async function NexaraPage() {
               maxIndustries={4}
               maxServicesPerIndustry={3}
               showGeo={false}
+            />
+          </div>
+        </section>
+
+        {/* Fabricantes (strip discreto, cerca del cierre) */}
+        <section className={styles.brandBand} aria-label="Fabricantes" data-reveal="soft">
+          <div className={shared.inner}>
+            <LogoStrip
+              label="Integramos tecnología de fabricantes líderes"
+              items={MARCAS}
+              display="marquee"
+              rows={2}
             />
           </div>
         </section>
