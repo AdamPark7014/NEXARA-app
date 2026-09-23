@@ -147,9 +147,10 @@ export default function CoberturaCityServicePage({ params }: { params: Params })
       telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
       address: {
         "@type": "PostalAddress",
-        streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+        streetAddress: "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla",
         addressLocality: "San Pedro Cholula",
-        addressRegion: "Puebla",
+        addressRegion: "Pue.",
+        postalCode: "72774",
         addressCountry: "MX",
       },
     },

@@ -15,7 +15,7 @@ const COMPANY =
   "NEW ENGINEERING EXPERTISE AND RESOURCE ADVANCEMENT S.A. DE C.V.";
 
 const ADDRESS =
-  "Ignacio Allende 512 local 2, Santiago Momoxpan, San Pedro Cholula Puebla C.P. 72775";
+  "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla, 72774 San Pedro Cholula, Pue.";
 
 const CONTACT_EMAIL = "gerencia@nexara.com.mx";
 

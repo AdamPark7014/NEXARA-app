@@ -19,7 +19,11 @@ const WA_LABEL = "+52 222 696 0350";
 const PHONE_LABEL = "+52 222 696 0350";
 const PHONE_TEL = "tel:+522226960350";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
-const MAPS_PLACE_URL = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
+const MAPS_PLACE_URL =
+  "https://www.google.com/maps/search/?api=1&query=" +
+  encodeURIComponent(
+    "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla, 72774 San Pedro Cholula, Pue."
+  );
 
 type Props = {
   visuals: PageVisualsContent;
@@ -254,7 +258,7 @@ export default function ContactoClient({ visuals }: Props) {
         <div className={shared.inner}>
           <div className={styles.mapHeader}>
             <p className={shared.eyebrow}>Ubicación</p>
-            <h2 className={styles.mapTitle}>Explanada Puebla, Santiago Momoxpan</h2>
+            <h2 className={styles.mapTitle}>Auditorio Explanada Puebla, Santiago Momoxpan</h2>
             <p className={styles.expectNote}>
               Cobertura{" "}
               <Link href="/cobertura/puebla/camaras-cctv">CCTV Puebla</Link>
@@ -270,7 +274,7 @@ export default function ContactoClient({ visuals }: Props) {
               <div className={styles.locationCopy}>
                 <p className={styles.locationLabel}>Base operativa</p>
                 <p className={styles.locationAddress}>
-                  Explanada Puebla · Santiago Momoxpan, Puebla
+                  Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla, 72774 San Pedro Cholula, Pue.
                 </p>
                 <p className={styles.locationHint}>
                   Visitas con cita. Para llegar, usa el enlace de Google Maps.

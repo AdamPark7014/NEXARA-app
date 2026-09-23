@@ -148,9 +148,7 @@ export default function Footer() {
               </li>
               <li>
                 <span className={styles.muted}>
-                  Ignacio Allende 512 · Santiago Momoxpan
-                  <br />
-                  San Pedro Cholula, Puebla
+                  Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla, 72774 San Pedro Cholula, Pue.
                 </span>
               </li>
             </ul>

@@ -4,7 +4,11 @@ import styles from "./Map.module.css";
 import { googleMapsMapId, isGoogleMapsConfigured, loadGoogleMaps, loadMapConstructor } from "@/lib/google-maps-loader";
 
 const NEXARA_LOCATION = { lat: 19.073802875589788, lng: -98.2778382565653 };
-const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
+const NEXARA_MAPS_LINK =
+  "https://www.google.com/maps/search/?api=1&query=" +
+  encodeURIComponent(
+    "Calle Ignacio Allende 512, Santiago Momoxpan — Auditorio Explanada Puebla, 72774 San Pedro Cholula, Pue."
+  );
 
 const NEXARA_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#07111f" }] },
@@ -83,7 +87,7 @@ export default function Map() {
             <div class="nexara-map-info">
               <img src="/logo-nexara-lockup.png" alt="NEXARA" class="nexara-map-logo" />
               <h3 class="nexara-map-title">NEXARA</h3>
-              <p class="nexara-map-subtitle">Explanada Puebla · Momoxpan</p>
+              <p class="nexara-map-subtitle">Auditorio Explanada Puebla · Momoxpan</p>
               <button type="button" class="nexara-map-btn" onclick="window.open('${NEXARA_MAPS_LINK}','_blank','noopener')">
                 Ver ubicación
               </button>
@@ -137,7 +141,7 @@ export default function Map() {
       <div className={styles.mapContainer}>
         <div className={styles.mapPlaceholder}>
           <p style={{ margin: 0, fontWeight: 600, color: "#eef4ff" }}>NEXARA</p>
-          <p style={{ margin: "4px 0 14px" }}>Explanada Puebla · Momoxpan</p>
+          <p style={{ margin: "4px 0 14px" }}>Auditorio Explanada Puebla · Momoxpan</p>
           {isGoogleMapsConfigured() ? (
             <button type="button" className="nexara-map-btn" onClick={() => setActive(true)}>
               Ver mapa
