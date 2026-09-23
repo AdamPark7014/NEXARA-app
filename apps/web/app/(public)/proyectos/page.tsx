@@ -157,6 +157,21 @@ export default async function ProyectosPage() {
     mainImage: p.mainImage || null,
     createdAt: p.createdAt,
   }));
+  // Fallback estático (cuando el API 500/[]): usar imágenes locales de `casos`
+  const fallbackProjects = casos.slice(0, 8).map((c, idx) => ({
+    id: idx + 1,
+    slug: c.title.toLowerCase().replace(/\s+/g, "-"),
+    title: c.title,
+    sector: c.sector,
+    summary: c.desc,
+    impact: c.metric,
+    services: [],
+    tags: [],
+    highlights: [],
+    gallery: [],
+    mainImage: c.image,
+    createdAt: new Date().toISOString(),
+  }));
 
   return (
     <main className={`${shared.page} home-main-flush`}>
@@ -224,25 +239,7 @@ export default async function ProyectosPage() {
           </header>
           
 
-          {studioProjects.length ? (
-            <CatalogShowcase projects={showcaseProjects as any} />
-          ) : (
-            <div className={shared.industryBoard} data-reveal-stagger>
-              {casos.map((c) => (
-                <Link
-                  key={c.title}
-                  href={`/soluciones/${resolveIndustriaSlug(c.sector)}`}
-                  className={`${shared.industryCell} ${styles.caseCell}`}
-                  data-reveal="up"
-                >
-                  <span className={shared.industryRisk}>{c.sector}</span>
-                  <h3 className={shared.industryCellTitle}>{c.title}</h3>
-                  <p className={shared.industryCellText}>{c.desc}</p>
-                  <span className={shared.industryCellLink}>{c.metric} →</span>
-                </Link>
-              ))}
-            </div>
-          )}
+          <CatalogShowcase projects={(studioProjects.length ? showcaseProjects : fallbackProjects) as any} />
         </div>
       </section>
 
