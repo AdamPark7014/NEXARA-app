@@ -12,6 +12,8 @@ import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { INDUSTRIA_SLUGS } from "@/lib/page-content-api";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
+import coverageStyles from "../cobertura/page.module.css";
+import { GEO_CITIES } from "@/lib/seo/geo-cities";
 
 const resolveIndustriaSlug = (label: string) =>
   INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -293,6 +295,30 @@ export default async function ProyectosPage() {
             maxIndustries={4}
             maxServicesPerIndustry={2}
           />
+        </div>
+      </section>
+
+      {/* Cobertura unificada dentro de Proyectos (sin duplicar hero) */}
+      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Cobertura</p>
+            <h2 className={shared.sectionTitle}>
+              Base en el centro, <span className={shared.sectionTitleAccent}>alcance nacional</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Consulta ciudades con páginas listas para cotizar por WhatsApp o formulario.
+            </p>
+          </header>
+          <div className={coverageStyles.cityGrid}>
+            {GEO_CITIES.slice(0, 12).map((c) => (
+              <Link key={c.slug} href={`/cobertura/${c.slug}`} className={coverageStyles.cityCard}>
+                <p className={coverageStyles.cityMeta}>{c.region}</p>
+                <h3 className={coverageStyles.cityName}>{c.name}</h3>
+                <p className={coverageStyles.cityHint}>{c.keywords[0]}</p>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 

@@ -110,12 +110,10 @@ import { usePathname } from 'next/navigation';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const navLinks = [
-  // Menú compacto (máx. 5): Inicio vive en el logo; "Nosotros" se alcanza por footer.
-  { name: 'Soluciones', href: '/soluciones' },
+  { name: 'Inicio', href: '/' },
   { name: 'Servicios', href: '/servicios' },
   { name: 'Proyectos', href: '/proyectos' },
-  { name: 'Cobertura', href: '/cobertura' },
-  { name: 'Contacto', href: '/contacto' },
+  { name: 'Nosotros', href: '/nosotros' },
 ];
 
 const isHomeRoute = (pathname: string | null) =>
@@ -145,9 +143,6 @@ export default function Header() {
   const isFlushHero = isFlushHeroRoute(pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const links = navLinks.some((l) => l.href === '/')
-    ? navLinks
-    : ([{ name: 'Inicio', href: '/' }, ...navLinks] as typeof navLinks);
 
   useEffect(() => {
     if (!isFlushHero) {
@@ -230,7 +225,7 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className={styles.navLinks}>
-          {links.map((link) => (
+          {navLinks.map((link) => (
             <Link
               key={link.name}
               href={link.href}
@@ -272,7 +267,7 @@ export default function Header() {
       {mobileMenuOpen && (
         <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu}>
           <nav id="mobile-main-menu" className={styles.mobileMenu} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Menú principal móvil">
-            {links.map((link) => (
+            {navLinks.map((link) => (
               <Link 
                 key={link.name} 
                 href={link.href} 
