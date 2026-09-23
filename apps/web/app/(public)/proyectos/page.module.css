@@ -32,27 +32,27 @@
 
 .studioCasesList {
   display: grid;
-  gap: clamp(20px, 2.6vw, 28px);
+  gap: clamp(22px, 3vw, 34px);
 }
 
 .studioCaseCard {
   display: grid;
-  grid-template-columns: 0.95fr 1.05fr;
-  border-radius: 12px;
-  border: 1px solid rgba(140, 190, 255, 0.14);
-  background: #0a1424;
+  grid-template-columns: 1fr 1fr;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
   overflow: hidden;
 }
 
 .studioCaseMedia {
   position: relative;
-  min-height: 280px;
-  border-right: 1px solid rgba(140, 190, 255, 0.12);
+  min-height: 320px;
   background: #07111f;
 }
 
 .studioCasePhoto {
   object-fit: cover;
+  object-position: center;
 }
 
 .studioCaseBody {
@@ -120,8 +120,6 @@
 
   .studioCaseMedia {
     min-height: 220px;
-    border-right: none;
-    border-bottom: 1px solid rgba(140, 190, 255, 0.12);
   }
 }
 
