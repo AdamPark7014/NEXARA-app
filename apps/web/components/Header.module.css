@@ -94,9 +94,9 @@
 	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-	color: rgba(238, 244, 255, 0.78) !important;
+  color: rgba(238, 244, 255, 0.86) !important;
 	text-transform: uppercase;
-	letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 	font-weight: 600;
 	font-size: 0.74rem;
 	font-family: "Space Grotesk", sans-serif;
