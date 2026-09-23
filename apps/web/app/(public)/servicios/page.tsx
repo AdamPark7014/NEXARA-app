@@ -129,7 +129,7 @@ export default async function ServiciosPage() {
             <span className={heroStyles.titleAccent}>desde el primer día</span>
           </>
         }
-        lead="Integramos seguridad, infraestructura y tecnología empresarial con un enfoque práctico: diseñamos, implementamos, documentamos y damos seguimiento para que cada solución funcione de forma confiable a largo plazo."
+        lead="Diseñamos, instalamos, documentamos y damos soporte — para que funcione a la primera."
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}

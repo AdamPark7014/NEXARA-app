@@ -266,7 +266,7 @@ export const DEFAULT_CTA: CtaContent = {
   eyebrow: "Siguiente paso",
   title: "Cuéntanos tu",
   titleAccent: "sitio o tu problema",
-  text: "En una llamada corta te decimos qué conviene instalar, qué posponer y qué presupuesto tiene sentido.",
+  text: "En una llamada breve: qué instalar, qué posponer y un presupuesto realista.",
   primaryLabel: "Agendar diagnóstico",
   primaryHref: "/contacto",
   secondaryLabel: "Ver servicios",
