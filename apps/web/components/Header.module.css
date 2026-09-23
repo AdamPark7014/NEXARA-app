@@ -148,7 +148,7 @@
 }
 
 .headerInner {
-	max-width: 1200px;
+	max-width: 1480px;
 	margin: 0 auto;
 	min-height: 76px;
 	padding: 0 clamp(20px, 4vw, 40px);
@@ -227,7 +227,7 @@
 	align-items: center;
 	gap: 8px;
 	padding: 10px 16px;
-	border-radius: 10px;
+	border-radius: 12px;
 	background: transparent;
 	color: #2dd8f2;
 	font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);

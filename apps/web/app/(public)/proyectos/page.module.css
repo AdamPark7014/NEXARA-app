@@ -375,7 +375,7 @@
 .caseThumb {
   position: relative;
   aspect-ratio: 4 / 3;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(140, 190, 255, 0.14);
   background: #07111f;

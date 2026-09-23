@@ -24,6 +24,7 @@
   --ds-font-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   --ds-font-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
   --ds-font-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  --ds-radius-sm: 10px;
   --ds-radius: var(--nx-radius, 12px);
   --ds-radius-lg: var(--nx-radius-lg, 16px);
 
@@ -110,6 +111,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
+  min-height: 46px;
   border-radius: var(--ds-radius);
   font-family: var(--ds-font-ui);
   font-size: 0.92rem;
@@ -480,7 +482,7 @@
 
 .serviceNav {
   position: sticky;
-  top: 100px;
+  top: calc(var(--public-header-height, 76px) + 20px);
   display: grid;
   gap: 4px;
 }
@@ -488,7 +490,7 @@
 .serviceNavLink {
   display: block;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--ds-radius-sm);
   font-family: var(--ds-font-ui);
   font-size: 0.9rem;
   font-weight: 500;
