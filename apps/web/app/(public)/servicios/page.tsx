@@ -31,7 +31,7 @@ const servicios = [
   {
     id: "cctv",
     title: "Seguridad Inteligente",
-    text: "Protegemos personas, activos y operaciones mediante sistemas de videovigilancia diseñados para las necesidades reales de cada sitio.",
+    text: "CCTV diseñado para tu riesgo.",
     points: [
       "Diseño estratégico de cobertura",
       "Cámaras IP y sistemas NVR/VMS",
@@ -43,7 +43,7 @@ const servicios = [
   {
     id: "redes",
     title: "Conectividad",
-    text: "Construimos redes estables, escalables y preparadas para el crecimiento de tu empresa.",
+    text: "Redes estables y documentadas.",
     points: [
       "Cableado estructurado certificado",
       "Switching administrable y segmentación VLAN",
@@ -55,7 +55,7 @@ const servicios = [
   {
     id: "computo",
     title: "Infraestructura TI",
-    text: "Implementamos infraestructura tecnológica que garantiza continuidad operativa y un mejor desempeño de los equipos.",
+    text: "Racks, servidores y respaldos estandarizados.",
     points: [
       "Estaciones de trabajo y servidores",
       "Instalación y organización de racks",
@@ -67,7 +67,7 @@ const servicios = [
   {
     id: "soporte",
     title: "Soporte TI",
-    text: "Acompañamos la operación de tu empresa con soporte técnico oportuno y atención especializada.",
+    text: "Mesa de ayuda con SLA.",
     points: [
       "Mesa de ayuda especializada",
       "Soporte remoto y asistencia en sitio",
@@ -79,7 +79,7 @@ const servicios = [
   {
     id: "software",
     title: "Plataformas a Medida",
-    text: "Desarrollamos soluciones digitales adaptadas a los procesos de tu organización para mejorar la eficiencia y el control operativo.",
+    text: "Portales y apps por fases.",
     points: [
       "Desarrollo de portales empresariales",
       "Automatización de procesos",
@@ -195,6 +195,8 @@ export default async function ServiciosPage() {
           </div>
         </div>
       </section>
+
+      {/* Se elimina un split adicional para evitar repetición; se conserva el visual central (mid). */}
 
       {mid?.desktopUrl ? (
         <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Campo">

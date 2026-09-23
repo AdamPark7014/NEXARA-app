@@ -186,12 +186,8 @@ export default async function NosotrosPage() {
                 Donde la tecnología{" "}
                 <span className={shared.sectionTitleAccent}>se convierte en resultados</span>
               </h2>
-              <p className={styles.storyLead}>
-                En NEXARA desarrollamos soluciones que fortalecen la operación de las empresas. Cada proyecto se diseña con una visión integral, priorizando la continuidad, la seguridad y el rendimiento de la infraestructura tecnológica.
-              </p>
-              <p className={styles.storyLeadSecondary}>
-                No solo entregamos un proyecto: construimos relaciones de largo plazo respaldadas por experiencia técnica, metodologías claras y un servicio cercano.
-              </p>
+              <p className={styles.storyLead}>Soluciones que sostienen la operación.</p>
+              <p className={styles.storyLeadSecondary}>Diseño, instalación y soporte con disciplina de campo.</p>
               <ul className={`${shared.factList} ${styles.storyFacts}`}>
                 {OPERACION.map((f) => (
                   <li key={f.label} className={shared.factRow}>
@@ -218,12 +214,8 @@ export default async function NosotrosPage() {
           </div>
 
           <div className={styles.storyDetailGrid} data-reveal="up">
-            <p className={styles.storyLeadSecondary}>
-              Transformamos necesidades tecnológicas en soluciones confiables mediante un proceso que integra consultoría, diseño, implementación y soporte especializado. Cada entrega está documentada, validada y orientada a garantizar una operación estable desde el primer día.
-            </p>
-            <p className={styles.storyLeadSecondary}>
-              Con cobertura nacional y presencia en Puebla y Ciudad de México, integramos videovigilancia, redes empresariales, infraestructura, Wi‑Fi, cómputo y soporte TI bajo una sola responsabilidad técnica. Un solo equipo, un solo proceso y un único compromiso con la calidad de cada proyecto.
-            </p>
+            <p className={styles.storyLeadSecondary}>Puebla y CDMX · cobertura nacional.</p>
+            <p className={styles.storyLeadSecondary}>Una sola responsabilidad técnica del inicio al soporte.</p>
           </div>
           <p className={styles.storyCta}>
             <Link href="/proyectos" data-track-conversion="nosotros_proyectos_link">
@@ -232,6 +224,8 @@ export default async function NosotrosPage() {
           </p>
         </div>
       </section>
+
+      {/* Split extra removido: mantenemos una sola visual fuerte por página */}
 
       <section id="valores" className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>

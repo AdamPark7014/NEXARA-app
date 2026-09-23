@@ -3,7 +3,7 @@ import "./utilities.scss";
 import "./ecosystem.scss";
 import "./ui-tokens.scss";
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Inter, Inter_Tight, Manrope, Fraunces, JetBrains_Mono } from "next/font/google";
+import { Space_Grotesk, Inter, Inter_Tight, Manrope, Fraunces, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
@@ -58,6 +58,14 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
   weight: ["400", "500", "600"],
   variable: "--ds-font-mono",
+});
+
+// Sans redondeada para headings públicos (look más amable)
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "600", "700", "800"],
+  variable: "--nx-font-rounded",
 });
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://www.nexara.com.mx").replace(/\/+$/, "");
@@ -242,7 +250,7 @@ export default function RootLayout({
     <html
       lang="es-MX"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${plusJakarta.variable}`}
     >
       <body suppressHydrationWarning>
         {/* Organization structured data */}
