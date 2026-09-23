@@ -15,6 +15,7 @@ import { INDUSTRIA_SLUGS } from "@/lib/page-content-api";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import coverageStyles from "../cobertura/page.module.css";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
+import CinematicMosaic from "../../components/CinematicMosaic";
 
 const resolveIndustriaSlug = (label: string) =>
   INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -187,6 +188,15 @@ export default async function ProyectosPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* Galería cinematográfica breve para marcar tono visual */}
+      <section className={shared.sectionTight} aria-label="Galería visual" data-reveal="up">
+        <CinematicMosaic
+          left={{ src: "/images/hero/hero-07.png", alt: "Proyecto en operación", badge: "En operación" }}
+          topRight={{ src: "/images/hero/hero-01.png", alt: "Diagnóstico en sitio", badge: "Diagnóstico" }}
+          bottomRight={{ src: "/images/hero/hero-02.png", alt: "Instalación", badge: "Instalación" }}
+        />
       </section>
 
       {/* Híbrido visual para romper bloques homogéneos */}
