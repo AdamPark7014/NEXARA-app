@@ -60,7 +60,7 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--ds-font-mono",
 });
 
-const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
+const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://www.nexara.com.mx").replace(/\/+$/, "");
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || "";
 const bingSiteVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION?.trim() || "";
@@ -74,28 +74,6 @@ export const metadata: Metadata = {
   },
   description:
     "Integramos CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas. Una sola firma: diseño, instalación y operación en Puebla, CDMX y cobertura nacional.",
-  keywords: [
-    // CCTV / videovigilancia
-    "cctv", "cámaras de seguridad", "cámaras ip", "videovigilancia",
-    "cctv Puebla", "cámaras de seguridad Puebla", "cctv CDMX",
-    "cámaras de seguridad CDMX", "instalación de cámaras Puebla",
-    "sistema de cámaras México",
-    // Cómputo
-    "equipo de cómputo", "venta de computadoras", "laptops",
-    "cómputo Puebla", "equipo de cómputo Puebla", "renta de equipo",
-    "mantenimiento de cómputo",
-    // Redes
-    "redes empresariales", "wifi empresarial", "cableado estructurado",
-    "redes Puebla", "wifi empresarial CDMX",
-    // Soporte TI
-    "soporte técnico", "soporte ti", "mesa de ayuda ti",
-    "soporte técnico Puebla", "outsourcing ti México",
-    // Infraestructura
-    "infraestructura ti", "ciberseguridad empresarial",
-    // Marca
-    "Nexara", "Nexara Puebla", "Nexara CDMX",
-    "soluciones tecnológicas Puebla", "empresa de tecnología Puebla",
-  ],
   authors: [{ name: "NEXARA", url: siteUrl }],
   creator: "NEXARA",
   publisher: "NEXARA",
@@ -183,6 +161,7 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "NEXARA",
+    alternateName: ["Nexara", "Zynora", "Zynora Tek", "Zynoratek", "Nexyx", "Nexo"],
     url: siteUrl,
     logo: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     image: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
@@ -191,7 +170,7 @@ export default function RootLayout({
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer service",
-      telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || undefined,
+      telephone: "+52 222 696 0350",
       email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || undefined,
       areaServed: "MX",
       availableLanguage: "Spanish",
@@ -203,18 +182,20 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
     name: "NEXARA",
+    alternateName: ["Nexara", "Zynora", "Zynora Tek", "Zynoratek", "Nexyx", "Nexo"],
     description:
       "CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
     url: siteUrl,
     image: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     logo: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
-    telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "",
+    telephone: "+52 222 696 0350",
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
     address: {
       "@type": "PostalAddress",
-      streetAddress: "Explanada Puebla, Santiago Momoxpan",
-      addressLocality: process.env.NEXT_PUBLIC_CITY || "Puebla",
-      addressRegion: process.env.NEXT_PUBLIC_STATE || "Puebla",
+      streetAddress: "Calle Ignacio Allende 512",
+      addressLocality: "Santiago Momoxpan",
+      postalCode: "72774",
+      addressRegion: "Puebla",
       addressCountry: "MX",
     },
     openingHoursSpecification: {
@@ -243,6 +224,7 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "NEXARA",
+    alternateName: ["Nexara", "Zynora", "Zynora Tek", "Zynoratek", "Nexyx", "Nexo"],
     url: siteUrl,
     inLanguage: "es-MX",
     publisher: { "@type": "Organization", name: "NEXARA", url: siteUrl },
