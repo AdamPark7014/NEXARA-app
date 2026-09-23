@@ -34,27 +34,27 @@ const CAPABILITIES = [
   {
     id: "cctv",
     title: "Videovigilancia Inteligente",
-    text: "Diseño de cobertura, implementación de sistemas CCTV, NVR/VMS, acceso remoto seguro y mantenimiento preventivo. Soluciones enfocadas en proteger activos y generar evidencia confiable, más allá de la instalación de cámaras.",
+    text: "Cobertura bien diseñada, grabación confiable y acceso seguro — evidencia que se opera.",
   },
   {
     id: "redes",
     title: "Redes Empresariales y Wi‑Fi",
-    text: "Diseño e implementación de infraestructura de red, cableado estructurado, switching administrable y redes Wi‑Fi de alto rendimiento para oficinas, plantas y múltiples sedes, con documentación técnica completa.",
+    text: "Cableado, switching y Wi‑Fi estable en una o muchas sedes — con documentación.",
   },
   {
     id: "computo",
     title: "Infraestructura Tecnológica",
-    text: "Implementación de estaciones de trabajo, servidores, racks, almacenamiento y sistemas de respaldo con configuraciones estandarizadas que garantizan estabilidad, continuidad y crecimiento.",
+    text: "Equipos, servidores, racks y respaldos estandarizados para continuidad y crecimiento.",
   },
   {
     id: "soporte",
     title: "Soporte y Gestión TI",
-    text: "Servicio de soporte remoto y en sitio con tiempos de respuesta definidos, mantenimiento preventivo y correctivo, monitoreo y acompañamiento continuo para mantener la operación sin interrupciones.",
+    text: "Mesa de ayuda remota y en sitio con SLAs — mantenimiento y continuidad sin sorpresas.",
   },
   {
     id: "software",
     title: "Desarrollo de Plataformas",
-    text: "Desarrollo de portales web, aplicaciones e integraciones adaptadas a los procesos de cada organización. Proyectos ejecutados por fases, con objetivos claros, entregables definidos y alcance controlado.",
+    text: "Portales, apps e integraciones por fases — alcance claro y entregables revisables.",
   },
 ];
 
@@ -226,10 +226,40 @@ export default async function NexaraPage() {
                   Lo que instalamos y <span className={shared.sectionTitleAccent}>sostenemos</span>
                 </h2>
               </div>
-              <p className={`${shared.sectionLead} ${styles.headLead}`}>
-                En NEXARA integramos tecnología con una visión estratégica. Diseñamos, instalamos y damos soporte a cada solución para garantizar un funcionamiento confiable, escalable y alineado con las necesidades de tu empresa.
-              </p>
+              <p className={`${shared.sectionLead} ${styles.headLead}`}>Diseñamos, instalamos y damos soporte. Tecnología que opera y escala.</p>
             </header>
+            <div className={`${shared.grid3} ${styles.visualBridge}`} data-reveal-stagger>
+              <Link href="/servicios#cctv" className={shared.imageCard} data-reveal="up">
+                <div className={shared.imageCardImg}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/hero/hero-02.png" alt="CCTV en sitio — proyecto Nexara" loading="lazy" decoding="async" />
+                </div>
+                <div className={shared.imageCardBody}>
+                  <h3 className={shared.imageCardTitle}>CCTV</h3>
+                  <p className={shared.imageCardText}>Cobertura y evidencia confiable.</p>
+                </div>
+              </Link>
+              <Link href="/servicios#redes" className={shared.imageCard} data-reveal="up">
+                <div className={shared.imageCardImg}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/hero/hero-04.png" alt="Redes y Wi‑Fi — implementación Nexara" loading="lazy" decoding="async" />
+                </div>
+                <div className={shared.imageCardBody}>
+                  <h3 className={shared.imageCardTitle}>Redes</h3>
+                  <p className={shared.imageCardText}>Conectividad estable en cada sede.</p>
+                </div>
+              </Link>
+              <Link href="/servicios#computo" className={shared.imageCard} data-reveal="up">
+                <div className={shared.imageCardImg}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/hero/hero-06.png" alt="Infraestructura y racks — instalación Nexara" loading="lazy" decoding="async" />
+                </div>
+                <div className={shared.imageCardBody}>
+                  <h3 className={shared.imageCardTitle}>Cómputo</h3>
+                  <p className={shared.imageCardText}>Infraestructura lista para operar.</p>
+                </div>
+              </Link>
+            </div>
             <div className={shared.capList} data-reveal-stagger>
               {CAPABILITIES.map((cap, i) => (
                 <Link
@@ -290,9 +320,7 @@ export default async function NexaraPage() {
                   De diagnóstico a <span className={shared.sectionTitleAccent}>operación</span>
                 </h2>
               </div>
-              <p className={`${shared.sectionLead} ${styles.headLead}`}>
-                Tres fases con alcance cerrado. Sabes qué se instala, cuándo y quién responde después.
-              </p>
+              <p className={`${shared.sectionLead} ${styles.headLead}`}>Tres fases, alcance cerrado. Instalación clara y soporte después.</p>
             </header>
             <div className={shared.timeline} data-reveal-stagger>
               {proceso.map((p) => (
@@ -354,9 +382,7 @@ export default async function NexaraPage() {
                   Verticales con <span className={shared.sectionTitleAccent}>riesgo real</span>
                 </h2>
               </div>
-              <p className={`${shared.sectionLead} ${styles.headLead}`}>
-                No vendemos el mismo paquete a todos. Cada industria tiene su propio fallo típico; armamos alrededor de eso.
-              </p>
+              <p className={`${shared.sectionLead} ${styles.headLead}`}>Cada industria tiene su riesgo típico; la solución se arma a la medida.</p>
             </header>
             <div className={shared.industryBoard} data-reveal-stagger>
               {industrias.map((ind) => {
@@ -399,9 +425,7 @@ export default async function NexaraPage() {
                     Cotiza cerca de{" "}
                     <span className={shared.sectionTitleAccent}>tu ciudad</span>
                   </h2>
-                  <p className={shared.sectionLead}>
-                    Base operativa en Puebla y CDMX, con presencia en campo por todo el país. Elige tu ciudad y llega con contexto.
-                  </p>
+                  <p className={shared.sectionLead}>Base en Puebla y CDMX; presencia nacional. Elige tu ciudad.</p>
                 </header>
                 <div className={styles.geoRow}>
                   {GEO_CITIES.filter((c) => c.mode === "base" || c.slug === "queretaro").map((c) => (

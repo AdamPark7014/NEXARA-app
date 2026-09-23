@@ -266,13 +266,13 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
       <div className={styles.mediaScrim} aria-hidden />
 
       <div className={styles.stage}>
-        <p className={styles.kicker}>Conectamos tecnología, impulsamos el futuro</p>
+        <p className={styles.kicker}>CCTV · Redes · Cómputo · Soporte TI</p>
         <h1 className={styles.title}>
-          Soluciones inteligentes para un{" "}
-          <span className={styles.titleAccent}>mundo conectado</span>
+          Tecnología que{" "}
+          <span className={styles.titleAccent}>opera tu negocio</span>
         </h1>
         <p className={styles.lead}>
-          CCTV, redes, cómputo y soporte — una sola firma responsable de tu operación.
+          Instalamos y sostenemos tu infraestructura — una sola firma responsable.
         </p>
         <div className={styles.actions}>
           <Link href="/contacto" className={styles.ctaPrimary} data-track-conversion="home_hero_contact_cta">
