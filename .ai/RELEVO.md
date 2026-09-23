@@ -91,6 +91,36 @@ referencia ETEK: cuerpo claro, tarjetas con icono, cifras, fotos reales.
   la tarjeta de Contacto y en el footer).
 - Deploy 4 hecho y verificado en producción (fondo tonal, cifras inline, mapa filtrado, CTA).
 
+## Quinta ronda (23-09, 16:40-17:10): mapa de marca vectorial (brief "Design Director")
+- **Qué:** el iframe de OpenStreetMap con filtro CSS salía café. Se reemplazó por un mapa
+  vectorial renderizado en el sitio: `apps/web/app/components/BrandMap.tsx` con **MapLibre GL 5
+  (variante CSP)** y el estilo `positron` de **OpenFreeMap** (`https://tiles.openfreemap.org`),
+  repintado al cargar con la paleta `--ds-*` (fondo navy, agua azul profundo, calles azul-gris,
+  principales más luminosas, edificios sutiles, etiquetas gris, POIs ocultos). Pin propio cian con
+  halo; CTA «Cómo llegar» (sistema de botones del sitio) → https://maps.app.goo.gl/uJBZyNeAApgAri536.
+- **Por qué no Google:** la clave web no tiene Maps Embed API ni facturación (JS API), y el embed
+  sin clave devuelve X-Frame-Options SAMEORIGIN. No se inventaron credenciales.
+- **Composición:** Contacto ahora es editorial (copy, dirección, visitas, cobertura y CTAs a la
+  izquierda; mapa 4:3 a la derecha; apila en ≤980 px). Footer: `BrandMap compact`.
+- **Configuración requerida:** ninguna clave. El worker vive en
+  `apps/web/public/maplibre-gl-csp-worker.js` (la CSP no permite `blob:`); al actualizar
+  `maplibre-gl` hay que volver a copiarlo desde `node_modules/maplibre-gl/dist/`. CSP: `frame-src`
+  añadido y COEP retirado (ronda 3); `connect-src/img-src/font-src https:` ya cubren OpenFreeMap.
+- **Carga:** MapLibre se importa dinámicamente cuando el mapa se acerca al viewport (no pesa en el
+  First Load de ninguna página). Sin WebGL → tarjeta con la dirección (fallback).
+- **Archivos:** `BrandMap.tsx` (nuevo), `Map.tsx`, `Map.module.css` (reescrito), `Footer.tsx`,
+  `Footer.module.css`, `contacto/ContactoClient.tsx`, `contacto/page.module.css`,
+  `lib/maplibre-csp.d.ts` (nuevo), `public/maplibre-gl-csp-worker.js` (nuevo), `package.json`,
+  `package-lock.json`. Eliminados: `app/mapa/proveedor/route.ts`, `useMapProvider.ts`.
+- **Comandos:** `npm install maplibre-gl@^5 -w apps/web` · `npx tsc --noEmit -p apps/web/tsconfig.json`
+  (limpio) · `npm test --workspace=apps/web` (597 ok, 1 falla previa en `recursos-core.spec.ts`,
+  ver «Ojo») · `npm run build --workspace=apps/web` (intento 1 con tipos, OK) · auditoría DOM a
+  1440/1280/1024/768/430/390/375 sin desbordes y con CTA visible. No hay eslint config en web
+  (ESLint 10 exige flat config): lint no ejecutado.
+- **Limitaciones:** el navegador integrado de Claude Code no tiene WebGL (ahí siempre cae al
+  fallback); se verificó el render real en Chrome. Teselas OpenFreeMap = servicio comunitario sin
+  SLA; si algún día se quiere Google, habilitar Maps Embed API o facturación en la clave.
+
 ## A medias / pendiente
 - **Google Maps:** habilitar «Maps Embed API» en la clave web (Google Cloud Console) para que
   el mapa vuelva a ser de Google; hoy es OpenStreetMap.
