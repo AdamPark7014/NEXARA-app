@@ -10,6 +10,7 @@ import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
+import LogoStrip from "../../components/LogoStrip";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
@@ -17,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-// Verticales (de Soluciones) — fusionadas aquí para una vista unificada
+// Verticales (de Soluciones) — tarjetas de uso (no texto largo)
 const industrias = [
   { slug: "retail", title: "Retail", risk: "Multi-sede + merma", text: "Aperturas y operaciones con CCTV por sucursal, Wi‑Fi estable y soporte de punta de venta. Mismo estándar en cada tienda, sin reinventar el cableado cada vez." },
   { slug: "manufactura", title: "Manufactura", risk: "Downtime de planta", text: "Redes de piso, perímetro y continuidad en equipos críticos. Cuando una caída detiene un turno, el diseño no puede ser “genérico de oficina”." },
@@ -25,6 +26,20 @@ const industrias = [
   { slug: "salud", title: "Salud", risk: "Continuidad clínica", text: "Segmentación, respaldos y soporte prioritario. La red y el cómputo tienen que sostener flujos clínicos, no solo el Wi‑Fi de la sala de espera." },
   { slug: "educacion", title: "Educación", risk: "Campus completo", text: "Wi‑Fi, CCTV y mesa de ayuda para aulas, labs y edificios administrativos. Cobertura que escala con el período escolar, no con el hotspot improvisado." },
   { slug: "gobierno", title: "Gobierno", risk: "Fases + auditoría", text: "Modernización por etapas con documentación auditable. Entregables claros, sin cajas negras técnicas ni alcance que no se pueda defender." },
+];
+
+const METRICS = [
+  { value: "Campo", label: "Diagnóstico y evidencia en sitio" },
+  { value: "1 firma", label: "Diseño, instalación y soporte" },
+  { value: "Puebla · CDMX", label: "Base con cobertura nacional" },
+  { value: "< 24 h", label: "Primera respuesta típica" },
+];
+
+const PROBLEMAS = [
+  "Cobertura de CCTV sin evidencia útil",
+  "Wi‑Fi inestable en horas pico",
+  "Racks y cableado sin estándar",
+  "Tickets sin SLA ni seguimiento",
 ];
 
 const servicios = [
@@ -135,20 +150,177 @@ export default async function ServiciosPage() {
         imageAlt={visuals.heroAlt}
       />
 
-      {/* Verticales (Soluciones) — fusionadas; sin usar la imagen de apertura verdosa */}
-      <section id="verticales" className={shared.section} data-reveal="up">
+      {/* S1 — Problema (texto) */}
+      <section className={shared.sectionTight} data-reveal="up" aria-label="Problema típico">
         <div className={shared.inner}>
           <header className={shared.sectionHead}>
-            <p className={shared.eyebrow}>Verticales</p>
+            <p className={shared.eyebrow}>Problema</p>
             <h2 className={shared.sectionTitle}>
-              Qué falla en tu sector — y <span className={shared.sectionTitleAccent}>cómo lo atacamos</span>
+              Lo que suele <span className={shared.sectionTitleAccent}>fallar</span>
             </h2>
-            <p className={shared.sectionLead}>
-              Entra al detalle de la industria más cercana a tu sitio. Si no encaja, igual podemos armar el alcance.
-            </p>
+          </header>
+          <ul className={shared.bulletList}>
+            {PROBLEMAS.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* S2 — Producto/evidencia + texto (alternado) */}
+      <section className={shared.sectionImageBand} aria-label="CCTV con evidencia" data-reveal="up">
+        <div className={shared.inner}>
+          <EditorialImage
+            desktopUrl="/images/hero/hero-02.png"
+            alt="Cobertura y montaje de CCTV en sitio"
+            kicker="CCTV"
+            title="Cobertura diseñada. Evidencia que sirve."
+            caption="Cámaras IP, VMS/NVR y acceso remoto con documentación de campo."
+            compose="split"
+            mediaSide="left"
+            layout="framed_wide"
+            objectPosition="center"
+          />
+        </div>
+      </section>
+
+      {/* S3 — Métricas (datos) */}
+      <section className={shared.sectionTight} data-reveal="soft" aria-label="Cifras operativas">
+        <div className={shared.inner}>
+          <div className={shared.metricsStrip}>
+            {METRICS.map((m) => (
+              <div key={m.value} className={shared.metric}>
+                <span className={shared.metricValue}>{m.value}</span>
+                <span className={shared.metricLabel}>{m.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* S4 — Producto/evidencia + texto (alternado inverso) */}
+      <section className={shared.sectionImageBand} aria-label="Redes y Wi‑Fi estable" data-reveal="up">
+        <div className={shared.inner}>
+          <EditorialImage
+            desktopUrl="/images/hero/hero-04.png"
+            alt="Redes y Wi‑Fi empresarial instalados y documentados"
+            kicker="Redes"
+            title="Conectividad estable. Documentada."
+            caption="Cableado, switching y Wi‑Fi empresarial con estándar repetible por sede."
+            compose="split"
+            mediaSide="right"
+            layout="framed_wide"
+            objectPosition="center"
+          />
+        </div>
+      </section>
+
+      {/* Use-cases con visual (tiles de servicio) */}
+      <section className={shared.section} data-reveal="up" aria-label="Qué incluye">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Qué hacemos</p>
+            <h2 className={shared.sectionTitle}>
+              Qué <span className={shared.sectionTitleAccent}>incluye</span>
+            </h2>
+          </header>
+          <div className={`${shared.grid2}`} data-reveal-stagger>
+            <Link href="#cctv" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/hero/hero-02.png" alt="CCTV Nexara" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>CCTV</h3>
+                <p className={shared.imageCardText}>Cobertura, VMS/NVR y evidencia confiable.</p>
+              </div>
+            </Link>
+            <Link href="#redes" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/hero/hero-04.png" alt="Redes y Wi‑Fi Nexara" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>Redes y Wi‑Fi</h3>
+                <p className={shared.imageCardText}>Cableado certificado y RF estable.</p>
+              </div>
+            </Link>
+            <Link href="#computo" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/hero/hero-06.png" alt="Infraestructura TI Nexara" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>Infraestructura</h3>
+                <p className={shared.imageCardText}>Racks, servidores y respaldos.</p>
+              </div>
+            </Link>
+            <Link href="#soporte" className={shared.imageCard} data-reveal="up">
+              <div className={shared.imageCardImg}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/hero/hero-01.png" alt="Soporte TI Nexara" loading="lazy" decoding="async" />
+              </div>
+              <div className={shared.imageCardBody}>
+                <h3 className={shared.imageCardTitle}>Soporte TI</h3>
+                <p className={shared.imageCardText}>Mesa de ayuda con SLA y visitas.</p>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Banda visual grande con texto corto (overlay/caption-bar) */}
+      {mid?.desktopUrl ? (
+        <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Campo">
+          <div className={shared.inner}>
+            <EditorialImage
+              desktopUrl={mid.desktopUrl}
+              mobileUrl={mid.mobileUrl}
+              alt={mid.alt}
+              caption={
+                mid.caption ||
+                "Instalación documentada y operable — evidencia, no promesas."
+              }
+              kicker="En sitio"
+              title="Del diagnóstico a la operación"
+              layout={mid.layout === "bleed_cinema" || mid.layout === "bleed_landscape" ? mid.layout : "bleed_cinema"}
+              objectPosition={mid.objectPosition}
+              compose="caption-bar"
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {/* Social proof — certificaciones / fabricantes */}
+      <section className={shared.section} data-reveal="soft" aria-label="Prueba social">
+        <div className={shared.inner}>
+          <LogoStrip
+            label="Certificaciones y fabricantes"
+            items={[
+              { src: "/certificaciones/certificaciones-06.png", alt: "HikVision" },
+              { src: "/certificaciones/certificaciones-01.png", alt: "Linksys" },
+              { src: "/certificaciones/certificaciones-09.png.jpeg", alt: "Dell Technologies" },
+              { src: "/certificaciones/certificaciones-03.png", alt: "Intellinet" },
+              { src: "/certificaciones/certificaciones-04.png", alt: "Lenovo SEG" },
+              { src: "/certificaciones/certificaciones-05.png.jpeg", alt: "Grandstream" },
+            ]}
+            display="marquee"
+            rows={1}
+          />
+        </div>
+      </section>
+
+      {/* Use-cases por industria (mosaico ligero) */}
+      <section id="verticales" className={shared.section} data-reveal="up" aria-label="Industrias">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Industrias</p>
+            <h2 className={shared.sectionTitle}>
+              Dónde <span className={shared.sectionTitleAccent}>aplica</span>
+            </h2>
           </header>
           <div className={shared.industryBoard} data-reveal-stagger>
-            {industrias.map((i) => (
+            {industrias.slice(0, 4).map((i) => (
               <Link
                 key={i.slug}
                 href={`/soluciones/${i.slug}`}
@@ -165,95 +337,16 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
-      <section className={shared.section} data-reveal="up">
-        <div className={shared.inner}>
-          <div className={shared.serviceLayout}>
-            <nav className={shared.serviceNav} aria-label="Índice de servicios">
-              {servicios.map((s) => (
-                <a key={s.id} href={`#${s.id}`} className={shared.serviceNavLink}>
-                  {s.title}
-                </a>
-              ))}
-              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary} ${shared.serviceNavCta}`}>
-                Cotiza tu proyecto <span className={shared.btnArrow} aria-hidden>→</span>
-              </Link>
-            </nav>
-
-            <div className={shared.serviceDetail} data-reveal-stagger>
-              {servicios.slice(0, 3).map((s) => (
-                <article key={s.id} id={s.id} className={shared.serviceBlock} data-reveal="up">
-                  <h2 className={shared.serviceBlockTitle}>{s.title}</h2>
-                  <p className={shared.serviceBlockText}>{s.text}</p>
-                  <ul className={shared.checkList}>
-                    {s.points.map((pt) => (
-                      <li key={pt}>{pt}</li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Se elimina un split adicional para evitar repetición; se conserva el visual central (mid). */}
-
-      {mid?.desktopUrl ? (
-        <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Campo">
-          <div className={shared.inner}>
-            <EditorialImage
-              desktopUrl={mid.desktopUrl}
-              mobileUrl={mid.mobileUrl}
-              alt={mid.alt}
-              caption={
-                mid.caption ||
-                "Documentamos, instalamos y dejamos operable — con evidencia, no solo con promesas."
-              }
-              kicker="Mitad del alcance"
-              title="Del índice a la línea de servicio"
-              layout={mid.layout === "bleed_cinema" || mid.layout === "bleed_landscape" ? "inset_offset" : mid.layout}
-              objectPosition={mid.objectPosition}
-              compose="split"
-            />
-          </div>
-        </section>
-      ) : null}
-
-      <section className={shared.section} data-reveal="up">
-        <div className={shared.inner}>
-          <div className={shared.serviceDetail} data-reveal-stagger>
-            {servicios.slice(3).map((s) => (
-              <article key={s.id} id={s.id} className={shared.serviceBlock} data-reveal="up">
-                <h2 className={shared.serviceBlockTitle}>{s.title}</h2>
-                <p className={shared.serviceBlockText}>{s.text}</p>
-                <ul className={shared.checkList}>
-                  {s.points.map((pt) => (
-                    <li key={pt}>{pt}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Por qué Nexara">
+      {/* Banda breve de porqué (texto muy corto) */}
+      <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Una sola firma">
         <div className={shared.inner}>
           <div className={shared.sectionHead}>
             <p className={shared.eyebrow}>Una sola empresa</p>
             <h2 className={shared.sectionTitle}>
               Una sola <span className={shared.sectionTitleAccent}>responsabilidad</span>
             </h2>
-            <p className={shared.sectionLead}>
-              Desde la infraestructura física hasta el soporte y la evolución tecnológica, centralizamos todo el proyecto bajo un mismo equipo. Esto reduce tiempos, mejora la coordinación y garantiza una implementación consistente de principio a fin.
-            </p>
+            <p className={shared.sectionLead}>Diseño, instalación y soporte bajo el mismo contrato.</p>
           </div>
-          <ul className={shared.checkList}>
-            <li>Ingeniería basada en las necesidades reales de tu operación.</li>
-            <li>Implementación con estándares profesionales y documentación completa.</li>
-            <li>Soporte técnico especializado antes, durante y después de la entrega.</li>
-            <li>Soluciones escalables preparadas para el crecimiento de tu empresa.</li>
-          </ul>
         </div>
       </section>
 
@@ -261,7 +354,7 @@ export default async function ServiciosPage() {
         <div className={shared.inner}>
           <SeoInterlinkHub
             title="Soluciones que más cotizan"
-            subtitle="CCTV, redes y soporte por industria — enlaces listos para Google y para cerrar."
+            subtitle="CCTV, redes y soporte por industria — listo para Google y para convertir."
             currentPath="/servicios"
             maxIndustries={4}
             maxServicesPerIndustry={3}

@@ -198,8 +198,8 @@ export default async function ProyectosPage() {
             kicker="Campo"
             title="Diagnóstico antes de la propuesta"
             caption="Evidencia en sitio. Sin sorpresas."
-            compose="split"
-            mediaSide="left"
+            compose="caption-bar"
+            layout="bleed_landscape"
           />
         </div>
       </section>
