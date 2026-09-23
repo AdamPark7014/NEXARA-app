@@ -425,8 +425,6 @@ export function middleware(request: NextRequest) {
 
   const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
 
-  const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
-
   // Redirecciones canónicas de marketing: consolidar secciones duplicadas
   // - /soluciones → /servicios (contenido fusionado en Servicios)
   // - /cobertura  → /proyectos (sección unificada Proyectos + Cobertura)
