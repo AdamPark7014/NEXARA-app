@@ -285,6 +285,21 @@ export default async function NexaraPage() {
           </div>
         </section>
 
+        {/* Bloque híbrido: texto breve + imagen funcional */}
+        <section className={shared.sectionImageBand} aria-label="Instalación en campo" data-reveal="up">
+          <div className={shared.inner}>
+            <EditorialImage
+              desktopUrl="/images/hero/hero-03.png"
+              alt="Foto de ejemplo — instalación y pruebas en sitio"
+              kicker="Instalación"
+              title="Campo, racks y RF"
+              caption="Diseño listo para instalar; cableado, racks y RF sin improvisación."
+              compose="split"
+              mediaSide="left"
+            />
+          </div>
+        </section>
+
         {slotCaps?.desktopUrl ? (
           <section className={shared.sectionTight} aria-label="En sitio" data-reveal="up">
             <div className={shared.inner}>

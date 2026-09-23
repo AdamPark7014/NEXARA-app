@@ -10,6 +10,8 @@ const WA_LABEL = "+52 222 696 0350";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
 const COMPANY_PHONE_LABEL = "+52 222 696 0350";
 const COMPANY_TEL = "tel:+522226960350";
+const MAPS_EMBED_SRC =
+  "https://www.google.com/maps?q=Ignacio%20Allende%20512%2C%20Santiago%20Momoxpan%2C%20San%20Pedro%20Cholula&output=embed";
 
 const Icon = {
   Facebook: () => (
@@ -149,6 +151,18 @@ export default function Footer() {
                   <br />
                   San Pedro Cholula, Puebla
                 </span>
+              </li>
+              <li className={styles.miniMapItem}>
+                <div className={styles.miniMapWrap} aria-label="Mapa — Nexara Explanada Puebla">
+                  <iframe
+                    className={styles.miniMap}
+                    src={MAPS_EMBED_SRC}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    aria-hidden="true"
+                    title="Mapa Nexara — Explanada Puebla"
+                  />
+                </div>
               </li>
             </ul>
           </div>

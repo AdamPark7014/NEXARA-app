@@ -233,6 +233,21 @@ export default async function NosotrosPage() {
         </div>
       </section>
 
+      {/* Híbrido visual para continuidad narrativa */}
+      <section className={shared.sectionImageBand} aria-label="Operación en campo" data-reveal="up">
+        <div className={shared.inner}>
+          <EditorialImage
+            desktopUrl="/images/hero/hero-05.png"
+            alt="Foto de ejemplo — operación y monitoreo"
+            kicker="Operación"
+            title="De entrega a soporte"
+            caption="Seguimiento y mantenimiento que sostienen la solución."
+            compose="split"
+            mediaSide="left"
+          />
+        </div>
+      </section>
+
       <section id="valores" className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>
           <div className={shared.sectionHead}>

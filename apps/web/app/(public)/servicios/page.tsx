@@ -196,6 +196,22 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
+      {/* Híbrido visual: corta pared de texto con imagen contextual */}
+      <section className={shared.sectionImageBand} aria-label="En campo" data-reveal="up">
+        <div className={shared.inner}>
+          <EditorialImage
+            desktopUrl="/images/hero/hero-04.png"
+            alt="Foto de ejemplo — redes y Wi‑Fi empresarial en sitio"
+            kicker="En campo"
+            title="Redes y Wi‑Fi bien documentadas"
+            caption="Cableado, switching y RF que se mantienen en el tiempo."
+            compose="split"
+            mediaSide="right"
+            layout="inset_offset"
+          />
+        </div>
+      </section>
+
       {mid?.desktopUrl ? (
         <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Campo">
           <div className={shared.inner}>
@@ -232,6 +248,22 @@ export default async function ServiciosPage() {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Híbrido visual: soporte y continuidad */}
+      <section className={shared.sectionImageBand} aria-label="Soporte y continuidad" data-reveal="up">
+        <div className={shared.inner}>
+          <EditorialImage
+            desktopUrl="/images/hero/hero-06.png"
+            alt="Foto de ejemplo — soporte y monitoreo TI"
+            kicker="Operación"
+            title="Soporte que sostiene la entrega"
+            caption="Mesa de ayuda y mantenimiento con SLA — continuidad después del go‑live."
+            compose="split"
+            mediaSide="left"
+            layout="framed_wide"
+          />
         </div>
       </section>
 
