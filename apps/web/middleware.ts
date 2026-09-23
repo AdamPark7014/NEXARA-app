@@ -162,6 +162,7 @@ const buildCsp = () => {
       : "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
+    "frame-src 'self' https://www.google.com https://maps.google.com https://www.openstreetmap.org",
     "frame-ancestors 'none'",
     "form-action 'self'",
     'upgrade-insecure-requests',
@@ -177,7 +178,6 @@ const applySecurityHeaders = (response: NextResponse) => {
   response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(self)');
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   response.headers.set('Cross-Origin-Resource-Policy', 'same-site');
-  response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
   response.headers.set('Origin-Agent-Cluster', '?1');
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   response.headers.set('Content-Security-Policy', buildCsp());
