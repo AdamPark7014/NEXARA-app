@@ -207,7 +207,7 @@
   position: absolute;
   z-index: 4;
   left: clamp(24px, 4vw, 48px);
-  bottom: calc(clamp(24px, 4vh, 40px) + 72px); /* deja libre la tarjeta de cifras que monta sobre el hero */
+  bottom: clamp(24px, 4vh, 40px);
   display: flex;
   gap: 8px;
   margin: 0;

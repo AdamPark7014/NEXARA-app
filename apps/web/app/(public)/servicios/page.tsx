@@ -204,7 +204,7 @@ export default async function ServiciosPage() {
       />
 
       {/* Problemas típicos: tarjeta que monta sobre el hero */}
-      <section aria-label="Lo que suele fallar" style={{ position: "relative", zIndex: 3 }}>
+      <section aria-label="Lo que suele fallar" className={shared.statsBand}>
         <div className={shared.inner}>
           <div className={shared.statsCard}>
             <div className={shared.tileRow}>

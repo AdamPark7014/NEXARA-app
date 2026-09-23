@@ -262,7 +262,7 @@ export default async function NexaraPage() {
 
       <div className={styles.homeBody}>
         {/* Cifras: tarjeta que monta sobre el hero */}
-        <section aria-label="Cifras de operación">
+        <section className={shared.statsBand} aria-label="Cifras de operación">
           <div className={shared.inner}>
             <div className={shared.statsCard}>
               <div className={shared.statsGrid}>

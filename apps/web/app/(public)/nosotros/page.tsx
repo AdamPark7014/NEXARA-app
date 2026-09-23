@@ -215,7 +215,7 @@ export default async function NosotrosPage() {
       />
 
       {/* Datos operativos: tarjeta que monta sobre el hero */}
-      <section aria-label="Datos operativos" style={{ position: "relative", zIndex: 3 }}>
+      <section aria-label="Datos operativos" className={shared.statsBand}>
         <div className={shared.inner}>
           <div className={shared.statsCard}>
             <div className={shared.tileRow}>

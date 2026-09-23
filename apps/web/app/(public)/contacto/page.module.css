@@ -59,23 +59,23 @@
 }
 
 .whatsappLink {
-  background: #25d366 !important;
-  color: #0b1a33;
+  background: rgba(18, 182, 212, 0.12) !important;
+  color: #0b1a33 !important;
 }
 
 .whatsappLink:hover {
-  background: #1ebe57 !important;
+  background: rgba(18, 182, 212, 0.2) !important;
 }
 
 .whatsappLabel {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: rgba(255, 255, 255, 0.92) !important;
+  color: #0b7f99 !important;
 }
 
 .whatsappLink .directValue {
-  color: #fff !important;
+  color: #0b1a33 !important;
   font-weight: 650;
 }
 
