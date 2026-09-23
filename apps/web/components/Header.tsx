@@ -111,10 +111,8 @@ import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const navLinks = [
   { name: 'Inicio', href: '/' },
-  { name: 'Soluciones', href: '/soluciones' },
   { name: 'Servicios', href: '/servicios' },
   { name: 'Proyectos', href: '/proyectos' },
-  { name: 'Cobertura', href: '/cobertura' },
   { name: 'Nosotros', href: '/nosotros' },
 ];
 
