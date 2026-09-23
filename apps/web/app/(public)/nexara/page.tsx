@@ -23,8 +23,7 @@ import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { fetchPublicHeroSlidesCached } from "@/lib/hero-slides-api";
 import { fetchPublicHeroVideoCached, resolveHeroVideoUrl } from "@/lib/hero-video-api";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
-import FeatureStrip from "../../components/FeatureStrip";
-import CinematicMosaic from "../../components/CinematicMosaic";
+// Nota: evitamos bloques “IA landing kit” — icon strips/mosaicos se retiraron
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("home");
@@ -219,27 +218,7 @@ export default async function NexaraPage() {
           </div>
         </section>
 
-        {/* Banda de capacidades (iconos + línea corta) — golpe visual sin copy largo */}
-        <section className={shared.sectionTight} aria-label="Capacidades clave" data-reveal="up">
-          <FeatureStrip
-            items={[
-              { icon: "cctv", label: "CCTV que se opera (evidencia real)" },
-              { icon: "wifi", label: "Redes y Wi‑Fi estables por sede" },
-              { icon: "rack", label: "Racks y cómputo estandarizados" },
-              { icon: "support", label: "Mesa de ayuda con SLA" },
-              { icon: "ai", label: "Monitoreo inteligente cuando aplica" },
-            ]}
-          />
-        </section>
-
-        {/* Mosaico cinematográfico de evidencia */}
-        <section className={shared.sectionTight} aria-label="Evidencia visual" data-reveal="up">
-          <CinematicMosaic
-            left={{ src: "/images/hero/hero-02.png", alt: "Instalación CCTV en sitio", badge: "CCTV" }}
-            topRight={{ src: "/images/hero/hero-04.png", alt: "Redes y Wi‑Fi", badge: "Redes" }}
-            bottomRight={{ src: "/images/hero/hero-06.png", alt: "Racks y cómputo", badge: "Infraestructura" }}
-          />
-        </section>
+        {/* (Se retiran strips/mosaicos decorativos para un look editorial más serio) */}
 
         <section className={shared.section} aria-label="Capacidades" data-reveal="up">
           <div className={shared.inner}>
