@@ -33,8 +33,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:supportsRtl="true"
-        android:isMonitoringTool="enterprise_management">
+        android:supportsRtl="true">
 
         <!--
           Declaración de herramienta de monitorización (política de stalkerware de
@@ -43,6 +42,9 @@
           monitorización y exige declararlo aquí. Sin esta marca la revisión se
           rechaza: fue el motivo del rechazo del App Bundle 11 (22-09-2026).
         -->
+        <meta-data
+            android:name="isMonitoringTool"
+            android:value="enterprise_management" />
 
         <!-- Google Maps API key. Reemplazar el placeholder con la key real. -->
         <meta-data

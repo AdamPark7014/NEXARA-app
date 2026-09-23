@@ -275,15 +275,18 @@ gradle.taskGraph.whenReady {
     // cuando ya nadie recuerda qué cambió. Se comprueba antes de generar el AAB.
     val manifiestoPrincipal = file("src/main/AndroidManifest.xml")
     val manifestText = if (manifiestoPrincipal.exists()) manifiestoPrincipal.readText() else ""
-    val hasMonitoringAttr = manifestText.contains("android:isMonitoringTool=\"enterprise_management\"")
-    if (!hasMonitoringAttr) {
+    // Requisito Play: meta-data isMonitoringTool con valor enterprise_management.
+    val hasMonitoringMeta =
+        manifestText.contains("android:name=\"isMonitoringTool\"") &&
+            manifestText.contains("android:value=\"enterprise_management\"")
+    if (!hasMonitoringMeta) {
         problems += """
-            |Falta `android:isMonitoringTool="enterprise_management"` en <application> (src/main/AndroidManifest.xml).
+            |Falta la meta-data de monitorización en <application> (src/main/AndroidManifest.xml).
             |  Google Play rechaza la revisión por la política de stalkerware/monitorización si no se declara.
-            |  Decláralo así en la etiqueta <application>:
-            |      <application
-            |          ...
-            |          android:isMonitoringTool="enterprise_management">
+            |  Declárala así dentro de <application>:
+            |      <meta-data
+            |          android:name="isMonitoringTool"
+            |          android:value="enterprise_management" />
         """.trimMargin()
     }
 
