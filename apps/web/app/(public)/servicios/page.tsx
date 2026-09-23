@@ -10,7 +10,6 @@ import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
-import heroStyles from "../../components/PublicPageHero.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
