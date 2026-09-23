@@ -171,7 +171,7 @@ export default async function NosotrosPage() {
             <span className={heroStyles.titleAccent}>cada solución</span>
           </>
         }
-        lead="Ingeniería, implementación y soporte con un solo compromiso: que tu tecnología funcione cuando más la necesitas. Desde nuestras sedes en Puebla y Ciudad de México, diseñamos, implementamos y respaldamos soluciones tecnológicas para empresas en todo México. Acompañamos cada proyecto desde la planeación hasta la operación, con procesos documentados, atención especializada y soporte continuo."
+        lead="Ingeniería, instalación y soporte que mantienen tu operación — Puebla y CDMX, cobertura nacional."
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}
