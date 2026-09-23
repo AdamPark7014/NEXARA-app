@@ -283,9 +283,6 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
             Hablar con un especialista
           </Link>
         </div>
-        <p className={styles.tertiaryLink}>
-          <Link href="/proyectos">Ver casos de campo →</Link>
-        </p>
       </div>
 
       {!showVideo && dynamicSlides.length > 1 && (
