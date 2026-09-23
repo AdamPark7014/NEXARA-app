@@ -10,12 +10,23 @@ import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
+import heroStyles from "../../components/PublicPageHero.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
 }
 
 export const dynamic = "force-dynamic";
+
+// Verticales (de Soluciones) — fusionadas aquí para una vista unificada
+const industrias = [
+  { slug: "retail", title: "Retail", risk: "Multi-sede + merma", text: "Aperturas y operaciones con CCTV por sucursal, Wi‑Fi estable y soporte de punta de venta. Mismo estándar en cada tienda, sin reinventar el cableado cada vez." },
+  { slug: "manufactura", title: "Manufactura", risk: "Downtime de planta", text: "Redes de piso, perímetro y continuidad en equipos críticos. Cuando una caída detiene un turno, el diseño no puede ser “genérico de oficina”." },
+  { slug: "hospitalidad", title: "Hospitalidad", risk: "Densidad + reputación", text: "Wi‑Fi de alta densidad, CCTV y operación unificada por propiedad. El huésped no distingue “red saturada” de “mal hotel”." },
+  { slug: "salud", title: "Salud", risk: "Continuidad clínica", text: "Segmentación, respaldos y soporte prioritario. La red y el cómputo tienen que sostener flujos clínicos, no solo el Wi‑Fi de la sala de espera." },
+  { slug: "educacion", title: "Educación", risk: "Campus completo", text: "Wi‑Fi, CCTV y mesa de ayuda para aulas, labs y edificios administrativos. Cobertura que escala con el período escolar, no con el hotspot improvisado." },
+  { slug: "gobierno", title: "Gobierno", risk: "Fases + auditoría", text: "Modernización por etapas con documentación auditable. Entregables claros, sin cajas negras técnicas ni alcance que no se pueda defender." },
+];
 
 const servicios = [
   {
@@ -124,6 +135,36 @@ export default async function ServiciosPage() {
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}
       />
+
+      {/* Verticales (Soluciones) — fusionadas; sin usar la imagen de apertura verdosa */}
+      <section id="verticales" className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Verticales</p>
+            <h2 className={shared.sectionTitle}>
+              Qué falla en tu sector — y <span className={shared.sectionTitleAccent}>cómo lo atacamos</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Entra al detalle de la industria más cercana a tu sitio. Si no encaja, igual podemos armar el alcance.
+            </p>
+          </header>
+          <div className={shared.industryBoard} data-reveal-stagger>
+            {industrias.map((i) => (
+              <Link
+                key={i.slug}
+                href={`/soluciones/${i.slug}`}
+                className={shared.industryCell}
+                data-reveal="up"
+              >
+                <span className={shared.industryRisk}>{i.risk}</span>
+                <h2 className={shared.industryCellTitle}>{i.title}</h2>
+                <p className={shared.industryCellText}>{i.text}</p>
+                <span className={shared.industryCellLink}>Ver detalle →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className={shared.section} data-reveal="up">
         <div className={shared.inner}>
