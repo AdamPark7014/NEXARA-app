@@ -771,16 +771,17 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
     };
   }
   if (isSupportRole(v2)) {
+    // Soporte coordina despacho y triage — puede crear/asignar OT, sin aprobar ni eliminar.
     return {
-      viewMode: 'execute',
-      defaultScope: 'self',
-      canCreate: false,
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: true,
       canEdit: true,
       canDelete: false,
-      canAssign: false,
+      canAssign: true,
       canApprove: false,
-      title: 'Mis OT',
-      subtitle: '1. Iniciar → 2. Evidencias → 3. Cerrar.',
+      title: 'Órdenes de trabajo · Asignación',
+      subtitle: 'Triage y despacho de OT a ingenieros.',
     };
   }
   return {
