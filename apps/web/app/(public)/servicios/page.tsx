@@ -32,7 +32,7 @@ type Servicio = {
   title: string;
   text: string;
   points: string[];
-  photo?: { src: string; alt: string };
+  photo?: { src: string; alt: string; srcSet?: string; sizes?: string };
 };
 
 const servicios: Servicio[] = [
@@ -79,7 +79,13 @@ const servicios: Servicio[] = [
       "Configuración estandarizada de equipos",
       "Administración y optimización de recursos",
     ],
-    photo: { src: "/fotos/rack-servidores-led.jpg", alt: "Rack de servidores y switching instalado por NEXARA" },
+    photo: {
+      src: "/fotos/tecnico-ensamble-chasis-pc-taller-1920.webp",
+      srcSet:
+        "/fotos/tecnico-ensamble-chasis-pc-taller-1200.webp 1200w, /fotos/tecnico-ensamble-chasis-pc-taller-1920.webp 1920w",
+      sizes: "(max-width: 1100px) 100vw, 520px",
+      alt: "Técnico ensamblando y cableando un chasis de PC en el taller",
+    },
   },
   {
     id: "soporte",
@@ -94,7 +100,13 @@ const servicios: Servicio[] = [
       "Atención bajo SLA",
       "Seguimiento y documentación de incidencias",
     ],
-    photo: { src: "/fotos/equipo-nexara-polos.jpg", alt: "Equipo técnico de NEXARA" },
+    photo: {
+      src: "/fotos/tecnicos-mantenimiento-pc-colaboracion-1920.webp",
+      srcSet:
+        "/fotos/tecnicos-mantenimiento-pc-colaboracion-1200.webp 1200w, /fotos/tecnicos-mantenimiento-pc-colaboracion-1920.webp 1920w",
+      sizes: "(max-width: 1100px) 100vw, 520px",
+      alt: "Dos técnicos de NEXARA colaborando en el mantenimiento de un equipo de cómputo",
+    },
   },
   {
     id: "software",
@@ -147,7 +159,13 @@ export default async function ServiciosPage() {
   const heroMobile = resolvePageMediaUrl(visuals.heroMobileUrl || visuals.heroDesktopUrl);
   const midPhoto = mid?.desktopUrl
     ? { src: resolvePageMediaUrl(mid.desktopUrl), alt: mid.alt || "Instalación NEXARA" }
-    : { src: "/fotos/monitoreo-videowall.jpg", alt: "Centro de monitoreo instalado por NEXARA" };
+    : {
+        src: "/fotos/equipo-taller-ensamble-pc-nexara-1920.webp",
+        srcSet:
+          "/fotos/equipo-taller-ensamble-pc-nexara-1200.webp 1200w, /fotos/equipo-taller-ensamble-pc-nexara-1920.webp 1920w",
+        sizes: "(max-width: 1100px) 100vw, 520px",
+        alt: "Equipo técnico de NEXARA ensamblando una computadora en el taller",
+      };
 
   return (
     <main className={`${shared.page} home-main-flush`}>
@@ -281,7 +299,14 @@ export default async function ServiciosPage() {
                   {s.photo ? (
                     <figure className={shared.serviceBlockMedia}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.photo.src} alt={s.photo.alt} loading="lazy" decoding="async" />
+                      <img
+                        src={s.photo.src}
+                        {...(s.photo.srcSet ? { srcSet: s.photo.srcSet } : {})}
+                        {...(s.photo.sizes ? { sizes: s.photo.sizes } : {})}
+                        alt={s.photo.alt}
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </figure>
                   ) : null}
                 </article>
@@ -317,7 +342,14 @@ export default async function ServiciosPage() {
             </div>
             <figure className={`${shared.photoFrame} ${shared.ar45} ${shared.splitMedia}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={midPhoto.src} alt={midPhoto.alt} loading="lazy" decoding="async" />
+              <img
+                src={midPhoto.src}
+                {...((midPhoto as any).srcSet ? { srcSet: (midPhoto as any).srcSet } : {})}
+                {...((midPhoto as any).sizes ? { sizes: (midPhoto as any).sizes } : {})}
+                alt={midPhoto.alt}
+                loading="lazy"
+                decoding="async"
+              />
               <span className={shared.photoBadge}>Proyecto real</span>
             </figure>
           </div>

@@ -61,14 +61,33 @@
 
 .headerPublic .link,
 .headerPublic .logoLink {
-	color: #eef4ff;
+	color: var(--header-text);
 }
 
 .logoLink {
 	display: inline-flex;
 	align-items: center;
+	gap: 12px;
 	text-decoration: none;
-	line-height: 0;
+	line-height: 1;
+}
+
+.logoMark {
+	display: block;
+	height: clamp(30px, 3.6vw, 36px);
+	width: auto;
+	object-fit: contain;
+	object-position: left center;
+}
+
+.logoWordmark {
+	display: inline-block;
+	font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+	font-weight: 800;
+	letter-spacing: 0.02em;
+	font-size: clamp(1.02rem, 1.7vw, 1.24rem);
+	line-height: 1;
+	color: inherit;
 }
 
 .logoLockup {
@@ -398,6 +417,10 @@
 		padding-inline: clamp(14px, 3vw, 22px);
 	}
 
+	.logoMark {
+		height: 32px;
+	}
+
 	.logoLockup {
 		height: 34px;
 		max-width: min(168px, 46vw);
@@ -437,6 +460,10 @@
 	.headerInner {
 		min-height: 66px;
 		gap: 0.5rem;
+	}
+
+	.logoMark {
+		height: 28px;
 	}
 
 	.logoLockup {
@@ -519,6 +546,10 @@
 
 :global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .linkActive::after {
 	background: #0e9ab8;
+}
+
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .logoLink {
+	color: #0b1a33;
 }
 
 :global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .hamburgerLine {
