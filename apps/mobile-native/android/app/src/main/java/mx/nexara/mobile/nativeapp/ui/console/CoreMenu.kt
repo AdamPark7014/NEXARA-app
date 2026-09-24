@@ -47,6 +47,8 @@ enum class CoreExtraModule(
     /** Página web del módulo (se abre en `https://core.nexara.com.mx`). */
     val webPath: String,
     val summary: String,
+    /** Grupo del hub «Más», alineado con la web: Hoy / Recursos / Finanzas / Gobierno. */
+    val group: Group,
     /**
      * Lo ve todo el personal, tenga o no su clave en `me/navigation`.
      *
@@ -60,27 +62,36 @@ enum class CoreExtraModule(
      */
     val paraTodoElPersonal: Boolean = false,
 ) {
-    COTIZACIONES(CoreKeys.COTIZACIONES, "Cotizaciones", "/erp/cotizaciones", "Propuestas técnicas: folio, envío y seguimiento."),
-    PROYECTOS(CoreKeys.PROYECTOS, "Proyectos", "/erp/proyectos", "Cronograma, alcance, equipo y documentos."),
-    KPIS_EQUIPO(CoreKeys.KPIS_EQUIPO, "KPIs del equipo", "/erp/asistencias/indicadores", "Retardos, uniforme y horas del equipo."),
-    ALMACEN(CoreKeys.ALMACEN, "Almacén", "/erp/almacen", "Inventario, entradas y salidas, y reabastecimiento."),
-    HERRAMIENTAS(CoreKeys.HERRAMIENTAS, "Herramientas", "/erp/almacen/herramientas", "Solicita herramienta, revisa tu kit y tus préstamos."),
-    VEHICULOS(CoreKeys.VEHICULOS, "Vehículos", "/erp/vehiculos", "Solicita un vehículo; entrega y recepción con fotos."),
-    ORGANIGRAMA(CoreKeys.ORGANIGRAMA, "Organigrama", "/erp/organigrama", "Quién reporta a quién en NEXARA."),
-    GASTOS(CoreKeys.GASTOS, "Gastos", "/erp/finance/expenses", "Gastos de la operación: captura, comprobación y estado."),
-    APROBACIONES(CoreKeys.APROBACIONES, "Aprobaciones", "/erp/approvals", "Lo que espera tu visto bueno, en un solo sitio."),
+    EXECUTIVE(
+        CoreKeys.EXECUTIVE,
+        "Hoy",
+        "/erp/executive",
+        "KPIs del negocio visibles para dirección.",
+        Group.HOY,
+    ),
+    COTIZACIONES(CoreKeys.COTIZACIONES, "Cotizaciones", "/erp/cotizaciones", "Propuestas técnicas: folio, envío y seguimiento.", Group.HOY),
+    PROYECTOS(CoreKeys.PROYECTOS, "Proyectos", "/erp/proyectos", "Cronograma, alcance, equipo y documentos.", Group.HOY),
+    KPIS_EQUIPO(CoreKeys.KPIS_EQUIPO, "KPIs del equipo", "/erp/asistencias/indicadores", "Retardos, uniforme y horas del equipo.", Group.HOY),
+    ALMACEN(CoreKeys.ALMACEN, "Almacén", "/erp/almacen", "Inventario, entradas y salidas, y reabastecimiento.", Group.RECURSOS),
+    HERRAMIENTAS(CoreKeys.HERRAMIENTAS, "Herramientas", "/erp/almacen/herramientas", "Solicita herramienta, revisa tu kit y tus préstamos.", Group.RECURSOS),
+    VEHICULOS(CoreKeys.VEHICULOS, "Vehículos", "/erp/vehiculos", "Solicita un vehículo; entrega y recepción con fotos.", Group.RECURSOS),
+    ORGANIGRAMA(CoreKeys.ORGANIGRAMA, "Organigrama", "/erp/organigrama", "Quién reporta a quién en NEXARA.", Group.RECURSOS),
+    GASTOS(CoreKeys.GASTOS, "Gastos", "/erp/finance/expenses", "Gastos de la operación: captura, comprobación y estado.", Group.FINANZAS),
+    APROBACIONES(CoreKeys.APROBACIONES, "Aprobaciones", "/erp/approvals", "Lo que espera tu visto bueno, en un solo sitio.", Group.HOY),
     PAGOS_EMPLEADOS(
         CoreKeys.PAGOS_EMPLEADOS,
         "Pagos a empleados",
         "/erp/finance/employee-payments",
         "Pagos y anticipos al personal, con su comprobante.",
+        Group.FINANZAS,
     ),
-    DOCUMENTOS(CoreKeys.DOCUMENTOS, "Documentos", "/erp/documents", "Manuales, planos y papeles de la operación."),
+    DOCUMENTOS(CoreKeys.DOCUMENTOS, "Documentos", "/erp/documents", "Manuales, planos y papeles de la operación.", Group.GOBIERNO),
     VIATICOS(
         CoreKeys.VIATICOS,
         "Viáticos",
         "/erp/finance/viatics",
         "Pide un viático con la foto del ticket, repártelo y compruébalo.",
+        Group.FINANZAS,
         paraTodoElPersonal = true,
     ),
     ;
@@ -99,6 +110,14 @@ enum class CoreExtraModule(
     companion object {
         fun fromKey(key: String?): CoreExtraModule? =
             key?.trim()?.lowercase()?.let { k -> entries.firstOrNull { k in it.claves } }
+    }
+
+    /** Grupos del hub «Más», alineados con la web ERP. */
+    enum class Group(val title: String) {
+        HOY("Hoy"),
+        RECURSOS("Recursos"),
+        FINANZAS("Finanzas"),
+        GOBIERNO("Gobierno"),
     }
 }
 

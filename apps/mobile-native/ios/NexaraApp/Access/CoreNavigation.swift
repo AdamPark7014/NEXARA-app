@@ -45,6 +45,7 @@ enum CoreModule: String, CaseIterable, Identifiable, Hashable {
 /// las mismas que la web registra en `apps/web/lib/core-surface.ts`. Mismo
 /// orden, textos y rutas que el hub «Más» de Android.
 enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
+    case executive = "executive"
     case cotizaciones = "erp-cotizaciones"
     case proyectos = "erp-proyectos"
     case kpisEquipo = "kpis-equipo"
@@ -61,6 +62,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
+        case .executive: return "Hoy"
         case .cotizaciones: return "Cotizaciones"
         case .proyectos: return "Proyectos"
         case .kpisEquipo: return "KPIs del equipo"
@@ -74,6 +76,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
 
     var systemImage: String {
         switch self {
+        case .executive: return "chart.bar"
         case .cotizaciones: return "doc.text"
         case .proyectos: return "folder"
         case .kpisEquipo: return "chart.bar"
@@ -88,6 +91,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     /// Ruta del módulo en la web de Core.
     var webPath: String {
         switch self {
+        case .executive: return "/erp/executive"
         case .cotizaciones: return "/erp/cotizaciones"
         case .proyectos: return "/erp/proyectos"
         case .kpisEquipo: return "/erp/asistencias/indicadores"
@@ -102,6 +106,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     /// Una línea para la lista del hub «Más».
     var summary: String {
         switch self {
+        case .executive: return "KPIs del negocio — vista de dirección."
         case .cotizaciones: return "Propuestas técnicas: folio, envío y seguimiento."
         case .proyectos: return "Cronograma, alcance, equipo y documentos."
         case .kpisEquipo: return "Retardos, uniforme y horas del equipo."
@@ -117,7 +122,10 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     /// una; Viáticos llega como `viatics` o como `my-viatics` según la ruta que
     /// tenga el rol en url-matrix.
     var claves: Set<String> {
-        self == .viaticos ? ["viatics", "my-viatics"] : [rawValue]
+        switch self {
+        case .viaticos: return ["viatics", "my-viatics"]
+        default: return [rawValue]
+        }
     }
 
     /// Lo ve todo el personal, tenga o no su clave en `me/navigation`.
@@ -129,6 +137,22 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     /// aprobar desde la calle. Quien no tenga el permiso ve el mensaje del 403
     /// del API, que es quien de verdad decide.
     var paraTodoElPersonal: Bool { self == .viaticos }
+
+    enum Group: String {
+        case hoy = "Hoy"
+        case recursos = "Recursos"
+        case finanzas = "Finanzas"
+        case gobierno = "Gobierno"
+    }
+
+    var group: Group {
+        switch self {
+        case .executive, .cotizaciones, .proyectos, .kpisEquipo, .aprobaciones: return .hoy
+        case .almacen, .herramientas, .vehiculos, .organigrama: return .recursos
+        case .gastos, .pagosEmpleados, .viaticos: return .finanzas
+        case .documentos: return .gobierno
+        }
+    }
 
     /// El módulo en la web (`CoreNavigation.coreWebBase` + `webPath`), mientras
     /// la app no tenga pantalla nativa.
