@@ -85,9 +85,34 @@ const METRICS: { icon: PublicIconName; value: string; label: string }[] = [
 
 /** Galería: fotografías reales de instalaciones NEXARA (en /public/fotos). */
 const GALERIA = [
-  { src: "/fotos/control-acceso-torniquetes.jpg", alt: "Torniquetes con reconocimiento facial", kicker: "Control de acceso", caption: "Torniquetes con terminales de reconocimiento facial" },
-  { src: "/fotos/rack-servidores-led.jpg", alt: "Rack de servidores", kicker: "Infraestructura", caption: "Rack de servidores y switching", tall: true },
-  { src: "/fotos/monitoreo-videowall.jpg", alt: "Video wall de CCTV", kicker: "Monitoreo", caption: "Centro de monitoreo con video wall" },
+  {
+    src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1920_ba8f.webp",
+    srcSet:
+      "/fotos/tecnico-nexara-entrega-equipo-sitio-1200_e08f.webp 1200w, /fotos/tecnico-nexara-entrega-equipo-sitio-1920_ba8f.webp 1920w",
+    sizes: "(max-width: 980px) 100vw, 640px",
+    alt: "Técnico de NEXARA manejando cajas de equipo durante entrega en sitio",
+    kicker: "Logística",
+    caption: "Entrega de equipo en instalación exterior",
+  },
+  {
+    src: "/fotos/cableado-interno-pc-guantes-taller-1920_8009.webp",
+    srcSet:
+      "/fotos/cableado-interno-pc-guantes-taller-1200_ab5a.webp 1200w, /fotos/cableado-interno-pc-guantes-taller-1920_8009.webp 1920w",
+    sizes: "(max-width: 980px) 100vw, 640px",
+    alt: "Manos con guantes realizando cableado interno de una PC en taller",
+    kicker: "Soporte",
+    caption: "Armado y cableado de equipos en taller",
+    tall: true,
+  },
+  {
+    src: "/fotos/equipo-tecnico-nexara-uniforme-1920_5775.webp",
+    srcSet:
+      "/fotos/equipo-tecnico-nexara-uniforme-1200_edc6.webp 1200w, /fotos/equipo-tecnico-nexara-uniforme-1920_5775.webp 1920w",
+    sizes: "(max-width: 980px) 100vw, 640px",
+    alt: "Equipo técnico de NEXARA con uniforme oficial en sitio de instalación",
+    kicker: "Equipo",
+    caption: "Ingeniería e instalación con el mismo equipo",
+  },
   { src: "/fotos/campo-enlace-antena-ciudad.jpg", alt: "Radioenlace sobre la ciudad", kicker: "Enlaces", caption: "Radioenlace punto a punto entre sedes" },
   { src: "/fotos/campo-mastil-antenas.jpg", alt: "Mástil con antenas", kicker: "Redes", caption: "Mástil con antenas de enlace inalámbrico", tall: true },
   { src: "/fotos/monitoreo-pantallas-cctv.jpg", alt: "Pantallas de CCTV", kicker: "CCTV", caption: "Monitores de videovigilancia multi‑cámara" },
@@ -250,7 +275,14 @@ export default async function ProyectosPage() {
             {GALERIA.map((g) => (
               <figure key={g.src} className={`${shared.galleryItem} ${g.tall ? shared.galleryTall : ""}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={g.src} alt={g.alt} loading="lazy" decoding="async" />
+                <img
+                  src={g.src}
+                  {...(g as any).srcSet ? { srcSet: (g as any).srcSet } : {}}
+                  {...(g as any).sizes ? { sizes: (g as any).sizes } : {}}
+                  alt={g.alt}
+                  loading="lazy"
+                  decoding="async"
+                />
                 <figcaption className={shared.photoCaption}>
                   <span className={shared.photoCaptionKicker}>{g.kicker}</span>
                   {g.caption}

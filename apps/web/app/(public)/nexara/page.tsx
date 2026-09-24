@@ -132,10 +132,13 @@ const EVIDENCE = [
     tall: true,
   },
   {
-    src: "/fotos/control-acceso-torniquetes.jpg",
-    alt: "Torniquetes con terminales de reconocimiento facial",
-    kicker: "Control de acceso",
-    caption: "Torniquetes con reconocimiento facial en acceso principal.",
+    src: "/fotos/descarga-equipo-camioneta-nexara-1920_411a.webp",
+    srcSet:
+      "/fotos/descarga-equipo-camioneta-nexara-1200_b23c.webp 1200w, /fotos/descarga-equipo-camioneta-nexara-1920_411a.webp 1920w",
+    sizes: "(max-width: 980px) 100vw, 640px",
+    alt: "Personal de NEXARA descargando cajas de equipo técnico desde una camioneta",
+    kicker: "Logística",
+    caption: "Entrega de equipo en sitio, listo para instalar.",
     tall: false,
   },
   {
@@ -324,7 +327,14 @@ export default async function NexaraPage() {
                   className={`${shared.photoFrame} ${e.tall ? shared.mosaicTall : shared.mosaicWide}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={e.src} alt={e.alt} loading="lazy" decoding="async" />
+                  <img
+                    src={e.src}
+                    {...(e as any).srcSet ? { srcSet: (e as any).srcSet } : {}}
+                    {...(e as any).sizes ? { sizes: (e as any).sizes } : {}}
+                    alt={e.alt}
+                    loading="lazy"
+                    decoding="async"
+                  />
                   <figcaption className={shared.photoCaption}>
                     <span className={shared.photoCaptionKicker}>{e.kicker}</span>
                     {e.caption}
