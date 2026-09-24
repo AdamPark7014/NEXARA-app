@@ -447,6 +447,13 @@
 	.contactCta {
 		padding: 8px 10px;
 		font-size: 0.78rem;
+		white-space: nowrap;
+		gap: 0;
+	}
+
+	/* En móvil el CTA cabe en una línea junto al conmutador de tema y el menú */
+	.contactArrow {
+		display: none;
 	}
 
 	.logoWordmark {

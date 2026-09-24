@@ -139,6 +139,11 @@ referencia ETEK: cuerpo claro, tarjetas con icono, cifras, fotos reales.
   claro con texto navy al hacer scroll, persistencia entre páginas. Ojo: en el navegador
   integrado las transiciones se congelan (pestaña oculta): para medir estilos tras cambiar el tema
   hay que inyectar `*{transition:none}`; si no, los valores calculados salen viejos.
+- Desplegado en producción (deploy #6) el 23-09 ~22:03 hora Puebla, build web en intento 1 con tipos.
+- Móvil (360-430 px): el CTA del header se partía en dos líneas al convivir con el conmutador de
+  tema; ahora va en una línea sin flecha (`Header.module.css`, media 640). Ojo al medir en el panel
+  integrado: con la pestaña oculta tampoco se despachan eventos `scroll`, así que el header parece
+  quedarse transparente; disparar `window.dispatchEvent(new Event("scroll"))` antes de leer.
 
 ## A medias / pendiente
 - **Google Maps:** habilitar «Maps Embed API» en la clave web (Google Cloud Console) para que
