@@ -28,6 +28,7 @@ export const ROLES = {
   COORD_OPERACIONES:  'coord_operaciones',  // Coordinador de campo / Project Manager
   ING_CAMPO:          'ing_campo',          // Ingeniero de Campo
   ING_SOPORTE:        'ing_soporte',        // Soporte técnico / NOC
+  ENC_SOPORTE:        'enc_soporte',        // Encargado de Soporte (coordina soporte)
   COORD_VENTAS:       'coord_ventas',       // Gerente Comercial
   VENDEDOR:           'vendedor',           // Ejecutivo de ventas
   LIDER_DISENO:       'lider_diseno',       // Líder de diseño / marketing
@@ -54,6 +55,7 @@ export const ROLE_TIER: Record<RoleKey, number> = {
   lider_diseno:       65,
   rh:                 60,
   contabilidad:       60,
+  enc_soporte:        60,
   ing_soporte:        50,
   administrativo:     45,
   vendedor:           45,
@@ -78,6 +80,7 @@ export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
   coord_operaciones:  'ops',
   ing_campo:          'ops',
   ing_soporte:        'ops',
+  enc_soporte:        'ops',
   coord_ventas:       'sales',
   vendedor:           'sales',
   lider_diseno:       'studio',
@@ -99,6 +102,7 @@ export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
   coord_operaciones:  ['ops', 'core', 'integra'],
   ing_campo:          ['ops'],
   ing_soporte:        ['ops', 'core', 'integra'],
+  enc_soporte:        ['ops', 'core', 'integra'],
   coord_ventas:       ['sales', 'core'],
   vendedor:           ['sales'],
   lider_diseno:       ['studio', 'core'],
@@ -118,6 +122,7 @@ export const ROLE_LABELS: Record<RoleKey, { es: string; en: string; departamento
   coord_operaciones: { es: 'Coordinador de Operaciones', en: 'Operations Coordinator', departamento: 'Operaciones' },
   ing_campo:         { es: 'Ingeniero de Campo',   en: 'Field Engineer',        departamento: 'Operaciones' },
   ing_soporte:       { es: 'Ingeniero de Soporte', en: 'Support Engineer',      departamento: 'Soporte' },
+  enc_soporte:       { es: 'Encargado de Soporte', en: 'Support Lead',          departamento: 'Soporte' },
   coord_ventas:      { es: 'Coordinador de Ventas', en: 'Sales Coordinator',    departamento: 'Comercial' },
   vendedor:          { es: 'Vendedor',             en: 'Sales Rep',             departamento: 'Comercial' },
   lider_diseno:      { es: 'Líder de Diseño',      en: 'Design Lead',           departamento: 'Marketing' },

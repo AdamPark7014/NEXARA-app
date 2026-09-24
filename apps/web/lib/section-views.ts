@@ -743,6 +743,20 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       subtitle: 'Supervisa OT del equipo.',
     };
   }
+  // Encargado de soporte: puede crear/asignar OT (sin aprobar/eliminar).
+  if (v2 === ROLES.ENC_SOPORTE) {
+    return {
+      viewMode: 'manage_execute',
+      defaultScope: 'team',
+      canCreate: true,
+      canEdit: true,
+      canDelete: false,
+      canAssign: true,
+      canApprove: false,
+      title: 'Órdenes de trabajo · Soporte',
+      subtitle: 'Asigna servicios al equipo y ejecuta las tuyas.',
+    };
+  }
   // Admin (DIR_ADMIN / COORD_ADMIN): lectura de reportes para facturación y seguimiento
   if (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN) {
     return {
