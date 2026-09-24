@@ -19,6 +19,9 @@ export const dynamic = "force-dynamic";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
+/** Feature flag — permitir mostrar fotos reales cuando existan oficiales. */
+const SHOW_TEAM_PHOTOS = false;
+
 const principios: { icon: PublicIconName; title: string; text: string }[] = [
   {
     icon: "target",
@@ -337,7 +340,7 @@ export default async function NosotrosPage() {
             {expertos.slice(0, 8).map((ex) => (
               <article key={ex.key} className={shared.teamCard} data-reveal="up">
                 <div className={shared.teamPhoto}>
-                  {ex.avatarUrl ? (
+                  {SHOW_TEAM_PHOTOS && ex.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={ex.avatarUrl} alt={`Foto de ${ex.name}`} loading="lazy" decoding="async" />
                   ) : (
