@@ -59,6 +59,10 @@ export type RequisitoBorrador = {
   id?: number | null;
   descripcion: string;
   cantidad: number;
+  /** Herramienta concreta (inventario). */
+  toolId?: number | null;
+  /** Fuente de la selección para este renglón. */
+  source?: "KIT" | "INVENTORY" | null;
 };
 
 let secuencia = 0;
@@ -68,7 +72,7 @@ function nuevaLlave(): string {
 }
 
 export function requisitoVacio(descripcion = "", cantidad = 1): RequisitoBorrador {
-  return { key: nuevaLlave(), id: null, descripcion, cantidad };
+  return { key: nuevaLlave(), id: null, descripcion, cantidad, toolId: null, source: null };
 }
 
 /** Quita acentos y espacios de más para detectar duplicados. */
@@ -89,6 +93,8 @@ export function borradoresDesdeChecklist(
     id: r.id,
     descripcion: r.descripcion,
     cantidad: r.cantidad,
+    toolId: r.toolId ?? null,
+    source: r.toolId ? null : null,
   }));
 }
 
@@ -100,6 +106,7 @@ export type ErroresRequisitos = {
 export function validarRequisitos(filas: readonly RequisitoBorrador[]): ErroresRequisitos {
   const porFila: Record<string, string> = {};
   const vistos = new Set<string>();
+  const vistosTool = new Set<number>();
 
   for (const fila of filas) {
     const descripcion = fila.descripcion.trim();
@@ -111,12 +118,20 @@ export function validarRequisitos(filas: readonly RequisitoBorrador[]): ErroresR
       porFila[fila.key] = `Máximo ${MAX_LARGO_DESCRIPCION} caracteres.`;
       continue;
     }
-    const clave = claveRequisito(descripcion);
-    if (vistos.has(clave)) {
-      porFila[fila.key] = "Esa herramienta ya está en la lista.";
-      continue;
+    if (fila.toolId && Number.isFinite(fila.toolId)) {
+      if (vistosTool.has(Number(fila.toolId))) {
+        porFila[fila.key] = "Esa herramienta ya está en la lista.";
+        continue;
+      }
+      vistosTool.add(Number(fila.toolId));
+    } else {
+      const clave = claveRequisito(descripcion);
+      if (vistos.has(clave)) {
+        porFila[fila.key] = "Esa herramienta ya está en la lista.";
+        continue;
+      }
+      vistos.add(clave);
     }
-    vistos.add(clave);
     if (!Number.isFinite(fila.cantidad) || fila.cantidad <= 0) {
       porFila[fila.key] = "La cantidad debe ser mayor a cero.";
     }
@@ -195,12 +210,26 @@ export function cargarChecklist(token: string, activityId: number) {
 export function definirRequisitos(
   token: string,
   activityId: number,
-  requisitos: Array<{ id?: number | null; descripcion: string; cantidad: number }>,
+  requisitos: Array<{ id?: number | null; descripcion: string; cantidad: number; toolId?: number | null; source?: "KIT" | "INVENTORY" | null }>,
+  /** Usuarios cuyas asignaciones de kit son válidas para esta OT (responsable + equipo). */
+  allowedKitUserIds?: number[],
 ) {
   return pedir<ChecklistHerramientas>(
     `activities/${activityId}/herramientas`,
     token,
-    { method: "PUT", body: JSON.stringify({ requisitos }) },
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        requisitos: requisitos.map((r) => ({
+          ...(r.id != null ? { id: r.id } : {}),
+          descripcion: r.descripcion,
+          cantidad: r.cantidad,
+          ...(r.toolId ? { toolId: r.toolId } : {}),
+          ...(r.source ? { toolSource: r.source } : {}),
+        })),
+        ...(Array.isArray(allowedKitUserIds) && allowedKitUserIds.length ? { allowedKitUserIds } : {}),
+      }),
+    },
     "No se pudo guardar el checklist de herramientas",
   );
 }

@@ -191,3 +191,63 @@ export async function rejectToolRenewal(token: string, id: number, reason: strin
     body: JSON.stringify({ reason }),
   });
 }
+
+// ── Kits e inventario: helpers para el selector de herramientas ────────────────
+
+export type InventoryToolOption = {
+  id: number;
+  toolName: string;
+  model: string;
+  serialNumber: string;
+  status: "AVAILABLE" | "ASSIGNED" | "IN_REPAIR" | "RETIRED" | string;
+  panoramicPhotoUrl?: string;
+  serialPhotoUrl?: string;
+};
+
+export type KitAssignmentRow = {
+  id: number;
+  user: { id: number; nombre: string; email?: string | null };
+  inventoryItem: InventoryToolOption;
+  assignedAt: string;
+  isActive: boolean;
+};
+
+export async function searchInventoryTools(token: string, query: string) {
+  const q = String(query || "").trim();
+  if (!q) return [] as InventoryToolOption[];
+  const data = await apiJson(token, `tool-requests/inventory/search?q=${encodeURIComponent(q)}`);
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map((r) => ({
+    id: Number(r.id),
+    toolName: String(r.toolName ?? ""),
+    model: String(r.model ?? ""),
+    serialNumber: String(r.serialNumber ?? ""),
+    status: String(r.status ?? ""),
+    panoramicPhotoUrl: r.panoramicPhotoUrl ? String(r.panoramicPhotoUrl) : undefined,
+    serialPhotoUrl: r.serialPhotoUrl ? String(r.serialPhotoUrl) : undefined,
+  })) as InventoryToolOption[];
+}
+
+export async function getUsersKit(token: string, userId: number) {
+  const data = await apiJson(token, `tool-requests/kits/users?userId=${encodeURIComponent(String(userId))}`);
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map((r) => ({
+    id: Number(r.id),
+    user: {
+      id: Number(r.user?.id ?? 0),
+      nombre: String(r.user?.nombre ?? ""),
+      email: r.user?.email ? String(r.user.email) : null,
+    },
+    inventoryItem: {
+      id: Number(r.inventoryItem?.id ?? 0),
+      toolName: String(r.inventoryItem?.toolName ?? ""),
+      model: String(r.inventoryItem?.model ?? ""),
+      serialNumber: String(r.inventoryItem?.serialNumber ?? ""),
+      status: String(r.inventoryItem?.status ?? ""),
+      panoramicPhotoUrl: r.inventoryItem?.panoramicPhotoUrl ? String(r.inventoryItem.panoramicPhotoUrl) : undefined,
+      serialPhotoUrl: r.inventoryItem?.serialPhotoUrl ? String(r.inventoryItem.serialPhotoUrl) : undefined,
+    },
+    assignedAt: String(r.assignedAt ?? ""),
+    isActive: Boolean(r.isActive),
+  })) as KitAssignmentRow[];
+}
