@@ -10,6 +10,7 @@
     "@types/jest": "^30.0.0",
     "@types/mocha": "^10.0.10",
     "@types/multer": "^2.0.0",
+    "sharp": "^0.33.4",
     "turbo": "^1.13.0"
   },
   "scripts": {
@@ -58,7 +59,8 @@
     "integra:isapi:scan": "npm run integra:isapi:scan --workspace=apps/api --",
     "integra:isapi:seed": "npm run integra:isapi:seed --workspace=apps/api --",
     "integra:isapi:sync": "npm run integra:isapi:sync --workspace=apps/api --",
-    "integra:isapi:publish": "npm run integra:isapi:publish --workspace=apps/api --"
+    "integra:isapi:publish": "npm run integra:isapi:publish --workspace=apps/api --",
+    "gen:webp:contact": "node scripts/gen-webp-contact.js"
   },
   "prisma": {
     "seed": "node apps/api/prisma/seed.js"
