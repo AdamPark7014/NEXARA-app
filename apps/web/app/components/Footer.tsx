@@ -67,7 +67,7 @@ export default function Footer() {
             <Link href="/" className={styles.brandLogoLink} aria-label="Nexara — Inicio">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/nexara-mark.png"
+                src="/brand/nexara-mark-v2.png"
                 alt=""
                 className={styles.brandMark}
                 width={44}
