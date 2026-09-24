@@ -485,3 +485,48 @@
     height: 40px;
   }
 }
+
+/* ── Tema claro: el footer sigue al tema (texto navy sobre gris-azul) ── */
+:global(html[data-public-theme="light"]) .footer {
+  --f-bg: #e9eef6;
+  --f-acento: #06708a;
+  --f-papel: #0b1a33;
+  --f-linea: rgba(11, 26, 51, 0.12);
+  --f-text: #33445c;
+  --f-dim: #4f607a;
+  --f-niebla: #5b6b85;
+  background: var(--f-bg);
+  border-top-color: var(--f-linea);
+}
+
+:global(html[data-public-theme="light"]) .topAccent {
+  background: linear-gradient(90deg, transparent, rgba(6, 112, 138, 0.4), rgba(6, 112, 138, 0.2), transparent);
+}
+
+:global(html[data-public-theme="light"]) .social:hover {
+  border-color: rgba(6, 112, 138, 0.45);
+  background: rgba(6, 112, 138, 0.08);
+}
+
+:global(html[data-public-theme="light"]) .miniMapWrap,
+:global(html[data-public-theme="light"]) .mapFrame {
+  background: #dfe6f0;
+  box-shadow: 0 16px 40px rgba(11, 26, 51, 0.1);
+}
+
+:global(html[data-public-theme="light"]) .contactCard {
+  background: #ffffff;
+}
+
+:global(html[data-public-theme="light"]) .backTop {
+  background: #ffffff;
+  border-color: rgba(6, 112, 138, 0.4);
+  color: #06708a;
+  box-shadow: 0 8px 22px rgba(11, 26, 51, 0.12);
+}
+
+:global(html[data-public-theme="light"]) .backTop:hover {
+  color: #0b1a33;
+  border-color: #06708a;
+  background: rgba(6, 112, 138, 0.08);
+}

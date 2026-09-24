@@ -47,8 +47,8 @@
 }
 
 :global(html[data-public-theme="light"]) .header:hover {
-  border-color: #0e9ab8;
-  color: #0b7f99;
+  border-color: #06708a;
+  color: #06708a;
 }
 
 /* Sobre el hero (header transparente) el botón siempre es claro sobre oscuro */
@@ -82,4 +82,12 @@
     height: 36px;
     border-radius: 10px;
   }
+}
+
+:global(html[data-public-theme="light"]) .footer {
+  color: #5b6b85;
+}
+
+:global(html[data-public-theme="light"]) .footer:hover {
+  color: #06708a;
 }

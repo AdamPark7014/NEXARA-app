@@ -196,3 +196,14 @@
     text-align: center;
   }
 }
+
+/* Tema claro: banner blanco con texto navy */
+:global(html[data-public-theme="light"]) .banner {
+  --cc-bg: #ffffff;
+  --cc-ink: #0b1a33;
+  --cc-muted: #4f607a;
+  --cc-line: rgba(11, 26, 51, 0.14);
+  --cc-cyan: #06708a;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 -1px 0 rgba(11, 26, 51, 0.06), 0 -12px 30px rgba(11, 26, 51, 0.08);
+}

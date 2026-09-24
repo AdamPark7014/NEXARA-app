@@ -143,11 +143,11 @@ export default function CoberturaPage() {
       <section className={shared.sectionTight} data-reveal="up" aria-label="Mapa de operaciones">
         <div className={shared.inner}>
           <EditorialImage
-            desktopUrl="/maps/mexico_map.svg"
-            alt="Mapa de México — zonas de operación Nexara"
+            desktopUrl="/fotos/mapa-cobertura-nexara.jpg"
+            alt="Mapa de cobertura NEXARA: 32 estados y más de 200 puntos de presencia en México"
             kicker="Geografía"
             title="Operamos donde importa"
-            caption="Base en el centro; alcance nacional por fases, partners y remoto."
+            caption="32 estados y más de 200 puntos de presencia; base en Puebla y CDMX."
             compose="caption-bar"
             layout="bleed_landscape"
             objectPosition="center"

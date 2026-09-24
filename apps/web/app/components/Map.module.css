@@ -284,3 +284,51 @@
 :global(html[data-public-theme="light"]) .mapContainer {
   box-shadow: 0 18px 44px rgba(11, 26, 51, 0.12);
 }
+
+/* Tema claro: el lienzo, el fallback y la tarjeta viven en gris-azul/blanco
+   (valores explícitos porque el footer queda fuera de `.page`) */
+:global(html[data-public-theme="light"]) .mapContainer {
+  --map-line: rgba(11, 26, 51, 0.14);
+  background: #dfe6f0;
+}
+
+:global(html[data-public-theme="light"]) .brandMap {
+  background: #e9eef6;
+}
+
+:global(html[data-public-theme="light"]) .brandMap :global(.maplibregl-ctrl-group button + button) {
+  border-top-color: rgba(11, 26, 51, 0.1);
+}
+
+:global(html[data-public-theme="light"]) .brandMap :global(.maplibregl-ctrl-attrib) {
+  color: #4f607a;
+}
+
+:global(html[data-public-theme="light"]) .brandMap :global(.maplibregl-ctrl-attrib a) {
+  color: #33445c;
+}
+
+:global(html[data-public-theme="light"]) .pinDot {
+  border-color: #f3f6fb;
+}
+
+:global(html[data-public-theme="light"]) .mapCardKicker {
+  color: #06708a;
+}
+
+:global(html[data-public-theme="light"]) .mapCardTitle {
+  color: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .mapCardText {
+  color: #4f607a;
+}
+
+:global(html[data-public-theme="light"]) .mapFallback {
+  background: #e9eef6;
+  color: #4f607a;
+}
+
+:global(html[data-public-theme="light"]) .mapFallback strong {
+  color: #0b1a33;
+}

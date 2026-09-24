@@ -453,3 +453,91 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Tema claro: panel blanco, texto navy, campos con borde visible ── */
+:global(html[data-public-theme="light"]) .fabOpen {
+  background: #ffffff;
+  color: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .overlay {
+  background: rgba(11, 26, 51, 0.28);
+}
+
+:global(html[data-public-theme="light"]) .panel {
+  background: linear-gradient(165deg, #ffffff 0%, #f3f6fb 100%);
+  border-color: rgba(11, 26, 51, 0.12);
+  box-shadow: 0 24px 58px rgba(11, 26, 51, 0.18);
+}
+
+:global(html[data-public-theme="light"]) .panelHeader h3,
+:global(html[data-public-theme="light"]) .closeButton,
+:global(html[data-public-theme="light"]) .formField label,
+:global(html[data-public-theme="light"]) .fieldLabel,
+:global(html[data-public-theme="light"]) .success h4 {
+  color: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .panelEyebrow {
+  color: rgba(4, 19, 26, 0.72);
+}
+
+:global(html[data-public-theme="light"]) .panelHeader h3,
+:global(html[data-public-theme="light"]) .closeButton {
+  color: #04131a;
+}
+
+:global(html[data-public-theme="light"]) .panelMeta span,
+:global(html[data-public-theme="light"]) .success p,
+:global(html[data-public-theme="light"]) .segmentedOption {
+  color: #4f607a;
+}
+
+:global(html[data-public-theme="light"]) .formField input,
+:global(html[data-public-theme="light"]) .formField textarea {
+  background: #ffffff;
+  border-color: rgba(11, 26, 51, 0.16);
+  color: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .formField input::placeholder,
+:global(html[data-public-theme="light"]) .formField textarea::placeholder {
+  color: #7b889c;
+}
+
+:global(html[data-public-theme="light"]) .segmented {
+  border-color: rgba(11, 26, 51, 0.14);
+  background: #ffffff;
+}
+
+:global(html[data-public-theme="light"]) .segmentedActive {
+  background: rgba(6, 112, 138, 0.12);
+  color: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .chip {
+  border-color: rgba(11, 26, 51, 0.16);
+  background: #ffffff;
+  color: #33445c;
+}
+
+:global(html[data-public-theme="light"]) .chip:hover,
+:global(html[data-public-theme="light"]) .chipActive {
+  color: #0b1a33;
+  border-color: #06708a;
+  background: rgba(6, 112, 138, 0.1);
+}
+
+:global(html[data-public-theme="light"]) .waQuick {
+  background: rgba(37, 211, 102, 0.12);
+  color: #1a7f47;
+}
+
+:global(html[data-public-theme="light"]) .waQuick:hover {
+  background: rgba(37, 211, 102, 0.2);
+  color: #14633a;
+}
+
+:global(html[data-public-theme="light"]) .footNote {
+  color: #6b7a92;
+}
