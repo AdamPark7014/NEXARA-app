@@ -1117,6 +1117,8 @@ model Activity {
   anNumber                String                   @db.VarChar(20)
   titulo                  String                   @db.VarChar(200)
   descripcion             String?
+  /// El responsable lleva su kit personal (flag para el checklist de herramientas).
+  usesPersonalKit         Boolean                  @default(false)
   indicaciones            String?
   estatus                 String                   @default("Pendiente") @db.VarChar(50)
   prioridad               String?                  @db.VarChar(20)

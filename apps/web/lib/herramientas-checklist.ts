@@ -50,6 +50,8 @@ export type ChecklistHerramientas = {
   listos: number;
   pendientes: string[];
   completo: boolean;
+  /** Flag: el responsable lleva su kit personal. */
+  usesPersonalKit?: boolean;
 };
 
 /** Una fila del editor: lo que se escribe antes de mandarlo a la API. */
@@ -213,6 +215,8 @@ export function definirRequisitos(
   requisitos: Array<{ id?: number | null; descripcion: string; cantidad: number; toolId?: number | null; source?: "KIT" | "INVENTORY" | null }>,
   /** Usuarios cuyas asignaciones de kit son válidas para esta OT (responsable + equipo). */
   allowedKitUserIds?: number[],
+  /** Flag: el responsable lleva su kit personal. */
+  usePersonalKit?: boolean,
 ) {
   return pedir<ChecklistHerramientas>(
     `activities/${activityId}/herramientas`,
@@ -228,6 +232,7 @@ export function definirRequisitos(
           ...(r.source ? { toolSource: r.source } : {}),
         })),
         ...(Array.isArray(allowedKitUserIds) && allowedKitUserIds.length ? { allowedKitUserIds } : {}),
+        ...(typeof usePersonalKit === "boolean" ? { usePersonalKit } : {}),
       }),
     },
     "No se pudo guardar el checklist de herramientas",

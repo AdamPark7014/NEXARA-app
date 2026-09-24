@@ -177,6 +177,7 @@ export default function OpsActivityForm({
   const [herramientasPendiente, setHerramientasPendiente] = useState<{ id: number; error: string } | null>(null);
   const erroresHerramientas = useMemo(() => validarRequisitos(herramientas), [herramientas]);
   const herramientasTituloId = useId();
+  const [usaKit, setUsaKit] = useState(false);
 
   const periodoId = useId();
 
@@ -512,6 +513,7 @@ export default function OpsActivityForm({
           ...(form.responsableId ? [Number(form.responsableId)] : []),
           ...((extraTeamIds ?? []).filter((id) => !form.responsableId || id !== Number(form.responsableId))),
         ],
+        usaKit,
       );
       return true;
     } catch (e) {
@@ -1215,6 +1217,8 @@ export default function OpsActivityForm({
             responsableNombreCorto={
               users.find((u) => String(u.id) === String(form.responsableId))?.nombre?.split(/\s+/).slice(0, 2).join(" ")
             }
+            usePersonalKit={usaKit}
+            onToggleUsePersonalKit={setUsaKit}
           />
         </section>
       ) : null}
