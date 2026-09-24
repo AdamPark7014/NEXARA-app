@@ -652,11 +652,10 @@ export class AuthService {
       set.add(PERMISSIONS.GPS_VIEW);
     }
 
-    // ── Ingeniero de soporte — triage/desk: puede asignar y dar seguimiento ──
+    // ── Ingeniero de soporte — ejecuta OT asignadas (no asigna ni administra) ──
     if (roleKey === 'ing_soporte') {
       set.add(PERMISSIONS.CONSOLE_ACCESS);
       set.add(PERMISSIONS.ACTIVITIES_VIEW);
-      set.add(PERMISSIONS.ACTIVITIES_MANAGE); // permitir crear/asignar OT (coordinación de soporte)
       set.add(PERMISSIONS.EVIDENCES_VIEW);
       set.add(PERMISSIONS.EVIDENCES_CREATE);
       set.add(PERMISSIONS.TOOLS_VIEW);
@@ -671,6 +670,26 @@ export class AuthService {
       set.add(PERMISSIONS.KB_VIEW);
       set.add(PERMISSIONS.DOCUMENTS_VIEW);
       // Viáticos propios — el soporte también viaja y necesita reportar gastos
+      set.add(PERMISSIONS.VIATICS_VIEW);
+      set.add(PERMISSIONS.VIATICS_CREATE);
+    }
+    // ── Encargado de soporte — igual que soporte + ACTIVITIES_MANAGE (puede asignar) ──
+    if (roleKey === 'enc_soporte') {
+      set.add(PERMISSIONS.CONSOLE_ACCESS);
+      set.add(PERMISSIONS.ACTIVITIES_VIEW);
+      set.add(PERMISSIONS.ACTIVITIES_MANAGE);
+      set.add(PERMISSIONS.EVIDENCES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_CREATE);
+      set.add(PERMISSIONS.TOOLS_VIEW);
+      set.add(PERMISSIONS.TOOLS_REQUEST);
+      set.add(PERMISSIONS.VEHICLES_VIEW);
+      set.add(PERMISSIONS.VEHICLES_REQUEST);
+      set.add(PERMISSIONS.SUPPORT_VIEW);
+      set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.ATTENDANCE_MANAGE);
+      set.add(PERMISSIONS.GPS_VIEW);
+      set.add(PERMISSIONS.KB_VIEW);
+      set.add(PERMISSIONS.DOCUMENTS_VIEW);
       set.add(PERMISSIONS.VIATICS_VIEW);
       set.add(PERMISSIONS.VIATICS_CREATE);
     }
