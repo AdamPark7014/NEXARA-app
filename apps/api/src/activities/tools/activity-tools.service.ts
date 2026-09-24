@@ -62,7 +62,7 @@ export class ActivityToolsService {
 
     // Validaciones: toolId debe existir y ser accesible desde KIT (usuario permitido) o INVENTORY (disponible).
     const allowedUsers = new Set<number>([
-      Number(activity as any).responsableId ?? 0,
+      Number(((activity as unknown) as { responsableId?: number | null }).responsableId ?? 0),
       ...((Array.isArray(payload?.allowedKitUserIds) ? payload.allowedKitUserIds : []) as number[]).map((n) =>
         Number(n),
       ),
