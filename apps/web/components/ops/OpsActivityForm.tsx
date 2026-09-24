@@ -64,6 +64,8 @@ type Props = {
   initialClientId?: number;
   /** Prefill encargado (pizarra → asignar) */
   initialResponsableId?: number;
+  /** Equipo extra elegido en el flujo de asignación (para selector de herramientas). */
+  extraTeamIds?: number[];
   /** Fija el tipo: tarea = sin proyecto, proyecto = con proyecto */
   forcedProjectMode?: ActivityProjectMode;
   /** Oculta el selector Con/Sin proyecto (cuando forcedProjectMode) */
@@ -100,6 +102,7 @@ export default function OpsActivityForm({
   requestId,
   initialClientId,
   initialResponsableId,
+  extraTeamIds,
   forcedProjectMode,
   hideProjectModePicker,
   tone = "ops",
@@ -174,6 +177,7 @@ export default function OpsActivityForm({
   const [herramientasPendiente, setHerramientasPendiente] = useState<{ id: number; error: string } | null>(null);
   const erroresHerramientas = useMemo(() => validarRequisitos(herramientas), [herramientas]);
   const herramientasTituloId = useId();
+  const [usaKit, setUsaKit] = useState(false);
 
   const periodoId = useId();
 
@@ -499,7 +503,17 @@ export default function OpsActivityForm({
       await definirRequisitos(
         token,
         newId,
-        herramientas.map((f) => ({ descripcion: f.descripcion.trim(), cantidad: f.cantidad })),
+        herramientas.map((f) => ({
+          descripcion: f.descripcion.trim(),
+          cantidad: f.cantidad,
+          ...(f.toolId ? { toolId: f.toolId } : {}),
+          ...(f.source ? { source: f.source } : {}),
+        })),
+        [
+          ...(form.responsableId ? [Number(form.responsableId)] : []),
+          ...((extraTeamIds ?? []).filter((id) => !form.responsableId || id !== Number(form.responsableId))),
+        ],
+        usaKit,
       );
       return true;
     } catch (e) {
@@ -1198,6 +1212,13 @@ export default function OpsActivityForm({
             onChange={setHerramientas}
             errores={herramientasIntentado ? erroresHerramientas : null}
             disabled={saving}
+            responsableId={form.responsableId ? Number(form.responsableId) : undefined}
+            extraTeamUserIds={extraTeamIds}
+            responsableNombreCorto={
+              users.find((u) => String(u.id) === String(form.responsableId))?.nombre?.split(/\s+/).slice(0, 2).join(" ")
+            }
+            usePersonalKit={usaKit}
+            onToggleUsePersonalKit={setUsaKit}
           />
         </section>
       ) : null}

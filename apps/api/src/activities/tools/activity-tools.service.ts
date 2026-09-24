@@ -14,6 +14,7 @@ import {
 export type ChecklistDeActividad = EstadoChecklist & {
   activityId: number;
   requisitos: RequisitoConCheck[];
+  usesPersonalKit: boolean;
 };
 
 /**
@@ -31,7 +32,7 @@ export class ActivityToolsService {
     const tenantId = requireCompanyId(companyId);
     const activity = await this.prisma.activity.findFirst({
       where: { id: activityId, ...companyWhere(tenantId) },
-      select: { id: true, companyId: true, estatus: true, titulo: true, anNumber: true },
+      select: { id: true, companyId: true, estatus: true, titulo: true, anNumber: true, responsableId: true },
     });
     assertCompanyAccess(activity, tenantId, 'Actividad');
     return activity!;
@@ -42,9 +43,67 @@ export class ActivityToolsService {
    * id, y si no por descripción); el que desaparece se borra con el suyo. Mandar `[]`
    * deja la OT sin checklist y por tanto sin candado al iniciar.
    */
-  async definirRequisitos(activityId: number, entrada: unknown, companyId?: number | null) {
+  async definirRequisitos(
+    activityId: number,
+    entrada:
+      | unknown
+      | {
+          requisitos?: unknown;
+          /** Usuarios cuyas asignaciones de kit son válidas (responsable + equipo). */
+          allowedKitUserIds?: number[];
+          /** Flag: el responsable lleva su kit personal. */
+          usePersonalKit?: boolean;
+        },
+    companyId?: number | null,
+  ) {
     const activity = await this.cargarActividad(activityId, companyId);
-    const requisitos = normalizarRequisitos(entrada);
+    const payload = (entrada as any) ?? {};
+    const requisitos = normalizarRequisitos(payload?.requisitos ?? entrada);
+
+    // Validaciones: toolId debe existir y ser accesible desde KIT (usuario permitido) o INVENTORY (disponible).
+    const allowedUsers = new Set<number>([
+      Number(activity as any).responsableId ?? 0,
+      ...((Array.isArray(payload?.allowedKitUserIds) ? payload.allowedKitUserIds : []) as number[]).map((n) =>
+        Number(n),
+      ),
+    ].filter((n) => Number.isFinite(n) && n > 0));
+
+    for (const req of requisitos) {
+      if (req.toolId && Number(req.toolId) > 0) {
+        const item = await (this.prisma as any).toolInventoryItem.findFirst({
+          where: { id: req.toolId, ...companyWhere(activity.companyId) },
+          select: { id: true, status: true },
+        });
+        if (!item) throw new BadRequestException('La herramienta seleccionada no existe en inventario');
+        const status = String(item.status || '').toUpperCase();
+        if (req.toolSource === 'INVENTORY' || !req.toolSource) {
+          if (status !== 'AVAILABLE') {
+            throw new BadRequestException('La herramienta seleccionada no está disponible en almacén');
+          }
+        } else if (req.toolSource === 'KIT') {
+          // Debe estar asignada activamente al responsable o a alguien del equipo permitido.
+          if (allowedUsers.size === 0) {
+            throw new BadRequestException(
+              'No se pudo validar el kit: falta el responsable o el equipo en la solicitud',
+            );
+          }
+          const asignacion = await (this.prisma as any).toolKitAssignment.findFirst({
+            where: {
+              inventoryItemId: req.toolId,
+              isActive: true,
+              userId: { in: [...allowedUsers] },
+              ...companyWhere(activity.companyId),
+            },
+            select: { id: true },
+          });
+          if (!asignacion) {
+            throw new BadRequestException(
+              'La herramienta seleccionada no pertenece al kit del responsable o su equipo',
+            );
+          }
+        }
+      }
+    }
 
     const existentes = await this.prisma.activityToolRequirement.findMany({
       where: { activityId, ...companyWhere(activity.companyId) },
@@ -57,6 +116,13 @@ export class ActivityToolsService {
     const conservados = new Set<number>();
 
     await this.prisma.$transaction(async (tx) => {
+      // Flag de kit personal en la actividad
+      if (typeof payload?.usePersonalKit === 'boolean') {
+        await tx.activity.update({
+          where: { id: activityId },
+          data: { usesPersonalKit: Boolean(payload.usePersonalKit) },
+        });
+      }
       for (const req of requisitos) {
         const previo =
           (req.id != null ? porId.get(req.id) : undefined) ??
@@ -67,6 +133,7 @@ export class ActivityToolsService {
           cantidad: new Prisma.Decimal(req.cantidad),
           productId: req.productId,
           toolId: req.toolId,
+          toolSource: (req.toolSource as any) ?? null,
         };
 
         if (previo) {
@@ -101,7 +168,12 @@ export class ActivityToolsService {
    * iniciar y el detalle, que ya la validaron.
    */
   async listarDeActividad(activityId: number, companyId: number): Promise<ChecklistDeActividad> {
-    const filas = await this.prisma.activityToolRequirement.findMany({
+    const [activity, filas] = await Promise.all([
+      this.prisma.activity.findFirst({
+        where: { id: activityId, ...companyWhere(companyId) },
+        select: { usesPersonalKit: true },
+      }),
+      this.prisma.activityToolRequirement.findMany({
       where: { activityId, ...companyWhere(companyId) },
       orderBy: { id: 'asc' },
       include: {
@@ -113,8 +185,9 @@ export class ActivityToolsService {
           take: 1,
           include: { user: { select: { id: true, nombre: true } } },
         },
-      },
-    });
+        },
+      }),
+    ]);
 
     const requisitos: RequisitoConCheck[] = filas.map((fila) => {
       const check = fila.checks[0];
@@ -142,7 +215,7 @@ export class ActivityToolsService {
       };
     });
 
-    return { activityId, requisitos, ...estadoChecklist(requisitos) };
+    return { activityId, requisitos, usesPersonalKit: Boolean(activity?.usesPersonalKit), ...estadoChecklist(requisitos) };
   }
 
   /**
