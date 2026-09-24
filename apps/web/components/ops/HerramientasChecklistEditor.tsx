@@ -25,6 +25,9 @@ type Props = {
   extraTeamUserIds?: number[];
   /** Nombre corto del responsable para encabezado (opcional). */
   responsableNombreCorto?: string;
+  /** Flag: el responsable lleva su kit personal. */
+  usePersonalKit?: boolean;
+  onToggleUsePersonalKit?: (next: boolean) => void;
 };
 
 const input: CSSProperties = {
@@ -70,6 +73,8 @@ export default function HerramientasChecklistEditor({
   responsableId,
   extraTeamUserIds,
   responsableNombreCorto,
+  usePersonalKit,
+  onToggleUsePersonalKit,
 }: Props) {
   const idBase = useId();
   const { token } = useUser();
@@ -137,7 +142,7 @@ export default function HerramientasChecklistEditor({
 
   const yaElegidos = useMemo(() => new Set(value.map((v) => Number(v.toolId || 0)).filter(Boolean)), [value]);
 
-  const agregarDeInventario = (item: InventoryToolOption, source: "KIT" | "INVENTORY") => {
+  const agregarDeInventario = (item: InventoryToolOption, source: "INVENTORY") => {
     if (lleno || disabled) return;
     if (yaElegidos.has(item.id)) return;
     const fila: RequisitoBorrador = {
@@ -161,6 +166,69 @@ export default function HerramientasChecklistEditor({
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      {/* Opción Kit personal */}
+      <div
+        style={{
+          display: "grid",
+          gap: 8,
+          padding: 12,
+          borderRadius: 12,
+          border: "1px solid var(--border)",
+          background: "var(--surface)",
+        }}
+      >
+        <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={Boolean(usePersonalKit)}
+            onChange={(e) => onToggleUsePersonalKit?.(e.target.checked)}
+            disabled={disabled}
+          />
+          <span style={{ fontSize: 14, fontWeight: 750 }}>Kit personal</span>
+        </label>
+        {responsableId ? (
+          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>
+            {responsableNombreCorto ? `${responsableNombreCorto} ` : "El responsable "}lleva su kit personal.
+            {kit.length ? " Referencia:" : "" }
+          </p>
+        ) : null}
+        {/* Solo referencia de lectura del kit */}
+        {kit.length ? (
+          <div style={{ display: "grid", gap: 6 }}>
+            {Array.from(kitPorUsuario.entries()).map(([uid, items]) => (
+              <div key={uid} style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                  {kit.find((k) => k.user?.id === uid)?.user?.nombre ?? "Usuario"} · {items.length} herramienta{items.length === 1 ? "" : "s"}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {items.map((it) => (
+                    <span
+                      key={it.id}
+                      title={labelDe(it)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "5px 10px",
+                        borderRadius: 999,
+                        border: "1px solid var(--border)",
+                        background: "var(--card-bg, var(--surface))",
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "var(--text-secondary)",
+                        cursor: "default",
+                      }}
+                    >
+                      {it.toolName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       {/* Lista actual */}
       {value.length > 0 ? (
         <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
@@ -234,40 +302,6 @@ export default function HerramientasChecklistEditor({
             );
           })}
         </ol>
-      ) : null}
-
-      {/* Kit personal y de equipo */}
-      {responsableId ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>
-            Kit personal{responsableNombreCorto ? ` de ${responsableNombreCorto}` : ""}{extraTeamUserIds?.length ? " y equipo" : ""}
-          </div>
-          {Array.from(kitPorUsuario.entries()).map(([uid, items]) => (
-            <div key={uid} style={{ display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                {kit.find((k) => k.user?.id === uid)?.user?.nombre ?? "Usuario"} · {items.length} herramienta{items.length === 1 ? "" : "s"}
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {items.map((it) => {
-                  const elegido = yaElegidos.has(it.id);
-                  return (
-                    <button
-                      key={it.id}
-                      type="button"
-                      style={{ ...chip, opacity: elegido || disabled || lleno ? 0.55 : 1 }}
-                      disabled={elegido || disabled || lleno}
-                      onClick={() => agregarDeInventario(it, "KIT")}
-                      title={labelDe(it)}
-                    >
-                      <AddIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-                      {it.toolName}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
       ) : null}
 
       {/* Inventario (disponibles) */}

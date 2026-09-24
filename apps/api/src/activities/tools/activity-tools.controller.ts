@@ -47,6 +47,8 @@ export class ActivityToolsController {
       }>;
       /** Usuarios cuyas asignaciones de kit cuentan para validar selección de herramientas. */
       allowedKitUserIds?: number[];
+      /** Flag: el responsable lleva su kit personal. */
+      usePersonalKit?: boolean;
     },
     @CurrentCompanyId() companyId: number | null,
   ) {
@@ -57,6 +59,7 @@ export class ActivityToolsController {
         allowedKitUserIds: Array.isArray(body?.allowedKitUserIds)
           ? (body!.allowedKitUserIds as number[]).filter((n) => Number.isFinite(n) && Number(n) > 0).map((n) => Number(n))
           : [],
+        usePersonalKit: Boolean(body?.usePersonalKit),
       },
       companyId,
     );

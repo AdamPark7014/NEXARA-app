@@ -14,6 +14,7 @@ import {
 export type ChecklistDeActividad = EstadoChecklist & {
   activityId: number;
   requisitos: RequisitoConCheck[];
+  usesPersonalKit: boolean;
 };
 
 /**
@@ -50,6 +51,8 @@ export class ActivityToolsService {
           requisitos?: unknown;
           /** Usuarios cuyas asignaciones de kit son válidas (responsable + equipo). */
           allowedKitUserIds?: number[];
+          /** Flag: el responsable lleva su kit personal. */
+          usePersonalKit?: boolean;
         },
     companyId?: number | null,
   ) {
@@ -113,6 +116,13 @@ export class ActivityToolsService {
     const conservados = new Set<number>();
 
     await this.prisma.$transaction(async (tx) => {
+      // Flag de kit personal en la actividad
+      if (typeof payload?.usePersonalKit === 'boolean') {
+        await tx.activity.update({
+          where: { id: activityId },
+          data: { usesPersonalKit: Boolean(payload.usePersonalKit) },
+        });
+      }
       for (const req of requisitos) {
         const previo =
           (req.id != null ? porId.get(req.id) : undefined) ??
@@ -158,7 +168,12 @@ export class ActivityToolsService {
    * iniciar y el detalle, que ya la validaron.
    */
   async listarDeActividad(activityId: number, companyId: number): Promise<ChecklistDeActividad> {
-    const filas = await this.prisma.activityToolRequirement.findMany({
+    const [activity, filas] = await Promise.all([
+      this.prisma.activity.findFirst({
+        where: { id: activityId, ...companyWhere(companyId) },
+        select: { usesPersonalKit: true },
+      }),
+      this.prisma.activityToolRequirement.findMany({
       where: { activityId, ...companyWhere(companyId) },
       orderBy: { id: 'asc' },
       include: {
@@ -170,8 +185,9 @@ export class ActivityToolsService {
           take: 1,
           include: { user: { select: { id: true, nombre: true } } },
         },
-      },
-    });
+        },
+      }),
+    ]);
 
     const requisitos: RequisitoConCheck[] = filas.map((fila) => {
       const check = fila.checks[0];
@@ -199,7 +215,7 @@ export class ActivityToolsService {
       };
     });
 
-    return { activityId, requisitos, ...estadoChecklist(requisitos) };
+    return { activityId, requisitos, usesPersonalKit: Boolean(activity?.usesPersonalKit), ...estadoChecklist(requisitos) };
   }
 
   /**

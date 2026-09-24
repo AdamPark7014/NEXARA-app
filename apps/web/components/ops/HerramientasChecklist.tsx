@@ -123,6 +123,7 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
   const [responsableId, setResponsableId] = useState<number | null>(null);
   const [equipoIds, setEquipoIds] = useState<number[]>([]);
   const [responsableNombreCorto, setResponsableNombreCorto] = useState<string | undefined>(undefined);
+  const [usaKit, setUsaKit] = useState<boolean>(false);
 
   const cargar = useCallback(async () => {
     if (!token || !activityId) return;
@@ -144,6 +145,14 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
       }
 
       setChecklist(await cargarChecklist(token, activityId));
+      // Flag de kit personal
+      try {
+        const loaded = await cargarChecklist(token, activityId);
+        setChecklist(loaded);
+        setUsaKit(Boolean(loaded?.usesPersonalKit));
+      } catch {
+        /* ignore, checklist ya se intentó cargar arriba */
+      }
       setError(null);
       setSinPermiso(false);
     } catch (e) {
@@ -198,6 +207,7 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
           ...(responsableId ? [responsableId] : []),
           ...equipoIds.filter((id) => !responsableId || id !== responsableId),
         ],
+        usaKit,
       );
       setChecklist(nuevo);
       setEditando(false);
@@ -331,6 +341,8 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
             responsableId={responsableId ?? undefined}
             extraTeamUserIds={equipoIds}
             responsableNombreCorto={responsableNombreCorto}
+            usePersonalKit={usaKit}
+            onToggleUsePersonalKit={setUsaKit}
           />
           {errorGuardar ? (
             <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>
