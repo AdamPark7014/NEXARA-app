@@ -652,10 +652,11 @@ export class AuthService {
       set.add(PERMISSIONS.GPS_VIEW);
     }
 
-    // ── Ingeniero de soporte — ejecuta OT asignadas (no asigna ni administra) ──
+    // ── Ingeniero de soporte — triage/desk: puede asignar y dar seguimiento ──
     if (roleKey === 'ing_soporte') {
       set.add(PERMISSIONS.CONSOLE_ACCESS);
       set.add(PERMISSIONS.ACTIVITIES_VIEW);
+      set.add(PERMISSIONS.ACTIVITIES_MANAGE); // permitir crear/asignar OT (coordinación de soporte)
       set.add(PERMISSIONS.EVIDENCES_VIEW);
       set.add(PERMISSIONS.EVIDENCES_CREATE);
       set.add(PERMISSIONS.TOOLS_VIEW);
