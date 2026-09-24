@@ -71,7 +71,7 @@ export default function Footer() {
                 alt=""
                 className={styles.brandMark}
                 width={44}
-                height={44}
+                height={40}
                 aria-hidden
               />
               <span className={styles.brandWordmark}>NEXARA</span>

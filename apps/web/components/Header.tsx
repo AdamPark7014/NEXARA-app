@@ -217,7 +217,7 @@ export default function Header() {
               src="/brand/nexara-mark.png"
               alt=""
               width={40}
-              height={40}
+              height={36}
               className={styles.logoMark}
               priority
               aria-hidden
