@@ -67,12 +67,14 @@ export default function Footer() {
             <Link href="/" className={styles.brandLogoLink} aria-label="Nexara — Inicio">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logo-nexara-lockup.png"
-                alt="Nexara"
-                className={styles.brandLogo}
-                width={200}
-                height={63}
+                src="/brand/nexara-mark.png"
+                alt=""
+                className={styles.brandMark}
+                width={44}
+                height={44}
+                aria-hidden
               />
+              <span className={styles.brandWordmark}>NEXARA</span>
             </Link>
             <p className={styles.brandTagline}>
               Conectamos tecnología. Impulsamos operación en campo.
