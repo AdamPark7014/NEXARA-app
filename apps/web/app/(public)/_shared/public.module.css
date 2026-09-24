@@ -379,7 +379,7 @@ a.iconCard:hover,
 .sectionNavy .iconTile,
 .ctaBand .iconTile {
   background: rgba(45, 216, 242, 0.14);
-  color: #2dd8f2;
+  color: var(--ds-cyan);
 }
 
 .iconTile svg {
@@ -550,7 +550,7 @@ a.iconCard:hover .iconCardLink {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #7fe6f7;
+  color: #7fe6f7; /* sobre foto: siempre claro */
 }
 
 .photoBadge {
@@ -1373,7 +1373,7 @@ a.iconCard:hover .iconCardLink {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #2dd8f2;
+  color: var(--ds-cyan);
 }
 
 .ctaTitle {
@@ -1426,7 +1426,7 @@ a.iconCard:hover .iconCardLink {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
-  color: #2dd8f2;
+  color: var(--ds-cyan);
   margin-top: 1px;
 }
 
@@ -1820,35 +1820,30 @@ a.iconCard:hover .iconCardLink {
   .factsInline { grid-template-columns: 1fr 1fr; }
 }
 
-/* ── Capa clara editorial (Tier 4): una por página, con propósito ── */
+/* ── Capa editorial de contraste (Tier 4): una por página, con propósito.
+   Vive DENTRO del tema: en oscuro es una superficie navy elevada; en claro,
+   un bloque blanco sobre el gris-azul de la página. Nunca se invierte. ── */
 .sectionLight {
-  --ds-bg: #eef2f8;
-  --ds-bg-alt: #e6ebf3;
-  --ds-surface: #ffffff;
-  --ds-surface-2: #f6f8fb;
-  --ds-ink: #0b1a33;
-  --ds-title: #0b1a33;
-  --ds-body: #33445c;
-  --ds-muted: #4f607a;
-  --ds-faint: #7b889c;
-  --ds-line: rgba(11, 26, 51, 0.1);
-  --ds-line-strong: rgba(11, 26, 51, 0.18);
-  --ds-cyan: #06708a;
-  --ds-cyan-soft: #06708a;
-  --ds-cyan-strong: #055a70;
-  --ds-cyan-tint: rgba(6, 112, 138, 0.12);
-  --ds-cyan-line: rgba(6, 112, 138, 0.4);
-  --ds-shadow: 0 18px 44px rgba(11, 26, 51, 0.1);
-  --ds-shadow-sm: 0 8px 22px rgba(11, 26, 51, 0.08);
-  background: var(--ds-bg);
+  --ds-bg: #122140;
+  --ds-bg-alt: #0f1c36;
+  --ds-surface: #192d4f;
+  --ds-surface-2: #21385f;
+  --ds-panel: #192d4f;
+  --ds-line: rgba(140, 180, 230, 0.16);
+  --ds-line-strong: rgba(140, 180, 230, 0.28);
+  --ds-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
+  --ds-shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 32%),
+    var(--ds-bg);
   color: var(--ds-body);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--ds-line-strong);
+  border-bottom: 1px solid var(--ds-line-strong);
 }
 
 .sectionLight .iconTile {
-  background: linear-gradient(135deg, rgba(14, 154, 184, 0.16), rgba(14, 154, 184, 0.05));
-  color: var(--ds-cyan-strong);
+  background: var(--ds-cyan-tint);
+  color: var(--ds-cyan);
 }
 
 .sectionLight .iconCard,
@@ -1861,7 +1856,7 @@ a.iconCard:hover .iconCardLink {
 }
 
 .sectionLight .checkList li::after {
-  border-color: var(--ds-cyan-strong);
+  border-color: var(--ds-cyan);
 }
 
 /* Ritmo de espaciado: tight → normal → spacious */
@@ -1882,9 +1877,11 @@ a.iconCard:hover .iconCardLink {
 
 /* ══════════════════════════════════════════════════════════════
    Tema claro / oscuro del sitio público
-   `<html data-public-theme="light">` invierte las capas: base clara,
-   capa editorial de contraste en navy. Hero, header sobre hero y footer
-   siguen oscuros en ambos temas (identidad y conclusión del sitio).
+   `<html data-public-theme="light">` cambia los tokens de TODA la página:
+   base gris-azul, superficies blancas, texto navy. Ninguna capa se
+   invierte: la capa editorial es blanca, la CTA band es blanca con tinte
+   cian y el footer sigue al tema. Solo el hero (video/foto) conserva su
+   tratamiento oscuro porque es imagen.
    ══════════════════════════════════════════════════════════════ */
 :global(html[data-public-theme="light"]) .page {
   --ds-bg: #f3f6fb;
@@ -1909,69 +1906,48 @@ a.iconCard:hover .iconCardLink {
   --ds-shadow-sm: 0 8px 22px rgba(11, 26, 51, 0.08);
 }
 
-/* En tema claro, la capa editorial de contraste es navy */
+/* En claro, la capa editorial es blanca sobre el gris-azul de la página */
 :global(html[data-public-theme="light"]) .sectionLight {
-  --ds-bg: #0b1a33;
-  --ds-bg-alt: #0e1f3a;
-  --ds-surface: #132340;
-  --ds-surface-2: #182b4c;
-  --ds-ink: #eef4ff;
-  --ds-title: #f3f6fb;
-  --ds-body: #c3cfe0;
-  --ds-muted: #9fb0c8;
-  --ds-faint: #7688a3;
-  --ds-line: rgba(140, 180, 230, 0.14);
-  --ds-line-strong: rgba(140, 180, 230, 0.24);
-  --ds-cyan: #2dd8f2;
-  --ds-cyan-soft: #7fe6f7;
-  --ds-cyan-strong: #12b6d4;
-  --ds-cyan-tint: rgba(45, 216, 242, 0.12);
-  --ds-cyan-line: rgba(45, 216, 242, 0.45);
-  --ds-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
-  --ds-shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.24);
+  --ds-bg: #ffffff;
+  --ds-bg-alt: #f6f8fb;
+  --ds-surface: #f3f6fb;
+  --ds-surface-2: #e9eef6;
+  --ds-panel: #ffffff;
+  --ds-line: rgba(11, 26, 51, 0.1);
+  --ds-line-strong: rgba(11, 26, 51, 0.16);
+  --ds-shadow: 0 18px 44px rgba(11, 26, 51, 0.08);
+  --ds-shadow-sm: 0 8px 22px rgba(11, 26, 51, 0.06);
   background: var(--ds-bg);
-  color: var(--ds-body);
-  border-top-color: rgba(11, 26, 51, 0.12);
-  border-bottom-color: rgba(11, 26, 51, 0.12);
-}
-
-:global(html[data-public-theme="light"]) .sectionLight .iconTile {
-  background: rgba(45, 216, 242, 0.14);
-  color: #2dd8f2;
-}
-
-:global(html[data-public-theme="light"]) .sectionLight .checkList li::after {
-  border-color: #2dd8f2;
-}
-
-/* La banda de CTA y la tarjeta destacada son navy en ambos temas */
-.ctaBand,
-.iconCardDark {
-  --ds-ink: #eef4ff;
-  --ds-title: #f3f6fb;
-  --ds-body: #c3cfe0;
-  --ds-muted: #9fb0c8;
-  --ds-faint: #7688a3;
-  --ds-line: rgba(140, 180, 230, 0.14);
-  --ds-line-strong: rgba(140, 180, 230, 0.24);
-  --ds-surface-2: #132340;
-  --ds-cyan: #2dd8f2;
-  --ds-cyan-soft: #7fe6f7;
-  --ds-cyan-strong: #12b6d4;
-  --ds-cyan-tint: rgba(45, 216, 242, 0.12);
-  --ds-cyan-line: rgba(45, 216, 242, 0.45);
-  color: var(--ds-body);
-}
-
-.ctaBand .iconTile,
-.iconCardDark .iconTile {
-  background: rgba(45, 216, 242, 0.14);
-  color: #2dd8f2;
+  border-top-color: var(--ds-line);
+  border-bottom-color: var(--ds-line);
 }
 
 /* Superficie navy con brillo cian: en claro es una superficie gris-azul sin brillo */
 :global(html[data-public-theme="light"]) .sectionNavy {
   background: var(--ds-bg-alt);
+}
+
+/* CTA band y tarjeta destacada: en claro son blancas con tinte cian, sin navy */
+:global(html[data-public-theme="light"]) .ctaBand {
+  background:
+    radial-gradient(60% 90% at 100% 0%, rgba(6, 112, 138, 0.1), transparent 55%),
+    #ffffff;
+  border-color: var(--ds-line-strong);
+  box-shadow: 0 30px 70px rgba(11, 26, 51, 0.1);
+}
+
+:global(html[data-public-theme="light"]) .iconCardDark {
+  background:
+    radial-gradient(70% 90% at 100% 0%, rgba(6, 112, 138, 0.1), transparent 60%),
+    #ffffff;
+  border-color: var(--ds-cyan-line);
+}
+
+:global(html[data-public-theme="light"]) .iconCardDark .iconTile,
+:global(html[data-public-theme="light"]) .sectionNavy .iconTile,
+:global(html[data-public-theme="light"]) .ctaBand .iconTile {
+  background: var(--ds-cyan-tint);
+  color: var(--ds-cyan);
 }
 
 :global(html[data-public-theme="light"]) .iconCard,

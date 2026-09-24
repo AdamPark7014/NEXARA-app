@@ -145,6 +145,26 @@ referencia ETEK: cuerpo claro, tarjetas con icono, cifras, fotos reales.
   integrado: con la pestaña oculta tampoco se despachan eventos `scroll`, así que el header parece
   quedarse transparente; disparar `window.dispatchEvent(new Event("scroll"))` antes de leer.
 
+## Séptima ronda (24-09, 08:40-09:10): temas sin inversión + mapa de cobertura nuevo
+- Adam: «esto está súper invertido y el footer no cambia con el tema». Antes, la capa editorial
+  (`.sectionLight`) era clara en oscuro y navy en claro, y la CTA band / el footer eran navy en
+  ambos temas. **Ahora ninguna capa se invierte:** en oscuro la capa editorial es navy elevado
+  (`#122140`), en claro es blanca sobre el gris-azul; la CTA band y la tarjeta destacada
+  (`.iconCardDark`) son blancas con tinte cian en claro; el footer, el banner de cookies, el
+  formulario flotante, el mapa (lienzo, fallback, tarjeta) y el botón «arriba» tienen overrides
+  `html[data-public-theme="light"]`. Solo el hero (video/foto) sigue oscuro en ambos temas.
+- Cian de texto dentro de CTA band ahora por token (`.ctaEyebrow`, `.ctaFacts svg`, tiles):
+  en claro es `#06708a`. Textos de tarjetas de casos Studio (`proyectos/page.module.css`) pasan a
+  tokens `--ds-*` (esa hoja no la importa la página actual, pero queda lista).
+- **Mapa de cobertura nuevo** (imagen que mandó Adam por WhatsApp, 1600×1126):
+  `public/fotos/mapa-cobertura-nexara.jpg`. Sustituye a `/mapa-operaciones.png` en Inicio
+  (sección Cobertura, caption «32 estados · +200 puntos de presencia») y a `/maps/mexico_map.svg`
+  en /cobertura (EditorialImage cae solo a `contain` por la proporción). El PNG y el SVG viejos
+  siguen en `public/` por si Studio los referencia.
+- Verificado en local (5 páginas, ambos temas): sin contraste < 3 salvo WhatsApp verde, el título
+  oculto (sr-only) del banner de cookies y el aviso de MapLibre; formulario de Contacto en claro
+  con inputs `#f3f6fb` / texto navy; footer claro `#e9eef6`.
+
 ## A medias / pendiente
 - **Google Maps:** habilitar «Maps Embed API» en la clave web (Google Cloud Console) para que
   el mapa vuelva a ser de Google; hoy es OpenStreetMap.
