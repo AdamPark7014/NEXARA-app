@@ -132,10 +132,13 @@ const EVIDENCE = [
     tall: true,
   },
   {
-    src: "/fotos/control-acceso-torniquetes.jpg",
-    alt: "Torniquetes con terminales de reconocimiento facial",
-    kicker: "Control de acceso",
-    caption: "Torniquetes con reconocimiento facial en acceso principal.",
+    src: "/fotos/descarga-equipo-camioneta-nexara-1920.webp",
+    srcSet:
+      "/fotos/descarga-equipo-camioneta-nexara-1200.webp 1200w, /fotos/descarga-equipo-camioneta-nexara-1920.webp 1920w",
+    sizes: "(max-width: 980px) 100vw, 640px",
+    alt: "Personal de NEXARA descargando cajas de equipo técnico desde una camioneta",
+    kicker: "Logística",
+    caption: "Entrega de equipo en sitio, listo para instalar.",
     tall: false,
   },
   {
@@ -259,48 +262,6 @@ export default async function NexaraPage() {
       <HomeHero bootstrap={heroBootstrap} />
 
       <div className={styles.homeBody}>
-        {/* Servicios */}
-        <section className={shared.section} aria-label="Servicios" data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-              <p className={shared.eyebrow}>Servicios</p>
-              <h2 className={shared.sectionTitle}>
-                Lo que instalamos y <span className={shared.sectionTitleAccent}>sostenemos</span>
-              </h2>
-              <p className={shared.sectionLead}>
-                Videovigilancia, redes, cómputo y soporte bajo una sola responsabilidad técnica.
-                Diseñamos, instalamos y operamos.
-              </p>
-            </header>
-            <div className={shared.iconGrid} data-reveal-stagger>
-              {CAPABILITIES.map((c) => (
-                <Link key={c.id} href={`/servicios#${c.id}`} className={shared.iconCard} data-reveal="up">
-                  <span className={shared.iconTile}>
-                    <PublicIcon name={c.icon} />
-                  </span>
-                  <h3 className={shared.iconCardTitle}>{c.title}</h3>
-                  <p className={shared.iconCardText}>{c.text}</p>
-                  <span className={shared.iconCardLink}>
-                    Ver servicio <PublicIcon name="arrowRight" size={16} />
-                  </span>
-                </Link>
-              ))}
-              <Link href="/soluciones" className={`${shared.iconCard} ${shared.iconCardDark}`} data-reveal="up">
-                <span className={shared.iconTile}>
-                  <PublicIcon name="layers" />
-                </span>
-                <h3 className={shared.iconCardTitle}>¿Tu operación es distinta?</h3>
-                <p className={shared.iconCardText}>
-                  Soluciones por industria: retail, manufactura, hospitalidad, salud, educación y gobierno.
-                </p>
-                <span className={shared.iconCardLink}>
-                  Ver soluciones <PublicIcon name="arrowRight" size={16} />
-                </span>
-              </Link>
-            </div>
-          </div>
-        </section>
-
         {/* Por qué NEXARA: foto real + promesas */}
         <section className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Por qué NEXARA" data-reveal="up">
           <div className={shared.inner}>
@@ -347,6 +308,90 @@ export default async function NexaraPage() {
           </div>
         </section>
 
+        {/* Evidencia real */}
+        <section className={shared.section} aria-label="Trabajo real en sitio" data-reveal="up">
+          <div className={shared.inner}>
+            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+              <p className={shared.eyebrow}>Trabajo real</p>
+              <h2 className={shared.sectionTitle}>
+                Instalaciones que <span className={shared.sectionTitleAccent}>operan hoy</span>
+              </h2>
+              <p className={shared.sectionLead}>
+                Fotografía de proyectos reales de NEXARA, no banco de imágenes.
+              </p>
+            </header>
+            <div className={shared.mosaic}>
+              {EVIDENCE.map((e) => (
+                <figure
+                  key={e.src}
+                  className={`${shared.photoFrame} ${e.tall ? shared.mosaicTall : shared.mosaicWide}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={e.src}
+                    {...(e as any).srcSet ? { srcSet: (e as any).srcSet } : {}}
+                    {...(e as any).sizes ? { sizes: (e as any).sizes } : {}}
+                    alt={e.alt}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <figcaption className={shared.photoCaption}>
+                    <span className={shared.photoCaptionKicker}>{e.kicker}</span>
+                    {e.caption}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+            <p className={styles.sectionMore}>
+              <Link href="/proyectos" className={shared.linkArrow}>
+                Ver casos de campo <PublicIcon name="arrowRight" size={16} />
+              </Link>
+            </p>
+          </div>
+        </section>
+
+        {/* Servicios (después de evidencia) */}
+        <section className={shared.section} aria-label="Servicios" data-reveal="up">
+          <div className={shared.inner}>
+            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+              <p className={shared.eyebrow}>Servicios</p>
+              <h2 className={shared.sectionTitle}>
+                Lo que instalamos y <span className={shared.sectionTitleAccent}>sostenemos</span>
+              </h2>
+              <p className={shared.sectionLead}>
+                Videovigilancia, redes, cómputo y soporte bajo una sola responsabilidad técnica.
+                Diseñamos, instalamos y operamos.
+              </p>
+            </header>
+            <div className={shared.iconGrid} data-reveal-stagger>
+              {CAPABILITIES.map((c) => (
+                <Link key={c.id} href={`/servicios#${c.id}`} className={shared.iconCard} data-reveal="up">
+                  <span className={shared.iconTile}>
+                    <PublicIcon name={c.icon} />
+                  </span>
+                  <h3 className={shared.iconCardTitle}>{c.title}</h3>
+                  <p className={shared.iconCardText}>{c.text}</p>
+                  <span className={shared.iconCardLink}>
+                    Ver servicio <PublicIcon name="arrowRight" size={16} />
+                  </span>
+                </Link>
+              ))}
+              <Link href="/soluciones" className={`${shared.iconCard} ${shared.iconCardDark}`} data-reveal="up">
+                <span className={shared.iconTile}>
+                  <PublicIcon name="layers" />
+                </span>
+                <h3 className={shared.iconCardTitle}>¿Tu operación es distinta?</h3>
+                <p className={shared.iconCardText}>
+                  Soluciones por industria: retail, manufactura, hospitalidad, salud, educación y gobierno.
+                </p>
+                <span className={shared.iconCardLink}>
+                  Ver soluciones <PublicIcon name="arrowRight" size={16} />
+                </span>
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Método (banda navy) */}
         <section className={`${shared.section} ${shared.sectionNavy}`} aria-label="Cómo trabajamos" data-reveal="up">
           <div className={shared.inner}>
@@ -368,41 +413,6 @@ export default async function NexaraPage() {
                 </article>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* Evidencia real */}
-        <section className={shared.section} aria-label="Trabajo real en sitio" data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-              <p className={shared.eyebrow}>Trabajo real</p>
-              <h2 className={shared.sectionTitle}>
-                Instalaciones que <span className={shared.sectionTitleAccent}>operan hoy</span>
-              </h2>
-              <p className={shared.sectionLead}>
-                Fotografía de proyectos reales de NEXARA, no banco de imágenes.
-              </p>
-            </header>
-            <div className={shared.mosaic}>
-              {EVIDENCE.map((e) => (
-                <figure
-                  key={e.src}
-                  className={`${shared.photoFrame} ${e.tall ? shared.mosaicTall : shared.mosaicWide}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={e.src} alt={e.alt} loading="lazy" decoding="async" />
-                  <figcaption className={shared.photoCaption}>
-                    <span className={shared.photoCaptionKicker}>{e.kicker}</span>
-                    {e.caption}
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-            <p className={styles.sectionMore}>
-              <Link href="/proyectos" className={shared.linkArrow}>
-                Ver casos de campo <PublicIcon name="arrowRight" size={16} />
-              </Link>
-            </p>
           </div>
         </section>
 
@@ -490,8 +500,12 @@ export default async function NexaraPage() {
               <figure className={styles.mapPanel}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/fotos/mapa-cobertura-nexara.jpg"
-                  alt="Mapa de cobertura NEXARA: 32 estados y más de 200 puntos de presencia en México, con base en Puebla y CDMX"
+                  src="/fotos/mapa-cobertura-nexara.webp"
+                  srcSet="/fotos/mapa-cobertura-nexara-1200.webp 1200w, /fotos/mapa-cobertura-nexara-1600.webp 1600w, /fotos/mapa-cobertura-nexara.webp 2000w"
+                  sizes="(max-width: 980px) 100vw, 720px"
+                  width={2000}
+                  height={1414}
+                  alt="Mapa de cobertura NEXARA — 32 estados y +200 puntos de presencia en México; base en Puebla y CDMX"
                   loading="lazy"
                   decoding="async"
                 />
