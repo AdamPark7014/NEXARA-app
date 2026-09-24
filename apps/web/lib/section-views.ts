@@ -142,7 +142,9 @@ export function resolveOpsPairNav(
       if (isFieldRole(v2)) return 'self';
       // Arquitecto supervisa OT/evidencias pero no gestiona flotilla.
       if (v2 === ROLES.ARQUITECTO) return null;
-      if (v2 === ROLES.ADMINISTRATIVO || v2 === ROLES.CONTABILIDAD) return null;
+      // Administrativo consulta/gestiona la flotilla a nivel equipo desde Core.
+      if (v2 === ROLES.ADMINISTRATIVO) return 'team';
+      if (v2 === ROLES.CONTABILIDAD) return null;
       if (isOpsManager(v2)) return 'team';
       return null;
     default:

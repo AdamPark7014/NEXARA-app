@@ -186,10 +186,6 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/erp/asistencias/**', scope: 'write' },
   { path: '/erp/chat', scope: 'write' },
   { path: '/erp/chat/**', scope: 'write' },
-  { path: '/erp/clientes', scope: 'write' },
-  { path: '/erp/clientes/**', scope: 'write' },
-  { path: '/api/ventas/clientes', scope: 'write' },
-  { path: '/api/ventas/clientes/**', scope: 'write' },
   { path: '/erp/actividades/tareas', scope: 'write' },
   { path: '/erp/actividades/tareas/**', scope: 'write' },
   { path: '/erp/actividades/diarias', scope: 'write' },
@@ -213,6 +209,14 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/api/activity-evidence/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   { path: '/api/operational-projects/**', methods: ['GET'], scope: 'read' },
   { path: '/api/proyectos/**', methods: ['GET'], scope: 'read' },
+];
+
+/** Clientes Core — restringido a dirección/ventas (no todo el personal). */
+export const CLIENTES_CORE_URL_RULES: UrlRule[] = [
+  { path: '/erp/clientes', scope: 'write' },
+  { path: '/erp/clientes/**', scope: 'write' },
+  { path: '/api/ventas/clientes', scope: 'write' },
+  { path: '/api/ventas/clientes/**', scope: 'write' },
 ];
 
 /**
@@ -744,6 +748,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
     ...CORE_RECURSOS_URL_RULES,
+    ...CLIENTES_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -782,6 +787,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.VENDEDOR]: [
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
+    ...CLIENTES_CORE_URL_RULES,
     { path: '/crm', scope: 'read' },
     { path: '/crm/dashboard', scope: 'read' },
     { path: '/crm/chat', scope: 'write' },

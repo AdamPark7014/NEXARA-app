@@ -426,7 +426,11 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   "erp-clients": {
     id: "erp-clients", panel: PANELS.ERP, path: "/clientes",
     label: "Clientes", description: "Proyecto, corporativo y comercial",
-    icon: "🤝", allowedRoles: ANY_INTERNAL,
+    icon: "🤝",
+    // Comercial únicamente en Core: dirección (CEO), dirección/comercial y equipo de ventas.
+    // Se alinea con la intención de `section-views` (SALES_MANAGERS / SALES_REP) y evita
+    // que roles operativos (p.ej. ingeniero de campo) vean Clientes por heredar ANY_INTERNAL.
+    allowedRoles: [R.CEO, R.DIRECTOR_COMMERCIAL, R.SALES_MANAGER, R.SALES_REP],
     group: "Hoy", visible: true,
   },
   "erp-cotizaciones": {
