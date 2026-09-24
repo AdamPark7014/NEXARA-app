@@ -23,6 +23,8 @@ export type RequisitoEntrada = {
   productId?: unknown;
   /** Herramienta concreta del inventario (por número de serie). */
   toolId?: unknown;
+  /** Fuente de la herramienta: KIT o INVENTORY. */
+  toolSource?: unknown;
 };
 
 export type RequisitoNormalizado = {
@@ -31,6 +33,7 @@ export type RequisitoNormalizado = {
   cantidad: number;
   productId: number | null;
   toolId: number | null;
+  toolSource: 'KIT' | 'INVENTORY' | null;
   orden: number;
 };
 
@@ -89,12 +92,19 @@ export function normalizarRequisitos(entrada: unknown): RequisitoNormalizado[] {
     if (vistos.has(clave)) continue;
     vistos.add(clave);
 
+    let src: 'KIT' | 'INVENTORY' | null = null;
+    if (typeof fila.toolSource === 'string') {
+      const s = fila.toolSource.toUpperCase();
+      if (s === 'KIT' || s === 'INVENTORY') src = s;
+    }
+
     salida.push({
       id: entero(fila.id),
       descripcion,
       cantidad: cantidadDe(fila.cantidad),
       productId: entero(fila.productId),
       toolId: entero(fila.toolId),
+      toolSource: src,
       orden: salida.length,
     });
     if (salida.length >= MAX_REQUISITOS) break;

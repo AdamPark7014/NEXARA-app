@@ -13,10 +13,10 @@ import { useUser } from "@/components/UserContext";
 import HerramientasChecklistEditor from "@/components/ops/HerramientasChecklistEditor";
 import { formatApiError } from "@/lib/erp-api";
 import {
+  definirRequisitos,
   avanceChecklist,
   borradoresDesdeChecklist,
   cargarChecklist,
-  definirRequisitos,
   hayErroresRequisitos,
   palomearRequisito,
   validarRequisitos,
@@ -24,6 +24,7 @@ import {
   type RequisitoBorrador,
   type RequisitoHerramienta,
 } from "@/lib/herramientas-checklist";
+import { getActivity, listActivityTeam } from "@/lib/ops-activities-api";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from "@/lib/permissions";
 
 type Props = {
@@ -119,12 +120,39 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
   const [palomeando, setPalomeando] = useState<number | null>(null);
   const [notaDe, setNotaDe] = useState<{ id: number; texto: string } | null>(null);
   const [errorFila, setErrorFila] = useState<{ id: number; mensaje: string } | null>(null);
+  const [responsableId, setResponsableId] = useState<number | null>(null);
+  const [equipoIds, setEquipoIds] = useState<number[]>([]);
+  const [responsableNombreCorto, setResponsableNombreCorto] = useState<string | undefined>(undefined);
+  const [usaKit, setUsaKit] = useState<boolean>(false);
 
   const cargar = useCallback(async () => {
     if (!token || !activityId) return;
     setCargando(true);
     try {
+      // Meta para selector (responsable + equipo actual)
+      try {
+        const [act, team] = await Promise.all([getActivity(token, activityId), listActivityTeam(token, activityId)]);
+        const rid = Number(act?.responsable?.id ?? 0) || null;
+        setResponsableId(rid);
+        setResponsableNombreCorto(
+          act?.responsable?.nombre ? act.responsable.nombre.split(/\s+/).slice(0, 2).join(" ") : undefined,
+        );
+        const miembros = (team ?? []).map((m) => Number(m.user?.id ?? m.id ?? 0)).filter((n) => n > 0);
+        setEquipoIds(miembros);
+      } catch {
+        setResponsableId(null);
+        setEquipoIds([]);
+      }
+
       setChecklist(await cargarChecklist(token, activityId));
+      // Flag de kit personal
+      try {
+        const loaded = await cargarChecklist(token, activityId);
+        setChecklist(loaded);
+        setUsaKit(Boolean(loaded?.usesPersonalKit));
+      } catch {
+        /* ignore, checklist ya se intentó cargar arriba */
+      }
       setError(null);
       setSinPermiso(false);
     } catch (e) {
@@ -167,7 +195,19 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
       const nuevo = await definirRequisitos(
         token,
         activityId,
-        borrador.map((f) => ({ id: f.id ?? undefined, descripcion: f.descripcion.trim(), cantidad: f.cantidad })),
+        borrador.map((f) => ({
+          id: f.id ?? undefined,
+          descripcion: f.descripcion.trim(),
+          cantidad: f.cantidad,
+          ...(f.toolId ? { toolId: f.toolId } : {}),
+          ...(f.source ? { source: f.source } : {}),
+        })),
+        // Responsable + quienes ya están en el equipo hoy
+        [
+          ...(responsableId ? [responsableId] : []),
+          ...equipoIds.filter((id) => !responsableId || id !== responsableId),
+        ],
+        usaKit,
       );
       setChecklist(nuevo);
       setEditando(false);
@@ -298,6 +338,11 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
             onChange={setBorrador}
             errores={intentado ? errores : null}
             disabled={guardando}
+            responsableId={responsableId ?? undefined}
+            extraTeamUserIds={equipoIds}
+            responsableNombreCorto={responsableNombreCorto}
+            usePersonalKit={usaKit}
+            onToggleUsePersonalKit={setUsaKit}
           />
           {errorGuardar ? (
             <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>

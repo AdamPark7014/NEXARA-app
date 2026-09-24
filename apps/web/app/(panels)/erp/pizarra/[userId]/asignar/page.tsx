@@ -923,6 +923,7 @@ export default function AsignarActividadPage() {
               coreKind={kind ?? undefined}
               assignmentCharge={effectiveCharge ?? undefined}
               initialResponsableId={userId}
+            extraTeamIds={extraIds}
               hideResponsableSelect
               forcedProjectMode={kindMeta.projectMode}
               hideProjectModePicker
