@@ -34,8 +34,6 @@ import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
 import { labelForAssignmentCharge } from "@/lib/activity-kinds";
 import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
 import { FotoProtegida, VisorPdf } from "@/components/ops/EquipoEvidencias";
-import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { getActivitiesSectionConfig } from "@/lib/section-views";
 
 function initials(name: string): string {
   return name
@@ -133,9 +131,6 @@ export default function PizarraPersonaPage() {
   const color = STATUS_COLORS[user.status];
   const act = user.currentActivity;
   const src = user.avatarUrl ? resolveAssetUrl(user.avatarUrl) : null;
-  const actCfg = getActivitiesSectionConfig(me);
-  const canAssign =
-    hasPermission(me, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
@@ -450,7 +445,7 @@ export default function PizarraPersonaPage() {
       </section>
 
       <div style={{ display: "grid", gap: 10 }}>
-        {!isSelf && canAssign ? (
+        {!isSelf ? (
           <Link
             href={`/erp/pizarra/${user.id}/asignar`}
             style={{
