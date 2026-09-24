@@ -275,7 +275,7 @@ export default async function NosotrosPage() {
       </section>
 
       {/* Principios */}
-      <section id="valores" className={`${shared.section} ${shared.sectionWhite}`} aria-label="Principios" data-reveal="up">
+      <section id="valores" className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Principios" data-reveal="up">
         <div className={shared.inner}>
           <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
             <p className={shared.eyebrow}>Principios</p>
@@ -284,14 +284,12 @@ export default async function NosotrosPage() {
             </h2>
             <p className={shared.sectionLead}>Tres compromisos que se notan en cada proyecto, del levantamiento al soporte.</p>
           </header>
-          <div className={shared.iconGrid} data-reveal-stagger>
-            {principios.map((v) => (
-              <article key={v.title} className={shared.iconCard} data-reveal="up">
-                <span className={shared.iconTile}>
-                  <PublicIcon name={v.icon} />
-                </span>
-                <h3 className={shared.iconCardTitle}>{v.title}</h3>
-                <p className={shared.iconCardText}>{v.text}</p>
+          <div className={shared.principleGrid} data-reveal-stagger>
+            {principios.map((v, i) => (
+              <article key={v.title} className={shared.principleItem} data-reveal="up">
+                <span className={shared.stepNumOpen}>0{i + 1}</span>
+                <h3 className={shared.principleTitle}>{v.title}</h3>
+                <p className={shared.principleText}>{v.text}</p>
               </article>
             ))}
           </div>
@@ -359,7 +357,7 @@ export default async function NosotrosPage() {
       {/* Certificaciones */}
       <section
         id="certificaciones"
-        className={`${shared.section} ${shared.sectionWhite}`}
+        className={shared.section}
         aria-label="Certificaciones"
         data-reveal="soft"
       >

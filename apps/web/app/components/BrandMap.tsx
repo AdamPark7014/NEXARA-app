@@ -20,20 +20,42 @@ export const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const WORKER_URL = "/maplibre-gl-csp-worker.js";
 
-const PALETTE = {
-  bg: "#070f1e",
-  land: "#0a1628",
-  park: "#0b1f33",
-  water: "#0b2440",
-  building: "#122240",
-  roadMinor: "#1a3050",
-  roadMajor: "#274b74",
-  roadCasing: "#08111f",
-  rail: "#1b3350",
-  boundary: "#2a3f5f",
-  text: "#93a4bd",
-  textHalo: "#070f1e",
+type Palette = Record<"bg" | "land" | "park" | "water" | "building" | "roadMinor" | "roadMajor" | "roadCasing" | "rail" | "boundary" | "text" | "textHalo", string>;
+
+/* Paletas ligadas a los tokens del sitio (tema oscuro y claro) */
+const PALETTES: Record<"dark" | "light", Palette> = {
+  dark: {
+    bg: "#070f1e",
+    land: "#0a1628",
+    park: "#0b1f33",
+    water: "#0b2440",
+    building: "#122240",
+    roadMinor: "#1a3050",
+    roadMajor: "#274b74",
+    roadCasing: "#08111f",
+    rail: "#1b3350",
+    boundary: "#2a3f5f",
+    text: "#93a4bd",
+    textHalo: "#070f1e",
+  },
+  light: {
+    bg: "#eef2f8",
+    land: "#e6ecf5",
+    park: "#dbe6f0",
+    water: "#c6d9ec",
+    building: "#d9e1ec",
+    roadMinor: "#ffffff",
+    roadMajor: "#bccfe6",
+    roadCasing: "#cbd6e4",
+    rail: "#c4d0df",
+    boundary: "#aebdd2",
+    text: "#4f607a",
+    textHalo: "#f3f6fb",
+  },
 };
+
+const currentTheme = (): "dark" | "light" =>
+  typeof document !== "undefined" && document.documentElement.getAttribute("data-public-theme") === "light" ? "light" : "dark";
 
 let libPromise: Promise<MapLibreModule> | null = null;
 /** Carga MapLibre solo cuando un mapa entra en escena: no pesa en el First Load de ninguna página. */
@@ -52,6 +74,7 @@ const loadMapLibre = (): Promise<MapLibreModule> => {
 
 /** Repinta las capas del estilo base con la paleta del sitio. */
 function restyle(map: MapLibreMap) {
+  const PALETTE = PALETTES[currentTheme()];
   const style = map.getStyle();
   if (!style?.layers) return;
   for (const layer of style.layers) {
@@ -123,6 +146,7 @@ export default function BrandMap({ compact = false, overlay = true, className }:
     let map: MapLibreMap | null = null;
     let cancelled = false;
     let failTimer: ReturnType<typeof setTimeout> | null = null;
+    let themeCleanup: (() => void) | null = null;
 
     let starting = false;
     const init = async () => {
@@ -165,6 +189,12 @@ export default function BrandMap({ compact = false, overlay = true, className }:
         map.on("style.load", () => {
           if (map) restyle(map);
         });
+        // Cambio de tema en vivo: repinta sin recargar.
+        const onTheme = () => {
+          if (map && map.isStyleLoaded()) restyle(map);
+        };
+        window.addEventListener("nexara:public-theme", onTheme);
+        themeCleanup = () => window.removeEventListener("nexara:public-theme", onTheme);
         map.on("load", () => {
           if (failTimer) clearTimeout(failTimer);
           if (!cancelled) setState("ready");
@@ -203,6 +233,7 @@ export default function BrandMap({ compact = false, overlay = true, className }:
         io.disconnect();
         clearTimeout(safety);
         if (failTimer) clearTimeout(failTimer);
+        themeCleanup?.();
         map?.remove();
       };
     }
@@ -211,6 +242,7 @@ export default function BrandMap({ compact = false, overlay = true, className }:
       cancelled = true;
       clearTimeout(safety);
       if (failTimer) clearTimeout(failTimer);
+      themeCleanup?.();
       map?.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

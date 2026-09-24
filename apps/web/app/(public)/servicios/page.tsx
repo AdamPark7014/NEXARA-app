@@ -308,15 +308,8 @@ export default async function ServiciosPage() {
               <div style={{ display: "grid", gap: 14, width: "100%" }}>
                 {PASOS.map((p) => (
                   <div key={p.num} className={shared.stepItemOpen}>
-                    <div className={shared.stepHead}>
-                      <h3 className={shared.stepTitleOpen}>
-                        <span className={shared.stepNumOpen} style={{ fontSize: "1rem", marginRight: 10 }}>{p.num}</span>
-                        {p.title}
-                      </h3>
-                      <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
-                        <PublicIcon name={p.icon} />
-                      </span>
-                    </div>
+                    <span className={shared.stepNumOpen}>{p.num}</span>
+                    <h3 className={shared.stepTitleOpen}>{p.title}</h3>
                     <p className={shared.stepTextOpen}>{p.text}</p>
                   </div>
                 ))}
@@ -332,7 +325,7 @@ export default async function ServiciosPage() {
       </section>
 
       {/* Certificaciones y fabricantes */}
-      <section className={`${shared.section} ${shared.sectionWhite}`} aria-label="Certificaciones" data-reveal="soft">
+      <section className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Certificaciones" data-reveal="soft">
         <div className={shared.inner}>
           <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
             <p className={shared.eyebrow}>Respaldo técnico</p>

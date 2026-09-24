@@ -121,6 +121,25 @@ referencia ETEK: cuerpo claro, tarjetas con icono, cifras, fotos reales.
   fallback); se verificó el render real en Chrome. Teselas OpenFreeMap = servicio comunitario sin
   SLA; si algún día se quiere Google, habilitar Maps Embed API o facturación en la clave.
 
+## Sexta ronda (23-09, 17:10-18:20): jerarquía por capas y tema claro/oscuro
+- **Capas con propósito (Tier 1-5):** base navy → superficie (`.sectionAlt`, `.sectionNavy` sin
+  brillo morado) → **una capa editorial de contraste por página** (`.sectionLight`: en tema oscuro
+  es clara; en tema claro es navy) → CTA band siempre navy. Home: «Por qué NEXARA»; Servicios:
+  certificaciones; Proyectos: referencias por vertical; Nosotros: principios; Contacto: formulario.
+- **Menos tarjeta, más composición:** pasos (`.stepItemOpen`), principios e industrias pasan a
+  composición abierta con regla superior y numerales grandes; se quitaron los iconos repetidos de
+  los pasos. Radios de una familia (8/12/16/pill), botón secundario dirigido por tokens.
+- **Tema claro/oscuro:** `<html data-public-theme>` lo fija un script inline en `app/layout.tsx`
+  (localStorage `nexara:public-theme` → si no, `prefers-color-scheme`; por defecto oscuro).
+  Conmutador `components/PublicThemeToggle.tsx` en header (junto al CTA) y footer (fila legal).
+  Tokens claros en `public.module.css` (`html[data-public-theme="light"] .page`), header claro al
+  hacer scroll (`Header.module.css`), mapa con paleta clara (`BrandMap` escucha el evento
+  `nexara:public-theme`). Hero, header sobre hero y footer siguen oscuros en ambos temas.
+- Verificado en local, ambos temas, 5 páginas: sin contraste < 3 salvo WhatsApp verde, header
+  claro con texto navy al hacer scroll, persistencia entre páginas. Ojo: en el navegador
+  integrado las transiciones se congelan (pestaña oculta): para medir estilos tras cambiar el tema
+  hay que inyectar `*{transition:none}`; si no, los valores calculados salen viejos.
+
 ## A medias / pendiente
 - **Google Maps:** habilitar «Maps Embed API» en la clave web (Google Cloud Console) para que
   el mapa vuelva a ser de Google; hoy es OpenStreetMap.
