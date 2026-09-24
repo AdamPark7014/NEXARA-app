@@ -214,13 +214,15 @@ export default function Header() {
         <div className={styles.logoSection}>
           <Link href="/" onClick={closeMobileMenu} className={styles.logoLink} aria-label="Nexara — Inicio">
             <Image
-              src="/logo-nexara-lockup.png"
-              alt="Nexara"
-              width={220}
-              height={69}
-              className={styles.logoLockup}
+              src="/brand/nexara-mark.png"
+              alt=""
+              width={40}
+              height={40}
+              className={styles.logoMark}
               priority
+              aria-hidden
             />
+            <span className={styles.logoWordmark}>NEXARA</span>
           </Link>
         </div>
 
