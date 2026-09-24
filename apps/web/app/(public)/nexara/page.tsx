@@ -490,8 +490,12 @@ export default async function NexaraPage() {
               <figure className={styles.mapPanel}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/fotos/mapa-cobertura-nexara.jpg"
-                  alt="Mapa de cobertura NEXARA: 32 estados y más de 200 puntos de presencia en México, con base en Puebla y CDMX"
+                  src="/fotos/mapa-cobertura-nexara.webp"
+                  srcSet="/fotos/mapa-cobertura-nexara-1200.webp 1200w, /fotos/mapa-cobertura-nexara-1600.webp 1600w, /fotos/mapa-cobertura-nexara.webp 2000w"
+                  sizes="(max-width: 980px) 100vw, 720px"
+                  width={2000}
+                  height={1414}
+                  alt="Mapa de cobertura NEXARA — 32 estados y +200 puntos de presencia en México; base en Puebla y CDMX"
                   loading="lazy"
                   decoding="async"
                 />
