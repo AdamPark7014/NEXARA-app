@@ -259,48 +259,6 @@ export default async function NexaraPage() {
       <HomeHero bootstrap={heroBootstrap} />
 
       <div className={styles.homeBody}>
-        {/* Servicios */}
-        <section className={shared.section} aria-label="Servicios" data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-              <p className={shared.eyebrow}>Servicios</p>
-              <h2 className={shared.sectionTitle}>
-                Lo que instalamos y <span className={shared.sectionTitleAccent}>sostenemos</span>
-              </h2>
-              <p className={shared.sectionLead}>
-                Videovigilancia, redes, cómputo y soporte bajo una sola responsabilidad técnica.
-                Diseñamos, instalamos y operamos.
-              </p>
-            </header>
-            <div className={shared.iconGrid} data-reveal-stagger>
-              {CAPABILITIES.map((c) => (
-                <Link key={c.id} href={`/servicios#${c.id}`} className={shared.iconCard} data-reveal="up">
-                  <span className={shared.iconTile}>
-                    <PublicIcon name={c.icon} />
-                  </span>
-                  <h3 className={shared.iconCardTitle}>{c.title}</h3>
-                  <p className={shared.iconCardText}>{c.text}</p>
-                  <span className={shared.iconCardLink}>
-                    Ver servicio <PublicIcon name="arrowRight" size={16} />
-                  </span>
-                </Link>
-              ))}
-              <Link href="/soluciones" className={`${shared.iconCard} ${shared.iconCardDark}`} data-reveal="up">
-                <span className={shared.iconTile}>
-                  <PublicIcon name="layers" />
-                </span>
-                <h3 className={shared.iconCardTitle}>¿Tu operación es distinta?</h3>
-                <p className={shared.iconCardText}>
-                  Soluciones por industria: retail, manufactura, hospitalidad, salud, educación y gobierno.
-                </p>
-                <span className={shared.iconCardLink}>
-                  Ver soluciones <PublicIcon name="arrowRight" size={16} />
-                </span>
-              </Link>
-            </div>
-          </div>
-        </section>
-
         {/* Por qué NEXARA: foto real + promesas */}
         <section className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Por qué NEXARA" data-reveal="up">
           <div className={shared.inner}>
@@ -347,30 +305,6 @@ export default async function NexaraPage() {
           </div>
         </section>
 
-        {/* Método (banda navy) */}
-        <section className={`${shared.section} ${shared.sectionNavy}`} aria-label="Cómo trabajamos" data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-              <p className={shared.eyebrow}>Cómo trabajamos</p>
-              <h2 className={shared.sectionTitle}>
-                De diagnóstico a <span className={shared.sectionTitleAccent}>operación</span>
-              </h2>
-              <p className={shared.sectionLead}>
-                Tres fases, alcance cerrado y un solo responsable de principio a fin.
-              </p>
-            </header>
-            <div className={shared.stepsRow} data-reveal-stagger>
-              {proceso.map((p) => (
-                <article key={p.num} className={shared.stepItemOpen} data-reveal="up">
-                  <span className={shared.stepNumOpen}>{p.num}</span>
-                  <h3 className={shared.stepTitleOpen}>{p.title}</h3>
-                  <p className={shared.stepTextOpen}>{p.text}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* Evidencia real */}
         <section className={shared.section} aria-label="Trabajo real en sitio" data-reveal="up">
           <div className={shared.inner}>
@@ -403,6 +337,72 @@ export default async function NexaraPage() {
                 Ver casos de campo <PublicIcon name="arrowRight" size={16} />
               </Link>
             </p>
+          </div>
+        </section>
+
+        {/* Servicios (después de evidencia) */}
+        <section className={shared.section} aria-label="Servicios" data-reveal="up">
+          <div className={shared.inner}>
+            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+              <p className={shared.eyebrow}>Servicios</p>
+              <h2 className={shared.sectionTitle}>
+                Lo que instalamos y <span className={shared.sectionTitleAccent}>sostenemos</span>
+              </h2>
+              <p className={shared.sectionLead}>
+                Videovigilancia, redes, cómputo y soporte bajo una sola responsabilidad técnica.
+                Diseñamos, instalamos y operamos.
+              </p>
+            </header>
+            <div className={shared.iconGrid} data-reveal-stagger>
+              {CAPABILITIES.map((c) => (
+                <Link key={c.id} href={`/servicios#${c.id}`} className={shared.iconCard} data-reveal="up">
+                  <span className={shared.iconTile}>
+                    <PublicIcon name={c.icon} />
+                  </span>
+                  <h3 className={shared.iconCardTitle}>{c.title}</h3>
+                  <p className={shared.iconCardText}>{c.text}</p>
+                  <span className={shared.iconCardLink}>
+                    Ver servicio <PublicIcon name="arrowRight" size={16} />
+                  </span>
+                </Link>
+              ))}
+              <Link href="/soluciones" className={`${shared.iconCard} ${shared.iconCardDark}`} data-reveal="up">
+                <span className={shared.iconTile}>
+                  <PublicIcon name="layers" />
+                </span>
+                <h3 className={shared.iconCardTitle}>¿Tu operación es distinta?</h3>
+                <p className={shared.iconCardText}>
+                  Soluciones por industria: retail, manufactura, hospitalidad, salud, educación y gobierno.
+                </p>
+                <span className={shared.iconCardLink}>
+                  Ver soluciones <PublicIcon name="arrowRight" size={16} />
+                </span>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Método (banda navy) */}
+        <section className={`${shared.section} ${shared.sectionNavy}`} aria-label="Cómo trabajamos" data-reveal="up">
+          <div className={shared.inner}>
+            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+              <p className={shared.eyebrow}>Cómo trabajamos</p>
+              <h2 className={shared.sectionTitle}>
+                De diagnóstico a <span className={shared.sectionTitleAccent}>operación</span>
+              </h2>
+              <p className={shared.sectionLead}>
+                Tres fases, alcance cerrado y un solo responsable de principio a fin.
+              </p>
+            </header>
+            <div className={shared.stepsRow} data-reveal-stagger>
+              {proceso.map((p) => (
+                <article key={p.num} className={shared.stepItemOpen} data-reveal="up">
+                  <span className={shared.stepNumOpen}>{p.num}</span>
+                  <h3 className={shared.stepTitleOpen}>{p.title}</h3>
+                  <p className={shared.stepTextOpen}>{p.text}</p>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
