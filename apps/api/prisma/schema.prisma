@@ -3498,11 +3498,17 @@ model ToolRequestNotification {
 /// Renglón del checklist de herramientas y material que exige una OT: lo que el técnico
 /// tiene que llevar y palomear antes de salir. Puede apuntar a un producto del catálogo,
 /// a una herramienta concreta del inventario o a ninguno (solo `descripcion`).
+enum ToolSource {
+  KIT
+  INVENTORY
+}
 model ActivityToolRequirement {
   id          Int      @id @default(autoincrement())
   activityId  Int
   productId   Int?
   toolId      Int?
+  /// Fuente de la herramienta: del kit personal (KIT) o del almacén (INVENTORY).
+  toolSource  ToolSource?
   /// Lo que ve el técnico: «Escalera de 6 m», «Ponchadora RJ45».
   descripcion String   @db.VarChar(300)
   cantidad    Decimal  @default(1) @db.Decimal(14, 4)

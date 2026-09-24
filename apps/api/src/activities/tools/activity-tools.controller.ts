@@ -43,11 +43,23 @@ export class ActivityToolsController {
         cantidad?: number;
         productId?: number;
         toolId?: number;
+        toolSource?: 'KIT' | 'INVENTORY';
       }>;
+      /** Usuarios cuyas asignaciones de kit cuentan para validar selección de herramientas. */
+      allowedKitUserIds?: number[];
     },
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.definirRequisitos(activityId, body?.requisitos ?? [], companyId);
+    return this.service.definirRequisitos(
+      activityId,
+      {
+        requisitos: body?.requisitos ?? [],
+        allowedKitUserIds: Array.isArray(body?.allowedKitUserIds)
+          ? (body!.allowedKitUserIds as number[]).filter((n) => Number.isFinite(n) && Number(n) > 0).map((n) => Number(n))
+          : [],
+      },
+      companyId,
+    );
   }
 
   /** «Lo traigo y sirve» / «falta o está dañado», con nota y foto opcionales. */
