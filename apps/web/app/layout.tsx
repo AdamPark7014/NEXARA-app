@@ -243,6 +243,13 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${plusJakarta.variable}`}
     >
       <body suppressHydrationWarning>
+        {/* Tema del sitio público antes del primer pintado: preferencia guardada o la del sistema. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var k='nexara:public-theme';var s=localStorage.getItem(k);var t=(s==='light'||s==='dark')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-public-theme',t);}catch(e){document.documentElement.setAttribute('data-public-theme','dark');}})();",
+          }}
+        />
         {/* Organization structured data */}
         <script
           type="application/ld+json"

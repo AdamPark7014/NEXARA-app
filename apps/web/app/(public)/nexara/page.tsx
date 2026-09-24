@@ -80,8 +80,6 @@ const PROMISES = [
   "Soporte con SLA después del arranque",
 ];
 
-const PROCESS_ICONS: PublicIconName[] = ["search", "hardhat", "refresh"];
-
 /** Logos reales en /public/marcas — decorativos, el grupo lleva la etiqueta. */
 const MARCAS = Array.from({ length: 36 }, (_, i) => ({
   src: `/marcas/marcas-${String(i + 1).padStart(2, "0")}.png`,
@@ -304,7 +302,7 @@ export default async function NexaraPage() {
         </section>
 
         {/* Por qué NEXARA: foto real + promesas */}
-        <section className={`${shared.section} ${shared.sectionWhite}`} aria-label="Por qué NEXARA" data-reveal="up">
+        <section className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Por qué NEXARA" data-reveal="up">
           <div className={shared.inner}>
             <div className={shared.split}>
               <figure className={`${shared.photoFrame} ${shared.ar43} ${shared.splitMedia}`}>
@@ -362,14 +360,9 @@ export default async function NexaraPage() {
               </p>
             </header>
             <div className={shared.stepsRow} data-reveal-stagger>
-              {proceso.map((p, i) => (
+              {proceso.map((p) => (
                 <article key={p.num} className={shared.stepItemOpen} data-reveal="up">
-                  <div className={shared.stepHead}>
-                    <span className={shared.stepNumOpen}>{p.num}</span>
-                    <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
-                      <PublicIcon name={PROCESS_ICONS[i] ?? "check"} />
-                    </span>
-                  </div>
+                  <span className={shared.stepNumOpen}>{p.num}</span>
                   <h3 className={shared.stepTitleOpen}>{p.title}</h3>
                   <p className={shared.stepTextOpen}>{p.text}</p>
                 </article>
@@ -414,7 +407,7 @@ export default async function NexaraPage() {
         </section>
 
         {/* Industrias */}
-        <section className={`${shared.section} ${shared.sectionWhite}`} aria-label="Industrias" data-reveal="up">
+        <section className={`${shared.section} ${shared.sectionAlt}`} aria-label="Industrias" data-reveal="up">
           <div className={shared.inner}>
             <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
               <p className={shared.eyebrow}>Industrias</p>
@@ -450,7 +443,7 @@ export default async function NexaraPage() {
         </section>
 
         {/* Fabricantes */}
-        <section className={`${styles.brandBand} ${shared.sectionAlt}`} aria-label="Fabricantes" data-reveal="soft">
+        <section className={styles.brandBand} aria-label="Fabricantes" data-reveal="soft">
           <div className={shared.inner}>
             <LogoStrip
               label="Integramos tecnología de fabricantes líderes"

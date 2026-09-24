@@ -251,3 +251,36 @@
     transition: none;
   }
 }
+
+/* Tema claro: controles, atribución, tarjeta y pin toman los tokens claros */
+.pinDot {
+  border-color: var(--ds-bg, #070f1e);
+}
+
+:global(html[data-public-theme="light"]) .brandMap :global(.maplibregl-ctrl-group) {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(11, 26, 51, 0.14);
+  box-shadow: 0 10px 24px rgba(11, 26, 51, 0.12);
+}
+
+:global(html[data-public-theme="light"]) .brandMap :global(.maplibregl-ctrl-group button .maplibregl-ctrl-icon) {
+  filter: none;
+  opacity: 0.8;
+}
+
+:global(html[data-public-theme="light"]) .brandMap :global(.maplibregl-ctrl-attrib) {
+  background: rgba(243, 246, 251, 0.8);
+}
+
+:global(html[data-public-theme="light"]) .brandMap :global(.maplibregl-ctrl-attrib-button) {
+  filter: none;
+}
+
+:global(html[data-public-theme="light"]) .mapCard {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 34px rgba(11, 26, 51, 0.14);
+}
+
+:global(html[data-public-theme="light"]) .mapContainer {
+  box-shadow: 0 18px 44px rgba(11, 26, 51, 0.12);
+}

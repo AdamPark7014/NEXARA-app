@@ -1,0 +1,85 @@
+/* Conmutador de tema — mismo lenguaje que el header (borde fino, sin brillo) */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid #2dd8f2;
+  outline-offset: 2px;
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Header: botón cuadrado discreto */
+.header {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(238, 244, 255, 0.22);
+  background: rgba(238, 244, 255, 0.04);
+  color: rgba(238, 244, 255, 0.9);
+}
+
+.header:hover {
+  border-color: rgba(45, 216, 242, 0.7);
+  color: #2dd8f2;
+}
+
+:global(html[data-public-theme="light"]) .header {
+  border-color: rgba(11, 26, 51, 0.16);
+  background: rgba(11, 26, 51, 0.03);
+  color: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .header:hover {
+  border-color: #0e9ab8;
+  color: #0b7f99;
+}
+
+/* Sobre el hero (header transparente) el botón siempre es claro sobre oscuro */
+:global(header[data-transparent="true"]) .header {
+  border-color: rgba(238, 244, 255, 0.22);
+  background: rgba(238, 244, 255, 0.04);
+  color: rgba(238, 244, 255, 0.9);
+}
+
+/* Footer: enlace de texto en la fila legal */
+.footer {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 0.82rem;
+  color: #6f85a5;
+}
+
+.footer:hover {
+  color: #2dd8f2;
+}
+
+.footer .icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+@media (max-width: 640px) {
+  .header {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+}

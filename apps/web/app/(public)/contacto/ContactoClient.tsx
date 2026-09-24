@@ -110,7 +110,7 @@ export default function ContactoClient({ visuals }: Props) {
 
   return (
     <>
-      <section id="formulario" className={styles.contactSection} data-reveal="up">
+      <section id="formulario" className={`${styles.contactSection} ${shared.sectionLight}`} data-reveal="up">
         <div className={shared.inner}>
           <div className={styles.formLayout}>
             <aside className={styles.formAside} data-reveal="left">

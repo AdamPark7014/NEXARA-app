@@ -42,6 +42,7 @@
   --ds-radius-sm: 8px;
   --ds-radius: 12px;
   --ds-radius-lg: 16px;
+  --ds-radius-pill: 999px;
 
   position: relative;
   background: var(--ds-bg);
@@ -160,7 +161,7 @@
   gap: 8px;
   padding: 12px 22px;
   min-height: 48px;
-  border-radius: 10px;
+  border-radius: var(--ds-radius);
   font-family: var(--ds-font-ui);
   font-size: 0.94rem;
   font-weight: 600;
@@ -189,9 +190,10 @@
   box-shadow: 0 14px 30px rgba(18, 182, 212, 0.28);
 }
 
+/* Secundario dirigido por tokens: contorno del color de título de la capa donde vive */
 .btnSecondary,
 .btnSecondaryLight {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
   color: var(--ds-title);
   border-color: var(--ds-line-strong);
 }
@@ -200,21 +202,7 @@
 .btnSecondaryLight:hover {
   transform: translateY(-1px);
   border-color: var(--ds-cyan);
-  background: rgba(45, 216, 242, 0.06);
-}
-
-/* Dentro de bandas oscuras el secundario se invierte; el primario es el mismo cian */
-.sectionNavy .btnSecondary,
-.ctaBand .btnSecondary {
-  background: transparent;
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-.sectionNavy .btnSecondary:hover,
-.ctaBand .btnSecondary:hover {
-  border-color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--ds-cyan-tint);
 }
 
 .btnArrow {
@@ -381,7 +369,7 @@ a.iconCard:hover,
   place-items: center;
   width: 52px;
   height: 52px;
-  border-radius: 14px;
+  border-radius: var(--ds-radius);
   background: linear-gradient(135deg, rgba(45, 216, 242, 0.18), rgba(45, 216, 242, 0.06));
   color: var(--ds-cyan);
   flex: 0 0 auto;
@@ -402,7 +390,7 @@ a.iconCard:hover,
 .iconTileSm {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--ds-radius-sm);
 }
 
 .iconTileSm svg {
@@ -983,14 +971,13 @@ a.iconCard:hover .iconCardLink {
   gap: clamp(20px, 3vw, 36px);
 }
 
+/* Pasos abiertos: numeral grande + regla superior, sin caja (menos "todo es card") */
 .stepItemOpen {
   display: grid;
   gap: 12px;
   align-content: start;
-  padding: clamp(22px, 2.6vw, 30px);
-  border-radius: var(--ds-radius-lg);
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-line);
+  padding: 22px 0 0;
+  border-top: 1px solid var(--ds-line-strong);
 }
 
 .stepHead {
@@ -1003,9 +990,9 @@ a.iconCard:hover .iconCardLink {
 .stepNumOpen {
   font-family: var(--ds-font-display);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--ds-cyan);
-  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  font-size: clamp(2rem, 3vw, 2.6rem);
   line-height: 1;
 }
 
@@ -1100,10 +1087,8 @@ a.iconCard:hover .iconCardLink {
 }
 
 .principleItem {
-  padding: clamp(22px, 2.6vw, 30px);
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-line);
-  border-radius: var(--ds-radius-lg);
+  padding: 22px 0 0;
+  border-top: 1px solid var(--ds-line-strong);
 }
 
 .principleTitle {
@@ -1833,4 +1818,173 @@ a.iconCard:hover .iconCardLink {
 
 @media (max-width: 640px) {
   .factsInline { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Capa clara editorial (Tier 4): una por página, con propósito ── */
+.sectionLight {
+  --ds-bg: #eef2f8;
+  --ds-bg-alt: #e6ebf3;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f6f8fb;
+  --ds-ink: #0b1a33;
+  --ds-title: #0b1a33;
+  --ds-body: #33445c;
+  --ds-muted: #4f607a;
+  --ds-faint: #7b889c;
+  --ds-line: rgba(11, 26, 51, 0.1);
+  --ds-line-strong: rgba(11, 26, 51, 0.18);
+  --ds-cyan: #06708a;
+  --ds-cyan-soft: #06708a;
+  --ds-cyan-strong: #055a70;
+  --ds-cyan-tint: rgba(6, 112, 138, 0.12);
+  --ds-cyan-line: rgba(6, 112, 138, 0.4);
+  --ds-shadow: 0 18px 44px rgba(11, 26, 51, 0.1);
+  --ds-shadow-sm: 0 8px 22px rgba(11, 26, 51, 0.08);
+  background: var(--ds-bg);
+  color: var(--ds-body);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sectionLight .iconTile {
+  background: linear-gradient(135deg, rgba(14, 154, 184, 0.16), rgba(14, 154, 184, 0.05));
+  color: var(--ds-cyan-strong);
+}
+
+.sectionLight .iconCard,
+.sectionLight .caseCard,
+.sectionLight .teamCard,
+.sectionLight .serviceBlock,
+.sectionLight .cityCard,
+.sectionLight .industryPill {
+  background-image: none;
+}
+
+.sectionLight .checkList li::after {
+  border-color: var(--ds-cyan-strong);
+}
+
+/* Ritmo de espaciado: tight → normal → spacious */
+.sectionSpacious {
+  padding: clamp(84px, 9vw, 136px) 0;
+}
+
+/* Sección con encabezado grande (momento display, uno por página) */
+.sectionTitleDisplay {
+  font-size: clamp(2.1rem, 4vw, 3.2rem);
+  letter-spacing: -0.028em;
+}
+
+.principleItem .stepNumOpen {
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Tema claro / oscuro del sitio público
+   `<html data-public-theme="light">` invierte las capas: base clara,
+   capa editorial de contraste en navy. Hero, header sobre hero y footer
+   siguen oscuros en ambos temas (identidad y conclusión del sitio).
+   ══════════════════════════════════════════════════════════════ */
+:global(html[data-public-theme="light"]) .page {
+  --ds-bg: #f3f6fb;
+  --ds-bg-alt: #e9eef6;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f6f8fb;
+  --ds-navy: #0b1a33;
+  --ds-panel: #ffffff;
+  --ds-ink: #0b1a33;
+  --ds-title: #0b1a33;
+  --ds-body: #33445c;
+  --ds-muted: #4f607a;
+  --ds-faint: #7b889c;
+  --ds-line: rgba(11, 26, 51, 0.1);
+  --ds-line-strong: rgba(11, 26, 51, 0.18);
+  --ds-cyan: #06708a;
+  --ds-cyan-soft: #06708a;
+  --ds-cyan-strong: #055a70;
+  --ds-cyan-tint: rgba(6, 112, 138, 0.12);
+  --ds-cyan-line: rgba(6, 112, 138, 0.4);
+  --ds-shadow: 0 18px 44px rgba(11, 26, 51, 0.1);
+  --ds-shadow-sm: 0 8px 22px rgba(11, 26, 51, 0.08);
+}
+
+/* En tema claro, la capa editorial de contraste es navy */
+:global(html[data-public-theme="light"]) .sectionLight {
+  --ds-bg: #0b1a33;
+  --ds-bg-alt: #0e1f3a;
+  --ds-surface: #132340;
+  --ds-surface-2: #182b4c;
+  --ds-ink: #eef4ff;
+  --ds-title: #f3f6fb;
+  --ds-body: #c3cfe0;
+  --ds-muted: #9fb0c8;
+  --ds-faint: #7688a3;
+  --ds-line: rgba(140, 180, 230, 0.14);
+  --ds-line-strong: rgba(140, 180, 230, 0.24);
+  --ds-cyan: #2dd8f2;
+  --ds-cyan-soft: #7fe6f7;
+  --ds-cyan-strong: #12b6d4;
+  --ds-cyan-tint: rgba(45, 216, 242, 0.12);
+  --ds-cyan-line: rgba(45, 216, 242, 0.45);
+  --ds-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
+  --ds-shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.24);
+  background: var(--ds-bg);
+  color: var(--ds-body);
+  border-top-color: rgba(11, 26, 51, 0.12);
+  border-bottom-color: rgba(11, 26, 51, 0.12);
+}
+
+:global(html[data-public-theme="light"]) .sectionLight .iconTile {
+  background: rgba(45, 216, 242, 0.14);
+  color: #2dd8f2;
+}
+
+:global(html[data-public-theme="light"]) .sectionLight .checkList li::after {
+  border-color: #2dd8f2;
+}
+
+/* La banda de CTA y la tarjeta destacada son navy en ambos temas */
+.ctaBand,
+.iconCardDark {
+  --ds-ink: #eef4ff;
+  --ds-title: #f3f6fb;
+  --ds-body: #c3cfe0;
+  --ds-muted: #9fb0c8;
+  --ds-faint: #7688a3;
+  --ds-line: rgba(140, 180, 230, 0.14);
+  --ds-line-strong: rgba(140, 180, 230, 0.24);
+  --ds-surface-2: #132340;
+  --ds-cyan: #2dd8f2;
+  --ds-cyan-soft: #7fe6f7;
+  --ds-cyan-strong: #12b6d4;
+  --ds-cyan-tint: rgba(45, 216, 242, 0.12);
+  --ds-cyan-line: rgba(45, 216, 242, 0.45);
+  color: var(--ds-body);
+}
+
+.ctaBand .iconTile,
+.iconCardDark .iconTile {
+  background: rgba(45, 216, 242, 0.14);
+  color: #2dd8f2;
+}
+
+/* Superficie navy con brillo cian: en claro es una superficie gris-azul sin brillo */
+:global(html[data-public-theme="light"]) .sectionNavy {
+  background: var(--ds-bg-alt);
+}
+
+:global(html[data-public-theme="light"]) .iconCard,
+:global(html[data-public-theme="light"]) .caseCard,
+:global(html[data-public-theme="light"]) .teamCard,
+:global(html[data-public-theme="light"]) .serviceBlock,
+:global(html[data-public-theme="light"]) .serviceNav,
+:global(html[data-public-theme="light"]) .cityCard,
+:global(html[data-public-theme="light"]) .industryPill,
+:global(html[data-public-theme="light"]) .stepItemOpen {
+  background-image: none;
+}
+
+:global(html[data-public-theme="light"]) .photoFrame {
+  border-color: rgba(11, 26, 51, 0.08);
 }

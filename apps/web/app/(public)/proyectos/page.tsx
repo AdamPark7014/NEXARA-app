@@ -263,7 +263,7 @@ export default async function ProyectosPage() {
 
       {/* Casos publicados desde Studio (si existen) */}
       {studioProjects.length ? (
-        <section className={`${shared.section} ${shared.sectionWhite}`} aria-label="Casos publicados" data-reveal="up">
+        <section className={`${shared.section} ${shared.sectionAlt}`} aria-label="Casos publicados" data-reveal="up">
           <div className={shared.inner}>
             <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
               <p className={shared.eyebrow}>Casos publicados</p>
@@ -310,7 +310,7 @@ export default async function ProyectosPage() {
       ) : null}
 
       {/* Referencias por vertical */}
-      <section className={`${shared.section} ${studioProjects.length ? "" : shared.sectionWhite}`} aria-label="Referencias por vertical" data-reveal="up">
+      <section className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Referencias por vertical" data-reveal="up">
         <div className={shared.inner}>
           <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
             <p className={shared.eyebrow}>Referencias por vertical</p>
@@ -362,12 +362,7 @@ export default async function ProyectosPage() {
           <div className={shared.stepsRow} data-reveal-stagger>
             {DOCUMENTACION.map((d) => (
               <article key={d.num} className={shared.stepItemOpen} data-reveal="up">
-                <div className={shared.stepHead}>
-                  <span className={shared.stepNumOpen}>{d.num}</span>
-                  <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
-                    <PublicIcon name={d.icon} />
-                  </span>
-                </div>
+                <span className={shared.stepNumOpen}>{d.num}</span>
                 <h3 className={shared.stepTitleOpen}>{d.title}</h3>
                 <p className={shared.stepTextOpen}>{d.text}</p>
               </article>

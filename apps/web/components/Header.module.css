@@ -491,3 +491,49 @@
 		0 10px 18px rgba(0, 0, 0, 0.4);
 }
 
+
+/* ── Tema claro del sitio público ──────────────────────────────
+   Sobre el hero el header sigue transparente/oscuro; al hacer scroll
+   sobre el cuerpo claro se vuelve una barra clara con texto navy. */
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) {
+	background: rgba(243, 246, 251, 0.9) !important;
+	border-bottom: 1px solid rgba(11, 26, 51, 0.1) !important;
+	box-shadow: 0 10px 24px rgba(11, 26, 51, 0.08) !important;
+}
+
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .link {
+	color: rgba(11, 26, 51, 0.82) !important;
+}
+
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .link:hover,
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .linkActive {
+	color: #0b1a33 !important;
+}
+
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .linkActive::after {
+	background: #0e9ab8;
+}
+
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .hamburgerLine {
+	background: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .headerPublic:not(.headerTransparent) .mobileMenuButton {
+	border-color: rgba(11, 26, 51, 0.18);
+	background: rgba(11, 26, 51, 0.03);
+}
+
+:global(html[data-public-theme="light"]) .mobileMenu {
+	background: #ffffff;
+	border: 1px solid rgba(11, 26, 51, 0.1);
+	box-shadow: 0 24px 60px rgba(11, 26, 51, 0.18);
+}
+
+:global(html[data-public-theme="light"]) .mobileLink {
+	color: #0b1a33;
+}
+
+:global(html[data-public-theme="light"]) .mobileLinkActive {
+	color: #0b7f99;
+	background: rgba(14, 154, 184, 0.1);
+}

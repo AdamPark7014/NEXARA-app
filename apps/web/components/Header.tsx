@@ -105,6 +105,7 @@ function BackupRestorePanel() {
 import Link from 'next/link';
 import Image from 'next/image';
 import styles from './Header.module.css';
+import PublicThemeToggle from './PublicThemeToggle';
 
 import { usePathname } from 'next/navigation';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
@@ -208,7 +209,7 @@ export default function Header() {
     .join(' ');
 
   return (
-    <header className={headerClass}>
+    <header className={headerClass} data-transparent={isFlushHero && !scrolled ? 'true' : 'false'}>
       <div className={styles.headerInner}>
         <div className={styles.logoSection}>
           <Link href="/" onClick={closeMobileMenu} className={styles.logoLink} aria-label="Nexara — Inicio">
@@ -239,6 +240,8 @@ export default function Header() {
 
         <div className={styles.rightSection}>
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
+
+          <PublicThemeToggle />
 
           {!isActiveLink('/contacto') && (
             <Link href="/contacto" className={styles.contactCta} onClick={closeMobileMenu}>

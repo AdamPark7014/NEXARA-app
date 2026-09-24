@@ -5,6 +5,7 @@ import styles from "./Footer.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { openCookiePreferences } from "@/lib/cookie-consent";
 import BrandMap from "./BrandMap";
+import PublicThemeToggle from "@/components/PublicThemeToggle";
 
 const WA_URL = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
 const WA_LABEL = "+52 222 696 0350";
@@ -180,6 +181,7 @@ export default function Footer() {
                 desde la navegación, no solo por URL directa. La página existía
                 y estaba en el sitemap, pero ningún enlace llevaba a ella. */}
             <Link href="/legal/eliminar-cuenta">Eliminar cuenta</Link>
+            <PublicThemeToggle variant="footer" />
             <button
               type="button"
               className={styles.legalButton}
