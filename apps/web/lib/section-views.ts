@@ -743,6 +743,20 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       subtitle: 'Supervisa OT del equipo.',
     };
   }
+  // Encargado de soporte: puede crear/asignar OT (sin aprobar/eliminar).
+  if (v2 === ROLES.ENC_SOPORTE) {
+    return {
+      viewMode: 'manage_execute',
+      defaultScope: 'team',
+      canCreate: true,
+      canEdit: true,
+      canDelete: false,
+      canAssign: true,
+      canApprove: false,
+      title: 'Órdenes de trabajo · Soporte',
+      subtitle: 'Asigna servicios al equipo y ejecuta las tuyas.',
+    };
+  }
   // Admin (DIR_ADMIN / COORD_ADMIN): lectura de reportes para facturación y seguimiento
   if (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN) {
     return {
@@ -771,17 +785,16 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
     };
   }
   if (isSupportRole(v2)) {
-    // Soporte coordina despacho y triage — puede crear/asignar OT, sin aprobar ni eliminar.
     return {
-      viewMode: 'manage',
-      defaultScope: 'team',
-      canCreate: true,
+      viewMode: 'execute',
+      defaultScope: 'self',
+      canCreate: false,
       canEdit: true,
       canDelete: false,
-      canAssign: true,
+      canAssign: false,
       canApprove: false,
-      title: 'Órdenes de trabajo · Asignación',
-      subtitle: 'Triage y despacho de OT a ingenieros.',
+      title: 'Mis OT',
+      subtitle: '1. Iniciar → 2. Evidencias → 3. Cerrar.',
     };
   }
   return {
