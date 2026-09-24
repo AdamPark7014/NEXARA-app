@@ -86,18 +86,18 @@ const METRICS: { icon: PublicIconName; value: string; label: string }[] = [
 /** Galería: fotografías reales de instalaciones NEXARA (en /public/fotos). */
 const GALERIA = [
   {
-    src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1920_ba8f.webp",
+    src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1920.webp",
     srcSet:
-      "/fotos/tecnico-nexara-entrega-equipo-sitio-1200_e08f.webp 1200w, /fotos/tecnico-nexara-entrega-equipo-sitio-1920_ba8f.webp 1920w",
+      "/fotos/tecnico-nexara-entrega-equipo-sitio-1200.webp 1200w, /fotos/tecnico-nexara-entrega-equipo-sitio-1920.webp 1920w",
     sizes: "(max-width: 980px) 100vw, 640px",
     alt: "Técnico de NEXARA manejando cajas de equipo durante entrega en sitio",
     kicker: "Logística",
     caption: "Entrega de equipo en instalación exterior",
   },
   {
-    src: "/fotos/cableado-interno-pc-guantes-taller-1920_8009.webp",
+    src: "/fotos/cableado-interno-pc-guantes-taller-1920.webp",
     srcSet:
-      "/fotos/cableado-interno-pc-guantes-taller-1200_ab5a.webp 1200w, /fotos/cableado-interno-pc-guantes-taller-1920_8009.webp 1920w",
+      "/fotos/cableado-interno-pc-guantes-taller-1200.webp 1200w, /fotos/cableado-interno-pc-guantes-taller-1920.webp 1920w",
     sizes: "(max-width: 980px) 100vw, 640px",
     alt: "Manos con guantes realizando cableado interno de una PC en taller",
     kicker: "Soporte",
@@ -105,9 +105,9 @@ const GALERIA = [
     tall: true,
   },
   {
-    src: "/fotos/equipo-tecnico-nexara-uniforme-1920_5775.webp",
+    src: "/fotos/equipo-tecnico-nexara-uniforme-1920.webp",
     srcSet:
-      "/fotos/equipo-tecnico-nexara-uniforme-1200_edc6.webp 1200w, /fotos/equipo-tecnico-nexara-uniforme-1920_5775.webp 1920w",
+      "/fotos/equipo-tecnico-nexara-uniforme-1200.webp 1200w, /fotos/equipo-tecnico-nexara-uniforme-1920.webp 1920w",
     sizes: "(max-width: 980px) 100vw, 640px",
     alt: "Equipo técnico de NEXARA con uniforme oficial en sitio de instalación",
     kicker: "Equipo",

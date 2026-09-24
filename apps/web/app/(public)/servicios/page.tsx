@@ -80,9 +80,9 @@ const servicios: Servicio[] = [
       "Administración y optimización de recursos",
     ],
     photo: {
-      src: "/fotos/tecnico-ensamble-chasis-pc-taller-1920_dde9.webp",
+      src: "/fotos/tecnico-ensamble-chasis-pc-taller-1920.webp",
       srcSet:
-        "/fotos/tecnico-ensamble-chasis-pc-taller-1200_a345.webp 1200w, /fotos/tecnico-ensamble-chasis-pc-taller-1920_dde9.webp 1920w",
+        "/fotos/tecnico-ensamble-chasis-pc-taller-1200.webp 1200w, /fotos/tecnico-ensamble-chasis-pc-taller-1920.webp 1920w",
       sizes: "(max-width: 1100px) 100vw, 520px",
       alt: "Técnico ensamblando y cableando un chasis de PC en el taller",
     },
@@ -101,9 +101,9 @@ const servicios: Servicio[] = [
       "Seguimiento y documentación de incidencias",
     ],
     photo: {
-      src: "/fotos/tecnicos-mantenimiento-pc-colaboracion-1920_83ef.webp",
+      src: "/fotos/tecnicos-mantenimiento-pc-colaboracion-1920.webp",
       srcSet:
-        "/fotos/tecnicos-mantenimiento-pc-colaboracion-1200_19e5.webp 1200w, /fotos/tecnicos-mantenimiento-pc-colaboracion-1920_83ef.webp 1920w",
+        "/fotos/tecnicos-mantenimiento-pc-colaboracion-1200.webp 1200w, /fotos/tecnicos-mantenimiento-pc-colaboracion-1920.webp 1920w",
       sizes: "(max-width: 1100px) 100vw, 520px",
       alt: "Dos técnicos de NEXARA colaborando en el mantenimiento de un equipo de cómputo",
     },
@@ -160,9 +160,9 @@ export default async function ServiciosPage() {
   const midPhoto = mid?.desktopUrl
     ? { src: resolvePageMediaUrl(mid.desktopUrl), alt: mid.alt || "Instalación NEXARA" }
     : {
-        src: "/fotos/equipo-taller-ensamble-pc-nexara-1920_e15c.webp",
+        src: "/fotos/equipo-taller-ensamble-pc-nexara-1920.webp",
         srcSet:
-          "/fotos/equipo-taller-ensamble-pc-nexara-1200_61ad.webp 1200w, /fotos/equipo-taller-ensamble-pc-nexara-1920_e15c.webp 1920w",
+          "/fotos/equipo-taller-ensamble-pc-nexara-1200.webp 1200w, /fotos/equipo-taller-ensamble-pc-nexara-1920.webp 1920w",
         sizes: "(max-width: 1100px) 100vw, 520px",
         alt: "Equipo técnico de NEXARA ensamblando una computadora en el taller",
       };

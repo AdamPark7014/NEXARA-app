@@ -132,9 +132,9 @@ const EVIDENCE = [
     tall: true,
   },
   {
-    src: "/fotos/descarga-equipo-camioneta-nexara-1920_411a.webp",
+    src: "/fotos/descarga-equipo-camioneta-nexara-1920.webp",
     srcSet:
-      "/fotos/descarga-equipo-camioneta-nexara-1200_b23c.webp 1200w, /fotos/descarga-equipo-camioneta-nexara-1920_411a.webp 1920w",
+      "/fotos/descarga-equipo-camioneta-nexara-1200.webp 1200w, /fotos/descarga-equipo-camioneta-nexara-1920.webp 1920w",
     sizes: "(max-width: 980px) 100vw, 640px",
     alt: "Personal de NEXARA descargando cajas de equipo técnico desde una camioneta",
     kicker: "Logística",
