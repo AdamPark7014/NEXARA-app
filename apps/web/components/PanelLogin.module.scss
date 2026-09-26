@@ -189,6 +189,26 @@
   background: color-mix(in srgb, var(--surface-2, #f4f7fb) 90%, transparent);
 }
 
+.remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f1c2e);
+  cursor: pointer;
+  user-select: none;
+  justify-self: start;
+}
+
+.rememberBox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary, #15a99d);
+  cursor: pointer;
+}
+
 .submit {
   margin-top: 4px;
   min-height: 48px;
