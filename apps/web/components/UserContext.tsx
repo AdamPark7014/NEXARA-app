@@ -63,6 +63,8 @@ export interface User {
 	loginDevice?: string;
 	/** Sesión sin validar token: solo UI offline (token puede estar vencido). */
 	offlineDegraded?: boolean;
+	/** "Recordarme": la sesión también se guarda en localStorage (sobrevive a cerrar la pestaña). */
+	remember?: boolean;
 }
 
 interface UserContextType {
@@ -127,6 +129,7 @@ const normalizeUser = (value: unknown): User | null => {
 		isPlatformOwner: Boolean(candidate.isPlatformOwner),
 		loginDevice: candidate.loginDevice,
 		offlineDegraded: Boolean(candidate.offlineDegraded),
+		remember: Boolean(candidate.remember),
 	};
 };
 
@@ -178,7 +181,8 @@ const safeGetStoredUser = (): User | null => {
 		try {
 			const { offlineDegraded: _omit, ...persistable } = u;
 			window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
-			window.localStorage.removeItem(USER_STORAGE_KEY);
+			// "Recordarme": se conserva en localStorage para nuevas pestañas / reinicios del navegador.
+			if (!u.remember) window.localStorage.removeItem(USER_STORAGE_KEY);
 		} catch {
 			/* ignore */
 		}
@@ -242,7 +246,7 @@ const safeGetStoredUser = (): User | null => {
  * el desarrollo local en `http://localhost`.
  */
 const SESSION_COOKIE = 'nx_session';
-const setSessionCookie = (active: boolean) => {
+const setSessionCookie = (active: boolean, maxAgeSeconds = 86400) => {
 	if (typeof document === 'undefined') return;
 	const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 	const isProduction = typeof window !== 'undefined' && window.location.hostname.includes('nexara.com.mx');
@@ -251,7 +255,7 @@ const setSessionCookie = (active: boolean) => {
 	// middleware auth-gate la vea al navegar cross-subdomain (ej. sales → core).
 	const domainFlag = isProduction ? '; Domain=.nexara.com.mx' : '';
 	if (active) {
-		document.cookie = `${SESSION_COOKIE}=1; Path=/; SameSite=Lax; Max-Age=86400${domainFlag}${secureFlag}`;
+		document.cookie = `${SESSION_COOKIE}=1; Path=/; SameSite=Lax; Max-Age=${maxAgeSeconds}${domainFlag}${secureFlag}`;
 	} else {
 		document.cookie = `${SESSION_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0${domainFlag}${secureFlag}`;
 	}
@@ -285,9 +289,21 @@ const safePersistUser = (user: User | null) => {
 		} catch {
 			// Ignore storage access errors
 		}
+	} else if (user?.remember) {
+		// "Recordarme": copia en localStorage para que una pestaña nueva recupere la sesión.
+		try {
+			write(window.localStorage);
+		} catch {
+			/* ignore */
+		}
 	} else {
 		try {
-			window.localStorage.removeItem(USER_STORAGE_KEY);
+			// Sin "Recordarme" no se deja copia; tampoco se pisa la sesión recordada de otra cuenta.
+			const raw = window.localStorage.getItem(USER_STORAGE_KEY);
+			const stored = raw ? (JSON.parse(raw) as Partial<User>) : null;
+			if (!user || !stored?.remember || Number(stored.id) === Number(user.id)) {
+				window.localStorage.removeItem(USER_STORAGE_KEY);
+			}
 		} catch {
 			/* ignore */
 		}
@@ -313,7 +329,7 @@ const safePersistUser = (user: User | null) => {
 
 	// `nx_session` es de todo el navegador: al cerrar sesión en una pestaña otras pueden seguir
 	// dentro, así que en navegador no se borra (la pestaña sin sesión vuelve a /login desde AppShell).
-	if (user?.token) setSessionCookie(true);
+	if (user?.token) setSessionCookie(true, user.remember ? 30 * 86400 : 86400);
 	else if (isCapacitorNative()) setSessionCookie(false);
 };
 

@@ -69,6 +69,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [ssoEnabled, setSsoEnabled] = useState(false);
   const [panelSkin, setPanelSkin] = useState<"default" | "integra">(skin);
   const { setUser } = useUser();
@@ -223,6 +224,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         password,
         ...(mfaCode.trim() ? { mfaCode: mfaCode.trim() } : {}),
         ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
+        // "Recordarme" solo existe en el login de consola (auth/login).
+        ...(mode === "console" && rememberMe ? { rememberMe: true } : {}),
         ...(companySlugFromHost && (mode === "tickets" || mode === "client" || mode === "branch")
           ? { companySlug: companySlugFromHost }
           : {}),
@@ -306,6 +309,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         isSuperAdmin: data.user.isSuperAdmin || false,
         isPlatformOwner: data.user.isPlatformOwner || false,
         loginDevice: data.loginDevice || data.user.loginDevice,
+        remember: data.rememberMe === true,
       };
 
       if (requiredPermission && !hasPermission(userData, requiredPermission)) {
@@ -339,7 +343,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         const secureFlag = isHttps ? "; Secure" : "";
         const isProduction = window.location.hostname.includes("nexara.com.mx");
         const domainFlag = isProduction ? "; Domain=.nexara.com.mx" : "";
-        document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=86400${domainFlag}${secureFlag}`;
+        const maxAge = userData.remember ? 30 * 86400 : 86400;
+        document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=${maxAge}${domainFlag}${secureFlag}`;
       }
 
       setUser(userData);
@@ -494,6 +499,20 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
                 />
               </div>
             </div>
+          )}
+
+          {mode === "console" && (
+            <label className={styles.remember} htmlFor="rememberMe">
+              <input
+                id="rememberMe"
+                name="rememberMe"
+                type="checkbox"
+                className={styles.rememberBox}
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span>Recordarme</span>
+            </label>
           )}
 
           <button type="submit" className={styles.submit} disabled={isLoading}>

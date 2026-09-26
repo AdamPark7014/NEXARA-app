@@ -1,3 +1,4 @@
+import { rememberExpiresIn, rememberMaxMs } from '../common/security/session-cookie.js';
 import { ModuleRef } from '@nestjs/core';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
@@ -1010,7 +1011,10 @@ export class AuthService {
       }
     }
 
-    return this.issueSession(user, req, { authMethod: 'password' });
+    return this.issueSession(user, req, {
+      authMethod: 'password',
+      remember: loginDto.rememberMe === true,
+    });
   }
 
   /** Login vía OIDC (SSO). El IdP ya autenticó; no exige MFA local. */
@@ -1018,7 +1022,11 @@ export class AuthService {
     return this.issueSession(user, req, { authMethod: 'oidc' });
   }
 
-  private async issueSession(user: any, req: any, opts: { authMethod: string }) {
+  private async issueSession(
+    user: any,
+    req: any,
+    opts: { authMethod: string; remember?: boolean },
+  ) {
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
     const ipAddress = String(req?.headers?.['x-forwarded-for'] || req?.ip || '')
       .split(',')[0]
@@ -1030,7 +1038,9 @@ export class AuthService {
 
     const { randomUUID } = await import('node:crypto');
     const jti = randomUUID().replace(/-/g, '');
-    const expiresInRaw = process.env.JWT_EXPIRES_IN || '4h';
+    // "Recordarme": sesión larga; sin marcar se conserva JWT_EXPIRES_IN.
+    const remember = opts.remember === true;
+    const expiresInRaw = remember ? rememberExpiresIn() : process.env.JWT_EXPIRES_IN || '4h';
     const expiresMs = this.parseExpiresToMs(expiresInRaw);
     const expiresAt = new Date(Date.now() + expiresMs);
 
@@ -1044,6 +1054,7 @@ export class AuthService {
       isSuperAdmin,
       isPlatformOwner: this.isPlatformOwner(user.email),
       jti,
+      ...(remember ? { rem: true } : {}),
     };
 
     await this.prisma.user.update({
@@ -1107,6 +1118,7 @@ export class AuthService {
       // Caducidad explícita: el cliente ya no puede leer el JWT para deducirla
       // cuando la sesión viaja en una cookie HttpOnly.
       expiresAt: expiresAt.toISOString(),
+      rememberMe: remember,
       loginDevice: detectedDevice,
       loginGreeting: `Hola, ${firstName}`,
       loginDeviceLabel: detectedDevice,
@@ -1131,7 +1143,8 @@ export class AuthService {
    * Sliding session: re-emite JWT y empuja expiresAt (+JWT_EXPIRES_IN),
    * con tope absoluto de 7 días desde createdAt de la UserSession.
    */
-  async extendSession(userId: number, jti: string | undefined, _req?: any) {
+  async extendSession(userId: number, jti: string | undefined, _req?: any, rememberFlag?: boolean) {
+    const remember = rememberFlag === true;
     if (!jti) {
       throw new UnauthorizedException('Sesión sin jti; vuelve a iniciar sesión.');
     }
@@ -1142,11 +1155,16 @@ export class AuthService {
       throw new UnauthorizedException('Sesión inválida');
     }
 
-    const ABSOLUTE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+    // Con "Recordarme" el tope absoluto es la duración larga (30d por defecto).
+    const ABSOLUTE_MAX_MS = remember
+      ? Math.max(rememberMaxMs(), 7 * 24 * 60 * 60 * 1000)
+      : 7 * 24 * 60 * 60 * 1000;
     const createdMs = session.createdAt.getTime();
     if (Date.now() - createdMs >= ABSOLUTE_MAX_MS) {
       throw new UnauthorizedException(
-        'Sesión máxima alcanzada (7 días). Vuelve a iniciar sesión.',
+        remember
+          ? 'Sesión máxima alcanzada. Vuelve a iniciar sesión.'
+          : 'Sesión máxima alcanzada (7 días). Vuelve a iniciar sesión.',
       );
     }
 
@@ -1160,7 +1178,7 @@ export class AuthService {
 
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.resolveUserPermissions(user, isSuperAdmin);
-    const expiresInRaw = process.env.JWT_EXPIRES_IN || '4h';
+    const expiresInRaw = remember ? rememberExpiresIn() : process.env.JWT_EXPIRES_IN || '4h';
     const expiresMs = this.parseExpiresToMs(expiresInRaw);
     let expiresAt = new Date(Date.now() + expiresMs);
     const absoluteCap = new Date(createdMs + ABSOLUTE_MAX_MS);
@@ -1183,11 +1201,13 @@ export class AuthService {
       isSuperAdmin,
       isPlatformOwner: this.isPlatformOwner(user.email),
       jti,
+      ...(remember ? { rem: true } : {}),
     };
 
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: expiresInRaw as any }),
       expiresAt: expiresAt.toISOString(),
+      rememberMe: remember,
     };
   }
 
@@ -1201,7 +1221,7 @@ export class AuthService {
     if (!token) {
       throw new UnauthorizedException('Sin sesión');
     }
-    let claims: { sub?: number; jti?: string; isClient?: boolean; isBranchUser?: boolean };
+    let claims: { sub?: number; jti?: string; isClient?: boolean; isBranchUser?: boolean; rem?: boolean };
     try {
       claims = this.jwtService.verify(token, { ignoreExpiration: true });
     } catch {
@@ -1235,7 +1255,8 @@ export class AuthService {
 
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.resolveUserPermissions(user, isSuperAdmin);
-    const expiresInRaw = process.env.JWT_EXPIRES_IN || '4h';
+    const remember = claims.rem === true;
+    const expiresInRaw = remember ? rememberExpiresIn() : process.env.JWT_EXPIRES_IN || '4h';
     const expiresAt = new Date(Date.now() + this.parseExpiresToMs(expiresInRaw));
 
     await this.prisma.userSession.update({
@@ -1253,11 +1274,13 @@ export class AuthService {
       isSuperAdmin,
       isPlatformOwner: this.isPlatformOwner(user.email),
       jti,
+      ...(remember ? { rem: true } : {}),
     };
 
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: expiresInRaw as any }),
       expiresAt: expiresAt.toISOString(),
+      rememberMe: remember,
     };
   }
 

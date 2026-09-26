@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Length, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Length, MinLength } from 'class-validator';
 
 export class LoginDto {
   @IsNotEmpty()
@@ -18,4 +18,9 @@ export class LoginDto {
   @IsString()
   @Length(6, 6)
   mfaCode?: string;
+
+  /** "Recordarme": sesión larga (JWT_REMEMBER_EXPIRES_IN, 30d por defecto). */
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
 }
