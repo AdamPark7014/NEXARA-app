@@ -19,7 +19,7 @@ export class ActivityEvidenceReminderCronService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_09, { timeZone: WORKDAY_TIMEZONE })
+  @Cron(CronExpression.EVERY_DAY_AT_9AM, { timeZone: WORKDAY_TIMEZONE })
   async sendDailyReminders() {
     try {
       const total = await this.sendPendingReminders();
