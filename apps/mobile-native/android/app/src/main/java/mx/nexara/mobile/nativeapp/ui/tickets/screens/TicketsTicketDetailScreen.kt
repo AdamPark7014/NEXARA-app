@@ -811,7 +811,7 @@ fun TicketsTicketDetailScreen(
 
                                     Text(
 
-                                        "Este ticket está ${t.estatus.orEmpty().lowercase().ifBlank { "cerrado" }}. " +
+                                        "Este ticket está ${t.estatus?.takeIf { it.isNotBlank() }?.let { NxStatusLabels.label(it).lowercase() } ?: "cerrado"}. " +
                                             "Si necesitas retomarlo, levanta una nueva solicitud.",
 
                                         style = MaterialTheme.typography.bodySmall,
