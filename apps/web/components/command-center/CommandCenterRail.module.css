@@ -1,0 +1,51 @@
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.chip:hover {
+  border-color: color-mix(in srgb, var(--panel-accent, var(--primary)) 40%, var(--border));
+  background: var(--surface-2);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--panel-accent, var(--primary));
+  outline-offset: 2px;
+}
+
+.alert {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+  background: var(--state-warning-bg);
+  color: var(--state-warning-text, var(--text-primary));
+}
+
+.hint {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 520px) {
+  .hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip { transition: none; }
+}

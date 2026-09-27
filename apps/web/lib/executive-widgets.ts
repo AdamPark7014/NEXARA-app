@@ -21,82 +21,43 @@ export type ExecutiveDashboardSnapshot = {
   alerts?: Array<{ level: string; title: string }>;
 };
 
-/** Widgets dinámicos derivados del snapshot ejecutivo (alertas operativas). */
+const count = (n: number, one: string, many: string) => `${n.toLocaleString("es-MX")} ${n === 1 ? one : many}`;
+
+/** Accesos que solo aparecen cuando algo del snapshot ejecutivo requiere atención. */
 export function buildExecutiveDynamicWidgets(
   data: ExecutiveDashboardSnapshot | null | undefined,
 ): CommandWidget[] {
   if (!data) return [];
 
   const widgets: CommandWidget[] = [];
-  const ops = data.operations;
-  const fin = data.finance;
-  const proc = data.procurement;
-  const sales = data.sales;
-
-  if ((ops?.otOverdue ?? 0) > 0) {
-    widgets.push({
-      id: "dyn-ot-overdue",
-      label: `${ops!.otOverdue} OT vencidas`,
-      href: "/ops/dispatch",
-      icon: "⚠️",
-      hint: "Centro de despacho",
-    });
-  }
-  if ((ops?.ticketsOpen ?? 0) > 5) {
-    widgets.push({
-      id: "dyn-tickets",
-      label: `${ops!.ticketsOpen} tickets abiertos`,
-      href: "/ops/support",
-      icon: "🎫",
-      hint: "Bandeja de soporte",
-    });
-  }
-  if ((fin?.overdueInvoices ?? 0) > 0) {
-    widgets.push({
-      id: "dyn-ar-overdue",
-      label: `${fin!.overdueInvoices} facturas vencidas`,
-      href: "/erp/invoicing",
-      icon: "💳",
-      hint: "Cobranza",
-    });
-  }
-  if ((proc?.pendingRequisitions ?? 0) > 0) {
-    widgets.push({
-      id: "dyn-req",
-      label: `${proc!.pendingRequisitions} requisiciones`,
-      href: "/erp/procurement",
-      icon: "📦",
-      hint: "Compras",
-    });
-  }
-  if ((proc?.lowStockItems ?? 0) > 0) {
-    widgets.push({
-      id: "dyn-stock",
-      label: `${proc!.lowStockItems} SKUs críticos`,
-      href: "/erp/warehouse",
-      icon: "📉",
-      hint: "Almacén",
-    });
-  }
-  if ((sales?.hotLeads ?? 0) >= 3) {
-    widgets.push({
-      id: "dyn-leads",
-      label: `${sales!.hotLeads} leads calientes`,
-      href: "/crm/leads",
-      icon: "🔥",
-      hint: "Pipeline comercial",
-    });
-  }
-
+  const otOverdue = data.operations?.otOverdue ?? 0;
+  const tickets = data.operations?.ticketsOpen ?? 0;
+  const overdueInvoices = data.finance?.overdueInvoices ?? 0;
+  const requisitions = data.procurement?.pendingRequisitions ?? 0;
+  const lowStock = data.procurement?.lowStockItems ?? 0;
+  const hotLeads = data.sales?.hotLeads ?? 0;
   const critical = (data.alerts ?? []).filter((a) => a.level === "critical").length;
+
   if (critical > 0) {
-    widgets.push({
-      id: "dyn-alerts",
-      label: `${critical} alertas críticas`,
-      href: "/erp/notifications-center",
-      icon: "🚨",
-      hint: "Centro de notificaciones",
-    });
+    widgets.push({ id: "dyn-alerts", label: count(critical, "alerta crítica", "alertas críticas"), href: "/erp/notifications-center", icon: "🚨", alert: true });
+  }
+  if (otOverdue > 0) {
+    widgets.push({ id: "dyn-ot-overdue", label: count(otOverdue, "orden de trabajo vencida", "órdenes de trabajo vencidas"), href: "/erp/pizarra", icon: "⚠️", alert: true });
+  }
+  if (overdueInvoices > 0) {
+    widgets.push({ id: "dyn-ar-overdue", label: count(overdueInvoices, "factura vencida", "facturas vencidas"), href: "/erp/invoicing", icon: "💳", alert: true });
+  }
+  if (tickets > 5) {
+    widgets.push({ id: "dyn-tickets", label: count(tickets, "ticket abierto", "tickets abiertos"), href: "/erp/notifications-center", icon: "🎫" });
+  }
+  if (requisitions > 0) {
+    widgets.push({ id: "dyn-req", label: count(requisitions, "requisición por revisar", "requisiciones por revisar"), href: "/erp/procurement", icon: "📦" });
+  }
+  if (lowStock > 0) {
+    widgets.push({ id: "dyn-stock", label: count(lowStock, "producto bajo mínimo", "productos bajo mínimo"), href: "/erp/warehouse", icon: "📉" });
+  }
+  if (hotLeads >= 3) {
+    widgets.push({ id: "dyn-leads", label: count(hotLeads, "prospecto caliente", "prospectos calientes"), href: "/erp/cotizaciones", icon: "🔥" });
   }
 
   return widgets;
@@ -109,7 +70,7 @@ export type ExecutiveBiDrillLink = {
   desc: string;
 };
 
-/** Enlaces de drill-down desde vista ejecutiva hacia BI. */
+/** Enlaces para profundizar desde la vista ejecutiva hacia Analítica. */
 export function buildExecutiveBiDrillLinks(
   data: ExecutiveDashboardSnapshot | null | undefined,
   headline?: { revenueMoMChange?: number; pipelineValue?: number },
@@ -117,7 +78,7 @@ export function buildExecutiveBiDrillLinks(
   const links: ExecutiveBiDrillLink[] = [
     {
       id: "bi-intelligence",
-      label: "Inteligencia y recomendaciones",
+      label: "Hallazgos y recomendaciones",
       href: "/erp/analytics/bi?section=intelligence",
       desc: "Qué pasa, por qué y qué hacer",
     },
@@ -125,7 +86,7 @@ export function buildExecutiveBiDrillLinks(
       id: "bi-margins",
       label: "Margen por línea de negocio",
       href: "/erp/analytics/bi?section=margins",
-      desc: "Presupuesto vs costo",
+      desc: "Presupuesto contra costo real",
     },
   ];
 
@@ -137,34 +98,34 @@ export function buildExecutiveBiDrillLinks(
       id: "bi-margins-alert",
       label: `Ingresos ${mom}% vs mes anterior`,
       href: "/erp/analytics/bi?section=margins",
-      desc: "Revisar márgenes y drivers",
+      desc: "Revisa márgenes y causas",
     });
   }
 
   if ((data.operations?.otOverdue ?? 0) > 0 || (data.operations?.otOpen ?? 0) > 10) {
     links.push({
       id: "bi-engineers",
-      label: "Eficiencia de ingenieros",
+      label: "Productividad de ingenieros",
       href: "/erp/analytics/bi?section=engineers",
-      desc: "Cierre de OT y tiempos",
+      desc: "Órdenes cerradas y tiempos",
     });
   }
 
   if ((data.procurement?.lowStockItems ?? 0) > 0) {
     links.push({
       id: "bi-clients",
-      label: "ROI por cliente",
+      label: "Rentabilidad por cliente",
       href: "/erp/analytics/bi?section=clients",
-      desc: "Drill-down a Customer 360",
+      desc: "Qué clientes dejan más margen",
     });
   }
 
   if ((headline?.pipelineValue ?? 0) > 0) {
     links.push({
       id: "bi-pipeline",
-      label: "Pipeline y forecast",
-      href: "/crm/pipeline",
-      desc: "Oportunidades activas",
+      label: "Cotizaciones en curso",
+      href: "/erp/cotizaciones",
+      desc: "Oportunidades abiertas",
     });
   }
 
