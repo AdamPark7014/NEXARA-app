@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import type { Socket } from "socket.io-client";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import PanelTabs from "@/components/ui/PanelTabs";
+import MetricStrip from "@/components/ui/MetricStrip";
+import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { IconLabel } from "@/components/ui/IconBadge";
 import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
 import { stripLeadingEmoji } from "@/lib/notification-kind";
@@ -23,6 +25,7 @@ import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
 import { toast } from "@/components/Toast";
 import { fetchActivityFeed, type ActivityFeedItem } from "@/lib/activity-feed-api";
@@ -32,6 +35,7 @@ import {
   isCrossPanelHref,
   resolveCrossPanelHref,
 } from "@/lib/cross-panel-handoff";
+import s from "./notifications.module.css";
 
 interface Notif {
   id: number;
@@ -47,6 +51,8 @@ interface Notif {
 type ViewMode = "action" | "notifications" | "feed";
 type CategoryFilter = "all" | "ops" | "attendance" | "chat" | "other";
 
+const VIEW_PARAM: Record<ViewMode, string | null> = { action: null, notifications: "all", feed: "feed" };
+
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
     ...opts,
@@ -56,14 +62,20 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
   return res.json();
 }
 
+const shortDate = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" });
+
 function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const m = Math.floor((Date.now() - t) / 60000);
   if (m < 1) return "Hace un momento";
   if (m < 60) return `Hace ${m} min`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `Hace ${h}h`;
-  return `Hace ${Math.floor(h / 24)}d`;
+  if (h < 24) return `Hace ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "Ayer";
+  if (d < 7) return `Hace ${d} días`;
+  return shortDate.format(t);
 }
 
 function bucketCategory(category: string): CategoryFilter {
@@ -98,95 +110,119 @@ const CATEGORY_LABEL: Record<string, string> = {
   celebraciones: "Celebración",
 };
 
+const FEED_KIND_LABEL: Record<ActivityFeedItem["kind"], string> = {
+  notification: "Aviso",
+  audit: "Cambio",
+  sales: "Ventas",
+  ops: "Operación",
+  crm: "Clientes",
+  procurement: "Compras",
+};
+
+const byPriorityThenDate = (a: Notif, b: Notif) => {
+  const pa = a.priority === "high" ? 0 : a.isRead ? 2 : 1;
+  const pb = b.priority === "high" ? 0 : b.isRead ? 2 : 1;
+  if (pa !== pb) return pa - pb;
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+};
+
+function SkeletonList() {
+  return (
+    <div className={s.list} aria-busy="true" aria-label="Cargando">
+      {[0, 1, 2, 3].map((i) => <div key={i} className={s.skeleton} />)}
+    </div>
+  );
+}
+
 export default function NotificationsCenterPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const socketRef = useRef<Socket | null>(null);
 
-  const initialView: ViewMode =
-    searchParams.get("view") === "feed"
-      ? "feed"
-      : searchParams.get("view") === "all"
-        ? "notifications"
-        : "action";
-  const [view, setView] = useState<ViewMode>(initialView);
+  const [view, setView] = useState<ViewMode>("action");
   const [category, setCategory] = useState<CategoryFilter>("all");
-  const [notifs, setNotifs] = useState<Notif[]>([]);
-  const [feed, setFeed] = useState<ActivityFeedItem[]>([]);
+  const [notifs, setNotifs] = useState<Notif[] | null>(null);
+  const [feed, setFeed] = useState<ActivityFeedItem[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [feedLoading, setFeedLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
 
   useEffect(() => {
-    const v = searchParams.get("view");
+    const v = new URLSearchParams(window.location.search).get("view");
     if (v === "feed") setView("feed");
     else if (v === "all") setView("notifications");
-    else setView("action");
-  }, [searchParams]);
+  }, []);
+
+  const changeView = useCallback((next: ViewMode) => {
+    setView(next);
+    const url = new URL(window.location.href);
+    const param = VIEW_PARAM[next];
+    if (param) url.searchParams.set("view", param);
+    else url.searchParams.delete("view");
+    window.history.replaceState(null, "", url.toString());
+  }, []);
 
   const loadNotifs = useCallback(async () => {
-    if (!token) return;
-    const data = await apiFetch("notifications?limit=80", token);
-    setNotifs(Array.isArray(data) ? data : (data.data ?? []));
-  }, [token]);
-
-  const loadFeed = useCallback(async () => {
-    if (!token) return;
-    const data = await fetchActivityFeed(token, 60);
-    setFeed(data.items);
-  }, [token]);
-
-  const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
     try {
-      await loadNotifs();
-      if (view === "feed") await loadFeed();
+      const data = await apiFetch("notifications?limit=80", token);
+      setNotifs(Array.isArray(data) ? data : (data.data ?? []));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(formatApiError(e, "No pudimos cargar tus notificaciones."));
     } finally {
       setLoading(false);
     }
-  }, [token, view, loadNotifs, loadFeed]);
+  }, [token]);
+
+  const loadFeed = useCallback(async () => {
+    if (!token) return;
+    setFeedLoading(true);
+    setFeedError(null);
+    try {
+      const data = await fetchActivityFeed(token, 60);
+      setFeed(data.items);
+    } catch (e: unknown) {
+      setFeedError(formatApiError(e, "No pudimos cargar la actividad reciente."));
+    } finally {
+      setFeedLoading(false);
+    }
+  }, [token]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadNotifs();
+  }, [loadNotifs]);
+
+  useEffect(() => {
+    if (view === "feed" && feed === null) void loadFeed();
+  }, [view, feed, loadFeed]);
 
   useEffect(() => {
     if (!token) return;
     const socket = createRealtimeSocket(getSocketBaseUrl(), { auth: { token } });
-    socketRef.current = socket;
-
     socket.on("notification:new", (payload: Notif) => {
-      setNotifs((prev) => [payload, ...prev.filter((n) => n.id !== payload.id)]);
+      setNotifs((prev) => [payload, ...(prev ?? []).filter((n) => n.id !== payload.id)]);
     });
     socket.on("notification:read", (payload: { id: number }) => {
-      setNotifs((prev) => prev.map((n) => (n.id === payload.id ? { ...n, isRead: true } : n)));
+      setNotifs((prev) => prev?.map((n) => (n.id === payload.id ? { ...n, isRead: true } : n)) ?? prev);
     });
     socket.on("notifications:read-all", () => {
-      setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setNotifs((prev) => prev?.map((n) => ({ ...n, isRead: true })) ?? prev);
     });
-
     return () => {
       socket.disconnect();
-      socketRef.current = null;
     };
   }, [token]);
-
-  useEffect(() => {
-    if (view === "feed" && token) void loadFeed();
-  }, [view, token, loadFeed]);
 
   const markRead = async (id: number) => {
     if (!token) return;
     try {
       await apiFetch(`notifications/${id}/read`, token, { method: "PATCH" });
-      setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+      setNotifs((prev) => prev?.map((n) => (n.id === id ? { ...n, isRead: true } : n)) ?? prev);
     } catch (e: unknown) {
-      toast.error("No se pudo marcar como leída: " + (e instanceof Error ? e.message : "error"));
+      toast.error(`No se pudo marcar como leída. ${formatApiError(e, "")}`.trim());
     }
   };
 
@@ -194,9 +230,9 @@ export default function NotificationsCenterPage() {
     if (!token) return;
     try {
       await apiFetch("notifications/read/all", token, { method: "PATCH" });
-      setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setNotifs((prev) => prev?.map((n) => ({ ...n, isRead: true })) ?? prev);
     } catch (e: unknown) {
-      toast.error("No se pudieron marcar todas: " + (e instanceof Error ? e.message : "error"));
+      toast.error(`No se pudieron marcar todas como leídas. ${formatApiError(e, "")}`.trim());
     }
   };
 
@@ -204,22 +240,20 @@ export default function NotificationsCenterPage() {
     if (!token) return;
     try {
       await apiFetch(`notifications/${id}`, token, { method: "DELETE" });
-      setNotifs((prev) => prev.filter((n) => n.id !== id));
+      setNotifs((prev) => prev?.filter((n) => n.id !== id) ?? prev);
     } catch (e: unknown) {
-      toast.error("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
+      toast.error(`No se pudo eliminar. ${formatApiError(e, "")}`.trim());
     }
   };
 
   const openPath = (path: string) => {
     const normalized = normalizeLegacyRelatedUrl(path);
     const current = detectCurrentPanelId();
-    const userJson = user ? JSON.stringify(user) : null;
     if (isCrossPanelHref(normalized, current)) {
-      window.location.assign(resolveCrossPanelHref(normalized, userJson, current));
+      window.location.assign(resolveCrossPanelHref(normalized, user ? JSON.stringify(user) : null, current));
       return;
     }
-    const local = resolveCrossPanelHref(normalized, null, current);
-    router.push(local);
+    router.push(resolveCrossPanelHref(normalized, null, current));
   };
 
   const openNotif = (n: Notif) => {
@@ -227,93 +261,83 @@ export default function NotificationsCenterPage() {
     if (n.relatedUrl) openPath(n.relatedUrl);
   };
 
-  const unread = notifs.filter((n) => !n.isRead).length;
-  const actionable = useMemo(() => notifs.filter(isActionable), [notifs]);
+  const list = useMemo(() => notifs ?? [], [notifs]);
+  const stats = useMemo(() => {
+    let unread = 0;
+    let high = 0;
+    for (const n of list) {
+      if (!n.isRead) {
+        unread++;
+        if (n.priority === "high") high++;
+      }
+    }
+    return { unread, high };
+  }, [list]);
+  const actionable = useMemo(() => list.filter(isActionable), [list]);
 
   const sortedNotifs = useMemo(() => {
     const base =
       view === "action"
         ? actionable
         : category === "all"
-          ? notifs
-          : notifs.filter((n) => bucketCategory(n.category) === category);
-    return [...base].sort((a, b) => {
-      const pa = a.priority === "high" ? 0 : a.isRead ? 2 : 1;
-      const pb = b.priority === "high" ? 0 : b.isRead ? 2 : 1;
-      if (pa !== pb) return pa - pb;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  }, [view, actionable, notifs, category]);
+          ? list
+          : list.filter((n) => bucketCategory(n.category) === category);
+    return [...base].sort(byPriorityThenDate);
+  }, [view, actionable, list, category]);
 
-  const highCount = notifs.filter((n) => !n.isRead && n.priority === "high").length;
+  const firstLoad = notifs === null && loading;
 
   return (
     <>
       <PageHeader
-        eyebrow="NEXARA · Decisiones"
-        title="Centro de notificaciones"
-        subtitle="Prioriza SLA, cotizaciones y OC — no ruido. Inbox personal + feed de señales de negocio."
+        eyebrow="Hoy"
+        title="Notificaciones"
+        subtitle="Lo que necesita tu atención primero, y todo lo demás en orden."
         actions={
-          unread > 0 ? (
-            <Button variant="secondary" onClick={markAllRead}>
-              Marcar todas leídas ({unread})
+          <>
+            <Button variant="ghost" iconLeft="↻" onClick={() => void (view === "feed" ? loadFeed() : loadNotifs())} loading={view === "feed" ? feedLoading : loading && notifs !== null} disabled={view === "feed" ? feedLoading : loading}>
+              Actualizar
             </Button>
-          ) : undefined
+            {stats.unread > 0 && (
+              <Button variant="secondary" iconLeft="✓" onClick={() => void markAllRead()}>
+                Marcar todas como leídas
+              </Button>
+            )}
+          </>
         }
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-          gap: 10,
-          marginBottom: 16,
-        }}
-      >
-        <div style={kpiBox}>
-          <div style={kpiLabel}>Sin leer</div>
-          <div style={kpiValue}>{loading ? "…" : unread}</div>
+      {notifs !== null && (
+        <div className={s.metrics}>
+          <MetricStrip
+            ariaLabel="Resumen de notificaciones"
+            metrics={[
+              { label: "sin leer", value: stats.unread, onClick: () => changeView("notifications") },
+              { label: "para atender ahora", value: actionable.length, tone: actionable.length ? "warning" : "default", onClick: () => changeView("action") },
+              { label: "prioridad alta", value: stats.high, tone: stats.high ? "danger" : "default" },
+            ]}
+          />
         </div>
-        <div style={kpiBox}>
-          <div style={kpiLabel}>Acción ahora</div>
-          <div style={{ ...kpiValue, color: actionable.length ? "var(--warning)" : "var(--text-primary)" }}>
-            {loading ? "…" : actionable.length}
-          </div>
-        </div>
-        <div style={kpiBox}>
-          <div style={kpiLabel}>Prioridad alta</div>
-          <div style={{ ...kpiValue, color: highCount ? "var(--danger)" : "var(--text-primary)" }}>
-            {loading ? "…" : highCount}
-          </div>
-        </div>
-      </div>
+      )}
 
       <PanelTabs
         ariaLabel="Vistas de notificaciones"
         value={view}
-        onChange={setView}
+        onChange={changeView}
         tabs={[
-          {
-            key: "action",
-            label: <IconLabel icon={TaskAltIcon} size={16}>Acción ahora</IconLabel>,
-            badge: actionable.length || undefined,
-          },
-          {
-            key: "notifications",
-            label: <IconLabel icon={InboxOutlinedIcon} size={16}>Inbox</IconLabel>,
-            badge: unread || undefined,
-          },
-          { key: "feed", label: <IconLabel icon={InsightsOutlinedIcon} size={16}>Señales de negocio</IconLabel> },
+          { key: "action", label: <IconLabel icon={TaskAltIcon} size={16}>Para atender</IconLabel>, badge: actionable.length || undefined },
+          { key: "notifications", label: <IconLabel icon={InboxOutlinedIcon} size={16}>Todas</IconLabel>, badge: stats.unread || undefined },
+          { key: "feed", label: <IconLabel icon={InsightsOutlinedIcon} size={16}>Actividad reciente</IconLabel> },
         ]}
       />
 
       {view === "notifications" && (
         <PanelTabs
-          ariaLabel="Filtro por dominio"
+          ariaLabel="Filtrar por tema"
           value={category}
           onChange={setCategory}
           tabs={[
-            { key: "all", label: <IconLabel icon={NotificationsNoneOutlinedIcon} size={16}>Todas</IconLabel> },
+            { key: "all", label: <IconLabel icon={NotificationsNoneOutlinedIcon} size={16}>Todos los temas</IconLabel> },
             { key: "ops", label: <IconLabel icon={AssignmentOutlinedIcon} size={16}>Actividades</IconLabel> },
             { key: "attendance", label: <IconLabel icon={EventAvailableOutlinedIcon} size={16}>Asistencia</IconLabel> },
             { key: "chat", label: <IconLabel icon={ChatBubbleOutlineIcon} size={16}>Chat</IconLabel> },
@@ -322,204 +346,141 @@ export default function NotificationsCenterPage() {
         />
       )}
 
-      <Section
-        title={
-          view === "feed"
-            ? "Señales accionables (OT, tickets, cotizaciones, OC)"
-            : view === "action"
-              ? loading
-                ? "Cargando…"
-                : `${actionable.length} requieren decisión`
-              : loading
-                ? "Cargando…"
-                : `${unread} sin leer`
-        }
-      >
-        {error && (
-          <div
-            style={{
-              padding: 14,
-              borderRadius: 10,
-              background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-              color: "var(--danger)",
-              marginBottom: 12,
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {(view === "action" || view === "notifications") && (
-          <>
-            {!loading && sortedNotifs.length === 0 && !error && (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
-                {view === "action" ? "Nada urgente en tu bandeja." : "Sin notificaciones."}
-              </div>
-            )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {sortedNotifs.map((n) => (
-                <article
-                  key={n.id}
-                  onClick={() => n.relatedUrl && openNotif(n)}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "auto minmax(0, 1fr) auto",
-                    gap: 10,
-                    alignItems: "start",
-                    padding: "10px 12px",
-                    cursor: n.relatedUrl ? "pointer" : "default",
-                    background: !n.isRead
-                      ? "color-mix(in srgb, var(--primary) 5%, transparent)"
-                      : "var(--surface)",
-                    border: "1px solid var(--nx-panel-hairline, var(--border))",
-                    borderLeft:
-                      n.priority === "high"
-                        ? "3px solid var(--danger)"
-                        : !n.isRead
-                          ? "3px solid var(--panel-accent, var(--primary))"
-                          : "1px solid var(--nx-panel-hairline, var(--border))",
-                    borderRadius: 8,
-                  }}
-                >
-                  <NotificationKindIcon category={n.category} title={n.title} size={34} muted={n.isRead} />
-                  <div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: !n.isRead ? 700 : 550, fontSize: 13 }}>{stripLeadingEmoji(n.title)}</span>
-                      {n.priority === "high" && <Tag variant="danger">Alta</Tag>}
+      {view !== "feed" && (
+        <Section
+          title={
+            notifs === null
+              ? view === "action" ? "Para atender" : "Todas"
+              : view === "action"
+                ? actionable.length === 1 ? "1 necesita tu atención" : `${actionable.length} necesitan tu atención`
+                : stats.unread === 1 ? "1 sin leer" : `${stats.unread} sin leer`
+          }
+        >
+          {error && (
+            <InlineAlert
+              variant={notifs ? "warning" : "danger"}
+              message={notifs ? `No pudimos actualizar; mostramos lo último que cargó. ${error}` : error}
+              action={<Button size="sm" variant="secondary" onClick={() => void loadNotifs()}>Reintentar</Button>}
+            />
+          )}
+          {firstLoad ? (
+            <SkeletonList />
+          ) : notifs !== null && sortedNotifs.length === 0 ? (
+            <EmptyState
+              icon="🔔"
+              title={view === "action" ? "Nada urgente" : "Sin notificaciones"}
+              description={
+                view === "action"
+                  ? "No tienes pendientes que requieran acción inmediata."
+                  : category === "all"
+                    ? "Cuando pase algo importante te avisaremos aquí."
+                    : "No hay notificaciones de este tema."
+              }
+              action={view === "action" && list.length > 0 ? (
+                <Button variant="secondary" onClick={() => changeView("notifications")}>Ver todas</Button>
+              ) : undefined}
+            />
+          ) : (
+            <ul className={s.list}>
+              {sortedNotifs.map((n) => {
+                const content = (
+                  <>
+                    <span className={s.head}>
+                      <span className={s.title}>{stripLeadingEmoji(n.title)}</span>
+                      {n.priority === "high" && <Tag variant="danger">Prioridad alta</Tag>}
                       <Tag variant="neutral">
                         <NotificationKindIcon category={n.category} variant="inline" size={14} muted />
-                        {CATEGORY_LABEL[n.category] ?? n.category}
+                        {CATEGORY_LABEL[n.category] ?? "Aviso"}
                       </Tag>
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3, lineHeight: 1.35 }}>
-                      {stripLeadingEmoji(n.message)}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
-                      {timeAgo(n.createdAt)}
-                      {n.relatedUrl ? " · Abrir →" : ""}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {!n.isRead && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void markRead(n.id);
-                        }}
-                        title="Marcar como leída"
-                        aria-label="Marcar como leída"
-                        style={iconBtn}
-                      >
-                        <CheckIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    </span>
+                    <span className={s.message}>{stripLeadingEmoji(n.message)}</span>
+                    <span className={s.meta}>
+                      <time dateTime={n.createdAt}>{timeAgo(n.createdAt)}</time>
+                      {!n.isRead && " · Sin leer"}
+                      {n.relatedUrl && <span className={s.open}> · Abrir →</span>}
+                    </span>
+                  </>
+                );
+                return (
+                  <li
+                    key={n.id}
+                    className={`${s.item} ${!n.isRead ? s.itemUnread : ""} ${n.priority === "high" ? s.itemHigh : ""}`}
+                  >
+                    <span className={s.kindIcon}>
+                      <NotificationKindIcon category={n.category} title={n.title} size={34} muted={n.isRead} />
+                    </span>
+                    {n.relatedUrl ? (
+                      <button type="button" className={s.body} onClick={() => openNotif(n)}>
+                        {content}
                       </button>
+                    ) : (
+                      <div className={s.body}>{content}</div>
                     )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void remove(n.id);
-                      }}
-                      title="Eliminar"
-                      aria-label="Eliminar"
-                      style={iconBtn}
-                    >
-                      <CloseIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </>
-        )}
+                    <div className={s.actions}>
+                      {!n.isRead && (
+                        <button type="button" className={s.iconBtn} onClick={() => void markRead(n.id)} title="Marcar como leída" aria-label="Marcar como leída">
+                          <CheckIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                        </button>
+                      )}
+                      <button type="button" className={s.iconBtn} onClick={() => void remove(n.id)} title="Eliminar" aria-label="Eliminar notificación">
+                        <CloseIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+      )}
 
-        {view === "feed" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {loading && (
-              <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
-                Cargando señales…
-              </div>
-            )}
-            {!loading && feed.length === 0 && (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
-                Sin señales de negocio en tu alcance.
-              </div>
-            )}
-            {feed.map((item) => (
-              <article
-                key={item.id}
-                onClick={() => item.deepLink && openPath(item.deepLink)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: 10,
-                  padding: "10px 12px",
-                  cursor: item.deepLink ? "pointer" : "default",
-                  background: "var(--surface)",
-                  border: "1px solid var(--nx-panel-hairline, var(--border))",
-                  borderLeft:
-                    item.priority === "high"
-                      ? "3px solid var(--danger)"
-                      : "1px solid var(--nx-panel-hairline, var(--border))",
-                  borderRadius: 8,
-                }}
-              >
-                <div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 650, fontSize: 13 }}>{stripLeadingEmoji(item.title)}</span>
-                    {item.priority === "high" && <Tag variant="danger">Alta</Tag>}
-                    <Tag variant="neutral">{item.kind}</Tag>
-                  </div>
-                  {item.subtitle && (
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>{item.subtitle}</div>
-                  )}
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
-                    {timeAgo(item.at)}
-                    {item.actorName && <> · {item.actorName}</>}
-                    {item.deepLink ? " · Abrir →" : ""}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </Section>
+      {view === "feed" && (
+        <Section title="Actividad reciente" subtitle="Movimientos del negocio que puedes ver: órdenes, tickets, cotizaciones y compras.">
+          {feedError && (
+            <InlineAlert
+              variant={feed ? "warning" : "danger"}
+              message={feedError}
+              action={<Button size="sm" variant="secondary" onClick={() => void loadFeed()}>Reintentar</Button>}
+            />
+          )}
+          {feed === null && feedLoading ? (
+            <SkeletonList />
+          ) : feed !== null && feed.length === 0 ? (
+            <EmptyState icon="📡" title="Sin actividad reciente" description="Aún no hay movimientos del negocio en tu alcance." />
+          ) : (
+            <ul className={s.list}>
+              {(feed ?? []).map((item) => {
+                const content = (
+                  <>
+                    <span className={s.head}>
+                      <span className={s.title}>{stripLeadingEmoji(item.title)}</span>
+                      {item.priority === "high" && <Tag variant="danger">Prioridad alta</Tag>}
+                      <Tag variant="neutral">{FEED_KIND_LABEL[item.kind] ?? "Aviso"}</Tag>
+                    </span>
+                    {item.subtitle && <span className={s.message}>{item.subtitle}</span>}
+                    <span className={s.meta}>
+                      <time dateTime={item.at}>{timeAgo(item.at)}</time>
+                      {item.actorName && <> · {item.actorName}</>}
+                      {item.deepLink && <span className={s.open}> · Abrir →</span>}
+                    </span>
+                  </>
+                );
+                return (
+                  <li key={item.id} className={`${s.item} ${s.itemFeed} ${item.priority === "high" ? s.itemHigh : ""}`}>
+                    {item.deepLink ? (
+                      <button type="button" className={s.body} onClick={() => openPath(item.deepLink!)}>
+                        {content}
+                      </button>
+                    ) : (
+                      <div className={s.body}>{content}</div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+      )}
     </>
   );
 }
-
-const kpiBox: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 8,
-  border: "1px solid var(--nx-panel-hairline, var(--border))",
-  background: "var(--surface)",
-};
-
-const kpiLabel: React.CSSProperties = {
-  fontSize: 10.5,
-  fontWeight: 700,
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  color: "var(--text-tertiary)",
-};
-
-const kpiValue: React.CSSProperties = {
-  fontSize: 22,
-  fontWeight: 750,
-  fontVariantNumeric: "tabular-nums",
-  marginTop: 2,
-  letterSpacing: "-0.02em",
-};
-
-const iconBtn: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  fontSize: 14,
-  color: "var(--text-tertiary)",
-  padding: "4px 6px",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: 6,
-};
