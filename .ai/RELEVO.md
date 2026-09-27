@@ -1,13 +1,30 @@
 # RELEVO
 
 - **Último turno:** cursor
-- **Fecha:** 2026-09-27 (madrugada)
-- **Rama canónica:** `main` = `a393c6cb`. `mejora/calidad-y-web` apunta al mismo commit.
-- **Servidor:** `/var/www/nexara-app` ahora sigue `main` (antes `mejora/calidad-y-web`). `deploy/update.sh` despliega la rama actual.
-- **Checkout local:** `C:\dev\apps\NEXARA-app` en `main`.
+- **Fecha:** 2026-09-27
+- **Regla:** se trabaja **siempre directo en `main`**: sin ramas, worktrees ni PRs (Adam es el único programador).
+  Está en las reglas de Cursor, `~/.claude/CLAUDE.md`, `C:\dev\CLAUDE.md`, `FUSION-PROTOCOL.md` y la plantilla EXEC-PACKET.
+- **Única rama:** `main` en local, en GitHub y en el servidor. Cero worktrees. `mejora/calidad-y-web` ya no existe.
+- **Servidor:** `/var/www/nexara-app` sigue `main`; `deploy/update.sh` despliega la rama actual.
+- **Respaldo de todo lo borrado:** `C:\dev\.ai\archivo-nexara-2026-09-27\` — `todas-las-ramas.bundle`
+  (224 ramas) + parches/zips de los 39 worktrees con cambios (`final\` = copia justo antes de borrar).
+  Recuperar una rama: `git fetch C:\dev\.ai\archivo-nexara-2026-09-27\todas-las-ramas.bundle "refs/heads/<rama>:refs/heads/<rama>"`.
+
+## Hecho: consolidación en `main` (tarde)
+- Fusionadas las 5 ramas con código nuevo sin conflicto: `ci-fixes` (CI, seeds, guardia release Android),
+  `erp-automation-map` (doc), recordatorio diario 9 am de evidencias pendientes >24 h, aviso de SLA
+  vencido a la jerarquía, y `revert-pr44-soporte`.
+- Corregido al fusionar: `EVERY_DAY_AT_09` → `EVERY_DAY_AT_9AM`; bloque `enc_soporte` duplicado en
+  `url-matrix.ts` (se queda el de `main`, que incluye ver flotilla); expectativa vieja de `ci-fixes` que
+  mandaba a `administrativo` a «Mis vehículos».
+- Verificado: API `tsc` 0, jest rbac/evidence/cron 134 ok; web `tsc` 0, vitest solo las 6 fallas previas;
+  Android `assembleDebug` OK. Deploy `8b625478` (solo API; `apps/web` idéntico a producción).
+- No fusionadas (en el respaldo): `feat/chat-android-whatsapp` y `feat/ios-chat-whatsapp` (lógica de
+  menciones/adjuntos/cola de envío con tests, sin conectar a la UI; su parte web choca con `main`) y
+  ~50 ramas viejas que chocan con `main`.
 
 ## Hecho: pulido UI/UX del ERP Core + apps móviles
-Nueve carriles en paralelo (un writer por worktree), integrados y fusionados:
+Nueve carriles en paralelo, integrados y fusionados en `main`:
 - **Sistema de diseño y shell:** tokens `--ui-*` (espaciado, tipografía, elevación, movimiento, z-index,
   `--ui-touch-min`), `Skeleton`/`PageSkeleton`/`PanelError`, `erp/loading|error|not-found.tsx`, menú
   lateral colapsable y recordado, cajón móvil táctil, paleta de comandos diferida, `Modal` (hoja en móvil,
@@ -51,7 +68,7 @@ Nueve carriles en paralelo (un writer por worktree), integrados y fusionados:
 - Notificaciones/Analítica/Reuniones leen `?tab` solo al cargar.
 - El contenedor local `nexara-web-dev` (localhost:3000) corre `next start` con un build viejo horneado:
   `docker compose up -d --build web` en `C:\dev\apps\NEXARA-app` para verlo al día.
-- Hay ~80 worktrees/ramas viejas de otros agentes en `C:\dev\apps\_worktrees`; no se tocaron.
+- `/core/login` redirige a `/erp/login` (404) por el remapeo genérico `/core` → `/erp`; el login real es `/login`.
 - Disco del servidor ~85 %.
 
 ## No tocar
