@@ -23,7 +23,7 @@ import { ButtonHTMLAttributes, forwardRef, ReactNode } from "react";
  */
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "accent" | "link";
-type Size = "sm" | "md" | "lg";
+type Size = "xs" | "sm" | "md" | "lg";
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -38,6 +38,8 @@ const SIZES: Record<Size, { height: number; padX: number; fontSize: number; radi
   // 32/13, no 30/12: a 12px el texto de un botón se lee barato, y era parte
   // de por qué las pantallas se sentían poco serias. Es el tamaño que fija
   // .ai/DISENO-FINANZAS.md para todo lo que no es la acción principal.
+  // xs: acciones dentro de una fila de tabla o un chip; nunca la acción principal.
+  xs: { height: 28, padX: 10, fontSize: 12.5, radius: 7, iconSize: 14 },
   sm: { height: 32, padX: 12, fontSize: 13, radius: 8, iconSize: 15 },
   md: { height: 36, padX: 14, fontSize: 13, radius: 9, iconSize: 15 },
   lg: { height: 44, padX: 20, fontSize: 14, radius: 10, iconSize: 16 },
@@ -121,7 +123,8 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
       aria-label={resolvedLabel}
       aria-busy={loading || undefined}
       title={resolvedTitle}
-      className={["nx-btn", `nx-btn--${variant}`, className].filter(Boolean).join(" ")}
+      className={["nx-btn", `nx-btn--${variant}`, `nx-btn--${size}`, className].filter(Boolean).join(" ")}
+      data-loading={loading ? "true" : undefined}
       style={{
         position: "relative",
         display: "inline-flex",
@@ -132,11 +135,11 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
         padding: variant === "link" ? "0 2px" : `0 ${iconOnly ? Math.max(8, s.padX - 4) : s.padX}px`,
         fontSize: s.fontSize,
         borderRadius: variant === "link" ? 6 : s.radius,
-        fontFamily: "var(--nx-font-ui, 'Inter Tight', 'Manrope', sans-serif)",
+        fontFamily: "var(--nx-font-ui, var(--ui-font, 'Inter', sans-serif))",
         fontWeight: 600,
         letterSpacing: "0.005em",
         whiteSpace: "nowrap",
-        cursor: disabled || loading ? "not-allowed" : "pointer",
+        cursor: loading ? "progress" : disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
         width: fullWidth ? "100%" : undefined,
         // Corta y natural: no hay nada que celebrar al pasar el ratón.
@@ -247,6 +250,18 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
         /* Pulsado: un píxel. Se siente, no se ve. */
         .nx-btn:active:not(:disabled) {
           transform: translateY(1px);
+        }
+
+        /* Pantalla táctil: objetivo mínimo de 40 px aunque el botón se dibuje
+           más bajo (sm/md). El alto visual no cambia en escritorio. */
+        @media (pointer: coarse) {
+          .nx-btn--sm,
+          .nx-btn--md {
+            min-height: 40px;
+          }
+          .nx-btn--link {
+            min-height: 0;
+          }
         }
 
         @media (prefers-reduced-motion: reduce) {

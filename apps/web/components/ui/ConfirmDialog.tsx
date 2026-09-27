@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Button from "./Button";
+import styles from "./overlay.module.scss";
+import { useScrollLock } from "./useScrollLock";
 
 export interface ConfirmState {
   message: string;
@@ -24,12 +26,16 @@ interface Props {
  * Usage:
  *   setConfirmState({ message: "¿…?", confirmLabel: "Confirmar", danger: false, fn: async () => { … } });
  *   <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+ *
+ * Si la acción es destructiva, el foco inicial cae en «Cancelar»: un Enter
+ * por inercia no borra nada.
  */
 export default function ConfirmDialog({ state, onClose, danger = true }: Props) {
   const titleId = useId();
   const msgId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
   /**
    * Cerrojo síncrono: `busy` deshabilita el botón, pero un doble clic rápido
    * entra dos veces antes del repintado (p. ej. Marcar pagado).
@@ -39,6 +45,8 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
 
   const isDanger = state?.danger ?? danger;
 
+  useScrollLock(Boolean(state));
+
   useEffect(() => {
     if (!state) {
       busyRef.current = false;
@@ -46,11 +54,12 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
       return;
     }
     const prev = document.activeElement as HTMLElement | null;
-    confirmBtnRef.current?.focus();
+    (isDanger ? cancelBtnRef.current : confirmBtnRef.current)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !busyRef.current) {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
         return;
       }
@@ -75,7 +84,7 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
       document.removeEventListener("keydown", onKey);
       prev?.focus?.();
     };
-  }, [state, onClose]);
+  }, [state, onClose, isDanger]);
 
   if (!state) return null;
 
@@ -93,73 +102,33 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
   };
 
   return (
-    <>
-      <div
-        role="presentation"
-        onClick={() => {
-          if (!busyRef.current) onClose();
-        }}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.35)",
-          zIndex: 1000,
-          backdropFilter: "blur(2px)",
-        }}
-      />
-
+    <div
+      role="presentation"
+      className={styles.scrim}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busyRef.current) onClose();
+      }}
+    >
       <div
         ref={panelRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={state.title ? titleId : msgId}
         aria-describedby={msgId}
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          zIndex: 1001,
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 16,
-          padding: "24px 28px",
-          width: "min(420px, 90vw)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
-        }}
+        aria-busy={busy || undefined}
+        className={`${styles.panel} ${styles.confirm}`}
       >
         {state.title ? (
-          <h2
-            id={titleId}
-            style={{
-              margin: "0 0 10px",
-              fontSize: 16,
-              fontWeight: 700,
-              color: "var(--text-primary)",
-            }}
-          >
+          <h2 id={titleId} className={styles.confirmTitle}>
             {state.title}
           </h2>
         ) : null}
-        <p
-          id={msgId}
-          style={{
-            margin: "0 0 22px",
-            fontSize: 14.5,
-            lineHeight: 1.55,
-            color: "var(--text-primary)",
-            fontWeight: 500,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "break-word",
-            maxHeight: "calc(100vh - 200px)",
-            overflowY: "auto",
-          }}
-        >
+        <p id={msgId} className={styles.confirmMessage}>
           {state.message}
         </p>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
+        <div className={styles.confirmActions}>
+          <Button ref={cancelBtnRef} variant="ghost" onClick={onClose} disabled={busy}>
             Cancelar
           </Button>
           <Button
@@ -173,6 +142,6 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
           </Button>
         </div>
       </div>
-    </>
+    </div>
   );
 }

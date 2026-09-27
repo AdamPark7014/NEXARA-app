@@ -1,0 +1,157 @@
+/* NEXARA · DataTable
+   Sombras de desplazamiento horizontal con la técnica `background-attachment:
+   local / scroll`: aparecen solo si hay columnas ocultas a ese lado. Cero JS. */
+
+.wrap {
+  --dt-bg: var(--ui-surface);
+  --dt-shadow: color-mix(in srgb, var(--ui-fg) 14%, transparent);
+
+  position: relative;
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-elev-1);
+  background:
+    linear-gradient(to right, var(--dt-bg) 30%, transparent) left center / 40px 100% no-repeat local,
+    linear-gradient(to left, var(--dt-bg) 30%, transparent) right center / 40px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--dt-shadow), transparent) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--dt-shadow), transparent) right center / 12px 100% no-repeat scroll,
+    var(--dt-bg);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 45%, transparent) transparent;
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 2px;
+  }
+
+  &::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--ui-fg-3) 35%, transparent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--ui-fg-3) 60%, transparent);
+    background-clip: padding-box;
+  }
+}
+
+.table {
+  --dt-pad-y: 11px;
+  --dt-pad-x: 16px;
+
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ui-fg);
+  /* Anula el marco global de `table` (borde, radio, fondo) dentro del componente. */
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  display: table;
+  white-space: normal;
+
+  &[data-density="compact"] {
+    --dt-pad-y: 7px;
+    --dt-pad-x: 12px;
+    font-size: 12.5px;
+  }
+
+  th,
+  td {
+    padding: var(--dt-pad-y) var(--dt-pad-x);
+    vertical-align: middle;
+  }
+
+  thead th {
+    padding-top: calc(var(--dt-pad-y) - 1px);
+    padding-bottom: calc(var(--dt-pad-y) - 1px);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--ui-fg-label);
+    background: var(--ui-surface-2);
+    border-bottom: 1px solid var(--ui-border);
+    z-index: 1;
+  }
+
+  tbody td {
+    border-bottom: 1px solid var(--ui-border-subtle);
+    color: var(--ui-fg);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  td[data-numeric="true"] {
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+  }
+
+  &[data-zebra="true"] tbody tr:nth-child(even) {
+    background: color-mix(in srgb, var(--ui-surface-2) 70%, transparent);
+  }
+
+  &[data-loading="true"] tbody {
+    opacity: 0.6;
+    transition: opacity var(--ui-duration-base) ease;
+  }
+}
+
+.wrap[data-sticky="true"] thead th {
+  position: sticky;
+  top: 0;
+}
+
+.row {
+  transition: background var(--ui-duration-fast) ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ui-brand) 5%, transparent);
+  }
+}
+
+.table[data-clickable="true"] .row {
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--ui-brand) 9%, transparent);
+    box-shadow: inset 3px 0 0 var(--ui-brand);
+  }
+
+  &:active {
+    background: color-mix(in srgb, var(--ui-brand) 11%, transparent);
+  }
+}
+
+.skeletonRow td {
+  height: calc(var(--dt-pad-y) * 2 + 18px);
+}
+
+@media (pointer: coarse) {
+  .table[data-clickable="true"] .row td {
+    padding-top: max(var(--dt-pad-y), 12px);
+    padding-bottom: max(var(--dt-pad-y), 12px);
+  }
+}

@@ -1,0 +1,173 @@
+.header {
+  min-width: 0;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  margin-left: -6px;
+  padding: 0 8px 0 4px;
+  border-radius: var(--ui-radius);
+  font-size: var(--ui-fs-label);
+  font-weight: 500;
+  color: var(--ui-fg-2);
+  text-decoration: none;
+  transition:
+    background var(--ui-duration-fast) ease,
+    color var(--ui-duration-fast) ease;
+
+  &:hover {
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 1px;
+  }
+
+  @media (pointer: coarse) {
+    height: 40px;
+  }
+}
+
+.crumbs {
+  min-width: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+
+  ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  li + li::before {
+    content: "/";
+    margin: 0 6px;
+    color: var(--ui-fg-3);
+    opacity: 0.7;
+  }
+
+  a {
+    color: var(--ui-fg-2);
+    text-decoration: none;
+    border-radius: var(--ui-radius-xs);
+
+    &:hover {
+      color: var(--ui-fg);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    &:focus-visible {
+      outline: var(--ui-focus-outline);
+      outline-offset: 2px;
+    }
+  }
+
+  [aria-current="page"] {
+    color: var(--ui-fg);
+    font-weight: 500;
+  }
+}
+
+.row {
+  display: flex;
+  /* Las acciones se alinean con el título, no con el final del subtítulo:
+     así la fila superior se lee de un golpe. */
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.text {
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--nx-panel-eyebrow-letter, 0.12em);
+  color: var(--ui-fg-label, var(--text-tertiary));
+}
+
+.eyebrowRule {
+  width: 14px;
+  height: 1.5px;
+  background: currentColor;
+  border-radius: 2px;
+  opacity: 0.45;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--nx-font-display, var(--ui-font));
+  font-weight: 700;
+  letter-spacing: var(--nx-panel-title-letter, -0.02em);
+  line-height: 1.12;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.subtitle {
+  margin-bottom: 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .text {
+    flex-basis: 100%;
+  }
+
+  /* En teléfono las acciones ocupan su propia fila y empiezan a la izquierda,
+     donde cae el pulgar después de leer el título. */
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 0 !important;
+  }
+}
