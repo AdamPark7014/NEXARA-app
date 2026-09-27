@@ -5,13 +5,16 @@ import CrossPanelLink from "@/components/CrossPanelLink";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { formatApiError } from "@/lib/erp-api";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import styles from "./PersonalCalendar.module.css";
 
 interface CalendarEvent {
   id: string;
@@ -33,9 +36,9 @@ async function apiFetch(path: string, token: string) {
 }
 
 const SOURCE_LABEL: Record<string, string> = {
-  CRM: "CRM",
+  CRM: "Cita comercial",
   MAINTENANCE: "Mantenimiento",
-  ACTIVITY: "OPS · Actividad",
+  ACTIVITY: "Actividad de campo",
   TENDER: "Licitación",
   PROJECT: "Proyecto",
 };
@@ -48,199 +51,232 @@ const SOURCE_VARIANT: Record<string, "accent" | "warning" | "positive" | "neutra
   PROJECT: "positive",
 };
 
-function isToday(iso: string) {
-  return new Date(iso).toDateString() === new Date().toDateString();
-}
+const RANGES = [7, 30, 90] as const;
+const DAY_MS = 86_400_000;
 
-function isTomorrow(iso: string) {
-  const t = new Date();
-  t.setDate(t.getDate() + 1);
-  return new Date(iso).toDateString() === t.toDateString();
-}
+const dayKey = (d: Date) => d.toLocaleDateString("sv-SE");
+const timeFmt = new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" });
+const dayFmt = new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long" });
+const exportFmt = new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" });
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : timeFmt.format(d);
 }
 
-export default function PersonalCalendar() {
+function dayLabel(key: string, todayKey: string, tomorrowKey: string, sample: Date) {
+  if (key === todayKey) return "Hoy";
+  if (key === tomorrowKey) return "Mañana";
+  return dayFmt.format(sample);
+}
+
+/** Agenda personal: eventos de todos los módulos en los próximos días. */
+export default function PersonalCalendar({ embedded = false }: { embedded?: boolean }) {
   const { user } = useUser();
   const token = user?.token ?? "";
 
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rangeDays, setRangeDays] = useState(30);
+  const [rangeDays, setRangeDays] = useState<number>(30);
   const [searchQ, setSearchQ] = useState("");
   const [filterSource, setFilterSource] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const from = new Date().toISOString();
-      const to = new Date(Date.now() + rangeDays * 86400000).toISOString();
+      const to = new Date(Date.now() + rangeDays * DAY_MS).toISOString();
       const data = await apiFetch(`calendar/events?from=${from}&to=${to}`, token);
       setEvents(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar el calendario");
-    } finally { setLoading(false); }
+      setError(formatApiError(e, "No pudimos cargar tu agenda."));
+    } finally {
+      setLoading(false);
+    }
   }, [token, rangeDays]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const all = useMemo(() => events ?? [], [events]);
 
   const visibleEvents = useMemo(() => {
-    let rows = events;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      rows = rows.filter((ev) =>
-        ev.title.toLowerCase().includes(q) ||
-        (ev.ownerName ?? "").toLowerCase().includes(q) ||
-        (ev.description ?? "").toLowerCase().includes(q)
-      );
-    }
-    if (filterSource) rows = rows.filter((ev) => ev.source === filterSource);
-    return rows;
-  }, [events, searchQ, filterSource]);
+    const q = searchQ.trim().toLowerCase();
+    return all.filter(
+      (ev) =>
+        (!filterSource || ev.source === filterSource) &&
+        (!q ||
+          ev.title.toLowerCase().includes(q) ||
+          (ev.ownerName ?? "").toLowerCase().includes(q) ||
+          (ev.description ?? "").toLowerCase().includes(q)),
+    );
+  }, [all, searchQ, filterSource]);
+
+  const { todayKey, tomorrowKey } = useMemo(() => {
+    const now = new Date();
+    return { todayKey: dayKey(now), tomorrowKey: dayKey(new Date(now.getTime() + DAY_MS)) };
+  }, []);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>();
+    const map = new Map<string, { sample: Date; items: CalendarEvent[] }>();
     for (const ev of visibleEvents) {
-      const day = new Date(ev.start).toLocaleDateString("es-MX", { weekday: "long", day: "2-digit", month: "short" });
-      if (!map.has(day)) map.set(day, []);
-      map.get(day)!.push(ev);
+      const d = new Date(ev.start);
+      if (Number.isNaN(d.getTime())) continue;
+      const key = dayKey(d);
+      const bucket = map.get(key);
+      if (bucket) bucket.items.push(ev);
+      else map.set(key, { sample: d, items: [ev] });
     }
-    return Array.from(map.entries()).sort((a, b) => new Date(a[1][0].start).getTime() - new Date(b[1][0].start).getTime());
-  }, [visibleEvents]);
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, { sample, items }]) => ({
+        key,
+        label: dayLabel(key, todayKey, tomorrowKey, sample),
+        items: items.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
+      }));
+  }, [visibleEvents, todayKey, tomorrowKey]);
 
-  const todayCount = events.filter((ev) => isToday(ev.start)).length;
-  const tomorrowCount = events.filter((ev) => isTomorrow(ev.start)).length;
-  const bySource = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const ev of events) m[ev.source] = (m[ev.source] ?? 0) + 1;
-    return m;
-  }, [events]);
+  const counts = useMemo(() => {
+    let today = 0;
+    let tomorrow = 0;
+    for (const ev of all) {
+      const k = dayKey(new Date(ev.start));
+      if (k === todayKey) today++;
+      else if (k === tomorrowKey) tomorrow++;
+    }
+    return { today, tomorrow };
+  }, [all, todayKey, tomorrowKey]);
+
+  const controls = (
+    <div className={styles.toolbar}>
+      <select aria-label="Periodo" className={styles.select} value={rangeDays} onChange={(e) => setRangeDays(Number(e.target.value))}>
+        {RANGES.map((d) => (
+          <option key={d} value={d}>Próximos {d} días</option>
+        ))}
+      </select>
+      <Button variant="ghost" iconLeft="↻" onClick={() => void load()} loading={loading && events !== null} disabled={loading}>
+        Actualizar
+      </Button>
+    </div>
+  );
+
+  const subtitle = "Actividades de campo, citas comerciales, visitas de mantenimiento y fechas límite de licitaciones.";
 
   return (
     <>
-      <PageHeader
-        eyebrow="ERP · Mi cuenta"
-        title="Mi calendario"
-        subtitle="Eventos agregados de OT (OPS), citas comerciales (CRM), visitas de mantenimiento y deadlines de licitación."
-        actions={
-          <>
-            <select
-              value={rangeDays}
-              onChange={(e) => setRangeDays(Number(e.target.value))}
-              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-            >
-              <option value={7}>Próximos 7 días</option>
-              <option value={30}>Próximos 30 días</option>
-              <option value={90}>Próximos 90 días</option>
-            </select>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-          </>
-        }
-      />
+      {embedded ? null : <PageHeader eyebrow="Mi cuenta" title="Mi agenda" subtitle={subtitle} actions={controls} />}
 
-      {!loading && !error && events.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Hoy" value={todayCount} icon="📅" variant={todayCount > 0 ? "accent" : "default"} hint="Eventos de hoy" />
-          <KpiCard label="Mañana" value={tomorrowCount} icon="🗓️" hint="Eventos de mañana" />
-          <KpiCard label="Total período" value={events.length} icon="📋" hint={`Próximos ${rangeDays} días`} />
-          {bySource.CRM != null && <KpiCard label="CRM" value={bySource.CRM} icon="🤝" variant="accent" hint="Citas y seguimientos" />}
-          {bySource.ACTIVITY != null && <KpiCard label="OPS" value={bySource.ACTIVITY} icon="🔧" hint="Órdenes de trabajo" />}
-          {bySource.MAINTENANCE != null && <KpiCard label="Mantenimiento" value={bySource.MAINTENANCE} icon="⚙️" variant="warning" hint="Visitas programadas" />}
+      {error && (
+        <InlineAlert
+          variant={events ? "warning" : "danger"}
+          message={events ? `No pudimos actualizar tu agenda; mostramos la última versión. ${error}` : error}
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      )}
+
+      {events !== null && all.length > 0 && (
+        <div className={styles.metrics}>
+          <MetricStrip
+            ariaLabel="Resumen de tu agenda"
+            metrics={[
+              { label: "hoy", value: counts.today, tone: counts.today > 0 ? "warning" : "default" },
+              { label: "mañana", value: counts.tomorrow },
+              { label: `próximos ${rangeDays} días`, value: all.length },
+            ]}
+          />
         </div>
       )}
 
-      {!loading && !error && events.length > 0 && Object.keys(bySource).length > 1 && (() => {
-        const total = events.length;
-        const sourceColors: Record<string, string> = { CRM: "var(--success)", ACTIVITY: "var(--primary)", MAINTENANCE: "var(--warning)", TENDER: "#a855f7", PROJECT: "var(--danger)" };
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Eventos por módulo</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {Object.entries(bySource).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
-                <div key={s} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{SOURCE_LABEL[s] ?? s}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: sourceColors[s] ?? "var(--primary)", borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                </div>
-              ))}
-            </div>
+      <Section
+        title={embedded ? "Mi agenda" : events === null ? "Eventos" : `${visibleEvents.length.toLocaleString("es-MX")} ${visibleEvents.length === 1 ? "evento" : "eventos"}`}
+        subtitle={embedded ? subtitle : undefined}
+        actions={embedded ? controls : undefined}
+      >
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, responsable o descripción…" }}
+          selects={[
+            {
+              label: "Tipo de evento",
+              value: filterSource,
+              onChange: setFilterSource,
+              options: Object.keys(SOURCE_LABEL).map((k) => ({ value: k, label: SOURCE_LABEL[k] })),
+              allowAll: true,
+              allLabel: "Todos los tipos",
+            },
+          ]}
+          onClear={() => {
+            setSearchQ("");
+            setFilterSource("");
+          }}
+          resultCount={events === null ? null : visibleEvents.length}
+          rightActions={all.length > 0 ? (
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleEvents, [
+              { key: "source", label: "Tipo", format: (v) => SOURCE_LABEL[String(v)] ?? String(v ?? "") },
+              { key: "title", label: "Título" },
+              { key: "ownerName", label: "Responsable" },
+              { key: "start", label: "Inicio", format: (v) => (v ? exportFmt.format(new Date(String(v))) : "") },
+              { key: "end", label: "Fin", format: (v) => (v ? exportFmt.format(new Date(String(v))) : "") },
+            ], "agenda")}>Excel</Button>
+          ) : undefined}
+        />
+
+        {events === null && loading ? (
+          <div className={styles.events} aria-busy="true" aria-label="Cargando agenda">
+            {[0, 1, 2, 3].map((i) => <div key={i} className={styles.skeleton} />)}
           </div>
-        );
-      })()}
-
-      <FilterToolbar
-        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, responsable o descripción…" }}
-        selects={[
-          {
-            label: "Origen",
-            value: filterSource,
-            onChange: setFilterSource,
-            options: Object.keys(SOURCE_LABEL).map((k) => ({ value: k, label: SOURCE_LABEL[k] })),
-            allowAll: true,
-          },
-        ]}
-        onClear={() => { setSearchQ(""); setFilterSource(""); }}
-        resultCount={loading ? null : visibleEvents.length}
-        rightActions={events.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleEvents, [
-            { key: "id", label: "ID" },
-            { key: "source", label: "Origen" },
-            { key: "type", label: "Tipo" },
-            { key: "title", label: "Título" },
-            { key: "ownerName", label: "Responsable" },
-            { key: "start", label: "Inicio", format: (v) => v ? String(v).slice(0, 16).replace("T", " ") : "" },
-            { key: "end", label: "Fin", format: (v) => v ? String(v).slice(0, 16).replace("T", " ") : "" },
-          ], "calendario")}>Excel</Button>
-        ) : undefined}
-      />
-
-      <Section title={loading ? "Cargando…" : `${visibleEvents.length} eventos`}>
-        {loading && <EmptyState icon="⏳" title="Cargando agenda…" description="Consultando eventos de todos los módulos." />}
-        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && grouped.length === 0 && <EmptyState icon="📅" title="Sin eventos" description="No hay citas, OT ni vencimientos en este rango o filtro." />}
-        {!loading && !error && grouped.map(([day, evs]) => (
-          <div key={day} style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 8 }}>{day}</div>
-            <div style={{ display: "grid", gap: 6 }}>
-              {evs.map((ev) => {
-                const inner = (
-                  <div style={{
-                    display: "grid", gridTemplateColumns: "auto 1fr auto",
-                    alignItems: "center", gap: 12, padding: "10px 14px",
-                    background: "var(--surface)", border: "1px solid var(--border)",
-                    borderRadius: 10, borderLeftWidth: 4, borderLeftColor: ev.color || "var(--primary)",
-                    cursor: ev.url ? "pointer" : "default",
-                  }}>
-                    <Tag variant={SOURCE_VARIANT[ev.source] ?? "default"}>{SOURCE_LABEL[ev.source] ?? ev.source}</Tag>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{ev.title}</div>
-                      {(ev.ownerName || ev.description) && (
-                        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>
-                          {ev.ownerName ? `${ev.ownerName}${ev.description ? " · " : ""}` : ""}
-                          {ev.description?.slice(0, 80)}
-                        </div>
+        ) : events === null ? null : grouped.length === 0 ? (
+          <EmptyState
+            icon="📅"
+            title={all.length > 0 ? "Sin coincidencias" : "Agenda libre"}
+            description={
+              all.length > 0
+                ? "Ningún evento coincide con la búsqueda o el tipo elegido."
+                : `No tienes citas, actividades ni fechas límite en los próximos ${rangeDays} días.`
+            }
+          />
+        ) : (
+          grouped.map((day) => (
+            <section key={day.key} className={styles.day} aria-labelledby={`dia-${day.key}`}>
+              <h3 id={`dia-${day.key}`} className={`${styles.dayTitle} ${day.key === todayKey ? styles.dayToday : ""}`}>
+                {day.label}
+              </h3>
+              <ul className={styles.events}>
+                {day.items.map((ev) => {
+                  const sub = [ev.ownerName, ev.description?.slice(0, 90)].filter(Boolean).join(" · ");
+                  const inner = (
+                    <>
+                      <Tag variant={SOURCE_VARIANT[ev.source] ?? "default"}>{SOURCE_LABEL[ev.source] ?? "Evento"}</Tag>
+                      <div style={{ minWidth: 0 }}>
+                        <div className={styles.eventTitle}>{ev.title}</div>
+                        {sub && <div className={styles.eventSub}>{sub}</div>}
+                      </div>
+                      <time className={styles.time} dateTime={ev.start}>
+                        {fmtTime(ev.start)}
+                        {ev.end ? ` – ${fmtTime(ev.end)}` : ""}
+                      </time>
+                    </>
+                  );
+                  const accent = { boxShadow: `inset 4px 0 0 ${ev.color || "var(--primary)"}` };
+                  return (
+                    <li key={ev.id}>
+                      {ev.url ? (
+                        <CrossPanelLink href={ev.url} className={styles.event} style={accent}>
+                          {inner}
+                        </CrossPanelLink>
+                      ) : (
+                        <div className={styles.event} style={accent}>{inner}</div>
                       )}
-                    </div>
-                    <span style={{ fontSize: 12, color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-                      {fmtTime(ev.start)}{ev.end ? ` – ${fmtTime(ev.end)}` : ""}
-                    </span>
-                  </div>
-                );
-                return ev.url ? (
-                  <CrossPanelLink key={ev.id} href={ev.url} style={{ textDecoration: "none" }}>{inner}</CrossPanelLink>
-                ) : (
-                  <div key={ev.id}>{inner}</div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))
+        )}
       </Section>
     </>
   );

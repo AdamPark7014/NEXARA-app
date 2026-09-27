@@ -23,6 +23,8 @@ import AddReactionOutlinedIcon from "@mui/icons-material/AddReactionOutlined";
 import MentionTextarea, { type MentionTextareaHandle } from "./chat/MentionTextarea";
 import EmojiPicker from "./chat/EmojiPicker";
 import { isJumboEmoji } from "@/lib/chat-emoji";
+import { formatApiError } from "@/lib/erp-api";
+import InlineAlert from "@/components/ui/InlineAlert";
 import {
   entityMentionToken,
   insertMentionToken,
@@ -607,7 +609,7 @@ export default function WorkspaceChat({
         return next;
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar el chat");
+      setError(formatApiError(e, "No se pudo cargar el chat"));
     } finally {
       setLoadingChannels(false);
     }
@@ -660,7 +662,7 @@ export default function WorkspaceChat({
           prev.map((c) => (c.id === channelId ? { ...c, unread: false, unreadCount: 0 } : c)),
         );
       } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudieron cargar mensajes");
+        setError(formatApiError(e, "No se pudieron cargar los mensajes"));
       } finally {
         setLoadingMessages(false);
       }
@@ -958,7 +960,7 @@ export default function WorkspaceChat({
       if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
       return (await res.json()) as Attachment;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo subir el archivo");
+      setError(formatApiError(e, "No se pudo subir el archivo"));
       return null;
     } finally {
       setUploading(false);
@@ -1061,7 +1063,7 @@ export default function WorkspaceChat({
         prev.map((m) => (m.clientMsgId === clientMsgId ? { ...m, pending: false, failed: true } : m));
       if (parentId) setThreadReplies(markFailed);
       else setMessages(markFailed);
-      setError(e instanceof Error ? e.message : "No se pudo enviar");
+      setError(formatApiError(e, "No se pudo enviar el mensaje"));
     } finally {
       setSending(false);
     }
@@ -1090,7 +1092,7 @@ export default function WorkspaceChat({
       setThreadReplies((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
       setEditingId(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo editar");
+      setError(formatApiError(e, "No se pudo editar el mensaje"));
     }
   };
 
@@ -1107,7 +1109,7 @@ export default function WorkspaceChat({
         return prev.filter((m) => m.id !== updated.id);
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo fijar el mensaje");
+      setError(formatApiError(e, "No se pudo fijar el mensaje"));
     }
   };
 
@@ -1124,7 +1126,7 @@ export default function WorkspaceChat({
         prev.map((c) => (c.id === activeId ? { ...c, muted: ch.muted, mutedUntil: ch.mutedUntil } : c)),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo silenciar el canal");
+      setError(formatApiError(e, "No se pudo silenciar el canal"));
     }
   };
 
@@ -1161,7 +1163,7 @@ export default function WorkspaceChat({
       await loadChannels();
       if (ch?.id) selectChannel(ch.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear el canal");
+      setError(formatApiError(e, "No se pudo crear el canal"));
     }
   };
 
@@ -1217,7 +1219,7 @@ export default function WorkspaceChat({
       await loadChannels();
       if (ch?.id) selectChannel(ch.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo abrir el DM");
+      setError(formatApiError(e, "No se pudo abrir la conversación"));
     }
   };
 
@@ -1249,7 +1251,7 @@ export default function WorkspaceChat({
       });
       setDetail(ch);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo actualizar el tema");
+      setError(formatApiError(e, "No se pudo actualizar el tema"));
     }
   };
 
@@ -1264,7 +1266,7 @@ export default function WorkspaceChat({
       setShowInvite(false);
       await loadChannels();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo invitar al usuario");
+      setError(formatApiError(e, "No se pudo invitar a la persona"));
     }
   };
 
@@ -1276,7 +1278,7 @@ export default function WorkspaceChat({
       setActiveId(null);
       await loadChannels();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo salir del canal");
+      setError(formatApiError(e, "No se pudo salir del canal"));
     }
   };
 
@@ -1780,19 +1782,20 @@ export default function WorkspaceChat({
               <button
                 type="button"
                 className={styles.headIcon}
-                title="Nuevo mensaje"
+                title="Nuevo mensaje directo"
                 onClick={() => {
                   setShowDm(true);
                   void searchColleagues("");
                 }}
               >
-                DM
+                Mensaje
               </button>
             </div>
           </div>
 
           <div className={styles.sidebarSearch}>
             <input
+              aria-label="Filtrar canales"
               placeholder="Filtrar canales…"
               value={sidebarFilter}
               onChange={(e) => setSidebarFilter(e.target.value)}
@@ -1817,7 +1820,7 @@ export default function WorkspaceChat({
             )}
             <div className={styles.sectionLabel}>
               <span>Canales</span>
-              <button type="button" className={styles.sectionAction} title="Nuevo canal" onClick={() => setShowNewChannel(true)}>
+              <button type="button" className={styles.sectionAction} title="Nuevo canal" aria-label="Crear canal" onClick={() => setShowNewChannel(true)}>
                 +
               </button>
             </div>
@@ -1830,6 +1833,7 @@ export default function WorkspaceChat({
                 type="button"
                 className={styles.sectionAction}
                 title="Nuevo mensaje"
+                aria-label="Nuevo mensaje directo"
                 onClick={() => {
                   setShowDm(true);
                   void searchColleagues("");
@@ -2130,8 +2134,8 @@ export default function WorkspaceChat({
                   ) : null}
                 </div>
                 {error && (
-                  <div role="alert" style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>
-                    {error}
+                  <div style={{ marginBottom: 8 }}>
+                    <InlineAlert variant="danger" dense message={error} onDismiss={() => setError(null)} />
                   </div>
                 )}
                 <div className={styles.composer}>
