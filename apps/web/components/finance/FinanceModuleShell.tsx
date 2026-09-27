@@ -37,7 +37,8 @@ export const financeInputStyle: CSSProperties = {
   borderRadius: 8,
   background: "var(--surface)",
   color: "var(--foreground, var(--text-primary))",
-  fontSize: 13,
+  // 16px: por debajo, iOS hace zoom al enfocar (mismo contrato que utilities.scss).
+  fontSize: 16,
   boxSizing: "border-box",
 };
 
