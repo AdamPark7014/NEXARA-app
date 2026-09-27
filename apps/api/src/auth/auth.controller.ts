@@ -19,6 +19,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import {
   clearSessionCookie,
   logoutDebeBorrarCookie,
+  rememberExpiresIn,
   sessionTokenFromHeaders,
   setSessionCookie,
 } from '../common/security/session-cookie.js';
@@ -43,7 +44,7 @@ export class AuthController {
     // cuerpo se mantiene para la app nativa y las integraciones, que no tienen
     // cookie jar.
     if (result?.access_token) {
-      setSessionCookie(res, result.access_token);
+      setSessionCookie(res, result.access_token, result.rememberMe ? rememberExpiresIn() : undefined);
     }
 
     return result;
@@ -118,9 +119,10 @@ export class AuthController {
       Number(user.id),
       user.jti as string | undefined,
       req,
+      user.rem === true,
     );
     if (result?.access_token) {
-      setSessionCookie(res, result.access_token);
+      setSessionCookie(res, result.access_token, result.rememberMe ? rememberExpiresIn() : undefined);
     }
     return result;
   }
@@ -134,7 +136,7 @@ export class AuthController {
   async refreshSession(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.refreshSession(sessionTokenFromHeaders(req.headers ?? {}));
     if (result?.access_token) {
-      setSessionCookie(res, result.access_token);
+      setSessionCookie(res, result.access_token, result.rememberMe ? rememberExpiresIn() : undefined);
     }
     return result;
   }

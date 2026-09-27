@@ -104,6 +104,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       clientId: payload.clientId,
       isClient: false,
       jti: payload.jti ?? null,
+      // "Recordarme": se conserva al renovar la sesión.
+      rem: payload.rem === true,
     };
   }
 }
