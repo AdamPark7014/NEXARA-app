@@ -173,11 +173,12 @@ struct EvidenceCaptureFlowView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !loaded {
-                ProgressView("Cargando tu evidencia…")
-                    .frame(maxWidth: .infinity)
+                NxLoadingState(text: "Cargando tu evidencia…")
             } else {
                 if let loadError {
-                    Text(loadError).font(.footnote).foregroundStyle(CorePalette.red)
+                    NxIconText(systemName: "exclamationmark.triangle.fill", text: loadError)
+                        .font(.footnote)
+                        .foregroundStyle(CorePalette.red)
                 }
                 statusBanner
                 // El avance lo calcula el API; aquí solo se pinta.
