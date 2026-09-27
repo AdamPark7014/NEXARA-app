@@ -3,7 +3,7 @@
 - **Escrito por:** Claude (cabeza)
 - **Fecha:** 2026-09-13
 - **Rama:** mejora/calidad-y-web
-- **Estado:** LISTO PARA CURSOR
+- **Estado:** CERRADO (2026-09-27, pasos 2-8 hechos en la misión de pulido UI; fusionado en `main` a393c6cb y desplegado)
 <!-- Estados: BORRADOR → LISTO PARA CURSOR → EN EJECUCION → CERRADO -->
 
 ## Objetivo
