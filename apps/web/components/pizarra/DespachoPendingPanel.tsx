@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   dispatchPoolEmails,
   ORG_EMAILS,
@@ -29,6 +29,57 @@ type Props = {
   onDone?: () => void;
 };
 
+type Aviso = { kind: "ok" | "error"; text: string };
+
+const btnPrimary: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: 44,
+  border: "none",
+  background: "var(--primary)",
+  color: "#fff",
+  fontWeight: 750,
+  fontSize: 14,
+  padding: "10px 16px",
+  borderRadius: 12,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+
+const btnSecondary: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: 44,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  color: "inherit",
+  fontWeight: 650,
+  fontSize: 14,
+  padding: "10px 16px",
+  borderRadius: 12,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+
+function AvisoLinea({ aviso }: { aviso: Aviso }) {
+  return (
+    <p
+      role={aviso.kind === "error" ? "alert" : "status"}
+      style={{
+        margin: 0,
+        fontSize: 13.5,
+        fontWeight: 650,
+        color: aviso.kind === "ok" ? "var(--success)" : "var(--danger)",
+      }}
+    >
+      {aviso.kind === "ok" ? "✅ " : ""}
+      {aviso.text}
+    </p>
+  );
+}
+
 export default function DespachoPendingPanel({
   token,
   managerEmail,
@@ -55,7 +106,7 @@ export default function DespachoPendingPanel({
   const [activeId, setActiveId] = useState<number | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<Aviso | null>(null);
 
   const isLuis = (managerEmail || "").trim().toLowerCase() === ORG_EMAILS.luis;
 
@@ -65,8 +116,7 @@ export default function DespachoPendingPanel({
       setRoster(board.users ?? []);
       setLoadError(null);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "No se pudo cargar el equipo");
-      setRoster([]);
+      setLoadError(formatApiError(e, "No se pudo cargar a tu equipo"));
     }
   }, [token]);
 
@@ -83,7 +133,10 @@ export default function DespachoPendingPanel({
     return others.filter((u) => allow.has((u.email || "").toLowerCase()));
   }, [roster, managerEmail, managerUserId]);
 
-  if (!despachos.length) return null;
+  if (!despachos.length) {
+    // Recién repartida la última: el aviso de éxito se queda a la vista.
+    return aviso?.kind === "ok" ? <AvisoLinea aviso={aviso} /> : null;
+  }
 
   const toggle = (id: number) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -92,30 +145,33 @@ export default function DespachoPendingPanel({
   const start = (activityId: number) => {
     setActiveId(activityId);
     setSelected([]);
-    setMsg(null);
+    setAviso(null);
   };
 
   const submit = async () => {
     if (!activeId || selected.length === 0) {
-      setMsg("Elige al menos a una persona de tu equipo");
+      setAviso({ kind: "error", text: "Elige al menos a una persona de tu equipo." });
       return;
     }
     setSaving(true);
-    setMsg(null);
+    setAviso(null);
     try {
       // El cupo viaja con la actividad. La API valida que sea tu equipo y decide el rol
-      // (Luis → Antonio como LEAD; Antonio/David → técnicos). No requiere permisos de OT.
+      // (Luis → Antonio como responsable; Antonio/David → técnicos). No requiere permisos de OT.
       const cupoNota = despachos.find((d) => d.id === activeId)?.indicaciones || undefined;
       await dispatchMyActivity(token, activeId, {
         userIds: selected,
         ...(cupoNota ? { indicaciones: cupoNota } : {}),
       });
-      setMsg(`Asignado a ${selected.length} persona(s)`);
+      setAviso({
+        kind: "ok",
+        text: selected.length === 1 ? "Listo: se la pasaste a 1 persona." : `Listo: se la pasaste a ${selected.length} personas.`,
+      });
       setActiveId(null);
       setSelected([]);
       onDone?.();
     } catch (e) {
-      setMsg(formatApiError(e, "No se pudo asignar"));
+      setAviso({ kind: "error", text: formatApiError(e, "No se pudo repartir. Intenta de nuevo.") });
     } finally {
       setSaving(false);
     }
@@ -133,40 +189,51 @@ export default function DespachoPendingPanel({
       }}
     >
       <div>
-        <div style={{ fontSize: 12, fontWeight: 750, letterSpacing: 0.04, color: "var(--text-secondary)" }}>
-          PENDIENTE DE DESPACHO
-        </div>
-        <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>
+          Te toca repartir{despachos.length > 1 ? ` (${despachos.length})` : ""}
+        </h2>
+        <p style={{ margin: "4px 0 0", fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
           {isLuis
             ? "Mándala a Antonio; él elige a quién del soporte."
-            : "Elige a quién de tu equipo ejecuta."}
+            : "Elige a quién de tu equipo le toca hacerla."}
         </p>
       </div>
 
-      {loadError ? <p style={{ margin: 0, color: "#b91c1c", fontSize: 13 }}>{loadError}</p> : null}
+      {loadError ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <p style={{ margin: 0, color: "var(--danger)", fontSize: 13.5 }}>{loadError}</p>
+          <button type="button" style={btnSecondary} onClick={() => void loadRoster()}>
+            Reintentar
+          </button>
+        </div>
+      ) : null}
 
       {despachos.map((a) => {
         const cupo = parseDispatchHeadcount(a.indicaciones);
+        const activa = activeId === a.id;
         return (
           <div
             key={a.id}
             style={{
-              border: "1px solid var(--border)",
+              border: `1px solid ${activa ? "var(--primary)" : "var(--border)"}`,
               borderRadius: 14,
-              padding: 12,
+              padding: 14,
               background: "var(--surface)",
               display: "grid",
               gap: 10,
             }}
           >
             <div>
-              <div style={{ fontWeight: 800, fontSize: 14 }}>
-                {a.anNumber} · {a.titulo}
-              </div>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                Despacho
+              <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.35 }}>{a.titulo}</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
+                Folio {a.anNumber}
                 {cupo != null ? ` · se ocupan ${cupo} persona${cupo === 1 ? "" : "s"}` : ""}
               </div>
+              {a.indicaciones ? (
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.4 }}>
+                  {a.indicaciones}
+                </div>
+              ) : null}
               <div style={{ marginTop: 8 }}>
                 <ReprogramarDespacho
                   token={token}
@@ -175,23 +242,38 @@ export default function DespachoPendingPanel({
                   onDone={onDone}
                 />
               </div>
-              {a.indicaciones ? (
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, lineHeight: 1.35 }}>
-                  {a.indicaciones}
-                </div>
-              ) : null}
             </div>
 
-            {activeId === a.id ? (
+            {activa ? (
               <>
                 {candidates.length === 0 ? (
-                  <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-                    No hay gente de tu equipo en el tablero. Actualiza o revisa la jerarquía.
+                  <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)" }}>
+                    No hay gente de tu equipo disponible. Avísale a dirección.
                   </p>
                 ) : (
                   <div style={{ display: "grid", gap: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-                      {isLuis ? "Elige a Antonio" : "Elige a quién asignas"}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        fontSize: 13,
+                        fontWeight: 650,
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      <span>{isLuis ? "Elige a Antonio" : "¿Quién la hace?"}</span>
+                      {cupo != null ? (
+                        <span
+                          aria-live="polite"
+                          style={{
+                            fontVariantNumeric: "tabular-nums",
+                            color: selected.length > cupo ? "#d97706" : selected.length === cupo ? "var(--success)" : undefined,
+                          }}
+                        >
+                          {selected.length} de {cupo} persona{cupo === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
                     </div>
                     {candidates.map((u) => {
                       const checked = selected.includes(u.id);
@@ -201,15 +283,16 @@ export default function DespachoPendingPanel({
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 10,
-                            padding: "8px 10px",
-                            borderRadius: 10,
+                            gap: 12,
+                            minHeight: 44,
+                            padding: 12,
+                            borderRadius: 12,
                             border: `1px solid ${checked ? "var(--primary)" : "var(--border)"}`,
                             background: checked
                               ? "color-mix(in srgb, var(--primary) 8%, var(--surface))"
                               : "var(--surface)",
                             cursor: "pointer",
-                            fontSize: 13,
+                            fontSize: 14,
                           }}
                         >
                           <input
@@ -226,77 +309,40 @@ export default function DespachoPendingPanel({
                     })}
                   </div>
                 )}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <button
                     type="button"
                     onClick={() => void submit()}
                     disabled={saving || candidates.length === 0}
-                    style={{
-                      border: "none",
-                      background: "var(--primary)",
-                      color: "#fff",
-                      fontWeight: 750,
-                      fontSize: 13,
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      cursor: saving ? "wait" : "pointer",
-                      fontFamily: "inherit",
-                    }}
+                    style={{ ...btnPrimary, opacity: saving || candidates.length === 0 ? 0.6 : 1, cursor: saving ? "wait" : "pointer" }}
                   >
-                    {saving ? "Asignando…" : "Asignar al equipo"}
+                    {saving ? "Repartiendo…" : "Pasársela"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setActiveId(null);
                       setSelected([]);
-                      setMsg(null);
+                      setAviso(null);
                     }}
                     disabled={saving}
-                    style={{
-                      border: "1px solid var(--border)",
-                      background: "var(--surface)",
-                      fontWeight: 650,
-                      fontSize: 13,
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
+                    style={btnSecondary}
                   >
                     Cancelar
                   </button>
+                  {aviso ? <AvisoLinea aviso={aviso} /> : null}
                 </div>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={() => start(a.id)}
-                style={{
-                  justifySelf: "start",
-                  border: "none",
-                  background: "var(--primary)",
-                  color: "#fff",
-                  fontWeight: 750,
-                  fontSize: 13,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                Despachar al equipo
+              <button type="button" onClick={() => start(a.id)} style={{ ...btnPrimary, justifySelf: "start" }}>
+                Elegir quién la hace
               </button>
             )}
           </div>
         );
       })}
 
-      {msg ? (
-        <p style={{ margin: 0, fontSize: 13, color: msg.includes("Asignado") ? "#15803d" : "#b91c1c" }}>
-          {msg}
-        </p>
-      ) : null}
+      {aviso && activeId == null ? <AvisoLinea aviso={aviso} /> : null}
     </section>
   );
 }
