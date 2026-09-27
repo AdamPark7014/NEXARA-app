@@ -1,24 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { FormField, FormGrid } from "@/components/ui/FormField";
 import { useUser } from "@/components/UserContext";
 import { isCeoEquivalentEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import PhoneField from "@/components/PhoneField";
-import KpiCard from "@/components/ui/KpiCard";
-import { IconLabel } from "@/components/ui/IconBadge";
-import HourglassTopIcon from "@mui/icons-material/HourglassTop";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
-import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
-import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
-import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
-import MailOutlineIcon from "@mui/icons-material/MailOutline";
-import CheckIcon from "@mui/icons-material/Check";
+import s from "./profile.module.css";
 
 interface Profile {
   telefono?: string | null;
@@ -94,14 +89,24 @@ const emptyForm: Profile = {
   curp: "", rfc: "", ineNumero: "", nss: "", contactoEmergenciaNombre: "", contactoEmergenciaTelefono: "",
 };
 
+const timeFmt = new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" });
+const hhmm = (iso?: string | null) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : timeFmt.format(d);
+};
+
+type TextKey = Exclude<keyof Profile, "estatus" | "telefono" | "contactoEmergenciaTelefono">;
+
 export default function MyProfilePage() {
   const { user } = useUser();
   const token = user?.token ?? "";
-  // Dirección (Christian, Claudia) y cuentas de sistema: sin expediente de RH, documentos ni checador.
+  // Dirección y cuentas de sistema: sin expediente de RH, documentos ni checador.
   const cuentaDireccion = isCeoEquivalentEmail(user?.email) || isNonEmployeeEmail(user?.email);
 
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [form, setForm] = useState<Profile>({ ...emptyForm });
+  const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -112,7 +117,8 @@ export default function MyProfilePage() {
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const today = new Date().toLocaleDateString("sv-SE");
       const [data, idn, hyb] = await Promise.all([
@@ -130,214 +136,249 @@ export default function MyProfilePage() {
           fechaNacimiento: data.perfil.fechaNacimiento ? String(data.perfil.fechaNacimiento).slice(0, 10) : "",
         });
       }
+      setDirty(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar tu perfil");
-    } finally { setLoading(false); }
+      setError(formatApiError(e, "No pudimos cargar tu perfil."));
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const update = <K extends keyof Profile>(key: K, value: Profile[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setDirty(true);
+    setSaved(false);
+  };
+
+  const text = (key: TextKey, transform?: (v: string) => string) => ({
+    className: s.input,
+    value: form[key] ?? "",
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => update(key, transform ? transform(e.target.value) : e.target.value),
+  });
 
   const save = async () => {
     if (!token) return;
-    setSaving(true); setSaved(false);
+    setSaving(true);
+    setSaved(false);
+    setSaveErr(null);
     try {
       await apiFetch("users/profile/me", token, { method: "PATCH", body: JSON.stringify(form) });
       setSaved(true);
+      setDirty(false);
       void load();
     } catch (e) {
-      setSaveErr(e instanceof Error ? e.message : "No se pudo guardar el perfil");
-    } finally { setSaving(false); }
+      setSaveErr(formatApiError(e, "No se pudo guardar tu perfil. Intenta de nuevo."));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
-  const lbl: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" };
+  const completeness = useMemo(() => {
+    const sections = [
+      { label: "Datos personales", fields: [form.telefono, form.fechaNacimiento, form.ciudad, form.estado] },
+      { label: "Documentos", fields: [form.curp, form.rfc, form.nss] },
+      { label: "Contacto de emergencia", fields: [form.contactoEmergenciaNombre, form.contactoEmergenciaTelefono] },
+    ].map((sec) => {
+      const filled = sec.fields.filter(Boolean).length;
+      return { ...sec, filled, total: sec.fields.length, pct: Math.round((filled / sec.fields.length) * 100) };
+    });
+    const filled = sections.reduce((acc, x) => acc + x.filled, 0);
+    const total = sections.reduce((acc, x) => acc + x.total, 0);
+    return { sections, pct: Math.round((filled / total) * 100) };
+  }, [form]);
+
+  const pctColor = (pct: number) => (pct === 100 ? "var(--success)" : pct >= 50 ? "var(--warning)" : "var(--danger)");
+  const hoy = hybrid?.items?.[0];
+  const entrada = hhmm(hoy?.erp?.checkIn);
+  const salida = hhmm(hoy?.erp?.checkOut);
+  const primerPase = hhmm(hoy?.acs?.firstAt);
+  const employeeNumber = identity?.user.employeeNumber || identity?.user.companyEmployeeNumber || profile?.employeeNumber || null;
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Mi cuenta"
+        eyebrow="Mi cuenta"
         title="Mi perfil"
-        subtitle={
-          cuentaDireccion
-            ? "Tus datos de contacto."
-            : "Tus datos personales, contacto de emergencia y documentos de identidad."
-        }
+        subtitle={cuentaDireccion ? "Tus datos de contacto." : "Tus datos personales, contacto de emergencia y documentos de identidad."}
         meta={profile && (
           <>
-            <Tag variant="accent" dot>{profile.role?.nombre ?? "—"}</Tag>
-            <Tag variant="default">{profile.department?.nombre ?? "—"}</Tag>
+            {profile.role?.nombre && <Tag variant="accent" dot>{profile.role.nombre}</Tag>}
+            {profile.department?.nombre && <Tag variant="default">{profile.department.nombre}</Tag>}
           </>
         )}
       />
 
-      {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando perfil…" description="Consultando tus datos." />}
-      {!loading && error && <EmptyState icon={<ErrorOutlineIcon fontSize="inherit" aria-hidden="true" />} title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+      {!profile && loading && (
+        <div aria-busy="true" aria-label="Cargando tu perfil" style={{ display: "grid", gap: 16 }}>
+          <div className={s.skeleton} style={{ height: 96 }} />
+          <div className={s.skeleton} style={{ height: 320 }} />
+        </div>
+      )}
 
-      {!loading && !error && profile && (() => {
-        const filled = [form.telefono, form.curp, form.rfc, form.nss, form.fechaNacimiento, form.ciudad, form.estado].filter(Boolean).length;
-        const completeness = Math.round((filled / 7) * 100);
-        return (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <KpiCard label="Departamento" value={profile.department?.nombre ?? "—"} icon={<BusinessOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
-            <KpiCard label="Rol" value={profile.role?.nombre ?? "—"} icon={<BadgeOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant="accent" />
-            {!cuentaDireccion && (
-              <KpiCard label="Perfil completo" value={`${completeness}%`} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={completeness >= 80 ? "positive" : completeness >= 50 ? "warning" : "danger"} hint="Campos personales" />
-            )}
-            <KpiCard label="Email" value={profile.email} icon={<MailOutlineIcon fontSize="inherit" aria-hidden="true" />} />
-          </div>
-        );
-      })()}
+      {!profile && !loading && error && (
+        <EmptyState
+          icon="⚠️"
+          title="No pudimos cargar tu perfil"
+          description={error}
+          action={<Button variant="primary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      )}
 
-      {!loading && !error && profile && !cuentaDireccion && (() => {
-        const sections = [
-          { label: "Datos personales", fields: [form.telefono, form.fechaNacimiento, form.ciudad, form.estado] },
-          { label: "Documentos", fields: [form.curp, form.rfc, form.nss] },
-          { label: "Emergencia", fields: [form.contactoEmergenciaNombre, form.contactoEmergenciaTelefono] },
-        ];
-        return (
-          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Completitud del perfil</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {sections.map((sec) => {
-                const filled = sec.fields.filter(Boolean).length;
-                const pct = Math.round((filled / sec.fields.length) * 100);
-                const color = pct === 100 ? "var(--success)" : pct >= 50 ? "var(--warning)" : "var(--danger)";
-                return (
-                  <div key={sec.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr 48px", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{sec.label}</span>
-                    <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
-                    </div>
-                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{filled}/{sec.fields.length}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {!loading && !error && profile && (
+      {profile && (
         <>
-          <Section title="Datos de cuenta">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div><span style={lbl}>Nombre</span><div style={{ fontSize: 14, fontWeight: 600 }}>{profile.nombre}</div></div>
-              <div><span style={lbl}>Email</span><div style={{ fontSize: 14, fontWeight: 600 }}>{profile.email}</div></div>
-              <div>
-                <span style={lbl}>Nº de empleado</span>
-                <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "ui-monospace, monospace" }}>
-                  {identity?.user.employeeNumber ||
-                    identity?.user.companyEmployeeNumber ||
-                    profile.employeeNumber ||
-                    "—"}
-                </div>
+          {error && (
+            <InlineAlert
+              variant="warning"
+              message={`No pudimos actualizar tus datos. ${error}`}
+              action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+            />
+          )}
+
+          {!cuentaDireccion && (
+            <div className={s.progress} aria-label="Qué tan completo está tu perfil">
+              <div className={s.progressHead}>
+                <span className={s.progressTitle}>Tu perfil está completo al</span>
+                <span className={s.progressPct} style={{ color: pctColor(completeness.pct) }}>{completeness.pct}%</span>
               </div>
-              <div>
-                <span style={lbl}>Control de acceso</span>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {completeness.sections.map((sec) => (
+                <div key={sec.label} className={s.progressItem}>
+                  <span className={s.progressLabel}>
+                    <span>{sec.label}</span>
+                    <span>{sec.filled} de {sec.total}</span>
+                  </span>
+                  <div className={s.track} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={sec.pct} aria-label={sec.label}>
+                    <div className={s.fill} style={{ width: `${sec.pct}%`, background: pctColor(sec.pct) }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Section title="Datos de cuenta">
+            <dl className={s.facts}>
+              <div className={s.fact}><dt>Nombre</dt><dd>{profile.nombre}</dd></div>
+              <div className={s.fact}><dt>Correo</dt><dd>{profile.email}</dd></div>
+              <div className={s.fact}><dt>Número de empleado</dt><dd className={s.mono}>{employeeNumber ?? "—"}</dd></div>
+              <div className={s.fact}>
+                <dt>Control de acceso</dt>
+                <dd>
                   {identity?.status === "linked"
-                    ? `Vinculado · ${identity.acsPerson?.personName || identity.acsPerson?.personId}`
+                    ? `Vinculado como ${identity.acsPerson?.personName || "tú"}`
                     : identity?.status === "erp_only"
-                      ? "Tu número aún no está en control de acceso"
+                      ? "Tu número aún no está en el control de acceso"
                       : identity?.status === "unlinked"
                         ? "Sin número de empleado"
                         : "—"}
-                </div>
+                </dd>
               </div>
-            </div>
+            </dl>
           </Section>
 
           {!cuentaDireccion && (
-          <Section
-            title="Acceso y asistencia (hoy)"
-            subtitle="El checador de la app es el que cuenta para tu nómina."
-          >
-            {(() => {
-              const row = hybrid?.items?.[0];
-              const erp = row?.erp;
-              const acs = row?.acs;
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div>
-                    <span style={lbl}>Checador de la app</span>
-                    <div style={{ fontSize: 13 }}>
-                      {erp?.checkIn
-                        ? `Entrada ${new Date(erp.checkIn).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
-                        : "Sin entrada"}
-                      {erp?.checkOut
-                        ? ` · Salida ${new Date(erp.checkOut).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
-                        : ""}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={lbl}>Pases en puertas</span>
-                    <div style={{ fontSize: 13 }}>
-                      {acs?.firstAt
-                        ? `${acs.passes ?? 0} pases · ${acs.firstDoor || "puerta"} · desde ${new Date(acs.firstAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
-                        : identity?.status === "linked"
-                          ? "Sin pases hoy"
-                          : "Sin vincular"}
-                    </div>
-                  </div>
+            <Section title="Tu asistencia de hoy" subtitle="El checador de la app es el que cuenta para tu nómina.">
+              <dl className={s.facts}>
+                <div className={s.fact}>
+                  <dt>Checador de la app</dt>
+                  <dd className={s.mono}>
+                    {entrada ? `Entrada ${entrada}` : "Sin entrada"}
+                    {salida ? ` · Salida ${salida}` : ""}
+                  </dd>
                 </div>
-              );
-            })()}
-            {identity?.status !== "linked" && (
-              <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-secondary)" }}>
-                {/* El texto de la API es para administradores (Integra, employeeNo); aquí va el del empleado. */}
-                Pide a RH que vincule tu número de empleado con el control de acceso.
-              </p>
-            )}
-          </Section>
+                <div className={s.fact}>
+                  <dt>Pases en puertas</dt>
+                  <dd className={s.mono}>
+                    {primerPase
+                      ? `${hoy?.acs?.passes ?? 0} ${hoy?.acs?.passes === 1 ? "pase" : "pases"} · desde ${primerPase}${hoy?.acs?.firstDoor ? ` · ${hoy.acs.firstDoor}` : ""}`
+                      : identity?.status === "linked"
+                        ? "Sin pases hoy"
+                        : "Sin vincular"}
+                  </dd>
+                </div>
+              </dl>
+              {identity?.status !== "linked" && (
+                <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  Pide a RH que vincule tu número de empleado con el control de acceso.
+                </p>
+              )}
+            </Section>
           )}
 
           <Section
             title={cuentaDireccion ? "Contacto" : "Datos personales"}
-            subtitle={cuentaDireccion ? undefined : "Solo tú y RH/Dirección pueden ver esta información."}
+            subtitle={cuentaDireccion ? undefined : "Solo tú, RH y Dirección pueden ver esta información."}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Teléfono</span>
-                <PhoneField value={form.telefono ?? ""} onChange={(telefono) => setForm((f) => ({ ...f, telefono }))} /></label>
-              {!cuentaDireccion && (<>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Fecha de nacimiento</span>
-                <input type="date" value={form.fechaNacimiento ?? ""} onChange={(e) => setForm((f) => ({ ...f, fechaNacimiento: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}><span style={lbl}>Dirección</span>
-                <input value={form.direccion ?? ""} onChange={(e) => setForm((f) => ({ ...f, direccion: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Colonia</span>
-                <input value={form.colonia ?? ""} onChange={(e) => setForm((f) => ({ ...f, colonia: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Ciudad</span>
-                <input value={form.ciudad ?? ""} onChange={(e) => setForm((f) => ({ ...f, ciudad: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Estado</span>
-                <input value={form.estado ?? ""} onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Código postal</span>
-                <input value={form.codigoPostal ?? ""} onChange={(e) => setForm((f) => ({ ...f, codigoPostal: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>CURP</span>
-                <input value={form.curp ?? ""} onChange={(e) => setForm((f) => ({ ...f, curp: e.target.value.toUpperCase() }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>RFC</span>
-                <input value={form.rfc ?? ""} onChange={(e) => setForm((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Número de INE</span>
-                <input value={form.ineNumero ?? ""} onChange={(e) => setForm((f) => ({ ...f, ineNumero: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>NSS (IMSS)</span>
-                <input value={form.nss ?? ""} onChange={(e) => setForm((f) => ({ ...f, nss: e.target.value }))} style={inp} /></label>
-              </>)}
-            </div>
+            <FormGrid>
+              <FormField label="Teléfono">
+                <PhoneField value={form.telefono ?? ""} onChange={(telefono) => update("telefono", telefono)} />
+              </FormField>
+              {!cuentaDireccion && (
+                <>
+                  <FormField label="Fecha de nacimiento">
+                    <input type="date" {...text("fechaNacimiento")} />
+                  </FormField>
+                  <FormField label="Dirección" fullWidth>
+                    <input autoComplete="street-address" placeholder="Calle y número" {...text("direccion")} />
+                  </FormField>
+                  <FormField label="Colonia">
+                    <input {...text("colonia")} />
+                  </FormField>
+                  <FormField label="Ciudad">
+                    <input autoComplete="address-level2" {...text("ciudad")} />
+                  </FormField>
+                  <FormField label="Estado">
+                    <input autoComplete="address-level1" {...text("estado")} />
+                  </FormField>
+                  <FormField label="Código postal">
+                    <input inputMode="numeric" autoComplete="postal-code" maxLength={5} {...text("codigoPostal")} />
+                  </FormField>
+                  <FormField label="CURP" hint="18 caracteres">
+                    <input maxLength={18} autoCapitalize="characters" {...text("curp", (v) => v.toUpperCase())} />
+                  </FormField>
+                  <FormField label="RFC" hint="12 o 13 caracteres">
+                    <input maxLength={13} autoCapitalize="characters" {...text("rfc", (v) => v.toUpperCase())} />
+                  </FormField>
+                  <FormField label="Número de INE">
+                    <input {...text("ineNumero")} />
+                  </FormField>
+                  <FormField label="Número de seguro social (IMSS)">
+                    <input inputMode="numeric" maxLength={11} {...text("nss")} />
+                  </FormField>
+                </>
+              )}
+            </FormGrid>
           </Section>
 
-          <Section title="Contacto de emergencia">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Nombre</span>
-                <input value={form.contactoEmergenciaNombre ?? ""} onChange={(e) => setForm((f) => ({ ...f, contactoEmergenciaNombre: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Teléfono</span>
+          <Section title="Contacto de emergencia" subtitle="A quién llamamos si te pasa algo en el trabajo.">
+            <FormGrid>
+              <FormField label="Nombre">
+                <input autoComplete="off" {...text("contactoEmergenciaNombre")} />
+              </FormField>
+              <FormField label="Teléfono">
                 <PhoneField
                   value={form.contactoEmergenciaTelefono ?? ""}
-                  onChange={(contactoEmergenciaTelefono) => setForm((f) => ({ ...f, contactoEmergenciaTelefono }))}
-                /></label>
-            </div>
+                  onChange={(contactoEmergenciaTelefono) => update("contactoEmergenciaTelefono", contactoEmergenciaTelefono)}
+                />
+              </FormField>
+            </FormGrid>
           </Section>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
-            {saved && <IconLabel icon={CheckIcon} style={{ fontSize: 12.5, color: "var(--success)" }}>{cuentaDireccion ? "Guardado" : "Guardado — pendiente de revisión por RH"}</IconLabel>}
+          {saveErr && <InlineAlert variant="danger" message={saveErr} onDismiss={() => setSaveErr(null)} />}
+
+          <div className={s.saveBar}>
+            <Button variant="primary" onClick={() => void save()} loading={saving} disabled={!dirty || saving}>
+              Guardar cambios
+            </Button>
+            {saved ? (
+              <span className={`${s.saveNote} ${s.saveOk}`} role="status">
+                ✓ {cuentaDireccion ? "Guardado" : "Guardado. RH revisará los cambios."}
+              </span>
+            ) : dirty ? (
+              <span className={s.saveNote}>Tienes cambios sin guardar.</span>
+            ) : null}
           </div>
         </>
       )}
