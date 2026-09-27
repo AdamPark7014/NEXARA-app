@@ -1,199 +1,77 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import PanelTabs from "@/components/ui/PanelTabs";
-import { useUser } from "@/components/UserContext";
-import { getErpInventorySectionConfig } from "@/lib/section-views";
-import { buildApiUrl } from "@/lib/api-base";
-import { toast } from "@/components/Toast";
-import FilterToolbar from "@/components/FilterToolbar";
-import { exportToExcel } from "@/lib/export-excel";
-import WholesalePanel from "@/components/WholesalePanel";
 import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { SkeletonRows } from "@/components/base";
+import { useUser } from "@/components/UserContext";
+import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
 import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
+import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { updateWholesaleTerms } from "@/lib/wholesale-api";
+import { cantidad, diasHasta, fechaCorta, pesos, plazoLegible } from "@/lib/recursos-ui";
 import chrome from "@/components/erp/erp-chrome.module.css";
+import ComparacionCotizaciones from "./ComparacionCotizaciones";
+import {
+  PO_STATUS,
+  PO_STATUS_COLOR,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  REQ_STATUS,
+  RFQ_STATUS,
+  TABS_COMPRAS,
+  apiFetch,
+  costosExtra,
+  descargarPdf,
+  errorLegible,
+  ocAbierta,
+  prioridad,
+  sortHighlight,
+  tabValida,
+  unwrapList,
+  variantePo,
+  varianteReq,
+  varianteRfq,
+  type GoodsReceipt,
+  type PoDetail,
+  type PoLine,
+  type ProcTab,
+  type PurchaseOrder,
+  type ReceiptLine,
+  type ReqDetail,
+  type Requisition,
+  type Rfq,
+  type RfqComparison,
+  type Supplier,
+  type Warehouse,
+} from "./compras-datos";
+import s from "./compras.module.css";
 
-type ProcTab = "orders" | "requisitions" | "receipts" | "rfq" | "mayoristas";
-
-interface PurchaseOrder {
-  id: number;
-  poNumber: string;
-  status: string;
-  totalAmount: number | string;
-  orderDate?: string;
-  expectedDate?: string;
-  supplier?: { id: number; name: string };
-  createdBy?: { nombre?: string };
-}
-
-interface Requisition {
-  id: number;
-  reqNumber: string;
-  title: string;
-  status: string;
-  priority?: string;
-  requiredDate?: string | null;
-  requestedBy?: { nombre?: string };
-}
-
-interface GoodsReceipt {
-  id: number;
-  receiptNumber: string;
-  receiptDate?: string;
-  purchaseOrderId: number;
-  warehouseId?: number | null;
-  notes?: string | null;
-  freightCost?: number | string;
-  insuranceCost?: number | string;
-  customsCost?: number | string;
-  otherLandedCost?: number | string;
-  purchaseOrder?: { id: number; poNumber: string; supplier?: { name?: string } | null };
-  warehouse?: { id: number; code?: string; name: string } | null;
-  receivedBy?: { nombre?: string };
-  items?: Array<{
-    id: number;
-    quantityReceived: number | string;
-    quantityRejected?: number | string;
-    lotNumber?: string | null;
-    landedCostAllocated?: number | string;
-    purchaseOrderItem?: {
-      description?: string;
-      unitPrice?: number | string;
-      product?: { sku?: string; name?: string } | null;
-    } | null;
-  }>;
-}
-
-interface RfqLine {
-  id: number;
-  supplierId: number;
-  productId?: number | null;
-  description: string;
-  quantity: number | string;
-  unitPrice?: number | string | null;
-  leadTimeDays?: number | null;
-  notes?: string | null;
-  supplier?: { id: number; name: string };
-  product?: { id: number; name: string; sku: string } | null;
-}
-
-interface Rfq {
-  id: number;
-  rfqNumber: string;
-  status: "DRAFT" | "SENT" | "QUOTED" | "AWARDED" | "CANCELLED";
-  dueDate?: string | null;
-  notes?: string | null;
-  requisition?: { id: number; reqNumber: string; title: string };
-  lines?: RfqLine[];
-  _count?: { lines: number };
-  awardedPurchaseOrder?: { id: number; poNumber: string } | null;
-}
-
-interface RfqComparisonSupplier {
-  supplierId: number;
-  supplierName: string;
-  lines: RfqLine[];
-  totalPrice: number;
-  maxLeadTimeDays: number;
-  quotedLines: number;
-  totalLines: number;
-}
-
-interface RfqComparison {
-  rfq: Rfq;
-  suppliers: RfqComparisonSupplier[];
-  bestPriceSupplierId: number | null;
-  bestLeadTimeSupplierId: number | null;
-}
-
-const RFQ_STATUS: Record<string, string> = {
-  DRAFT: "Borrador",
-  SENT: "Enviada",
-  QUOTED: "Cotizada",
-  AWARDED: "Adjudicada",
-  CANCELLED: "Cancelada",
-};
-
-interface PoLine {
-  id: number;
-  description: string;
-  quantity: number | string;
-  unitPrice?: number | string;
-  receivedQty?: number | string;
-}
-
-interface ReqLine {
-  id: number;
-  description: string;
-  quantity: number | string;
-  estimatedCost?: number | string;
-}
-
-type PoDetail = PurchaseOrder & { items?: PoLine[]; notes?: string | null };
-type ReqDetail = Requisition & { items?: ReqLine[]; rejectionReason?: string | null; notes?: string | null };
-type ReceiptLine = { purchaseOrderItemId: number; description: string; ordered: number; alreadyReceived: number; qty: string };
-
-async function apiFetch<T = unknown>(path: string, token: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(buildApiUrl(path), {
-    ...opts,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<T>;
-}
-
-function unwrapList<T>(data: unknown): T[] {
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === "object" && Array.isArray((data as { data?: unknown }).data)) {
-    return (data as { data: T[] }).data;
-  }
-  return [];
-}
-
-function sortHighlight<T extends { id: number }>(rows: T[], idParam: string | null) {
-  if (!idParam) return rows;
-  const id = Number(idParam);
-  if (Number.isNaN(id)) return rows;
-  return [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-}
-
-const PO_STATUS: Record<string, string> = {
-  DRAFT: "Borrador",
-  PENDING: "Pendiente",
-  CONFIRMED: "Confirmada",
-  PARTIALLY_RECEIVED: "Parcial",
-  RECEIVED: "Recibida",
-  CANCELLED: "Cancelada",
-};
-
-const REQ_STATUS: Record<string, string> = {
-  DRAFT: "Borrador",
-  PENDING: "Pendiente",
-  APPROVED: "Aprobada",
-  REJECTED: "Rechazada",
-  CANCELLED: "Cancelada",
-};
-
-const PRIORITIES = ["NORMAL", "URGENT", "CRITICAL"] as const;
-const PRIORITY_LABEL: Record<string, string> = { NORMAL: "Normal", URGENT: "Urgente", CRITICAL: "Crítica" };
+const WholesalePanel = dynamic(() => import("@/components/WholesalePanel"), {
+  ssr: false,
+  loading: () => <SkeletonRows rows={5} label="Cargando mayoristas" />,
+});
 
 type ReqItem = { description: string; quantity: number; estimatedCost: string };
-type PoItem  = { description: string; quantity: number; unitPrice: string };
+type PoItem = { description: string; quantity: number; unitPrice: string };
 
 const emptyReqForm = { title: "", priority: "NORMAL" };
 const emptyReqItem: ReqItem = { description: "", quantity: 1, estimatedCost: "" };
-const emptyPoForm  = { supplierName: "", expectedDate: "" };
-const emptyPoItem: PoItem  = { description: "", quantity: 1, unitPrice: "" };
+const emptyPoForm = { supplierName: "", expectedDate: "" };
+const emptyPoItem: PoItem = { description: "", quantity: 1, unitPrice: "" };
+const emptyLanded = { freightCost: "", insuranceCost: "", customsCost: "", otherLandedCost: "" };
+const emptyRfqForm = { requisitionId: "", supplierIds: [] as number[], dueDate: "", notes: "" };
 
 const emptySupplierForm = {
   name: "",
@@ -204,99 +82,148 @@ const emptySupplierForm = {
   limiteCredito: "",
 };
 
-const inp: React.CSSProperties = {
-  width: "100%", padding: "7px 9px", border: "1px solid var(--border)",
-  borderRadius: 7, background: "var(--surface)", color: "var(--foreground)", fontSize: 12.5, boxSizing: "border-box",
-};
+const ETAPAS: ReadonlyArray<{ tab: ProcTab; label: string }> = [
+  { tab: "requisitions", label: "Requisición" },
+  { tab: "rfq", label: "Cotización" },
+  { tab: "orders", label: "Orden de compra" },
+  { tab: "receipts", label: "Recepción" },
+];
+
+const COSTOS_EXTRA: ReadonlyArray<{ key: keyof typeof emptyLanded; label: string }> = [
+  { key: "freightCost", label: "Flete" },
+  { key: "insuranceCost", label: "Seguro" },
+  { key: "customsCost", label: "Aranceles" },
+  { key: "otherLandedCost", label: "Otros" },
+];
+
+const hoyIso = () => new Date().toISOString().slice(0, 10);
 
 export default function ProcurementPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "procurement"), [user]);
   const token = user?.token ?? "";
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const pathname = usePathname() ?? "/erp/procurement";
 
-  const tab = (searchParams.get("tab") as ProcTab) || "orders";
-  const highlightId = searchParams.get("id");
-  const poId = searchParams.get("poId");
+  // `?tab=`, `?id=` y `?poId=` se leen de la URL (sin useSearchParams).
+  const [tab, setTabState] = useState<ProcTab>("orders");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [poId, setPoId] = useState<string | null>(null);
+  const [urlLista, setUrlLista] = useState(false);
 
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
+  const [rfqs, setRfqs] = useState<Rfq[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cargado, setCargado] = useState<Partial<Record<ProcTab, boolean>>>({});
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+
   const [searchQ, setSearchQ] = useState("");
+  const busqueda = useDeferredValue(searchQ);
   const [filterPoStatus, setFilterPoStatus] = useState("");
   const [filterReqStatus, setFilterReqStatus] = useState("");
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [aprobandoId, setAprobandoId] = useState<string | null>(null);
 
-  // ── Create Requisición ──────────────────────────────────────────────────
+  // ── Requisición ─────────────────────────────────────────────────────────
   const [showReqForm, setShowReqForm] = useState(false);
   const [reqForm, setReqForm] = useState({ ...emptyReqForm });
   const [reqItems, setReqItems] = useState<ReqItem[]>([{ ...emptyReqItem }]);
   const [savingReq, setSavingReq] = useState(false);
+  const [reqErr, setReqErr] = useState<string | null>(null);
 
-  // ── Create OC ──────────────────────────────────────────────────────────
+  // ── Orden de compra ─────────────────────────────────────────────────────
   const [showPoForm, setShowPoForm] = useState(false);
   const [poForm, setPoForm] = useState({ ...emptyPoForm });
   const [poItems, setPoItems] = useState<PoItem[]>([{ ...emptyPoItem }]);
   const [savingPo, setSavingPo] = useState(false);
+  const [poErr, setPoErr] = useState<string | null>(null);
 
-  // ── Recepción de mercancía ─────────────────────────────────────────────
+  // ── Recepción de mercancía ──────────────────────────────────────────────
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [receiptPoId, setReceiptPoId] = useState("");
   const [receiptNotes, setReceiptNotes] = useState("");
   const [receiptWarehouseId, setReceiptWarehouseId] = useState("");
-  const [receiptLandedCost, setReceiptLandedCost] = useState({ freightCost: "", insuranceCost: "", customsCost: "", otherLandedCost: "" });
-  const [warehouses, setWarehouses] = useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [receiptLandedCost, setReceiptLandedCost] = useState({ ...emptyLanded });
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [savingReceipt, setSavingReceipt] = useState(false);
+  const [receiptLines, setReceiptLines] = useState<ReceiptLine[]>([]);
+  const [loadingReceiptPo, setLoadingReceiptPo] = useState(false);
+  const [receiptErr, setReceiptErr] = useState<string | null>(null);
 
-  // ── Rechazar requisición ───────────────────────────────────────────────
+  // ── Rechazar requisición ────────────────────────────────────────────────
   const [rejectReqModal, setRejectReqModal] = useState<Requisition | null>(null);
   const [rejectReqReason, setRejectReqReason] = useState("");
   const [rejectingReq, setRejectingReq] = useState(false);
   const [rejectReqErr, setRejectReqErr] = useState<string | null>(null);
 
-  // ── RFQ multi-proveedor ────────────────────────────────────────────────
-  const [rfqs, setRfqs] = useState<Rfq[]>([]);
-  const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string; rfc?: string | null }>>([]);
-  const [savingSupplierRfcId, setSavingSupplierRfcId] = useState<number | null>(null);
-
-  // ── Alta de proveedor ──────────────────────────────────────────────────
+  // ── Proveedores ─────────────────────────────────────────────────────────
   // Hasta ahora el proveedor nacía de rebote: alguien tecleaba un nombre en la
   // orden de compra y quedaba una ficha con nombre y nada más. Sin RFC no hay
   // DIOT ni factura de proveedor que cuadre, y las condiciones de convenio no
   // tenían por dónde entrar —la pestaña de mayoristas solo lista a los que ya
   // lo son, así que el primero no podía marcarse nunca—.
+  const [savingSupplierRfcId, setSavingSupplierRfcId] = useState<number | null>(null);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [supplierForm, setSupplierForm] = useState({ ...emptySupplierForm });
   const [savingSupplier, setSavingSupplier] = useState(false);
   const [supplierErr, setSupplierErr] = useState<string | null>(null);
+
+  // ── Cotizaciones ────────────────────────────────────────────────────────
   const [showRfqForm, setShowRfqForm] = useState(false);
-  const [rfqForm, setRfqForm] = useState<{ requisitionId: string; supplierIds: number[]; dueDate: string; notes: string }>({ requisitionId: "", supplierIds: [], dueDate: "", notes: "" });
+  const [rfqForm, setRfqForm] = useState({ ...emptyRfqForm });
   const [savingRfq, setSavingRfq] = useState(false);
   const [rfqComparison, setRfqComparison] = useState<RfqComparison | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
-  const [quoteDraft, setQuoteDraft] = useState<Record<number, { unitPrice: string; leadTimeDays: string }>>({});
   const [savingQuoteLineId, setSavingQuoteLineId] = useState<number | null>(null);
   const [awardingSupplierId, setAwardingSupplierId] = useState<number | null>(null);
 
+  // ── Detalle ─────────────────────────────────────────────────────────────
   const [detailKind, setDetailKind] = useState<"order" | "req" | null>(null);
   const [poDetail, setPoDetail] = useState<PoDetail | null>(null);
   const [reqDetail, setReqDetail] = useState<ReqDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
-  const [receiptLines, setReceiptLines] = useState<ReceiptLine[]>([]);
-  const [loadingReceiptPo, setLoadingReceiptPo] = useState(false);
-  const [receiptErr, setReceiptErr] = useState<string | null>(null);
 
-  const setTab = (next: ProcTab) => {
-    const p = new URLSearchParams();
-    p.set("tab", next);
-    router.push(`/erp/procurement?${p.toString()}`);
-  };
+  useEffect(() => {
+    const leerUrl = () => {
+      const p = new URLSearchParams(window.location.search);
+      setTabState(tabValida(p.get("tab")));
+      setHighlightId(p.get("id"));
+      setPoId(p.get("poId"));
+      setUrlLista(true);
+    };
+    leerUrl();
+    window.addEventListener("popstate", leerUrl);
+    return () => window.removeEventListener("popstate", leerUrl);
+  }, [pathname]);
+
+  /** Cambia de pestaña (y de registro resaltado) dejando rastro en el historial. */
+  const navegar = useCallback(
+    (siguiente: { tab: ProcTab; id?: number | string | null; poId?: number | string | null }) => {
+      const p = new URLSearchParams();
+      p.set("tab", siguiente.tab);
+      if (siguiente.id != null) p.set("id", String(siguiente.id));
+      if (siguiente.poId != null) p.set("poId", String(siguiente.poId));
+      setTabState(siguiente.tab);
+      setHighlightId(siguiente.id != null ? String(siguiente.id) : null);
+      setPoId(siguiente.poId != null ? String(siguiente.poId) : null);
+      router.push(`${pathname}?${p.toString()}`, { scroll: false });
+    },
+    [pathname, router],
+  );
+
+  const setTab = useCallback((next: ProcTab) => navegar({ tab: next }), [navegar]);
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!token || !urlLista || tab === "mayoristas") {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setErrorCarga(null);
     try {
       if (tab === "orders") {
         setOrders(unwrapList<PurchaseOrder>(await apiFetch("procurement/purchase-orders", token)));
@@ -304,80 +231,107 @@ export default function ProcurementPage() {
         setRequisitions(unwrapList<Requisition>(await apiFetch("procurement/requisitions", token)));
       } else if (tab === "rfq") {
         const [rfqRows, reqRows, supplierRows] = await Promise.all([
-          apiFetch<Rfq[] | { data: Rfq[] }>("procurement/rfq", token),
-          apiFetch<Requisition[] | { data: Requisition[] }>("procurement/requisitions", token),
-          apiFetch<Array<{ id: number; name: string }> | { data: Array<{ id: number; name: string }> }>("procurement/purchase-orders/suppliers", token),
+          apiFetch<unknown>("procurement/rfq", token),
+          apiFetch<unknown>("procurement/requisitions", token),
+          apiFetch<unknown>("procurement/purchase-orders/suppliers", token),
         ]);
         setRfqs(unwrapList<Rfq>(rfqRows));
         setRequisitions(unwrapList<Requisition>(reqRows));
-        setSuppliers(unwrapList<{ id: number; name: string }>(supplierRows));
+        setSuppliers(unwrapList<Supplier>(supplierRows));
       } else {
-        const qs = poId ? `?purchaseOrderId=${poId}` : "";
+        const qs = poId ? `?purchaseOrderId=${encodeURIComponent(poId)}` : "";
         setReceipts(unwrapList<GoodsReceipt>(await apiFetch(`procurement/goods-receipts${qs}`, token)));
       }
+      setCargado((prev) => ({ ...prev, [tab]: true }));
     } catch (e) {
-      toast.error("Error al cargar: " + (e instanceof Error ? e.message : "error"));
+      // Lo que ya se veía se queda; el aviso ofrece reintentar.
+      setErrorCarga(errorLegible(e, "No se pudo cargar compras"));
     } finally {
       setLoading(false);
     }
-  }, [token, tab, poId]);
+  }, [token, tab, poId, urlLista]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  const loadSuppliers = useCallback(async () => {
+    if (!token) return;
+    try {
+      setSuppliers(unwrapList<Supplier>(await apiFetch("procurement/purchase-orders/suppliers", token)));
+    } catch {
+      /* La lista es un apoyo del formulario: si no carga, el alta sigue en pie. */
+    }
+  }, [token]);
+
+  // Almacenes y órdenes abiertas solo hacen falta con el formulario de recepción abierto.
   useEffect(() => {
     if (!token || !showReceiptForm) return;
+    let vivo = true;
     void (async () => {
       try {
-        const rows = unwrapList<{ id: number; code: string; name: string; isActive?: boolean }>(
-          await apiFetch("warehouse", token),
-        );
-        const active = rows.filter((w) => w.isActive !== false);
-        setWarehouses(active);
-        if (!receiptWarehouseId && active[0]) setReceiptWarehouseId(String(active[0].id));
+        const rows = unwrapList<Warehouse & { isActive?: boolean }>(await apiFetch("warehouse", token));
+        const activos = rows.filter((w) => w.isActive !== false);
+        if (!vivo) return;
+        setWarehouses(activos);
+        setReceiptWarehouseId((actual) => actual || (activos[0] ? String(activos[0].id) : ""));
       } catch {
-        setWarehouses([]);
+        if (vivo) setWarehouses([]);
       }
     })();
+    if (orders.length === 0) {
+      void apiFetch("procurement/purchase-orders", token)
+        .then((rows) => {
+          if (vivo) setOrders(unwrapList<PurchaseOrder>(rows));
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, showReceiptForm]);
 
+  // ── Listas filtradas ────────────────────────────────────────────────────
   const visibleOrders = useMemo(() => {
     let rows = orders;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      rows = rows.filter((o) =>
-        (o.poNumber ?? "").toLowerCase().includes(q) ||
-        (o.supplier?.name ?? "").toLowerCase().includes(q) ||
-        (o.createdBy?.nombre ?? "").toLowerCase().includes(q)
+    const q = busqueda.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (o) =>
+          (o.poNumber ?? "").toLowerCase().includes(q) ||
+          (o.supplier?.name ?? "").toLowerCase().includes(q) ||
+          (o.createdBy?.nombre ?? "").toLowerCase().includes(q),
       );
     }
     if (filterPoStatus) rows = rows.filter((o) => o.status === filterPoStatus);
     return sortHighlight(rows, highlightId);
-  }, [orders, highlightId, searchQ, filterPoStatus]);
+  }, [orders, highlightId, busqueda, filterPoStatus]);
 
   const visibleReqs = useMemo(() => {
     let rows = requisitions;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      rows = rows.filter((r) =>
-        (r.reqNumber ?? "").toLowerCase().includes(q) ||
-        (r.title ?? "").toLowerCase().includes(q) ||
-        (r.requestedBy?.nombre ?? "").toLowerCase().includes(q)
+    const q = busqueda.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (r) =>
+          (r.reqNumber ?? "").toLowerCase().includes(q) ||
+          (r.title ?? "").toLowerCase().includes(q) ||
+          (r.requestedBy?.nombre ?? "").toLowerCase().includes(q),
       );
     }
     if (filterReqStatus) rows = rows.filter((r) => r.status === filterReqStatus);
     return sortHighlight(rows, highlightId);
-  }, [requisitions, highlightId, searchQ, filterReqStatus]);
+  }, [requisitions, highlightId, busqueda, filterReqStatus]);
 
   const visibleReceipts = useMemo(() => {
     let rows = receipts;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      rows = rows.filter((r) =>
-        (r.receiptNumber ?? "").toLowerCase().includes(q) ||
-        (r.purchaseOrder?.poNumber ?? "").toLowerCase().includes(q) ||
-        (r.receivedBy?.nombre ?? "").toLowerCase().includes(q)
+    const q = busqueda.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (r) =>
+          (r.receiptNumber ?? "").toLowerCase().includes(q) ||
+          (r.purchaseOrder?.poNumber ?? "").toLowerCase().includes(q) ||
+          (r.receivedBy?.nombre ?? "").toLowerCase().includes(q),
       );
     }
     if (highlightId) {
@@ -385,20 +339,102 @@ export default function ProcurementPage() {
       if (!Number.isNaN(id)) rows = rows.filter((r) => r.id === id);
     }
     return rows;
-  }, [receipts, highlightId, searchQ]);
+  }, [receipts, highlightId, busqueda]);
+
+  const visibleRfqs = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return rfqs;
+    return rfqs.filter(
+      (r) =>
+        (r.rfqNumber ?? "").toLowerCase().includes(q) ||
+        (r.requisition?.title ?? "").toLowerCase().includes(q) ||
+        (r.requisition?.reqNumber ?? "").toLowerCase().includes(q),
+    );
+  }, [rfqs, busqueda]);
+
+  const ordenesAbiertas = useMemo(() => orders.filter((o) => ocAbierta(o.status)), [orders]);
+
+  // ── Cifras de la pestaña activa (solo con lo que esa pestaña cargó) ─────
+  const cifras = useMemo(() => {
+    if (tab === "orders") {
+      let porAprobar = 0;
+      let abiertas = 0;
+      let atrasadas = 0;
+      let montoAbierto = 0;
+      const porEstado: Record<string, number> = {};
+      for (const o of orders) {
+        porEstado[o.status] = (porEstado[o.status] ?? 0) + 1;
+        if (o.status === "DRAFT") porAprobar += 1;
+        if (ocAbierta(o.status)) {
+          abiertas += 1;
+          montoAbierto += Number(o.totalAmount || 0);
+          const dias = diasHasta(o.expectedDate);
+          if (dias != null && dias < 0) atrasadas += 1;
+        }
+      }
+      return { porAprobar, abiertas, atrasadas, montoAbierto, porEstado };
+    }
+    return null;
+  }, [tab, orders]);
+
+  const cifrasReq = useMemo(() => {
+    let pendientes = 0;
+    let urgentes = 0;
+    let aprobadas = 0;
+    for (const r of requisitions) {
+      if (r.status === "PENDING") {
+        pendientes += 1;
+        if (r.priority === "URGENT" || r.priority === "CRITICAL" || r.priority === "HIGH") urgentes += 1;
+      }
+      if (r.status === "APPROVED") aprobadas += 1;
+    }
+    return { pendientes, urgentes, aprobadas };
+  }, [requisitions]);
+
+  const cifrasRecepciones = useMemo(() => {
+    const ahora = new Date();
+    let esteMes = 0;
+    let extra = 0;
+    for (const r of receipts) {
+      const f = r.receiptDate ? new Date(r.receiptDate) : null;
+      if (f && f.getMonth() === ahora.getMonth() && f.getFullYear() === ahora.getFullYear()) esteMes += 1;
+      extra += costosExtra(r);
+    }
+    return { esteMes, extra };
+  }, [receipts]);
+
+  const cifrasRfq = useMemo(() => {
+    let esperando = 0;
+    let conPrecios = 0;
+    let adjudicadas = 0;
+    for (const r of rfqs) {
+      if (r.status === "SENT" || r.status === "DRAFT") esperando += 1;
+      else if (r.status === "QUOTED") conPrecios += 1;
+      else if (r.status === "AWARDED") adjudicadas += 1;
+    }
+    return { esperando, conPrecios, adjudicadas };
+  }, [rfqs]);
+
+  // ── Requisiciones ───────────────────────────────────────────────────────
+  const abrirReqForm = () => {
+    setReqErr(null);
+    setShowReqForm(true);
+  };
 
   const saveReq = async () => {
-    if (!token || !reqForm.title.trim()) return;
-    const items = reqItems.filter(i => i.description.trim());
-    if (!items.length) return;
+    if (!token) return;
+    if (!reqForm.title.trim()) { setReqErr("Ponle un título a la requisición."); return; }
+    const items = reqItems.filter((i) => i.description.trim());
+    if (!items.length) { setReqErr("Agrega al menos un artículo con su descripción."); return; }
     setSavingReq(true);
+    setReqErr(null);
     try {
       await apiFetch("procurement/requisitions", token, {
         method: "POST",
         body: JSON.stringify({
           title: reqForm.title.trim(),
           priority: reqForm.priority,
-          items: items.map(i => ({
+          items: items.map((i) => ({
             description: i.description.trim(),
             quantity: Number(i.quantity),
             estimatedCost: i.estimatedCost ? Number(i.estimatedCost) : undefined,
@@ -408,61 +444,26 @@ export default function ProcurementPage() {
       setShowReqForm(false);
       setReqForm({ ...emptyReqForm });
       setReqItems([{ ...emptyReqItem }]);
+      toast.success("Requisición creada");
       void load();
     } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+      setReqErr(errorLegible(e, "No se pudo crear la requisición"));
     } finally {
       setSavingReq(false);
     }
   };
 
-  const savePo = async () => {
-    if (!token || !poForm.supplierName.trim()) return;
-    const items = poItems.filter(i => i.description.trim() && Number(i.unitPrice) > 0);
-    if (!items.length) return;
-    setSavingPo(true);
-    try {
-      await apiFetch("procurement/purchase-orders", token, {
-        method: "POST",
-        body: JSON.stringify({
-          supplierName: poForm.supplierName.trim(),
-          orderDate: new Date().toISOString().slice(0, 10),
-          expectedDate: poForm.expectedDate || undefined,
-          items: items.map(i => ({
-            description: i.description.trim(),
-            quantity: Number(i.quantity),
-            unitPrice: Number(i.unitPrice),
-          })),
-        }),
-      });
-      setShowPoForm(false);
-      setPoForm({ ...emptyPoForm });
-      setPoItems([{ ...emptyPoItem }]);
-      void load();
-    } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
-    } finally {
-      setSavingPo(false);
-    }
-  };
-
-  const approvePo = async (id: number) => {
-    if (!token) return;
-    try {
-      await apiFetch(`procurement/purchase-orders/${id}/approve`, token, { method: "PATCH" });
-      void load();
-    } catch (e) {
-      toast.error("Error al aprobar OC: " + (e instanceof Error ? e.message : "error"));
-    }
-  };
-
   const approveReq = async (id: number) => {
     if (!token) return;
+    setAprobandoId(`req-${id}`);
     try {
       await apiFetch(`procurement/requisitions/${id}/approve`, token, { method: "PATCH" });
+      toast.success("Requisición aprobada");
       void load();
     } catch (e) {
-      toast.error("Error al aprobar requisición: " + (e instanceof Error ? e.message : "error"));
+      toast.error(errorLegible(e, "No se pudo aprobar la requisición"));
+    } finally {
+      setAprobandoId(null);
     }
   };
 
@@ -474,24 +475,104 @@ export default function ProcurementPage() {
 
   const submitRejectReq = async () => {
     if (!token || !rejectReqModal) return;
-    if (!rejectReqReason.trim()) { setRejectReqErr("Escribe un motivo de rechazo."); return; }
-    setRejectingReq(true); setRejectReqErr(null);
+    if (!rejectReqReason.trim()) { setRejectReqErr("Escribe el motivo para que quien la pidió sepa qué corregir."); return; }
+    setRejectingReq(true);
+    setRejectReqErr(null);
     try {
       await apiFetch(`procurement/requisitions/${rejectReqModal.id}/reject`, token, {
         method: "PATCH",
         body: JSON.stringify({ reason: rejectReqReason.trim() }),
       });
       setRejectReqModal(null);
+      toast.success("Requisición rechazada");
       void load();
     } catch (e) {
-      setRejectReqErr(e instanceof Error ? e.message : "Error al rechazar");
-    } finally { setRejectingReq(false); }
+      setRejectReqErr(errorLegible(e, "No se pudo rechazar la requisición"));
+    } finally {
+      setRejectingReq(false);
+    }
   };
 
-  // kept for backward compat with column definitions that may call rejectReq(id)
-  const rejectReq = (id: number) => {
-    const req = requisitions.find((r) => r.id === id);
-    if (req) openRejectReq(req);
+  // ── Órdenes de compra ───────────────────────────────────────────────────
+  const abrirPoForm = () => {
+    setPoErr(null);
+    setShowPoForm(true);
+    if (suppliers.length === 0) void loadSuppliers();
+  };
+
+  const savePo = async () => {
+    if (!token) return;
+    if (!poForm.supplierName.trim()) { setPoErr("Escribe el proveedor."); return; }
+    const items = poItems.filter((i) => i.description.trim() && Number(i.unitPrice) > 0);
+    if (!items.length) { setPoErr("Agrega al menos un artículo con descripción y precio."); return; }
+    setSavingPo(true);
+    setPoErr(null);
+    try {
+      await apiFetch("procurement/purchase-orders", token, {
+        method: "POST",
+        body: JSON.stringify({
+          supplierName: poForm.supplierName.trim(),
+          orderDate: hoyIso(),
+          expectedDate: poForm.expectedDate || undefined,
+          items: items.map((i) => ({
+            description: i.description.trim(),
+            quantity: Number(i.quantity),
+            unitPrice: Number(i.unitPrice),
+          })),
+        }),
+      });
+      setShowPoForm(false);
+      setPoForm({ ...emptyPoForm });
+      setPoItems([{ ...emptyPoItem }]);
+      toast.success("Orden de compra creada");
+      void load();
+    } catch (e) {
+      setPoErr(errorLegible(e, "No se pudo crear la orden de compra"));
+    } finally {
+      setSavingPo(false);
+    }
+  };
+
+  const approvePo = async (id: number) => {
+    if (!token) return;
+    setAprobandoId(`po-${id}`);
+    try {
+      await apiFetch(`procurement/purchase-orders/${id}/approve`, token, { method: "PATCH" });
+      toast.success("Orden de compra aprobada");
+      void load();
+    } catch (e) {
+      toast.error(errorLegible(e, "No se pudo aprobar la orden de compra"));
+    } finally {
+      setAprobandoId(null);
+    }
+  };
+
+  const downloadPoPdf = async (id: number, poNumber?: string) => {
+    if (!token) return;
+    try {
+      await descargarPdf(`procurement/purchase-orders/${id}/pdf`, token, `OC-${poNumber || id}`, "No se pudo generar el PDF");
+      toast.success("PDF de la orden descargado");
+    } catch (e) {
+      toast.error(errorLegible(e, "No se pudo generar el PDF"));
+    }
+  };
+
+  const downloadReceiptPdf = async (id: number, receiptNumber?: string) => {
+    if (!token) return;
+    try {
+      await descargarPdf(`procurement/goods-receipts/${id}/pdf`, token, `GR-${receiptNumber || id}`, "No se pudo generar el PDF de recepción");
+      toast.success("PDF de la recepción descargado");
+    } catch (e) {
+      toast.error(errorLegible(e, "No se pudo generar el PDF de recepción"));
+    }
+  };
+
+  // ── Detalle ─────────────────────────────────────────────────────────────
+  const cerrarDetalle = () => {
+    setDetailKind(null);
+    setPoDetail(null);
+    setReqDetail(null);
+    setDetailErr(null);
   };
 
   const loadOrderDetail = async (id: number) => {
@@ -504,64 +585,11 @@ export default function ProcurementPage() {
       setPoDetail(await apiFetch<PoDetail>(`procurement/purchase-orders/${id}`, token));
     } catch (e) {
       setPoDetail(null);
-      setDetailErr(e instanceof Error ? e.message : "No se pudo cargar la OC");
+      setDetailErr(errorLegible(e, "No se pudo abrir la orden de compra"));
     } finally {
       setDetailLoading(false);
     }
   };
-
-  const downloadPoPdf = async (id: number, poNumber?: string) => {
-    if (!token) return;
-    try {
-      const res = await fetch(buildApiUrl(`procurement/purchase-orders/${id}/pdf`), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `OC-${(poNumber || String(id)).replace(/[^\w.-]+/g, "_")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("PDF de orden de compra descargado");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
-    }
-  };
-
-  const downloadReceiptPdf = async (id: number, receiptNumber?: string) => {
-    if (!token) return;
-    try {
-      const res = await fetch(buildApiUrl(`procurement/goods-receipts/${id}/pdf`), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          typeof (data as { error?: string }).error === "string"
-            ? (data as { error: string }).error
-            : "No se pudo generar el PDF de recepción",
-        );
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `GR-${(receiptNumber || String(id)).replace(/[^\w.-]+/g, "_")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("PDF de recepción descargado");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
-    }
-  };
-
-  const receiptLandedTotal = (r: GoodsReceipt) =>
-    Number(r.freightCost || 0) +
-    Number(r.insuranceCost || 0) +
-    Number(r.customsCost || 0) +
-    Number(r.otherLandedCost || 0);
 
   const loadReqDetail = async (id: number) => {
     if (!token) return;
@@ -573,19 +601,19 @@ export default function ProcurementPage() {
       setReqDetail(await apiFetch<ReqDetail>(`procurement/requisitions/${id}`, token));
     } catch (e) {
       setReqDetail(null);
-      setDetailErr(e instanceof Error ? e.message : "No se pudo cargar la requisición");
+      setDetailErr(errorLegible(e, "No se pudo abrir la requisición"));
     } finally {
       setDetailLoading(false);
     }
   };
 
-  const loadReceiptPo = async (poIdValue?: string) => {
-    const id = poIdValue ?? receiptPoId;
-    if (!token || !id.trim()) return;
+  // ── Recepción ───────────────────────────────────────────────────────────
+  const loadReceiptPo = async (poIdValue: string) => {
+    if (!token || !poIdValue.trim()) return;
     setLoadingReceiptPo(true);
     setReceiptErr(null);
     try {
-      const po = await apiFetch<{ items?: PoLine[] }>(`procurement/purchase-orders/${id}`, token);
+      const po = await apiFetch<{ items?: PoLine[] }>(`procurement/purchase-orders/${poIdValue}`, token);
       const lines = (po.items ?? []).map((i) => {
         const ordered = Number(i.quantity);
         const alreadyReceived = Number(i.receivedQty ?? 0);
@@ -599,26 +627,55 @@ export default function ProcurementPage() {
         };
       });
       setReceiptLines(lines);
-      if (!lines.length) setReceiptErr("La OC no tiene partidas.");
+      if (!lines.length) setReceiptErr("Esta orden no tiene artículos.");
     } catch (e) {
       setReceiptLines([]);
-      setReceiptErr(e instanceof Error ? e.message : "No se pudo cargar partidas");
+      setReceiptErr(errorLegible(e, "No se pudieron cargar los artículos de la orden"));
     } finally {
       setLoadingReceiptPo(false);
     }
   };
 
-  const openReceiptForPo = (id: number) => {
-    setReceiptPoId(String(id));
+  const limpiarRecepcion = () => {
+    setReceiptPoId("");
     setReceiptNotes("");
     setReceiptLines([]);
     setReceiptErr(null);
+    setReceiptLandedCost({ ...emptyLanded });
+  };
+
+  const abrirRecepcion = () => {
+    limpiarRecepcion();
+    setShowReceiptForm(true);
+  };
+
+  const cerrarRecepcion = () => {
+    setShowReceiptForm(false);
+    limpiarRecepcion();
+  };
+
+  const openReceiptForPo = (id: number) => {
+    limpiarRecepcion();
+    setReceiptPoId(String(id));
     setShowReceiptForm(true);
     void loadReceiptPo(String(id));
   };
 
+  const elegirOrdenRecepcion = (valor: string) => {
+    setReceiptPoId(valor);
+    setReceiptLines([]);
+    setReceiptErr(null);
+    if (valor) void loadReceiptPo(valor);
+  };
+
+  const totalCostosExtra = useMemo(
+    () => COSTOS_EXTRA.reduce((acc, c) => acc + (Number(receiptLandedCost[c.key]) || 0), 0),
+    [receiptLandedCost],
+  );
+
   const saveReceipt = async () => {
-    if (!token || !receiptPoId) return;
+    if (!token) return;
+    if (!receiptPoId) { setReceiptErr("Elige la orden de compra que llegó."); return; }
     const items = receiptLines
       .map((l) => ({ purchaseOrderItemId: l.purchaseOrderItemId, quantityReceived: Number(l.qty) }))
       .filter((i) => i.quantityReceived > 0);
@@ -635,7 +692,7 @@ export default function ProcurementPage() {
         body: JSON.stringify({
           purchaseOrderId: poNum,
           warehouseId: receiptWarehouseId ? Number(receiptWarehouseId) : undefined,
-          receiptDate: new Date().toISOString().slice(0, 10),
+          receiptDate: hoyIso(),
           notes: receiptNotes.trim() || undefined,
           freightCost: receiptLandedCost.freightCost ? Number(receiptLandedCost.freightCost) : undefined,
           insuranceCost: receiptLandedCost.insuranceCost ? Number(receiptLandedCost.insuranceCost) : undefined,
@@ -645,36 +702,21 @@ export default function ProcurementPage() {
         }),
       });
       setShowReceiptForm(false);
-      setReceiptPoId("");
-      setReceiptNotes("");
       setReceiptWarehouseId("");
-      setReceiptLines([]);
-      setReceiptLandedCost({ freightCost: "", insuranceCost: "", customsCost: "", otherLandedCost: "" });
-      toast.success("Recepción registrada · stock y factura AP generados");
+      limpiarRecepcion();
+      toast.success("Recepción registrada: entró al almacén y se generó la cuenta por pagar");
       if (detailKind === "order" && poDetail?.id === poNum) {
         void loadOrderDetail(poDetail.id);
       }
       void load();
     } catch (e) {
-      setReceiptErr(e instanceof Error ? e.message : "No se pudo registrar");
+      setReceiptErr(errorLegible(e, "No se pudo registrar la recepción"));
     } finally {
       setSavingReceipt(false);
     }
   };
 
-  const loadSuppliers = useCallback(async () => {
-    if (!token) return;
-    try {
-      const rows = await apiFetch<Array<{ id: number; name: string; rfc?: string | null }> | { data: Array<{ id: number; name: string; rfc?: string | null }> }>(
-        "procurement/purchase-orders/suppliers",
-        token,
-      );
-      setSuppliers(unwrapList<{ id: number; name: string; rfc?: string | null }>(rows));
-    } catch {
-      /* La lista es un apoyo del formulario: si no carga, el alta sigue en pie. */
-    }
-  }, [token]);
-
+  // ── Proveedores ─────────────────────────────────────────────────────────
   const openSupplierForm = () => {
     setSupplierForm({ ...emptySupplierForm });
     setSupplierErr(null);
@@ -687,24 +729,20 @@ export default function ProcurementPage() {
     if (!name) { setSupplierErr("Ponle el nombre o razón social del proveedor."); return; }
     const rfc = supplierForm.rfc.trim().toUpperCase();
     if (rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) {
-      setSupplierErr("El RFC no tiene el formato del SAT (12 dígitos para moral, 13 para física).");
+      setSupplierErr("El RFC no tiene el formato del SAT (12 caracteres para persona moral, 13 para física).");
       return;
     }
     setSavingSupplier(true);
     setSupplierErr(null);
     try {
-      const created = await apiFetch<{ id: number; name: string; rfc?: string | null }>(
-        "procurement/purchase-orders/suppliers",
-        token,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            name,
-            rfc: rfc || undefined,
-            description: supplierForm.description.trim() || undefined,
-          }),
-        },
-      );
+      const created = await apiFetch<Supplier>("procurement/purchase-orders/suppliers", token, {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          rfc: rfc || undefined,
+          description: supplierForm.description.trim() || undefined,
+        }),
+      });
       // Las condiciones de convenio viven en otra ruta. Se mandan solo si el
       // usuario marcó la casilla: así el primer mayorista puede marcarse desde
       // aquí, que era lo que no tenía salida.
@@ -715,13 +753,13 @@ export default function ProcurementPage() {
           limiteCredito: supplierForm.limiteCredito ? Number(supplierForm.limiteCredito) : null,
         });
       }
-      toast.success(`Proveedor "${name}" dado de alta`);
+      toast.success(`Proveedor «${name}» dado de alta`);
       setShowSupplierForm(false);
       setSupplierForm({ ...emptySupplierForm });
       void loadSuppliers();
       void load();
     } catch (e) {
-      setSupplierErr(e instanceof Error ? e.message : "No se pudo dar de alta el proveedor");
+      setSupplierErr(errorLegible(e, "No se pudo dar de alta el proveedor"));
     } finally {
       setSavingSupplier(false);
     }
@@ -735,12 +773,19 @@ export default function ProcurementPage() {
         method: "POST",
         body: JSON.stringify({ name, rfc: rfc.trim().toUpperCase() || undefined }),
       });
-      setSuppliers(prev => prev.map(s => s.id === supplierId ? { ...s, rfc: rfc.trim().toUpperCase() || null } : s));
+      setSuppliers((prev) => prev.map((sp) => (sp.id === supplierId ? { ...sp, rfc: rfc.trim().toUpperCase() || null } : sp)));
+      toast.success(`RFC de ${name} guardado`);
     } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo guardar el RFC"));
+      toast.error(errorLegible(e, "No se pudo guardar el RFC"));
     } finally {
       setSavingSupplierRfcId(null);
     }
+  };
+
+  // ── Cotizaciones ────────────────────────────────────────────────────────
+  const abrirRfqForm = () => {
+    setRfqForm({ ...emptyRfqForm });
+    setShowRfqForm(true);
   };
 
   const submitCreateRfq = async () => {
@@ -757,41 +802,33 @@ export default function ProcurementPage() {
         }),
       });
       setShowRfqForm(false);
-      setRfqForm({ requisitionId: "", supplierIds: [], dueDate: "", notes: "" });
-      toast.success("RFQ enviada a los proveedores seleccionados");
+      setRfqForm({ ...emptyRfqForm });
+      toast.success("Cotización pedida a los proveedores elegidos");
       void load();
     } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear la RFQ"));
+      toast.error(errorLegible(e, "No se pudo pedir la cotización"));
     } finally {
       setSavingRfq(false);
     }
   };
 
-  const openRfqComparison = async (id: number) => {
-    if (!token) return;
-    setComparisonLoading(true);
-    setRfqComparison(null);
-    try {
-      const comparison = await apiFetch<RfqComparison>(`procurement/rfq/${id}/compare`, token);
-      setRfqComparison(comparison);
-      const draft: Record<number, { unitPrice: string; leadTimeDays: string }> = {};
-      for (const s of comparison.suppliers) {
-        for (const l of s.lines) {
-          draft[l.id] = { unitPrice: l.unitPrice != null ? String(l.unitPrice) : "", leadTimeDays: l.leadTimeDays != null ? String(l.leadTimeDays) : "" };
-        }
+  const openRfqComparison = useCallback(
+    async (id: number) => {
+      if (!token) return;
+      setComparisonLoading(true);
+      try {
+        setRfqComparison(await apiFetch<RfqComparison>(`procurement/rfq/${id}/compare`, token));
+      } catch (e) {
+        toast.error(errorLegible(e, "No se pudo abrir la comparación"));
+      } finally {
+        setComparisonLoading(false);
       }
-      setQuoteDraft(draft);
-    } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo cargar la comparación"));
-    } finally {
-      setComparisonLoading(false);
-    }
-  };
+    },
+    [token],
+  );
 
-  const submitQuoteLine = async (lineId: number) => {
-    if (!token || !rfqComparison) return;
-    const draft = quoteDraft[lineId];
-    if (!draft || !draft.unitPrice) return;
+  const submitQuoteLine = async (lineId: number, draft: { unitPrice: string; leadTimeDays: string }) => {
+    if (!token || !rfqComparison || !draft.unitPrice) return;
     setSavingQuoteLineId(lineId);
     try {
       await apiFetch(`procurement/rfq/${rfqComparison.rfq.id}/lines/${lineId}/quote`, token, {
@@ -803,70 +840,173 @@ export default function ProcurementPage() {
       });
       void openRfqComparison(rfqComparison.rfq.id);
     } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo guardar la cotización"));
+      toast.error(errorLegible(e, "No se pudo guardar el precio"));
     } finally {
       setSavingQuoteLineId(null);
     }
   };
 
-  const submitAwardRfq = async (supplierId: number) => {
-    if (!token || !rfqComparison) return;
-    setAwardingSupplierId(supplierId);
-    try {
-      await apiFetch(`procurement/rfq/${rfqComparison.rfq.id}/award`, token, {
-        method: "POST",
-        body: JSON.stringify({ supplierId }),
+  const pedirAdjudicar = (supplierId: number, supplierName: string) => {
+    if (!rfqComparison) return;
+    const rfqId = rfqComparison.rfq.id;
+    setConfirm({
+      title: "Adjudicar cotización",
+      message: `Se creará una orden de compra para ${supplierName} con los precios capturados. Las demás propuestas quedan descartadas.`,
+      confirmLabel: "Adjudicar y crear orden",
+      danger: false,
+      fn: async () => {
+        if (!token) return;
+        setAwardingSupplierId(supplierId);
+        try {
+          await apiFetch(`procurement/rfq/${rfqId}/award`, token, {
+            method: "POST",
+            body: JSON.stringify({ supplierId }),
+          });
+          toast.success("Cotización adjudicada: se creó la orden de compra");
+          setRfqComparison(null);
+          void load();
+        } catch (e) {
+          toast.error(errorLegible(e, "No se pudo adjudicar"));
+        } finally {
+          setAwardingSupplierId(null);
+        }
+      },
+    });
+  };
+
+  const pedirCancelarRfq = (r: Rfq) => {
+    setConfirm({
+      title: "Cancelar cotización",
+      message: `¿Cancelar la cotización ${r.rfqNumber}${r.requisition?.title ? ` de «${r.requisition.title}»` : ""}? Los precios capturados ya no se podrán adjudicar.`,
+      confirmLabel: "Cancelar cotización",
+      danger: true,
+      fn: async () => {
+        if (!token) return;
+        try {
+          await apiFetch(`procurement/rfq/${r.id}/cancel`, token, { method: "PATCH" });
+          toast.success("Cotización cancelada");
+          if (rfqComparison?.rfq.id === r.id) setRfqComparison(null);
+          void load();
+        } catch (e) {
+          toast.error(errorLegible(e, "No se pudo cancelar la cotización"));
+        }
+      },
+    });
+  };
+
+  // ── Excel (la librería se carga solo al exportar) ───────────────────────
+  const exportar = async (tipo: "orders" | "requisitions" | "receipts") => {
+    const { exportToExcel } = await import("@/lib/export-excel");
+    if (tipo === "orders") {
+      exportToExcel(visibleOrders, [
+        { key: "poNumber", label: "OC" },
+        { key: "supplier", label: "Proveedor", format: (v) => (v as PurchaseOrder["supplier"])?.name ?? "—" },
+        { key: "totalAmount", label: "Monto" },
+        { key: "status", label: "Estado", format: (v) => PO_STATUS[String(v ?? "")] ?? String(v ?? "") },
+        { key: "expectedDate", label: "Entrega estimada", format: (v) => (v ? String(v).slice(0, 10) : "") },
+      ], "ordenes-compra", {
+        title: "ÓRDENES DE COMPRA",
+        summaryRows: [
+          { label: "Órdenes visibles", value: visibleOrders.length },
+          { label: "Monto total", value: visibleOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0) },
+        ],
       });
-      toast.success("RFQ adjudicada — orden de compra generada");
-      setRfqComparison(null);
-      void load();
-    } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo adjudicar"));
-    } finally {
-      setAwardingSupplierId(null);
+    } else if (tipo === "requisitions") {
+      exportToExcel(visibleReqs, [
+        { key: "reqNumber", label: "Folio" },
+        { key: "title", label: "Título" },
+        { key: "priority", label: "Prioridad", format: (v) => PRIORITY_LABEL[String(v ?? "NORMAL")] ?? "Normal" },
+        { key: "status", label: "Estado", format: (v) => REQ_STATUS[String(v ?? "")] ?? String(v ?? "") },
+        { key: "requestedBy", label: "Solicitó", format: (v) => (v as Requisition["requestedBy"])?.nombre ?? "—" },
+      ], "requisiciones", { title: "REQUISICIONES" });
+    } else {
+      exportToExcel(
+        visibleReceipts.map((r) => ({
+          folio: r.receiptNumber,
+          oc: r.purchaseOrder?.poNumber ?? `OC-${r.purchaseOrderId}`,
+          proveedor: r.purchaseOrder?.supplier?.name ?? "",
+          almacen: r.warehouse ? [r.warehouse.code, r.warehouse.name].filter(Boolean).join(" — ") : "",
+          partidas: r.items?.length ?? 0,
+          cantidad: (r.items ?? []).reduce((acc, i) => acc + Number(i.quantityReceived || 0), 0),
+          extra: costosExtra(r),
+          recibio: r.receivedBy?.nombre ?? "",
+          fecha: r.receiptDate ? String(r.receiptDate).slice(0, 10) : "",
+          notas: r.notes ?? "",
+        })),
+        [
+          { key: "folio", label: "Folio" },
+          { key: "oc", label: "OC" },
+          { key: "proveedor", label: "Proveedor" },
+          { key: "almacen", label: "Almacén" },
+          { key: "partidas", label: "Artículos" },
+          { key: "cantidad", label: "Cantidad recibida" },
+          { key: "extra", label: "Costos de importación" },
+          { key: "recibio", label: "Recibió" },
+          { key: "fecha", label: "Fecha" },
+          { key: "notas", label: "Notas" },
+        ],
+        "recepciones-mercancia",
+        { title: "RECEPCIONES DE MERCANCÍA" },
+      );
     }
   };
 
-  const submitCancelRfq = async (id: number) => {
-    if (!token) return;
-    try {
-      await apiFetch(`procurement/rfq/${id}/cancel`, token, { method: "PATCH" });
-      void load();
-    } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo cancelar"));
-    }
-  };
-
+  // ── Columnas ────────────────────────────────────────────────────────────
   const rfqColumns: Column<Rfq>[] = [
-    { key: "rfqNumber", label: "RFQ", render: (r) => <code style={{ fontSize: 11.5 }}>{r.rfqNumber}</code>, width: 110 },
-    { key: "requisition", label: "Requisición", render: (r) => (
-      <div>
-        <div style={{ fontSize: 13 }}>{r.requisition?.title ?? "—"}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.requisition?.reqNumber}</div>
-      </div>
-    ) },
-    { key: "lines", label: "Proveedores/líneas", render: (r) => <span style={{ fontSize: 12 }}>{r._count?.lines ?? r.lines?.length ?? 0} líneas</span>, width: 130 },
-    { key: "status", label: "Estado", width: 130, render: (r) => (
-      <Tag variant={r.status === "AWARDED" ? "positive" : r.status === "CANCELLED" ? "default" : r.status === "QUOTED" ? "accent" : "neutral"}>
-        {RFQ_STATUS[r.status] ?? r.status}
-      </Tag>
-    ) },
-    { key: "actions", label: "", width: 180, render: (r) => (
-      <div style={{ display: "flex", gap: 6 }}>
-        <Button size="sm" variant="secondary" onClick={() => void openRfqComparison(r.id)}>
-          {r.status === "AWARDED" ? "Ver" : "Comparar"}
-        </Button>
-        {(r.status === "SENT" || r.status === "QUOTED") && (
-          <Button size="sm" variant="ghost" onClick={() => void submitCancelRfq(r.id)}>Cancelar</Button>
-        )}
-      </div>
-    ) },
+    {
+      key: "requisition",
+      label: "Qué se cotiza",
+      render: (r) => (
+        <div style={{ display: "grid", gap: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{r.requisition?.title ?? "Sin requisición"}</span>
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            {r.rfqNumber}
+            {r.requisition?.reqNumber ? ` · ${r.requisition.reqNumber}` : ""}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "lines",
+      label: "Renglones",
+      numeric: true,
+      width: 100,
+      render: (r) => <span className={s.num}>{r._count?.lines ?? r.lines?.length ?? 0}</span>,
+    },
+    {
+      key: "dueDate",
+      label: "Responder antes del",
+      width: 150,
+      render: (r) => (r.dueDate ? <span style={{ fontSize: 12 }}>{fechaCorta(r.dueDate)}</span> : <span className={s.sinDato}>—</span>),
+    },
+    {
+      key: "status",
+      label: "Estado",
+      width: 150,
+      render: (r) => <Tag variant={varianteRfq(r.status)}>{RFQ_STATUS[r.status] ?? "Sin estado"}</Tag>,
+    },
+    {
+      key: "actions",
+      label: <span className={s.srOnly}>Acciones</span>,
+      width: 190,
+      render: (r) => (
+        <div className={s.accionesFila}>
+          <Button size="sm" variant="secondary" onClick={() => void openRfqComparison(r.id)}>
+            {r.status === "AWARDED" || r.status === "CANCELLED" ? "Ver" : "Comparar precios"}
+          </Button>
+          {(r.status === "SENT" || r.status === "QUOTED") && (
+            <Button size="sm" variant="ghost" onClick={() => pedirCancelarRfq(r)}>Cancelar</Button>
+          )}
+        </div>
+      ),
+    },
   ];
 
   const orderColumns: Column<PurchaseOrder>[] = [
     {
       key: "poNumber",
       label: "OC",
+      width: 130,
       render: (o) => (
         <button
           type="button"
@@ -880,171 +1020,228 @@ export default function ProcurementPage() {
           {o.poNumber}
         </button>
       ),
-      width: 130,
     },
     {
       key: "supplier",
       label: "Proveedor",
       render: (o) => <span style={{ fontWeight: 600, fontSize: 13 }}>{o.supplier?.name ?? "—"}</span>,
     },
-    { key: "totalAmount", label: "Monto", render: (o) => <Money value={Number(o.totalAmount)} />, width: 120 },
+    { key: "totalAmount", label: "Monto", numeric: true, width: 130, render: (o) => <Money value={Number(o.totalAmount)} /> },
     {
       key: "expectedDate",
-      label: "Entrega est.",
+      label: "Entrega estimada",
+      width: 140,
       render: (o) => {
-        if (!o.expectedDate) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
-        const daysLeft = Math.ceil((new Date(o.expectedDate).getTime() - Date.now()) / 86400000);
-        const isOpen = o.status !== "RECEIVED" && o.status !== "CANCELLED";
-        const color = !isOpen ? "var(--text-tertiary)" : daysLeft < 0 ? "var(--danger)" : daysLeft <= 3 ? "var(--danger)" : daysLeft <= 7 ? "var(--warning)" : "var(--text-secondary)";
+        if (!o.expectedDate) return <span className={s.sinDato}>—</span>;
+        const dias = diasHasta(o.expectedDate);
+        const abierta = ocAbierta(o.status);
+        const color = !abierta || dias == null
+          ? "var(--text-tertiary)"
+          : dias < 0 ? "var(--danger)" : dias <= 3 ? "var(--warning)" : "var(--text-secondary)";
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 12, color }}>{new Date(o.expectedDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
-            {isOpen && <span style={{ fontSize: 10.5, fontWeight: daysLeft <= 7 ? 700 : 400, color }}>{daysLeft < 0 ? "ATRASADA" : `${daysLeft}d`}</span>}
+          <div style={{ display: "grid", gap: 2 }}>
+            <span style={{ fontSize: 12 }}>{fechaCorta(o.expectedDate)}</span>
+            {abierta && dias != null && (
+              <span style={{ fontSize: 11, fontWeight: dias <= 3 ? 700 : 400, color }}>
+                {dias < 0 ? `Atrasada ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "día" : "días"}` : plazoLegible(dias)}
+              </span>
+            )}
           </div>
         );
       },
-      width: 100,
     },
     {
       key: "status",
       label: "Estado",
+      width: 150,
+      render: (o) => <Tag variant={variantePo(o.status)}>{PO_STATUS[o.status] ?? "Sin estado"}</Tag>,
+    },
+    {
+      key: "actions",
+      label: <span className={s.srOnly}>Acciones</span>,
+      width: 170,
       render: (o) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Tag variant={o.status === "RECEIVED" ? "positive" : o.status === "CANCELLED" ? "danger" : o.status === "DRAFT" ? "neutral" : "accent"}>
-            {PO_STATUS[o.status] ?? o.status}
-          </Tag>
+        <div className={s.accionesFila}>
           {o.status === "DRAFT" && cfg.canApprove && (
-            <button onClick={(e) => { e.stopPropagation(); void approvePo(o.id); }} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
-              ✓
-            </button>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={aprobandoId === `po-${o.id}`}
+              disabled={aprobandoId != null}
+              onClick={(e) => {
+                e.stopPropagation();
+                void approvePo(o.id);
+              }}
+            >
+              Aprobar
+            </Button>
           )}
           <Button
             size="sm"
             variant="ghost"
-            iconLeft="📄"
-            title="Descargar PDF"
+            aria-label={`Descargar PDF de la orden ${o.poNumber}`}
             onClick={(e) => {
               e.stopPropagation();
               void downloadPoPdf(o.id, o.poNumber);
             }}
           >
-            Descargar PDF
+            PDF
           </Button>
         </div>
       ),
-      width: 200,
     },
   ];
 
   const reqColumns: Column<Requisition>[] = [
-    { key: "reqNumber", label: "Folio", render: (r) => <code style={{ fontSize: 11.5 }}>{r.reqNumber}</code>, width: 120 },
     {
       key: "title",
       label: "Requisición",
       render: (r) => (
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{r.title}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{r.requestedBy?.nombre}</div>
+        <div style={{ display: "grid", gap: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{r.title}</span>
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            {r.reqNumber}
+            {r.requestedBy?.nombre ? ` · ${r.requestedBy.nombre}` : ""}
+          </span>
         </div>
       ),
     },
-    { key: "priority", label: "Prioridad", render: (r) => <Tag variant={r.priority === "HIGH" || r.priority === "URGENT" ? "danger" : r.priority === "MEDIUM" ? "warning" : "neutral"}>{r.priority ?? "NORMAL"}</Tag>, width: 100 },
+    {
+      key: "priority",
+      label: "Prioridad",
+      width: 110,
+      render: (r) => {
+        const p = prioridad(r.priority);
+        return <Tag variant={p.variante}>{p.texto}</Tag>;
+      },
+    },
+    {
+      key: "requiredDate",
+      label: "Se necesita",
+      width: 120,
+      render: (r) => (r.requiredDate ? <span style={{ fontSize: 12 }}>{fechaCorta(r.requiredDate)}</span> : <span className={s.sinDato}>—</span>),
+    },
     {
       key: "status",
       label: "Estado",
-      render: (r) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Tag variant={r.status === "APPROVED" ? "neutral" : r.status === "REJECTED" ? "danger" : "warning"}>
-            {REQ_STATUS[r.status] ?? r.status}
-          </Tag>
-          {r.status === "PENDING" && cfg.canApprove && (
-            <>
-              <button onClick={() => void approveReq(r.id)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
-                ✓
-              </button>
-              <button onClick={() => void rejectReq(r.id)} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
-                ✕
-              </button>
-            </>
-          )}
-        </div>
-      ),
-      width: 160,
+      width: 120,
+      render: (r) => <Tag variant={varianteReq(r.status)}>{REQ_STATUS[r.status] ?? "Sin estado"}</Tag>,
+    },
+    {
+      key: "actions",
+      label: <span className={s.srOnly}>Acciones</span>,
+      width: 190,
+      render: (r) =>
+        r.status === "PENDING" && cfg.canApprove ? (
+          <div className={s.accionesFila}>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={aprobandoId === `req-${r.id}`}
+              disabled={aprobandoId != null}
+              onClick={(e) => {
+                e.stopPropagation();
+                void approveReq(r.id);
+              }}
+            >
+              Aprobar
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                openRejectReq(r);
+              }}
+            >
+              Rechazar
+            </Button>
+          </div>
+        ) : null,
     },
   ];
 
   const receiptColumns: Column<GoodsReceipt>[] = [
-    { key: "receiptNumber", label: "Folio", render: (r) => <code style={{ fontSize: 11.5 }}>{r.receiptNumber}</code>, width: 120 },
+    { key: "receiptNumber", label: "Folio", width: 120, render: (r) => <code style={{ fontSize: 11.5 }}>{r.receiptNumber}</code> },
     {
       key: "purchaseOrder",
-      label: "OC",
+      label: "Orden",
+      width: 120,
       render: (r) => (
-        <Link href={`/erp/procurement?tab=orders&id=${r.purchaseOrderId}`} style={{ color: "var(--primary)", fontWeight: 600, fontSize: 13, textDecoration: "none" }}>
-          {r.purchaseOrder?.poNumber ?? `OC-${r.purchaseOrderId}`}
-        </Link>
-      ),
-      width: 110,
-    },
-    {
-      key: "supplier",
-      label: "Proveedor",
-      accessor: (r) => r.purchaseOrder?.supplier?.name ?? "—",
-      width: 140,
-    },
-    {
-      key: "warehouse",
-      label: "Almacén",
-      render: (r) => (
-        <span style={{ fontSize: 12 }}>
-          {r.warehouse ? [r.warehouse.code, r.warehouse.name].filter(Boolean).join(" · ") : "—"}
-        </span>
-      ),
-      width: 140,
-    },
-    {
-      key: "items",
-      label: "Partidas",
-      render: (r) => {
-        const n = r.items?.length ?? 0;
-        const qty = (r.items ?? []).reduce((s, i) => s + Number(i.quantityReceived || 0), 0);
-        return <span style={{ fontSize: 12 }}>{n} · cant. {qty}</span>;
-      },
-      width: 100,
-      numeric: true,
-    },
-    {
-      key: "landed",
-      label: "Landed",
-      render: (r) => {
-        const t = receiptLandedTotal(r);
-        return t > 0 ? <Money value={t} compact /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>;
-      },
-      width: 90,
-      numeric: true,
-    },
-    { key: "receivedBy", label: "Usuario", accessor: (r) => r.receivedBy?.nombre ?? "—", width: 120 },
-    {
-      key: "receiptDate",
-      label: "Fecha",
-      accessor: (r) => (r.receiptDate ? new Date(r.receiptDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"),
-      width: 110,
-    },
-    {
-      key: "actions",
-      label: "",
-      width: 56,
-      render: (r) => (
-        <button
-          type="button"
-          title="PDF recepción"
-          onClick={(e) => { e.stopPropagation(); void downloadReceiptPdf(r.id, r.receiptNumber); }}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--primary)", padding: "4px 6px", fontWeight: 600 }}
-        >
-          PDF
+        <button type="button" className={s.enlace} onClick={() => navegar({ tab: "orders", id: r.purchaseOrderId })}>
+          {r.purchaseOrder?.poNumber ?? "Ver orden"}
         </button>
       ),
     },
+    { key: "supplier", label: "Proveedor", width: 150, accessor: (r) => r.purchaseOrder?.supplier?.name ?? "—" },
+    {
+      key: "warehouse",
+      label: "Almacén",
+      width: 150,
+      render: (r) => <span style={{ fontSize: 12 }}>{r.warehouse?.name ?? "—"}</span>,
+    },
+    {
+      key: "items",
+      label: "Recibido",
+      numeric: true,
+      width: 120,
+      render: (r) => {
+        const n = r.items?.length ?? 0;
+        const qty = (r.items ?? []).reduce((acc, i) => acc + Number(i.quantityReceived || 0), 0);
+        return (
+          <span style={{ fontSize: 12 }}>
+            {cantidad(qty)} en {n} {n === 1 ? "artículo" : "artículos"}
+          </span>
+        );
+      },
+    },
+    {
+      key: "landed",
+      label: "Costos de importación",
+      numeric: true,
+      width: 130,
+      render: (r) => {
+        const t = costosExtra(r);
+        return t > 0 ? <Money value={t} compact /> : <span className={s.sinDato}>—</span>;
+      },
+    },
+    { key: "receivedBy", label: "Recibió", width: 130, accessor: (r) => r.receivedBy?.nombre ?? "—" },
+    { key: "receiptDate", label: "Fecha", width: 110, accessor: (r) => fechaCorta(r.receiptDate) },
+    {
+      key: "actions",
+      label: <span className={s.srOnly}>Acciones</span>,
+      width: 70,
+      render: (r) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={`Descargar PDF de la recepción ${r.receiptNumber}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            void downloadReceiptPdf(r.id, r.receiptNumber);
+          }}
+        >
+          PDF
+        </Button>
+      ),
+    },
   ];
+
+  const primeraCarga = loading && !cargado[tab];
+  const totalReq = reqItems.reduce((acc, i) => acc + (Number(i.estimatedCost) || 0) * (Number(i.quantity) || 0), 0);
+  const totalPo = poItems.reduce((acc, i) => acc + (Number(i.unitPrice) || 0) * (Number(i.quantity) || 0), 0);
+  const ordenRecepcionFuera = receiptPoId && !ordenesAbiertas.some((o) => String(o.id) === receiptPoId);
+  const poNumberFiltro = poId ? receipts.find((r) => String(r.purchaseOrderId) === poId)?.purchaseOrder?.poNumber : null;
+
+  const tituloSeccion = primeraCarga
+    ? "Cargando…"
+    : tab === "orders"
+      ? `${visibleOrders.length} ${visibleOrders.length === 1 ? "orden" : "órdenes"}`
+      : tab === "requisitions"
+        ? `${visibleReqs.length} ${visibleReqs.length === 1 ? "requisición" : "requisiciones"}`
+        : tab === "rfq"
+          ? `${visibleRfqs.length} ${visibleRfqs.length === 1 ? "cotización" : "cotizaciones"}`
+          : `${visibleReceipts.length} ${visibleReceipts.length === 1 ? "recepción" : "recepciones"}`;
 
   return (
     <>
@@ -1054,316 +1251,879 @@ export default function ProcurementPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
+            {tab !== "mayoristas" && (
+              <Button variant="ghost" size="sm" onClick={() => void load()} loading={loading && !primeraCarga}>
+                Actualizar
+              </Button>
+            )}
             {cfg.canCreate && (
               <Button variant="secondary" size="sm" iconLeft="+" onClick={openSupplierForm}>Nuevo proveedor</Button>
             )}
             {cfg.canCreate && tab === "requisitions" && (
-              <Button variant="primary" size="sm" onClick={() => { setShowReqForm(true); setShowPoForm(false); }}>Nueva requisición</Button>
+              <Button variant="primary" size="sm" onClick={abrirReqForm}>Nueva requisición</Button>
             )}
             {cfg.canCreate && tab === "orders" && (
-              <Button variant="primary" size="sm" onClick={() => { setShowPoForm(true); setShowReqForm(false); }}>Nueva OC</Button>
+              <Button variant="primary" size="sm" onClick={abrirPoForm}>Nueva orden de compra</Button>
             )}
             {cfg.canCreate && tab === "receipts" && (
-              <Button variant="primary" size="sm" onClick={() => setShowReceiptForm(true)}>Registrar recepción</Button>
+              <Button variant="primary" size="sm" onClick={abrirRecepcion}>Registrar recepción</Button>
             )}
             {cfg.canCreate && tab === "rfq" && (
-              <Button variant="primary" size="sm" onClick={() => setShowRfqForm(true)}>Nueva RFQ</Button>
+              <Button variant="primary" size="sm" onClick={abrirRfqForm}>Pedir cotización</Button>
             )}
           </>
         }
       />
 
-      {/* ── Formulario: Nueva Requisición ─────────────────────────────── */}
-      {showReqForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva requisición</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Título *</label>
-              <input value={reqForm.title} onChange={e => setReqForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej. Cables y conectores para obra Pachuca" style={inp} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Prioridad</label>
-              <select value={reqForm.priority} onChange={e => setReqForm(f => ({ ...f, priority: e.target.value }))} style={inp}>
-                {PRIORITIES.map(p => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
-              </select>
-            </div>
-          </div>
-          <p style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", margin: "0 0 6px" }}>Artículos</p>
-          {reqItems.map((item, idx) => (
-            <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, marginBottom: 6 }}>
-              <input value={item.description} onChange={e => setReqItems(prev => prev.map((it, i) => i === idx ? { ...it, description: e.target.value } : it))} placeholder="Descripción del artículo" style={inp} />
-              <input type="number" min={1} value={item.quantity} onChange={e => setReqItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: +e.target.value } : it))} placeholder="Cant." style={{ ...inp, width: 70 }} />
-              <input type="number" min={0} value={item.estimatedCost} onChange={e => setReqItems(prev => prev.map((it, i) => i === idx ? { ...it, estimatedCost: e.target.value } : it))} placeholder="Costo est." style={{ ...inp, width: 110 }} />
-              {reqItems.length > 1 && (
-                <button onClick={() => setReqItems(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "0 4px" }}>✕</button>
-              )}
-            </div>
-          ))}
-          <button onClick={() => setReqItems(prev => [...prev, { ...emptyReqItem }])} style={{ fontSize: 12, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 10 }}>+ Agregar artículo</button>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="ghost" onClick={() => setShowReqForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void saveReq()} disabled={savingReq}>{savingReq ? "Guardando…" : "Crear requisición"}</Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Formulario: Nueva OC ──────────────────────────────────────── */}
-      {showPoForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva orden de compra</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Proveedor *</label>
-              <input value={poForm.supplierName} onChange={e => setPoForm(f => ({ ...f, supplierName: e.target.value }))} placeholder="Nombre del proveedor" style={inp} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Fecha entrega est.</label>
-              <input type="date" value={poForm.expectedDate} onChange={e => setPoForm(f => ({ ...f, expectedDate: e.target.value }))} style={inp} />
-            </div>
-          </div>
-          <p style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", margin: "0 0 6px" }}>Artículos</p>
-          {poItems.map((item, idx) => (
-            <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, marginBottom: 6 }}>
-              <input value={item.description} onChange={e => setPoItems(prev => prev.map((it, i) => i === idx ? { ...it, description: e.target.value } : it))} placeholder="Descripción del artículo" style={inp} />
-              <input type="number" min={1} value={item.quantity} onChange={e => setPoItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: +e.target.value } : it))} placeholder="Cant." style={{ ...inp, width: 70 }} />
-              <input type="number" min={0} value={item.unitPrice} onChange={e => setPoItems(prev => prev.map((it, i) => i === idx ? { ...it, unitPrice: e.target.value } : it))} placeholder="Precio unit." style={{ ...inp, width: 110 }} />
-              {poItems.length > 1 && (
-                <button onClick={() => setPoItems(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "0 4px" }}>✕</button>
-              )}
-            </div>
-          ))}
-          <button onClick={() => setPoItems(prev => [...prev, { ...emptyPoItem }])} style={{ fontSize: 12, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 10 }}>+ Agregar artículo</button>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="ghost" onClick={() => setShowPoForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void savePo()} disabled={savingPo}>{savingPo ? "Guardando…" : "Crear OC"}</Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Formulario: Nueva RFQ ─────────────────────────────────────── */}
-      {showRfqForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva RFQ (solicitud de cotización)</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Requisición *</label>
-              <select value={rfqForm.requisitionId} onChange={(e) => setRfqForm((f) => ({ ...f, requisitionId: e.target.value }))} style={inp}>
-                <option value="">Seleccionar…</option>
-                {requisitions.map((r) => <option key={r.id} value={r.id}>{r.reqNumber} — {r.title}</option>)}
-              </select>
-            </div>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Proveedores a cotizar *</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {suppliers.length === 0 && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin proveedores — da de alta el primero con «Nuevo proveedor».</span>}
-                {suppliers.map((s) => {
-                  const checked = rfqForm.supplierIds.includes(s.id);
-                  return (
-                    <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 8, border: `1px solid ${checked ? "var(--primary)" : "var(--border)"}`, background: checked ? "color-mix(in srgb, var(--primary) 8%, transparent)" : "var(--surface)", fontSize: 12.5, cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => setRfqForm((f) => ({ ...f, supplierIds: e.target.checked ? [...f.supplierIds, s.id] : f.supplierIds.filter((id) => id !== s.id) }))}
-                      />
-                      {s.name}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Fecha límite de respuesta</label>
-              <input type="date" value={rfqForm.dueDate} onChange={(e) => setRfqForm((f) => ({ ...f, dueDate: e.target.value }))} style={inp} />
-            </div>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Notas</label>
-              <input value={rfqForm.notes} onChange={(e) => setRfqForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Condiciones, referencias…" style={inp} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="ghost" onClick={() => setShowRfqForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void submitCreateRfq()} disabled={savingRfq || !rfqForm.requisitionId || !rfqForm.supplierIds.length}>
-              {savingRfq ? "Enviando…" : "Enviar RFQ"}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {tab === "rfq" && suppliers.length > 0 && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}>
-          <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 13 }}>Proveedores · RFC para DIOT</p>
-          <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--text-secondary)" }}>
-            El RFC alimenta el reporte DIOT en Contabilidad → Cumplimiento SAT.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
-            {suppliers.map((s) => (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12.5, flex: 1 }}>{s.name}</span>
-                <input
-                  defaultValue={s.rfc ?? ""}
-                  placeholder="RFC"
-                  disabled={savingSupplierRfcId === s.id}
-                  onBlur={(e) => { if (e.target.value.trim().toUpperCase() !== (s.rfc ?? "")) void saveSupplierRfc(s.id, s.name, e.target.value); }}
-                  style={{ ...inp, width: 140, borderColor: s.rfc ? "var(--border)" : "var(--warning)" }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Comparación de cotizaciones ──────────────────────────────── */}
-      {(comparisonLoading || rfqComparison) && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
-          {comparisonLoading ? (
-            <p style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Cargando comparación…</p>
-          ) : rfqComparison ? (
-            <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
-                  {rfqComparison.rfq.rfqNumber} · {rfqComparison.rfq.requisition?.title} · <Tag variant={rfqComparison.rfq.status === "AWARDED" ? "positive" : "accent"}>{RFQ_STATUS[rfqComparison.rfq.status]}</Tag>
-                </p>
-                <Button variant="ghost" size="sm" onClick={() => setRfqComparison(null)}>Cerrar</Button>
-              </div>
-              {rfqComparison.rfq.status === "AWARDED" && rfqComparison.rfq.awardedPurchaseOrder && (
-                <p style={{ fontSize: 12.5, marginBottom: 12 }}>
-                  Adjudicada → <Link href={`/erp/procurement?tab=orders&id=${rfqComparison.rfq.awardedPurchaseOrder.id}`} style={{ color: "var(--primary)" }}>{rfqComparison.rfq.awardedPurchaseOrder.poNumber}</Link>
-                </p>
-              )}
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {rfqComparison.suppliers.map((s) => {
-                  const isBestPrice = s.supplierId === rfqComparison.bestPriceSupplierId;
-                  const isBestLeadTime = s.supplierId === rfqComparison.bestLeadTimeSupplierId;
-                  const complete = s.quotedLines === s.totalLines;
-                  return (
-                    <div key={s.supplierId} style={{ border: `1px solid ${isBestPrice ? "var(--success)" : "var(--border)"}`, borderRadius: 10, padding: 14, background: "var(--surface)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <strong style={{ fontSize: 13.5 }}>{s.supplierName}</strong>
-                          {isBestPrice && <Tag variant="positive">Mejor precio</Tag>}
-                          {isBestLeadTime && <Tag variant="accent">Mejor entrega</Tag>}
-                          <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{s.quotedLines}/{s.totalLines} cotizadas</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <Money value={s.totalPrice} />
-                          {rfqComparison.rfq.status !== "AWARDED" && rfqComparison.rfq.status !== "CANCELLED" && cfg.canApprove && (
-                            <Button size="sm" variant="primary" disabled={!complete || awardingSupplierId === s.supplierId} onClick={() => void submitAwardRfq(s.supplierId)}>
-                              {awardingSupplierId === s.supplierId ? "Adjudicando…" : "Adjudicar"}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                        <thead>
-                          <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-                            <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
-                            <th style={{ textAlign: "right", padding: "6px 8px" }}>Cant.</th>
-                            <th style={{ textAlign: "right", padding: "6px 8px", width: 110 }}>Precio unit.</th>
-                            <th style={{ textAlign: "right", padding: "6px 8px", width: 90 }}>Días entrega</th>
-                            <th style={{ padding: "6px 8px", width: 70 }} />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {s.lines.map((l) => {
-                            const draft = quoteDraft[l.id] ?? { unitPrice: "", leadTimeDays: "" };
-                            const editable = rfqComparison.rfq.status !== "AWARDED" && rfqComparison.rfq.status !== "CANCELLED";
-                            return (
-                              <tr key={l.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                                <td style={{ padding: "6px 8px" }}>{l.description}</td>
-                                <td style={{ padding: "6px 8px", textAlign: "right" }}>{Number(l.quantity)}</td>
-                                <td style={{ padding: "6px 8px" }}>
-                                  <input
-                                    type="number" min={0} step="0.01"
-                                    disabled={!editable}
-                                    value={draft.unitPrice}
-                                    onChange={(e) => setQuoteDraft((q) => ({ ...q, [l.id]: { ...draft, unitPrice: e.target.value } }))}
-                                    style={{ ...inp, textAlign: "right" }}
-                                  />
-                                </td>
-                                <td style={{ padding: "6px 8px" }}>
-                                  <input
-                                    type="number" min={0}
-                                    disabled={!editable}
-                                    value={draft.leadTimeDays}
-                                    onChange={(e) => setQuoteDraft((q) => ({ ...q, [l.id]: { ...draft, leadTimeDays: e.target.value } }))}
-                                    style={{ ...inp, textAlign: "right" }}
-                                  />
-                                </td>
-                                <td style={{ padding: "6px 8px", textAlign: "right" }}>
-                                  {editable && (
-                                    <Button size="sm" variant="ghost" disabled={!draft.unitPrice || savingQuoteLineId === l.id} onClick={() => void submitQuoteLine(l.id)}>
-                                      {savingQuoteLineId === l.id ? "…" : "Guardar"}
-                                    </Button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : null}
-        </div>
-      )}
-
-      {!loading && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Requisiciones pendientes" value={requisitions.filter(r => r.status === "PENDING").length} variant={requisitions.filter(r => r.status === "PENDING").length > 0 ? "warning" : "positive"} icon="📋" />
-          <KpiCard label="OC activas" value={orders.filter(o => o.status !== "RECEIVED" && o.status !== "CANCELLED").length} variant="accent" icon="🛒" />
-          <KpiCard label="OC recibidas" value={orders.filter(o => o.status === "RECEIVED").length} variant="positive" icon="✅" />
-          <KpiCard label="Recepciones registradas" value={receipts.length} icon="📦" />
-        </div>
-      )}
-
-      {!loading && orders.length > 0 && (() => {
-        const statuses = [
-          { label: "Borrador", count: orders.filter(o => o.status === "DRAFT").length, color: "var(--text-tertiary)" },
-          { label: "Enviada", count: orders.filter(o => o.status === "SENT").length, color: "var(--primary)" },
-          { label: "Recibida", count: orders.filter(o => o.status === "RECEIVED").length, color: "var(--success)" },
-          { label: "Cancelada", count: orders.filter(o => o.status === "CANCELLED").length, color: "var(--danger)" },
-        ].filter(s => s.count > 0);
-        if (!statuses.length) return null;
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Estado de órdenes de compra</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {statuses.map(s => (
-                <div key={s.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{s.label}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(s.count / orders.length) * 100}%`, background: s.color, borderRadius: 3, transition: "width .4s" }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{s.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+      <ol className={s.flujo} aria-label="Así avanza una compra">
+        {ETAPAS.map((e) => (
+          <li key={e.tab} className={s.flujoPaso}>
+            <span
+              className={`${s.flujoEtapa} ${tab === e.tab ? s.flujoActivo : ""}`}
+              aria-current={tab === e.tab ? "step" : undefined}
+            >
+              {e.label}
+            </span>
+          </li>
+        ))}
+      </ol>
 
       <PanelTabs
         ariaLabel="Secciones de compras"
         value={tab}
         onChange={setTab}
-        tabs={[
-          { key: "requisitions", label: "Requisiciones" },
-          { key: "orders", label: "Órdenes de compra" },
-          { key: "receipts", label: "Recepciones" },
-          { key: "rfq", label: "RFQ · Comparar" },
-          { key: "mayoristas", label: "Mayoristas" },
-        ]}
+        tabs={TABS_COMPRAS.map((t) => ({ key: t.key, label: t.label }))}
       />
 
-      {/* Mayoristas trae su propia tabla y su propio detalle: el FilterToolbar
-          y la Section de abajo filtran órdenes y requisiciones, que aquí no
-          aplican, así que se ocultan en vez de mostrarse vacíos. */}
+      {/* Mayoristas trae su propia tabla y su propio detalle. */}
       {tab === "mayoristas" && <WholesalePanel token={token} canManage={cfg.canCreate} />}
+
+      {tab !== "mayoristas" && (
+        <>
+          {errorCarga && (
+            <div style={{ marginBottom: 12 }}>
+              <InlineAlert
+                variant={cargado[tab] ? "warning" : "danger"}
+                message={cargado[tab] ? `${errorCarga}. Se muestra lo último que cargó.` : errorCarga}
+                action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+              />
+            </div>
+          )}
+
+          {cargado[tab] && (
+            <div className={s.kpis}>
+              {tab === "orders" && cifras && (
+                <>
+                  <KpiCard label="Por aprobar" value={cifras.porAprobar} variant={cifras.porAprobar > 0 ? "warning" : "neutral"} />
+                  <KpiCard label="Abiertas" value={cifras.abiertas} hint="sin recibir completas" variant="accent" />
+                  <KpiCard label="Atrasadas" value={cifras.atrasadas} hint="pasó su fecha de entrega" variant={cifras.atrasadas > 0 ? "danger" : "positive"} />
+                  <KpiCard label="Monto abierto" value={<span className={s.num}>{pesos(cifras.montoAbierto, { enteros: true })}</span>} />
+                </>
+              )}
+              {tab === "requisitions" && (
+                <>
+                  <KpiCard label="Por aprobar" value={cifrasReq.pendientes} variant={cifrasReq.pendientes > 0 ? "warning" : "positive"} />
+                  <KpiCard label="Urgentes por aprobar" value={cifrasReq.urgentes} variant={cifrasReq.urgentes > 0 ? "danger" : "neutral"} />
+                  <KpiCard label="Aprobadas" value={cifrasReq.aprobadas} hint="listas para cotizar o comprar" variant="accent" />
+                </>
+              )}
+              {tab === "rfq" && (
+                <>
+                  <KpiCard label="Esperando precios" value={cifrasRfq.esperando} variant={cifrasRfq.esperando > 0 ? "warning" : "neutral"} />
+                  <KpiCard label="Con precios" value={cifrasRfq.conPrecios} hint="listas para adjudicar" variant="accent" />
+                  <KpiCard label="Adjudicadas" value={cifrasRfq.adjudicadas} variant="positive" />
+                </>
+              )}
+              {tab === "receipts" && (
+                <>
+                  <KpiCard label="Recepciones" value={receipts.length} />
+                  <KpiCard label="Este mes" value={cifrasRecepciones.esteMes} variant="accent" />
+                  <KpiCard
+                    label="Costos de importación"
+                    value={<span className={s.num}>{pesos(cifrasRecepciones.extra, { enteros: true })}</span>}
+                    hint="flete, seguro, aranceles y otros"
+                  />
+                </>
+              )}
+            </div>
+          )}
+
+          {tab === "orders" && cifras && orders.length > 0 && (
+            <div className={s.reparto}>
+              <p className={s.repartoTitulo}>Órdenes por estado</p>
+              <div className={s.repartoBarra} aria-hidden>
+                {Object.keys(PO_STATUS)
+                  .filter((k) => cifras.porEstado[k])
+                  .map((k) => (
+                    <div
+                      key={k}
+                      className={s.repartoTramo}
+                      style={{ width: `${(cifras.porEstado[k] / orders.length) * 100}%`, background: PO_STATUS_COLOR[k] }}
+                    />
+                  ))}
+              </div>
+              <ul className={s.repartoLeyenda}>
+                {Object.keys(PO_STATUS)
+                  .filter((k) => cifras.porEstado[k])
+                  .map((k) => (
+                    <li key={k}>
+                      <span className={s.repartoPunto} style={{ background: PO_STATUS_COLOR[k] }} aria-hidden />
+                      {PO_STATUS[k]} <strong className={s.num}>{cifras.porEstado[k]}</strong>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          {tab === "rfq" && suppliers.length > 0 && (
+            <Section
+              title="RFC de proveedores"
+              subtitle="Se usa en la DIOT (Contabilidad → Cumplimiento SAT). Se guarda al salir del campo."
+            >
+              <div className={s.rfcs}>
+                {suppliers.map((sp) => (
+                  <div key={sp.id} className={s.rfcFila}>
+                    <span title={sp.name}>{sp.name}</span>
+                    <input
+                      defaultValue={sp.rfc ?? ""}
+                      placeholder="RFC"
+                      aria-label={`RFC de ${sp.name}`}
+                      maxLength={13}
+                      disabled={savingSupplierRfcId === sp.id}
+                      onBlur={(e) => {
+                        if (e.target.value.trim().toUpperCase() !== (sp.rfc ?? "")) void saveSupplierRfc(sp.id, sp.name, e.target.value);
+                      }}
+                      className={`${s.input} ${s.rfcInput} ${sp.rfc ? "" : s.rfcFalta}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {tab === "rfq" && (
+            <ComparacionCotizaciones
+              comparison={rfqComparison}
+              loading={comparisonLoading}
+              canApprove={cfg.canApprove}
+              savingLineId={savingQuoteLineId}
+              awardingSupplierId={awardingSupplierId}
+              onClose={() => setRfqComparison(null)}
+              onSaveLine={(lineId, draft) => void submitQuoteLine(lineId, draft)}
+              onAward={pedirAdjudicar}
+              onVerOrden={(id) => navegar({ tab: "orders", id })}
+            />
+          )}
+
+          <FilterToolbar
+            search={{
+              value: searchQ,
+              onChange: setSearchQ,
+              placeholder:
+                tab === "orders"
+                  ? "Buscar orden, proveedor…"
+                  : tab === "requisitions"
+                    ? "Buscar requisición, título, quién la pidió…"
+                    : tab === "rfq"
+                      ? "Buscar cotización o requisición…"
+                      : "Buscar recepción u orden…",
+            }}
+            selects={
+              tab === "orders"
+                ? [{
+                    label: "Estado",
+                    value: filterPoStatus,
+                    onChange: setFilterPoStatus,
+                    options: Object.entries(PO_STATUS).map(([value, label]) => ({ value, label })),
+                    allowAll: true,
+                  }]
+                : tab === "requisitions"
+                  ? [{
+                      label: "Estado",
+                      value: filterReqStatus,
+                      onChange: setFilterReqStatus,
+                      options: Object.entries(REQ_STATUS).map(([value, label]) => ({ value, label })),
+                      allowAll: true,
+                    }]
+                  : []
+            }
+            onClear={() => { setSearchQ(""); setFilterPoStatus(""); setFilterReqStatus(""); }}
+            resultCount={
+              primeraCarga
+                ? null
+                : tab === "orders"
+                  ? visibleOrders.length
+                  : tab === "requisitions"
+                    ? visibleReqs.length
+                    : tab === "rfq"
+                      ? visibleRfqs.length
+                      : visibleReceipts.length
+            }
+            rightActions={
+              tab === "orders" && orders.length > 0 ? (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => void exportar("orders")}>Descargar Excel</Button>
+              ) : tab === "requisitions" && requisitions.length > 0 ? (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => void exportar("requisitions")}>Descargar Excel</Button>
+              ) : tab === "receipts" && visibleReceipts.length > 0 ? (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => void exportar("receipts")}>Descargar Excel</Button>
+              ) : undefined
+            }
+          />
+
+          {highlightId && (
+            <p className={s.aviso}>
+              {tab === "receipts"
+                ? "Vienes de un enlace: se muestra solo esa recepción."
+                : "Vienes de un enlace: ese registro va primero en la lista."}
+              <button type="button" className={s.enlace} onClick={() => navegar({ tab })}>Ver todos</button>
+            </p>
+          )}
+          {poId && tab === "receipts" && (
+            <p className={s.aviso}>
+              Recepciones de la orden {poNumberFiltro ?? "elegida"}.
+              <button type="button" className={s.enlace} onClick={() => navegar({ tab: "receipts" })}>Ver todas</button>
+            </p>
+          )}
+
+          {detailKind && (
+            <section className={chrome.poDetail} aria-labelledby="detalle-compra-titulo">
+              <div className={chrome.poDetailHead}>
+                <h2 id="detalle-compra-titulo" className={chrome.poDetailTitle}>
+                  {detailKind === "order" ? `Orden de compra ${poDetail?.poNumber ?? ""}` : `Requisición ${reqDetail?.reqNumber ?? ""}`}
+                </h2>
+                <Button variant="ghost" size="sm" onClick={cerrarDetalle}>Cerrar</Button>
+              </div>
+              {detailLoading && <SkeletonRows rows={4} label="Cargando detalle" />}
+              {detailErr && !detailLoading && <InlineAlert variant="danger" message={detailErr} />}
+              {!detailLoading && detailKind === "order" && poDetail && (
+                <>
+                  <div className={chrome.poMetaGrid}>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Proveedor</span>
+                      <div className={chrome.poMetaValue}>{poDetail.supplier?.name ?? "—"}</div>
+                    </div>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Estado</span>
+                      <div className={chrome.poMetaValue}>
+                        <Tag variant={variantePo(poDetail.status)}>{PO_STATUS[poDetail.status] ?? "Sin estado"}</Tag>
+                      </div>
+                    </div>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Monto</span>
+                      <div className={chrome.poMetaValue}><Money value={Number(poDetail.totalAmount)} /></div>
+                    </div>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Entrega estimada</span>
+                      <div className={chrome.poMetaValue}>{fechaCorta(poDetail.expectedDate)}</div>
+                    </div>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Creada por</span>
+                      <div className={chrome.poMetaValue}>{poDetail.createdBy?.nombre ?? "—"}</div>
+                    </div>
+                  </div>
+                  {(poDetail.items ?? []).length > 0 ? (
+                    <div className={s.tablaEnvoltura}>
+                      <table className={chrome.poTable}>
+                        <thead>
+                          <tr>
+                            <th scope="col">Artículo</th>
+                            <th scope="col" className={s.num}>Pedido</th>
+                            <th scope="col" className={s.num}>Recibido</th>
+                            <th scope="col" className={s.num}>Precio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(poDetail.items ?? []).map((i) => (
+                            <tr key={i.id}>
+                              <td>{i.description}</td>
+                              <td className={s.num}>{cantidad(i.quantity)}</td>
+                              <td className={s.num}>{cantidad(i.receivedQty ?? 0)}</td>
+                              <td className={s.num}><Money value={Number(i.unitPrice ?? 0)} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <EmptyState variant="compact" title="Sin artículos" description="Esta orden no tiene artículos registrados." />
+                  )}
+                  <div className={s.accionesFila} style={{ marginTop: 12 }}>
+                    <Button variant="secondary" onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}>
+                      Descargar PDF
+                    </Button>
+                    {cfg.canCreate && ocAbierta(poDetail.status) && (
+                      <Button variant="primary" onClick={() => openReceiptForPo(poDetail.id)}>Registrar recepción</Button>
+                    )}
+                    <Button variant="ghost" onClick={() => navegar({ tab: "receipts", poId: poDetail.id })}>
+                      Ver sus recepciones
+                    </Button>
+                  </div>
+                </>
+              )}
+              {!detailLoading && detailKind === "req" && reqDetail && (
+                <>
+                  <div className={chrome.poMetaGrid}>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Título</span>
+                      <div className={chrome.poMetaValue}>{reqDetail.title}</div>
+                    </div>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Estado</span>
+                      <div className={chrome.poMetaValue}>
+                        <Tag variant={varianteReq(reqDetail.status)}>{REQ_STATUS[reqDetail.status] ?? "Sin estado"}</Tag>
+                      </div>
+                    </div>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Prioridad</span>
+                      <div className={chrome.poMetaValue}>{prioridad(reqDetail.priority).texto}</div>
+                    </div>
+                    <div className={chrome.poMetaItem}>
+                      <span className={chrome.poMetaLabel}>Solicitó</span>
+                      <div className={chrome.poMetaValue}>{reqDetail.requestedBy?.nombre ?? "—"}</div>
+                    </div>
+                  </div>
+                  {reqDetail.rejectionReason && (
+                    <InlineAlert variant="danger" message={`Motivo del rechazo: ${reqDetail.rejectionReason}`} />
+                  )}
+                  {(reqDetail.items ?? []).length > 0 ? (
+                    <div className={s.tablaEnvoltura}>
+                      <table className={chrome.poTable}>
+                        <thead>
+                          <tr>
+                            <th scope="col">Artículo</th>
+                            <th scope="col" className={s.num}>Cantidad</th>
+                            <th scope="col" className={s.num}>Costo estimado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(reqDetail.items ?? []).map((i) => (
+                            <tr key={i.id}>
+                              <td>{i.description}</td>
+                              <td className={s.num}>{cantidad(i.quantity)}</td>
+                              <td className={s.num}><Money value={Number(i.estimatedCost ?? 0)} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <EmptyState variant="compact" title="Sin artículos" description="Esta requisición no tiene artículos." />
+                  )}
+                  {reqDetail.status === "PENDING" && cfg.canApprove && (
+                    <div className={s.accionesFila} style={{ marginTop: 12 }}>
+                      <Button
+                        variant="primary"
+                        loading={aprobandoId === `req-${reqDetail.id}`}
+                        onClick={() => void approveReq(reqDetail.id).then(() => loadReqDetail(reqDetail.id))}
+                      >
+                        Aprobar
+                      </Button>
+                      <Button variant="ghost" onClick={() => openRejectReq(reqDetail)}>Rechazar</Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+
+          <Section title={tituloSeccion}>
+            {primeraCarga ? (
+              <SkeletonRows rows={6} label="Cargando compras" />
+            ) : errorCarga && !cargado[tab] ? null : tab === "rfq" ? (
+              <DataTable
+                columns={rfqColumns}
+                rows={visibleRfqs}
+                rowKey={(r) => r.id}
+                emptyTitle={busqueda ? "Ninguna cotización coincide" : "Aún no hay cotizaciones"}
+                emptyDescription="Pide precios a varios proveedores a partir de una requisición y compáralos antes de crear la orden de compra."
+                emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={abrirRfqForm}>Pedir cotización</Button> : undefined}
+              />
+            ) : tab === "orders" ? (
+              <DataTable
+                columns={orderColumns}
+                rows={visibleOrders}
+                rowKey={(o) => o.id}
+                onRowClick={(o) => void loadOrderDetail(o.id)}
+                emptyTitle={busqueda || filterPoStatus ? "Ninguna orden coincide" : "Aún no hay órdenes de compra"}
+                emptyDescription={
+                  busqueda || filterPoStatus
+                    ? "Prueba con otra búsqueda o quita el filtro de estado."
+                    : "Crea una orden directa o aprueba una requisición para generar la primera."
+                }
+                emptyAction={
+                  busqueda || filterPoStatus ? (
+                    <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterPoStatus(""); }}>Quitar filtros</Button>
+                  ) : cfg.canCreate ? (
+                    <Button size="sm" variant="primary" onClick={abrirPoForm}>Nueva orden de compra</Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => setTab("requisitions")}>Ver requisiciones</Button>
+                  )
+                }
+              />
+            ) : tab === "requisitions" ? (
+              <DataTable
+                columns={reqColumns}
+                rows={visibleReqs}
+                rowKey={(r) => r.id}
+                onRowClick={(r) => void loadReqDetail(r.id)}
+                emptyTitle={busqueda || filterReqStatus ? "Ninguna requisición coincide" : "Aún no hay requisiciones"}
+                emptyDescription={
+                  busqueda || filterReqStatus
+                    ? "Prueba con otra búsqueda o quita el filtro de estado."
+                    : "Pide aquí materiales o servicios; compras los cotiza y genera la orden."
+                }
+                emptyAction={
+                  busqueda || filterReqStatus ? (
+                    <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterReqStatus(""); }}>Quitar filtros</Button>
+                  ) : cfg.canCreate ? (
+                    <Button size="sm" variant="primary" onClick={abrirReqForm}>Nueva requisición</Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <DataTable
+                columns={receiptColumns}
+                rows={visibleReceipts}
+                rowKey={(r) => r.id}
+                emptyTitle={busqueda ? "Ninguna recepción coincide" : "Aún no hay recepciones"}
+                emptyDescription="Cuando llegue mercancía, regístrala contra su orden de compra: entra al almacén y genera la cuenta por pagar."
+                emptyAction={
+                  cfg.canCreate ? (
+                    <Button size="sm" variant="primary" onClick={abrirRecepcion}>Registrar recepción</Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => setTab("orders")}>Ver órdenes</Button>
+                  )
+                }
+              />
+            )}
+          </Section>
+        </>
+      )}
+
+      {/* ── Nueva requisición ─────────────────────────────────────────── */}
+      <Modal
+        open={showReqForm}
+        onClose={() => setShowReqForm(false)}
+        title="Nueva requisición"
+        maxWidth={680}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowReqForm(false)} disabled={savingReq}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveReq()} loading={savingReq}>Crear requisición</Button>
+          </>
+        }
+      >
+        {reqErr && <InlineAlert variant="danger" message={reqErr} style={{ marginBottom: 12 }} />}
+        <div className={s.rejilla}>
+          <label className={`${s.campo} ${s.ancho}`}>
+            <span className={s.etiqueta}>Qué se necesita</span>
+            <input
+              value={reqForm.title}
+              onChange={(e) => setReqForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Ej. Cables y conectores para obra Pachuca"
+              className={s.input}
+              aria-invalid={reqErr && !reqForm.title.trim() ? true : undefined}
+            />
+          </label>
+          <label className={s.campo}>
+            <span className={s.etiqueta}>Prioridad</span>
+            <select value={reqForm.priority} onChange={(e) => setReqForm((f) => ({ ...f, priority: e.target.value }))} className={s.input}>
+              {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className={s.subtitulo}>Artículos</p>
+        {reqItems.map((item, idx) => (
+          <div key={idx} className={s.partida}>
+            <input
+              value={item.description}
+              onChange={(e) => setReqItems((prev) => prev.map((it, i) => (i === idx ? { ...it, description: e.target.value } : it)))}
+              placeholder="Descripción del artículo"
+              aria-label={`Artículo ${idx + 1}: descripción`}
+              className={s.input}
+            />
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={item.quantity}
+              onChange={(e) => setReqItems((prev) => prev.map((it, i) => (i === idx ? { ...it, quantity: +e.target.value } : it)))}
+              placeholder="Cant."
+              aria-label={`Artículo ${idx + 1}: cantidad`}
+              className={`${s.input} ${s.num}`}
+            />
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              value={item.estimatedCost}
+              onChange={(e) => setReqItems((prev) => prev.map((it, i) => (i === idx ? { ...it, estimatedCost: e.target.value } : it)))}
+              placeholder="Costo est."
+              aria-label={`Artículo ${idx + 1}: costo estimado por pieza`}
+              className={`${s.input} ${s.num}`}
+            />
+            {reqItems.length > 1 ? (
+              <button
+                type="button"
+                className={s.quitar}
+                aria-label={`Quitar artículo ${idx + 1}`}
+                onClick={() => setReqItems((prev) => prev.filter((_, i) => i !== idx))}
+              >
+                ✕
+              </button>
+            ) : <span />}
+          </div>
+        ))}
+        <button type="button" className={s.agregar} onClick={() => setReqItems((prev) => [...prev, { ...emptyReqItem }])}>
+          + Agregar artículo
+        </button>
+        {totalReq > 0 && (
+          <p className={s.total}>Estimado: <strong>{pesos(totalReq)}</strong></p>
+        )}
+      </Modal>
+
+      {/* ── Nueva orden de compra ─────────────────────────────────────── */}
+      <Modal
+        open={showPoForm}
+        onClose={() => setShowPoForm(false)}
+        title="Nueva orden de compra"
+        maxWidth={680}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowPoForm(false)} disabled={savingPo}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void savePo()} loading={savingPo}>Crear orden</Button>
+          </>
+        }
+      >
+        {poErr && <InlineAlert variant="danger" message={poErr} style={{ marginBottom: 12 }} />}
+        <div className={s.rejilla}>
+          <label className={s.campo}>
+            <span className={s.etiqueta}>Proveedor</span>
+            <input
+              value={poForm.supplierName}
+              onChange={(e) => setPoForm((f) => ({ ...f, supplierName: e.target.value }))}
+              placeholder="Nombre del proveedor"
+              list="compras-proveedores"
+              autoComplete="off"
+              className={s.input}
+              aria-invalid={poErr && !poForm.supplierName.trim() ? true : undefined}
+            />
+            <datalist id="compras-proveedores">
+              {suppliers.map((sp) => <option key={sp.id} value={sp.name} />)}
+            </datalist>
+          </label>
+          <label className={s.campo}>
+            <span className={s.etiqueta}>Entrega estimada</span>
+            <input
+              type="date"
+              min={hoyIso()}
+              value={poForm.expectedDate}
+              onChange={(e) => setPoForm((f) => ({ ...f, expectedDate: e.target.value }))}
+              className={s.input}
+            />
+          </label>
+        </div>
+        <p className={s.subtitulo}>Artículos</p>
+        {poItems.map((item, idx) => (
+          <div key={idx} className={s.partida}>
+            <input
+              value={item.description}
+              onChange={(e) => setPoItems((prev) => prev.map((it, i) => (i === idx ? { ...it, description: e.target.value } : it)))}
+              placeholder="Descripción del artículo"
+              aria-label={`Artículo ${idx + 1}: descripción`}
+              className={s.input}
+            />
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={item.quantity}
+              onChange={(e) => setPoItems((prev) => prev.map((it, i) => (i === idx ? { ...it, quantity: +e.target.value } : it)))}
+              placeholder="Cant."
+              aria-label={`Artículo ${idx + 1}: cantidad`}
+              className={`${s.input} ${s.num}`}
+            />
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              value={item.unitPrice}
+              onChange={(e) => setPoItems((prev) => prev.map((it, i) => (i === idx ? { ...it, unitPrice: e.target.value } : it)))}
+              placeholder="Precio unit."
+              aria-label={`Artículo ${idx + 1}: precio unitario`}
+              className={`${s.input} ${s.num}`}
+            />
+            {poItems.length > 1 ? (
+              <button
+                type="button"
+                className={s.quitar}
+                aria-label={`Quitar artículo ${idx + 1}`}
+                onClick={() => setPoItems((prev) => prev.filter((_, i) => i !== idx))}
+              >
+                ✕
+              </button>
+            ) : <span />}
+          </div>
+        ))}
+        <button type="button" className={s.agregar} onClick={() => setPoItems((prev) => [...prev, { ...emptyPoItem }])}>
+          + Agregar artículo
+        </button>
+        {totalPo > 0 && (
+          <p className={s.total}>Total: <strong>{pesos(totalPo)}</strong></p>
+        )}
+      </Modal>
+
+      {/* ── Pedir cotización ──────────────────────────────────────────── */}
+      <Modal
+        open={showRfqForm}
+        onClose={() => setShowRfqForm(false)}
+        title="Pedir cotización"
+        maxWidth={640}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowRfqForm(false)} disabled={savingRfq}>Cancelar</Button>
+            <Button
+              variant="primary"
+              onClick={() => void submitCreateRfq()}
+              loading={savingRfq}
+              disabled={!rfqForm.requisitionId || !rfqForm.supplierIds.length}
+            >
+              Pedir precios
+            </Button>
+          </>
+        }
+      >
+        <div className={s.rejilla}>
+          <label className={`${s.campo} ${s.ancho}`}>
+            <span className={s.etiqueta}>Requisición</span>
+            <select
+              value={rfqForm.requisitionId}
+              onChange={(e) => setRfqForm((f) => ({ ...f, requisitionId: e.target.value }))}
+              className={s.input}
+            >
+              <option value="">Elige qué se va a cotizar…</option>
+              {requisitions
+                .filter((r) => r.status !== "REJECTED" && r.status !== "CANCELLED")
+                .map((r) => <option key={r.id} value={r.id}>{r.title} ({r.reqNumber})</option>)}
+            </select>
+          </label>
+          <fieldset className={`${s.campo} ${s.ancho}`} style={{ border: "none", margin: 0, padding: 0 }}>
+            <legend className={s.etiqueta} style={{ marginBottom: 4 }}>
+              Proveedores a los que se pide precio
+              {rfqForm.supplierIds.length > 0 ? ` · ${rfqForm.supplierIds.length} elegidos` : ""}
+            </legend>
+            <div className={s.opciones}>
+              {suppliers.length === 0 && (
+                <span className={s.ayuda}>Aún no hay proveedores. Da de alta el primero con «Nuevo proveedor».</span>
+              )}
+              {suppliers.map((sp) => {
+                const checked = rfqForm.supplierIds.includes(sp.id);
+                return (
+                  <label key={sp.id} className={`${s.opcion} ${checked ? s.opcionActiva : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setRfqForm((f) => ({
+                          ...f,
+                          supplierIds: e.target.checked ? [...f.supplierIds, sp.id] : f.supplierIds.filter((id) => id !== sp.id),
+                        }))
+                      }
+                    />
+                    {sp.name}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+          <label className={s.campo}>
+            <span className={s.etiqueta}>Responder antes del</span>
+            <input
+              type="date"
+              min={hoyIso()}
+              value={rfqForm.dueDate}
+              onChange={(e) => setRfqForm((f) => ({ ...f, dueDate: e.target.value }))}
+              className={s.input}
+            />
+          </label>
+          <label className={`${s.campo} ${s.ancho}`}>
+            <span className={s.etiqueta}>Notas para el proveedor</span>
+            <input
+              value={rfqForm.notes}
+              onChange={(e) => setRfqForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="Condiciones, marcas aceptadas, lugar de entrega…"
+              className={s.input}
+            />
+          </label>
+        </div>
+      </Modal>
+
+      {/* ── Registrar recepción ───────────────────────────────────────── */}
+      <Modal
+        open={showReceiptForm}
+        onClose={cerrarRecepcion}
+        title="Registrar recepción de mercancía"
+        maxWidth={760}
+        footer={
+          <>
+            <Button variant="ghost" onClick={cerrarRecepcion} disabled={savingReceipt}>Cancelar</Button>
+            <Button
+              variant="primary"
+              onClick={() => void saveReceipt()}
+              loading={savingReceipt}
+              disabled={!receiptPoId || receiptLines.length === 0}
+            >
+              Registrar entrada
+            </Button>
+          </>
+        }
+      >
+        <div className={s.rejilla}>
+          <label className={`${s.campo} ${s.ancho}`}>
+            <span className={s.etiqueta}>Orden de compra que llegó</span>
+            <select value={receiptPoId} onChange={(e) => elegirOrdenRecepcion(e.target.value)} className={s.input}>
+              <option value="">{ordenesAbiertas.length ? "Elige la orden…" : "No hay órdenes abiertas por recibir"}</option>
+              {ordenRecepcionFuera && (
+                <option value={receiptPoId}>{poDetail && String(poDetail.id) === receiptPoId ? poDetail.poNumber : "Orden elegida"}</option>
+              )}
+              {ordenesAbiertas.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.poNumber} · {o.supplier?.name ?? "Sin proveedor"} · {pesos(o.totalAmount, { enteros: true })}
+                  {o.status === "DRAFT" ? " (por aprobar)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={s.campo}>
+            <span className={s.etiqueta}>Almacén donde entra</span>
+            <select value={receiptWarehouseId} onChange={(e) => setReceiptWarehouseId(e.target.value)} className={s.input}>
+              <option value="">El de siempre</option>
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          </label>
+          <label className={s.campo}>
+            <span className={s.etiqueta}>Notas</span>
+            <input
+              value={receiptNotes}
+              onChange={(e) => setReceiptNotes(e.target.value)}
+              placeholder="Ej. llegó una caja golpeada"
+              className={s.input}
+            />
+          </label>
+        </div>
+
+        {loadingReceiptPo && <SkeletonRows rows={3} label="Cargando artículos de la orden" />}
+
+        {!loadingReceiptPo && receiptLines.length > 0 && (
+          <>
+            <div className={s.tablaEnvoltura}>
+              <table className={s.tabla}>
+                <thead>
+                  <tr>
+                    <th scope="col">Artículo</th>
+                    <th scope="col" className={s.num}>Pedido</th>
+                    <th scope="col" className={s.num}>Ya llegó</th>
+                    <th scope="col" className={s.num}>Llega ahora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receiptLines.map((line) => (
+                    <tr key={line.purchaseOrderItemId}>
+                      <td>{line.description}</td>
+                      <td className={s.num}>{cantidad(line.ordered)}</td>
+                      <td className={s.num}>{cantidad(line.alreadyReceived)}</td>
+                      <td className={s.num}>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          max={Math.max(0, line.ordered - line.alreadyReceived)}
+                          value={line.qty}
+                          aria-label={`Cantidad que llega de ${line.description}`}
+                          onChange={(e) =>
+                            setReceiptLines((prev) =>
+                              prev.map((l) => (l.purchaseOrderItemId === line.purchaseOrderItemId ? { ...l, qty: e.target.value } : l)),
+                            )
+                          }
+                          className={`${s.input} ${s.num}`}
+                          style={{ width: 96 }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className={s.ayuda} style={{ margin: "8px 0 0" }}>
+              Si no llegó todo, registra lo que sí llegó; lo demás queda pendiente en la orden.
+            </p>
+
+            <div className={s.caja}>
+              <p className={s.cajaTitulo}>Costos de importación (opcional)</p>
+              <p className={s.ayuda} style={{ margin: 0 }}>
+                Se reparten entre los artículos según su valor y se suman a su costo.
+              </p>
+              <div className={s.rejilla4}>
+                {COSTOS_EXTRA.map((c) => (
+                  <label key={c.key} className={s.campo}>
+                    <span className={s.etiqueta}>{c.label}</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      value={receiptLandedCost[c.key]}
+                      onChange={(e) => setReceiptLandedCost((f) => ({ ...f, [c.key]: e.target.value }))}
+                      className={`${s.input} ${s.num}`}
+                    />
+                  </label>
+                ))}
+              </div>
+              {totalCostosExtra > 0 && (
+                <p className={s.total}>A repartir: <strong>{pesos(totalCostosExtra)}</strong></p>
+              )}
+            </div>
+          </>
+        )}
+
+        {receiptErr && <InlineAlert variant="danger" message={receiptErr} style={{ marginTop: 12 }} />}
+      </Modal>
+
+      {/* ── Rechazar requisición ──────────────────────────────────────── */}
+      <Modal
+        open={rejectReqModal != null}
+        onClose={() => setRejectReqModal(null)}
+        title="Rechazar requisición"
+        maxWidth={480}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRejectReqModal(null)} disabled={rejectingReq}>Cancelar</Button>
+            <Button variant="danger" onClick={() => void submitRejectReq()} loading={rejectingReq}>Rechazar</Button>
+          </>
+        }
+      >
+        {rejectReqModal && (
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)" }}>
+            <strong>{rejectReqModal.title}</strong> · {rejectReqModal.reqNumber}
+          </p>
+        )}
+        <label className={s.campo}>
+          <span className={s.etiqueta}>Motivo</span>
+          <textarea
+            value={rejectReqReason}
+            onChange={(e) => {
+              setRejectReqReason(e.target.value);
+              if (e.target.value.trim()) setRejectReqErr(null);
+            }}
+            rows={4}
+            placeholder="Explica por qué, para que quien la pidió sepa qué corregir…"
+            aria-invalid={rejectReqErr ? true : undefined}
+            className={s.input}
+            style={{ resize: "vertical", lineHeight: 1.45 }}
+          />
+        </label>
+        {rejectReqErr && <InlineAlert variant="danger" message={rejectReqErr} style={{ marginTop: 12 }} />}
+      </Modal>
 
       {/* ── Alta de proveedor ─────────────────────────────────────────── */}
       <Modal
@@ -1372,495 +2132,78 @@ export default function ProcurementPage() {
         title="Nuevo proveedor"
         footer={
           <>
-            <Button size="sm" variant="secondary" onClick={() => setShowSupplierForm(false)}>Cancelar</Button>
-            <Button size="sm" variant="primary" onClick={() => void saveSupplier()} disabled={savingSupplier}>
-              {savingSupplier ? "Guardando…" : "Dar de alta"}
-            </Button>
+            <Button variant="ghost" onClick={() => setShowSupplierForm(false)} disabled={savingSupplier}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveSupplier()} loading={savingSupplier}>Dar de alta</Button>
           </>
         }
       >
         {supplierErr && <InlineAlert variant="danger" message={supplierErr} style={{ marginBottom: 12 }} />}
         <FinanceFormGrid>
-          <FinanceField label="Nombre o razón social" fullWidth hint="Tal como lo emite en sus facturas. Si ya existe, se completa su ficha en vez de duplicarla.">
-            <input value={supplierForm.name} onChange={e => setSupplierForm(f => ({ ...f, name: e.target.value }))} placeholder="Distribuidora del Norte S.A. de C.V." style={inp} />
+          <FinanceField label="Nombre o razón social" fullWidth hint="Tal como aparece en sus facturas. Si ya existe, se completa su ficha en vez de duplicarla.">
+            <input
+              value={supplierForm.name}
+              onChange={(e) => setSupplierForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Distribuidora del Norte S.A. de C.V."
+              className={s.input}
+            />
           </FinanceField>
           <FinanceField label="RFC" optional hint="Sin él no entra en la DIOT ni cuadra su factura recibida.">
             <input
               value={supplierForm.rfc}
-              onChange={e => setSupplierForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))}
+              onChange={(e) => setSupplierForm((f) => ({ ...f, rfc: e.target.value.toUpperCase() }))}
               placeholder="DNO920101AB1"
               maxLength={13}
-              style={{ ...inp, textTransform: "uppercase" }}
+              className={s.input}
+              style={{ textTransform: "uppercase" }}
             />
           </FinanceField>
-          <FinanceField label="Qué surte" optional hint="Una línea: para reconocerlo al cotizar.">
-            <input value={supplierForm.description} onChange={e => setSupplierForm(f => ({ ...f, description: e.target.value }))} placeholder="Material eléctrico y canalización" style={inp} />
+          <FinanceField label="Qué surte" optional hint="Una línea, para reconocerlo al cotizar.">
+            <input
+              value={supplierForm.description}
+              onChange={(e) => setSupplierForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Material eléctrico y canalización"
+              className={s.input}
+            />
           </FinanceField>
-          <FinanceField label="Convenio de mayorista" fullWidth optional hint="Márcalo solo si hay condiciones pactadas. Es lo que lo hace aparecer en la pestaña de Mayoristas.">
-            <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <FinanceField label="Convenio de mayorista" fullWidth optional hint="Márcalo solo si hay condiciones pactadas. Así aparece en la pestaña Mayoristas.">
+            <label className={s.opcion} style={{ border: "none", padding: 0, background: "none" }}>
               <input
                 type="checkbox"
                 checked={supplierForm.esMayorista}
-                onChange={e => setSupplierForm(f => ({ ...f, esMayorista: e.target.checked }))}
+                onChange={(e) => setSupplierForm((f) => ({ ...f, esMayorista: e.target.checked }))}
               />
               Es mayorista con convenio
-            </span>
+            </label>
           </FinanceField>
           {supplierForm.esMayorista && (
             <>
               <FinanceField label="Días de crédito" optional hint="Vacío o cero = pago de contado.">
-                <input type="number" min={0} value={supplierForm.creditoDias} onChange={e => setSupplierForm(f => ({ ...f, creditoDias: e.target.value }))} style={inp} />
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={supplierForm.creditoDias}
+                  onChange={(e) => setSupplierForm((f) => ({ ...f, creditoDias: e.target.value }))}
+                  className={`${s.input} ${s.num}`}
+                />
               </FinanceField>
               <FinanceField label="Límite de crédito" optional hint="Tope de saldo por pagar. La orden avisa antes de pasarse.">
-                <input type="number" min={0} step="0.01" value={supplierForm.limiteCredito} onChange={e => setSupplierForm(f => ({ ...f, limiteCredito: e.target.value }))} style={inp} />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={supplierForm.limiteCredito}
+                  onChange={(e) => setSupplierForm((f) => ({ ...f, limiteCredito: e.target.value }))}
+                  className={`${s.input} ${s.num}`}
+                />
               </FinanceField>
             </>
           )}
         </FinanceFormGrid>
       </Modal>
 
-      {tab !== "mayoristas" && (
-      <FilterToolbar
-        search={{ value: searchQ, onChange: setSearchQ, placeholder: tab === "orders" ? "Buscar OC, proveedor…" : tab === "requisitions" ? "Buscar requisición, título…" : tab === "rfq" ? "Buscar RFQ, requisición…" : "Buscar recepción, OC…" }}
-        selects={tab === "orders" ? [{
-          label: "Estado",
-          value: filterPoStatus,
-          onChange: setFilterPoStatus,
-          options: Object.entries(PO_STATUS).map(([value, label]) => ({ value, label })),
-          allowAll: true,
-        }] : tab === "requisitions" ? [{
-          label: "Estado",
-          value: filterReqStatus,
-          onChange: setFilterReqStatus,
-          options: Object.entries(REQ_STATUS).map(([value, label]) => ({ value, label })),
-          allowAll: true,
-        }] : []}
-        onClear={() => { setSearchQ(""); setFilterPoStatus(""); setFilterReqStatus(""); }}
-        resultCount={loading ? null : tab === "orders" ? visibleOrders.length : tab === "requisitions" ? visibleReqs.length : tab === "rfq" ? rfqs.length : visibleReceipts.length}
-        rightActions={tab === "orders" && orders.length > 0 ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {poDetail && detailKind === "order" ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                iconLeft="📄"
-                onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}
-              >
-                PDF OC
-              </Button>
-            ) : null}
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleOrders, [
-              { key: "poNumber", label: "OC" },
-              { key: "supplier", label: "Proveedor", format: (v) => (v as PurchaseOrder["supplier"])?.name ?? "—" },
-              { key: "totalAmount", label: "Monto" },
-              { key: "status", label: "Estado", format: (v) => PO_STATUS[String(v ?? "")] ?? String(v ?? "") },
-              { key: "expectedDate", label: "Entrega est.", format: (v) => v ? String(v).slice(0, 10) : "" },
-            ], "ordenes-compra", {
-              title: "ÓRDENES DE COMPRA",
-              summaryRows: [
-                { label: "Órdenes visibles", value: visibleOrders.length },
-                { label: "Monto total", value: visibleOrders.reduce((s, o) => s + Number(o.totalAmount || 0), 0) },
-              ],
-            })}>Descargar Excel</Button>
-          </div>
-        ) : tab === "requisitions" && requisitions.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleReqs, [
-            { key: "reqNumber", label: "Folio" },
-            { key: "title", label: "Título" },
-            { key: "priority", label: "Prioridad" },
-            { key: "status", label: "Estado", format: (v) => REQ_STATUS[String(v ?? "")] ?? String(v ?? "") },
-            { key: "requestedBy", label: "Solicitó", format: (v) => (v as Requisition["requestedBy"])?.nombre ?? "—" },
-          ], "requisiciones", { title: "REQUISICIONES" })}>Descargar Excel</Button>
-        ) : tab === "receipts" && visibleReceipts.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(
-            visibleReceipts.map((r) => ({
-              folio: r.receiptNumber,
-              oc: r.purchaseOrder?.poNumber ?? `OC-${r.purchaseOrderId}`,
-              proveedor: r.purchaseOrder?.supplier?.name ?? "",
-              almacen: r.warehouse ? [r.warehouse.code, r.warehouse.name].filter(Boolean).join(" — ") : "",
-              partidas: r.items?.length ?? 0,
-              cantidad: (r.items ?? []).reduce((s, i) => s + Number(i.quantityReceived || 0), 0),
-              landed: receiptLandedTotal(r),
-              recibio: r.receivedBy?.nombre ?? "",
-              fecha: r.receiptDate ? String(r.receiptDate).slice(0, 10) : "",
-              notas: r.notes ?? "",
-            })),
-            [
-              { key: "folio", label: "Folio" },
-              { key: "oc", label: "OC" },
-              { key: "proveedor", label: "Proveedor" },
-              { key: "almacen", label: "Almacén" },
-              { key: "partidas", label: "Partidas" },
-              { key: "cantidad", label: "Cant. recibida" },
-              { key: "landed", label: "Landed cost" },
-              { key: "recibio", label: "Usuario" },
-              { key: "fecha", label: "Fecha" },
-              { key: "notas", label: "Notas" },
-            ],
-            "recepciones-mercancia",
-            { title: "RECEPCIONES DE MERCANCÍA" },
-          )}>Descargar Excel</Button>
-        ) : undefined}
-      />
-      )}
-
-      {highlightId && tab !== "receipts" && (
-        <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-          Mostrando registro <strong>#{highlightId}</strong> desde enlace directo.
-        </p>
-      )}
-      {poId && tab === "receipts" && (
-        <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-          Recepciones de OC <strong>#{poId}</strong>.{" "}
-          <Link href="/erp/procurement?tab=receipts" style={{ color: "var(--primary)" }}>
-            Ver todas
-          </Link>
-        </p>
-      )}
-
-      {showReceiptForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Registrar recepción de mercancía</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Orden de compra (ID) *</label>
-              <input value={receiptPoId} onChange={(e) => setReceiptPoId(e.target.value)} placeholder="Ej. 12" style={inp} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Almacén NEXARA</label>
-              <select value={receiptWarehouseId} onChange={(e) => setReceiptWarehouseId(e.target.value)} style={inp}>
-                <option value="">Automático</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Notas</label>
-              <input value={receiptNotes} onChange={(e) => setReceiptNotes(e.target.value)} placeholder="Observaciones" style={inp} />
-            </div>
-            <Button variant="secondary" onClick={() => void loadReceiptPo()} disabled={loadingReceiptPo || !receiptPoId.trim()}>
-              {loadingReceiptPo ? "Cargando…" : "Cargar partidas"}
-            </Button>
-          </div>
-          {receiptLines.length > 0 && (
-            <div style={{ marginTop: 12, overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
-                    <th style={{ textAlign: "right", padding: "6px 8px" }}>Pedido</th>
-                    <th style={{ textAlign: "right", padding: "6px 8px" }}>Recibido</th>
-                    <th style={{ textAlign: "right", padding: "6px 8px" }}>Recibir ahora</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receiptLines.map((line) => (
-                    <tr key={line.purchaseOrderItemId} style={{ borderBottom: "1px solid var(--border)" }}>
-                      <td style={{ padding: "8px" }}>{line.description}</td>
-                      <td style={{ padding: "8px", textAlign: "right" }}>{line.ordered}</td>
-                      <td style={{ padding: "8px", textAlign: "right" }}>{line.alreadyReceived}</td>
-                      <td style={{ padding: "8px", textAlign: "right" }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={Math.max(0, line.ordered - line.alreadyReceived)}
-                          value={line.qty}
-                          onChange={(e) => setReceiptLines((prev) => prev.map((l) => l.purchaseOrderItemId === line.purchaseOrderItemId ? { ...l, qty: e.target.value } : l))}
-                          style={{ ...inp, width: 90, textAlign: "right" }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", margin: "8px 0 0" }}>Puedes registrar recepción parcial por partida.</p>
-
-              <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "var(--surface)", border: "1px solid var(--border)" }}>
-                <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 12.5 }}>Landed cost (opcional)</p>
-                <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "var(--text-secondary)" }}>
-                  Se prorratea por valor entre las partidas de producto recibidas y se suma al costo unitario (WAC).
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-                  <div>
-                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Flete</label>
-                    <input type="number" min={0} step="0.01" value={receiptLandedCost.freightCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, freightCost: e.target.value }))} style={inp} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Seguro</label>
-                    <input type="number" min={0} step="0.01" value={receiptLandedCost.insuranceCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, insuranceCost: e.target.value }))} style={inp} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Aranceles</label>
-                    <input type="number" min={0} step="0.01" value={receiptLandedCost.customsCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, customsCost: e.target.value }))} style={inp} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Otros</label>
-                    <input type="number" min={0} step="0.01" value={receiptLandedCost.otherLandedCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, otherLandedCost: e.target.value }))} style={inp} />
-                  </div>
-                </div>
-                {(() => {
-                  const total = ["freightCost", "insuranceCost", "customsCost", "otherLandedCost"]
-                    .reduce((s, k) => s + (Number(receiptLandedCost[k as keyof typeof receiptLandedCost]) || 0), 0);
-                  return total > 0 ? (
-                    <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--text-secondary)" }}>
-                      Total a prorratear: <strong>${total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</strong>
-                    </p>
-                  ) : null;
-                })()}
-              </div>
-            </div>
-          )}
-          {receiptErr && (
-            <div role="alert" style={{ marginTop: 10, padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
-              {receiptErr}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-            <Button variant="ghost" onClick={() => { setShowReceiptForm(false); setReceiptErr(null); setReceiptLines([]); setReceiptLandedCost({ freightCost: "", insuranceCost: "", customsCost: "", otherLandedCost: "" }); }}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void saveReceipt()} disabled={savingReceipt}>{savingReceipt ? "Registrando…" : "Registrar entrada"}</Button>
-          </div>
-        </div>
-      )}
-
-      {(detailKind === "order" || detailKind === "req") && (
-        <div className={chrome.poDetail}>
-          <div className={chrome.poDetailHead}>
-            <p className={chrome.poDetailTitle}>
-              {detailKind === "order" ? `Orden de compra ${poDetail?.poNumber ?? ""}` : `Requisición ${reqDetail?.reqNumber ?? ""}`}
-            </p>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              {detailKind === "order" && poDetail ? (
-                <Button variant="primary" size="sm" iconLeft="📄" onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}>
-                  Descargar PDF
-                </Button>
-              ) : null}
-              <Button variant="ghost" size="sm" onClick={() => { setDetailKind(null); setPoDetail(null); setReqDetail(null); setDetailErr(null); }}>Cerrar</Button>
-            </div>
-          </div>
-          {detailLoading && (
-            <EmptyState variant="compact" icon="⏳" title="Cargando detalle…" description="Consultando líneas y estado." />
-          )}
-          {detailErr && (
-            <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
-              {detailErr}
-            </div>
-          )}
-          {!detailLoading && detailKind === "order" && poDetail && (
-            <>
-              <div className={chrome.poMetaGrid}>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Proveedor</span>
-                  <div className={chrome.poMetaValue}>{poDetail.supplier?.name ?? "—"}</div>
-                </div>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Estado</span>
-                  <div className={chrome.poMetaValue}>
-                    <Tag variant={poDetail.status === "RECEIVED" ? "positive" : poDetail.status === "CANCELLED" ? "danger" : "accent"}>
-                      {PO_STATUS[poDetail.status] ?? poDetail.status}
-                    </Tag>
-                  </div>
-                </div>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Monto</span>
-                  <div className={chrome.poMetaValue}><Money value={Number(poDetail.totalAmount)} /></div>
-                </div>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Creada por</span>
-                  <div className={chrome.poMetaValue}>{poDetail.createdBy?.nombre ?? "—"}</div>
-                </div>
-              </div>
-              {(poDetail.items ?? []).length > 0 ? (
-                <table className={chrome.poTable}>
-                  <thead>
-                    <tr>
-                      <th>Artículo</th>
-                      <th style={{ textAlign: "right" }}>Cant.</th>
-                      <th style={{ textAlign: "right" }}>Recibido</th>
-                      <th style={{ textAlign: "right" }}>Precio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(poDetail.items ?? []).map((i) => (
-                      <tr key={i.id}>
-                        <td>{i.description}</td>
-                        <td style={{ textAlign: "right" }}>{Number(i.quantity)}</td>
-                        <td style={{ textAlign: "right" }}>{Number(i.receivedQty ?? 0)}</td>
-                        <td style={{ textAlign: "right" }}><Money value={Number(i.unitPrice ?? 0)} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <EmptyState variant="compact" icon="📋" title="Sin partidas" description="Esta OC no tiene líneas registradas." />
-              )}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button variant="secondary" iconLeft="📄" onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}>
-                  PDF profesional
-                </Button>
-                {cfg.canCreate && poDetail.status !== "RECEIVED" && poDetail.status !== "CANCELLED" && (
-                  <Button variant="primary" onClick={() => openReceiptForPo(poDetail.id)}>Registrar recepción</Button>
-                )}
-              </div>
-            </>
-          )}
-          {!detailLoading && detailKind === "req" && reqDetail && (
-            <>
-              <div className={chrome.poMetaGrid}>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Título</span>
-                  <div className={chrome.poMetaValue}>{reqDetail.title}</div>
-                </div>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Estado</span>
-                  <div className={chrome.poMetaValue}>{REQ_STATUS[reqDetail.status] ?? reqDetail.status}</div>
-                </div>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Prioridad</span>
-                  <div className={chrome.poMetaValue}>{reqDetail.priority ?? "NORMAL"}</div>
-                </div>
-                <div className={chrome.poMetaItem}>
-                  <span className={chrome.poMetaLabel}>Solicitó</span>
-                  <div className={chrome.poMetaValue}>{reqDetail.requestedBy?.nombre ?? "—"}</div>
-                </div>
-              </div>
-              {reqDetail.rejectionReason && (
-                <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 10 }}>Motivo rechazo: {reqDetail.rejectionReason}</p>
-              )}
-              {(reqDetail.items ?? []).length > 0 ? (
-                <table className={chrome.poTable}>
-                  <thead>
-                    <tr>
-                      <th>Artículo</th>
-                      <th style={{ textAlign: "right" }}>Cant.</th>
-                      <th style={{ textAlign: "right" }}>Costo est.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(reqDetail.items ?? []).map((i) => (
-                      <tr key={i.id}>
-                        <td>{i.description}</td>
-                        <td style={{ textAlign: "right" }}>{Number(i.quantity)}</td>
-                        <td style={{ textAlign: "right" }}><Money value={Number(i.estimatedCost ?? 0)} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <EmptyState variant="compact" icon="📋" title="Sin partidas" description="Esta requisición no tiene líneas." />
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {tab !== "mayoristas" && (
-      <Section
-        title={
-          loading
-            ? "Cargando…"
-            : tab === "orders"
-              ? `${visibleOrders.length} órdenes`
-              : tab === "requisitions"
-                ? `${visibleReqs.length} requisiciones`
-                : tab === "rfq"
-                  ? `${rfqs.length} RFQ`
-                  : `${visibleReceipts.length} recepciones`
-        }
-      >
-        {loading ? (
-          <EmptyState icon="⏳" title="Cargando compras…" description="Consultando órdenes, requisiciones y recepciones." />
-        ) : tab === "rfq" ? (
-          <DataTable
-            columns={rfqColumns}
-            rows={rfqs}
-            rowKey={(r) => r.id}
-            emptyTitle="Sin RFQ"
-            emptyDescription="Envía una solicitud de cotización a varios proveedores para comparar precio y tiempo de entrega antes de emitir la OC."
-            emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowRfqForm(true)}>Nueva RFQ</Button> : undefined}
-          />
-        ) : tab === "orders" ? (
-          <DataTable
-            columns={orderColumns}
-            rows={visibleOrders}
-            rowKey={(o) => o.id}
-            onRowClick={(o) => void loadOrderDetail(o.id)}
-            emptyTitle="Sin órdenes"
-            emptyDescription="Crea una OC directa o aprueba una requisición para generar la primera."
-            emptyAction={
-              cfg.canCreate ? (
-                <Button size="sm" variant="primary" onClick={() => { setShowPoForm(true); setShowReqForm(false); }}>
-                  Nueva OC
-                </Button>
-              ) : (
-                <Button size="sm" variant="secondary" onClick={() => setTab("requisitions")}>Ver requisiciones</Button>
-              )
-            }
-          />
-        ) : tab === "requisitions" ? (
-          <DataTable
-            columns={reqColumns}
-            rows={visibleReqs}
-            rowKey={(r) => r.id}
-            onRowClick={(r) => void loadReqDetail(r.id)}
-            emptyTitle="Sin requisiciones"
-            emptyDescription="Solicita materiales o servicios para que compras genere la OC."
-            emptyAction={
-              cfg.canCreate ? (
-                <Button size="sm" variant="primary" onClick={() => { setShowReqForm(true); setShowPoForm(false); }}>
-                  Nueva requisición
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <DataTable
-            columns={receiptColumns}
-            rows={visibleReceipts}
-            rowKey={(r) => r.id}
-            emptyTitle="Sin recepciones"
-            emptyDescription="Cuando llegue mercancía, registra la recepción contra una OC abierta."
-            emptyAction={<Button size="sm" variant="secondary" onClick={() => setTab("orders")}>Ver órdenes</Button>}
-          />
-        )}
-      </Section>
-      )}
-
-      {/* ── Rechazar requisición modal ── */}
-      {rejectReqModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setRejectReqModal(null)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Rechazar requisición</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
-              <strong>{rejectReqModal.reqNumber}</strong> · {rejectReqModal.title}
-            </div>
-            <label style={{ display: "grid", gap: 4, marginBottom: 14 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo del rechazo *</span>
-              <textarea
-                value={rejectReqReason}
-                onChange={(e) => { setRejectReqReason(e.target.value); if (e.target.value.trim()) setRejectReqErr(null); }}
-                rows={4}
-                placeholder="Explica la razón del rechazo para que el solicitante pueda tomar acción…"
-                autoFocus
-                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${rejectReqErr ? "var(--danger)" : "var(--border)"}`, background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
-              />
-            </label>
-            {rejectReqErr && (
-              <div style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)", marginBottom: 12 }}>
-                {rejectReqErr}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setRejectReqModal(null)}>Cancelar</Button>
-              <Button variant="danger" onClick={() => void submitRejectReq()} disabled={rejectingReq}>
-                {rejectingReq ? "Rechazando…" : "Confirmar rechazo"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </>
   );
 }

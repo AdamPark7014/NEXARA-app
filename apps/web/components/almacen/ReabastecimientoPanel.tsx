@@ -7,6 +7,7 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import StatusDot from "@/components/ui/StatusDot";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import InlineAlert from "@/components/ui/InlineAlert";
+import { SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -65,8 +66,8 @@ export default function ReabastecimientoPanel() {
     try {
       setFilas(await listarReabastecimiento(token, { todos }));
     } catch (e) {
+      // Un fallo al refrescar no borra lo que ya se veía.
       setError(formatApiError(e, "No se pudo cargar el reabastecimiento"));
-      setFilas([]);
     } finally {
       setCargando(false);
     }
@@ -208,7 +209,7 @@ export default function ReabastecimientoPanel() {
     },
     {
       key: "lead",
-      label: "Tarda",
+      label: "Entrega en",
       numeric: true,
       width: 76,
       render: (r) => (
@@ -234,8 +235,15 @@ export default function ReabastecimientoPanel() {
       title="Qué comprar"
       actions={
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12.5 }}>
-            <input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} />
+          <label
+            style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: 12.5, minHeight: 36, cursor: "pointer" }}
+          >
+            <input
+              type="checkbox"
+              checked={todos}
+              onChange={(e) => setTodos(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: "var(--primary)" }}
+            />
             Ver todo el circulante
           </label>
           <Button size="sm" variant="secondary" onClick={() => void recalcular()} loading={recalculando}>
@@ -247,7 +255,13 @@ export default function ReabastecimientoPanel() {
       footer={
         ultimoCalculo ? (
           <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            Último cálculo: {new Date(ultimoCalculo).toLocaleString("es-MX")}
+            Último cálculo:{" "}
+            {new Date(ultimoCalculo).toLocaleString("es-MX", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </span>
         ) : null
       }
@@ -262,8 +276,8 @@ export default function ReabastecimientoPanel() {
       {error && (
         <div style={{ marginBottom: 12 }}>
           <InlineAlert
-            variant="danger"
-            message={error}
+            variant={filas.length > 0 ? "warning" : "danger"}
+            message={filas.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
             action={
               <Button size="sm" variant="secondary" onClick={() => void cargar()}>
                 Reintentar
@@ -273,10 +287,8 @@ export default function ReabastecimientoPanel() {
         </div>
       )}
       {cargando && filas.length === 0 ? (
-        <p role="status" style={{ margin: 0, padding: "24px 0", fontSize: 12.5, color: "var(--text-tertiary)" }}>
-          Cargando…
-        </p>
-      ) : (
+        <SkeletonRows rows={6} label="Cargando reabastecimiento" />
+      ) : error && filas.length === 0 ? null : (
       <DataTable
         columns={columnas}
         rows={filas}

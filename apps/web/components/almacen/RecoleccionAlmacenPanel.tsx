@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import StatusDot from "@/components/ui/StatusDot";
 import InlineAlert from "@/components/ui/InlineAlert";
+import { SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -25,13 +26,13 @@ const inp: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: "9px 12px",
-  minHeight: 40,
+  minHeight: 44,
   borderRadius: 10,
   border: "1px solid var(--border)",
   background: "var(--surface)",
   color: "inherit",
   font: "inherit",
-  fontSize: 14,
+  fontSize: 16,
 };
 
 function vigencia(p: { vencido: boolean; horasRestantes: number | null }) {
@@ -70,7 +71,6 @@ export default function RecoleccionAlmacenPanel() {
       setPendientes(await listarPendientesDeRecoleccion(token));
     } catch (e) {
       setError(formatApiError(e, "No se pudo cargar lo pendiente de entregar"));
-      setPendientes([]);
     } finally {
       setCargando(false);
     }
@@ -157,6 +157,7 @@ export default function RecoleccionAlmacenPanel() {
         <Button
           size="sm"
           variant="secondary"
+          aria-label={`Entregar ${p.toolName} a ${p.usuario?.nombre ?? "quien la pidió"}`}
           disabled={p.vencido || !p.pickupCode || entregando}
           onClick={() => void entregar(p.id, p.pickupCode ?? "", p.usuario?.id)}
         >
@@ -194,6 +195,7 @@ export default function RecoleccionAlmacenPanel() {
               en cuanto lo hay, el primario pasa a la entrega y este baja a gris. */}
           <Button
             variant={hallazgo?.valido ? "secondary" : "primary"}
+            size="lg"
             onClick={() => void buscar()}
             loading={buscando}
             disabled={!codigo.trim()}
@@ -226,6 +228,7 @@ export default function RecoleccionAlmacenPanel() {
               <div>
                 <Button
                   variant="primary"
+                  size="lg"
                   loading={entregando}
                   onClick={() =>
                     void entregar(
@@ -255,8 +258,8 @@ export default function RecoleccionAlmacenPanel() {
         {error && (
           <div style={{ marginBottom: 12 }}>
             <InlineAlert
-              variant="danger"
-              message={error}
+              variant={pendientes.length > 0 ? "warning" : "danger"}
+              message={pendientes.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
               action={
                 <Button size="sm" variant="secondary" onClick={() => void cargar()}>
                   Reintentar
@@ -266,10 +269,8 @@ export default function RecoleccionAlmacenPanel() {
           </div>
         )}
         {cargando && pendientes.length === 0 ? (
-          <p role="status" style={{ margin: 0, padding: "24px 0", fontSize: 12.5, color: "var(--text-tertiary)" }}>
-            Cargando…
-          </p>
-        ) : (
+          <SkeletonRows rows={4} label="Cargando herramientas por entregar" />
+        ) : error && pendientes.length === 0 ? null : (
           <DataTable
             columns={columnas}
             rows={pendientes}
