@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
@@ -312,6 +312,7 @@ export default function EmployeePaymentsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [tab, setTab] = useState<"lista" | "analytics">("lista");
   const [searchQ, setSearchQ] = useState("");
+  const deferredQ = useDeferredValue(searchQ);
   const [filterUser, setFilterUser] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
@@ -352,18 +353,20 @@ export default function EmployeePaymentsPage() {
         financeFetch("employee-payments", token),
         financeFetch("users", token).catch((e) => {
           setUsersErr(formatApiError(e, "No se pudo cargar el catálogo de empleados"));
-          return [];
+          return null;
         }),
       ]);
       const rows = Array.isArray(data) ? data : (data?.data ?? []);
       setItems(rows.map((r: Record<string, unknown>) => mapPaymentRow(r)));
-      const userRows = Array.isArray(usersData) ? usersData : (usersData?.data ?? []);
-      setUsers(
-        userRows.map((u: { id: number; nombre?: string }) => ({
-          id: u.id,
-          nombre: u.nombre || `#${u.id}`,
-        })),
-      );
+      if (usersData !== null) {
+        const userRows = Array.isArray(usersData) ? usersData : (usersData?.data ?? []);
+        setUsers(
+          userRows.map((u: { id: number; nombre?: string }) => ({
+            id: u.id,
+            nombre: u.nombre || `#${u.id}`,
+          })),
+        );
+      }
     } catch (e) {
       // Un fallo al refrescar NO borra lo que ya estaba en pantalla: se avisa
       // arriba y la tabla sigue mostrando la última lista buena. Vaciarla
@@ -412,8 +415,8 @@ export default function EmployeePaymentsPage() {
 
   const visibleItems = useMemo(() => {
     let result = items;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
+    if (deferredQ.trim()) {
+      const q = deferredQ.trim().toLowerCase();
       result = result.filter(
         (p) =>
           (p.user?.nombre ?? "").toLowerCase().includes(q) ||
@@ -425,7 +428,7 @@ export default function EmployeePaymentsPage() {
     if (filterUser) result = result.filter((p) => String(p.userId) === filterUser);
     if (filterStatus) result = result.filter((p) => p.status === filterStatus);
     return result;
-  }, [items, searchQ, filterUser, filterStatus]);
+  }, [items, deferredQ, filterUser, filterStatus]);
 
   /**
    * Regla 1: lo que la persona viene a saber — qué falta por aprobar, cuánto se
@@ -896,7 +899,7 @@ export default function EmployeePaymentsPage() {
         }
         tabs={[
           { id: "lista", label: "Lista" },
-          { id: "analytics", label: "Analytics" },
+          { id: "analytics", label: "Análisis" },
         ]}
         activeTab={tab}
         onTabChange={(id) => setTab(id as "lista" | "analytics")}
@@ -1201,7 +1204,9 @@ export default function EmployeePaymentsPage() {
             <input
               type="number"
               min={0}
-              value={form.amount}
+              step="0.01"
+              inputMode="decimal"
+              value={form.amount || ""}
               aria-invalid={Boolean(formErrors.amount)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, amount: Number(e.target.value) }));
@@ -1224,6 +1229,8 @@ export default function EmployeePaymentsPage() {
                 type="number"
                 min={0}
                 step="0.01"
+                inputMode="decimal"
+                aria-label="Horas trabajadas"
                 value={Math.round((form.totalMinutes / 60) * 100) / 100}
                 onChange={(e) => setForm((f) => ({ ...f, totalMinutes: Math.round(Number(e.target.value) * 60) }))}
                 style={financeInputStyle}
