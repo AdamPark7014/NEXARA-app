@@ -173,15 +173,15 @@
 }
 
 .gPendiente::before {
-  background: #d9a441;
+  background: var(--ui-warning);
 }
 
 .gError {
-  color: #b42318;
+  color: var(--ui-danger-text);
 }
 
 .gError::before {
-  background: #d92d20;
+  background: var(--ui-danger);
 }
 
 @keyframes latido {
@@ -253,11 +253,11 @@
 .dangerBtn {
   border: 1px solid var(--doc-borde);
   background: var(--doc-superficie);
-  color: #b42318;
+  color: var(--ui-danger-text);
 }
 
 .dangerBtn:hover:not(:disabled) {
-  border-color: color-mix(in srgb, #d92d20 40%, var(--doc-borde));
+  border-color: color-mix(in srgb, var(--ui-danger) 40%, var(--doc-borde));
 }
 
 .primaryBtn:disabled,
@@ -312,7 +312,7 @@
 }
 
 .iconBtnPeligro:hover:not(:disabled) {
-  color: #b42318;
+  color: var(--ui-danger-text);
 }
 
 /* Un solo anillo de foco, en verde de marca, para todo lo que se puede enfocar. */
@@ -1372,7 +1372,7 @@ select.celda {
 }
 
 .menuFilaPeligro {
-  color: #b42318;
+  color: var(--ui-danger-text);
 }
 
 .menuFilaLinea {
@@ -1650,8 +1650,8 @@ select.celda {
   gap: 8px;
   padding: 6px 10px;
   border-radius: var(--doc-radio-campo);
-  background: color-mix(in srgb, #d92d20 7%, var(--doc-superficie));
-  color: #b42318;
+  background: color-mix(in srgb, var(--ui-danger) 7%, var(--doc-superficie));
+  color: var(--ui-danger-text);
   font-size: 12px;
 }
 
@@ -1746,14 +1746,14 @@ select.celda {
 }
 
 .avisoAlerta {
-  border-color: color-mix(in srgb, #d9a441 45%, var(--doc-borde));
-  background: color-mix(in srgb, #d9a441 8%, var(--doc-superficie));
+  border-color: color-mix(in srgb, var(--ui-warning) 45%, var(--doc-borde));
+  background: color-mix(in srgb, var(--ui-warning) 8%, var(--doc-superficie));
 }
 
 .avisoError {
-  border-color: color-mix(in srgb, #d92d20 35%, var(--doc-borde));
-  background: color-mix(in srgb, #d92d20 6%, var(--doc-superficie));
-  color: #b42318;
+  border-color: color-mix(in srgb, var(--ui-danger) 35%, var(--doc-borde));
+  background: color-mix(in srgb, var(--ui-danger) 6%, var(--doc-superficie));
+  color: var(--ui-danger-text);
 }
 
 .avisoOk {
@@ -1924,11 +1924,11 @@ select.celda {
 }
 
 .pieza_cadena .piezaTexto {
-  color: #6941c6;
+  color: var(--ui-violet-text);
 }
 
 .pieza_revision .piezaTexto {
-  color: #b54708;
+  color: var(--ui-warning-text);
 }
 
 .folioResumen {
@@ -1962,7 +1962,7 @@ select.celda {
 }
 
 .tonoInfo {
-  color: #1570a6;
+  color: var(--ui-info-text);
 }
 
 .tonoOk {
@@ -1970,17 +1970,8 @@ select.celda {
 }
 
 .tonoAlerta {
-  color: #b42318;
+  color: var(--ui-danger-text);
 }
-
-:global(body.dark) .tonoInfo {
-  color: #7dd3fc;
-}
-
-:global(body.dark) .tonoAlerta {
-  color: #fca5a5;
-}
-
 .soloLector {
   position: absolute;
   width: 1px;

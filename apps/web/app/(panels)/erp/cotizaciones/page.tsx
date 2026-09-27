@@ -41,6 +41,7 @@ import {
   type Segmento,
 } from "@/lib/cotizaciones-api";
 import { partesDelFolio } from "@/lib/cotizacion-folio";
+import { formatApiError } from "@/lib/erp-api";
 import FolioExplicado from "./_editor/FolioExplicado";
 import styles from "./cotizaciones-core.module.css";
 
@@ -143,7 +144,7 @@ export default function CotizacionesPage() {
       // Un fallo al refrescar avisa arriba, pero NO borra lo que ya estaba en
       // pantalla: vaciar la lista deja a quien la consulta peor que antes de
       // pulsar «Reintentar».
-      setError(e instanceof Error ? e.message : "No se pudieron cargar las cotizaciones");
+      setError(formatApiError(e, "No se pudieron cargar las cotizaciones"));
     } finally {
       setCargando(false);
     }
@@ -220,11 +221,14 @@ export default function CotizacionesPage() {
     };
   }, [visibles]);
 
-  const viejos = items.filter((r) => r.necesitaRefolio).length;
+  const viejos = useMemo(() => items.filter((r) => r.necesitaRefolio).length, [items]);
 
   // El ejemplo de la explicación es una cotización real con nomenclatura, si la hay.
-  const ejemplo =
-    items.find((r) => partesDelFolio(r.folio)?.cadena.length) ?? items.find((r) => partesDelFolio(r.folio)) ?? null;
+  const ejemplo = useMemo(
+    () =>
+      items.find((r) => partesDelFolio(r.folio)?.cadena.length) ?? items.find((r) => partesDelFolio(r.folio)) ?? null,
+    [items],
+  );
 
   const hayFiltros = Boolean(segmento || estado || q.trim());
   /** El esqueleto solo en la primera carga: al refrescar, la lista se queda. */

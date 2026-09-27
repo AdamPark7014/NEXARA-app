@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SEGMENTO_LABEL, archivarPlantilla, listarPlantillasGuardadas, type PlantillaGuardadaResumen } from "@/lib/cotizaciones-api";
+import { formatApiError } from "@/lib/erp-api";
 import { Ayuda } from "./campos";
 import styles from "./editor.module.css";
 
@@ -76,7 +77,7 @@ export default function ElegirPlantilla({
                       await archivarPlantilla(token, p.id);
                       setPlantillas((lista) => (lista ?? []).filter((x) => x.id !== p.id));
                     } catch (e) {
-                      onError(e instanceof Error ? e.message : "No se pudo quitar la plantilla");
+                      onError(formatApiError(e, "No se pudo quitar la plantilla"));
                     }
                   }}
                 >

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { vistaPreviaEnVivo, type GuardarCotizacion } from "@/lib/cotizaciones-api";
+import { formatApiError } from "@/lib/erp-api";
 import {
   crearProgramador,
   leerSecciones,
@@ -180,10 +181,10 @@ export default function VistaPrevia({
           return URL.createObjectURL(new Blob([r.bytes.slice()], { type: "application/pdf" }));
         });
         void pintar(r.bytes, leerSecciones(r.secciones)).catch((e) =>
-          setError(e instanceof Error ? `No se pudo dibujar el PDF: ${e.message}` : "No se pudo dibujar el PDF"),
+          setError(e instanceof Error ? `No se pudo dibujar el PDF: ${formatApiError(e)}` : "No se pudo dibujar el PDF"),
         );
       },
-      alError: (e) => setError(e instanceof Error ? e.message : "No se pudo armar la vista previa"),
+      alError: (e) => setError(formatApiError(e, "No se pudo armar la vista previa")),
       alCambiarEstado: setActualizando,
     });
     programador.current = p;
