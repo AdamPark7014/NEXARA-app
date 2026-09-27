@@ -11,22 +11,30 @@
   top: 12px;
   z-index: 10000;
   padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--surface, #fff);
-  color: var(--text-primary, #0f1c2e);
-  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
   font-size: 13px;
   font-weight: 650;
   text-decoration: none;
-  box-shadow: 0 8px 24px rgba(15, 28, 46, 0.12);
+  box-shadow: var(--ui-shadow-pop);
   transform: translateY(-160%);
-  transition: transform 0.15s ease;
+  transition: transform var(--ui-duration-fast) var(--ui-ease-out);
 
   &:focus,
   &:focus-visible {
     transform: translateY(0);
-    outline: 2px solid var(--primary, #2563EB);
-    outline-offset: 2px;
+    outline: var(--ui-focus-outline);
+    outline-offset: var(--ui-focus-offset);
+  }
+}
+
+/* Anillo de foco único para todos los controles del shell. */
+%shellFocus {
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 1px;
   }
 }
 
@@ -35,7 +43,7 @@
   display: grid;
   /* minmax(0, 1fr): la columna main puede encogerse; sin esto el min-content
      empuja el shell más allá del viewport y overflow-x: clip corta la derecha. */
-  grid-template-columns: var(--shell-sidebar-w, 240px) minmax(0, 1fr);
+  grid-template-columns: var(--shell-sidebar-w, var(--ui-sidebar-w, 240px)) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas:
     "sidebar topbar"
@@ -70,7 +78,7 @@
 }
 
 .shell[data-collapsed="true"] {
-  --shell-sidebar-w: 60px;
+  --shell-sidebar-w: var(--ui-sidebar-w-collapsed, 60px);
 }
 
 /* Integra consola: sin sidebar ni topbar ERP — HUD propio full viewport */
@@ -139,11 +147,10 @@
   flex-direction: column;
   background: var(--ui-surface);
   border-right: 1px solid var(--ui-border);
-  z-index: 30;
+  z-index: var(--ui-z-sidebar, 30);
   /* visible: el menú de perfil se despliega fuera del riel cuando está colapsado.
      El scroll lo gestiona `.menu`, no el aside. */
   overflow: visible;
-  transition: width 200ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 @media (max-width: 900px) {
@@ -157,22 +164,44 @@
     left: 0;
     height: 100vh;
     height: 100dvh;
-    width: min(288px, 86vw);
+    width: min(300px, 86vw);
     transform: translateX(-100%);
     /* Cerrado no es solo invisible: sale del orden de tabulación. */
     visibility: hidden;
-    box-shadow: var(--ui-shadow-pop);
+    box-shadow: var(--ui-shadow-lg);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    will-change: transform;
     transition:
-      transform 220ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
-      visibility 0s linear 220ms;
+      transform var(--ui-duration-slow) var(--ui-ease-out),
+      visibility 0s linear var(--ui-duration-slow);
   }
 
   .shell[data-mobile-open="true"] .sidebar {
     transform: translateX(0);
     visibility: visible;
     transition:
-      transform 220ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+      transform var(--ui-duration-slow) var(--ui-ease-out),
       visibility 0s;
+  }
+
+  /* Cajón: renglones y controles táctiles de 44 px. `.sidebar` delante para
+     ganarle a las reglas base, que vienen más abajo en la hoja. */
+  .sidebar .menuItem {
+    font-size: 15px;
+  }
+
+  .sidebar .searchInput {
+    height: var(--ui-touch-min);
+    /* 16 px: iOS no hace zoom al enfocar. */
+    font-size: 16px;
+  }
+
+  .sidebar .userTrigger {
+    min-height: 52px;
+  }
+
+  .sidebar .userMenuItem {
+    min-height: var(--ui-touch-min);
   }
 }
 
@@ -235,8 +264,8 @@
 /* Cierre del cajón: solo existe donde el cajón existe. */
 .drawerClose {
   display: none;
-  width: 32px;
-  height: 32px;
+  width: var(--ui-touch-min);
+  height: var(--ui-touch-min);
   border: 0;
   border-radius: var(--ui-radius);
   background: transparent;
@@ -245,7 +274,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  margin-right: -4px;
+  margin-right: -8px;
 
   &:hover {
     background: var(--ui-hover);
@@ -298,12 +327,16 @@
   color: var(--ui-fg);
   outline: none;
   transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    box-shadow 120ms ease;
+    background var(--ui-duration-fast) ease,
+    border-color var(--ui-duration-fast) ease,
+    box-shadow var(--ui-duration-fast) ease;
 
   &::placeholder {
     color: var(--ui-fg-3);
+  }
+
+  &::-webkit-search-cancel-button {
+    cursor: pointer;
   }
 
   &:hover {
@@ -674,6 +707,16 @@
     display: none;
   }
 
+  /* Sin micro-etiquetas, los grupos se separan con una línea fina. */
+  .shell[data-collapsed="true"] .menu {
+    gap: 10px;
+  }
+
+  .shell[data-collapsed="true"] .group + .group {
+    padding-top: 10px;
+    border-top: 1px solid var(--ui-border-subtle);
+  }
+
   .shell[data-collapsed="true"] .brand {
     justify-content: center;
     padding: 0;
@@ -803,18 +846,37 @@
 
   & .crumbCurrent {
     color: var(--ui-fg);
-    font-weight: 500;
+    font-weight: 600;
+  }
+
+  & a:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 0;
+    color: var(--ui-fg);
   }
 
   /* En teléfono solo cabe la página actual. */
   @media (max-width: 600px) {
-    /* !important: cada miga trae `display` en línea. */
-    & > a,
-    & > span:not(:last-child),
+    & > .crumbHome,
+    & > .crumb:not([data-last]),
     & .crumbSep {
-      display: none !important;
+      display: none;
     }
   }
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* La última miga es la que se encoge primero; el resto conserva su ancho. */
+.crumb:not([data-last]),
+.crumbHome {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .topbarActions {
@@ -950,14 +1012,14 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--danger, #c9423d);
-  color: #fff;
+  background: var(--ui-danger);
+  color: var(--ui-danger-fg);
   font-size: 9.5px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--background);
+  border: 2px solid var(--ui-surface);
 }
 
 /* ============================================================
@@ -994,11 +1056,12 @@
 
 .switcherDropdown {
   position: absolute;
-  top: 50px;
+  top: calc(100% + 8px);
   right: 0;
-  min-width: 340px;
-  max-width: 400px;
-  max-height: 540px;
+  min-width: min(340px, calc(100vw - 24px));
+  max-width: min(400px, calc(100vw - 24px));
+  max-height: min(540px, calc(100dvh - 80px));
+  overscroll-behavior: contain;
   overflow-y: auto;
   /* Misma profundidad que el menú de cuenta: superficie, 1 px y elevación
      mínima. Sin blur ni sombras marcadas. */
@@ -1028,7 +1091,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-tertiary);
+  color: var(--ui-fg-label);
 }
 
 .switcherItem {
@@ -1036,15 +1099,21 @@
   align-items: flex-start;
   gap: 14px;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: var(--ui-radius);
   text-decoration: none;
-  color: var(--text-primary);
+  color: var(--ui-fg);
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background var(--nx-motion-fast) ease;
+  transition: background var(--ui-duration-fast) ease;
 
   &:hover {
-    background: var(--surface-2);
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: -2px;
   }
 
   &[data-current="true"] {
@@ -1076,14 +1145,14 @@
 
 .switcherItemName {
   font-size: 13.5px;
-  font-weight: 700;
-  font-family: var(--nx-font-display);
+  font-weight: 650;
+  font-family: var(--ui-font);
   letter-spacing: -0.01em;
 }
 
 .switcherItemTagline {
   font-size: 11.5px;
-  color: var(--text-secondary);
+  color: var(--ui-fg-2);
   margin-top: 3px;
   line-height: 1.4;
 }
@@ -1098,13 +1167,13 @@
 }
 
 .switcherPill[data-variant="current"] {
-  background: var(--panel-accent, var(--primary));
-  color: #fff;
+  background: var(--panel-accent, var(--ui-brand));
+  color: var(--ui-brand-fg);
 }
 
 .switcherPill[data-variant="home"] {
-  background: var(--surface-2);
-  color: var(--text-secondary);
+  background: var(--ui-neutral-bg);
+  color: var(--ui-neutral-text);
 }
 
 /* ============================================================
@@ -1210,11 +1279,11 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  z-index: 25;
+  background: var(--ui-scrim);
+  z-index: var(--ui-z-overlay-nav, 25);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--nx-motion-base) ease;
+  transition: opacity var(--ui-duration-slow) var(--ui-ease-out);
 }
 
 .shell[data-mobile-open="true"] .overlay {
@@ -1249,7 +1318,482 @@
 
   .userMenu,
   .switcherDropdown,
+  .notifPop,
   .contentInner {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   ANCLAS DE MENÚS DESPLEGABLES
+   ============================================================ */
+.popAnchor {
+  position: relative;
+  display: inline-flex;
+}
+
+/* ============================================================
+   FOCO DE LOS CONTROLES DE LA BARRA
+   ============================================================ */
+.mobileMenuBtn,
+.collapseBtn,
+.iconBtn,
+.paletteBtn,
+.switcherBtn {
+  @extend %shellFocus;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.collapseBtn,
+.mobileMenuBtn {
+  transition:
+    background var(--ui-duration-fast) ease,
+    color var(--ui-duration-fast) ease;
+}
+
+/* La barra se despega del contenido con una sombra leve al hacer scroll.
+   Solo CSS (animación ligada al scroll): ningún listener en JavaScript. */
+@supports (animation-timeline: scroll()) {
+  .topbar {
+    animation: topbarRaise linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 64px;
+  }
+
+  .shell[data-chat="true"] .topbar {
+    animation: none;
+  }
+}
+
+@keyframes topbarRaise {
+  to {
+    box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--ui-fg) 30%, transparent);
+  }
+}
+
+/* ============================================================
+   CONTADOR DE LA CAMPANA
+   ============================================================ */
+.notifCount {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-danger);
+  color: var(--ui-danger-fg);
+  box-shadow: 0 0 0 2px var(--ui-surface);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* ============================================================
+   VISTA RÁPIDA DE NOTIFICACIONES
+   ============================================================ */
+.notifPop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  background: var(--ui-surface-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-pop);
+  z-index: var(--ui-z-dropdown, 50);
+  overflow: hidden;
+  animation: switcherIn var(--ui-duration-base) var(--ui-ease-out);
+}
+
+.notifHead {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ui-fg);
+}
+
+.notifList {
+  max-height: min(360px, calc(100dvh - 180px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notifItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: default;
+  position: relative;
+  transition: background var(--ui-duration-fast) ease;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &[data-link="true"] {
+    cursor: pointer;
+  }
+
+  &:hover {
+    background: var(--ui-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: -2px;
+  }
+
+  /* Nueva = tinte de marca + punto; se distingue sin depender solo del color. */
+  &[data-unread="true"] {
+    background: color-mix(in srgb, var(--ui-brand) 6%, transparent);
+  }
+
+  &[data-unread="true"]::after {
+    content: "";
+    position: absolute;
+    top: 16px;
+    right: 12px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ui-brand);
+  }
+}
+
+.notifItemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  padding-right: 12px;
+}
+
+.notifItemTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ui-fg);
+}
+
+.notifItemText {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ui-fg-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notifSkeletons {
+  display: flex;
+  flex-direction: column;
+}
+
+.notifSkeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ui-border-subtle);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.notifSkeletonText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.notifEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  font-size: 13px;
+  color: var(--ui-fg-2);
+  text-align: center;
+
+  svg {
+    color: var(--ui-fg-3);
+  }
+}
+
+.notifFoot {
+  padding: 10px 14px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface-2);
+}
+
+.notifFootLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+  border-radius: var(--ui-radius-sm);
+
+  &:hover {
+    color: var(--ui-brand-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 2px;
+  }
+}
+
+/* ============================================================
+   AVISO DE SESIÓN (franja superior)
+   ============================================================ */
+.sessionBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--ui-warning-border);
+  background: color-mix(in srgb, var(--ui-warning) 14%, var(--ui-surface));
+  color: var(--ui-fg);
+  animation: ui-fade-in var(--ui-duration-base) var(--ui-ease-out);
+
+  &[data-tone="danger"] {
+    border-bottom-color: var(--ui-danger-border);
+    background: color-mix(in srgb, var(--ui-danger) 12%, var(--ui-surface));
+  }
+}
+
+.sessionBannerBtn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  @extend %shellFocus;
+
+  &:hover:not(:disabled) {
+    background: var(--ui-hover);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: progress;
+  }
+}
+
+.sessionBannerDismiss {
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius);
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: inherit;
+  cursor: pointer;
+  @extend %shellFocus;
+
+  &:hover {
+    color: var(--ui-fg);
+    background: color-mix(in srgb, var(--ui-fg) 6%, transparent);
+  }
+}
+
+/* ============================================================
+   PANTALLAS DE ESTADO (cargando sesión, sin rol, sin acceso)
+   ============================================================ */
+.stateScreen {
+  min-height: 62vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.stateSpinner {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--ui-border);
+  border-top-color: var(--ui-brand);
+  animation: shellSpin 0.8s linear infinite;
+}
+
+@keyframes shellSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stateTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ui-fg-2);
+}
+
+.stateHeading {
+  margin: 6px 0 0;
+  font-family: var(--ui-font);
+  font-size: var(--ui-text-xl);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ui-fg);
+}
+
+.stateText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ui-fg-2);
+}
+
+.stateMeta {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ui-fg-3);
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+%stateBtnBase {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--ui-radius);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--ui-duration-fast) ease,
+    border-color var(--ui-duration-fast) ease;
+  @extend %shellFocus;
+}
+
+.stateBtn {
+  @extend %stateBtnBase;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+
+  &:hover {
+    background: var(--ui-hover);
+    border-color: var(--ui-border-strong);
+    color: var(--ui-fg);
+  }
+}
+
+.stateBtnPrimary {
+  @extend %stateBtnBase;
+  border: 1px solid var(--ui-brand);
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg);
+
+  &:hover {
+    background: var(--ui-brand-hover);
+    color: var(--ui-brand-fg);
+  }
+}
+
+/* ============================================================
+   TELÉFONO · objetivos táctiles de 44 px en la barra superior
+   (al final de la hoja para ganar por orden a las reglas base)
+   ============================================================ */
+@media (max-width: 900px) {
+  .topbar {
+    gap: 4px;
+    padding: 0 8px;
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(var(--ui-topbar-h) + env(safe-area-inset-top, 0px));
+  }
+
+  .mobileMenuBtn,
+  .iconBtn,
+  .paletteBtn {
+    width: var(--ui-touch-min);
+    height: var(--ui-touch-min);
+    border-radius: var(--ui-radius-lg);
+  }
+
+  .switcherBtn {
+    height: 36px;
+  }
+
+  .topbarActions {
+    gap: 2px;
+  }
+
+  .notifPop {
+    position: fixed;
+    top: calc(var(--ui-topbar-h) + env(safe-area-inset-top, 0px) + 6px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stateSpinner {
+    animation-duration: 2.4s;
+  }
+
+  .sessionBanner {
     animation: none;
   }
 }

@@ -1,0 +1,237 @@
+/* Capas compartidas por Modal y ConfirmDialog.
+   Escritorio: tarjeta centrada. Teléfono: hoja que sube desde abajo. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-modal, 1000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--ui-scrim);
+  animation: overlayFade var(--ui-duration-base) var(--ui-ease-out);
+}
+
+.panel {
+  position: relative;
+  width: 100%;
+  max-height: min(88vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  box-shadow: var(--ui-shadow-lg);
+  animation: overlayIn var(--ui-duration-slow) var(--ui-ease-out);
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px 20px;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-page);
+  line-height: var(--ui-lh-section);
+  letter-spacing: var(--ui-tracking-section);
+  color: var(--ui-fg);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--ui-fs-label);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+.close {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius);
+  background: transparent;
+  color: var(--ui-fg-3);
+  cursor: pointer;
+  transition:
+    background var(--ui-duration-fast) ease,
+    color var(--ui-duration-fast) ease;
+
+  &:hover {
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 1px;
+  }
+
+  @media (pointer: coarse) {
+    width: var(--ui-touch-min);
+    height: var(--ui-touch-min);
+  }
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-2);
+}
+
+/* ── Confirmación ─────────────────────────────────────── */
+.confirm {
+  max-width: 440px;
+  padding: 20px 24px;
+  gap: 0;
+}
+
+.confirmTitle {
+  margin: 0 0 8px;
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-page);
+  line-height: var(--ui-lh-section);
+  color: var(--ui-fg);
+}
+
+.confirmMessage {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 500;
+  color: var(--ui-fg);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-height: calc(100dvh - 220px);
+  overflow-y: auto;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ── Teléfono ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .scrim {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .panel {
+    max-width: none !important;
+    max-height: calc(100dvh - 24px);
+    border-radius: var(--ui-radius-xl) var(--ui-radius-xl) 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation-name: sheetIn;
+  }
+
+  /* Asa visual de hoja. */
+  .panel::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--ui-border-strong);
+  }
+
+  .header {
+    padding-top: 18px;
+  }
+
+  .confirm {
+    padding: 24px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .confirmActions,
+  .footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .confirmActions > *,
+  .footer > * {
+    width: 100%;
+    min-height: var(--ui-touch-min);
+  }
+}
+
+@keyframes overlayFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheetIn {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .panel {
+    animation: none;
+  }
+}

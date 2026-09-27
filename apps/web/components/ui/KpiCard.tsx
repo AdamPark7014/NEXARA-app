@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import Skeleton from "./Skeleton";
 
 /**
  * NEXARA · KpiCard (premium)
@@ -27,6 +28,9 @@ export default function KpiCard({
   sparkline,
   footer,
   onClick,
+  loading = false,
+  selected = false,
+  ariaLabel,
 }: {
   label: ReactNode;
   value: ReactNode;
@@ -37,6 +41,12 @@ export default function KpiCard({
   sparkline?: number[];
   footer?: ReactNode;
   onClick?: () => void;
+  /** Mientras llega la cifra: bloque esqueleto en lugar del valor. */
+  loading?: boolean;
+  /** Tarjeta usada como filtro: marca la que está activa. */
+  selected?: boolean;
+  /** Nombre accesible cuando la tarjeta es clicable y el texto visible no basta. */
+  ariaLabel?: string;
 }) {
   const variantStyles: Record<KpiVariant, { glow: string; accent: string; ring: string }> = {
     default: {
@@ -77,23 +87,38 @@ export default function KpiCard({
   return (
     <article
       onClick={onClick}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? ariaLabel : undefined}
+      aria-pressed={interactive && selected ? true : undefined}
+      aria-busy={loading || undefined}
       className="nx-kpi"
+      data-interactive={interactive ? "true" : undefined}
+      data-selected={selected ? "true" : undefined}
       style={{
         position: "relative",
-        background: "var(--nx-panel-surface-overlay)",
-        border: `1px solid ${ring}`,
-        borderRadius: "var(--nx-panel-radius)",
-        padding: 14,
+        background: "var(--ui-surface)",
+        border: `1px solid ${selected ? `color-mix(in srgb, ${accent} 60%, var(--ui-border))` : ring}`,
+        borderRadius: "var(--ui-radius-lg)",
+        padding: 16,
         display: "flex",
         flexDirection: "column",
         gap: 10,
         overflow: "hidden",
         cursor: interactive ? "pointer" : "default",
-        boxShadow: "var(--nx-panel-elev-1)",
+        boxShadow: selected ? `0 0 0 1px color-mix(in srgb, ${accent} 45%, transparent)` : "var(--ui-elev-1)",
         transition:
-          "transform 200ms var(--nx-ease-out), box-shadow 240ms var(--nx-ease-out), border-color 200ms var(--nx-ease-out)",
+          "transform var(--ui-duration-fast) var(--ui-ease-out), box-shadow var(--ui-duration-base) var(--ui-ease-out), border-color var(--ui-duration-fast) var(--ui-ease-out)",
       }}
     >
       <span
@@ -102,7 +127,7 @@ export default function KpiCard({
           position: "absolute",
           inset: 0,
           background: `linear-gradient(140deg, ${glow} 0%, transparent 55%)`,
-          opacity: 0.7,
+          opacity: 0.55,
           pointerEvents: "none",
         }}
       />
@@ -162,19 +187,20 @@ export default function KpiCard({
       <div
         style={{
           fontFamily: "var(--nx-font-display)",
-          fontSize: "clamp(1.7rem, 1.4rem + 0.8vw, 2.1rem)",
-          fontWeight: 700,
+          fontSize: "clamp(1.6rem, 1.35rem + 0.7vw, 2rem)",
+          fontWeight: 650,
           letterSpacing: "-0.025em",
           color: "var(--text-primary)",
-          lineHeight: 1,
+          lineHeight: 1.05,
           position: "relative",
-          fontVariantNumeric: "tabular-nums",
+          fontVariantNumeric: "tabular-nums lining-nums",
+          minHeight: "1.05em",
         }}
       >
-        {value}
+        {loading ? <Skeleton width="58%" height="0.9em" radius={6} /> : value}
       </div>
 
-      {sparkline && sparkline.length > 1 && (
+      {!loading && sparkline && sparkline.length > 1 && (
         <Sparkline data={sparkline} color={accent} />
       )}
 
@@ -247,10 +273,25 @@ export default function KpiCard({
       )}
 
       <style jsx>{`
-        .nx-kpi:hover {
-          transform: ${interactive ? "translateY(-2px)" : "translateY(-1px)"};
-          box-shadow: var(--nx-panel-elev-hover);
-          border-color: color-mix(in srgb, ${accent} 50%, var(--border));
+        /* Solo la tarjeta que hace algo reacciona al puntero: una cifra estática
+           que se mueve promete un clic que no existe. */
+        .nx-kpi[data-interactive="true"]:hover {
+          transform: translateY(-1px);
+          /* !important: borde y sombra base van en línea. */
+          box-shadow: var(--ui-elev-2) !important;
+          border-color: color-mix(in srgb, ${accent} 45%, var(--ui-border)) !important;
+        }
+        .nx-kpi[data-interactive="true"]:active {
+          transform: none;
+        }
+        .nx-kpi:focus-visible {
+          outline: var(--ui-focus-outline);
+          outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .nx-kpi[data-interactive="true"]:hover {
+            transform: none;
+          }
         }
       `}</style>
     </article>

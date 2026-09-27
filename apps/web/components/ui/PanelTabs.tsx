@@ -1,10 +1,13 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useRef, type KeyboardEvent } from "react";
+import styles from "./PanelTabs.module.scss";
 
 /**
  * NEXARA · PanelTabs
- * Pestañas densas, profesionales, con tokens `--nx-panel-*`.
+ * Pestañas densas con tokens del sistema. Teclado: ← → cambian de pestaña,
+ * Inicio / Fin van a la primera / última. En teléfono se desplazan en una
+ * fila en vez de partirse en dos renglones.
  * Uso en módulos ERP/OPS/CRM (estado local) — no confundir con TabBar de rutas.
  */
 
@@ -26,19 +29,30 @@ export default function PanelTabs<T extends string>({
   onChange: (key: T) => void;
   ariaLabel?: string;
 }) {
+  const listRef = useRef<HTMLElement>(null);
+
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    const enabled = tabs.filter((t) => !t.disabled);
+    if (enabled.length === 0) return;
+    const current = enabled.findIndex((t) => t.key === value);
+    let next = -1;
+    if (e.key === "ArrowRight") next = (current + 1) % enabled.length;
+    else if (e.key === "ArrowLeft") next = (current - 1 + enabled.length) % enabled.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = enabled.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    const key = enabled[next].key;
+    onChange(key);
+    listRef.current?.querySelector<HTMLElement>(`[data-tab-key="${CSS.escape(key)}"]`)?.focus();
+  };
+
+  // Si ninguna coincide con `value`, la primera habilitada recibe el Tab.
+  const hasActive = tabs.some((t) => t.key === value && !t.disabled);
+  const fallbackKey = hasActive ? null : tabs.find((t) => !t.disabled)?.key;
+
   return (
-    <nav
-      role="tablist"
-      aria-label={ariaLabel}
-      style={{
-        display: "flex",
-        gap: 2,
-        flexWrap: "wrap",
-        marginBottom: 14,
-        borderBottom: "1px solid var(--nx-panel-hairline)",
-        paddingBottom: 0,
-      }}
-    >
+    <nav ref={listRef} role="tablist" aria-label={ariaLabel} className={styles.list} onKeyDown={onKeyDown}>
       {tabs.map((t) => {
         const active = t.key === value;
         return (
@@ -47,54 +61,15 @@ export default function PanelTabs<T extends string>({
             type="button"
             role="tab"
             aria-selected={active}
+            tabIndex={active || t.key === fallbackKey ? 0 : -1}
+            data-tab-key={t.key}
+            data-active={active ? "true" : undefined}
             disabled={t.disabled}
             onClick={() => onChange(t.key)}
-            style={{
-              appearance: "none",
-              fontFamily: "inherit",
-              padding: "7px 12px",
-              marginBottom: -1,
-              fontSize: 12.5,
-              fontWeight: active ? 700 : 550,
-              letterSpacing: active ? "-0.01em" : "0",
-              cursor: t.disabled ? "not-allowed" : "pointer",
-              opacity: t.disabled ? 0.45 : 1,
-              border: "none",
-              borderBottom: active
-                ? "2px solid var(--panel-accent, var(--primary))"
-                : "2px solid transparent",
-              background: "transparent",
-              color: active
-                ? "var(--text-primary)"
-                : "var(--text-secondary)",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 7,
-              whiteSpace: "nowrap",
-              transition: "color 140ms ease, border-color 140ms ease",
-            }}
+            className={styles.tab}
           >
             {t.label}
-            {t.badge != null && t.badge !== "" && (
-              <span
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 700,
-                  fontVariantNumeric: "tabular-nums",
-                  padding: "1px 6px",
-                  borderRadius: 999,
-                  background: active
-                    ? "color-mix(in srgb, var(--panel-accent, var(--primary)) 16%, transparent)"
-                    : "var(--surface-2)",
-                  color: active
-                    ? "var(--panel-accent, var(--primary))"
-                    : "var(--text-tertiary)",
-                  border: "1px solid var(--nx-panel-hairline-soft)",
-                }}
-              >
-                {t.badge}
-              </span>
-            )}
+            {t.badge != null && t.badge !== "" && <span className={styles.badge}>{t.badge}</span>}
           </button>
         );
       })}

@@ -19,7 +19,8 @@
  *   </AppShell>
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
@@ -77,7 +78,6 @@ import {
   type NavMode,
 } from "@/lib/nav-mode";
 import styles from "./AppShell.module.scss";
-import CommandPalette from "./CommandPalette";
 import ShellConnectionStatus from "./ShellConnectionStatus";
 import CelebracionesBanner from "./CelebracionesBanner";
 import { ModuleIcon } from "./ShellIcons";
@@ -101,6 +101,11 @@ import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNone
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
+
+/** La paleta solo se descarga la primera vez que alguien la abre (⌘K o «Buscar…»). */
+const CommandPalette = dynamic(() => import("./CommandPalette"), { ssr: false });
+
+const COLLAPSED_STORAGE_KEY = "nx-shell-collapsed";
 
 type AppShellProps = {
   panel: PanelId;
@@ -177,10 +182,53 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const [navQuery, setNavQuery] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteMounted, setPaletteMounted] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [serverNav, setServerNav] = useState<MeNavigation | null>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (paletteOpen) setPaletteMounted(true);
+  }, [paletteOpen]);
+
+  const [shortcutLabel, setShortcutLabel] = useState("Ctrl K");
+  useEffect(() => {
+    if (/Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent)) setShortcutLabel("⌘K");
+  }, []);
+
+  // El riel colapsado se recuerda entre visitas (solo escritorio).
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1") setCollapsed(true);
+    } catch {
+      /* almacenamiento bloqueado: se queda expandido */
+    }
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(COLLAPSED_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* sin almacenamiento: vale para esta sesión */
+      }
+      return next;
+    });
+  }, []);
+
+  // Con el cajón abierto la página de atrás no se desplaza (iOS arrastraba el fondo).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = prevOverflow;
+    };
+  }, [mobileOpen]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -450,6 +498,43 @@ export default function AppShell({ panel, children }: AppShellProps) {
     return !canUserAccessPath(user, path);
   }, [user, pathname]);
 
+  // Solo la opción más específica: en «KPIs del equipo» no se marca también «Asistencias».
+  const activeMenuTarget = useMemo(
+    () =>
+      rutaActivaDelMenu(
+        pathname,
+        filteredGroups.flatMap((group) => group.items.map((item) => getModuleUrl(item.id))),
+      ),
+    [pathname, filteredGroups],
+  );
+
+  // Al entrar a un módulo que está al fondo del menú, el renglón activo queda a la vista.
+  useEffect(() => {
+    const active = menuRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    active?.scrollIntoView({ block: "nearest" });
+  }, [activeMenuTarget]);
+
+  const userJson = useMemo(() => (user ? JSON.stringify(user) : null), [user]);
+
+  const onNavQueryKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Escape" && navQuery) {
+        e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
+        setNavQuery("");
+        return;
+      }
+      if (e.key === "Enter") {
+        const first = filteredGroups[0]?.items[0];
+        if (!first || !navQuery.trim()) return;
+        e.preventDefault();
+        setNavQuery("");
+        router.push(getModuleUrl(first.id));
+      }
+    },
+    [filteredGroups, navQuery, router],
+  );
+
   // Ruta bloqueada dentro de un panel permitido → redirigir a la entrada del panel
   // (no al home global, evita saltos cross-panel y parpadeos).
   useEffect(() => {
@@ -471,24 +556,13 @@ export default function AppShell({ panel, children }: AppShellProps) {
         data-auth-state={isContextReady ? "redirecting" : "loading"}
       >
         <main className={styles.main}>
-          <div
-            className={styles.contentInner}
-            style={{
-              minHeight: "60vh",
-              display: "grid",
-              placeItems: "center",
-              color: "var(--text-tertiary, #64748b)",
-              fontSize: 14,
-              gap: 8,
-            }}
-          >
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text-secondary, #475569)" }}>
-                {isContextReady ? "Redirigiendo a inicio de sesión…" : "Cargando tu sesión…"}
+          <div className={`${styles.contentInner} ${styles.stateScreen}`} role="status" aria-live="polite">
+            <div className={styles.stateCard}>
+              <span className={styles.stateSpinner} aria-hidden="true" />
+              <div className={styles.stateTitle}>
+                {isContextReady ? "Te llevamos a iniciar sesión…" : "Cargando tu sesión…"}
               </div>
-              <div style={{ marginTop: 4, fontSize: 12.5 }}>
-                NEXARA · {panelMeta.name}
-              </div>
+              <div className={styles.stateMeta}>NEXARA · {panelMeta.name}</div>
             </div>
           </div>
         </main>
@@ -508,40 +582,21 @@ export default function AppShell({ panel, children }: AppShellProps) {
         data-auth-state="no-access"
       >
         <main className={styles.main}>
-          <div
-            className={styles.contentInner}
-            style={{
-              minHeight: "60vh",
-              display: "grid",
-              placeItems: "center",
-              padding: 24,
-            }}
-          >
-            <div style={{ textAlign: "center", maxWidth: 420 }}>
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-                <IconBadge icon={LockOutlinedIcon} size={56} />
-              </div>
-              <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text-primary)", marginBottom: 8 }}>
-                Tu cuenta no tiene un rol asignado
-              </div>
-              <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 18 }}>
-                Estás autenticado como <strong>{user.email}</strong>, pero todavía
-                no se te ha asignado un rol con permisos. Pide a tu
-                administrador que te asigne uno desde <em>ERP · Usuarios</em>.
-              </div>
-              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+          <div className={`${styles.contentInner} ${styles.stateScreen}`}>
+            <div className={styles.stateCard}>
+              <IconBadge icon={LockOutlinedIcon} size={56} />
+              <h1 className={styles.stateHeading}>Tu cuenta todavía no tiene un rol</h1>
+              <p className={styles.stateText}>
+                Entraste como <strong>{user.email}</strong>, pero aún no te asignan permisos. Pide a tu
+                administrador que te asigne un rol desde <em>ERP · Usuarios</em>.
+              </p>
+              <div className={styles.stateActions}>
                 <button
                   type="button"
-                  onClick={() => { logout?.(); router.replace("/login"); }}
-                  style={{
-                    padding: "10px 16px",
-                    borderRadius: 10,
-                    border: "1px solid var(--nx-panel-hairline)",
-                    background: "var(--surface)",
-                    color: "var(--text-primary)",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
+                  className={styles.stateBtn}
+                  onClick={() => {
+                    logout?.();
+                    router.replace("/login");
                   }}
                 >
                   Cerrar sesión
@@ -561,12 +616,6 @@ export default function AppShell({ panel, children }: AppShellProps) {
     .join("");
 
   const roleLabel = getUserRoleLabel(user);
-
-  // Solo la opción más específica: en «KPIs del equipo» no se marca también «Asistencias».
-  const activeMenuTarget = rutaActivaDelMenu(
-    pathname,
-    filteredGroups.flatMap((group) => group.items.map((item) => getModuleUrl(item.id))),
-  );
 
   const handleLogout = () => {
     logout?.();
@@ -606,46 +655,23 @@ export default function AppShell({ panel, children }: AppShellProps) {
       {(sessionExpiringSoon || sessionEndedMessage) && (
         <div
           role="status"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-            flexWrap: "wrap",
-            padding: "10px 16px",
-            background: sessionEndedMessage
-              ? "color-mix(in srgb, var(--danger) 14%, var(--surface))"
-              : "color-mix(in srgb, var(--warning) 16%, var(--surface))",
-            borderBottom: "1px solid var(--nx-panel-hairline)",
-            fontSize: 13,
-            zIndex: 200,
-          }}
+          className={styles.sessionBanner}
+          data-tone={sessionEndedMessage ? "danger" : "warning"}
         >
           <span>
             {sessionEndedMessage ??
-              "Tu sesión está por expirar. Extiéndela para no perder el trabajo."}
+              "Tu sesión está por terminar. Extiéndela para no perder lo que estás haciendo."}
           </span>
           {sessionExpiringSoon && user && (
             <button
               type="button"
+              className={styles.sessionBannerBtn}
               disabled={extendingSession}
+              aria-busy={extendingSession || undefined}
               onClick={async () => {
                 setExtendingSession(true);
                 await extendSession();
                 setExtendingSession(false);
-              }}
-              style={{
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                borderRadius: 8,
-                padding: "6px 12px",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
               }}
             >
               {extendingSession ? "Extendiendo…" : "Extender sesión"}
@@ -654,14 +680,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
           {sessionEndedMessage && (
             <button
               type="button"
+              className={styles.sessionBannerDismiss}
               onClick={() => clearSessionEndedMessage()}
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "var(--text-secondary)",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
             >
               Cerrar
             </button>
@@ -714,14 +734,17 @@ export default function AppShell({ panel, children }: AppShellProps) {
               type="search"
               className={styles.searchInput}
               placeholder="Filtrar…"
-              aria-label="Filtrar el menú"
+              aria-label="Filtrar el menú (Enter abre el primero)"
               value={navQuery}
               onChange={(e) => setNavQuery(e.target.value)}
+              onKeyDown={onNavQueryKeyDown}
+              autoComplete="off"
+              spellCheck={false}
             />
           </div>
         </div>
 
-        <nav className={styles.menu} aria-label="Menú principal">
+        <nav ref={menuRef} className={styles.menu} aria-label="Menú principal">
           {filteredGroups.length === 0 ? (
             <p className={styles.menuEmpty}>
               {navQuery.trim()
@@ -894,9 +917,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
         <button
           type="button"
           className={styles.collapseBtn}
-          onClick={() => setCollapsed((v) => !v)}
-          aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
-          title={collapsed ? "Expandir" : "Colapsar"}
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Mostrar el menú completo" : "Reducir el menú a iconos"}
+          aria-controls="nx-sidebar-nav"
+          aria-expanded={!collapsed}
+          title={collapsed ? "Mostrar menú" : "Reducir menú"}
         >
           {collapsed ? (
             <ChevronRightIcon aria-hidden="true" sx={{ fontSize: 18 }} />
@@ -931,7 +956,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           )}
 
           {allowedPanels.length > 1 && (
-            <div ref={switcherRef} style={{ position: "relative" }}>
+            <div ref={switcherRef} className={styles.popAnchor}>
               <button
                 type="button"
                 className={styles.switcherBtn}
@@ -952,7 +977,6 @@ export default function AppShell({ panel, children }: AppShellProps) {
                   {allowedPanels.map((p) => {
                     const isCurrent = p.id === panel;
                     const isHome = homeUrl.startsWith(`/${p.id}`);
-                    const userJson = user ? JSON.stringify(user) : null;
                     const panelHref = buildCrossPanelUrl(
                       p.id,
                       getUserPanelSwitchPath(user, p.id),
@@ -963,6 +987,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
                         key={p.id}
                         href={panelHref}
                         className={styles.switcherItem}
+                        role="menuitem"
+                        aria-current={isCurrent ? "page" : undefined}
                         data-current={isCurrent ? "true" : "false"}
                       >
                         <span className={styles.switcherItemIcon} aria-hidden="true" style={{ color: p.accent }}>
@@ -998,12 +1024,17 @@ export default function AppShell({ panel, children }: AppShellProps) {
             type="button"
             className={styles.paletteBtn}
             onClick={() => setPaletteOpen(true)}
-            title="Buscar (⌘K)"
-            aria-label="Abrir paleta de comandos"
+            title={`Buscar (${shortcutLabel})`}
+            aria-label="Buscar módulos, clientes y acciones"
+            aria-keyshortcuts="Control+K Meta+K"
+            aria-haspopup="dialog"
+            aria-expanded={paletteOpen}
           >
             <SearchIcon aria-hidden="true" sx={{ fontSize: 16 }} />
             <span className={styles.paletteBtnLabel}>Buscar…</span>
-            <kbd className={styles.paletteBtnKbd}>⌘K</kbd>
+            <kbd className={styles.paletteBtnKbd} aria-hidden="true">
+              {shortcutLabel}
+            </kbd>
           </button>
 
           <button
@@ -1021,15 +1052,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
           </button>
 
           {notificationsUrl && (
-            <div ref={notifRef} style={{ position: "relative" }}>
+            <div ref={notifRef} className={styles.popAnchor}>
               <button
                 type="button"
                 className={styles.iconBtn}
                 title="Notificaciones"
-                aria-label="Notificaciones"
+                aria-label={
+                  unreadNotifs > 0 ? `Notificaciones: ${unreadNotifs} sin leer` : "Notificaciones"
+                }
                 aria-haspopup="dialog"
                 aria-expanded={notifOpen}
-                style={{ position: "relative" }}
                 onClick={() => {
                   const next = !notifOpen;
                   setNotifOpen(next);
@@ -1038,66 +1070,32 @@ export default function AppShell({ panel, children }: AppShellProps) {
               >
                 <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 {unreadNotifs > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: 2,
-                      right: 2,
-                      minWidth: 16,
-                      height: 16,
-                      padding: "0 4px",
-                      borderRadius: 999,
-                      background: "var(--danger)",
-                      color: "#fff",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      lineHeight: 1,
-                    }}
-                  >
+                  <span className={styles.notifCount} aria-hidden="true">
                     {unreadNotifs > 99 ? "99+" : unreadNotifs}
                   </span>
                 )}
               </button>
               {notifOpen && (
-                <div
-                  role="dialog"
-                  aria-label="Notificaciones recientes"
-                  style={{
-                    position: "absolute",
-                    right: 0,
-                    top: "calc(100% + 8px)",
-                    width: 340,
-                    maxWidth: "min(340px, 92vw)",
-                    background: "var(--surface)",
-                    border: "1px solid var(--nx-panel-hairline)",
-                    borderRadius: 14,
-                    boxShadow: "0 8px 28px rgba(8,24,38,0.16)",
-                    zIndex: 60,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "12px 14px",
-                      borderBottom: "1px solid var(--nx-panel-hairline)",
-                      fontWeight: 700,
-                      fontSize: 13,
-                    }}
-                  >
-                    Notificaciones
-                  </div>
-                  <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                <div role="dialog" aria-label="Notificaciones recientes" className={styles.notifPop}>
+                  <div className={styles.notifHead}>Notificaciones</div>
+                  <div className={styles.notifList} aria-busy={notifLoading || undefined}>
                     {notifLoading && (
-                      <div style={{ padding: 16, fontSize: 13, color: "var(--text-secondary)" }}>
-                        Cargando…
+                      <div className={styles.notifSkeletons} aria-label="Cargando notificaciones">
+                        {[0, 1, 2].map((i) => (
+                          <div key={i} className={styles.notifSkeletonRow} aria-hidden="true">
+                            <span className="ui-skeleton" data-shape="circle" style={{ width: 30, height: 30 }} />
+                            <span className={styles.notifSkeletonText}>
+                              <span className="ui-skeleton" style={{ width: "62%", height: 11 }} />
+                              <span className="ui-skeleton" style={{ width: "88%", height: 10 }} />
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     )}
                     {!notifLoading && notifPreview.length === 0 && (
-                      <div style={{ padding: 16, fontSize: 13, color: "var(--text-secondary)" }}>
-                        Sin notificaciones recientes.
+                      <div className={styles.notifEmpty}>
+                        <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 22 }} />
+                        <span>Estás al día. No hay avisos nuevos.</span>
                       </div>
                     )}
                     {!notifLoading &&
@@ -1105,46 +1103,24 @@ export default function AppShell({ panel, children }: AppShellProps) {
                         <button
                           key={n.id}
                           type="button"
+                          className={styles.notifItem}
+                          data-unread={n.isRead ? undefined : "true"}
+                          data-link={n.relatedUrl ? "true" : undefined}
                           onClick={() => void openNotifPreview(n)}
-                          style={{
-                            display: "flex",
-                            gap: 10,
-                            alignItems: "flex-start",
-                            width: "100%",
-                            textAlign: "left",
-                            padding: "10px 14px",
-                            border: "none",
-                            borderBottom: "1px solid var(--nx-panel-hairline-soft)",
-                            background: n.isRead
-                              ? "transparent"
-                              : "color-mix(in srgb, var(--primary) 6%, transparent)",
-                            cursor: n.relatedUrl ? "pointer" : "default",
-                            fontFamily: "inherit",
-                            color: "inherit",
-                          }}
                         >
                           <NotificationKindIcon category={n.category} title={n.title} size={30} muted={n.isRead} />
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{stripLeadingEmoji(n.title)}</div>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-secondary)",
-                                marginTop: 2,
-                                lineHeight: 1.35,
-                              }}
-                            >
-                              {stripLeadingEmoji(n.message)}
-                            </div>
-                          </div>
+                          <span className={styles.notifItemBody}>
+                            <span className={styles.notifItemTitle}>{stripLeadingEmoji(n.title)}</span>
+                            <span className={styles.notifItemText}>{stripLeadingEmoji(n.message)}</span>
+                          </span>
                         </button>
                       ))}
                   </div>
-                  <div style={{ padding: 10, borderTop: "1px solid var(--nx-panel-hairline)" }}>
+                  <div className={styles.notifFoot}>
                     {notificationsUrl.startsWith("http") || notificationsUrl.includes("?_nxt=") ? (
                       <a
                         href={notificationsUrl}
-                        style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}
+                        className={styles.notifFootLink}
                         onClick={() => setNotifOpen(false)}
                       >
                         Ver todas →
@@ -1152,7 +1128,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                     ) : (
                       <Link
                         href={notificationsUrl}
-                        style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}
+                        className={styles.notifFootLink}
                         onClick={() => setNotifOpen(false)}
                       >
                         Ver todas →
@@ -1176,15 +1152,17 @@ export default function AppShell({ panel, children }: AppShellProps) {
         </div>
       </main>
 
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        user={user}
-        token={user.token}
-        navigation={serverNav}
-        onToggleDark={toggleDarkMode}
-        onLogout={handleLogout}
-      />
+      {paletteMounted ? (
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          user={user}
+          token={user.token}
+          navigation={serverNav}
+          onToggleDark={toggleDarkMode}
+          onLogout={handleLogout}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1220,69 +1198,32 @@ function PanelAccessDenied({
       data-auth-state="panel-denied"
     >
       <main className={styles.main}>
-        <div
-          className={styles.contentInner}
-          style={{
-            minHeight: "70vh",
-            display: "grid",
-            placeItems: "center",
-            padding: 24,
-          }}
-        >
-          <div style={{ textAlign: "center", maxWidth: 480 }}>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
-              <IconBadge icon={BlockOutlinedIcon} size={60} color="var(--danger, #dc2626)" />
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 20, color: "var(--text-primary)", marginBottom: 8 }}>
-              No tienes acceso a este panel
-            </div>
-            <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 20 }}>
-              Estás autenticado como <strong>{user.nombre || user.email}</strong>
+        <div className={`${styles.contentInner} ${styles.stateScreen}`}>
+          <div className={styles.stateCard}>
+            <IconBadge icon={BlockOutlinedIcon} size={60} color="var(--ui-danger)" />
+            <h1 className={styles.stateHeading}>No tienes acceso a este panel</h1>
+            <p className={styles.stateText}>
+              Entraste como <strong>{user.nombre || user.email}</strong>
               {roleLabel ? <> ({roleLabel})</> : null}. Tu rol no incluye módulos en{" "}
               <strong>{panelMeta.name.replace(/^NEXARA\s+/i, "")}</strong>.
-              <br />
-              <span style={{ fontSize: 12.5, opacity: 0.75 }}>
-                Serás redirigido a tu panel en unos segundos…
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            </p>
+            <p className={styles.stateMeta} role="status">
+              Te llevamos a tu panel en unos segundos…
+            </p>
+            <div className={styles.stateActions}>
               {/* Anchor nativo — necesario para navegar cross-subdomain */}
-              <a
-                href={homeUrlAbsolute}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 10,
-                  background: "var(--primary)",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                }}
-              >
+              <a href={homeUrlAbsolute} className={styles.stateBtnPrimary}>
                 Ir a mi panel ({allowedPanels[0]?.name.replace(/^NEXARA\s+/i, "") ?? "inicio"})
               </a>
-              <button
-                type="button"
-                onClick={onLogout}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 10,
-                  border: "1px solid var(--nx-panel-hairline)",
-                  background: "var(--surface)",
-                  color: "var(--text-primary)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
+              <button type="button" className={styles.stateBtn} onClick={onLogout}>
                 Cerrar sesión
               </button>
             </div>
             {allowedPanels.length > 1 && (
-              <div style={{ marginTop: 22, fontSize: 12.5, color: "var(--text-tertiary)" }}>
+              <p className={styles.stateMeta}>
                 Paneles disponibles:{" "}
                 {allowedPanels.map((p) => p.name.replace(/^NEXARA\s+/i, "")).join(" · ")}
-              </div>
+              </p>
             )}
           </div>
         </div>
@@ -1329,16 +1270,20 @@ function Breadcrumbs({
 
   if (segments.length === 0) {
     return (
-      <div className={styles.breadcrumbs}>
-        <span className={styles.crumbCurrent}>{PANEL_META[panel].name}</span>
-      </div>
+      <nav className={styles.breadcrumbs} aria-label="Estás en">
+        <span className={styles.crumbCurrent} aria-current="page">
+          {PANEL_META[panel].name}
+        </span>
+      </nav>
     );
   }
 
   const accumulated: string[] = [];
   return (
-    <div className={styles.breadcrumbs}>
-      <Link href={homeHref}>{PANEL_META[panel].name}</Link>
+    <nav className={styles.breadcrumbs} aria-label="Estás en">
+      <Link href={homeHref} className={styles.crumbHome}>
+        {PANEL_META[panel].name}
+      </Link>
       {segments.map((seg, idx) => {
         accumulated.push(seg);
         const isLast = idx === segments.length - 1;
@@ -1347,17 +1292,21 @@ function Breadcrumbs({
         // Un id numérico (/indicadores/21, /cotizaciones/7) no dice nada: «Detalle».
         const label = moduleHit?.label || (/^\d+$/.test(seg) ? "Detalle" : humanize(seg));
         return (
-          <span key={target} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <span className={styles.crumbSep}>/</span>
+          <span key={target} className={styles.crumb} data-last={isLast ? "true" : undefined}>
+            <span className={styles.crumbSep} aria-hidden="true">
+              /
+            </span>
             {isLast ? (
-              <span className={styles.crumbCurrent}>{label}</span>
+              <span className={styles.crumbCurrent} aria-current="page">
+                {label}
+              </span>
             ) : (
               <Link href={target}>{label}</Link>
             )}
           </span>
         );
       })}
-    </div>
+    </nav>
   );
 }
 

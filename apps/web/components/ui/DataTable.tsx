@@ -2,15 +2,19 @@
 
 import { ReactNode } from "react";
 import EmptyState from "./EmptyState";
+import Skeleton from "./Skeleton";
+import styles from "./DataTable.module.scss";
 
 /**
- * NEXARA · DataTable (premium)
+ * NEXARA · DataTable
  *  - Render personalizado por celda
- *  - Header sticky con hairline + uppercase eyebrow
+ *  - Encabezado fijo al desplazar, sombras laterales cuando hay más columnas
+ *    a la derecha/izquierda (solo CSS)
  *  - Tipografía tabular en montos / cifras
- *  - Densidad compacta o comfortable
- *  - Row con onClick (selección/navegación), hover sutil, focus ring
- *  - Estado vacío elegante
+ *  - Densidad `comfortable` o `compact`; `zebra` opcional
+ *  - Fila con onClick (selección/navegación), hover sutil, foco visible
+ *  - `loading`: renglones esqueleto con los encabezados reales (sin salto)
+ *  - Estado vacío amable
  */
 
 export type Column<T> = {
@@ -37,7 +41,22 @@ type Props<T> = {
   ariaLabel?: string;
   emptyDescription?: ReactNode;
   emptyAction?: ReactNode;
+  /** Mientras llegan los datos: renglones esqueleto bajo los encabezados reales. */
+  loading?: boolean;
+  /** Cuántos renglones esqueleto mostrar con `loading` y sin filas. */
+  loadingRows?: number;
+  /** Fondo alterno en filas pares (tablas largas y anchas). */
+  zebra?: boolean;
+  /** Título de la tabla para el lector de pantalla (no se ve). */
+  caption?: ReactNode;
+  /** Alto máximo del área desplazable con `stickyHeader`. */
+  maxHeight?: number | string;
+  className?: string;
 };
+
+function alignOf<T>(col: Column<T>) {
+  return col.align ?? (col.numeric ? "right" : "left");
+}
 
 export default function DataTable<T>({
   columns,
@@ -50,142 +69,92 @@ export default function DataTable<T>({
   ariaLabel = "Tabla",
   emptyDescription = "No hay registros para mostrar todavía.",
   emptyAction,
+  loading = false,
+  loadingRows = 6,
+  zebra = false,
+  caption,
+  maxHeight,
+  className,
 }: Props<T>) {
-  if (rows.length === 0) {
+  const showSkeleton = loading && rows.length === 0;
+
+  if (rows.length === 0 && !showSkeleton) {
     return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   }
-
-  const cellPaddingY = density === "compact" ? 8 : 12;
-  const cellPaddingX = 16;
-  const fontSize = density === "compact" ? 12.5 : 13;
 
   return (
     <div
       role="region"
       aria-label={ariaLabel}
-      className="nx-table-wrap"
-      style={{
-        overflowX: "auto",
-        overflowY: "auto",
-        maxHeight: stickyHeader ? "min(72vh, 720px)" : undefined,
-        borderRadius: "var(--nx-panel-radius)",
-        border: "1px solid var(--nx-panel-hairline)",
-        background: "var(--surface)",
-        boxShadow: "var(--nx-panel-elev-1)",
-      }}
+      aria-busy={loading || undefined}
+      tabIndex={0}
+      className={[styles.wrap, "nx-table-wrap", className].filter(Boolean).join(" ")}
+      data-sticky={stickyHeader ? "true" : undefined}
+      style={stickyHeader ? { maxHeight: maxHeight ?? "min(72vh, 720px)" } : undefined}
     >
       <table
-        style={{
-          width: "100%",
-          borderCollapse: "separate",
-          borderSpacing: 0,
-          fontSize,
-        }}
+        className={styles.table}
+        data-density={density}
+        data-zebra={zebra ? "true" : undefined}
+        data-clickable={onRowClick ? "true" : undefined}
+        data-loading={loading && !showSkeleton ? "true" : undefined}
       >
+        {caption ? <caption className="ui-sr-only">{caption}</caption> : null}
         <thead>
           <tr>
-            {columns.map((col, i) => (
-              <th
-                key={col.key}
-                scope="col"
-                style={{
-                  textAlign: col.align ?? (col.numeric ? "right" : "left"),
-                  padding: `${cellPaddingY + 2}px ${cellPaddingX}px`,
-                  fontSize: 10.5,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  color: "var(--text-tertiary)",
-                  background:
-                    "linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 80%, var(--surface)) 0%, color-mix(in srgb, var(--surface-2) 55%, var(--surface)) 100%)",
-                  borderBottom: "1px solid var(--nx-panel-hairline)",
-                  whiteSpace: "nowrap",
-                  width: col.width,
-                  position: stickyHeader ? "sticky" : undefined,
-                  top: stickyHeader ? 0 : undefined,
-                  zIndex: 1,
-                  borderTopLeftRadius: i === 0 ? "var(--nx-panel-radius)" : 0,
-                  borderTopRightRadius: i === columns.length - 1 ? "var(--nx-panel-radius)" : 0,
-                }}
-              >
+            {columns.map((col) => (
+              <th key={col.key} scope="col" style={{ textAlign: alignOf(col), width: col.width }}>
                 {col.label}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
-            <tr
-              key={rowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              tabIndex={onRowClick ? 0 : undefined}
-              onKeyDown={
-                onRowClick
-                  ? (e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onRowClick(row);
-                      }
-                    }
-                  : undefined
-              }
-              className="nx-row"
-              style={{
-                cursor: onRowClick ? "pointer" : "default",
-                background: "transparent",
-                transition: "background 140ms var(--nx-ease-out)",
-              }}
-            >
-              {columns.map((col) => (
-                <td
-                  key={col.key}
-                  style={{
-                    padding: `${cellPaddingY}px ${cellPaddingX}px`,
-                    textAlign: col.align ?? (col.numeric ? "right" : "left"),
-                    borderBottom:
-                      idx === rows.length - 1
-                        ? "none"
-                        : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                    color: "var(--text-primary)",
-                    verticalAlign: "middle",
-                    fontVariantNumeric: col.numeric ? "tabular-nums" : undefined,
-                  }}
+          {showSkeleton
+            ? Array.from({ length: loadingRows }, (_, r) => (
+                <tr key={`sk-${r}`} aria-hidden="true" className={styles.skeletonRow}>
+                  {columns.map((col, c) => (
+                    <td key={col.key} style={{ textAlign: alignOf(col) }}>
+                      <Skeleton
+                        height={10}
+                        width={c === 0 ? `${58 + ((r * 13) % 32)}%` : `${40 + ((r * 7 + c * 11) % 40)}%`}
+                        style={alignOf(col) === "right" ? { marginLeft: "auto" } : undefined}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            : rows.map((row) => (
+                <tr
+                  key={rowKey(row)}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onRowClick(row);
+                          }
+                        }
+                      : undefined
+                  }
+                  className={`${styles.row} nx-row`}
                 >
-                  {col.render ? col.render(row) : col.accessor ? col.accessor(row) : ""}
-                </td>
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      data-numeric={col.numeric ? "true" : undefined}
+                      style={{ textAlign: alignOf(col) }}
+                    >
+                      {col.render ? col.render(row) : col.accessor ? col.accessor(row) : ""}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          ))}
         </tbody>
       </table>
-
-      <style jsx>{`
-        .nx-row:hover {
-          background: color-mix(in srgb, var(--primary) 6%, transparent) !important;
-        }
-        .nx-row:focus-visible {
-          outline: none;
-          background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
-          box-shadow: inset 3px 0 0 var(--primary);
-        }
-        .nx-table-wrap::-webkit-scrollbar {
-          width: 9px;
-          height: 9px;
-        }
-        .nx-table-wrap::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .nx-table-wrap::-webkit-scrollbar-thumb {
-          background: color-mix(in srgb, var(--border) 90%, transparent);
-          border-radius: 999px;
-          border: 2px solid transparent;
-          background-clip: padding-box;
-        }
-        .nx-table-wrap::-webkit-scrollbar-thumb:hover {
-          background: color-mix(in srgb, var(--primary) 50%, transparent);
-          background-clip: padding-box;
-        }
-      `}</style>
+      {showSkeleton ? <span className="ui-sr-only">Cargando registros…</span> : null}
     </div>
   );
 }
