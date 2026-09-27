@@ -308,7 +308,7 @@ private struct NxCardModifier: ViewModifier {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
-                    .strokeBorder(highlight ?? Color.primary.opacity(0.06), lineWidth: highlight == nil ? 0.5 : 1.5)
+                    .strokeBorder(highlight ?? Color.primary.opacity(0.08), lineWidth: highlight == nil ? 0.5 : 1.5)
             )
     }
 }

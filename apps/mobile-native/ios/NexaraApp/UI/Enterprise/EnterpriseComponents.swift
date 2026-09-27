@@ -110,9 +110,7 @@ struct NxKpiCard: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(NxSpacing.m + 2)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
+        .nxCard(padding: NxSpacing.m + 2)
         .accessibilityElement(children: .combine)
     }
 }
