@@ -102,11 +102,12 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
@@ -370,6 +371,7 @@ private fun ticketStatusTone(status: String?): NxTone {
 
 
 
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
@@ -402,29 +404,9 @@ fun TicketsTicketDetailScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
 
-        Row(
-
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-
-            modifier = Modifier
-
-                .fillMaxWidth()
-
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-
-        ) {
-
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-
-            OutlinedButton(onClick = { vm.load(ticketId, initial = false) }, modifier = Modifier.weight(1f)) { Text("Actualizar") }
-
-        }
-
-
-
         if (state.isLoading) {
 
-            NxLoadingBlock("Cargando ticket…")
+            NxSkeletonList(itemCount = 4, itemHeight = 110.dp, modifier = Modifier.fillMaxWidth().padding(16.dp))
 
             return@Column
 
@@ -536,7 +518,7 @@ fun TicketsTicketDetailScreen(
 
                                 t.estatus?.takeIf { it.isNotBlank() }?.let {
 
-                                    NxStatusChip(it, ticketStatusTone(it))
+                                    NxStatusChip(NxStatusLabels.label(it), ticketStatusTone(it))
 
                                 }
 

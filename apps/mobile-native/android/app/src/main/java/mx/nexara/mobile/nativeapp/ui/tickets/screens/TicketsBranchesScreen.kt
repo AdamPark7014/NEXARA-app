@@ -28,7 +28,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 
 import androidx.compose.foundation.lazy.items
 
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 
@@ -83,7 +84,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 
@@ -183,7 +185,7 @@ class TicketsBranchesViewModel(app: Application) : AndroidViewModel(app) {
 
 fun TicketsBranchesScreen(
 
-    onBack: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
 
     onCreate: () -> Unit,
 
@@ -213,11 +215,7 @@ fun TicketsBranchesScreen(
 
         ) {
 
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-
-            OutlinedButton(onClick = { vm.refresh(initial = false) }, modifier = Modifier.weight(1f)) { Text("Actualizar") }
-
-            Button(onClick = onCreate, modifier = Modifier.weight(1f)) { Text("+ Nueva") }
+            NxPrimaryButton(text = "Nueva sucursal", onClick = onCreate, icon = Icons.Default.Add)
 
         }
 
@@ -225,7 +223,7 @@ fun TicketsBranchesScreen(
 
         if (state.isLoading) {
 
-            NxLoadingBlock("Cargando sucursales…")
+            NxSkeletonList(modifier = Modifier.padding(horizontal = 16.dp))
 
             return@Column
 

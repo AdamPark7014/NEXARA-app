@@ -39,10 +39,19 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.tickets.PortalProfile
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
 data class TicketsProfileUiState(
     val isLoading: Boolean = true,
@@ -167,6 +176,7 @@ class TicketsProfileViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketsProfileScreen(
@@ -178,27 +188,11 @@ fun TicketsProfileScreen(
     val editable = state.profile?.kind == PortalProfile.Kind.CLIENT
 
     if (state.isLoading) {
-        Column(
-            modifier = modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            NxLoadingBlock("Cargando perfil…")
-        }
+        NxSkeletonList(itemCount = 3, itemHeight = 160.dp, modifier = modifier.fillMaxWidth().padding(16.dp))
         return
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-        ) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-            OutlinedButton(onClick = { vm.refresh(initial = false) }, modifier = Modifier.weight(1f)) { Text("Actualizar") }
-        }
-
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { vm.refresh(initial = false) },
@@ -221,15 +215,24 @@ fun TicketsProfileScreen(
                 Spacer(Modifier.height(12.dp))
 
                 if (!state.error.isNullOrBlank()) {
-                    NxErrorBlock(state.error!!) { vm.refresh(initial = true) }
+                    if (state.profile == null) {
+                        NxErrorBlock(state.error!!) { vm.refresh(initial = true) }
+                    } else {
+                        NxRefreshErrorBanner(message = state.error, onRetry = { vm.refresh(initial = false) })
+                    }
                     Spacer(Modifier.height(10.dp))
                 }
 
                 if (!state.message.isNullOrBlank()) {
-                    NxPanelShell(contentPadding = PaddingValues(12.dp)) {
-                        Text(state.message!!, color = MaterialTheme.colorScheme.primary)
-                        OutlinedButton(onClick = vm::dismissMessage) { Text("Cerrar") }
-                    }
+                    NxAlertBanner(
+                        NxAlert(
+                            id = "message",
+                            title = state.message!!,
+                            tone = NxTone.Success,
+                            actionLabel = "Cerrar",
+                            onAction = vm::dismissMessage,
+                        ),
+                    )
                     Spacer(Modifier.height(10.dp))
                 }
 
@@ -243,15 +246,17 @@ fun TicketsProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = editable,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = state.contactEmail,
                         onValueChange = vm::setContactEmail,
-                        label = { Text("Email") },
+                        label = { Text("Correo electrónico") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = editable,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -261,6 +266,7 @@ fun TicketsProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = editable,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
                     )
                 }
 
@@ -275,6 +281,7 @@ fun TicketsProfileScreen(
                         label = { Text("Dirección") },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = editable,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -284,6 +291,7 @@ fun TicketsProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = editable,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -293,6 +301,7 @@ fun TicketsProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = editable,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
@@ -302,15 +311,19 @@ fun TicketsProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = editable,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                     )
                 }
 
                 Spacer(Modifier.height(14.dp))
-                Button(
-                    onClick = { vm.save() },
-                    enabled = editable && !state.saving,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (state.saving) "Guardando…" else "Guardar cambios") }
+                if (editable) {
+                    NxPrimaryButton(
+                        text = if (state.saving) "Guardando…" else "Guardar cambios",
+                        onClick = { vm.save() },
+                        enabled = !state.saving,
+                        loading = state.saving,
+                    )
+                }
 
                 Spacer(Modifier.height(16.dp))
             }
