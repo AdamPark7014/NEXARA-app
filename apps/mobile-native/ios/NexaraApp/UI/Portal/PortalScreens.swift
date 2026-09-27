@@ -149,15 +149,30 @@ struct PortalBranchEditView: View {
     var body: some View {
         Form {
             if isLoading && branchId != nil {
-                ProgressView("Cargando sucursal…")
+                NxLoadingState(text: "Cargando sucursal…")
             }
-            if let message { Text(message).foregroundColor(.green).font(.footnote) }
-            if let error { Text(error).foregroundColor(.red).font(.footnote) }
+            if let message {
+                NxIconText(systemName: "checkmark.circle.fill", text: message)
+                    .font(.footnote)
+                    .foregroundStyle(CorePalette.green)
+            }
+            if let error {
+                NxIconText(systemName: "exclamationmark.triangle.fill", text: error)
+                    .font(.footnote)
+                    .foregroundStyle(CorePalette.red)
+            }
             Section("Datos") {
                 TextField("Nombre *", text: $name)
+                    .submitLabel(.next)
                 TextField("Número de sucursal *", text: $branchNumber)
-                TextField("Usuario (email) *", text: $portalEmail).keyboardType(.emailAddress)
-                TextField(branchId == nil ? "Password *" : "Password (opcional)", text: $portalPassword)
+                    .submitLabel(.next)
+                TextField("Usuario (correo) *", text: $portalEmail)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SecureField(branchId == nil ? "Contraseña *" : "Contraseña (opcional)", text: $portalPassword)
+                    .textContentType(.newPassword)
             }
             Section("Dirección") {
                 TextField("Dirección", text: $address)
@@ -855,7 +870,7 @@ struct PortalFeedbackView: View {
                 }
             }
         }
-        .navigationTitle("Feedback pendiente")
+        .navigationTitle("Calificar servicios")
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -921,7 +936,7 @@ struct PortalFeedbackView: View {
                 wasOnTime: d.wasOnTime, wasFriendly: d.wasFriendly, wasSolved: d.wasSolved,
                 comments: d.comments.nilIfEmpty
             )
-            message = "Feedback enviado"
+            message = "¡Gracias! Tu calificación se envió."
             await reload()
         } catch { self.error = error.toUserMessage() }
     }

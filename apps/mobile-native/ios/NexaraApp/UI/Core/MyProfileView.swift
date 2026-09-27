@@ -21,12 +21,10 @@ struct MyProfileView: View {
     var body: some View {
         List {
             if loading && profile == nil {
-                Section { ProgressView("Cargando perfil…") }
+                Section { NxLoadingState(text: "Cargando tu perfil…") }
             } else if let error, profile == nil {
                 Section {
-                    Text("No se pudo cargar").font(.headline)
-                    Text(error).font(.footnote).foregroundColor(.secondary)
-                    Button("Reintentar") { Task { await load() } }
+                    NxErrorState(message: error) { Task { await load() } }
                 }
             }
 

@@ -140,8 +140,16 @@ struct PortalHomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if isLoading { ProgressView().frame(maxWidth: .infinity).padding(.top, 40) }
-                if let error { Text(error).foregroundColor(.red).font(.footnote) }
+                if isLoading && profile == nil {
+                    NxLoadingState(text: "Cargando tu portal…").padding(.top, 24)
+                }
+                if let error {
+                    if profile == nil {
+                        NxErrorState(message: error) { Task { await load() } }
+                    } else {
+                        NxStaleBanner(message: error) { Task { await load() } }
+                    }
+                }
 
                 if let p = profile {
                     portalHeader(p)
@@ -149,7 +157,7 @@ struct PortalHomeView: View {
                         portalBtn("person.circle", "Mi perfil", .profile)
                         if isClient {
                             portalBtn("building.2", "Sucursales", .branches)
-                            portalBtn("star.bubble", "Feedback pendiente", .feedback)
+                            portalBtn("star.bubble", "Calificar servicios", .feedback)
                         }
                         portalBtn("tray.full", "Solicitudes", .requests)
                         portalBtn("ticket", "Tickets", .tickets)
