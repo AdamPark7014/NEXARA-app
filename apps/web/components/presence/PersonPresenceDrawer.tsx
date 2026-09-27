@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatApiError } from "@/lib/erp-api";
 import { PersonFaceThumb } from "@/components/presence/_PersonFace";
 import {
   fetchPersonPresence,
@@ -42,7 +43,7 @@ export function PersonPresenceDrawer({
         if (!stop) setDetail(d);
       })
       .catch((e) => {
-        if (!stop) setError(e instanceof Error ? e.message : "No se pudo cargar la ficha");
+        if (!stop) setError(formatApiError(e, "No se pudo cargar la ficha"));
       })
       .finally(() => {
         if (!stop) setLoading(false);

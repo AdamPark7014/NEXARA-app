@@ -12,6 +12,7 @@ import { DetailError, DetailSection, formatDateTime } from "@/components/detail/
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { listActivityTimeline, type ActivityTimelineEvent } from "@/lib/ops-activities-api";
+import { formatApiError } from "@/lib/erp-api";
 import type { SvgIconComponent } from "@mui/icons-material";
 import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
@@ -109,7 +110,7 @@ export default function ActivityHistoryPage() {
       const data = await listActivityTimeline(token, activity.id);
       setEvents(data.events ?? []);
     } catch (e) {
-      setTimelineError(e instanceof Error ? e.message : "No se pudo cargar el historial");
+      setTimelineError(formatApiError(e, "No se pudo cargar el historial"));
       setEvents([]);
     } finally {
       setLoading(false);
