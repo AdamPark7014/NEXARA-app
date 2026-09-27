@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cambiosEntre } from "@/lib/cotizacion-documento";
+import { formatApiError } from "@/lib/erp-api";
 
 /**
  * Autoguardado del editor: guarda solo lo que cambió, un momento después de dejar de escribir.
@@ -79,7 +80,7 @@ export function useAutoguardado<P extends object>(opciones: {
       } catch (e) {
         if (montado.current) {
           setEstado("error");
-          setError(e instanceof Error ? e.message : "No se pudo guardar");
+          setError(formatApiError(e, "No se pudo guardar"));
         }
         return false;
       }

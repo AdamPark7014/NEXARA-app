@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { obtenerCotizacion, type CotizacionDetalle } from "@/lib/cotizaciones-api";
+import { formatApiError } from "@/lib/erp-api";
 import EditorCotizacion from "../_editor/EditorCotizacion";
 import styles from "../cotizaciones-core.module.css";
 
@@ -24,7 +25,7 @@ export default function CotizacionDetallePage() {
     try {
       setDetalle(await obtenerCotizacion(token, id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar la cotización");
+      setError(formatApiError(e, "No se pudo cargar la cotización"));
     } finally {
       setCargando(false);
     }

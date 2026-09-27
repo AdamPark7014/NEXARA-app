@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import { useUser } from "@/components/UserContext";
 import { triggerFileDownload } from "@/lib/file-download";
+import { formatApiError } from "@/lib/erp-api";
 import {
   ESTADO_TONO,
   SEGMENTO_LABEL,
@@ -279,7 +280,7 @@ export default function EditorCotizacion({
       setRecargaVista((v) => v + 1);
       setAviso("Listo: la versión enviada quedó guardada y ya puedes editar.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo retomar la cotización");
+      setError(formatApiError(e, "No se pudo retomar la cotización"));
     } finally {
       setDesbloqueando(false);
     }
@@ -312,7 +313,7 @@ export default function EditorCotizacion({
       setRecargaVista((v) => v + 1);
       setAviso("Paquete agregado: partidas y alcance actualizados.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo agregar el paquete");
+      setError(formatApiError(e, "No se pudo agregar el paquete"));
     }
   }
 
@@ -338,7 +339,7 @@ export default function EditorCotizacion({
         setPlantillaElegida(plantilla);
         setAviso(`Plantilla «${nombre}» aplicada: escribe el cliente y se guarda sola.`);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudo abrir la plantilla");
+        setError(formatApiError(e, "No se pudo abrir la plantilla"));
       }
     },
     [token, plantillas],
@@ -360,7 +361,7 @@ export default function EditorCotizacion({
         `Plantilla «${hecha.nombre}» guardada${hecha.conPartidas ? ` con ${hecha.partidas} partidas` : ""}. Aparece en «Nueva cotización».`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar la plantilla");
+      setError(formatApiError(e, "No se pudo guardar la plantilla"));
     }
   }
 
