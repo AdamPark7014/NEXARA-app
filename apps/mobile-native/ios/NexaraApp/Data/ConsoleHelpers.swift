@@ -34,6 +34,10 @@ enum ConsoleHelpers {
     }
 
     static func mapInt64(_ m: [String: Any], _ keys: String...) -> Int64? {
+        firstInt64(m, keys)
+    }
+
+    private static func firstInt64(_ m: [String: Any], _ keys: [String]) -> Int64? {
         for k in keys {
             if let v = m[k] as? Int64 { return v }
             if let v = m[k] as? Int { return Int64(v) }
@@ -44,7 +48,7 @@ enum ConsoleHelpers {
     }
 
     static func mapInt(_ m: [String: Any], _ keys: String...) -> Int {
-        Int(mapInt64(m, keys) ?? 0)
+        Int(firstInt64(m, keys) ?? 0)
     }
 
     static func mapDouble(_ m: [String: Any], _ keys: String...) -> Double {
