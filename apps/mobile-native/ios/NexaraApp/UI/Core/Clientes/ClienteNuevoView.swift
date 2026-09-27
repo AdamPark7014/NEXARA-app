@@ -38,17 +38,23 @@ struct ClienteNuevoView: View {
                         if sectors.contains(s) { sectors.remove(s) } else { sectors.insert(s) }
                     } label: {
                         HStack {
-                            Label(s.shortTitle, systemImage: s.symbol).foregroundColor(.primary)
+                            Label(s.shortTitle, systemImage: s.symbol).foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: sectors.contains(s) ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(sectors.contains(s) ? .accentColor : .secondary)
+                                .foregroundStyle(sectors.contains(s) ? Color.accentColor : Color.secondary)
+                                .imageScale(.large)
                         }
+                        .frame(minHeight: NxMetrics.minTap)
+                        .contentShape(Rectangle())
                     }
+                    .accessibilityAddTraits(sectors.contains(s) ? [.isSelected] : [])
                 }
             }
 
-            Section("Datos fiscales") {
+            Section {
                 TextField("Nombre comercial *", text: $name)
+                    .textContentType(.organizationName)
+                    .submitLabel(.next)
                 TextField("RFC *", text: $taxId)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
@@ -68,11 +74,15 @@ struct ClienteNuevoView: View {
                 }
                 .disabled(lookingUp || taxId.trimmingCharacters(in: .whitespaces).count < 12)
                 if let lookupMessage {
-                    Text(lookupMessage)
-                        .font(.caption)
-                        .foregroundColor(lookupOk ? .green : .orange)
+                    NxIconText(
+                        systemName: lookupOk ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                        text: lookupMessage
+                    )
+                    .font(.caption)
+                    .foregroundStyle(lookupOk ? CorePalette.green : CorePalette.orange)
                 }
                 TextField("Razón social *", text: $legalName)
+                    .submitLabel(.next)
                 if regimes.isEmpty {
                     TextField("Régimen fiscal (clave SAT)", text: $fiscalRegime)
                         .keyboardType(.numberPad)
@@ -85,14 +95,24 @@ struct ClienteNuevoView: View {
                     }
                 }
                 TextField("Dirección fiscal *", text: $fiscalAddress)
-                TextField("CP fiscal *", text: $fiscalZipCode)
+                    .textContentType(.fullStreetAddress)
+                    .submitLabel(.next)
+                TextField("Código postal fiscal *", text: $fiscalZipCode)
                     .keyboardType(.numberPad)
-                TextField("Email facturación *", text: $billingEmail)
+                    .textContentType(.postalCode)
+                TextField("Correo para facturas *", text: $billingEmail)
                     .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .submitLabel(.next)
                 TextField("Teléfono", text: $billingPhone)
                     .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
+            } header: {
+                Text("Datos fiscales")
+            } footer: {
+                Text("Los campos con * son obligatorios.")
             }
 
             Section("Notas") {
@@ -101,14 +121,21 @@ struct ClienteNuevoView: View {
             }
 
             if let error {
-                Section { Text(error).foregroundColor(.red).font(.footnote) }
+                Section {
+                    NxIconText(systemName: "exclamationmark.triangle.fill", text: error)
+                        .font(.footnote)
+                        .foregroundStyle(CorePalette.red)
+                }
             }
 
             Section {
                 Button(saving ? "Guardando…" : "Crear cliente") {
                     Task { await save() }
                 }
+                .buttonStyle(NxPrimaryButtonStyle())
                 .disabled(saving)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
         }
         .navigationTitle("Nuevo cliente")
@@ -153,22 +180,22 @@ struct ClienteNuevoView: View {
 
     private func save() async {
         guard !sectors.isEmpty else {
-            error = "Elige al menos un sector"
+            error = "Elige al menos un sector."
             return
         }
         let t = { (s: String) in s.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard !t(name).isEmpty, !t(legalName).isEmpty, !t(taxId).isEmpty,
               !t(fiscalAddress).isEmpty, !t(fiscalZipCode).isEmpty, !t(billingEmail).isEmpty else {
-            error = "Completa los campos obligatorios (*)"
+            error = "Completa los campos marcados con *."
             return
         }
         guard t(billingEmail).contains("@") else {
-            error = "Email de facturación inválido"
+            error = "Revisa el correo para facturas; parece incompleto."
             return
         }
         let phoneDigits = billingPhone.filter(\.isNumber).count
         if !t(billingPhone).isEmpty && !(10...15).contains(phoneDigits) {
-            error = "Teléfono inválido para el país seleccionado"
+            error = "El teléfono debe tener entre 10 y 15 dígitos."
             return
         }
         saving = true
@@ -193,7 +220,7 @@ struct ClienteNuevoView: View {
                 dismiss()
             }
         } catch {
-            self.error = error.toUserMessage(fallback: "No se pudo crear")
+            self.error = error.toUserMessage(fallback: "No se pudo crear el cliente")
         }
     }
 }

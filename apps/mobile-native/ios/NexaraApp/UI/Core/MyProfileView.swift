@@ -21,12 +21,10 @@ struct MyProfileView: View {
     var body: some View {
         List {
             if loading && profile == nil {
-                Section { ProgressView("Cargando perfil…") }
+                Section { NxLoadingState(text: "Cargando tu perfil…") }
             } else if let error, profile == nil {
                 Section {
-                    Text("No se pudo cargar").font(.headline)
-                    Text(error).font(.footnote).foregroundColor(.secondary)
-                    Button("Reintentar") { Task { await load() } }
+                    NxErrorState(message: error) { Task { await load() } }
                 }
             }
 
@@ -357,18 +355,15 @@ struct MyProfileView: View {
 
     /// Hora local `es-MX` de un ISO-8601 del API.
     private func clock(_ iso: String) -> String {
-        let parser = ISO8601DateFormatter()
-        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var date = parser.date(from: iso)
-        if date == nil {
-            parser.formatOptions = [.withInternetDateTime]
-            date = parser.date(from: iso)
-        }
-        guard let date else { return String(iso.prefix(16)) }
-        let out = DateFormatter()
-        out.locale = Locale(identifier: "es_MX")
-        out.timeStyle = .short
-        out.dateStyle = .none
-        return out.string(from: date)
+        guard let date = NxFormat.parseISO(iso) else { return String(iso.prefix(16)) }
+        return Self.clockFormatter.string(from: date)
     }
+
+    private static let clockFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_MX")
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f
+    }()
 }

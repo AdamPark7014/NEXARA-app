@@ -26,7 +26,7 @@ struct CoreExtraDestination: View {
             AlmacenView()
         case .viaticos:
             ViaticosView()
-        case .cotizaciones, .herramientas:
+        case .executive, .cotizaciones, .herramientas, .gastos, .aprobaciones, .pagosEmpleados, .documentos:
             // Sin pantalla propia todavía; van en otra ola.
             CoreModulePlaceholderView(module: module)
         }
@@ -38,7 +38,7 @@ struct CoreExtraDestination: View {
         switch module {
         case .vehiculos, .kpisEquipo, .organigrama, .proyectos, .almacen, .viaticos:
             return true
-        case .cotizaciones, .herramientas:
+        case .executive, .cotizaciones, .herramientas, .gastos, .aprobaciones, .pagosEmpleados, .documentos:
             return false
         }
     }

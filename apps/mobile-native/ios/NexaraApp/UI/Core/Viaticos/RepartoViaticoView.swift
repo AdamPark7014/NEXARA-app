@@ -80,7 +80,7 @@ struct RepartoViaticoView: View {
             }
 
             if cargando && viatico == nil {
-                Section { ProgressView().frame(maxWidth: .infinity) }
+                Section { NxLoadingState(text: "Cargando reparto…") }
             }
 
             if viatico != nil {
@@ -269,11 +269,13 @@ struct RepartoViaticoView: View {
             error = nil
             precargar(v)
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         // Las actividades se piden aparte: sin ellas todavía se puede ver y
         // ajustar el reparto que ya existe.
-        actividades = (try? await CoreRepository.shared.myActivities().open) ?? []
+        if let abiertas = try? await CoreRepository.shared.myActivities().open {
+            actividades = abiertas
+        }
         cargando = false
     }
 
@@ -329,7 +331,7 @@ struct RepartoViaticoView: View {
                 // El 400 del servidor dice al centavo cuánto falta o sobra: se
                 // enseña tal cual y no se pierde nada de lo tecleado.
                 enviando = false
-                self.error = error.localizedDescription
+                self.error = error.toUserMessage()
             }
         }
     }
