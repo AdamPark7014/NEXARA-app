@@ -1,21 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
 import OpsAttendanceRail from "@/components/ops/OpsAttendanceRail";
+import { SkeletonList, Skeleton } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { getAttendanceViewMode } from "@/lib/user-access";
 import { getLunchBreaksSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 
 const LunchBreakForm = dynamic(() => import("@/components/LunchBreakForm"), { ssr: false });
 
@@ -41,11 +43,17 @@ interface LunchBreak {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+const MAX_MINUTES = 60;
+
 async function apiFetch(path: string, token: string) {
   const res = await fetch(buildApiUrl(path), {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const readable = text.trim().startsWith("<") ? "" : text;
+    throw new Error(readable || (res.status === 403 ? "No tienes permiso para ver estos registros." : "El servidor no respondió. Intenta de nuevo en unos minutos."));
+  }
   return res.json();
 }
 
@@ -59,15 +67,34 @@ function fmtTime(iso: string) {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("es-MX", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function isSameDay(iso: string) {
   return iso.slice(0, 10) === todayIso();
+}
+
+type Tone = "success" | "warning" | "danger" | "neutral";
+
+const TONE_STYLE: Record<Tone, { bg: string; border: string; text: string }> = {
+  success: { bg: "var(--state-success-bg)", border: "var(--state-success-border)", text: "var(--state-success-text)" },
+  warning: { bg: "var(--state-warning-bg)", border: "var(--state-warning-border)", text: "var(--state-warning-text)" },
+  danger: { bg: "var(--state-danger-bg)", border: "var(--state-danger-border)", text: "var(--state-danger-text)" },
+  neutral: { bg: "var(--surface)", border: "var(--border)", text: "var(--text-secondary)" },
+};
+
+function DurationChip({ minutes }: { minutes: number }) {
+  const over = minutes > MAX_MINUTES;
+  return (
+    <Tag size="sm" variant={over ? "danger" : "positive"}>
+      <span style={{ fontVariantNumeric: "tabular-nums" }}>{minutes} min</span>
+    </Tag>
+  );
 }
 
 // ─── Employee: Today's break status hero ─────────────────────────────────────
@@ -89,35 +116,32 @@ function BreakStatusHero({ todayBreak }: { todayBreak: LunchBreak | null }) {
   const elapsedMin = Math.floor(elapsed / 60);
   const elapsedSec = elapsed % 60;
 
-  const isOver60 = elapsedMin >= 60;
+  const isOver60 = elapsedMin >= MAX_MINUTES;
   const duration = todayBreak ? durationMinutes(todayBreak.checkinTime, todayBreak.checkoutTime) : null;
 
-  let statusLabel = "Sin registro hoy";
-  let statusColor = "#6b7280";
-  let bgColor = "var(--surface)";
-  let borderColor = "var(--border)";
+  let statusLabel = "Aún no sales a comer hoy";
+  let tone: Tone = "neutral";
   let icon = "🍽️";
 
   if (todayBreak?.status === "IN_PROGRESS") {
-    statusLabel = "En comida ahora";
-    statusColor = isOver60 ? "#ef4444" : "#f59e0b";
-    bgColor = isOver60 ? "#fef2f2" : "#fffbeb";
-    borderColor = isOver60 ? "#fca5a5" : "#fcd34d";
+    statusLabel = isOver60 ? "Llevas más de una hora en comida" : "Estás en tu hora de comida";
+    tone = isOver60 ? "danger" : "warning";
     icon = isOver60 ? "⚠️" : "⏳";
   } else if (todayBreak?.status === "COMPLETED") {
-    statusLabel = "Comida completada";
-    statusColor = "#22c55e";
-    bgColor = "#f0fdf4";
-    borderColor = "#86efac";
+    statusLabel = "Comida registrada";
+    tone = "success";
     icon = "✅";
   }
+  const t = TONE_STYLE[tone];
 
   return (
-    <div
+    <section
+      aria-label="Tu comida de hoy"
+      aria-live="polite"
       style={{
-        border: `1.5px solid ${borderColor}`,
+        border: `1.5px solid ${t.border}`,
         borderRadius: 14,
-        background: bgColor,
+        background: t.bg,
         padding: "20px 24px",
         marginBottom: 20,
         display: "flex",
@@ -126,153 +150,121 @@ function BreakStatusHero({ todayBreak }: { todayBreak: LunchBreak | null }) {
         flexWrap: "wrap",
       }}
     >
-      <span style={{ fontSize: 40 }}>{icon}</span>
+      <span aria-hidden="true" style={{ fontSize: 40 }}>{icon}</span>
 
       <div style={{ flex: 1, minWidth: 180 }}>
-        <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 2 }}>Estado de hoy</div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: statusColor }}>{statusLabel}</div>
+        <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 2 }}>Hoy</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{statusLabel}</div>
         {todayBreak?.isCheckinLate && (
-          <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 4 }}>
-            ⚠️ Entrada fuera de horario ({fmtTime(todayBreak.checkinTime)})
+          <div style={{ fontSize: 13, color: "var(--state-warning-text)", marginTop: 4 }}>
+            Saliste fuera del horario de comida ({fmtTime(todayBreak.checkinTime)}).
           </div>
         )}
         {todayBreak?.isCheckoutLate && (
-          <div style={{ fontSize: 12, color: "#ef4444", marginTop: 2 }}>
-            ⚠️ Regreso tardio ({todayBreak.checkoutTime ? fmtTime(todayBreak.checkoutTime) : "—"})
+          <div style={{ fontSize: 13, color: "var(--state-danger-text)", marginTop: 2 }}>
+            Regresaste tarde ({todayBreak.checkoutTime ? fmtTime(todayBreak.checkoutTime) : "sin hora"}).
           </div>
         )}
       </div>
 
       {todayBreak?.status === "IN_PROGRESS" && (
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Tiempo transcurrido</div>
-          <div style={{ fontSize: 28, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: isOver60 ? "#ef4444" : "#f59e0b" }}>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 2 }}>Tiempo transcurrido</div>
+          <div
+            role="timer"
+            aria-label={`${elapsedMin} minutos`}
+            style={{ fontSize: 28, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: isOver60 ? "var(--danger)" : "var(--warning)" }}
+          >
             {String(elapsedMin).padStart(2, "0")}:{String(elapsedSec).padStart(2, "0")}
           </div>
-          {isOver60 && <div style={{ fontSize: 11, color: "#ef4444" }}>Excede 60 min</div>}
+          {isOver60 && <div style={{ fontSize: 12, color: "var(--danger)" }}>Pasaste los {MAX_MINUTES} min</div>}
         </div>
       )}
 
       {todayBreak && (
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <dl style={{ display: "flex", gap: 16, flexWrap: "wrap", margin: 0 }}>
           <div style={{ textAlign: "center", minWidth: 80 }}>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Entrada</div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtTime(todayBreak.checkinTime)}</div>
+            <dt style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 4 }}>Salida</dt>
+            <dd style={{ margin: 0, fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{fmtTime(todayBreak.checkinTime)}</dd>
           </div>
           {todayBreak.checkoutTime && (
             <div style={{ textAlign: "center", minWidth: 80 }}>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Salida</div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtTime(todayBreak.checkoutTime)}</div>
+              <dt style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 4 }}>Regreso</dt>
+              <dd style={{ margin: 0, fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{fmtTime(todayBreak.checkoutTime)}</dd>
             </div>
           )}
           {duration !== null && (
             <div style={{ textAlign: "center", minWidth: 80 }}>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Duracion</div>
-              <div
-                style={{
-                  display: "inline-block",
-                  padding: "3px 10px",
-                  borderRadius: 99,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  background: duration > 60 ? "#fee2e2" : "#dcfce7",
-                  color: duration > 60 ? "#ef4444" : "#16a34a",
-                }}
-              >
-                {duration} min
-              </div>
+              <dt style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 4 }}>Duración</dt>
+              <dd style={{ margin: 0 }}><DurationChip minutes={duration} /></dd>
             </div>
           )}
-        </div>
+        </dl>
       )}
-    </div>
+    </section>
   );
 }
 
 // ─── Employee: My history list ────────────────────────────────────────────────
 
 function MyHistoryList({ items }: { items: LunchBreak[] }) {
-  const past = items.filter((b) => !isSameDay(b.date)).slice(0, 14);
+  const past = useMemo(() => items.filter((b) => !isSameDay(b.date)).slice(0, 14), [items]);
   if (!past.length) return null;
 
   return (
     <div style={{ marginTop: 16 }}>
-      <Section title="Historial reciente">
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {past.map((b) => {
-          const dur = durationMinutes(b.checkinTime, b.checkoutTime);
-          const isLate = b.isCheckinLate || b.isCheckoutLate;
-          return (
-            <div
-              key={b.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "var(--surface)",
-                border: `1px solid ${isLate ? "#fcd34d" : "var(--border)"}`,
-              }}
-            >
-              <span style={{ fontSize: 20 }}>
-                {b.status === "COMPLETED" ? (isLate ? "⚠️" : "✅") : "⏳"}
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{fmtDate(b.date)}</div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {fmtTime(b.checkinTime)}
-                  {b.checkoutTime ? ` → ${fmtTime(b.checkoutTime)}` : " → en curso"}
-                </div>
-              </div>
-              {dur !== null ? (
-                <span
-                  style={{
-                    padding: "2px 8px",
-                    borderRadius: 99,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    background: dur > 60 ? "#fee2e2" : "#dcfce7",
-                    color: dur > 60 ? "#ef4444" : "#16a34a",
-                  }}
-                >
-                  {dur} min
+      <Section title="Tus últimas comidas">
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {past.map((b) => {
+            const dur = durationMinutes(b.checkinTime, b.checkoutTime);
+            const isLate = b.isCheckinLate || b.isCheckoutLate;
+            return (
+              <li
+                key={b.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: "var(--surface)",
+                  border: `1px solid ${isLate ? "var(--state-warning-border)" : "var(--border)"}`,
+                }}
+              >
+                <span aria-hidden="true" style={{ fontSize: 20 }}>
+                  {b.status === "COMPLETED" ? (isLate ? "⚠️" : "✅") : "⏳"}
                 </span>
-              ) : (
-                <span style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>En curso</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Section>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{fmtDate(b.date)}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+                    {fmtTime(b.checkinTime)}
+                    {b.checkoutTime ? ` – ${fmtTime(b.checkoutTime)}` : " – sin regreso registrado"}
+                    {isLate && <span style={{ color: "var(--state-warning-text)" }}> · fuera de horario</span>}
+                  </div>
+                </div>
+                {dur !== null ? <DurationChip minutes={dur} /> : <Tag size="sm" variant="warning">En curso</Tag>}
+              </li>
+            );
+          })}
+        </ul>
+      </Section>
     </div>
   );
 }
 
 // ─── Manager: Team break card ─────────────────────────────────────────────────
 
-function TeamBreakCard({ member }: { member: LunchBreak }) {
+function TeamBreakCard({ member, highlighted }: { member: LunchBreak; highlighted?: boolean }) {
   const dur = durationMinutes(member.checkinTime, member.checkoutTime);
   const isInProgress = member.status === "IN_PROGRESS";
   const isLate = member.isCheckinLate || member.isCheckoutLate;
-
-  let borderColor = "#86efac";
-  let bgChip = "#dcfce7";
-  let textChip = "#16a34a";
-  let chipLabel = "Completada";
-
-  if (isInProgress) {
-    borderColor = isLate ? "#fca5a5" : "#fcd34d";
-    bgChip = isLate ? "#fee2e2" : "#fffbeb";
-    textChip = isLate ? "#ef4444" : "#d97706";
-    chipLabel = "En comida";
-  }
+  const tone: Tone = isInProgress ? (isLate ? "danger" : "warning") : (isLate ? "warning" : "success");
 
   return (
-    <div
+    <article
+      aria-label={`${member.user?.nombre ?? "Persona"}: ${isInProgress ? "en comida" : "comida terminada"}`}
       style={{
-        border: `1.5px solid ${borderColor}`,
+        border: `1.5px solid ${highlighted ? "var(--primary)" : TONE_STYLE[tone].border}`,
         borderRadius: 12,
         padding: "14px 16px",
         background: "var(--surface)",
@@ -281,60 +273,45 @@ function TeamBreakCard({ member }: { member: LunchBreak }) {
         gap: 10,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>{member.user?.nombre ?? "—"}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>{member.user?.nombre ?? "Sin nombre"}</div>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
             {member.user?.department?.nombre ?? member.user?.role?.name ?? ""}
           </div>
         </div>
-        <span
-          style={{
-            padding: "3px 10px",
-            borderRadius: 99,
-            fontSize: 11,
-            fontWeight: 700,
-            background: bgChip,
-            color: textChip,
-          }}
-        >
-          {chipLabel}
-        </span>
+        <Tag size="sm" dot variant={isInProgress ? (isLate ? "danger" : "warning") : "positive"}>
+          {isInProgress ? "En comida" : "Terminada"}
+        </Tag>
       </div>
 
-      <div style={{ display: "flex", gap: 14 }}>
+      <dl style={{ display: "flex", gap: 14, margin: 0, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 2 }}>Entrada</div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>
+          <dt style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Salida</dt>
+          <dd style={{ margin: 0, fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: member.isCheckinLate ? "var(--state-warning-text)" : undefined }}>
             {fmtTime(member.checkinTime)}
-            {member.isCheckinLate && " ⚠️"}
-          </div>
+            {member.isCheckinLate && <span style={{ fontWeight: 500 }}> · tarde</span>}
+          </dd>
         </div>
         {member.checkoutTime && (
           <div>
-            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 2 }}>Regreso</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>
+            <dt style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Regreso</dt>
+            <dd style={{ margin: 0, fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: member.isCheckoutLate ? "var(--state-danger-text)" : undefined }}>
               {fmtTime(member.checkoutTime)}
-              {member.isCheckoutLate && " ⚠️"}
-            </div>
+              {member.isCheckoutLate && <span style={{ fontWeight: 500 }}> · tarde</span>}
+            </dd>
           </div>
         )}
         {dur !== null && (
           <div>
-            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 2 }}>Duracion</div>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: dur > 60 ? "#ef4444" : "#16a34a",
-              }}
-            >
+            <dt style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Duración</dt>
+            <dd style={{ margin: 0, fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: dur > MAX_MINUTES ? "var(--danger)" : "var(--success)" }}>
               {dur} min
-            </div>
+            </dd>
           </div>
         )}
-      </div>
-    </div>
+      </dl>
+    </article>
   );
 }
 
@@ -351,14 +328,15 @@ function TeamLunchView({
 }) {
   const [items, setItems] = useState<LunchBreak[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewType, setViewType] = useState<"cards" | "table">("cards");
   const [searchQ, setSearchQ] = useState("");
+  const deferredQ = useDeferredValue(searchQ);
   const [filterStatus, setFilterStatus] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const endpoint = dateFilter === todayIso()
         ? "lunch-breaks/today"
@@ -374,8 +352,10 @@ function TeamLunchView({
         return score(a) - score(b);
       });
       setItems(arr);
+      setLoadedFor(dateFilter);
+      setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar");
+      setError(formatApiError(e, "No se pudieron cargar las comidas del equipo."));
     } finally {
       setLoading(false);
     }
@@ -383,11 +363,14 @@ function TeamLunchView({
 
   useEffect(() => { void load(); }, [load]);
 
+  const loaded = loadedFor !== null;
+  const staleDate = loaded && loadedFor !== dateFilter;
+
   const visibleItems = useMemo(() => {
     let rows = items;
     if (filterStatus) rows = rows.filter((b) => b.status === filterStatus);
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
+    const q = deferredQ.trim().toLowerCase();
+    if (q) {
       rows = rows.filter((b) =>
         (b.user?.nombre ?? "").toLowerCase().includes(q) ||
         (b.user?.department?.nombre ?? "").toLowerCase().includes(q)
@@ -402,15 +385,22 @@ function TeamLunchView({
       }
     }
     return rows;
-  }, [items, searchQ, filterStatus, highlightId]);
+  }, [items, deferredQ, filterStatus, highlightId]);
 
   const stats = useMemo(() => {
-    const durs = items.map((b) => durationMinutes(b.checkinTime, b.checkoutTime)).filter((d): d is number => d !== null);
-    const avg = durs.length ? Math.round(durs.reduce((s, d) => s + d, 0) / durs.length) : 0;
-    const over60 = items.filter((b) => { const d = durationMinutes(b.checkinTime, b.checkoutTime); return d !== null && d > 60; }).length;
-    const inProgress = items.filter((b) => b.status === "IN_PROGRESS").length;
-    const lateCount = items.filter((b) => b.isCheckinLate || b.isCheckoutLate).length;
-    return { avg, over60, inProgress, lateCount };
+    let sum = 0, count = 0, over60 = 0, inProgress = 0, completed = 0, lateCount = 0;
+    for (const b of items) {
+      const d = durationMinutes(b.checkinTime, b.checkoutTime);
+      if (d !== null) {
+        sum += d;
+        count++;
+        if (d > MAX_MINUTES) over60++;
+      }
+      if (b.status === "IN_PROGRESS") inProgress++;
+      else completed++;
+      if (b.isCheckinLate || b.isCheckoutLate) lateCount++;
+    }
+    return { avg: count ? Math.round(sum / count) : 0, over60, inProgress, completed, lateCount };
   }, [items]);
 
   const cols: Column<LunchBreak>[] = [
@@ -419,128 +409,106 @@ function TeamLunchView({
       label: "Persona",
       render: (b) => (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{b.user?.nombre ?? "—"}</div>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{b.user?.department?.nombre ?? ""}</div>
+          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{b.user?.nombre ?? "Sin nombre"}</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{b.user?.department?.nombre ?? ""}</div>
         </div>
       ),
-      width: 180,
+      width: 200,
     },
     {
       key: "status",
       label: "Estado",
       render: (b) => (
-        <Tag variant={b.status === "IN_PROGRESS" ? "warning" : "positive"}>
-          {b.status === "IN_PROGRESS" ? "En comida" : "Completada"}
+        <Tag size="sm" dot variant={b.status === "IN_PROGRESS" ? "warning" : "positive"}>
+          {b.status === "IN_PROGRESS" ? "En comida" : "Terminada"}
         </Tag>
       ),
-      width: 120,
+      width: 130,
     },
     {
       key: "checkinTime",
-      label: "Entrada",
+      label: "Salida",
       render: (b) => (
-        <span style={{ fontSize: 12 }}>
+        <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: b.isCheckinLate ? "var(--state-warning-text)" : undefined }}>
           {fmtTime(b.checkinTime)}
-          {b.isCheckinLate && <span style={{ marginLeft: 4, color: "#f59e0b" }}>⚠️</span>}
+          {b.isCheckinLate && " · tarde"}
         </span>
       ),
-      width: 100,
+      width: 120,
     },
     {
       key: "checkoutTime",
       label: "Regreso",
       render: (b) => (
-        <span style={{ fontSize: 12 }}>
+        <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: b.isCheckoutLate ? "var(--state-danger-text)" : undefined }}>
           {b.checkoutTime ? (
             <>
               {fmtTime(b.checkoutTime)}
-              {b.isCheckoutLate && <span style={{ marginLeft: 4, color: "#ef4444" }}>⚠️</span>}
+              {b.isCheckoutLate && " · tarde"}
             </>
-          ) : "—"}
+          ) : <span style={{ color: "var(--text-tertiary)" }}>Pendiente</span>}
         </span>
       ),
-      width: 100,
+      width: 120,
     },
     {
       key: "id" as keyof LunchBreak,
-      label: "Duracion",
+      label: "Duración",
+      align: "right",
       render: (b) => {
         const d = durationMinutes(b.checkinTime, b.checkoutTime);
-        if (d === null) return <Tag variant="warning">En curso</Tag>;
-        return <Tag variant={d > 60 ? "danger" : "positive"}>{d} min</Tag>;
+        if (d === null) return <Tag size="sm" variant="warning">En curso</Tag>;
+        return <DurationChip minutes={d} />;
       },
       width: 110,
     },
     {
       key: "notes",
       label: "Notas",
-      render: (b) => <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{b.notes ?? "—"}</span>,
+      render: (b) => b.notes
+        ? <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{b.notes}</span>
+        : <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin notas</span>,
     },
   ];
 
+  const hasFilters = Boolean(searchQ || filterStatus);
+  const highlightNum = highlightId ? Number(highlightId) : NaN;
+
   return (
     <>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: 12,
-          marginBottom: 20,
-        }}
-      >
-        <KpiCard label="Promedio hoy" value={`${stats.avg} min`} icon="🍽️" />
-        <KpiCard label="Mas de 60 min" value={stats.over60} variant={stats.over60 > 0 ? "warning" : "positive"} icon="⏰" />
-        <KpiCard label="En comida ahora" value={stats.inProgress} icon="⏳" />
-        <KpiCard label="Tardanzas" value={stats.lateCount} variant={stats.lateCount > 0 ? "danger" : "positive"} icon="⚠️" />
-      </div>
-
-      {items.length > 0 && (() => {
-        const inProgress = items.filter(b => b.status === "IN_PROGRESS").length;
-        const completed = items.filter(b => b.status === "COMPLETED").length;
-        const over60 = items.filter(b => { const d = durationMinutes(b.checkinTime, b.checkoutTime); return d !== null && d > 60; }).length;
-        const total = items.length;
-        const rows = [
-          { label: "En comida", count: inProgress, color: "var(--warning)" },
-          { label: "Completadas", count: completed, color: "var(--success)" },
-          { label: "> 60 min", count: over60, color: "var(--danger)" },
-        ].filter(r => r.count > 0);
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución de pausas</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {rows.map(r => (
-                <div key={r.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+      {loaded && (
+        <div style={{ marginBottom: 16, opacity: staleDate ? 0.6 : 1 }}>
+          <MetricStrip
+            ariaLabel="Resumen de comidas del equipo"
+            metrics={[
+              { label: "Duración promedio", value: `${stats.avg} min`, hint: `Máximo esperado: ${MAX_MINUTES} min` },
+              { label: `Más de ${MAX_MINUTES} min`, value: stats.over60, tone: stats.over60 > 0 ? "warning" : "success" },
+              { label: "En comida ahora", value: stats.inProgress, onClick: () => setFilterStatus("IN_PROGRESS") },
+              { label: "Fuera de horario", value: stats.lateCount, tone: stats.lateCount > 0 ? "danger" : "success" },
+            ]}
+          />
+        </div>
+      )}
 
       <FilterToolbar
-        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre o departamento…" }}
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre o departamento…", ariaLabel: "Buscar persona" }}
         selects={[{
           label: "Estado",
           value: filterStatus,
           onChange: setFilterStatus,
           options: [
             { value: "IN_PROGRESS", label: "En comida" },
-            { value: "COMPLETED", label: "Completada" },
+            { value: "COMPLETED", label: "Terminada" },
           ],
           allowAll: true,
         }]}
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
-        resultCount={loading ? null : visibleItems.length}
+        resultCount={loaded ? visibleItems.length : null}
         rightActions={items.length > 0 ? (
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems.map((b) => ({
             nombre: b.user?.nombre ?? "",
             departamento: b.user?.department?.nombre ?? "",
-            estado: b.status === "IN_PROGRESS" ? "En comida" : "Completada",
+            estado: b.status === "IN_PROGRESS" ? "En comida" : "Terminada",
             entrada: fmtTime(b.checkinTime),
             salida: b.checkoutTime ? fmtTime(b.checkoutTime) : "",
             duracion: durationMinutes(b.checkinTime, b.checkoutTime) ?? "",
@@ -549,20 +517,22 @@ function TeamLunchView({
             { key: "nombre", label: "Nombre" },
             { key: "departamento", label: "Departamento" },
             { key: "estado", label: "Estado" },
-            { key: "entrada", label: "Entrada" },
-            { key: "salida", label: "Salida" },
+            { key: "entrada", label: "Salida a comer" },
+            { key: "salida", label: "Regreso" },
             { key: "duracion", label: "Duración (min)" },
-            { key: "tardanza", label: "Tardanza" },
-          ], `comidas-${dateFilter}`)}>Excel</Button>
+            { key: "tardanza", label: "Fuera de horario" },
+          ], `comidas-${dateFilter}`)}>Exportar a Excel</Button>
         ) : undefined}
       />
       <Section
-        title={loading ? "Cargando equipo…" : `${visibleItems.length} registros`}
+        title="Comidas del equipo"
+        subtitle={dateFilter === todayIso() ? "Hoy" : fmtDate(`${dateFilter}T12:00:00`)}
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="group" aria-label="Vista">
             <Button
               size="sm"
               variant={viewType === "cards" ? "primary" : "ghost"}
+              aria-pressed={viewType === "cards"}
               onClick={() => setViewType("cards")}
             >
               Tarjetas
@@ -570,59 +540,68 @@ function TeamLunchView({
             <Button
               size="sm"
               variant={viewType === "table" ? "primary" : "ghost"}
+              aria-pressed={viewType === "table"}
               onClick={() => setViewType("table")}
             >
               Tabla
             </Button>
-            <Button size="sm" variant="ghost" iconLeft="🔄" onClick={() => void load()}>
+            <Button size="sm" variant="ghost" loading={loading && loaded} onClick={() => void load()}>
               Actualizar
             </Button>
           </div>
         }
       >
-        {loading && (
-          <EmptyState icon="⏳" title="Cargando…" description="Consultando registros del equipo." />
-        )}
-        {!loading && error && (
-          <EmptyState
-            icon="⚠️"
-            title="No se pudo cargar"
-            description={error}
-            action={
-              <Button size="sm" variant="secondary" onClick={() => void load()}>
-                Reintentar
-              </Button>
-            }
+        {loaded && error && (
+          <InlineAlert
+            variant="warning"
+            title="No se pudo actualizar"
+            message={`${error} Mostramos la última información cargada.`}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+            style={{ marginBottom: 12 }}
           />
         )}
-        {!loading && !error && visibleItems.length === 0 && (
+        {!loaded && loading && <SkeletonList rows={4} tableLike={viewType === "table"} />}
+        {!loaded && !loading && error && (
+          <InlineAlert
+            variant="danger"
+            title="No se pudieron cargar las comidas"
+            message={error}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
+        {loaded && visibleItems.length === 0 && (
           <EmptyState
             icon="🍽️"
-            title="Sin registros"
-            description={searchQ || filterStatus ? "Sin resultados para ese filtro." : "Nadie ha registrado comida para esta fecha."}
+            title={hasFilters ? "Nadie coincide con la búsqueda" : "Sin registros"}
+            description={hasFilters ? "Prueba con otro nombre o quita los filtros." : "Nadie ha registrado su comida en esta fecha."}
+            action={hasFilters ? <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterStatus(""); }}>Quitar filtros</Button> : undefined}
           />
         )}
-        {!loading && !error && visibleItems.length > 0 && viewType === "cards" && (
+        {loaded && visibleItems.length > 0 && viewType === "cards" && (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))",
               gap: 12,
+              opacity: staleDate ? 0.6 : 1,
             }}
           >
             {visibleItems.map((m) => (
-              <TeamBreakCard key={m.id} member={m} />
+              <TeamBreakCard key={m.id} member={m} highlighted={m.user?.id === highlightNum} />
             ))}
           </div>
         )}
-        {!loading && !error && visibleItems.length > 0 && viewType === "table" && (
-          <DataTable<LunchBreak>
-            columns={cols}
-            rows={visibleItems}
-            rowKey={(b) => b.id}
-            emptyTitle="Sin registros"
-            emptyDescription="No hay comidas registradas para esta fecha."
-          />
+        {loaded && visibleItems.length > 0 && viewType === "table" && (
+          <div style={{ opacity: staleDate ? 0.6 : 1 }}>
+            <DataTable<LunchBreak>
+              columns={cols}
+              rows={visibleItems}
+              rowKey={(b) => b.id}
+              ariaLabel="Comidas del equipo"
+              emptyTitle="Sin registros"
+              emptyDescription="No hay comidas registradas para esta fecha."
+            />
+          </div>
         )}
       </Section>
     </>
@@ -633,8 +612,7 @@ function TeamLunchView({
 
 export default function LunchBreaksPage() {
   const { user } = useUser();
-  const searchParams = useSearchParams();
-  const highlightId = searchParams.get("highlight");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const viewMode = useMemo(() => getAttendanceViewMode(user), [user]);
   const headerCfg = useMemo(() => getLunchBreaksSectionConfig(user), [user]);
   const isManager = viewMode !== "register";
@@ -643,7 +621,12 @@ export default function LunchBreaksPage() {
 
   const [myBreaks, setMyBreaks] = useState<LunchBreak[]>([]);
   const [loadingMy, setLoadingMy] = useState(true);
+  const [myError, setMyError] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState(todayIso());
+
+  useEffect(() => {
+    setHighlightId(new URLSearchParams(window.location.search).get("highlight"));
+  }, []);
 
   const loadMyBreaks = useCallback(async () => {
     if (!token || !canRegister) return;
@@ -651,8 +634,9 @@ export default function LunchBreaksPage() {
     try {
       const data = await apiFetch("lunch-breaks/my-breaks", token);
       setMyBreaks(Array.isArray(data) ? data : []);
-    } catch {
-      // silent — hero shows no data gracefully
+      setMyError(null);
+    } catch (e) {
+      setMyError(formatApiError(e, "No se pudo consultar tu registro de comida."));
     } finally {
       setLoadingMy(false);
     }
@@ -668,28 +652,32 @@ export default function LunchBreaksPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Personas"
+        eyebrow="Recursos Humanos"
         title={headerCfg.title}
         subtitle={headerCfg.subtitle}
         actions={
           isManager ? (
-            <input
-              type="date"
-              value={dateFilter}
-              max={todayIso()}
-              onChange={(e) => setDateFilter(e.target.value)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--text-primary)",
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)" }}>
+              Fecha
+              <input
+                type="date"
+                value={dateFilter}
+                max={todayIso()}
+                onChange={(e) => e.target.value && setDateFilter(e.target.value)}
+                style={{
+                  minHeight: 40,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text-primary)",
+                  fontSize: 16,
+                  cursor: "pointer",
+                }}
+              />
+            </label>
           ) : (
-            <Button variant="ghost" onClick={() => void loadMyBreaks()}>
+            <Button variant="ghost" loading={loadingMy && myBreaks.length > 0} onClick={() => void loadMyBreaks()}>
               Actualizar
             </Button>
           )
@@ -699,41 +687,61 @@ export default function LunchBreaksPage() {
       <OpsAttendanceRail />
 
       {highlightId && (
-        <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 8, border: "1px solid var(--nx-panel-hairline)", background: "var(--nx-panel-surface-overlay)", fontSize: 12.5 }}>
-          Destacando usuario <strong>#{highlightId}</strong> desde notificación de comida.
-        </div>
+        <InlineAlert
+          variant="info"
+          dense
+          message="Abriste esta página desde una notificación: la persona indicada aparece primero."
+          onDismiss={() => setHighlightId(null)}
+          style={{ marginBottom: 12 }}
+        />
       )}
 
       {canRegister && (
         <>
-          {loadingMy ? (
+          {myError && (
+            <InlineAlert
+              variant="warning"
+              message={myError}
+              action={<Button size="sm" variant="secondary" onClick={() => void loadMyBreaks()}>Reintentar</Button>}
+              style={{ marginBottom: 12 }}
+            />
+          )}
+          {loadingMy && myBreaks.length === 0 ? (
             <div
+              aria-busy="true"
+              aria-label="Cargando tu comida de hoy"
               style={{
                 border: "1.5px solid var(--border)",
                 borderRadius: 14,
                 padding: "20px 24px",
                 marginBottom: 20,
-                color: "var(--text-tertiary)",
-                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+                gap: 20,
               }}
             >
-              Cargando estado de hoy...
+              <Skeleton width={40} height={40} radius={10} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                <Skeleton width={80} height={12} />
+                <Skeleton width="50%" height={20} />
+              </div>
             </div>
           ) : (
             <BreakStatusHero todayBreak={todayBreak} />
           )}
-          {!loadingMy && (
+          {!(loadingMy && myBreaks.length === 0) && (
             <Section
-              title={todayBreak?.status === "IN_PROGRESS" ? "Registrar regreso" : "Registrar salida a comida"}
-              subtitle="Captura foto al salir y al regresar de tu hora de comida."
+              title={todayBreak?.status === "IN_PROGRESS" ? "Registrar regreso" : "Registrar salida a comer"}
+              subtitle="Toma una foto al salir y otra al regresar de tu hora de comida."
             >
               <LunchBreakForm
+                key={`${todayBreak?.id ?? "sin-registro"}-${todayBreak?.status ?? ""}`}
                 isCheckin={todayBreak?.status !== "IN_PROGRESS"}
                 onSuccess={() => void loadMyBreaks()}
               />
             </Section>
           )}
-          {!loadingMy && <MyHistoryList items={myBreaks} />}
+          <MyHistoryList items={myBreaks} />
         </>
       )}
 
