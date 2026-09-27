@@ -1,0 +1,134 @@
+/* Siluetas de carga. El bloque base (`.ui-skeleton`) vive en `app/ui-tokens.scss`. */
+
+.text {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  min-width: 0;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+}
+
+.table {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+}
+
+.tableHead,
+.tableRow {
+  display: grid;
+  align-items: center;
+  gap: var(--ui-space-4);
+  padding: 0 var(--ui-space-4);
+}
+
+.tableHead {
+  height: 38px;
+  background: var(--ui-surface-2);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.tableRow {
+  height: var(--ui-row-h);
+  border-bottom: 1px solid var(--ui-border-subtle);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-5);
+  animation: ui-fade-in var(--ui-duration-base) var(--ui-ease-out) both;
+  /* No aparece si la ruta llega en menos de ~120 ms: evita el parpadeo. */
+  animation-delay: 120ms;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  flex-wrap: wrap;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  flex: 1 1 280px;
+
+  > :last-child {
+    max-width: 100%;
+  }
+}
+
+.headerActions {
+  display: flex;
+  gap: var(--ui-space-2);
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--ui-space-3);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--ui-space-4);
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .headerActions {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    animation: none;
+  }
+}

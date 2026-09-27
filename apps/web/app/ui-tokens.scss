@@ -244,6 +244,98 @@
   --ui-row-h: 40px;
   --ui-topbar-h: 52px;
   --ui-nav-item-h: 32px;
+
+  /* ==========================================================
+     AMPLIACIÓN (aditiva) — nada de arriba cambia de nombre.
+     ========================================================== */
+
+  /* Espaciado · alias legibles sobre la rejilla de 4 px.
+     `--ui-space-N` = N × 4 px (0-5 = 2 px). Úsalos en código nuevo. */
+  --ui-space-0: 0px;
+  --ui-space-0-5: 2px;
+  --ui-space-1: 4px;
+  --ui-space-1-5: 6px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-space-8: 32px;
+  --ui-space-10: 40px;
+  --ui-space-12: 48px;
+  --ui-space-16: 64px;
+  --ui-s8: 64px;
+
+  /* Tipografía · escalones que faltaban y pesos con nombre */
+  --ui-text-2xs: 11px;
+  --ui-text-xl: 18px;
+  --ui-text-display: 28px;
+  --ui-fw-regular: 400;
+  --ui-fw-medium: 500;
+  --ui-fw-semibold: 600;
+  --ui-fw-bold: 650;
+  --ui-lh-tight: 1.2;
+  --ui-lh-snug: 1.35;
+  --ui-lh-normal: 1.5;
+
+  /* Papeles de color con nombre genérico (alias; misma tinta) */
+  --ui-primary: var(--ui-brand);
+  --ui-primary-hover: var(--ui-brand-hover);
+  --ui-primary-soft: var(--ui-brand-soft);
+  --ui-text-primary: var(--ui-fg);
+  --ui-text-secondary: var(--ui-fg-2);
+  --ui-text-tertiary: var(--ui-fg-3);
+
+  /* Forma */
+  --ui-radius-xs: 4px;
+  --ui-radius-md: var(--ui-radius);
+
+  /* Elevación · cuarto peldaño, solo para modales y hojas */
+  --ui-elev-3: 0 2px 4px rgba(15, 23, 42, 0.06), 0 24px 56px rgba(15, 23, 42, 0.16);
+  --ui-shadow-md: var(--ui-elev-2);
+  --ui-shadow-lg: var(--ui-elev-3);
+
+  /* Velo detrás de modales, cajón y paleta */
+  --ui-scrim: rgba(15, 23, 42, 0.44);
+
+  /* Capas · un solo orden para todo el panel */
+  --ui-z-base: 1;
+  --ui-z-sticky: 20;
+  --ui-z-overlay-nav: 25;
+  --ui-z-sidebar: 30;
+  --ui-z-dropdown: 50;
+  --ui-z-modal: 1000;
+  --ui-z-palette: 9000;
+  --ui-z-toast: 9500;
+
+  /* Movimiento · extras */
+  --ui-duration-instant: 80ms;
+  --ui-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+
+  /* Controles y layout */
+  --ui-control-h-sm: 28px;
+  --ui-control-h-xl: 44px;
+  --ui-touch-min: 44px; /* objetivo táctil mínimo (WCAG 2.5.5) */
+  --ui-sidebar-w: 240px;
+  --ui-sidebar-w-collapsed: 60px;
+  --ui-content-max: 1440px;
+
+  /* Foco · anillo único para todo lo nuevo */
+  --ui-focus-outline: 2px solid var(--ui-brand);
+  --ui-focus-offset: 2px;
+
+  /* Esqueletos de carga */
+  --ui-skeleton-base: var(--ui-track);
+  --ui-skeleton-shine: color-mix(in srgb, var(--ui-surface) 70%, var(--ui-track));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ui-duration-instant: 0ms;
+    --ui-duration-fast: 0ms;
+    --ui-duration-base: 0ms;
+    --ui-duration-slow: 0ms;
+  }
 }
 
 body.dark {
@@ -326,8 +418,15 @@ body.dark {
   --ui-elev-1: 0 1px 2px rgba(0, 0, 0, 0.3);
   --ui-elev-2: 0 1px 2px rgba(0, 0, 0, 0.34), 0 6px 16px rgba(0, 0, 0, 0.38);
   --ui-elev-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.45);
+  --ui-elev-3: 0 2px 6px rgba(0, 0, 0, 0.45), 0 28px 64px rgba(0, 0, 0, 0.55);
   --ui-shadow-sm: var(--ui-elev-1);
+  --ui-shadow-md: var(--ui-elev-2);
+  --ui-shadow-lg: var(--ui-elev-3);
   --ui-shadow-pop: var(--ui-elev-pop);
+
+  --ui-scrim: rgba(2, 6, 16, 0.62);
+  --ui-skeleton-base: var(--ui-track);
+  --ui-skeleton-shine: color-mix(in srgb, var(--ui-surface-3) 80%, var(--ui-track));
 }
 
 /* ------------------------------------------------------------
@@ -351,6 +450,83 @@ body.dark {
 .nx-app-shell ::selection {
   background: color-mix(in srgb, var(--ui-brand) 22%, transparent);
   color: inherit;
+}
+
+/* ------------------------------------------------------------
+   Utilidades globales del sistema (prefijo `ui-`).
+   Clases planas para poder usarlas también desde componentes de
+   servidor (loading.tsx) y desde módulos que no importan React.
+   ------------------------------------------------------------ */
+
+/* Oculto a la vista, legible para el lector de pantalla. */
+.ui-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Cifras alineadas en columnas (importes, contadores, horas). */
+.ui-num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: var(--ui-numeric);
+}
+
+/* Bloque de carga: late suave, sin distraer. Base de <Skeleton />. */
+.ui-skeleton {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 100%;
+  border-radius: var(--ui-radius-sm);
+  background-color: var(--ui-skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ui-skeleton-shine) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: ui-shimmer 1.6s var(--ui-ease-in-out) infinite;
+}
+
+.ui-skeleton[data-shape="circle"] {
+  border-radius: 50%;
+}
+
+.ui-skeleton[data-shape="pill"] {
+  border-radius: var(--ui-radius-pill);
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* Aparición de contenido: solo opacidad, sin mover nada (no hay salto). */
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton {
+    animation: none;
+    background-image: none;
+  }
 }
 
 /* ============================================================
