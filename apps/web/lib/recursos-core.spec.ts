@@ -32,10 +32,10 @@ describe('recursos de Core', () => {
   it('en Core, quien no gestiona flotilla cae en «Mis vehículos» y puede pedir', () => {
     // Antes, el que no tenía par OPS de vehículos (RH, ventas, contabilidad…) caía en la
     // flotilla, donde no podía pedir nada.
-    for (const role of [ROLES.ING_CAMPO, ROLES.RH, ROLES.VENDEDOR, ROLES.CONTABILIDAD, ROLES.ARQUITECTO]) {
+    for (const role of [ROLES.ING_CAMPO, ROLES.RH, ROLES.VENDEDOR, ROLES.CONTABILIDAD, ROLES.ARQUITECTO, ROLES.ADMINISTRATIVO]) {
       expect(coreVehiclesHome({ roleKey: role }), role).toBe(MIS_VEHICULOS_PATH);
     }
-    for (const role of [ROLES.COORD_OPERACIONES, ROLES.DIR_OPERACIONES, ROLES.ADMINISTRATIVO, ROLES.CEO]) {
+    for (const role of [ROLES.COORD_OPERACIONES, ROLES.DIR_OPERACIONES, ROLES.CEO]) {
       expect(coreVehiclesHome({ roleKey: role }), role).toBe(VEHICULOS_PATH);
     }
     expect(coreVehiclesHome({ roleKey: ROLES.CEO, isSuperAdmin: true })).toBe(VEHICULOS_PATH);

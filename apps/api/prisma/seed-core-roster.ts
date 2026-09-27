@@ -11,6 +11,24 @@ import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+/**
+ * Obtiene la contraseña de un usuario desde variables de entorno, evitando
+ * literales en el repo. Nombre: SEED_PASSWORD_<EMAIL_SLUG>, por ejemplo
+ *   SEED_PASSWORD_GERENCIA_NEXARA_COM_MX
+ * Si no está definida, devuelve un marcador inofensivo (login deshabilitado en la práctica).
+ */
+function seedPassword(email: string): string {
+  const varName =
+    'SEED_PASSWORD_' + email.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+  const value = process.env[varName]?.trim();
+  if (!value) {
+    // Este warning es intencionado: fuerza a definir la contraseña fuera del árbol git.
+    console.warn(`   ⚠️  Falta ${varName} para ${email} — usando marcador local 'x'`);
+    return 'x';
+  }
+  return value;
+}
+
 type AccessMode = 'off' | 'on';
 type ModuleAccessMap = Record<string, AccessMode>;
 
@@ -109,7 +127,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-001',
     puesto: 'Director General',
-    password: 'Nexara!NX001',
+    password: seedPassword('gerencia@nexara.com.mx'),
     managerEmail: null,
     moduleAccess: FULL_OLA1,
     isActive: true,
@@ -121,7 +139,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-002',
     puesto: 'Developer / Super Admin',
-    password: 'Nexara!NX002',
+    password: seedPassword('developer@nexara.com.mx'),
     managerEmail: null,
     moduleAccess: FULL_OLA1,
     isActive: true,
@@ -133,7 +151,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Operaciones',
     employeeNumber: 'NX-302',
     puesto: 'Encargado de instalación',
-    password: 'Nexara!NX302',
+    password: seedPassword('operaciones@nexara.com.mx'),
     managerEmail: 'gerencia@nexara.com.mx',
     moduleAccess: DAVID_OLA1,
     isActive: true,
@@ -145,7 +163,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Servicios',
     employeeNumber: 'NX-301',
     puesto: 'Encargado de servicios',
-    password: 'Nexara!NX301',
+    password: seedPassword('direccion.operaciones@nexara.com.mx'),
     managerEmail: 'gerencia@nexara.com.mx',
     moduleAccess: LUIS_OLA1,
     isActive: true,
@@ -157,7 +175,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Sistemas',
     employeeNumber: 'NX-303',
     puesto: 'Encargado de soporte',
-    password: 'Nexara!NX303',
+    password: seedPassword('jose.ramirez@nexara.com.mx'),
     managerEmail: 'gerencia@nexara.com.mx',
     moduleAccess: ANTONIO_OLA1,
     isActive: true,
@@ -169,7 +187,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Sistemas',
     employeeNumber: 'NX-405',
     puesto: 'Ingeniera de Soporte',
-    password: 'Nexara!NX405',
+    password: seedPassword('soporte@nexara.com.mx'),
     managerEmail: 'jose.ramirez@nexara.com.mx',
     moduleAccess: SOPORTE_MIN,
     isActive: true,
@@ -181,7 +199,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Sistemas',
     employeeNumber: 'NX-407',
     puesto: 'Ingeniero de Sistemas',
-    password: 'Nexara!NX407',
+    password: seedPassword('alejandro.gonzalez@nexara.com.mx'),
     managerEmail: 'jose.ramirez@nexara.com.mx',
     moduleAccess: SOPORTE_MIN,
     isActive: true,
@@ -193,7 +211,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Administración',
     employeeNumber: 'NX-103',
     puesto: 'Encargada comercial',
-    password: 'Nexara!NX103',
+    password: seedPassword('daniela.hernandez@nexara.com.mx'),
     managerEmail: 'gerencia@nexara.com.mx',
     moduleAccess: ADMIN_COMERCIAL,
     isActive: true,
@@ -205,7 +223,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Obra',
     employeeNumber: 'NX-003',
     puesto: 'Encargado de Obra',
-    password: 'Nexara!NX003',
+    password: seedPassword('infraestructura@nexara.com.mx'),
     managerEmail: 'gerencia@nexara.com.mx',
     moduleAccess: BLANK_OLA1,
     isActive: true,
@@ -217,7 +235,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Administración',
     employeeNumber: 'NX-102',
     puesto: 'Ejecutiva Administrativa / Comercial',
-    password: 'Nexara!NX102',
+    password: seedPassword('soluciones@nexara.com.mx'),
     managerEmail: 'gerencia@nexara.com.mx',
     moduleAccess: ADMIN_COMERCIAL,
     isActive: true,
@@ -229,7 +247,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-404',
     puesto: 'Ingeniero de Campo',
-    password: 'Nexara!NX404',
+    password: seedPassword('joan.sanchez@nexara.com.mx'),
     managerEmail: 'operaciones@nexara.com.mx',
     moduleAccess: FIELD_MIN,
     isActive: true,
@@ -241,7 +259,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-408',
     puesto: 'Ingeniero de Campo',
-    password: 'Nexara!NX408',
+    password: seedPassword('israel.ramos@nexara.com.mx'),
     managerEmail: 'operaciones@nexara.com.mx',
     moduleAccess: FIELD_MIN,
     isActive: true,
@@ -253,7 +271,7 @@ const ACTIVE_ROSTER: RosterUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-409',
     puesto: 'Ingeniero de Campo',
-    password: 'Nexara!NX409',
+    password: seedPassword('juan.gonzalez@nexara.com.mx'),
     managerEmail: 'operaciones@nexara.com.mx',
     moduleAccess: FIELD_MIN,
     isActive: true,

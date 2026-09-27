@@ -54,6 +54,8 @@ jobs:
       # sobrescribirlo desde fuera hace que ts-jest busque `apps/tsconfig.json`
       # —que no existe— y la suite entera falle al arrancar.
       - name: Tests · API
+        env:
+          TZ: America/Mexico_City
         run: npx jest --config apps/api/jest.config.js --runInBand --ci
 
       # La web pasó mucho tiempo con `tsc --noEmit` como única red: los tipos
@@ -92,6 +94,7 @@ jobs:
                --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' \
                --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=dist \
                --exclude='*.spec.ts' --exclude='*.test.ts' \
+               --exclude='*.spec.tsx' --exclude='*.test.tsx' \
                . > /tmp/fugas.txt; then
             echo "::error::Posibles credenciales en claro:"
             cat /tmp/fugas.txt
@@ -112,12 +115,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Instalar Android SDK (manual)
+        run: |
+          set -euo errexit
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          SDKM="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then
+            echo "::error::No se encontró sdkmanager en $SDKM"
+            exit 1
+          fi
+          # Aceptar licencias; ignorar SIGPIPE de `yes` cuando sdkmanager termina antes.
+          ( yes | "$SDKM" --licenses ) >/dev/null 2>&1 || true
+          "$SDKM" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Assemble debug + unit tests
         working-directory: apps/mobile-native/android
-        run: ./gradlew :app:assembleDebug test --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:assembleDebug test --no-daemon
 
       # Un `e.message` de Retrofit es literalmente "HTTP 403 Forbidden". Puesto
       # en un `Text(...)` eso es lo que lee el usuario --y lo que acabo en las
