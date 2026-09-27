@@ -187,11 +187,11 @@ export type AsignadasPorMiResponse = {
 };
 
 export const STATUS_LABELS: Record<BoardUserStatus, string> = {
-  activo: "Activo",
+  activo: "Trabajando",
   atrasado: "Atrasado",
-  libre: "Terminó",
-  sin_actividad: "Sin actividad",
-  inactivo: "Inactivo",
+  libre: "Libre",
+  sin_actividad: "Sin nada asignado",
+  inactivo: "Sin entrada hoy",
 };
 
 export const STATUS_COLORS: Record<BoardUserStatus, string> = {

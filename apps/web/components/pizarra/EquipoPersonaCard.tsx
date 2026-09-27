@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { resolveAssetUrl } from "@/lib/evidence-display";
-import type { TeamBoardUser } from "@/lib/team-board-api";
+import { STATUS_LABELS, type TeamBoardUser } from "@/lib/team-board-api";
 import {
   ARO_DE_ESTADO,
   contextoActividad,
@@ -79,20 +79,29 @@ export const rejillaEquipo = s.rejilla;
  * caben ni ayudan aquí: viven completos en su ficha, a un clic, que es a donde
  * lleva la tarjeta.
  */
+const CLASE_ESTADO: Record<EstadoAro, string> = {
+  trabajando: s.estadoTrabajando,
+  retraso: s.estadoRetraso,
+  libre: s.estadoLibre,
+};
+
 export default function EquipoPersonaCard({
   user,
   isSelf = false,
   ahora = Date.now(),
+  asignarHref,
 }: {
   user: TeamBoardUser;
   isSelf?: boolean;
   ahora?: number;
+  /** Con permiso de asignar (y no es uno mismo): botón «＋ Asignar» bajo la tarjeta. */
+  asignarHref?: string;
 }) {
   const estado = ARO_DE_ESTADO[user.status] ?? "retraso";
   const actividad = queHace(user);
   const contexto = contextoActividad(user, ahora);
   const espera = user.enEsperaAprobacion ?? 0;
-  return (
+  const tarjeta = (
     <Link
       href={`/erp/pizarra/${user.id}`}
       className={[s.tarjeta, isSelf ? s.tarjetaYo : ""].filter(Boolean).join(" ")}
@@ -100,6 +109,7 @@ export default function EquipoPersonaCard({
       <AvatarAro nombre={user.nombre} avatarUrl={user.avatarUrl} estado={estado} />
       <span className={s.nombre}>{user.nombre}</span>
       {user.puesto ? <span className={s.puesto}>{user.puesto}</span> : null}
+      <span className={[s.estado, CLASE_ESTADO[estado]].join(" ")}>{STATUS_LABELS[user.status]}</span>
       <span className={s.actividad} title={actividad}>
         {actividad}
       </span>
@@ -120,5 +130,14 @@ export default function EquipoPersonaCard({
         </span>
       ) : null}
     </Link>
+  );
+  if (!asignarHref) return tarjeta;
+  return (
+    <div className={s.celda}>
+      {tarjeta}
+      <Link href={asignarHref} className={s.asignar} aria-label={`Asignar una actividad a ${user.nombre}`}>
+        ＋ Asignar
+      </Link>
+    </div>
   );
 }
