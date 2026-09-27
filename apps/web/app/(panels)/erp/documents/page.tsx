@@ -1,20 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import PageChrome from "@/components/ui/PageChrome";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
+import Modal from "@/components/ui/Modal";
+import { FormField, FormGrid } from "@/components/ui/FormField";
+import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
-import chrome from "@/components/erp/erp-chrome.module.css";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {
@@ -43,6 +46,39 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 const emptyForm = { title: "", description: "", categoryId: "", fileUrl: "" };
 
+const STATUS_META: Record<string, { label: string; variant: "positive" | "warning" | "default" | "neutral" | "danger" }> = {
+  DRAFT: { label: "Borrador", variant: "default" },
+  PENDING_APPROVAL: { label: "Por aprobar", variant: "warning" },
+  APPROVED: { label: "Aprobado", variant: "positive" },
+  ARCHIVED: { label: "Archivado", variant: "neutral" },
+  OBSOLETE: { label: "Obsoleto", variant: "neutral" },
+};
+
+const LOCKED_STATUSES = new Set(["APPROVED", "ARCHIVED", "OBSOLETE"]);
+
+function statusMeta(s: string) {
+  return STATUS_META[s] ?? { label: "Borrador", variant: "default" as const };
+}
+
+function fileIcon(url?: string | null): { icon: string; label: string } {
+  const ext = (url ?? "").split("?")[0].split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf") return { icon: "📕", label: "PDF" };
+  if (["doc", "docx", "odt", "rtf"].includes(ext)) return { icon: "📘", label: "Word" };
+  if (["xls", "xlsx", "csv", "ods"].includes(ext)) return { icon: "📗", label: "Excel" };
+  if (["ppt", "pptx", "odp"].includes(ext)) return { icon: "📙", label: "Presentación" };
+  if (["png", "jpg", "jpeg", "gif", "webp", "heic"].includes(ext)) return { icon: "🖼️", label: "Imagen" };
+  if (["zip", "rar", "7z"].includes(ext)) return { icon: "🗜️", label: "Comprimido" };
+  if (url) return { icon: "📎", label: "Archivo" };
+  return { icon: "📄", label: "Sin archivo" };
+}
+
+const DAY_MS = 86_400_000;
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid var(--border)",
+  background: "var(--surface)", color: "var(--foreground)", minHeight: 40, boxSizing: "border-box",
+};
+
 export default function DocumentsPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "documents"), [user]);
@@ -52,13 +88,18 @@ export default function DocumentsPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [cats, setCats] = useState<DocCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ManagedDoc | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [initialForm, setInitialForm] = useState({ ...emptyForm });
+  const [touched, setTouched] = useState(false);
   const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [approving, setApproving] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
 
@@ -72,8 +113,9 @@ export default function DocumentsPage() {
       ]);
       setDocs(Array.isArray(docsData) ? docsData : (docsData?.data ?? []));
       setCats(Array.isArray(catsData) ? catsData : []);
+      setLoaded(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar documentos");
+      setError(formatApiError(e, "No se pudieron cargar los documentos."));
     } finally { setLoading(false); }
   }, [token]);
 
@@ -81,54 +123,82 @@ export default function DocumentsPage() {
 
   const filtered = useMemo(() => {
     let rows = docs;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      rows = rows.filter((d) => d.title.toLowerCase().includes(q) || d.documentNumber.toLowerCase().includes(q));
+    const q = deferredSearch.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter((d) =>
+        d.title.toLowerCase().includes(q) ||
+        d.documentNumber.toLowerCase().includes(q) ||
+        (d.description ?? "").toLowerCase().includes(q) ||
+        (d.createdBy?.nombre ?? "").toLowerCase().includes(q),
+      );
     }
     if (filterStatus) rows = rows.filter((d) => d.status === filterStatus);
     if (filterCategory) rows = rows.filter((d) => String(d.categoryId ?? "") === filterCategory);
     return rows;
-  }, [docs, search, filterStatus, filterCategory]);
+  }, [docs, deferredSearch, filterStatus, filterCategory]);
 
-  const pendientes = docs.filter((d) => d.status === "PENDING_APPROVAL").length;
-  const aprobados = docs.filter((d) => d.status === "APPROVED").length;
+  const stats = useMemo(() => {
+    let pending = 0;
+    let approved = 0;
+    let stale = 0;
+    const now = Date.now();
+    for (const d of docs) {
+      if (d.status === "PENDING_APPROVAL") {
+        pending += 1;
+        if (d.createdAt && now - new Date(d.createdAt).getTime() >= 7 * DAY_MS) stale += 1;
+      } else if (d.status === "APPROVED") approved += 1;
+    }
+    return { pending, approved, stale };
+  }, [docs]);
 
   const openNew = () => {
     setEditing(null);
     setForm({ ...emptyForm });
+    setInitialForm({ ...emptyForm });
     setFormErr(null);
+    setTouched(false);
     setShowForm(true);
   };
 
   const openEdit = async (d: ManagedDoc) => {
-    if (d.status === "APPROVED" || d.status === "ARCHIVED" || d.status === "OBSOLETE") {
-      toast.warning("Solo se pueden editar documentos en borrador o pendientes de aprobación.");
+    if (LOCKED_STATUSES.has(d.status)) {
+      toast.warning("Solo se pueden editar documentos en borrador o por aprobar.");
       return;
     }
     setEditing(d);
     setFormErr(null);
+    setTouched(false);
     setShowForm(true);
-    setForm({
+    const base = {
       title: d.title,
       description: d.description ?? "",
       categoryId: d.categoryId != null ? String(d.categoryId) : "",
       fileUrl: d.fileUrl ?? "",
-    });
+    };
+    setForm(base);
+    setInitialForm(base);
     try {
       const full = await apiFetch(`documents/${d.id}`, token) as ManagedDoc;
-      setForm({
+      const next = {
         title: full.title ?? d.title,
         description: full.description ?? "",
         categoryId: full.categoryId != null ? String(full.categoryId) : "",
         fileUrl: full.fileUrl ?? "",
-      });
+      };
+      setForm(next);
+      setInitialForm(next);
     } catch (e) {
-      setFormErr(e instanceof Error ? e.message : "No se pudo cargar el documento");
+      setFormErr(formatApiError(e, "No se pudo cargar el documento completo."));
     }
   };
 
+  const closeForm = () => { setShowForm(false); setEditing(null); setFormErr(null); };
+  const dirty = (Object.keys(form) as Array<keyof typeof form>).some((k) => form[k] !== initialForm[k]);
+  const titleError = touched && !form.title.trim() ? "Escribe un título." : null;
+
   const submit = async () => {
-    if (!token || !form.title) return;
+    setTouched(true);
+    if (!token || !form.title.trim()) return;
     setSaving(true);
     setFormErr(null);
     try {
@@ -143,199 +213,279 @@ export default function DocumentsPage() {
       } else {
         await apiFetch("documents", token, { method: "POST", body: JSON.stringify(body) });
       }
+      toast.success(editing ? "Documento actualizado" : "Documento creado");
       setShowForm(false);
       setEditing(null);
       setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      setFormErr(e instanceof Error ? e.message : "No se pudo guardar");
+      setFormErr(formatApiError(e, "No se pudo guardar el documento."));
     } finally { setSaving(false); }
   };
 
   const approve = async (d: ManagedDoc) => {
     if (!token) return;
+    setApproving(d.id);
     try {
       await apiFetch(`documents/${d.id}/approve`, token, { method: "PATCH" });
+      toast.success("Documento aprobado");
       void load();
-    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo aprobar el documento"));
+    } finally {
+      setApproving(null);
+    }
   };
 
-  const archive = async (d: ManagedDoc) => {
+  const archive = (d: ManagedDoc) => {
     if (!token) return;
-    setConfirmState({ message: `¿Archivar "${d.title}"?`, confirmLabel: "Archivar", fn: async () => {
-    try {
-      await apiFetch(`documents/${d.id}/archive`, token, { method: "PATCH" });
-      void load();
-    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
-  } });
+    setConfirmState({
+      title: "Archivar documento",
+      message: `«${d.title}» dejará de estar vigente y ya no podrá editarse.`,
+      confirmLabel: "Archivar",
+      danger: true,
+      fn: async () => {
+        try {
+          await apiFetch(`documents/${d.id}/archive`, token, { method: "PATCH" });
+          toast.success("Documento archivado");
+          void load();
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo archivar el documento"));
+        }
+      },
+    });
   };
-
-  const statusVariant = (s: string): "positive" | "warning" | "default" =>
-    s === "APPROVED" ? "positive" : s === "PENDING_APPROVAL" ? "warning" : "default";
-
-  const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
   const columns: Column<ManagedDoc>[] = [
-    { key: "documentNumber", label: "Folio", render: (d) => <code style={{ fontSize: 11.5 }}>{d.documentNumber}</code>, width: 120 },
     {
       key: "title", label: "Documento",
-      render: (d) => (
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{d.title}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{d.category?.name ?? "Sin categoría"} · {d.createdBy?.nombre ?? "—"}</div>
-        </div>
-      ),
-    },
-    { key: "status", label: "Estado", render: (d) => <Tag variant={statusVariant(d.status)}>{d.status.replace(/_/g, " ")}</Tag>, width: 160 },
-    {
-      key: "createdAt", label: "Antigüedad",
       render: (d) => {
-        if (!d.createdAt) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
-        const days = Math.floor((Date.now() - new Date(d.createdAt).getTime()) / 86400000);
-        const isPending = d.status === "DRAFT" || d.status === "PENDING_APPROVAL";
-        const color = !isPending ? "var(--text-tertiary)" : days >= 14 ? "var(--danger)" : days >= 7 ? "var(--warning)" : "var(--text-secondary)";
+        const f = fileIcon(d.fileUrl);
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{new Date(d.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
-            {isPending && <span style={{ fontSize: 10.5, fontWeight: days >= 7 ? 700 : 400, color }}>{days}d pendiente</span>}
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0 }}>
+            <span aria-hidden="true" title={f.label} style={{ fontSize: 20, lineHeight: 1.2 }}>{f.icon}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 650, fontSize: 13.5 }}>{d.title}</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontVariantNumeric: "tabular-nums" }}>{d.documentNumber}</span>
+                <span>· {d.category?.name ?? "Sin categoría"}</span>
+                {d.createdBy?.nombre && <span>· {d.createdBy.nombre}</span>}
+              </div>
+            </div>
           </div>
         );
       },
-      width: 110,
     },
     {
-      key: "acciones" as keyof ManagedDoc, label: "",
+      key: "status", label: "Estado", width: 130,
+      render: (d) => {
+        const m = statusMeta(d.status);
+        return <Tag variant={m.variant} size="sm" dot>{m.label}</Tag>;
+      },
+    },
+    {
+      key: "createdAt", label: "Creado", width: 130,
+      render: (d) => {
+        if (!d.createdAt) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const days = Math.floor((Date.now() - new Date(d.createdAt).getTime()) / DAY_MS);
+        const isPending = d.status === "DRAFT" || d.status === "PENDING_APPROVAL";
+        const color = days >= 14 ? "var(--state-danger-text)" : days >= 7 ? "var(--state-warning-text)" : "var(--text-tertiary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <time dateTime={d.createdAt} style={{ fontSize: 12.5, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+              {new Date(d.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+            </time>
+            {isPending && days > 0 && (
+              <span style={{ fontSize: 11.5, fontWeight: days >= 7 ? 650 : 400, color }}>
+                {days === 1 ? "1 día sin cerrar" : `${days} días sin cerrar`}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "acciones" as keyof ManagedDoc, label: "Acciones", align: "right",
       render: (d) => (
-        <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-          {d.fileUrl && <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.open(buildApiUrl(d.fileUrl!), "_blank"); }}>Ver</Button>}
-          {cfg.canCreate && d.status !== "APPROVED" && d.status !== "ARCHIVED" && d.status !== "OBSOLETE" && (
+        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          {d.fileUrl && (
+            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); window.open(buildApiUrl(d.fileUrl!), "_blank", "noopener"); }}>
+              Abrir
+            </Button>
+          )}
+          {cfg.canCreate && !LOCKED_STATUSES.has(d.status) && (
             <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEdit(d); }}>Editar</Button>
           )}
           {cfg.canApprove && d.status === "PENDING_APPROVAL" && (
-            <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void approve(d); }}>Aprobar</Button>
+            <Button size="sm" variant="primary" loading={approving === d.id} onClick={(e) => { e.stopPropagation(); void approve(d); }}>Aprobar</Button>
           )}
           {cfg.canApprove && d.status !== "ARCHIVED" && (
-            <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void archive(d); }}>Archivar</Button>
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); archive(d); }} style={{ color: "var(--danger)" }}>Archivar</Button>
           )}
         </div>
       ),
-      width: 200,
+      width: 280,
     },
   ];
 
+  const initialLoading = loading && !loaded;
+  const clearFilters = () => { setSearch(""); setFilterStatus(""); setFilterCategory(""); };
+
   return (
     <PageChrome
-      eyebrow="ERP · Gobierno"
+      eyebrow="Gobierno · Documentos"
       title="Documentos"
-      subtitle="Contratos, manuales, certificados y actas con versionado y aprobación."
+      subtitle="Contratos, manuales, certificados y actas con control de versiones y aprobación."
       primaryAction={
         cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo documento</Button> : undefined
       }
       secondaryActions={
-        <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+        <Button variant="secondary" iconLeft="↻" loading={loading && loaded} onClick={() => void load()}>Actualizar</Button>
       }
       filters={
         <FilterToolbar
-          search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o folio…" }}
+          search={{ value: search, onChange: setSearch, placeholder: "Buscar por título, folio, descripción o autor…", ariaLabel: "Buscar documentos" }}
           selects={[
             {
               label: "Estado",
               value: filterStatus,
               onChange: setFilterStatus,
-              options: [
-                { value: "DRAFT", label: "Borrador" },
-                { value: "PENDING_APPROVAL", label: "Pendiente de aprobación" },
-                { value: "APPROVED", label: "Aprobado" },
-                { value: "ARCHIVED", label: "Archivado" },
-              ],
+              options: ["DRAFT", "PENDING_APPROVAL", "APPROVED", "ARCHIVED"].map((s) => ({ value: s, label: STATUS_META[s].label })),
+              allowAll: true,
             },
-            {
+            ...(cats.length > 0 ? [{
               label: "Categoría",
               value: filterCategory,
               onChange: setFilterCategory,
               options: cats.map((c) => ({ value: String(c.id), label: c.name })),
-            },
+              allowAll: true,
+              allLabel: "Todas",
+            }] : []),
           ]}
-          onClear={() => { setSearch(""); setFilterStatus(""); setFilterCategory(""); }}
-          resultCount={loading ? null : filtered.length}
+          onClear={clearFilters}
+          resultCount={initialLoading ? null : filtered.length}
           rightActions={filtered.length > 0 ? (
             <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
               { key: "documentNumber", label: "Folio" },
               { key: "title", label: "Título" },
-              { key: "status", label: "Estado" },
-            ], "documentos")}>Excel</Button>
+              { key: "category", label: "Categoría", format: (v) => (v as ManagedDoc["category"])?.name ?? "Sin categoría" },
+              { key: "status", label: "Estado", format: (v) => statusMeta(String(v ?? "")).label },
+              { key: "createdBy", label: "Autor", format: (v) => (v as ManagedDoc["createdBy"])?.nombre ?? "" },
+              { key: "createdAt", label: "Creado", format: (v) => (v ? new Date(String(v)).toLocaleDateString("es-MX") : "") },
+            ], "documentos")}>Exportar a Excel</Button>
           ) : undefined}
         />
       }
     >
-      <div className={chrome.kpiStrip}>
-        <KpiCard label="Total documentos" value={docs.length} icon="📂" />
-        <KpiCard label="Pendientes de aprobar" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
-        <KpiCard label="Aprobados" value={aprobados} variant="positive" icon="✅" />
-        <KpiCard label="Tasa de aprobación" value={docs.length > 0 ? `${Math.round((aprobados / docs.length) * 100)}%` : "—"} variant={docs.length > 0 && aprobados / docs.length >= 0.8 ? "positive" : "default"} icon="📈" hint="Aprobados vs total" />
-      </div>
-
-      {docs.length > 0 && (() => {
-        const byCat = Object.entries(
-          docs.reduce<Record<string, number>>((acc, d) => {
-            const k = d.category?.name ?? "Sin categoría";
-            acc[k] = (acc[k] ?? 0) + 1;
-            return acc;
-          }, {})
-        ).sort((a, b) => b[1] - a[1]).slice(0, 5);
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Documentos por categoría</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {byCat.map(([cat, count]) => (
-                <div key={cat} style={{ display: "grid", gridTemplateColumns: "150px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / docs.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      <Section title={loading ? "Cargando…" : `${filtered.length} documentos`} dense>
-        {loading && <EmptyState icon="⏳" title="Cargando documentos…" description="Consultando el repositorio." variant="compact" />}
-        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} variant="compact" />}
-        {!loading && !error && <DataTable columns={columns} rows={filtered} rowKey={(d) => d.id} emptyTitle="Sin documentos" emptyDescription="Sube el primer documento al repositorio." />}
-      </Section>
-
-      {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => { setShowForm(false); setEditing(null); }}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 460, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{editing ? "Editar documento" : "Nuevo documento"}</div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Título</span>
-                <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Contrato de arrendamiento CEDIS Puebla" style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
-                <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
-                  <option value="">— Sin categoría —</option>
-                  {cats.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                </select></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>URL del archivo</span>
-                <input value={form.fileUrl} onChange={(e) => setForm((f) => ({ ...f, fileUrl: e.target.value }))} placeholder="/uploads/documents/archivo.pdf" style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
-                <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={3} style={{ ...inp, resize: "vertical" }} /></label>
-              {formErr && (
-                <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
-                  {formErr}
-                </div>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => { setShowForm(false); setEditing(null); setFormErr(null); }}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.title}>{saving ? "Guardando…" : editing ? "Guardar" : "Crear"}</Button>
-            </div>
-          </div>
+      {loaded && docs.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <MetricStrip
+            ariaLabel="Resumen de documentos"
+            metrics={[
+              { label: "Documentos", value: docs.length },
+              {
+                label: "Por aprobar",
+                value: stats.pending,
+                tone: stats.pending ? "warning" : "success",
+                hint: stats.stale ? `${stats.stale} con más de 7 días` : undefined,
+                onClick: () => setFilterStatus("PENDING_APPROVAL"),
+              },
+              { label: "Aprobados", value: stats.approved, tone: "success", onClick: () => setFilterStatus("APPROVED") },
+              { label: "Aprobados del total", value: `${Math.round((stats.approved / docs.length) * 100)}%` },
+            ]}
+          />
         </div>
       )}
+
+      {error && loaded && (
+        <InlineAlert
+          variant="warning"
+          title="No se pudo actualizar"
+          message={`${error} Mostramos la última información cargada.`}
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      <Section title={initialLoading ? "Cargando documentos" : `${filtered.length} ${filtered.length === 1 ? "documento" : "documentos"}`} dense>
+        {initialLoading && !error && <SkeletonList rows={5} tableLike />}
+        {!loaded && !loading && error && (
+          <InlineAlert
+            variant="danger"
+            title="No se pudieron cargar los documentos"
+            message={error}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
+        {loaded && (
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            rowKey={(d) => d.id}
+            ariaLabel="Documentos"
+            emptyTitle={docs.length === 0 ? "Aún no hay documentos" : "Sin coincidencias"}
+            emptyDescription={docs.length === 0 ? "Registra el primer contrato, manual o certificado." : "Ningún documento coincide con la búsqueda o los filtros."}
+            emptyAction={
+              docs.length === 0
+                ? (cfg.canCreate ? <Button size="sm" variant="primary" onClick={openNew}>Nuevo documento</Button> : undefined)
+                : <Button size="sm" variant="secondary" onClick={clearFilters}>Limpiar filtros</Button>
+            }
+          />
+        )}
+      </Section>
+
+      <Modal
+        open={showForm}
+        onClose={closeForm}
+        dirty={dirty && !saving}
+        maxWidth={560}
+        title={editing ? "Editar documento" : "Nuevo documento"}
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeForm}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submit()} loading={saving} disabled={!!editing && !dirty}>
+              {editing ? "Guardar cambios" : "Crear documento"}
+            </Button>
+          </>
+        }
+      >
+        <FormGrid>
+          <FormField label="Título" fullWidth error={titleError}>
+            <input
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Contrato de arrendamiento CEDIS Puebla"
+              style={inp}
+              aria-invalid={!!titleError}
+            />
+          </FormField>
+          <FormField label="Categoría" optional fullWidth>
+            <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
+              <option value="">Sin categoría</option>
+              {cats.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Ubicación del archivo" optional fullWidth hint="Ruta o enlace donde está guardado el archivo.">
+            <input
+              value={form.fileUrl}
+              onChange={(e) => setForm((f) => ({ ...f, fileUrl: e.target.value }))}
+              placeholder="/uploads/documents/archivo.pdf"
+              style={inp}
+              autoCapitalize="off"
+              spellCheck={false}
+            />
+          </FormField>
+          <FormField label="Descripción" optional fullWidth>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              rows={4}
+              style={{ ...inp, resize: "vertical", lineHeight: 1.5 }}
+            />
+          </FormField>
+        </FormGrid>
+        {formErr && <InlineAlert message={formErr} style={{ marginTop: 14 }} />}
+      </Modal>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </PageChrome>
   );
