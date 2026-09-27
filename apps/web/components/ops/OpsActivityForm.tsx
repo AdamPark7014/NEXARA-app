@@ -56,6 +56,7 @@ import { createMyActivity } from "@/lib/my-activities-api";
 import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
 import { aInputFecha, hoyISO } from "@/lib/proyecto-plan";
 import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-periodo";
+import coreCss from "./OpsActivityFormCore.module.css";
 
 type Props = {
   activityId?: number;
@@ -95,6 +96,15 @@ const gridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: 12,
+};
+
+/** Etiqueta visible arriba del campo (tono Core). */
+const coreLabelStyle: CSSProperties = {
+  display: "grid",
+  gap: 6,
+  fontSize: 13,
+  fontWeight: 650,
+  color: "var(--text-secondary)",
 };
 
 export default function OpsActivityForm({
@@ -490,7 +500,13 @@ export default function OpsActivityForm({
         await terminarCreacion(newId);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al guardar");
+      setError(
+        tone === "core"
+          ? apiErrorMessage(e, "No se pudo guardar la actividad. Intenta de nuevo.")
+          : e instanceof Error
+            ? e.message
+            : "Error al guardar",
+      );
     } finally {
       setSaving(false);
     }
@@ -657,28 +673,31 @@ export default function OpsActivityForm({
     );
   }
 
+  const isCore = tone === "core";
+
   return (
+    <div className={isCore ? coreCss.core : undefined}>
     <Section
       title={
         isEdit
-          ? tone === "core"
-            ? `Editar actividad #${activityId}`
+          ? isCore
+            ? "Editar actividad"
             : `Editar OT #${activityId}`
-          : tone === "core"
+          : isCore
             ? "Datos de la actividad"
             : "Nueva orden de trabajo"
       }
       subtitle={
-        tone === "core"
+        isCore
           ? form.projectMode === "with_project"
             ? "Elige proyecto, prioridad y agenda. El cliente sale del proyecto."
-            : "Título, prioridad semáforo y lo esencial — sin jerga técnica."
+            : "Qué hay que hacer, qué tan urgente es y para cuándo."
           : form.projectMode === "with_project"
             ? "OT con proyecto operativo: el cliente sale del proyecto."
             : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto."
       }
       actions={
-        !isEdit ? (
+        !isEdit && !isCore ? (
           <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
             AN sugerido: {nextAn || (nextAnLoaded ? "No disponible" : "Calculando…")}
           </span>
@@ -699,11 +718,13 @@ export default function OpsActivityForm({
         >
           <div
             style={{
-              background: "var(--card-bg, #fff)",
+              background: "var(--surface)",
+              color: "var(--text-primary, inherit)",
+              border: "1px solid var(--border)",
               borderRadius: 12,
               padding: "24px 28px",
-              minWidth: 320,
-              maxWidth: 420,
+              width: "min(420px, calc(100vw - 32px))",
+              boxSizing: "border-box",
             }}
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700 }}>Tipo personalizado</h3>
@@ -786,7 +807,7 @@ export default function OpsActivityForm({
       )}
 
       <div style={gridStyle}>
-        {!isEdit && (
+        {!isEdit && !isCore && (
           <input
             className="input"
             placeholder="AN (automático)"
@@ -794,12 +815,25 @@ export default function OpsActivityForm({
             disabled
           />
         )}
-        <input
-          className="input"
-          placeholder={tone === "core" ? "Título de la actividad" : "Título de la OT"}
-          value={form.titulo}
-          onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-        />
+        {isCore ? (
+          <label style={{ ...coreLabelStyle, gridColumn: "1 / -1" }}>
+            ¿Qué hay que hacer? *
+            <input
+              className="input"
+              placeholder="Ej. Revisar cámaras de la entrada principal"
+              value={form.titulo}
+              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+              style={{ fontWeight: 400 }}
+            />
+          </label>
+        ) : (
+          <input
+            className="input"
+            placeholder="Título de la OT"
+            value={form.titulo}
+            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+          />
+        )}
         {form.projectMode === "with_project" ? (
           <>
             <select
@@ -1059,22 +1093,55 @@ export default function OpsActivityForm({
               : "Sin último día es de un solo momento (día y hora). Si el trabajo dura varios días, pon hasta cuándo: así no hay que cargarla cada día."}
           </p>
         </div>
-        <input
-          className="input"
-          type="number"
-          min={0}
-          placeholder={tone === "core" ? "¿Cuántos minutos esperas que tome?" : "Tiempo esperado (min)"}
-          value={form.tiempoEstimadoMin}
-          onChange={(e) => setForm({ ...form, tiempoEstimadoMin: e.target.value })}
-        />
-        <input
-          className="input"
-          type="number"
-          min={0}
-          placeholder={tone === "core" ? "Tope máximo (min)" : "Tiempo máximo (min)"}
-          value={form.tiempoMaximoMin}
-          onChange={(e) => setForm({ ...form, tiempoMaximoMin: e.target.value })}
-        />
+        {isCore ? (
+          <>
+            <label style={coreLabelStyle}>
+              ¿Cuánto tiempo toma? (min)
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                placeholder="Ej. 90"
+                value={form.tiempoEstimadoMin}
+                onChange={(e) => setForm({ ...form, tiempoEstimadoMin: e.target.value })}
+                style={{ fontWeight: 400 }}
+              />
+            </label>
+            <label style={coreLabelStyle}>
+              Máximo permitido (min)
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                placeholder="Ej. 120"
+                value={form.tiempoMaximoMin}
+                onChange={(e) => setForm({ ...form, tiempoMaximoMin: e.target.value })}
+                style={{ fontWeight: 400 }}
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              placeholder="Tiempo esperado (min)"
+              value={form.tiempoEstimadoMin}
+              onChange={(e) => setForm({ ...form, tiempoEstimadoMin: e.target.value })}
+            />
+            <input
+              className="input"
+              type="number"
+              min={0}
+              placeholder="Tiempo máximo (min)"
+              value={form.tiempoMaximoMin}
+              onChange={(e) => setForm({ ...form, tiempoMaximoMin: e.target.value })}
+            />
+          </>
+        )}
         {pendingRequestId && (
           <>
             <input className="input" placeholder="Sucursal" value={form.branchName} onChange={(e) => setForm({ ...form, branchName: e.target.value })} />
@@ -1084,19 +1151,31 @@ export default function OpsActivityForm({
             <input className="input" placeholder="Dirección sucursal" value={form.branchAddress} onChange={(e) => setForm({ ...form, branchAddress: e.target.value })} />
           </>
         )}
-        <input
-          className="input"
-          placeholder={
-            tone === "core"
-              ? "Indicaciones generales (para todo el equipo)"
-              : "Indicaciones para el responsable"
-          }
-          value={form.indicaciones}
-          onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
-          style={{ gridColumn: "1 / -1" }}
-        />
-        {tone === "core" ? (
-          <label
+        {isCore ? (
+          <label style={{ ...coreLabelStyle, gridColumn: "1 / -1" }}>
+            Indicaciones para todos
+            <textarea
+              className="input"
+              rows={3}
+              placeholder="Qué deben saber todos los que la hagan: acceso, material, contacto…"
+              value={form.indicaciones}
+              onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
+              style={{ fontSize: 16, fontWeight: 400, lineHeight: 1.4, resize: "vertical", fontFamily: "inherit" }}
+            />
+          </label>
+        ) : (
+          <input
+            className="input"
+            placeholder="Indicaciones para el responsable"
+            value={form.indicaciones}
+            onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
+            style={{ gridColumn: "1 / -1" }}
+          />
+        )}
+        {isCore ? (
+          <div
+            role="group"
+            aria-label="Fotos de evidencia por persona"
             style={{
               gridColumn: "1 / -1",
               display: "flex",
@@ -1113,7 +1192,9 @@ export default function OpsActivityForm({
               <button
                 type="button"
                 className="btn"
-                style={{ minWidth: 36, padding: "4px 10px" }}
+                aria-label="Una foto menos"
+                disabled={Number(form.evidencePhotoRequired || 4) <= 2}
+                style={{ minWidth: 44, minHeight: 44, padding: "4px 10px", fontSize: 18 }}
                 onClick={() =>
                   setForm((prev) => ({
                     ...prev,
@@ -1125,13 +1206,18 @@ export default function OpsActivityForm({
               >
                 −
               </button>
-              <strong style={{ minWidth: 24, textAlign: "center", color: "var(--text)" }}>
+              <strong
+                aria-live="polite"
+                style={{ minWidth: 28, textAlign: "center", fontSize: 16, color: "var(--text-primary, var(--text))" }}
+              >
                 {form.evidencePhotoRequired}
               </strong>
               <button
                 type="button"
                 className="btn"
-                style={{ minWidth: 36, padding: "4px 10px" }}
+                aria-label="Una foto más"
+                disabled={Number(form.evidencePhotoRequired || 4) >= 8}
+                style={{ minWidth: 44, minHeight: 44, padding: "4px 10px", fontSize: 18 }}
                 onClick={() =>
                   setForm((prev) => ({
                     ...prev,
@@ -1144,8 +1230,8 @@ export default function OpsActivityForm({
                 +
               </button>
             </span>
-            <span style={{ fontWeight: 500, fontSize: 12 }}>(2–8)</span>
-          </label>
+            <span style={{ fontWeight: 500, fontSize: 13 }}>(de 2 a 8)</span>
+          </div>
         ) : null}
       </div>
 
@@ -1291,21 +1377,30 @@ export default function OpsActivityForm({
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 16 }}>
         {onCancel && !camposPendiente && !herramientasPendiente && (
-          <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
+          <Button variant="secondary" size={isCore ? "lg" : "sm"} onClick={onCancel}>Cancelar</Button>
         )}
         {!camposPendiente && !herramientasPendiente ? (
           <Button
-            size="sm"
-            variant={tone === "core" ? "primary" : undefined}
+            size={isCore ? "lg" : "sm"}
+            variant={isCore ? "primary" : undefined}
             onClick={() => void handleSubmit()}
             disabled={saving}
           >
             {saving ? "Guardando…" : activitySubmitLabel(form, isEdit, tone)}
           </Button>
         ) : null}
-        {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
-        {success && <span style={{ color: "var(--success)", fontSize: 13 }}>{success}</span>}
+        {error && (
+          <span role="alert" style={{ color: "var(--danger)", fontSize: isCore ? 14 : 13 }}>
+            {error}
+          </span>
+        )}
+        {success && (
+          <span role="status" style={{ color: "var(--success)", fontSize: isCore ? 14 : 13 }}>
+            {success}
+          </span>
+        )}
       </div>
     </Section>
+    </div>
   );
 }
