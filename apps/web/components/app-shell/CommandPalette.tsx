@@ -15,7 +15,7 @@
  * Se monta una sola vez dentro de AppShell y escucha ⌘K / Ctrl+K en window.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PANEL_META,
@@ -26,7 +26,7 @@ import {
   getUserAllowedModules,
   getModuleEntryUrl,
 } from "@/lib/user-access";
-import { resolveCrossPanelHref, isCrossPanelHref, detectCurrentPanelId, panelIdFromInternalPath } from "@/lib/cross-panel-handoff";
+import { resolveCrossPanelHref, isCrossPanelHref, detectCurrentPanelId } from "@/lib/cross-panel-handoff";
 import type { UserAccessInput } from "@/lib/user-access";
 import { fetchGlobalSearch, type GlobalSearchResult } from "@/lib/search-api";
 import {
@@ -41,6 +41,7 @@ import {
 import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
 import SearchIcon from "@mui/icons-material/Search";
 import { PaletteActionIcon } from "./ShellIcons";
+import styles from "./CommandPalette.module.scss";
 import {
   buildLegacyCreateActions,
   buildLegacyPanelJumpActions,
@@ -220,15 +221,24 @@ export default function CommandPalette({
   const [entityHint, setEntityHint] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setActiveIdx(0);
-      setEntityResults([]);
-      setEntityHint(null);
-      setTimeout(() => inputRef.current?.focus(), 10);
-    }
+    if (!open) return;
+    setQuery("");
+    setActiveIdx(0);
+    setEntityResults([]);
+    setEntityHint(null);
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    body.style.overflow = "hidden";
+    const raf = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(raf);
+      body.style.overflow = prevOverflow;
+      prevFocus?.focus?.();
+    };
   }, [open]);
 
   useEffect(() => {
@@ -419,6 +429,19 @@ export default function CommandPalette({
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setActiveIdx((i) => Math.max(0, i - 1));
+      } else if (e.key === "PageDown") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.min(flatResults.length - 1, i + 8));
+      } else if (e.key === "PageUp") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.max(0, i - 8));
+      } else if ((e.key === "Home" || e.key === "End") && e.ctrlKey) {
+        e.preventDefault();
+        setActiveIdx(e.key === "Home" ? 0 : Math.max(0, flatResults.length - 1));
+      } else if (e.key === "Tab") {
+        // El foco se queda en el buscador: las flechas mueven la selección.
+        e.preventDefault();
+        inputRef.current?.focus();
       } else if (e.key === "Enter") {
         e.preventDefault();
         const sel = flatResults[activeIdx];
@@ -456,139 +479,62 @@ export default function CommandPalette({
   if (!open) return null;
 
   let runningIdx = -1;
+  const activeOptionId = flatResults[activeIdx] ? `${listboxId}-opt-${activeIdx}` : undefined;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Paleta de comandos"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9000,
-        background: "color-mix(in srgb, #050a14 62%, transparent)",
-        backdropFilter: "blur(10px) saturate(120%)",
-        WebkitBackdropFilter: "blur(10px) saturate(120%)",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        paddingTop: "11vh",
-        animation: "nxPaletteFade 180ms ease",
-      }}
-    >
+    <div className={styles.scrim} role="presentation" onClick={onClose}>
       <div
+        className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Buscar en NEXARA"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "min(740px, calc(100vw - 32px))",
-          maxHeight: "72vh",
-          background:
-            "linear-gradient(180deg, color-mix(in srgb, var(--surface) 99%, transparent) 0%, color-mix(in srgb, var(--surface-2) 92%, var(--surface)) 100%)",
-          border: "1px solid var(--nx-panel-hairline)",
-          borderRadius: 18,
-          boxShadow:
-            "0 4px 10px rgba(0,0,0,0.18), 0 36px 80px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.06)",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          animation: "nxPaletteIn 220ms cubic-bezier(0.34,1.56,0.64,1)",
-        }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "16px 18px",
-            borderBottom: "1px solid var(--nx-panel-hairline-soft)",
-            background:
-              "linear-gradient(180deg, color-mix(in srgb, var(--primary) 10%, transparent) 0%, transparent 100%)",
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background:
-                "linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 60%, var(--accent)) 100%)",
-              color: "#fff",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 700,
-              fontFamily: "var(--nx-font-display)",
-              fontSize: 16,
-              boxShadow:
-                "0 1px 0 rgba(255,255,255,0.18) inset, 0 6px 14px color-mix(in srgb, var(--primary) 32%, transparent)",
-            }}
-          >
+        <div className={styles.head}>
+          <span className={styles.headIcon} aria-hidden="true">
             <SearchIcon aria-hidden="true" sx={{ fontSize: 20 }} />
           </span>
           <input
             ref={inputRef}
+            className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar clientes, actividades, módulos…"
-            style={{
-              flex: 1,
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              fontSize: 15.5,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.005em",
-            }}
             aria-label="Buscar"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            aria-activedescendant={activeOptionId}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
           />
-          <kbd
-            style={{
-              fontSize: 10.5,
-              fontWeight: 600,
-              padding: "3px 8px",
-              borderRadius: 6,
-              background: "var(--surface-2)",
-              border: "1px solid var(--nx-panel-hairline)",
-              color: "var(--text-tertiary)",
-              fontFamily: "inherit",
-              letterSpacing: "0.05em",
-            }}
-          >
-            ESC
-          </kbd>
+          {entityLoading && query.trim().length >= 2 ? (
+            <span className={styles.spinner} aria-hidden="true" />
+          ) : null}
+          <button type="button" className={styles.escBtn} onClick={onClose} aria-label="Cerrar búsqueda">
+            <span className={styles.escLabel}>Esc</span>
+            <span className={styles.escClose} aria-hidden="true">
+              ×
+            </span>
+          </button>
         </div>
 
-        <div
-          ref={listRef}
-          style={{
-            overflow: "auto",
-            padding: 8,
-            flex: 1,
-          }}
-        >
+        <div ref={listRef} className={styles.list} id={listboxId} role="listbox" aria-label="Resultados">
           {entityLoading && query.trim().length >= 2 && (
-            <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-tertiary)" }}>
+            <div className={styles.note} role="status">
               {CORE_SURFACE_ONLY ? "Buscando…" : "Buscando en toda la plataforma…"}
             </div>
           )}
           {entityHint && !entityLoading && entityResults.length > 0 && (
-            <div style={{ padding: "6px 12px 10px", fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              {entityHint}
-            </div>
+            <div className={styles.note}>{entityHint}</div>
           )}
           {flatResults.length === 0 && (
-            <div
-              style={{
-                padding: "40px 20px",
-                textAlign: "center",
-                color: "var(--text-tertiary)",
-                fontSize: 13,
-              }}
-            >
-              No hay coincidencias para <strong style={{ color: "var(--text-secondary)" }}>{query}</strong>.
-              <div style={{ marginTop: 8, fontSize: 12 }}>
+            <div className={styles.empty} role="status">
+              No hay coincidencias para <strong>{query}</strong>.
+              <div className={styles.emptyHint}>
                 {CORE_SURFACE_ONLY ? (
                   <>
                     Prueba con: <em>clientes</em>, <em>actividades</em>, <em>asistencias</em>,{" "}
@@ -605,17 +551,8 @@ export default function CommandPalette({
           )}
 
           {groups.map(([groupName, items]) => (
-            <div key={groupName} style={{ marginBottom: 8 }}>
-              <div
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 700,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "var(--text-tertiary)",
-                  padding: "10px 12px 4px",
-                }}
-              >
+            <div key={groupName} className={styles.group} role="group" aria-label={groupName}>
+              <div className={styles.groupTitle} aria-hidden="true">
                 {groupName}
               </div>
               {items.map((a) => {
@@ -623,119 +560,51 @@ export default function CommandPalette({
                 const idx = runningIdx;
                 const active = idx === activeIdx;
                 return (
-                  <button
+                  <div
                     key={a.id}
-                    type="button"
+                    id={`${listboxId}-opt-${idx}`}
+                    role="option"
+                    aria-selected={active}
                     data-idx={idx}
-                    onMouseEnter={() => setActiveIdx(idx)}
-                    onClick={() => selectAction(a)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "none",
-                      background: active
-                        ? "color-mix(in srgb, var(--primary) 10%, transparent)"
-                        : "transparent",
-                      borderRadius: 10,
-                      textAlign: "left",
-                      cursor: "pointer",
-                      color: "var(--text-primary)",
-                      fontSize: 13.5,
+                    data-active={active ? "true" : undefined}
+                    className={styles.option}
+                    onMouseMove={() => {
+                      if (!active) setActiveIdx(idx);
                     }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectAction(a)}
                   >
-                    <span
-                      style={{
-                        fontSize: 16,
-                        width: 30,
-                        height: 30,
-                        borderRadius: 8,
-                        background: "var(--surface-2)",
-                        border: "1px solid var(--border)",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--primary)",
-                      }}
-                      aria-hidden="true"
-                    >
+                    <span className={styles.optionIcon} aria-hidden="true">
                       <PaletteActionIcon actionId={a.id} size={18} />
                     </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 600 }}>{a.label}</span>
-                        {a.panel && (
+                    <span className={styles.optionBody}>
+                      <span className={styles.optionHead}>
+                        <span className={styles.optionLabel}>{a.label}</span>
+                        {a.panel && a.panel !== "erp" && (
                           <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              padding: "1px 6px",
-                              borderRadius: 4,
-                              background: `color-mix(in srgb, ${PANEL_META[a.panel].accent} 18%, transparent)`,
-                              color: PANEL_META[a.panel].accent,
-                              letterSpacing: "0.05em",
-                            }}
+                            className={styles.panelTag}
+                            style={{ "--tag-color": PANEL_META[a.panel].accent } as React.CSSProperties}
                           >
                             {PANEL_LABEL[a.panel]}
                           </span>
                         )}
-                      </div>
-                      {a.description && (
-                        <div
-                          style={{
-                            fontSize: 11.5,
-                            color: "var(--text-tertiary)",
-                            marginTop: 2,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {a.description}
-                        </div>
-                      )}
-                    </div>
-                    {a.url && (
-                      <code
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text-tertiary)",
-                          padding: "2px 6px",
-                          borderRadius: 5,
-                          background: "var(--surface-2)",
-                          whiteSpace: "nowrap",
-                          maxWidth: 220,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {a.url}
-                      </code>
-                    )}
-                  </button>
+                      </span>
+                      {a.description && <span className={styles.optionDesc}>{a.description}</span>}
+                    </span>
+                    <span className={styles.optionEnter} aria-hidden="true">
+                      ↵
+                    </span>
+                  </div>
                 );
               })}
             </div>
           ))}
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 16px",
-            borderTop: "1px solid var(--nx-panel-hairline-soft)",
-            background: "color-mix(in srgb, var(--surface-2) 70%, transparent)",
-            fontSize: 11,
-            color: "var(--text-tertiary)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 14 }}>
+        <div className={styles.foot}>
+          <div className={styles.footKeys}>
             <span>
-              <Kbd>↑</Kbd> <Kbd>↓</Kbd> navegar
+              <Kbd>↑</Kbd> <Kbd>↓</Kbd> moverte
             </span>
             <span>
               <Kbd>↵</Kbd> abrir
@@ -744,51 +613,15 @@ export default function CommandPalette({
               <Kbd>esc</Kbd> cerrar
             </span>
           </div>
-          <div style={{ fontVariantNumeric: "tabular-nums" }}>
+          <div className={styles.footCount} aria-live="polite">
             {flatResults.length} {flatResults.length === 1 ? "resultado" : "resultados"}
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes nxPaletteFade {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes nxPaletteIn {
-          from {
-            opacity: 0;
-            transform: translateY(-16px) scale(0.96);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
     </div>
   );
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd
-        style={{
-        display: "inline-block",
-        padding: "1px 6px",
-        borderRadius: 5,
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        fontSize: 10.5,
-        fontFamily: "inherit",
-        color: "var(--text-secondary)",
-      }}
-    >
-      {children}
-    </kbd>
-  );
+  return <kbd className={styles.kbd}>{children}</kbd>;
 }
