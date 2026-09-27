@@ -19,6 +19,40 @@
   border-radius: var(--ui-radius);
 }
 
+.filaFiltro {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Como filtro: la celda entera es el botón (≥44px) y la activa lleva el borde de marca. */
+.boton {
+  min-height: 44px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--ui-duration-fast) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.boton:hover {
+  border-color: var(--ui-border-strong);
+  border-left-color: var(--acento, var(--ui-border-strong));
+}
+
+.boton:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.activa,
+.activa:hover {
+  border-color: var(--primary, var(--ui-brand));
+  border-left-color: var(--acento, var(--primary, var(--ui-brand)));
+  box-shadow: 0 0 0 1px var(--primary, var(--ui-brand)) inset;
+  background: color-mix(in srgb, var(--ui-brand) 6%, var(--ui-surface));
+}
+
+.todos { --acento: var(--ui-brand); }
 .trabajando { --acento: var(--ui-success); }
 .retraso { --acento: var(--ui-warning); }
 .libres { --acento: var(--ui-info); }
@@ -60,5 +94,11 @@
   }
   .pista {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boton {
+    transition: none;
   }
 }
