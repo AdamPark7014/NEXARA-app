@@ -27,9 +27,11 @@ export type TabBarProps = {
   tabs: TabItem[];
   /** Prefijo común. Útil para layouts con :id dinámico. */
   baseHref?: string;
+  /** Nombre accesible de la navegación. */
+  ariaLabel?: string;
 };
 
-export function TabBar({ tabs, baseHref = '' }: TabBarProps) {
+export function TabBar({ tabs, baseHref = '', ariaLabel = 'Secciones' }: TabBarProps) {
   const pathname = usePathname() ?? '';
   const { user } = useUser();
   const role = ((user?.roleKey as RoleKey | undefined) || (user?.role as RoleKey | undefined) || null);
@@ -45,7 +47,7 @@ export function TabBar({ tabs, baseHref = '' }: TabBarProps) {
 
   return (
     <nav
-      role="tablist"
+      aria-label={ariaLabel}
       style={{
         display: 'flex',
         gap: 2,
@@ -61,9 +63,9 @@ export function TabBar({ tabs, baseHref = '' }: TabBarProps) {
           <Link
             key={t.id}
             href={fullHref}
-            role="tab"
-            aria-selected={active}
+            aria-current={active ? 'page' : undefined}
             style={{
+              minHeight: 40,
               padding: '9px 14px',
               marginBottom: -1,
               fontSize: 12.5,

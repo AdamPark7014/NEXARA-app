@@ -9,9 +9,9 @@ import ContextRail from "@/components/ui/ContextRail";
 const HR_LINKS = [
   { id: "plantilla", label: "Plantilla", href: "/erp/hr" },
   { id: "org", label: "Organigrama", href: "/erp/hr/orgchart" },
-  { id: "kpis", label: "KPIs", href: "/erp/hr/kpis" },
+  { id: "kpis", label: "Indicadores", href: "/erp/hr/kpis" },
   { id: "multas", label: "Incidencias", href: "/erp/hr/fines" },
-  { id: "prenomina", label: "Pre-nómina", href: "/erp/hr/prenomina" },
+  { id: "prenomina", label: "Prenómina", href: "/erp/hr/prenomina" },
 ] as const;
 
 function isHrPlantillaPath(pathname: string): boolean {
@@ -24,7 +24,7 @@ export default function HrModuleRail() {
 
   return (
     <ContextRail
-      ariaLabel="Módulos RRHH"
+      ariaLabel="Secciones de Recursos Humanos"
       items={HR_LINKS.map((l) => {
         const active =
           l.id === "plantilla"

@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useDeferredValue, useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import InlineAlert from "@/components/ui/InlineAlert";
+import Modal from "@/components/ui/Modal";
+import { FormField, FormGrid } from "@/components/ui/FormField";
 import HrModuleRail from "@/components/hr/HrModuleRail";
+import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -56,6 +60,20 @@ const ESTATUS_PAGO = [
   { value: "Apelado", label: "Apelado" },
   { value: "Cancelado", label: "Cancelado" },
 ];
+const ESTATUS_PAGO_LABEL: Record<string, string> = Object.fromEntries(ESTATUS_PAGO.map((s) => [s.value, s.label]));
+
+const APROBACION_LABEL: Record<string, string> = {
+  Pendiente: "Por autorizar",
+  Aprobado: "Autorizada",
+  Rechazado: "Rechazada",
+};
+
+const HTTP_FALLBACK: Record<number, string> = {
+  400: "Revisa los datos capturados.",
+  401: "Tu sesión expiró. Vuelve a iniciar sesión.",
+  403: "No tienes permiso para esta acción.",
+  404: "No encontramos la sanción.",
+};
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -64,7 +82,8 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || `HTTP ${res.status}`);
+    const readable = text.trim().startsWith("<") ? "" : text;
+    throw new Error(readable || HTTP_FALLBACK[res.status] || "El servidor no respondió. Intenta de nuevo en unos minutos.");
   }
   return res.json();
 }
@@ -82,33 +101,52 @@ function motivoFromFine(f: Fine): string {
   return match?.key ?? MOTIVOS.find((m) => m.razon === f.razon)?.key ?? "OTRO";
 }
 
+function motivoLabel(f: Fine): string {
+  const known = MOTIVOS.find((m) => m.razon === f.razon)?.label;
+  if (known) return known;
+  if (!f.razon) return "Sin motivo";
+  const text = f.razon.replace(/_/g, " ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function daysLabel(days: number): string {
+  if (days <= 0) return "Hoy";
+  return days === 1 ? "1 día" : `${days} días`;
+}
+
 export default function FinesPage() {
   const { user } = useUser();
   const cfg = useHrManagementGuard();
   const viewCfg = useMemo(() => getHrSubmoduleConfig(user, "fines"), [user]);
   const token = user?.token ?? "";
-  const searchParams = useSearchParams();
-  const highlightId = searchParams.get("highlight");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const [items, setItems] = useState<Fine[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [searchQ, setSearchQ] = useState("");
+  const deferredQ = useDeferredValue(searchQ);
   const [filterMotivo, setFilterMotivo] = useState("");
   const [filterPago, setFilterPago] = useState("");
   const [filterAprobacion, setFilterAprobacion] = useState("");
   const [staff, setStaff] = useState<HrStaff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Fine | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [formDirty, setFormDirty] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setHighlightId(new URLSearchParams(window.location.search).get("highlight"));
+  }, []);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
-    setLoadError(null);
     try {
       const [finesData, staffData] = await Promise.all([
         apiFetch("fines", token),
@@ -116,9 +154,10 @@ export default function FinesPage() {
       ]);
       setItems(Array.isArray(finesData) ? finesData : (finesData?.data ?? []));
       setStaff(Array.isArray(staffData) ? staffData : (staffData?.data ?? []));
+      setLoaded(true);
+      setLoadError(null);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar las sanciones");
-      setItems([]);
+      setLoadError(formatApiError(e, "No se pudieron cargar las sanciones."));
     } finally {
       setLoading(false);
     }
@@ -128,9 +167,15 @@ export default function FinesPage() {
     void load();
   }, [load]);
 
+  const patchForm = (patch: Partial<typeof emptyForm>) => {
+    setForm((f) => ({ ...f, ...patch }));
+    setFormDirty(true);
+  };
+
   const openNew = () => {
     setEditing(null);
     setForm({ ...emptyForm });
+    setFormDirty(false);
     setSaveErr(null);
     setShowForm(true);
   };
@@ -144,15 +189,22 @@ export default function FinesPage() {
       monto: Number(f.monto ?? 0),
       estatusPago: f.estatusPago ?? "Pendiente",
     });
+    setFormDirty(false);
     setSaveErr(null);
     setShowForm(true);
   };
+
+  const montoError = Number.isNaN(form.monto) || form.monto < 0 ? "El monto no puede ser negativo." : null;
 
   const save = async () => {
     if (!token) return;
     const motivo = MOTIVOS.find((m) => m.key === form.motivoKey) ?? MOTIVOS[0];
     if (!editing && !form.usuarioId) {
-      setSaveErr("Selecciona el empleado al que aplica la sanción.");
+      setSaveErr("Elige a la persona a la que aplica la sanción.");
+      return;
+    }
+    if (montoError) {
+      setSaveErr(montoError);
       return;
     }
     setSaving(true);
@@ -169,6 +221,7 @@ export default function FinesPage() {
           }),
         });
         setItems((prev) => prev.map((f) => (f.id === editing.id ? { ...f, ...updated } : f)));
+        toast.success("Sanción actualizada");
       } else {
         const created = await apiFetch("fines", token, {
           method: "POST",
@@ -181,52 +234,51 @@ export default function FinesPage() {
           }),
         });
         setItems((prev) => [created, ...prev]);
+        toast.success("Sanción registrada");
       }
       setShowForm(false);
     } catch (e) {
-      setSaveErr(e instanceof Error ? e.message : "No se pudo guardar la sanción");
+      setSaveErr(formatApiError(e, "No se pudo guardar la sanción."));
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (id: number) => {
+  const remove = (f: Fine) => {
     if (!token) return;
-    setConfirmState({ message: "¿Cancelar/eliminar esta sanción?", confirmLabel: "Cancelar sanción", fn: async () => {
-    try {
-      await apiFetch(`fines/${id}`, token, { method: "DELETE" });
-      setItems((prev) => prev.filter((f) => f.id !== id));
-    } catch (e) {
-      toast.error("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
-    }
-  } });
-  };
-
-  const inp: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 10px",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    background: "var(--surface)",
-    color: "var(--foreground)",
-    fontSize: 13,
-    boxSizing: "border-box",
+    setConfirmState({
+      title: "Eliminar sanción",
+      message: `Se eliminará la sanción de ${f.usuario?.nombre ?? "esta persona"} (${motivoLabel(f)}). Esta acción no se puede deshacer.`,
+      confirmLabel: "Eliminar sanción",
+      fn: async () => {
+        try {
+          await apiFetch(`fines/${f.id}`, token, { method: "DELETE" });
+          setItems((prev) => prev.filter((x) => x.id !== f.id));
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo eliminar la sanción."));
+        }
+      },
+    });
   };
 
   const approveFine = async (id: number, action: "approve" | "reject") => {
     if (!token) return;
+    setBusyId(id);
     try {
       await apiFetch(`fines/${id}/approve`, token, { method: "PATCH", body: JSON.stringify({ action }) });
+      toast.success(action === "approve" ? "Sanción autorizada" : "Sanción rechazada");
       void load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al autorizar multa");
+      toast.error(formatApiError(e, "No se pudo registrar la autorización."));
+    } finally {
+      setBusyId(null);
     }
   };
 
   const visibleItems = useMemo(() => {
     let result = items;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
+    const q = deferredQ.trim().toLowerCase();
+    if (q) {
       result = result.filter((f) =>
         (f.usuario?.nombre ?? "").toLowerCase().includes(q) ||
         (f.usuario?.email ?? "").toLowerCase().includes(q) ||
@@ -244,121 +296,149 @@ export default function FinesPage() {
       if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return result;
-  }, [items, highlightId, searchQ, filterMotivo, filterPago, filterAprobacion]);
+  }, [items, highlightId, deferredQ, filterMotivo, filterPago, filterAprobacion]);
+
+  const stats = useMemo(() => {
+    let pendingApproval = 0, paid = 0, total = 0;
+    const byRazon = new Map<string, number>();
+    for (const f of items) {
+      if (f.estatusAprobacion === "Pendiente") pendingApproval++;
+      if (isPaid(f.estatusPago)) paid++;
+      total += Number(f.monto ?? 0);
+      if (f.razon) byRazon.set(f.razon, (byRazon.get(f.razon) ?? 0) + 1);
+    }
+    const byTipo = MOTIVOS
+      .map((m) => ({ label: m.label, count: byRazon.get(m.razon) ?? 0 }))
+      .filter((x) => x.count > 0)
+      .sort((a, b) => b.count - a.count);
+    return { pendingApproval, paid, total, byTipo };
+  }, [items]);
+
+  const clearFilters = () => { setSearchQ(""); setFilterMotivo(""); setFilterPago(""); setFilterAprobacion(""); };
+  const hasFilters = Boolean(searchQ || filterMotivo || filterPago || filterAprobacion);
 
   const columns: Column<Fine>[] = [
-    { key: "id", label: "ID", render: (f) => <Tag variant="danger">#{f.id}</Tag>, width: 70 },
     {
       key: "usuario",
-      label: "Empleado",
+      label: "Persona",
       render: (f) => (
         <div>
           {f.usuario?.id ? (
-            <Link href={`/erp/hr/${f.usuario.id}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{f.usuario.nombre ?? "—"}</Link>
+            <Link href={`/erp/hr/${f.usuario.id}`} style={{ fontWeight: 600, fontSize: 13.5, color: "var(--primary)", textDecoration: "none" }}>{f.usuario.nombre ?? "Sin nombre"}</Link>
           ) : (
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{f.usuario?.nombre ?? "—"}</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{f.usuario?.nombre ?? "Sin asignar"}</div>
           )}
-          {f.usuario?.email && <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{f.usuario.email}</div>}
+          {f.usuario?.email && <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{f.usuario.email}</div>}
+          {highlightId && String(f.id) === highlightId && <Tag size="sm" variant="accent">Enlace directo</Tag>}
         </div>
       ),
-      width: 180,
+      width: 200,
     },
     {
       key: "razon",
       label: "Motivo",
-      render: (f) => (
-        <Tag variant="warning">{(MOTIVOS.find((m) => m.razon === f.razon)?.label ?? f.razon ?? "—").replace(/_/g, " ")}</Tag>
-      ),
-      width: 150,
+      render: (f) => <Tag size="sm" variant="warning">{motivoLabel(f)}</Tag>,
+      width: 170,
     },
-    { key: "descripcion", label: "Descripción", render: (f) => <span style={{ fontSize: 13 }}>{f.descripcion ?? f.razon ?? "—"}</span> },
-    { key: "monto", label: "Monto", render: (f) => <Money value={Number(f.monto ?? 0)} />, width: 100 },
     {
-      key: "fechaCreacion", label: "Antigüedad",
+      key: "descripcion",
+      label: "Descripción",
+      render: (f) => f.descripcion
+        ? <span style={{ fontSize: 13, maxWidth: "60ch", display: "inline-block" }}>{f.descripcion}</span>
+        : <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin descripción</span>,
+    },
+    { key: "monto", label: "Monto", render: (f) => <Money value={Number(f.monto ?? 0)} />, width: 120, numeric: true, align: "right" },
+    {
+      key: "fechaCreacion", label: "Registrada hace",
       render: (f) => {
         if (!f.fechaCreacion) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
-        const days = Math.floor((Date.now() - new Date(f.fechaCreacion).getTime()) / 86400000);
+        const days = Math.max(0, Math.floor((Date.now() - new Date(f.fechaCreacion).getTime()) / 86400000));
         const isPending = isOutstanding(f.estatusPago);
         const color = !isPending ? "var(--text-tertiary)" : days >= 30 ? "var(--danger)" : days >= 14 ? "var(--warning)" : "var(--text-secondary)";
         return (
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            {isPending && <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />}
-            <span style={{ fontSize: 12, fontWeight: isPending && days >= 14 ? 700 : 400, color }}>{days}d</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }} title={new Date(f.fechaCreacion).toLocaleDateString("es-MX", { dateStyle: "long" })}>
+            {isPending && <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />}
+            <span style={{ fontSize: 12.5, fontWeight: isPending && days >= 14 ? 700 : 400, color, fontVariantNumeric: "tabular-nums" }}>{daysLabel(days)}</span>
           </div>
         );
       },
-      width: 80,
+      width: 130,
     },
     {
       key: "estatusAprobacion",
       label: "Autorización",
       render: (f) => (
-        <Tag variant={f.estatusAprobacion === "Aprobado" ? "positive" : f.estatusAprobacion === "Rechazado" ? "danger" : "warning"}>
-          {f.estatusAprobacion ?? "Pendiente"}
+        <Tag size="sm" dot variant={f.estatusAprobacion === "Aprobado" ? "positive" : f.estatusAprobacion === "Rechazado" ? "danger" : "warning"}>
+          {APROBACION_LABEL[f.estatusAprobacion ?? "Pendiente"] ?? f.estatusAprobacion}
         </Tag>
       ),
-      width: 120,
+      width: 140,
     },
     {
       key: "estatusPago",
       label: "Estado",
       render: (f) => (
-        <Tag variant={isPaid(f.estatusPago) ? "neutral" : isCancelled(f.estatusPago) ? "danger" : "warning"}>
-          {f.estatusPago ?? "Pendiente"}
+        <Tag size="sm" variant={isPaid(f.estatusPago) ? "neutral" : isCancelled(f.estatusPago) ? "danger" : "warning"}>
+          {ESTATUS_PAGO_LABEL[f.estatusPago ?? "Pendiente"] ?? f.estatusPago}
         </Tag>
       ),
-      width: 120,
+      width: 150,
     },
     {
-      key: "id",
-      label: "",
+      key: "acciones",
+      label: "Acciones",
+      align: "right",
       render: (f) => (
-        <div style={{ display: "flex", gap: 4 }}>
-          {cfg.canEdit && (
-            <button onClick={() => openEdit(f)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
-              ✎
-            </button>
-          )}
+        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
           {cfg.canApprove && f.estatusAprobacion === "Pendiente" && (
             <>
-              <button onClick={() => void approveFine(f.id, "approve")} title="Autorizar" style={{ background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontSize: 11 }}>
-                ✓
-              </button>
-              <button onClick={() => void approveFine(f.id, "reject")} title="Rechazar" style={{ background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontSize: 11 }}>
-                ✕
-              </button>
+              <Button size="sm" variant="primary" loading={busyId === f.id} onClick={() => void approveFine(f.id, "approve")}>Autorizar</Button>
+              <Button size="sm" variant="ghost" disabled={busyId === f.id} onClick={() => void approveFine(f.id, "reject")}>Rechazar</Button>
             </>
           )}
+          {cfg.canEdit && (
+            <Button size="sm" variant="ghost" onClick={() => openEdit(f)} aria-label={`Editar sanción de ${f.usuario?.nombre ?? "persona"}`}>Editar</Button>
+          )}
           {cfg.canApprove && (
-            <button onClick={() => void remove(f.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
-              ✕
-            </button>
+            <Button size="sm" variant="danger" onClick={() => remove(f)} aria-label={`Eliminar sanción de ${f.usuario?.nombre ?? "persona"}`}>Eliminar</Button>
           )}
         </div>
       ),
-      width: 60,
+      width: 300,
     },
   ];
+
+  const initialLoading = loading && !loaded;
+  const inp: React.CSSProperties = {
+    width: "100%",
+    minHeight: 40,
+    padding: "8px 12px",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    background: "var(--surface)",
+    color: "var(--foreground)",
+    boxSizing: "border-box",
+  };
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Personas"
+        eyebrow="Recursos Humanos"
         title={viewCfg.title}
         subtitle={viewCfg.subtitle}
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {visibleItems.length > 0 && (
               <Button variant="ghost" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
-                { key: "id", label: "ID" },
-                { key: "usuario", label: "Empleado", format: (v) => (v as Fine["usuario"])?.nombre ?? "—" },
-                { key: "razon", label: "Motivo" },
+                { key: "id", label: "Folio" },
+                { key: "usuario", label: "Persona", format: (v) => (v as Fine["usuario"])?.nombre ?? "—" },
+                { key: "razon", label: "Motivo", format: (_v, row) => motivoLabel(row as Fine) },
                 { key: "descripcion", label: "Descripción" },
-                { key: "monto", label: "Monto ($)" },
-                { key: "estatusPago", label: "Estado pago" },
-                { key: "estatusAprobacion", label: "Autorización" },
+                { key: "monto", label: "Monto (MXN)" },
+                { key: "estatusPago", label: "Estado", format: (v) => ESTATUS_PAGO_LABEL[String(v ?? "Pendiente")] ?? String(v ?? "") },
+                { key: "estatusAprobacion", label: "Autorización", format: (v) => APROBACION_LABEL[String(v ?? "Pendiente")] ?? String(v ?? "") },
                 { key: "fechaCreacion", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-              ], "sanciones")}>Exportar Excel</Button>
+              ], "sanciones")}>Exportar a Excel</Button>
             )}
             {cfg.canCreate && <Button variant="primary" onClick={openNew}>Nueva sanción</Button>}
           </div>
@@ -367,117 +447,64 @@ export default function FinesPage() {
 
       <HrModuleRail />
 
-      {showForm && (
-        <div style={{ background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", padding: 18, marginBottom: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, boxShadow: "var(--nx-panel-elev-1)" }}>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              Empleado <span style={{ color: "var(--danger)" }}>*</span>
-            </label>
-            {editing ? (
-              <input value={staff.find((s) => String(s.id) === form.usuarioId)?.nombre ?? editing.usuario?.nombre ?? "—"} disabled style={{ ...inp, opacity: 0.7 }} />
-            ) : (
-              <select value={form.usuarioId} onChange={(e) => setForm((f) => ({ ...f, usuarioId: e.target.value }))} style={inp} required>
-                <option value="">— Seleccionar empleado —</option>
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                    {s.department?.nombre ? ` · ${s.department.nombre}` : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Tipo de sanción</label>
-            <select value={form.motivoKey} onChange={(e) => setForm((f) => ({ ...f, motivoKey: e.target.value }))} style={inp}>
-              {MOTIVOS.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {editing && (
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Estado</label>
-              <select value={form.estatusPago} onChange={(e) => setForm((f) => ({ ...f, estatusPago: e.target.value }))} style={inp}>
-                {ESTATUS_PAGO.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div style={{ gridColumn: editing ? undefined : "1 / -1" }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Descripción del hecho</label>
-            <input value={form.descripcion} onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))} placeholder="Describe la incidencia con detalle" style={inp} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Monto a descontar ($)</label>
-            <input type="number" min={0} step="0.01" value={form.monto} onChange={(e) => setForm((f) => ({ ...f, monto: +e.target.value }))} style={inp} />
-          </div>
-          {saveErr && (
-            <div style={{ gridColumn: "1 / -1", padding: "8px 12px", borderRadius: 8, background: "var(--state-danger-bg)", color: "var(--state-danger-text)", fontSize: 12.5 }}>
-              {saveErr}
-            </div>
-          )}
-          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>
-              Cancelar
-            </Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving}>
-              {saving ? "Guardando…" : editing ? "Guardar" : "Registrar sanción"}
-            </Button>
-          </div>
+      {loaded && loadError && (
+        <InlineAlert
+          variant="warning"
+          title="No se pudo actualizar"
+          message={`${loadError} Mostramos la última información cargada.`}
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          style={{ marginBottom: 12 }}
+        />
+      )}
+
+      {loaded && items.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <MetricStrip
+            ariaLabel="Resumen de sanciones"
+            metrics={[
+              { label: "Sanciones", value: items.length, onClick: clearFilters },
+              {
+                label: "Por autorizar",
+                value: stats.pendingApproval,
+                tone: stats.pendingApproval > 0 ? "warning" : "success",
+                onClick: () => setFilterAprobacion("Pendiente"),
+              },
+              { label: "Aplicadas en nómina", value: stats.paid, onClick: () => setFilterPago("Pagado") },
+              { label: "Monto total", value: <Money value={stats.total} compact />, hint: "Todas las sanciones registradas" },
+            ]}
+          />
         </div>
       )}
 
-      {!loading && items.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Total sanciones" value={items.length} icon="📋" />
-          <KpiCard label="Pendientes aprobación" value={items.filter(f => f.estatusAprobacion === "Pendiente").length} variant={items.filter(f => f.estatusAprobacion === "Pendiente").length > 0 ? "warning" : "positive"} icon="⏳" />
-          <KpiCard label="Pagadas" value={items.filter(f => isPaid(f.estatusPago)).length} variant="positive" icon="✅" />
-          <KpiCard label="Monto total" value={<Money value={items.reduce((s, f) => s + Number(f.monto ?? 0), 0)} compact />} icon="💰" hint="Sanciones registradas" />
-        </div>
-      )}
-
-      {!loading && items.length > 0 && (() => {
-        const byTipo = MOTIVOS
-          .map((m) => ({ label: m.label, count: items.filter((f) => f.razon === m.razon).length }))
-          .filter((x) => x.count > 0)
-          .sort((a, b) => b.count - a.count);
-        if (!byTipo.length) return null;
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Motivos de sanción</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {byTipo.map((row) => (
-                <div key={row.label} style={{ display: "grid", gridTemplateColumns: "160px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{row.label}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(row.count / items.length) * 100}%`, background: "var(--danger)", borderRadius: 3, transition: "width .4s" }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{row.count}</span>
+      {loaded && stats.byTipo.length > 0 && (
+        <section aria-label="Sanciones por motivo" style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Sanciones por motivo</div>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {stats.byTipo.map((row) => (
+              <li key={row.label} style={{ display: "grid", gridTemplateColumns: "minmax(110px, 180px) 1fr 36px", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 500 }}>{row.label}</span>
+                <div aria-hidden="true" style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(row.count / items.length) * 100}%`, background: "var(--danger)", borderRadius: 3, transition: "width .4s" }} />
                 </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <FilterToolbar
-        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado o descripción…" }}
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por persona o descripción…", ariaLabel: "Buscar sanciones" }}
         selects={[
           {
-            label: "Tipo de sanción",
+            label: "Motivo",
             value: filterMotivo,
             onChange: setFilterMotivo,
             options: MOTIVOS.map((m) => ({ value: m.key, label: m.label })),
             allowAll: true,
           },
           {
-            label: "Estado pago",
+            label: "Estado",
             value: filterPago,
             onChange: setFilterPago,
             options: ESTATUS_PAGO,
@@ -487,35 +514,103 @@ export default function FinesPage() {
             label: "Autorización",
             value: filterAprobacion,
             onChange: setFilterAprobacion,
-            options: [
-              { value: "Pendiente", label: "Pendiente" },
-              { value: "Aprobado", label: "Aprobado" },
-              { value: "Rechazado", label: "Rechazado" },
-            ],
+            options: Object.entries(APROBACION_LABEL).map(([value, label]) => ({ value, label })),
             allowAll: true,
           },
         ]}
-        onClear={() => { setSearchQ(""); setFilterMotivo(""); setFilterPago(""); setFilterAprobacion(""); }}
-        resultCount={loading ? null : visibleItems.length}
+        onClear={clearFilters}
+        resultCount={loaded ? visibleItems.length : null}
       />
 
-      <Section title={loading ? "Cargando…" : `${visibleItems.length} sanciones`}>
+      <Section title="Sanciones registradas">
         {highlightId && (
-          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-            Mostrando sanción <strong>#{highlightId}</strong> desde enlace directo.
-          </p>
+          <InlineAlert
+            variant="info"
+            dense
+            message="Abriste esta página desde un enlace directo: la sanción indicada aparece primero."
+            onDismiss={() => setHighlightId(null)}
+            style={{ marginBottom: 12 }}
+          />
         )}
-        {loadError && (
-          <div role="alert" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 8, fontSize: 12 }}>
-            {loadError} <Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>
-          </div>
+        {initialLoading && <SkeletonList rows={5} tableLike />}
+        {!loaded && !loading && loadError && (
+          <InlineAlert
+            variant="danger"
+            title="No se pudieron cargar las sanciones"
+            message={loadError}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
         )}
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : !loadError ? (
-          <DataTable columns={columns} rows={visibleItems} rowKey={(f) => f.id} emptyTitle="Sin sanciones registradas" emptyDescription="Registra una incidencia cuando sea necesario." />
-        ) : null}
+        {loaded && (
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(f) => f.id}
+            ariaLabel="Sanciones"
+            emptyTitle={hasFilters ? "Ninguna sanción coincide" : "Sin sanciones registradas"}
+            emptyDescription={hasFilters ? "Prueba con otra búsqueda o quita los filtros." : "Registra una sanción solo cuando haya una incidencia documentada."}
+            emptyAction={hasFilters ? <Button size="sm" variant="secondary" onClick={clearFilters}>Quitar filtros</Button> : undefined}
+          />
+        )}
       </Section>
+
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        dirty={formDirty && !saving}
+        maxWidth={560}
+        title={editing ? "Editar sanción" : "Nueva sanción"}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void save()} loading={saving} disabled={!!montoError || (!!editing && !formDirty)}>
+              {editing ? "Guardar cambios" : "Registrar sanción"}
+            </Button>
+          </>
+        }
+      >
+        <FormGrid>
+          <FormField label="Persona" fullWidth>
+            {editing ? (
+              <input value={staff.find((s) => String(s.id) === form.usuarioId)?.nombre ?? editing.usuario?.nombre ?? "—"} disabled style={{ ...inp, opacity: 0.7 }} />
+            ) : (
+              <select value={form.usuarioId} onChange={(e) => patchForm({ usuarioId: e.target.value })} style={inp} required>
+                <option value="">Elige a la persona</option>
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                    {s.department?.nombre ? ` · ${s.department.nombre}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
+          <FormField label="Motivo">
+            <select value={form.motivoKey} onChange={(e) => patchForm({ motivoKey: e.target.value })} style={inp}>
+              {MOTIVOS.map((m) => (
+                <option key={m.key} value={m.key}>{m.label}</option>
+              ))}
+            </select>
+          </FormField>
+          {editing && (
+            <FormField label="Estado">
+              <select value={form.estatusPago} onChange={(e) => patchForm({ estatusPago: e.target.value })} style={inp}>
+                {ESTATUS_PAGO.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </FormField>
+          )}
+          <FormField label="Monto a descontar (MXN)" error={montoError} hint="Escribe 0 si solo es una amonestación.">
+            <input type="number" inputMode="decimal" min={0} step="0.01" value={form.monto} onChange={(e) => patchForm({ monto: +e.target.value })} style={{ ...inp, fontVariantNumeric: "tabular-nums" }} />
+          </FormField>
+          <FormField label="Descripción del hecho" fullWidth optional hint="Qué pasó, cuándo y dónde. Ayuda si la persona apela.">
+            <textarea rows={3} value={form.descripcion} onChange={(e) => patchForm({ descripcion: e.target.value })} style={{ ...inp, resize: "vertical" }} />
+          </FormField>
+        </FormGrid>
+        {saveErr && <InlineAlert message={saveErr} style={{ marginTop: 14 }} />}
+      </Modal>
+
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );

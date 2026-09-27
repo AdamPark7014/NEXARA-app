@@ -1,15 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
+import Modal from "@/components/ui/Modal";
+import { FormField, FormGrid } from "@/components/ui/FormField";
+import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -42,6 +46,26 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 const emptyForm = { title: "", content: "", categoryId: "", visibility: "INTERNAL", tags: "" };
 
+const VISIBILITY_LABEL: Record<string, string> = {
+  INTERNAL: "Todo el equipo",
+  RESTRICTED: "Solo dirección",
+  PUBLIC: "Público",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  PUBLISHED: "Publicado",
+  DRAFT: "Borrador",
+};
+
+function splitTags(tags?: string | null): string[] {
+  return (tags ?? "").split(",").map((t) => t.trim()).filter(Boolean);
+}
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid var(--border)",
+  background: "var(--surface)", color: "var(--foreground)", minHeight: 40, boxSizing: "border-box",
+};
+
 export default function KbPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "kb"), [user]);
@@ -51,16 +75,21 @@ export default function KbPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [cats, setCats] = useState<KbCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<KbArticle | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [initialForm, setInitialForm] = useState({ ...emptyForm });
+  const [touched, setTouched] = useState(false);
   const [formErr, setFormErr] = useState<string | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterVisibility, setFilterVisibility] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -72,8 +101,9 @@ export default function KbPage() {
       ]);
       setArticles(Array.isArray(artData) ? artData : (artData?.data ?? []));
       setCats(Array.isArray(catData) ? catData : []);
+      setLoaded(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar la base de conocimiento");
+      setError(formatApiError(e, "No se pudo cargar la base de conocimiento."));
     } finally { setLoading(false); }
   }, [token]);
 
@@ -81,52 +111,84 @@ export default function KbPage() {
 
   const filtered = useMemo(() => {
     let rows = articles;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      rows = rows.filter((a) => a.title.toLowerCase().includes(q) || (a.tags ?? "").toLowerCase().includes(q));
+    const q = deferredSearch.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter((a) =>
+        a.title.toLowerCase().includes(q) ||
+        (a.excerpt ?? "").toLowerCase().includes(q) ||
+        (a.tags ?? "").toLowerCase().includes(q) ||
+        (a.category?.name ?? "").toLowerCase().includes(q),
+      );
     }
     if (filterStatus) rows = rows.filter((a) => a.status === filterStatus);
     if (filterVisibility) rows = rows.filter((a) => a.visibility === filterVisibility);
+    if (filterCategory) rows = rows.filter((a) => String(a.categoryId ?? a.category?.id ?? "") === filterCategory);
     return rows;
-  }, [articles, search, filterStatus, filterVisibility]);
+  }, [articles, deferredSearch, filterStatus, filterVisibility, filterCategory]);
+
+  const stats = useMemo(() => {
+    let published = 0;
+    let drafts = 0;
+    let views = 0;
+    for (const a of articles) {
+      if (a.status === "PUBLISHED") published += 1;
+      else if (a.status === "DRAFT") drafts += 1;
+      views += a.viewCount ?? 0;
+    }
+    return { published, drafts, views };
+  }, [articles]);
 
   const openNew = () => {
     setEditing(null);
     setForm({ ...emptyForm });
+    setInitialForm({ ...emptyForm });
     setFormErr(null);
+    setTouched(false);
     setShowForm(true);
   };
 
   const openEdit = async (a: KbArticle) => {
     setEditing(a);
     setFormErr(null);
+    setTouched(false);
     setShowForm(true);
-    setForm({
+    const base = {
       title: a.title,
       content: "",
       categoryId: a.categoryId != null ? String(a.categoryId) : "",
       visibility: a.visibility,
       tags: a.tags ?? "",
-    });
+    };
+    setForm(base);
+    setInitialForm(base);
     setLoadingEdit(true);
     try {
       const full = await apiFetch(`kb/articles/${a.id}`, token) as KbArticle & { content?: string };
-      setForm({
+      const next = {
         title: full.title ?? a.title,
         content: full.content ?? "",
         categoryId: full.categoryId != null ? String(full.categoryId) : (a.categoryId != null ? String(a.categoryId) : ""),
         visibility: full.visibility ?? a.visibility,
         tags: full.tags ?? a.tags ?? "",
-      });
+      };
+      setForm(next);
+      setInitialForm(next);
     } catch (e) {
-      setFormErr(e instanceof Error ? e.message : "No se pudo cargar el artículo");
+      setFormErr(formatApiError(e, "No se pudo cargar el contenido del artículo."));
     } finally {
       setLoadingEdit(false);
     }
   };
 
+  const closeForm = () => { setShowForm(false); setEditing(null); setFormErr(null); };
+
+  const dirty = (Object.keys(form) as Array<keyof typeof form>).some((k) => form[k] !== initialForm[k]);
+  const titleError = touched && !form.title.trim() ? "Escribe un título." : null;
+  const contentError = touched && !loadingEdit && !form.content.trim() ? "Escribe el contenido del artículo." : null;
+
   const submit = async () => {
-    if (!token || !form.title || !form.content) return;
+    setTouched(true);
+    if (!token || !form.title.trim() || !form.content.trim()) return;
     setSaving(true);
     setFormErr(null);
     try {
@@ -147,23 +209,33 @@ export default function KbPage() {
           body: JSON.stringify({ ...body, status: "PUBLISHED" }),
         });
       }
+      toast.success(editing ? "Artículo actualizado" : "Artículo publicado");
       setShowForm(false);
       setEditing(null);
       setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      setFormErr(e instanceof Error ? e.message : "No se pudo guardar");
+      setFormErr(formatApiError(e, "No se pudo guardar el artículo."));
     } finally { setSaving(false); }
   };
 
-  const remove = async (a: KbArticle) => {
+  const remove = (a: KbArticle) => {
     if (!token) return;
-    setConfirmState({ message: `¿Eliminar el artículo "${a.title}"?`, fn: async () => {
-    try {
-      await apiFetch(`kb/articles/${a.id}`, token, { method: "DELETE" });
-      setArticles((prev) => prev.filter((x) => x.id !== a.id));
-    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
-  } });
+    setConfirmState({
+      title: "Eliminar artículo",
+      message: `Se eliminará «${a.title}». Esta acción no se puede deshacer.`,
+      confirmLabel: "Eliminar",
+      danger: true,
+      fn: async () => {
+        try {
+          await apiFetch(`kb/articles/${a.id}`, token, { method: "DELETE" });
+          setArticles((prev) => prev.filter((x) => x.id !== a.id));
+          toast.success("Artículo eliminado");
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo eliminar el artículo"));
+        }
+      },
+    });
   };
 
   const togglePublish = async (a: KbArticle) => {
@@ -172,245 +244,254 @@ export default function KbPage() {
     try {
       await apiFetch(`kb/articles/${a.id}`, token, { method: "PATCH", body: JSON.stringify({ status: nextStatus }) });
       setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, status: nextStatus } : x)));
-    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+      toast.success(nextStatus === "PUBLISHED" ? "Artículo publicado" : "Artículo movido a borradores");
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cambiar el estado"));
+    }
   };
-
-  const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
   const columns: Column<KbArticle>[] = [
     {
       key: "title", label: "Artículo",
-      render: (a) => (
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{a.title}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{a.excerpt?.slice(0, 70) ?? "—"}</div>
-        </div>
-      ),
+      render: (a) => {
+        const tags = splitTags(a.tags);
+        return (
+          <div style={{ minWidth: 0, maxWidth: 520 }}>
+            <div style={{ fontWeight: 650, fontSize: 13.5 }}>{a.title}</div>
+            {a.excerpt && (
+              <div
+                style={{
+                  fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45, marginTop: 2,
+                  display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                }}
+              >
+                {a.excerpt}
+              </div>
+            )}
+            {tags.length > 0 && (
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                {tags.slice(0, 4).map((t) => (
+                  <span key={t} style={{ fontSize: 11, padding: "1px 7px", borderRadius: 999, background: "var(--surface-2)", color: "var(--text-secondary)" }}>
+                    #{t}
+                  </span>
+                ))}
+                {tags.length > 4 && <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>+{tags.length - 4}</span>}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
-    { key: "category", label: "Categoría", accessor: (a) => a.category?.name ?? "—", width: 140 },
-    { key: "visibility", label: "Visibilidad", render: (a) => <Tag variant={a.visibility === "RESTRICTED" ? "warning" : "default"}>{a.visibility}</Tag>, width: 120 },
-    { key: "status", label: "Estado", render: (a) => <Tag variant={a.status === "PUBLISHED" ? "positive" : "warning"}>{a.status}</Tag>, width: 110 },
-    { key: "viewCount", label: "Vistas", accessor: (a) => a.viewCount ?? 0, width: 80 },
+    { key: "category", label: "Categoría", accessor: (a) => a.category?.name ?? "Sin categoría", width: 150 },
+    {
+      key: "visibility", label: "Quién lo ve", width: 140,
+      render: (a) => <Tag variant={a.visibility === "RESTRICTED" ? "warning" : a.visibility === "PUBLIC" ? "accent" : "default"} size="sm">{VISIBILITY_LABEL[a.visibility] ?? "Todo el equipo"}</Tag>,
+    },
+    {
+      key: "status", label: "Estado", width: 110,
+      render: (a) => <Tag variant={a.status === "PUBLISHED" ? "positive" : "warning"} size="sm" dot>{STATUS_LABEL[a.status] ?? "Borrador"}</Tag>,
+    },
+    { key: "viewCount", label: "Lecturas", numeric: true, align: "right", accessor: (a) => (a.viewCount ?? 0).toLocaleString("es-MX"), width: 90 },
     ...(cfg.canCreate ? [{
-      key: "acciones" as keyof KbArticle, label: "",
+      key: "acciones" as keyof KbArticle, label: "Acciones", align: "right" as const,
       render: (a: KbArticle) => (
-        <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEdit(a); }}>Editar</Button>
-          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void togglePublish(a); }}>
-            {a.status === "PUBLISHED" ? "Despublicar" : "Publicar"}
+        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void openEdit(a); }}>Editar</Button>
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void togglePublish(a); }}>
+            {a.status === "PUBLISHED" ? "Pasar a borrador" : "Publicar"}
           </Button>
-          {cfg.canDelete && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(a); }}>Eliminar</Button>}
+          {cfg.canDelete && (
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); remove(a); }} style={{ color: "var(--danger)" }}>
+              Eliminar
+            </Button>
+          )}
         </div>
       ),
-      width: 200,
+      width: 280,
     }] : []),
   ];
+
+  const initialLoading = loading && !loaded;
+  const clearFilters = () => { setSearch(""); setFilterStatus(""); setFilterVisibility(""); setFilterCategory(""); };
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Gobierno"
-        title="Knowledge Base"
-        subtitle="Procedimientos, manuales técnicos, checklists y políticas internas — wiki con búsqueda y permisos por visibilidad."
+        eyebrow="Gobierno · Base de conocimiento"
+        title="Base de conocimiento"
+        subtitle="Procedimientos, manuales técnicos, listas de verificación y políticas internas, con búsqueda y control de quién puede verlos."
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            <Button variant="secondary" iconLeft="↻" loading={loading && loaded} onClick={() => void load()}>Actualizar</Button>
             {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo artículo</Button>}
           </>
         }
       />
 
-      {!loading && articles.length > 0 && (() => {
-        const publicados = articles.filter((a) => a.status === "PUBLISHED").length;
-        const borradores = articles.filter((a) => a.status === "DRAFT").length;
-        const totalVistas = articles.reduce((s, a) => s + (a.viewCount ?? 0), 0);
-        const byCat = Object.entries(
-          articles.reduce<Record<string, number>>((acc, a) => { const k = a.category?.name ?? "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
-        ).sort((a, b) => b[1] - a[1]);
-        return (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
-              <KpiCard label="Artículos total" value={articles.length} icon="📚" />
-              <KpiCard label="Publicados" value={publicados} variant="positive" icon="✅" hint="Visibles para usuarios" />
-              <KpiCard label="Borradores" value={borradores} variant={borradores > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de revisar" />
-              <KpiCard label="Vistas totales" value={totalVistas} variant="accent" icon="👁️" hint="Lecturas acumuladas" />
-            </div>
-            {byCat.length > 0 && (
-              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Artículos por categoría</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {byCat.map(([cat, count]) => (
-                    <div key={cat} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
-                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${(count / articles.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
-                      </div>
-                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()}
+      {loaded && articles.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <MetricStrip
+            ariaLabel="Resumen de la base de conocimiento"
+            metrics={[
+              { label: "Artículos", value: articles.length },
+              { label: "Publicados", value: stats.published, tone: "success", onClick: () => setFilterStatus("PUBLISHED") },
+              { label: "Borradores", value: stats.drafts, tone: stats.drafts ? "warning" : "default", hint: stats.drafts ? "Pendientes de revisar" : undefined, onClick: () => setFilterStatus("DRAFT") },
+              { label: "Lecturas", value: stats.views.toLocaleString("es-MX") },
+            ]}
+          />
+        </div>
+      )}
+
+      {error && loaded && (
+        <InlineAlert
+          variant="warning"
+          title="No se pudo actualizar"
+          message={`${error} Mostramos la última información cargada.`}
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       <FilterToolbar
-        search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o tag…" }}
+        search={{ value: search, onChange: setSearch, placeholder: "Buscar por título, contenido, categoría o etiqueta…", ariaLabel: "Buscar artículos" }}
         selects={[
+          ...(cats.length > 0 ? [{
+            label: "Categoría",
+            value: filterCategory,
+            onChange: setFilterCategory,
+            options: cats.map((c) => ({ value: String(c.id), label: c.name })),
+            allowAll: true,
+            allLabel: "Todas",
+          }] : []),
           {
             label: "Estado",
             value: filterStatus,
             onChange: setFilterStatus,
             options: [
-              { value: "PUBLISHED", label: "Publicado" },
-              { value: "DRAFT", label: "Borrador" },
+              { value: "PUBLISHED", label: "Publicados" },
+              { value: "DRAFT", label: "Borradores" },
             ],
             allowAll: true,
           },
           {
-            label: "Visibilidad",
+            label: "Quién lo ve",
             value: filterVisibility,
             onChange: setFilterVisibility,
-            options: [
-              { value: "INTERNAL", label: "Interno" },
-              { value: "RESTRICTED", label: "Dirección" },
-              { value: "PUBLIC", label: "Público" },
-            ],
+            options: Object.entries(VISIBILITY_LABEL).map(([value, label]) => ({ value, label })),
             allowAll: true,
           },
         ]}
-        onClear={() => { setSearch(""); setFilterStatus(""); setFilterVisibility(""); }}
-        resultCount={loading ? null : filtered.length}
+        onClear={clearFilters}
+        resultCount={initialLoading ? null : filtered.length}
         rightActions={articles.length > 0 ? (
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "title", label: "Título" },
-            { key: "category", label: "Categoría", format: (v) => (v as KbArticle["category"])?.name ?? "—" },
-            { key: "status", label: "Estado" },
-            { key: "visibility", label: "Visibilidad" },
-            { key: "viewCount", label: "Vistas" },
-            { key: "tags", label: "Tags" },
-          ], "knowledge-base")}>Excel</Button>
+            { key: "category", label: "Categoría", format: (v) => (v as KbArticle["category"])?.name ?? "Sin categoría" },
+            { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v)] ?? String(v ?? "") },
+            { key: "visibility", label: "Quién lo ve", format: (v) => VISIBILITY_LABEL[String(v)] ?? String(v ?? "") },
+            { key: "viewCount", label: "Lecturas" },
+            { key: "tags", label: "Etiquetas" },
+          ], "base-de-conocimiento")}>Exportar a Excel</Button>
         ) : undefined}
       />
 
-      <Section title={loading ? "Cargando…" : `${filtered.length} artículos`}>
-        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando la base de conocimiento." />}
-        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={filtered} rowKey={(a) => a.id} emptyTitle="Sin artículos" emptyDescription="Crea el primer artículo de la wiki interna." />}
+      <Section title={initialLoading ? "Cargando artículos" : `${filtered.length} ${filtered.length === 1 ? "artículo" : "artículos"}`}>
+        {initialLoading && !error && <SkeletonList rows={5} tableLike />}
+        {!loaded && !loading && error && (
+          <InlineAlert
+            variant="danger"
+            title="No se pudo cargar la base de conocimiento"
+            message={error}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
+        {loaded && (
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            rowKey={(a) => a.id}
+            ariaLabel="Artículos"
+            emptyTitle={articles.length === 0 ? "Aún no hay artículos" : "Sin coincidencias"}
+            emptyDescription={articles.length === 0 ? "Documenta el primer procedimiento para que el equipo lo consulte." : "Ningún artículo coincide con la búsqueda o los filtros."}
+            emptyAction={
+              articles.length === 0
+                ? (cfg.canCreate ? <Button size="sm" variant="primary" onClick={openNew}>Nuevo artículo</Button> : undefined)
+                : <Button size="sm" variant="secondary" onClick={clearFilters}>Limpiar filtros</Button>
+            }
+          />
+        )}
       </Section>
 
-      {showForm && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 1000,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 16,
-          }}
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            role="dialog"
-            aria-labelledby="kb-new-title"
-            style={{
-              background: "var(--surface)",
-              borderRadius: 14,
-              width: "100%",
-              maxWidth: 520,
-              maxHeight: "min(88vh, 560px)",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 20px 48px rgba(0,0,0,0.22)",
-              border: "1px solid var(--border)",
-              overflow: "hidden",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ padding: "18px 20px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-              <div id="kb-new-title" style={{ fontSize: 15, fontWeight: 700 }}>{editing ? "Editar artículo" : "Nuevo artículo"}</div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
-                Procedimiento o guía para el equipo. Se publica de inmediato en la wiki interna.
-              </div>
-            </div>
-
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "grid", gap: 12 }}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Título *</span>
-                <input
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Ej. Instalación CCTV residencial — checklist"
-                  style={inp}
-                  autoFocus
-                />
-              </label>
-
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contenido *</span>
-                <textarea
-                  value={form.content}
-                  onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                  placeholder="Pasos, requisitos, notas técnicas… (Markdown permitido)"
-                  rows={5}
-                  style={{ ...inp, resize: "vertical", minHeight: 96, maxHeight: 180, fontFamily: "inherit", lineHeight: 1.45 }}
-                />
-              </label>
-
-              <div style={{ display: "grid", gridTemplateColumns: cats.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>
-                {cats.length > 0 && (
-                  <label style={{ display: "grid", gap: 4 }}>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
-                    <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
-                      <option value="">Sin categoría</option>
-                      {cats.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                    </select>
-                  </label>
-                )}
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Quién puede verlo</span>
-                  <select value={form.visibility} onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value }))} style={inp}>
-                    <option value="INTERNAL">Todo el equipo</option>
-                    <option value="RESTRICTED">Solo dirección</option>
-                    <option value="PUBLIC">Público (portal)</option>
-                  </select>
-                </label>
-              </div>
-
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Etiquetas (opcional)</span>
-                <input
-                  value={form.tags}
-                  onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  placeholder="cctv, instalación, checklist"
-                  style={inp}
-                />
-              </label>
-
-              {formErr && (
-                <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
-                  {formErr}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              display: "flex", gap: 10, padding: "12px 20px 16px",
-              justifyContent: "flex-end", borderTop: "1px solid var(--border)", flexShrink: 0,
-              background: "var(--surface)",
-            }}>
-              <Button variant="secondary" onClick={() => { setShowForm(false); setEditing(null); setFormErr(null); }}>Cancelar</Button>
-              <Button
-                variant="primary"
-                onClick={() => void submit()}
-                disabled={saving || loadingEdit || !form.title.trim() || !form.content.trim()}
-              >
-                {saving ? "Guardando…" : loadingEdit ? "Cargando…" : editing ? "Guardar cambios" : "Publicar artículo"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showForm}
+        onClose={closeForm}
+        dirty={dirty && !saving}
+        maxWidth={720}
+        title={editing ? "Editar artículo" : "Nuevo artículo"}
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeForm}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submit()} loading={saving} disabled={loadingEdit || (!!editing && !dirty)}>
+              {editing ? "Guardar cambios" : "Publicar artículo"}
+            </Button>
+          </>
+        }
+      >
+        {!editing && (
+          <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            Procedimiento o guía para el equipo. Se publica de inmediato.
+          </p>
+        )}
+        <FormGrid>
+          <FormField label="Título" fullWidth error={titleError}>
+            <input
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Ej. Instalación de CCTV residencial: lista de verificación"
+              style={inp}
+              aria-invalid={!!titleError}
+            />
+          </FormField>
+          <FormField label="Contenido" fullWidth error={contentError} hint="Puedes usar formato Markdown: **negritas**, listas con guiones y títulos con #.">
+            {loadingEdit ? (
+              <SkeletonList rows={4} />
+            ) : (
+              <textarea
+                value={form.content}
+                onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+                placeholder="Pasos, requisitos y notas técnicas…"
+                rows={10}
+                style={{ ...inp, resize: "vertical", minHeight: 180, fontFamily: "inherit", lineHeight: 1.55 }}
+                aria-invalid={!!contentError}
+              />
+            )}
+          </FormField>
+          {cats.length > 0 && (
+            <FormField label="Categoría" optional>
+              <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
+                <option value="">Sin categoría</option>
+                {cats.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+              </select>
+            </FormField>
+          )}
+          <FormField label="Quién puede verlo" fullWidth={cats.length === 0}>
+            <select value={form.visibility} onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value }))} style={inp}>
+              <option value="INTERNAL">Todo el equipo</option>
+              <option value="RESTRICTED">Solo dirección</option>
+              <option value="PUBLIC">Público (portal de clientes)</option>
+            </select>
+          </FormField>
+          <FormField label="Etiquetas" optional fullWidth hint="Separadas por comas.">
+            <input
+              value={form.tags}
+              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+              placeholder="cctv, instalación, lista de verificación"
+              style={inp}
+            />
+          </FormField>
+        </FormGrid>
+        {formErr && <InlineAlert message={formErr} style={{ marginTop: 14 }} />}
+      </Modal>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
