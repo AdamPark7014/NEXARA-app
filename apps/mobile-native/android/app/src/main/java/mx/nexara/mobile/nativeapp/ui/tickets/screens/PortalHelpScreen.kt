@@ -150,7 +150,7 @@ private fun formatPublishedAt(raw: String?): String {
     if (raw.isNullOrBlank()) return ""
     return runCatching {
         val instant = Instant.parse(raw)
-        val formatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale("es", "MX"))
+        val formatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("es-MX"))
         formatter.format(instant.atZone(ZoneId.systemDefault()))
     }.getOrDefault(raw.take(10))
 }
@@ -158,7 +158,7 @@ private fun formatPublishedAt(raw: String?): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PortalHelpScreen(
-    onBack: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val vm: PortalHelpViewModel = viewModel()
@@ -174,12 +174,8 @@ fun PortalHelpScreen(
                 .fillMaxSize()
                 .padding(16.dp),
         ) {
-            OutlinedButton(onClick = onBack) { Text("← Portal") }
-
-            Spacer(Modifier.height(12.dp))
-
             Text(
-                "🆘 Centro de ayuda",
+                "Centro de ayuda",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = NxColors.Slate,

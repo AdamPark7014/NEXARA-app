@@ -99,7 +99,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 
@@ -491,7 +492,7 @@ fun TicketsBranchEditScreen(
 
     branchId: Long?,
 
-    onBack: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
 
     modifier: Modifier = Modifier,
 
@@ -539,17 +540,17 @@ fun TicketsBranchEditScreen(
 
         ) {
 
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
+            NxPrimaryButton(
 
-            Button(
+                text = if (state.saving) "Guardando…" else "Guardar sucursal",
 
                 onClick = { vm.save(branchId, context) },
 
                 enabled = !state.saving,
 
-                modifier = Modifier.weight(1f),
+                loading = state.saving,
 
-            ) { Text(if (state.saving) "Guardando…" else "Guardar") }
+            )
 
         }
 
@@ -557,7 +558,7 @@ fun TicketsBranchEditScreen(
 
         if (state.isLoading) {
 
-            NxLoadingBlock("Cargando sucursal…")
+            NxSkeletonList(itemCount = 4, itemHeight = 96.dp, modifier = Modifier.padding(horizontal = 16.dp))
 
             return@Column
 

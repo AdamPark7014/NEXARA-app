@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 
 import androidx.compose.foundation.layout.padding
 
@@ -47,6 +48,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 
 import androidx.compose.material3.OutlinedButton
 
@@ -327,7 +329,7 @@ class TicketsRequestNewViewModel(app: Application) : AndroidViewModel(app) {
 
 fun TicketsRequestNewScreen(
 
-    onBack: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
 
     modifier: Modifier = Modifier,
 
@@ -418,8 +420,6 @@ fun TicketsRequestNewScreen(
 
             ) {
 
-                OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-
                 Button(
 
                     onClick = {
@@ -450,9 +450,9 @@ fun TicketsRequestNewScreen(
 
                     enabled = canSubmit,
 
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
 
-                ) { Text(if (state.saving) "Enviando…" else "Crear") }
+                ) { Text(if (state.saving) "Enviando…" else "Enviar solicitud") }
 
             }
 
@@ -618,7 +618,7 @@ fun TicketsRequestNewScreen(
 
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = branchExpanded) },
 
-                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
 
                                 )
 
@@ -698,7 +698,7 @@ fun TicketsRequestNewScreen(
 
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = urgencyExpanded) },
 
-                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
 
                                 )
 
@@ -746,7 +746,7 @@ fun TicketsRequestNewScreen(
 
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
 
-                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
 
                                 )
 
