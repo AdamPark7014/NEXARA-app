@@ -16,6 +16,18 @@ import type { CSSProperties, ReactNode } from "react";
 
 type Variant = "default" | "compact" | "page";
 
+/** Color del icono según el motivo del vacío. `neutral` = gris (por defecto). */
+export type EmptyStateTone = "neutral" | "brand" | "info" | "success" | "warning" | "danger";
+
+const TONE_INK: Record<EmptyStateTone, { color: string; bg: string | null }> = {
+  neutral: { color: "var(--ui-fg-3, var(--text-tertiary))", bg: null },
+  brand: { color: "var(--ui-brand-text)", bg: "var(--ui-brand-soft)" },
+  info: { color: "var(--ui-info-text)", bg: "var(--ui-info-bg)" },
+  success: { color: "var(--ui-success-text)", bg: "var(--ui-success-bg)" },
+  warning: { color: "var(--ui-warning-text)", bg: "var(--ui-warning-bg)" },
+  danger: { color: "var(--ui-danger-text)", bg: "var(--ui-danger-bg)" },
+};
+
 function DefaultIcon() {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
@@ -39,6 +51,8 @@ export default function EmptyState({
   variant = "default",
   className,
   style,
+  tone = "neutral",
+  secondaryAction,
 }: {
   icon?: ReactNode;
   title: ReactNode;
@@ -47,8 +61,13 @@ export default function EmptyState({
   variant?: Variant;
   className?: string;
   style?: CSSProperties;
+  /** Color del icono (p. ej. `success` para «todo al día», `danger` para «no se pudo cargar»). */
+  tone?: EmptyStateTone;
+  /** Segunda salida, junto a `action` (p. ej. «Limpiar filtros»). */
+  secondaryAction?: ReactNode;
 }) {
   const s = SPACE[variant] ?? SPACE.default;
+  const ink = TONE_INK[tone] ?? TONE_INK.neutral;
 
   return (
     <div
@@ -70,9 +89,15 @@ export default function EmptyState({
         aria-hidden="true"
         style={{
           display: "inline-flex",
-          // El icono orienta, no decora: gris terciario, sin píldora detrás.
-          color: "var(--text-tertiary)",
+          alignItems: "center",
+          justifyContent: "center",
+          // El icono orienta, no decora: gris terciario, sin píldora detrás
+          // salvo que el tono diga algo (éxito, error…).
+          color: ink.color,
           marginBottom: 2,
+          ...(ink.bg
+            ? { background: ink.bg, width: s.icon + 22, height: s.icon + 22, borderRadius: "50%" }
+            : null),
         }}
       >
         {icon ?? <DefaultIcon />}
@@ -107,7 +132,20 @@ export default function EmptyState({
         </p>
       )}
 
-      {action && <div style={{ marginTop: s.gap }}>{action}</div>}
+      {(action || secondaryAction) && (
+        <div
+          style={{
+            marginTop: s.gap,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            justifyContent: "center",
+          }}
+        >
+          {action}
+          {secondaryAction}
+        </div>
+      )}
     </div>
   );
 }
