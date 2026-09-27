@@ -40,10 +40,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AlternateEmail
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -51,9 +53,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Lock
@@ -103,7 +103,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -177,7 +177,7 @@ import java.util.Locale
 private val chatZone: ZoneId = ZoneId.systemDefault()
 private val chatTimeFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val chatDayFmt: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", Locale("es", "MX"))
+    DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", Locale.forLanguageTag("es-MX"))
 private val chatChannelTimeFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM HH:mm")
 private val chatEntityLinkRegex = Regex("""\[([^\]\n]+)\]\(([^)]+)\)""")
 
@@ -1663,7 +1663,7 @@ fun ChatScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = { vm.clearChannel() }) {
-                            Icon(Icons.Default.ArrowBack, "Volver")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver")
                         }
                     },
                     actions = {
@@ -1737,7 +1737,7 @@ fun ChatScreen(
                                 if (state.canLeaveChannel) {
                                     DropdownMenuItem(
                                         text = { Text("Salir del canal") },
-                                        leadingIcon = { Icon(Icons.Default.Logout, contentDescription = "Salir") },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Salir") },
                                         enabled = !state.channelActionLoading,
                                         onClick = {
                                             channelMenuExpanded = false
@@ -2621,7 +2621,7 @@ private fun ChatComposeBar(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Default.Send,
+                    Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Enviar",
                     tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
@@ -2645,7 +2645,7 @@ private fun ReplyPreviewBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(Icons.Default.Reply, contentDescription = "Respondiendo", tint = NxColors.Brand)
+        Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = "Respondiendo", tint = NxColors.Brand)
         Column(Modifier.weight(1f)) {
             Text("Respondiendo a $author", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
             Text(
@@ -2772,7 +2772,7 @@ private fun ThreadSheetContent(
                 onClick = onSend,
                 enabled = draft.isNotBlank() && !sending && !uploading,
             ) {
-                Icon(Icons.Default.Send, contentDescription = "Enviar respuesta", modifier = Modifier.padding(end = 4.dp))
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar respuesta", modifier = Modifier.padding(end = 4.dp))
                 Text("Responder")
             }
         }
@@ -3135,7 +3135,7 @@ private fun messageActionItems(
     DropdownMenuItem(
         text = { Text("Responder") },
         onClick = onReply,
-        leadingIcon = { Icon(Icons.Default.Reply, contentDescription = "Responder") },
+        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, contentDescription = "Responder") },
     )
     if (isOwn) {
         DropdownMenuItem(

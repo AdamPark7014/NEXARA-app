@@ -3,10 +3,10 @@ package mx.nexara.mobile.nativeapp.ui.console
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
@@ -255,9 +255,9 @@ internal object ConsoleRoutes {
 }
 
 private fun CoreModule.icon(): ImageVector = when (this) {
-    CoreModule.ACTIVIDADES -> Icons.Default.Assignment
+    CoreModule.ACTIVIDADES -> Icons.AutoMirrored.Filled.Assignment
     CoreModule.ASISTENCIAS -> Icons.Default.Schedule
-    CoreModule.CHAT -> Icons.Default.Chat
+    CoreModule.CHAT -> Icons.AutoMirrored.Filled.Chat
     CoreModule.CLIENTES -> Icons.Default.Business
     CoreModule.MI_PERFIL -> Icons.Default.Person
 }

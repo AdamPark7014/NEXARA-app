@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
-import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -82,7 +82,7 @@ enum class OfflineMutationKind(
 ) {
     Evidence("Evidencia", Icons.Outlined.PhotoCamera, NxColors.Info),
     Activity("Actividad", Icons.Outlined.Event, NxColors.Brand),
-    Chat("Chat", Icons.Outlined.Chat, Color(0xFF6366F1)),
+    Chat("Chat", Icons.AutoMirrored.Outlined.Chat, Color(0xFF6366F1)),
     Attendance("Asistencia", Icons.AutoMirrored.Outlined.Assignment, NxColors.BrandDark),
     Gps("GPS", Icons.Outlined.GpsFixed, NxColors.Accent),
     Generic("Mutación", Icons.Outlined.CloudSync, NxColors.Muted),
