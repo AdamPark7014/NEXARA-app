@@ -396,6 +396,19 @@ object NxStatusLabels {
         return human.replaceFirstChar { it.titlecase(Locale.forLanguageTag("es-MX")) }
     }
 
+    /** `HIGH` / `ALTA` → «Alta»; `null` si no hay prioridad. */
+    fun priority(raw: String?): String? {
+        val key = raw?.trim()?.uppercase(Locale.ROOT).orEmpty()
+        return when (key) {
+            "", "—", "NULL" -> null
+            "LOW", "BAJA" -> "Baja"
+            "MEDIUM", "NORMAL", "MEDIA" -> "Media"
+            "HIGH", "ALTA" -> "Alta"
+            "URGENT", "URGENTE", "CRITICAL", "CRITICA", "CRÍTICA" -> "Urgente"
+            else -> label(raw)
+        }
+    }
+
     fun tone(raw: String?): NxTone {
         val key = raw?.trim()?.uppercase(Locale.ROOT)?.replace(' ', '_')?.replace('-', '_').orEmpty()
         return when (key) {

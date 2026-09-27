@@ -61,9 +61,11 @@ import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedPdfButton
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 
 /**
  * El día de una persona del equipo (/erp/pizarra/:userId): entrada, tiempo en
@@ -123,9 +125,9 @@ fun BoardPersonScreen(
     val p = person
     if (p == null) {
         if (loading) {
-            NxLoadingBlock("Cargando perfil…")
+            NxSkeletonList(itemCount = 4, itemHeight = 96.dp, modifier = Modifier.fillMaxWidth().padding(16.dp))
         } else {
-            Column(Modifier.padding(16.dp)) { NxErrorBlock(error ?: "No encontrado") { reload++ } }
+            NxErrorState(message = error ?: "No se encontró a esta persona.", onRetry = { reload++ })
         }
         return
     }
@@ -143,6 +145,11 @@ fun BoardPersonScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            error?.let { msg ->
+                item(key = "refresh-error") {
+                    NxRefreshErrorBanner(message = msg, onRetry = { reload++ }, onDismiss = { error = null })
+                }
+            }
             item {
                 NxPanelShell {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -235,8 +242,14 @@ fun BoardPersonScreen(
                     if (act != null) {
                         act.anNumber?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate) }
                         Text(act.titulo.orEmpty(), fontSize = 16.sp, color = NxColors.Slate)
-                        Text("Estatus: ${act.estatus.orEmpty()}", fontSize = 13.sp, color = NxColors.Muted)
-                        TextButton(onClick = { onOpenActivity(act.id, null) }) {
+                        act.estatus?.takeIf { it.isNotBlank() }?.let { estatus ->
+                            Spacer(Modifier.height(6.dp))
+                            NxStatusChip(estatus, activStatusTone(estatus))
+                        }
+                        TextButton(
+                            onClick = { onOpenActivity(act.id, null) },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
                             Text("Abrir actividad →", color = NxColors.Brand, fontWeight = FontWeight.Bold)
                         }
                     } else {

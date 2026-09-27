@@ -1,37 +1,36 @@
 package mx.nexara.mobile.nativeapp.ui.tickets.screens
 
 import android.app.Application
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -46,10 +45,27 @@ import mx.nexara.mobile.nativeapp.data.api.ClientTicketRequestDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterBar
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterPill
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSecondaryButton
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
 data class TicketsRequestsUiState(
@@ -96,6 +112,8 @@ class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun dismissMessage() = _state.update { it.copy(message = null) }
+
+    fun dismissError() = _state.update { it.copy(error = null) }
 
     fun closeRequest(id: Long) {
         _state.update { it.copy(saving = true, error = null, message = null) }
@@ -146,13 +164,31 @@ private fun requestStatusTone(status: String?): NxTone {
     }
 }
 
+private fun requestStatusLabel(status: String?): String = when ((status ?: "").uppercase()) {
+    "NEW" -> "Nueva"
+    "APPROVED" -> "Autorizada"
+    "REJECTED" -> "Rechazada"
+    "CLOSED" -> "Cerrada"
+    else -> NxStatusLabels.label(status)
+}
+
 private fun requestTypeLabel(type: String?): String = when (type?.uppercase()) {
     "PREVENTIVE_INVENTORY" -> "Mantenimiento e inventario"
     "ISSUE" -> "Ticket por problema"
-    else -> type ?: "—"
+    else -> NxStatusLabels.label(type)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val REQUEST_FILTERS = listOf(
+    "activas" to "Activas",
+    "nuevas" to "Nuevas",
+    "cerradas" to "Cerradas",
+    "todas" to "Todas",
+)
+
+/** Acción que espera confirmación: cerrar o rechazar no se deshacen. */
+private data class PendingRequestAction(val id: Long, val kind: String)
+
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun TicketsRequestsScreen(
     onBack: () -> Unit,
@@ -161,181 +197,256 @@ fun TicketsRequestsScreen(
 ) {
     val vm: TicketsRequestsViewModel = viewModel()
     val state by vm.state.collectAsState()
-    var filter by remember { mutableStateOf("activas") }
-    var query by remember { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf("activas") }
+    var query by rememberSaveable { mutableStateOf("") }
+    var pending by remember { mutableStateOf<PendingRequestAction?>(null) }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-        ) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-            OutlinedButton(onClick = { vm.refresh(initial = false) }, modifier = Modifier.weight(1f)) { Text("Actualizar") }
-            Button(onClick = onCreate, modifier = Modifier.weight(1f)) { Text("+ Nueva") }
+    val requests = state.requests
+    val kpis = remember(requests) {
+        val open = requests.count { (it.status ?: "").uppercase() != "CLOSED" }
+        val newCount = requests.count { (it.status ?: "").uppercase() == "NEW" }
+        listOf(
+            NxKpi("Activas", "$open", tone = if (open > 0) NxTone.Warning else NxTone.Success),
+            NxKpi("Nuevas", "$newCount", tone = if (newCount > 0) NxTone.Info else NxTone.Neutral),
+            NxKpi("Total", "${requests.size}", tone = NxTone.Brand),
+        )
+    }
+    val filtered = remember(requests, filter, query) {
+        val q = query.trim().lowercase()
+        requests.filter { r ->
+            val status = (r.status ?: "").uppercase()
+            val matchFilter = when (filter) {
+                "activas" -> status != "CLOSED"
+                "cerradas" -> status == "CLOSED"
+                "nuevas" -> status == "NEW"
+                else -> true
+            }
+            val matchQuery = q.isBlank() || buildString {
+                append(r.description); append(" ")
+                append(r.branchName ?: ""); append(" ")
+                append(r.urgency ?: ""); append(" ")
+                append(r.status ?: "")
+            }.lowercase().contains(q)
+            matchFilter && matchQuery
         }
+    }
 
-        if (state.isLoading) {
-            NxLoadingBlock("Cargando solicitudes…")
-            return@Column
-        }
-
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = { vm.refresh(initial = false) },
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+    NxScreenScaffold(
+        modifier = modifier,
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+    ) {
+        when {
+            state.isLoading -> NxSkeletonList(
+                itemCount = 5,
+                itemHeight = 120.dp,
+                modifier = Modifier.fillMaxWidth().padding(NxSpacing.ListPadding),
+            )
+            requests.isEmpty() && !state.error.isNullOrBlank() -> NxErrorState(
+                message = state.error,
+                onRetry = { vm.refresh(initial = true) },
+            )
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
+                verticalArrangement = Arrangement.spacedBy(NxSpacing.ListGap),
             ) {
-                item {
-                    Text("Solicitudes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Levanta tickets y revisa el estatus de cada solicitud",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                state.message?.takeIf { it.isNotBlank() }?.let { msg ->
+                    item(key = "message") {
+                        NxAlertBanner(
+                            NxAlert(
+                                id = "message",
+                                title = msg,
+                                tone = NxTone.Success,
+                                actionLabel = "Cerrar",
+                                onAction = vm::dismissMessage,
+                            ),
+                        )
+                    }
                 }
-
-                if (!state.message.isNullOrBlank()) {
-                    item {
-                        Text(state.message!!, color = MaterialTheme.colorScheme.primary)
-                        OutlinedButton(onClick = vm::dismissMessage) { Text("Cerrar aviso") }
+                state.error?.takeIf { it.isNotBlank() }?.let { msg ->
+                    item(key = "refresh-error") {
+                        NxRefreshErrorBanner(
+                            message = msg,
+                            onRetry = { vm.refresh(initial = false) },
+                            onDismiss = vm::dismissError,
+                        )
                     }
                 }
 
-                if (!state.error.isNullOrBlank()) {
-                    item {
-                        Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                        Button(onClick = { vm.refresh(initial = true) }) { Text("Reintentar") }
-                    }
-                }
-
-                item {
-                    val open = state.requests.count { (it.status ?: "").uppercase() != "CLOSED" }
-                    val newCount = state.requests.count { (it.status ?: "").uppercase() == "NEW" }
-                    NxKpiGrid(
-                        items = listOf(
-                            NxKpi("Activas", "$open", tone = if (open > 0) NxTone.Warning else NxTone.Success),
-                            NxKpi("Nuevas", "$newCount", tone = if (newCount > 0) NxTone.Info else NxTone.Neutral),
-                            NxKpi("Total", "${state.requests.size}", tone = NxTone.Brand),
-                        ),
+                item(key = "header") {
+                    NxSectionHeader(
+                        title = "Solicitudes",
+                        subtitle = "Levanta tickets y revisa el estatus de cada solicitud.",
                     )
                 }
 
-                item {
-                    OutlinedTextField(
+                item(key = "kpis") { NxKpiGrid(items = kpis, columns = 3) }
+
+                item(key = "search") {
+                    NxSearchField(
                         value = query,
                         onValueChange = { query = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Buscar descripción o sucursal") },
-                        singleLine = true,
+                        placeholder = "Buscar descripción o sucursal",
                     )
                 }
 
-                item {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        listOf(
-                            "activas" to "Activas",
-                            "nuevas" to "Nuevas",
-                            "cerradas" to "Cerradas",
-                            "todas" to "Todas",
-                        ).forEach { (key, label) ->
-                            FilterChip(
+                item(key = "filters") {
+                    NxFilterBar(contentPadding = PaddingValues(0.dp)) {
+                        REQUEST_FILTERS.forEach { (key, label) ->
+                            NxFilterPill(
+                                label = label,
+                                count = null,
                                 selected = filter == key,
                                 onClick = { filter = key },
-                                label = { Text(label) },
                             )
                         }
                     }
                 }
 
-                val q = query.trim().lowercase()
-                val filtered = state.requests.filter { r ->
-                    val status = (r.status ?: "").uppercase()
-                    val matchFilter = when (filter) {
-                        "activas" -> status != "CLOSED"
-                        "cerradas" -> status == "CLOSED"
-                        "nuevas" -> status == "NEW"
-                        else -> true
-                    }
-                    val matchQuery = q.isBlank() || buildString {
-                        append(r.description); append(" ")
-                        append(r.branchName ?: ""); append(" ")
-                        append(r.urgency ?: ""); append(" ")
-                        append(r.status ?: "")
-                    }.lowercase().contains(q)
-                    matchFilter && matchQuery
-                }
-
                 if (filtered.isEmpty()) {
-                    item {
-                        Text("No hay solicitudes con este filtro.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    item(key = "empty") {
+                        NxEmptyState(
+                            title = if (requests.isEmpty()) "Sin solicitudes" else "Sin resultados",
+                            subtitle = if (requests.isEmpty()) {
+                                "Cuando levantes una solicitud aparecerá aquí."
+                            } else {
+                                "Ninguna solicitud coincide con el filtro o la búsqueda."
+                            },
+                            icon = Icons.Outlined.Inbox,
+                        )
                     }
                 } else {
-                    items(filtered, key = { it.id }) { r ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(2.dp),
-                        ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(
-                                        r.branchName ?: "Solicitud #${r.id}",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    NxStatusChip(r.status ?: "—", requestStatusTone(r.status))
-                                }
-                                Text(r.description, style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    "Flujo: ${requestTypeLabel(r.requestType)}",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                                val meta = buildList {
-                                    r.urgency?.takeIf { it.isNotBlank() }?.let { add("Urgencia: $it") }
-                                    r.dueAt?.takeIf { it.isNotBlank() }?.let { add("Límite: $it") }
-                                    r.branchNumber?.takeIf { it.isNotBlank() }?.let { add("No. $it") }
-                                }.joinToString(" · ")
-                                if (meta.isNotBlank()) {
-                                    Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                                }
-                                val status = (r.status ?: "").uppercase()
-                                if (status != "CLOSED") {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        OutlinedButton(
-                                            onClick = { vm.closeRequest(r.id) },
-                                            enabled = !state.saving,
-                                        ) { Text(if (state.saving) "…" else "Cerrar") }
-                                        if (status == "NEW") {
-                                            Button(
-                                                onClick = { vm.decideRequest(r.id, "APPROVED") },
-                                                enabled = !state.saving,
-                                            ) { Text("Autorizar") }
-                                            OutlinedButton(
-                                                onClick = { vm.decideRequest(r.id, "REJECTED") },
-                                                enabled = !state.saving,
-                                            ) { Text("Rechazar") }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    items(filtered, key = { it.id }, contentType = { "request" }) { r ->
+                        RequestCard(
+                            request = r,
+                            saving = state.saving,
+                            onClose = { pending = PendingRequestAction(r.id, "close") },
+                            onApprove = { vm.decideRequest(r.id, "APPROVED") },
+                            onReject = { pending = PendingRequestAction(r.id, "reject") },
+                        )
                     }
                 }
+            }
+        }
 
-                item { Spacer(Modifier.height(8.dp)) }
+        if (!state.isLoading) {
+            ExtendedFloatingActionButton(
+                onClick = onCreate,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Nueva solicitud") },
+                containerColor = NxColors.Brand,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+            )
+        }
+    }
+
+    pending?.let { action ->
+        val closing = action.kind == "close"
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text(if (closing) "¿Cerrar solicitud?" else "¿Rechazar solicitud?") },
+            text = {
+                Text(
+                    if (closing) {
+                        "La solicitud dejará de estar activa. Esta acción no se puede deshacer."
+                    } else {
+                        "La solicitud quedará rechazada y no se atenderá."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pending = null
+                    if (closing) vm.closeRequest(action.id) else vm.decideRequest(action.id, "REJECTED")
+                }) {
+                    Text(if (closing) "Cerrar solicitud" else "Rechazar", color = NxColors.Danger, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pending = null }) { Text("Cancelar") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RequestCard(
+    request: ClientTicketRequestDto,
+    saving: Boolean,
+    onClose: () -> Unit,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+) {
+    val r = request
+    val status = (r.status ?: "").uppercase()
+    NxPanelShell {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                r.branchName?.takeIf { it.isNotBlank() } ?: "Solicitud #${r.id}",
+                style = MaterialTheme.typography.titleSmall,
+                color = NxColors.Slate,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            NxStatusChip(requestStatusLabel(r.status), requestStatusTone(r.status))
+        }
+        Text(
+            r.description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = NxColors.Slate,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        val meta = buildList {
+            add(requestTypeLabel(r.requestType))
+            NxStatusLabels.priority(r.urgency)?.let { add("Urgencia $it") }
+            r.dueAt?.takeIf { it.isNotBlank() }?.let { add("Límite ${NxFormat.dateTime(it)}") }
+            r.branchNumber?.takeIf { it.isNotBlank() }?.let { add("Sucursal $it") }
+        }.joinToString(" · ")
+        Text(
+            meta,
+            color = NxColors.Muted,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (status != "CLOSED") {
+            Column(
+                modifier = Modifier.padding(top = NxSpacing.M),
+                verticalArrangement = Arrangement.spacedBy(NxSpacing.S),
+            ) {
+                if (status == "NEW") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(NxSpacing.S)) {
+                        NxPrimaryButton(
+                            text = "Autorizar",
+                            onClick = onApprove,
+                            enabled = !saving,
+                            containerColor = NxColors.Success,
+                            modifier = Modifier.weight(1f),
+                        )
+                        NxSecondaryButton(
+                            text = "Rechazar",
+                            onClick = onReject,
+                            enabled = !saving,
+                            contentColor = NxColors.Danger,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                NxSecondaryButton(
+                    text = "Cerrar solicitud",
+                    onClick = onClose,
+                    enabled = !saving,
+                    contentColor = NxColors.Muted,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
