@@ -27,6 +27,9 @@ export function consumeFreshLoginIntent(): boolean {
 
   try {
     window.sessionStorage.removeItem('nexara_user');
+    // "Recordarme": olvidar también la copia de localStorage (solo si es una sesión recordada).
+    const raw = window.localStorage.getItem('nexara_user');
+    if (raw && JSON.parse(raw)?.remember === true) window.localStorage.removeItem('nexara_user');
   } catch {
     /* ignore */
   }

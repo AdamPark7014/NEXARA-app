@@ -52,6 +52,20 @@ export function sessionCookieOptions(maxAgeMs: number) {
   };
 }
 
+/**
+ * Duración de la sesión con "Recordarme" marcado (formato JWT_EXPIRES_IN).
+ * Sin "Recordarme" se mantiene JWT_EXPIRES_IN.
+ */
+export function rememberExpiresIn(): string {
+  const raw = process.env['JWT_REMEMBER_EXPIRES_IN'];
+  return raw && /^\d+[smhd]$/i.test(raw.trim()) ? raw.trim() : '30d';
+}
+
+/** Tope absoluto de la sesión deslizante con "Recordarme" (ms). */
+export function rememberMaxMs(): number {
+  return parseExpiresToMs(rememberExpiresIn());
+}
+
 /** Emite la cookie de sesión. `expiresInRaw` acepta el formato de JWT_EXPIRES_IN. */
 export function setSessionCookie(res: Response, token: string, expiresInRaw?: string): void {
   const maxAgeMs = parseExpiresToMs(expiresInRaw ?? process.env['JWT_EXPIRES_IN']);
