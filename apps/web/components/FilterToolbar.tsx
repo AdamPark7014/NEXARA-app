@@ -110,7 +110,10 @@ export default function FilterToolbar({
       }}
     >
       {search && (
-        <span style={{ position: "relative", display: "inline-flex", flex: "1 1 220px", minWidth: 180, maxWidth: 360 }}>
+        <span
+          className="nx-ft-search"
+          style={{ position: "relative", display: "inline-flex", flex: "1 1 220px", minWidth: 180, maxWidth: 360 }}
+        >
           <svg
             width="14"
             height="14"
@@ -261,8 +264,31 @@ export default function FilterToolbar({
         .nx-ft select:focus-visible,
         .nx-ft button:focus-visible,
         .nx-ft label:focus-within {
-          outline: 2px solid var(--primary);
+          outline: var(--ui-focus-outline, 2px solid var(--primary));
           outline-offset: 1px;
+        }
+        /* Teléfono: buscador a lo ancho, controles de 40 px y texto de 16 px
+           (con menos, iOS hace zoom al enfocar y descuadra la pantalla). */
+        @media (max-width: 900px), (pointer: coarse) {
+          .nx-ft input,
+          .nx-ft select {
+            font-size: 16px !important;
+            height: 40px !important;
+            min-height: 40px;
+          }
+          .nx-ft label,
+          .nx-ft button {
+            min-height: 40px;
+          }
+        }
+        @media (max-width: 640px) {
+          .nx-ft-search {
+            flex-basis: 100% !important;
+            max-width: none !important;
+          }
+          .nx-ft select {
+            flex: 1 1 140px;
+          }
         }
         .nx-ft input:hover:not(:focus),
         .nx-ft select:hover:not(:focus) {
