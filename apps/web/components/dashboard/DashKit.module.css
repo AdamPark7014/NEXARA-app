@@ -304,6 +304,11 @@ a.statCard:hover {
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 4px;
+  border-radius: 6px;
 }
 
 .panelAction:hover { text-decoration: underline; }
@@ -443,6 +448,52 @@ a.statCard:hover {
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 3px;
+}
+
+.emptyAction {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Skeleton de carga ─────────────────────────────────────── */
+.skeleton {
+  display: block;
+  max-width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 0%,
+    color-mix(in srgb, var(--surface-2) 55%, var(--surface)) 50%,
+    var(--surface-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: dashShimmer 1.3s ease-in-out infinite;
+}
+
+@keyframes dashShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ── Foco visible y movimiento reducido ────────────────────── */
+.row:focus-visible,
+.panelAction:focus-visible,
+a.statCard:focus-visible {
+  outline: 2px solid var(--panel-accent, var(--primary));
+  outline-offset: 2px;
+}
+
+a.row { min-height: 44px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  .barFill,
+  .statCard,
+  .row { transition: none; }
+  a.statCard:hover { transform: none; }
 }
 
 .pill {

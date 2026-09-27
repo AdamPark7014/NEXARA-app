@@ -292,11 +292,48 @@ export function DashPill({ tone = "neutral", children }: { tone?: DashTone | "ne
   return <span className={`${styles.pill} ${PILL_CLASS[tone]}`}>{children}</span>;
 }
 
-export function DashEmpty({ title, description }: { title: string; description?: string }) {
+export function DashEmpty({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
     <div className={styles.empty}>
       <div className={styles.emptyTitle}>{title}</div>
       {description && <div>{description}</div>}
+      {action && <div className={styles.emptyAction}>{action}</div>}
+    </div>
+  );
+}
+
+/** Bloque de carga con la forma aproximada del contenido final (evita saltos de layout). */
+export function DashSkeleton({
+  width = "100%",
+  height = 12,
+  rows = 1,
+  gap = 10,
+}: {
+  width?: number | string;
+  height?: number;
+  rows?: number;
+  gap?: number;
+}) {
+  if (rows <= 1) {
+    return <span className={styles.skeleton} style={{ width, height }} aria-hidden="true" />;
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap }} aria-hidden="true">
+      {Array.from({ length: rows }, (_, i) => (
+        <span
+          key={i}
+          className={styles.skeleton}
+          style={{ width: i === rows - 1 ? "62%" : width, height }}
+        />
+      ))}
     </div>
   );
 }
