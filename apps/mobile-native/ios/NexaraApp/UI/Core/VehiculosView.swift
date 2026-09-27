@@ -12,24 +12,29 @@ struct VehiculosView: View {
     @State private var checklist: ChecklistRequest?
     @State private var solicitar: VehiculoFlota?
 
+    @State private var cargado = false
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let error {
-                    NxAlertBanner(alert: NxAlert(id: "vehiculos", title: error, tone: .danger))
-                }
-
-                if cargando {
-                    ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+            LazyVStack(alignment: .leading, spacing: NxSpacing.l) {
+                if cargando && !cargado {
+                    NxSkeletonRows(count: 4)
+                } else if let error, !cargado {
+                    NxErrorState(message: error) { Task { await cargar() } }
+                        .padding(.top, NxSpacing.xxl)
                 } else {
+                    if let error {
+                        NxStaleBanner(message: error) { Task { await cargar() } }
+                    }
                     activa
                     solicitudes
                     disponibles
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 14)
+            .padding(.horizontal, NxSpacing.l)
+            .padding(.vertical, NxSpacing.m + 2)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Vehículos")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await cargar() }
@@ -71,7 +76,7 @@ struct VehiculosView: View {
                 HStack(spacing: 10) {
                     NxKpiCard(kpi: NxKpi(
                         label: "Km inicial",
-                        value: asignacion.odometroInicio.map { "\($0)" } ?? "—"
+                        value: asignacion.odometroInicio.map { "\(NxFormat.integer($0)) km" } ?? "—"
                     ))
                     NxKpiCard(kpi: NxKpi(
                         label: "Gasolina inicial",
@@ -95,27 +100,26 @@ struct VehiculosView: View {
                         abrirChecklist(salida: true, activa: asignacion)
                     } label: {
                         Label("Registrar salida", systemImage: "camera")
-                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NxBrand.primary)
+                    .buttonStyle(NxPrimaryButtonStyle())
                 }
                 if asignacion.requiereDevolucion {
                     Button {
                         abrirChecklist(salida: false, activa: asignacion)
                     } label: {
                         Label("Registrar regreso", systemImage: "camera")
-                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NxBrand.primary)
+                    .buttonStyle(NxPrimaryButtonStyle())
                 }
             }
-            .padding(14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .nxCard()
         } else if !cargando {
-            NxEmptyState(title: "Sin vehículo asignado", subtitle: "Solicita uno de la flota disponible.")
+            NxEmptyState(
+                title: "Sin vehículo asignado",
+                subtitle: "Solicita uno de la flota disponible.",
+                systemImage: "car"
+            )
+            .nxCard(padding: 0)
         }
     }
 
@@ -135,12 +139,10 @@ struct VehiculosView: View {
                             }
                         }
                         Spacer()
-                        NxStatusChip(text: item.estatusAprobacion.isEmpty ? "—" : item.estatusAprobacion,
-                                     tone: tono(item))
+                        NxStatusChip(text: NxStatusText.label(item.estatusAprobacion), tone: tono(item))
                     }
-                    .padding(12)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .nxCard(padding: NxSpacing.m)
+                    .accessibilityElement(children: .combine)
                 }
             }
         }
@@ -170,17 +172,17 @@ struct VehiculosView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(vehiculo.titulo).font(.subheadline.weight(.semibold))
                             if let km = vehiculo.odometroUltimo {
-                                Text("\(km) km").font(.caption).foregroundStyle(.secondary)
+                                Text("\(NxFormat.integer(km)) km").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                         Spacer()
                         Button("Solicitar") { solicitar = vehiculo }
                             .buttonStyle(.bordered)
+                            .controlSize(.large)
                             .tint(NxBrand.primary)
+                            .accessibilityLabel("Solicitar \(vehiculo.titulo)")
                     }
-                    .padding(12)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .nxCard(padding: NxSpacing.m)
                 }
             }
         }
@@ -199,9 +201,11 @@ struct VehiculosView: View {
 
     @MainActor
     private func cargar() async {
-        error = nil
+        cargando = true
         do {
             datos = try await VehiculosRepository.shared.misVehiculos()
+            cargado = true
+            error = nil
         } catch {
             self.error = error.toUserMessage()
         }

@@ -565,7 +565,9 @@ struct ChatView: View {
                 )
             }
         }
-        .padding()
+        .padding(.horizontal, NxSpacing.m)
+        .padding(.vertical, NxSpacing.s)
+        .background(.bar)
     }
 
     /// «Fulano está escribiendo…», con la misma caducidad que la web (2.8 s).
