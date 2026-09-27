@@ -66,6 +66,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxListRow
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
@@ -182,11 +184,17 @@ fun ClientsListScreen(
                 }
 
                 state.error?.let { err ->
-                    item { NxErrorBlock(err) { vm.load() } }
+                    item {
+                        if (state.items.isEmpty()) {
+                            NxErrorBlock(err) { vm.load() }
+                        } else {
+                            NxRefreshErrorBanner(err, onRetry = { vm.load(refresh = true) })
+                        }
+                    }
                 }
 
                 when {
-                    state.loading -> item { NxLoadingBlock("Cargando clientes…") }
+                    state.loading -> item { NxSkeletonList() }
                     state.error != null && state.items.isEmpty() -> Unit
                     state.items.isNotEmpty() && state.visible.isEmpty() -> item {
                         NxEmptyState(
