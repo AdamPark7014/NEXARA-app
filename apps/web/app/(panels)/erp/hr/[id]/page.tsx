@@ -1,16 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
+import Modal from "@/components/ui/Modal";
+import { FormField, FormGrid } from "@/components/ui/FormField";
 import { Tag } from "@/components/ui/DataTable";
+import { SkeletonList, Skeleton } from "@/components/PageState";
+import { Avatar } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 
@@ -37,12 +43,22 @@ interface AttendancePunch {
   photoUrl?: string | null;
 }
 
+const HTTP_FALLBACK: Record<number, string> = {
+  401: "Tu sesión expiró. Vuelve a iniciar sesión.",
+  403: "No tienes permiso para ver esta ficha.",
+  404: "No encontramos a esta persona. Puede que se haya eliminado.",
+};
+
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const readable = text.trim().startsWith("<") ? "" : text;
+    throw new Error(readable || HTTP_FALLBACK[res.status] || "El servidor no respondió. Intenta de nuevo en unos minutos.");
+  }
   if (res.status === 204) return null;
   return res.json();
 }
@@ -51,29 +67,34 @@ const TIPO_CONTRATO = ["Planta", "Honorarios", "Contratista"] as const;
 const ESTADOS_RRHH = ["Activo", "Vacaciones", "Incidencia", "Baja"] as const;
 
 const inp: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", borderRadius: 8,
+  width: "100%", minHeight: 40, padding: "8px 12px", borderRadius: 8,
   border: "1px solid var(--border)", background: "var(--surface)",
-  color: "var(--foreground)", fontSize: 13, boxSizing: "border-box",
+  color: "var(--foreground)", boxSizing: "border-box",
 };
+
+const PUNCH_LABEL: Record<string, string> = { entrada: "Entrada", salida: "Salida" };
 
 export default function EmployeeDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const router = useRouter();
   const { user } = useUser();
   const token = user?.token ?? "";
 
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null);
   const [punches, setPunches] = useState<AttendancePunch[]>([]);
+  const [punchesError, setPunchesError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [formDirty, setFormDirty] = useState(false);
   const [form, setForm] = useState({ puesto: "", tipoContrato: "Planta" as string, estadoRRHH: "Activo" as string, fechaIngreso: "" });
 
   const load = useCallback(async () => {
     if (!token || !id) return;
     setLoading(true);
-    setError(null);
     try {
       const [empData, attData] = await Promise.allSettled([
         apiFetch(`users/${id}`, token),
@@ -87,11 +108,13 @@ export default function EmployeeDetailPage() {
       if (attData.status === "fulfilled") {
         const arr = Array.isArray(attData.value) ? attData.value : [];
         setPunches(arr as AttendancePunch[]);
+        setPunchesError(false);
       } else {
-        setPunches([]);
+        setPunchesError(true);
       }
+      setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar el empleado");
+      setError(formatApiError(e, "No se pudo cargar la ficha de esta persona."));
     } finally {
       setLoading(false);
     }
@@ -107,12 +130,20 @@ export default function EmployeeDetailPage() {
       estadoRRHH: employee.estadoRRHH ?? "Activo",
       fechaIngreso: employee.fechaIngreso ? employee.fechaIngreso.slice(0, 10) : "",
     });
+    setSaveErr(null);
+    setFormDirty(false);
     setEditing(true);
+  };
+
+  const patchForm = (patch: Partial<typeof form>) => {
+    setForm((f) => ({ ...f, ...patch }));
+    setFormDirty(true);
   };
 
   const saveEdit = async () => {
     if (!token || !id) return;
     setSaving(true);
+    setSaveErr(null);
     try {
       const updated = await apiFetch(`users/${id}/hr`, token, {
         method: "PATCH",
@@ -123,7 +154,7 @@ export default function EmployeeDetailPage() {
       setEditing(false);
       toast.success("Cambios guardados");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al guardar");
+      setSaveErr(formatApiError(e, "No se pudieron guardar los cambios."));
     } finally { setSaving(false); }
   };
 
@@ -136,146 +167,157 @@ export default function EmployeeDetailPage() {
     const d = employee?.fechaIngreso ?? employee?.createdAt;
     if (!d) return null;
     const years = (Date.now() - new Date(d).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    return years >= 1 ? `${Math.floor(years)} año${Math.floor(years) !== 1 ? "s" : ""}` : `${Math.round(years * 12)} meses`;
+    if (years >= 1) return `${Math.floor(years)} año${Math.floor(years) !== 1 ? "s" : ""}`;
+    const months = Math.max(0, Math.round(years * 12));
+    return months < 1 ? "Menos de 1 mes" : `${months} ${months === 1 ? "mes" : "meses"}`;
   }, [employee]);
 
-  if (loading) return <EmptyState icon="⏳" title="Cargando perfil…" description="Consultando datos del empleado." />;
-  if (error) return <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />;
-  if (!employee) return null;
+  const punchStats = useMemo(() => {
+    let entradas = 0, salidas = 0, conFoto = 0;
+    for (const p of punches) {
+      if (p.type === "entrada") entradas++;
+      else if (p.type === "salida") salidas++;
+      if (p.photoUrl) conFoto++;
+    }
+    return { entradas, salidas, conFoto, total: punches.length };
+  }, [punches]);
+
+  if (loading && !employee) {
+    return (
+      <div aria-busy="true" aria-label="Cargando ficha">
+        <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "8px 0 24px" }}>
+          <Skeleton width={56} height={56} radius={999} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+            <Skeleton width="40%" height={22} />
+            <Skeleton width="25%" height={14} />
+          </div>
+        </div>
+        <SkeletonList rows={4} />
+      </div>
+    );
+  }
+  if (!employee) {
+    return (
+      <EmptyState
+        icon="⚠️"
+        title="No se pudo cargar la ficha"
+        description={error ?? "No encontramos a esta persona."}
+        action={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
+            <Button size="sm" variant="ghost" onClick={() => router.push("/erp/hr")}>Volver a Plantilla</Button>
+          </div>
+        }
+      />
+    );
+  }
 
   const employeeId = employee.employeeNumber ?? `EMP-${String(employee.id).padStart(3, "0")}`;
+  const infoRows: { label: string; value?: string | null }[] = [
+    { label: "Correo", value: employee.email },
+    { label: "Puesto", value: employee.puesto },
+    { label: "Departamento", value: employee.department?.nombre },
+    { label: "Rol", value: employee.role?.nombre },
+    { label: "Tipo de contrato", value: employee.tipoContrato },
+    { label: "Situación laboral", value: employee.estadoRRHH ?? "Activo" },
+    { label: "Fecha de ingreso", value: employee.fechaIngreso ? new Date(employee.fechaIngreso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
+    { label: "No. empleado", value: employeeId },
+  ];
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Personas"
+        eyebrow="Recursos Humanos · Ficha"
         title={employee.nombre}
         subtitle={[employee.puesto, employee.department?.nombre].filter(Boolean).join(" · ") || "Colaborador"}
         meta={
           <>
+            <Avatar url={employee.avatarUrl} name={employee.nombre} size={28} />
             <Tag variant={stateColor(employee.estadoRRHH)} dot>{employee.estadoRRHH ?? "Activo"}</Tag>
             <Tag variant={contractColor(employee.tipoContrato)}>{employee.tipoContrato ?? "Planta"}</Tag>
-            <code style={{ fontSize: 11, color: "var(--text-tertiary)", padding: "2px 6px", borderRadius: 5, background: "var(--surface-2)" }}>{employeeId}</code>
+            <Tag variant="default" size="sm">{employeeId}</Tag>
           </>
         }
         actions={
           <>
-            <Link href="/erp/hr" style={{ textDecoration: "none" }}>
-              <Button variant="ghost">← Volver a RH</Button>
-            </Link>
-            <Button variant="primary" iconLeft="✎" onClick={openEdit}>Editar</Button>
+            <Button variant="ghost" onClick={() => router.push("/erp/hr")}>← Plantilla</Button>
+            <Button variant="primary" onClick={openEdit}>Editar ficha</Button>
           </>
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Estado" value={employee.isActive !== false ? "Activo" : "Inactivo"} variant={employee.isActive !== false ? "positive" : "warning"} icon="👤" />
-        <KpiCard label="Área" value={employee.department?.nombre ?? "—"} icon="🏢" />
-        <KpiCard label="Rol" value={employee.role?.nombre ?? "—"} icon="🎭" />
-        <KpiCard label="Antigüedad" value={yearsAtCompany ?? "—"} icon="📅" />
+      {error && (
+        <InlineAlert
+          variant="warning"
+          title="No se pudo actualizar"
+          message={`${error} Mostramos la última información cargada.`}
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          style={{ marginBottom: 12 }}
+        />
+      )}
+
+      <div style={{ marginBottom: 20 }}>
+        <MetricStrip
+          ariaLabel="Resumen de la ficha"
+          metrics={[
+            { label: "Cuenta", value: employee.isActive !== false ? "Activa" : "Inactiva", tone: employee.isActive !== false ? "success" : "warning" },
+            { label: "Área", value: employee.department?.nombre ?? "Sin área" },
+            { label: "Rol", value: employee.role?.nombre ?? "Sin rol" },
+            { label: "Antigüedad", value: yearsAtCompany ?? "Sin fecha" },
+          ]}
+        />
       </div>
 
-      {punches.length > 0 && (() => {
-        const entradas = punches.filter((p) => p.type === "entrada").length;
-        const salidas = punches.filter((p) => p.type === "salida").length;
-        const conFoto = punches.filter((p) => Boolean(p.photoUrl)).length;
-        const total = punches.length;
-        return (
-          <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
-              Checadas recientes ({total})
+      <Section title="Datos laborales" actions={<Button size="sm" variant="ghost" onClick={openEdit}>Editar</Button>}>
+        <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 16, margin: 0 }}>
+          {infoRows.map(({ label, value }) => (
+            <div key={label}>
+              <dt style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</dt>
+              <dd style={{ margin: 0, fontSize: 14, color: value ? "var(--text-primary)" : "var(--text-tertiary)", overflowWrap: "anywhere" }}>{value || "Sin registrar"}</dd>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {([
-                { label: "Entradas", count: entradas, color: "var(--success)" },
-                { label: "Salidas", count: salidas, color: "var(--primary)" },
-                { label: "Con foto", count: conFoto, color: "var(--accent, var(--primary))" },
-              ] as { label: string; count: number; color: string }[]).filter((r) => r.count > 0).map((r) => (
-                <div key={r.label} style={{ display: "grid", gridTemplateColumns: "100px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {editing ? (
-        <Section title="Editar ficha de empleado">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Puesto / cargo</label>
-              <input value={form.puesto} onChange={(e) => setForm((f) => ({ ...f, puesto: e.target.value }))} placeholder="Ej: Ingeniero de Campo" style={inp} autoFocus />
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Tipo de contrato</label>
-              <select value={form.tipoContrato} onChange={(e) => setForm((f) => ({ ...f, tipoContrato: e.target.value }))} style={inp}>
-                {TIPO_CONTRATO.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Estado RRHH</label>
-              <select value={form.estadoRRHH} onChange={(e) => setForm((f) => ({ ...f, estadoRRHH: e.target.value }))} style={inp}>
-                {ESTADOS_RRHH.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fecha de ingreso</label>
-              <input type="date" value={form.fechaIngreso} onChange={(e) => setForm((f) => ({ ...f, fechaIngreso: e.target.value }))} style={inp} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 18, justifyContent: "flex-end" }}>
-            <Button variant="secondary" onClick={() => setEditing(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void saveEdit()} disabled={saving}>
-              {saving ? "Guardando…" : "Guardar cambios"}
-            </Button>
-          </div>
-        </Section>
-      ) : (
-        <Section title="Información del colaborador" actions={<Button size="sm" variant="ghost" iconLeft="✎" onClick={openEdit}>Editar</Button>}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            {[
-              { label: "Email", value: employee.email },
-              { label: "Puesto", value: employee.puesto },
-              { label: "Departamento", value: employee.department?.nombre },
-              { label: "Rol / acceso", value: employee.role?.nombre },
-              { label: "Tipo de contrato", value: employee.tipoContrato },
-              { label: "Estado", value: employee.estadoRRHH ?? "Activo" },
-              { label: "Fecha de ingreso", value: employee.fechaIngreso ? new Date(employee.fechaIngreso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
-              { label: "ID empleado", value: employeeId },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 13, color: value ? "var(--text-primary)" : "var(--text-tertiary)" }}>{value ?? "—"}</div>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
+          ))}
+        </dl>
+      </Section>
 
       <Section
         eyebrow="Asistencia"
-        title="Fotos de entrada y salida"
-        subtitle="Últimas checadas del checador (con foto cuando exista)"
-        actions={<Link href="/erp/hr/attendance" style={{ fontSize: 12, color: "var(--primary)" }}>Ver gestión →</Link>}
+        title="Últimas checadas"
+        subtitle={punchStats.total > 0
+          ? `${punchStats.entradas} ${punchStats.entradas === 1 ? "entrada" : "entradas"} · ${punchStats.salidas} ${punchStats.salidas === 1 ? "salida" : "salidas"} · ${punchStats.conFoto} con foto`
+          : "Entradas y salidas registradas desde la app, con foto cuando exista."}
+        actions={<Link href="/erp/hr/attendance" style={{ fontSize: 13, color: "var(--primary)", padding: "8px 0", display: "inline-block" }}>Ver asistencia del equipo →</Link>}
       >
-        {punches.length === 0 ? (
-          <EmptyState
-            icon="📷"
-            title="Sin checadas recientes"
-            description="Cuando registre entrada o salida con la app, aquí verás la hora y la foto."
+        {punchesError && (
+          <InlineAlert
+            variant="warning"
+            dense
+            message={punches.length ? "No se pudieron actualizar las checadas. Mostramos las últimas cargadas." : "No se pudieron cargar las checadas."}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+            style={{ marginBottom: 12 }}
           />
+        )}
+        {punches.length === 0 ? (
+          !punchesError && (
+            <EmptyState
+              icon="📷"
+              title="Sin checadas recientes"
+              description="Cuando registre entrada o salida con la app, aquí verás la hora y la foto."
+            />
+          )
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 160px), 1fr))", gap: 12 }}>
             {punches.map((p) => {
               const src = p.photoUrl ? resolveAssetUrl(p.photoUrl) : "";
-              const label = p.type === "salida" ? "Salida" : p.type === "entrada" ? "Entrada" : p.type;
+              const label = PUNCH_LABEL[p.type] ?? "Checada";
+              const when = new Date(p.timestamp).toLocaleString("es-MX", {
+                weekday: "short",
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
               return (
-                <article
+                <li
                   key={p.id}
                   style={{
                     border: "1px solid var(--border)",
@@ -288,7 +330,8 @@ export default function EmployeeDetailPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={src}
-                      alt={`Foto ${label}`}
+                      alt={`Foto de ${label.toLowerCase()}, ${when}`}
+                      loading="lazy"
                       style={{ width: "100%", height: 140, objectFit: "cover", display: "block", background: "var(--surface-2)" }}
                     />
                   ) : (
@@ -300,30 +343,58 @@ export default function EmployeeDetailPage() {
                         justifyContent: "center",
                         background: "var(--surface-2)",
                         color: "var(--text-tertiary)",
-                        fontSize: 12,
+                        fontSize: 13,
                       }}
                     >
                       Sin foto
                     </div>
                   )}
                   <div style={{ padding: "8px 10px" }}>
-                    <Tag variant={p.type === "entrada" ? "positive" : "accent"}>{label}</Tag>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
-                      {new Date(p.timestamp).toLocaleString("es-MX", {
-                        weekday: "short",
-                        day: "2-digit",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <Tag size="sm" variant={p.type === "entrada" ? "positive" : "accent"}>{label}</Tag>
+                    <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 6, fontVariantNumeric: "tabular-nums" }}>
+                      {when}
                     </div>
                   </div>
-                </article>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </Section>
+
+      <Modal
+        open={editing}
+        onClose={() => setEditing(false)}
+        dirty={formDirty && !saving}
+        maxWidth={520}
+        title="Editar ficha"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditing(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveEdit()} loading={saving} disabled={!formDirty}>Guardar cambios</Button>
+          </>
+        }
+      >
+        <FormGrid>
+          <FormField label="Puesto" fullWidth optional>
+            <input value={form.puesto} onChange={(e) => patchForm({ puesto: e.target.value })} placeholder="Ej. Ingeniero de campo" style={inp} />
+          </FormField>
+          <FormField label="Tipo de contrato">
+            <select value={form.tipoContrato} onChange={(e) => patchForm({ tipoContrato: e.target.value })} style={inp}>
+              {TIPO_CONTRATO.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Situación laboral">
+            <select value={form.estadoRRHH} onChange={(e) => patchForm({ estadoRRHH: e.target.value })} style={inp}>
+              {ESTADOS_RRHH.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Fecha de ingreso" optional>
+            <input type="date" value={form.fechaIngreso} onChange={(e) => patchForm({ fechaIngreso: e.target.value })} style={inp} />
+          </FormField>
+        </FormGrid>
+        {saveErr && <InlineAlert message={saveErr} style={{ marginTop: 14 }} />}
+      </Modal>
     </>
   );
 }

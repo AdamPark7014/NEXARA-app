@@ -652,7 +652,7 @@ export default function HrPage() {
       key: "nombre", label: "Persona",
       render: (e) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <Avatar name={e.nombre} size={32} />
+          <Avatar url={e.avatarUrl} name={e.nombre} size={32} />
           <div style={{ minWidth: 0 }}>
             <Link
               href={`/erp/hr/${e.id}`}
