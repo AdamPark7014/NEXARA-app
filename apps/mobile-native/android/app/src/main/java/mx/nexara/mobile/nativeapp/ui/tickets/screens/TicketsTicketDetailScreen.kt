@@ -102,11 +102,13 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
@@ -370,6 +372,7 @@ private fun ticketStatusTone(status: String?): NxTone {
 
 
 
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
@@ -402,29 +405,9 @@ fun TicketsTicketDetailScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
 
-        Row(
-
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-
-            modifier = Modifier
-
-                .fillMaxWidth()
-
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-
-        ) {
-
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-
-            OutlinedButton(onClick = { vm.load(ticketId, initial = false) }, modifier = Modifier.weight(1f)) { Text("Actualizar") }
-
-        }
-
-
-
         if (state.isLoading) {
 
-            NxLoadingBlock("Cargando ticket…")
+            NxSkeletonList(itemCount = 4, itemHeight = 110.dp, modifier = Modifier.fillMaxWidth().padding(16.dp))
 
             return@Column
 
@@ -536,7 +519,7 @@ fun TicketsTicketDetailScreen(
 
                                 t.estatus?.takeIf { it.isNotBlank() }?.let {
 
-                                    NxStatusChip(it, ticketStatusTone(it))
+                                    NxStatusChip(NxStatusLabels.label(it), ticketStatusTone(it))
 
                                 }
 
@@ -554,21 +537,21 @@ fun TicketsTicketDetailScreen(
 
                                 TicketDetailRow("Prioridad", t.displayPriority())
 
-                                TicketDetailRow("Tipo", t.ticketType ?: t.urgency)
+                                TicketDetailRow("Tipo", (t.ticketType ?: t.urgency)?.takeIf { it.isNotBlank() }?.let(NxStatusLabels::label))
 
                                 TicketDetailRow("Responsable", responsable)
 
                                 if (location.isNotBlank()) TicketDetailRow("Ubicación", location)
 
-                                TicketDetailRow("Compromiso", t.dueAt?.take(16))
+                                TicketDetailRow("Compromiso", t.dueAt?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("SLA", t.slaDueAt?.take(16))
+                                TicketDetailRow("SLA", t.slaDueAt?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("Asignación", t.fechaAsignacion?.take(16))
+                                TicketDetailRow("Asignación", t.fechaAsignacion?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("Inicio", t.fechaInicio?.take(16))
+                                TicketDetailRow("Inicio", t.fechaInicio?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("Cierre", t.fechaFinalizacion?.take(16))
+                                TicketDetailRow("Cierre", t.fechaFinalizacion?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
                                 if (t.isOpen()) {
 
@@ -663,7 +646,7 @@ fun TicketsTicketDetailScreen(
 
                                     if (whenAt.isNotBlank()) {
 
-                                        Text(whenAt.take(16), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(NxFormat.dateTime(whenAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                                     }
 
@@ -829,7 +812,7 @@ fun TicketsTicketDetailScreen(
 
                                     Text(
 
-                                        "Este ticket está ${t.estatus.orEmpty().lowercase().ifBlank { "cerrado" }}. " +
+                                        "Este ticket está ${t.estatus?.takeIf { it.isNotBlank() }?.let { NxStatusLabels.label(it).lowercase() } ?: "cerrado"}. " +
                                             "Si necesitas retomarlo, levanta una nueva solicitud.",
 
                                         style = MaterialTheme.typography.bodySmall,

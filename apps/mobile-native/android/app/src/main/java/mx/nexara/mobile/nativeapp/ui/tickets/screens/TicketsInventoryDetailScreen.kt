@@ -101,11 +101,12 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
@@ -461,6 +462,7 @@ private fun inventoryStatusTone(status: String?): NxTone = when ((status ?: "").
 
 
 
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
@@ -529,29 +531,9 @@ fun TicketsInventoryDetailScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
 
-        Row(
-
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-
-            modifier = Modifier
-
-                .fillMaxWidth()
-
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-
-        ) {
-
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-
-            OutlinedButton(onClick = { vm.load(inventoryId, initial = false) }, modifier = Modifier.weight(1f)) { Text("Actualizar") }
-
-        }
-
-
-
         if (state.isLoading) {
 
-            NxLoadingBlock("Cargando inventario…")
+            NxSkeletonList(itemCount = 5, modifier = Modifier.fillMaxWidth().padding(16.dp))
 
             return@Column
 
@@ -661,7 +643,7 @@ fun TicketsInventoryDetailScreen(
 
                             Text(snap.title ?: "Inventario #${snap.id}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
 
-                            snap.status?.takeIf { it.isNotBlank() }?.let { NxStatusChip(it, inventoryStatusTone(it)) }
+                            snap.status?.takeIf { it.isNotBlank() }?.let { NxStatusChip(NxStatusLabels.label(it), inventoryStatusTone(it)) }
 
                         }
 

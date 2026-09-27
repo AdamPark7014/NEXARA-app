@@ -42,13 +42,16 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxListRow
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 
@@ -93,10 +96,16 @@ fun VehiculosScreen() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (state.loading) {
-                item { NxLoadingBlock("Cargando tus vehículos…") }
+                item { NxSkeletonList(itemCount = 3, itemHeight = 96.dp) }
             }
             state.error?.let { msg ->
-                item { NxErrorBlock(msg, onRetry = { vm.load(refresh = true) }) }
+                item {
+                    if (state.vacio) {
+                        NxErrorBlock(msg, onRetry = { vm.load(refresh = true) })
+                    } else {
+                        NxRefreshErrorBanner(msg, onRetry = { vm.load(refresh = true) })
+                    }
+                }
             }
             state.activa?.let { activa ->
                 item { AsignacionActivaCard(activa = activa, onAccion = vm::abrirChecklist) }
@@ -186,8 +195,8 @@ private fun AsignacionActivaCard(
             NxStatusChip(if (activa.esInventario) "Inventario" else "Solicitud", NxTone.Brand)
         }
         val fechas = listOfNotNull(
-            activa.inicio?.take(16)?.replace('T', ' '),
-            activa.fin?.take(16)?.replace('T', ' '),
+            activa.inicio?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
+            activa.fin?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
         ).joinToString(" → ")
         if (fechas.isNotBlank()) {
             Text(fechas, fontSize = 12.5.sp, color = NxColors.Muted)
@@ -252,11 +261,11 @@ private fun SolicitudRow(solicitud: SolicitudResumenDto) {
             solicitud.placasVehiculo?.takeIf { it.isNotBlank() },
         ).joinToString(" · ").ifBlank { "Solicitud" },
         subtitle = listOfNotNull(
-            solicitud.fechaInicioSolicitada?.take(16)?.replace('T', ' '),
-            solicitud.fechaFinSolicitada?.take(16)?.replace('T', ' '),
+            solicitud.fechaInicioSolicitada?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
+            solicitud.fechaFinSolicitada?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
         ).joinToString(" → ").ifBlank { null },
-        meta = solicitud.entregaEstatus?.takeIf { it.isNotBlank() },
-        chipText = estatus.ifBlank { "Pendiente" },
+        meta = solicitud.entregaEstatus?.takeIf { it.isNotBlank() }?.let { "Entrega: ${NxStatusLabels.label(it).lowercase()}" },
+        chipText = if (estatus.isBlank()) "Pendiente" else NxStatusLabels.label(estatus),
         chipTone = tono,
     )
 }
