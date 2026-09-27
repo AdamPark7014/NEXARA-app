@@ -1,67 +1,77 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import PageChrome from "@/components/ui/PageChrome";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
+import MetricStrip from "@/components/ui/MetricStrip";
+import Modal from "@/components/ui/Modal";
 import { useUser } from "@/components/UserContext";
 import { getApprovalsSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { formatApiError } from "@/lib/erp-api";
 import {
   listMyPendingApprovals,
   decideApproval,
   buildApprovalChain,
   labelForEntityType,
   formatRequestedAt,
+  entityApprovalHref,
   type PendingApproval,
   type ApprovalChainStep,
 } from "@/lib/workflow-api";
-import Link from "next/link";
-import chrome from "@/components/erp/erp-chrome.module.css";
+import s from "./approvals.module.css";
 
 /**
- * Aprobaciones jerárquicas: el flujo va de OPERATIVE → SPECIALIST → MANAGER →
- * DIRECTOR → EXECUTIVE según monto y tipo. Esta página muestra la bandeja
- * con todo lo que requiere tu intervención según tu nivel.
- *
- * Conectada a GET /api/workflow/my-pending y POST /api/workflow/approvals/:id/decide.
+ * Bandeja de aprobaciones jerárquicas: todo lo que requiere tu firma según tu nivel.
+ * GET /api/workflow/my-pending · POST /api/workflow/approvals/:id/decide.
  */
 
+type Prioridad = "Alta" | "Media" | "Baja";
+type Filtro = "all" | Prioridad;
+
 type ApprovalRow = {
-  id: string;
+  key: string;
   approvalId: number;
   instanceId: number;
   type: string;
   titulo: string;
   detalle: string;
-  monto?: string;
+  folio: string;
+  href: string | null;
   solicita: string;
   solicitaRol: string;
   pasos: ApprovalChainStep[];
-  prioridad: "Alta" | "Media" | "Baja";
+  prioridad: Prioridad;
   fechaSolicitud: string;
   createdAt: string;
 };
+
+const DAY_MS = 86_400_000;
 
 const toApprovalRow = (approval: PendingApproval): ApprovalRow => {
   const inst = approval.instance;
   const decidedCount = (inst.approvals || []).filter((a) => a.status !== "PENDING").length;
   const totalSteps = inst.workflow?.steps?.length ?? (inst.approvals?.length || 1);
   const ratio = totalSteps > 0 ? decidedCount / totalSteps : 0;
-  const prioridad: ApprovalRow["prioridad"] = ratio >= 0.66 ? "Alta" : ratio >= 0.33 ? "Media" : "Baja";
+  const prioridad: Prioridad = ratio >= 0.66 ? "Alta" : ratio >= 0.33 ? "Media" : "Baja";
+  const tipo = labelForEntityType(inst.entityType);
+  const href = entityApprovalHref(inst.entityType, inst.entityId);
 
   return {
-    id: `AP-${approval.id}`,
+    key: `AP-${approval.id}`,
     approvalId: approval.id,
     instanceId: inst.id,
-    type: labelForEntityType(inst.entityType),
-    titulo: `${inst.workflow?.name ?? labelForEntityType(inst.entityType)} · #${inst.entityId}`,
-    detalle: `Solicitud iniciada para ${labelForEntityType(inst.entityType)} #${inst.entityId}.`,
-    solicita: inst.startedBy?.nombre ?? "—",
-    solicitaRol: inst.startedBy?.role?.nombre ?? "Equipo NEXARA",
+    type: tipo,
+    titulo: inst.workflow?.name ?? tipo,
+    detalle: `${tipo} con folio ${inst.entityId}, en espera de tu decisión.`,
+    folio: String(inst.entityId),
+    href: href && href.startsWith("/erp/") ? href : null,
+    solicita: inst.startedBy?.nombre ?? "Sin nombre",
+    solicitaRol: inst.startedBy?.role?.nombre ?? "",
     pasos: buildApprovalChain(inst, approval.id),
     prioridad,
     fechaSolicitud: formatRequestedAt(approval.createdAt),
@@ -69,466 +79,455 @@ const toApprovalRow = (approval: PendingApproval): ApprovalRow => {
   };
 };
 
+const daysWaiting = (iso: string) => {
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((Date.now() - t) / DAY_MS));
+};
+
+const STEP_COLOR: Record<ApprovalChainStep["estado"], string> = {
+  Aprobado: "var(--success)",
+  Rechazado: "var(--danger)",
+  Pendiente: "var(--warning)",
+  "En espera": "var(--text-tertiary)",
+};
+
+const FILTERS: Array<{ key: Filtro; label: string }> = [
+  { key: "all", label: "Todas" },
+  { key: "Alta", label: "Alta" },
+  { key: "Media", label: "Media" },
+  { key: "Baja", label: "Baja" },
+];
+
+function ApprovalChain({ pasos }: { pasos: ApprovalChainStep[] }) {
+  return (
+    <div className={s.chain}>
+      <h4 className={s.chainTitle}>Cadena de aprobación</h4>
+      <ol className={s.chainList}>
+        {pasos.map((paso, idx) => {
+          const color = STEP_COLOR[paso.estado] ?? "var(--text-tertiary)";
+          const filled = paso.estado === "Aprobado" || paso.estado === "Rechazado";
+          return (
+            <li key={idx} className={s.step}>
+              <div className={s.stepRail} aria-hidden="true">
+                <span
+                  className={s.stepDot}
+                  style={{
+                    color,
+                    background: filled ? color : "transparent",
+                    boxShadow: paso.isCurrent ? `0 0 0 4px color-mix(in srgb, ${color} 22%, transparent)` : undefined,
+                  }}
+                />
+                {idx < pasos.length - 1 && (
+                  <span className={`${s.stepLine} ${paso.estado === "Aprobado" ? s.stepLineDone : ""}`} />
+                )}
+              </div>
+              <div>
+                <div className={s.stepRole}>
+                  {paso.rol}
+                  {paso.isCurrent && <span className={s.stepNow}>En curso</span>}
+                </div>
+                <div className={s.stepInfo}>
+                  <span style={{ color, fontWeight: 600 }}>{paso.estado}</span>
+                  {paso.quien && <span>{paso.quien}</span>}
+                  {paso.fecha && <span>{paso.fecha}</span>}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 export default function ApprovalsPage() {
   const { user } = useUser();
+  const token = user?.token;
   const cfg = useMemo(() => getApprovalsSectionConfig(user), [user]);
-  const searchParams = useSearchParams();
-  const highlightId = searchParams.get("highlight");
-  const highlightRef = useRef<HTMLDivElement | null>(null);
-  const [filter, setFilter] = useState<"all" | "Alta" | "Media" | "Baja">("all");
-  const [data, setData] = useState<ApprovalRow[]>([]);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  const highlightRef = useRef<HTMLElement | null>(null);
+  const [filter, setFilter] = useState<Filtro>("all");
+  const [searchQ, setSearchQ] = useState("");
+  const [data, setData] = useState<ApprovalRow[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [decidingId, setDecidingId] = useState<number | null>(null);
-  const [rejectModal, setRejectModal] = useState<ApprovalRow | null>(null);
+  const [decideError, setDecideError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<ApprovalRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-  const [infoModal, setInfoModal] = useState<ApprovalRow | null>(null);
+  const [infoTarget, setInfoTarget] = useState<ApprovalRow | null>(null);
   const [infoMessage, setInfoMessage] = useState("");
-  const [decidingErr, setDecidingErr] = useState<string | null>(null);
-  const [searchQ, setSearchQ] = useState("");
 
-  const fetchPending = async () => {
-    if (!user?.token) {
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("highlight");
+    const id = raw ? Number(raw) : NaN;
+    if (!Number.isNaN(id)) setHighlightId(id);
+  }, []);
+
+  const fetchPending = useCallback(async () => {
+    if (!token) {
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const list = await listMyPendingApprovals(user.token);
+      const list = await listMyPendingApprovals(token);
       setData(list.map(toApprovalRow));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "No se pudo conectar a workflow";
-      setError(msg);
-      setData([]);
+      setError(formatApiError(e, "No pudimos cargar tus aprobaciones."));
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     void fetchPending();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.token]);
+  }, [fetchPending]);
+
+  const rows = useMemo(() => data ?? [], [data]);
 
   const list = useMemo(() => {
-    let rows = filter === "all" ? data : data.filter((a) => a.prioridad === filter);
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      rows = rows.filter((a) =>
-        a.titulo.toLowerCase().includes(q) ||
-        a.type.toLowerCase().includes(q) ||
-        a.solicita.toLowerCase().includes(q)
+    let out = filter === "all" ? rows : rows.filter((a) => a.prioridad === filter);
+    const q = searchQ.trim().toLowerCase();
+    if (q) {
+      out = out.filter(
+        (a) =>
+          a.titulo.toLowerCase().includes(q) ||
+          a.type.toLowerCase().includes(q) ||
+          a.solicita.toLowerCase().includes(q) ||
+          a.folio.includes(q),
       );
     }
-    if (highlightId) {
-      const id = Number(highlightId);
-      if (!Number.isNaN(id)) {
-        rows = [...rows].sort((a, b) => {
-          const aHit = a.instanceId === id;
-          const bHit = b.instanceId === id;
-          if (aHit && !bHit) return -1;
-          if (!aHit && bHit) return 1;
-          return 0;
-        });
-      }
+    if (highlightId !== null) {
+      out = [...out].sort((a, b) => Number(b.instanceId === highlightId) - Number(a.instanceId === highlightId));
     }
-    return rows;
-  }, [data, filter, highlightId]);
+    return out;
+  }, [rows, filter, searchQ, highlightId]);
 
   useEffect(() => {
-    if (highlightId && highlightRef.current) {
+    if (highlightId !== null && highlightRef.current) {
       highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [highlightId, list, loading]);
+  }, [highlightId, list]);
 
-  const handleRequestInfo = (row: ApprovalRow) => {
-    setInfoModal(row);
-    setInfoMessage("");
-  };
-
-  const handleDecide = async (row: ApprovalRow, decision: "APPROVED" | "REJECTED") => {
-    if (!user?.token) return;
-    if (decision === "REJECTED") {
-      setRejectModal(row);
-      setRejectReason("");
-      setDecidingErr(null);
-      return;
+  const counts = useMemo(() => {
+    const c = { all: rows.length, Alta: 0, Media: 0, Baja: 0, late: 0, oldest: 0 };
+    for (const a of rows) {
+      c[a.prioridad]++;
+      const d = daysWaiting(a.createdAt);
+      if (d >= 3) c.late++;
+      if (d > c.oldest) c.oldest = d;
     }
+    return c;
+  }, [rows]);
+
+  const approve = async (row: ApprovalRow) => {
+    if (!token) return;
     setDecidingId(row.approvalId);
-    setDecidingErr(null);
+    setDecideError(null);
+    setNotice(null);
     try {
-      await decideApproval(user.token, row.approvalId, decision, undefined);
+      await decideApproval(token, row.approvalId, "APPROVED", undefined);
+      setNotice(`Aprobaste «${row.titulo}».`);
       await fetchPending();
     } catch (e: unknown) {
-      setDecidingErr(e instanceof Error ? e.message : "No se pudo registrar la decisión");
+      setDecideError(formatApiError(e, "No se pudo registrar la aprobación. Intenta de nuevo."));
     } finally {
       setDecidingId(null);
     }
+  };
+
+  const openReject = (row: ApprovalRow) => {
+    setRejectTarget(row);
+    setRejectReason("");
+    setDecideError(null);
   };
 
   const submitReject = async () => {
-    if (!user?.token || !rejectModal) return;
-    setDecidingId(rejectModal.approvalId);
-    setDecidingErr(null);
+    if (!token || !rejectTarget) return;
+    const target = rejectTarget;
+    setDecidingId(target.approvalId);
+    setDecideError(null);
+    setNotice(null);
     try {
-      await decideApproval(user.token, rejectModal.approvalId, "REJECTED", rejectReason.trim() || undefined);
-      setRejectModal(null);
+      await decideApproval(token, target.approvalId, "REJECTED", rejectReason.trim() || undefined);
+      setRejectTarget(null);
+      setNotice(`Rechazaste «${target.titulo}».`);
       await fetchPending();
     } catch (e: unknown) {
-      setDecidingErr(e instanceof Error ? e.message : "No se pudo registrar el rechazo");
+      setDecideError(formatApiError(e, "No se pudo registrar el rechazo. Intenta de nuevo."));
     } finally {
       setDecidingId(null);
     }
   };
 
-  const counts = useMemo(() => {
-    const c = { all: data.length, Alta: 0, Media: 0, Baja: 0 };
-    for (const a of data) c[a.prioridad]++;
-    return c;
-  }, [data]);
+  const copyInfoRequest = async () => {
+    if (!infoTarget) return;
+    const text = `Hola ${infoTarget.solicita}, sobre «${infoTarget.titulo}» (folio ${infoTarget.folio}): ${infoMessage.trim()}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice(`Mensaje copiado. Pégalo en el Chat para enviárselo a ${infoTarget.solicita}.`);
+    } catch {
+      setNotice("No pudimos copiar el mensaje automáticamente. Escríbelo directamente en el Chat.");
+    }
+    setInfoTarget(null);
+  };
+
+  const showSkeleton = loading && data === null;
+  const hasFilters = filter !== "all" || searchQ.trim() !== "";
 
   return (
     <PageChrome
-      eyebrow="ERP · Gobierno"
+      eyebrow="Hoy"
       title={cfg.title}
       subtitle={cfg.subtitle}
       secondaryActions={
-        <>
-          <Button variant="ghost" iconLeft="🔄" onClick={() => void fetchPending()} disabled={loading}>
-            Actualizar
-          </Button>
-          <Link href="/erp/architecture" style={{ textDecoration: "none" }}>
-            <Button variant="secondary" iconLeft="🗺️">Ver flujos en mapa</Button>
-          </Link>
-        </>
+        <Button variant="ghost" iconLeft="↻" onClick={() => void fetchPending()} loading={loading && data !== null} disabled={loading}>
+          Actualizar
+        </Button>
       }
       filters={
         <FilterToolbar
-          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título o solicitante…" }}
-          onClear={() => { setSearchQ(""); setFilter("all"); }}
-          resultCount={loading ? null : list.length}
-          rightActions={list.length > 0 ? (
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(list, [
-              { key: "type", label: "Tipo" },
-              { key: "titulo", label: "Título" },
-              { key: "prioridad", label: "Prioridad" },
-              { key: "monto", label: "Monto" },
-            ], "aprobaciones-pendientes")}>Excel</Button>
-          ) : undefined}
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título, folio o solicitante…" }}
+          onClear={() => {
+            setSearchQ("");
+            setFilter("all");
+          }}
+          resultCount={showSkeleton ? null : list.length}
+          rightActions={
+            list.length > 0 ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft="⬇"
+                onClick={() =>
+                  exportToExcel(list, [
+                    { key: "type", label: "Tipo" },
+                    { key: "titulo", label: "Solicitud" },
+                    { key: "folio", label: "Folio" },
+                    { key: "solicita", label: "Solicita" },
+                    { key: "prioridad", label: "Prioridad" },
+                    { key: "fechaSolicitud", label: "Fecha" },
+                  ], "aprobaciones-pendientes")
+                }
+              >
+                Excel
+              </Button>
+            ) : undefined
+          }
         />
       }
     >
       {error && (
-        <div
-          role="alert"
-          style={{
-            padding: "10px 14px",
-            background: "var(--state-warning-bg)",
-            border: "1px solid var(--state-warning-border)",
-            color: "var(--state-warning-text)",
-            borderRadius: 12,
-            fontSize: 12.5,
-            marginBottom: 14,
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-          }}
-        >
-          <span aria-hidden="true">⚠️</span>
-          <span>No se pudo cargar el flujo de aprobaciones: {error}</span>
-          <Button size="sm" variant="ghost" onClick={() => void fetchPending()} style={{ marginLeft: "auto" }}>
-            Reintentar
-          </Button>
+        <InlineAlert
+          variant={data ? "warning" : "danger"}
+          message={data ? `No pudimos actualizar la bandeja; mostramos la última versión. ${error}` : error}
+          action={<Button size="sm" variant="secondary" onClick={() => void fetchPending()}>Reintentar</Button>}
+        />
+      )}
+      {decideError && !rejectTarget && (
+        <InlineAlert variant="danger" message={decideError} onDismiss={() => setDecideError(null)} />
+      )}
+      {notice && <InlineAlert variant="success" message={notice} onDismiss={() => setNotice(null)} />}
+
+      {!showSkeleton && data && (
+        <div style={{ marginBottom: 14 }}>
+          <MetricStrip
+            ariaLabel="Resumen de la bandeja"
+            metrics={[
+              { label: "pendientes", value: counts.all, hint: counts.all === 0 ? "bandeja al día" : "esperan tu decisión", tone: counts.all > 0 ? "warning" : "success" },
+              { label: "prioridad alta", value: counts.Alta, hint: counts.Alta > 0 ? "atiéndelas primero" : "sin urgentes", tone: counts.Alta > 0 ? "danger" : "default", onClick: counts.Alta > 0 ? () => setFilter("Alta") : undefined },
+              { label: "esperando 3 días o más", value: counts.late, tone: counts.late > 0 ? "warning" : "default" },
+              { label: "la más antigua", value: counts.all > 0 ? (counts.oldest === 0 ? "hoy" : `${counts.oldest} ${counts.oldest === 1 ? "día" : "días"}`) : "—" },
+            ]}
+          />
         </div>
       )}
 
-      {!loading && (
-        <div className={chrome.kpiStrip}>
-          <KpiCard label="Pendientes" value={counts.all} variant={counts.all > 0 ? "warning" : "positive"} icon="📋" hint={counts.all === 0 ? "Bandeja limpia" : "Requieren decisión"} />
-          <KpiCard label="Prioridad alta" value={counts.Alta} variant={counts.Alta > 0 ? "danger" : "positive"} icon="🔴" hint={counts.Alta > 0 ? "Atención inmediata" : "Sin urgentes"} />
-          <KpiCard label="Prioridad media" value={counts.Media} variant={counts.Media > 0 ? "accent" : "default"} icon="🟡" />
-          <KpiCard label="Prioridad baja" value={counts.Baja} icon="🟢" />
-        </div>
-      )}
-
-      {!loading && counts.all > 0 && (
-        <div className={chrome.distCard}>
-          <div className={chrome.distLabel}>Distribución por prioridad</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {(["Alta", "Media", "Baja"] as const).filter(p => counts[p] > 0).map((p) => (
-              <div key={p} style={{ display: "grid", gridTemplateColumns: "60px 1fr 36px", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{p}</span>
-                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${(counts[p] / counts.all) * 100}%`, background: p === "Alta" ? "var(--danger)" : p === "Media" ? "var(--warning)" : "var(--success)", borderRadius: 3 }} />
-                </div>
-                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{counts[p]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {(["all", "Alta", "Media", "Baja"] as const).map((p) => (
+      <div className={s.chips} role="group" aria-label="Filtrar por prioridad">
+        {FILTERS.map((f) => (
           <button
-            key={p}
+            key={f.key}
             type="button"
-            onClick={() => setFilter(p)}
-            style={{
-              padding: "7px 14px",
-              fontSize: 12.5,
-              fontWeight: 600,
-              borderRadius: 999,
-              border: filter === p ? "1px solid var(--primary)" : "1px solid var(--border)",
-              background: filter === p ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
-              color: filter === p ? "var(--primary)" : "var(--text-primary)",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-            }}
+            className={s.chip}
+            aria-pressed={filter === f.key}
+            onClick={() => setFilter(f.key)}
           >
-            <span>{p === "all" ? "Todas" : p}</span>
-            <span
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                background: filter === p ? "var(--primary)" : "var(--surface-2)",
-                color: filter === p ? "#fff" : "var(--text-secondary)",
-                padding: "1px 6px",
-                borderRadius: 6,
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {counts[p]}
-            </span>
+            {f.label}
+            <span className={s.chipCount}>{counts[f.key]}</span>
           </button>
         ))}
       </div>
 
-      {loading ? (
-        <EmptyState icon="⏳" title="Cargando aprobaciones…" description="Consultando tu bandeja de workflow." />
-      ) : !user?.token ? (
-        <EmptyState icon="🔒" title="Sin sesión" description="Inicia sesión para ver tus aprobaciones pendientes." />
+      {showSkeleton ? (
+        <div className={s.list} aria-busy="true" aria-label="Cargando aprobaciones">
+          <div className={s.skeletonCard} />
+          <div className={s.skeletonCard} />
+        </div>
+      ) : !token ? (
+        <EmptyState icon="🔒" title="Inicia sesión" description="Necesitas iniciar sesión para ver tus aprobaciones." />
       ) : list.length === 0 ? (
-        <EmptyState
-          icon="✅"
-          title="Bandeja limpia"
-          description={
-            filter === "all"
-              ? "No hay aprobaciones pendientes que requieran tu atención. Buen trabajo."
-              : `No hay aprobaciones de prioridad ${filter}.`
-          }
-        />
+        data === null ? (
+          <EmptyState
+            icon="⚠️"
+            title="No pudimos cargar la bandeja"
+            description="Revisa tu conexión e intenta de nuevo."
+            action={<Button variant="primary" onClick={() => void fetchPending()}>Reintentar</Button>}
+          />
+        ) : hasFilters ? (
+          <EmptyState
+            icon="🔍"
+            title="Sin coincidencias"
+            description="Ninguna solicitud coincide con la búsqueda o el filtro."
+            action={<Button variant="secondary" onClick={() => { setFilter("all"); setSearchQ(""); }}>Ver todas</Button>}
+          />
+        ) : (
+          <EmptyState icon="✅" title="Todo al día" description="No hay solicitudes esperando tu firma. Buen trabajo." />
+        )
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {highlightId && (
-            <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
-              Solicitud de workflow <strong>#{highlightId}</strong> desde enlace directo.
+        <div className={s.list}>
+          {highlightId !== null && rows.some((r) => r.instanceId === highlightId) && (
+            <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: 0 }}>
+              Abriste esta bandeja desde un enlace: la solicitud señalada aparece primero.
             </p>
           )}
           {list.map((a) => {
-            const isHighlighted = Boolean(highlightId && a.instanceId === Number(highlightId));
+            const isHighlighted = highlightId !== null && a.instanceId === highlightId;
+            const days = daysWaiting(a.createdAt);
+            const busy = decidingId === a.approvalId;
             return (
               <article
-                key={a.id}
+                key={a.key}
                 ref={isHighlighted ? highlightRef : undefined}
-                style={{
-                  background: isHighlighted ? "color-mix(in srgb, var(--primary) 6%, var(--surface))" : "var(--surface)",
-                  border: isHighlighted ? "2px solid var(--primary)" : "1px solid var(--border)",
-                  borderRadius: 16,
-                  padding: 18,
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)",
-                  gap: 20,
-                }}
+                className={`${s.card} ${isHighlighted ? s.cardHighlighted : ""}`}
+                aria-labelledby={`${a.key}-title`}
               >
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: "var(--primary)", color: "#fff", fontFamily: "var(--nx-font-display)" }}>
-                      {a.id}
+                <div style={{ minWidth: 0 }}>
+                  <div className={s.cardMeta}>
+                    <span className={s.tag}>{a.type}</span>
+                    <span className={`${s.tag} ${a.prioridad === "Alta" ? s.tagHigh : a.prioridad === "Media" ? s.tagMedium : ""}`}>
+                      Prioridad {a.prioridad.toLowerCase()}
                     </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                      {a.type}
+                    <span className={`${s.waiting} ${days >= 3 ? s.waitingVeryLate : days >= 1 ? s.waitingLate : ""}`}>
+                      {a.fechaSolicitud}
+                      {days >= 1 ? ` · ${days} ${days === 1 ? "día" : "días"} esperando` : ""}
                     </span>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: "3px 8px",
-                        borderRadius: 6,
-                        background: a.prioridad === "Alta" ? "var(--state-danger-bg)" : a.prioridad === "Media" ? "var(--state-warning-bg)" : "var(--surface-2)",
-                        color: a.prioridad === "Alta" ? "var(--state-danger-text)" : a.prioridad === "Media" ? "var(--state-warning-text)" : "var(--text-secondary)",
-                      }}
-                    >
-                      {a.prioridad}
-                    </span>
-                    {(() => {
-                      const days = Math.floor((Date.now() - new Date(a.createdAt).getTime()) / 86400000);
-                      const color = days >= 3 ? "var(--danger)" : days >= 1 ? "var(--warning)" : "var(--text-tertiary)";
-                      return (
-                        <span style={{ fontSize: 11, color, fontWeight: days >= 1 ? 700 : 400 }}>
-                          {a.fechaSolicitud}{days >= 1 ? ` · ${days}d esperando` : ""}
-                        </span>
-                      );
-                    })()}
                   </div>
 
-                  <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--nx-font-display)", lineHeight: 1.3 }}>
-                    {a.titulo}
-                  </h3>
-                  <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "6px 0 12px", lineHeight: 1.5 }}>
-                    {a.detalle}
-                  </p>
+                  <h3 id={`${a.key}-title`} className={s.cardTitle}>{a.titulo}</h3>
+                  <p className={s.cardDetail}>{a.detalle}</p>
 
-                  <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                    {a.monto && (
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>Monto</div>
-                        <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 18 }}>{a.monto}</div>
-                      </div>
-                    )}
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>Solicita</div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>
-                        {a.solicita}{" "}
-                        <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>· {a.solicitaRol}</span>
-                      </div>
+                  <div>
+                    <div className={s.fieldLabel}>Solicita</div>
+                    <div className={s.fieldValue}>
+                      {a.solicita}
+                      {a.solicitaRol && <span> · {a.solicitaRol}</span>}
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
-                    <Button variant="primary" iconLeft="✓" onClick={() => void handleDecide(a, "APPROVED")} disabled={decidingId === a.approvalId}>
-                      {decidingId === a.approvalId ? "Aprobando…" : "Aprobar"}
+                  <div className={s.actions}>
+                    <Button variant="primary" iconLeft="✓" onClick={() => void approve(a)} loading={busy} disabled={decidingId !== null}>
+                      {busy ? "Aprobando…" : "Aprobar"}
                     </Button>
-                    <Button variant="secondary" iconLeft="💬" onClick={() => handleRequestInfo(a)}>Pedir más info</Button>
-                    <Button variant="ghost" iconLeft="✕" onClick={() => void handleDecide(a, "REJECTED")} disabled={decidingId === a.approvalId} style={{ color: "var(--danger)" }}>
+                    <Button variant="ghost" iconLeft="✕" onClick={() => openReject(a)} disabled={decidingId !== null} style={{ color: "var(--danger)" }}>
                       Rechazar
                     </Button>
+                    <Button variant="secondary" iconLeft="💬" onClick={() => { setInfoTarget(a); setInfoMessage(""); }}>
+                      Pedir más info
+                    </Button>
+                    {a.href && (
+                      <Link href={a.href} className={s.entityLink}>
+                        Ver solicitud →
+                      </Link>
+                    )}
                   </div>
                 </div>
 
-                <div style={{ background: "color-mix(in srgb, var(--surface-2) 50%, transparent)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
-                  <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", marginBottom: 12 }}>
-                    Cadena de aprobación
-                  </div>
-                  <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 0 }}>
-                    {a.pasos.map((paso, idx) => {
-                      const color =
-                        paso.estado === "Aprobado" ? "var(--success)" :
-                        paso.estado === "Rechazado" ? "var(--danger)" :
-                        paso.estado === "Pendiente" ? "var(--warning)" : "var(--text-tertiary)";
-                      return (
-                        <li key={idx} style={{ display: "grid", gridTemplateColumns: "20px 1fr", gap: 12, padding: "8px 0", position: "relative" }}>
-                          <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
-                            <span style={{
-                              width: 12, height: 12, borderRadius: 999,
-                              background: paso.estado === "Aprobado" || paso.estado === "Rechazado" ? color : "transparent",
-                              border: `2px solid ${color}`,
-                              zIndex: 2, marginTop: 4,
-                              boxShadow: paso.isCurrent ? `0 0 0 4px color-mix(in srgb, ${color} 22%, transparent)` : "none",
-                            }} />
-                            {idx < a.pasos.length - 1 && (
-                              <span style={{ position: "absolute", top: 16, bottom: -4, width: 2, background: paso.estado === "Aprobado" ? "var(--success)" : "var(--border)" }} />
-                            )}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                              {paso.rol}
-                              {paso.isCurrent && (
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "color-mix(in srgb, var(--warning) 18%, transparent)", color: "var(--warning)" }}>
-                                  AQUÍ
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
-                              <span style={{ fontSize: 11, color, fontWeight: 600 }}>{paso.estado}</span>
-                              {paso.quien && <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{paso.quien}</span>}
-                              {paso.fecha && <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{paso.fecha}</span>}
-                            </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                </div>
+                <ApprovalChain pasos={a.pasos} />
               </article>
             );
           })}
         </div>
       )}
 
-      {/* ── Rechazo modal ── */}
-      {rejectModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setRejectModal(null)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Rechazar solicitud</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
-              <strong>{rejectModal.titulo}</strong> · Solicitada por {rejectModal.solicita}
-            </div>
-            <label style={{ display: "grid", gap: 4, marginBottom: 16 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo del rechazo (visible al solicitante)</span>
+      <Modal
+        open={rejectTarget !== null}
+        onClose={() => setRejectTarget(null)}
+        title="Rechazar solicitud"
+        dirty={rejectReason.trim().length > 0 && decidingId === null}
+        maxWidth={460}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRejectTarget(null)}>Cancelar</Button>
+            <Button
+              variant="danger"
+              onClick={() => void submitReject()}
+              loading={rejectTarget !== null && decidingId === rejectTarget.approvalId}
+            >
+              Confirmar rechazo
+            </Button>
+          </>
+        }
+      >
+        {rejectTarget && (
+          <>
+            <p className={s.modalLead}>
+              <strong>{rejectTarget.titulo}</strong> · solicitada por {rejectTarget.solicita}
+            </p>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span className={s.fieldLabel}>Motivo (lo verá quien solicitó)</span>
               <textarea
+                className={s.textarea}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={4}
-                placeholder="Explica la razón del rechazo para que el solicitante pueda tomar acción…"
-                autoFocus
-                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+                placeholder="Explica por qué la rechazas para que puedan corregirla…"
               />
             </label>
-            {decidingErr && (
-              <div style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)", marginBottom: 12 }}>
-                {decidingErr}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setRejectModal(null)}>Cancelar</Button>
-              <Button variant="danger" onClick={() => void submitReject()} disabled={decidingId === rejectModal.approvalId}>
-                {decidingId === rejectModal.approvalId ? "Rechazando…" : "Confirmar rechazo"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            {decideError && <div style={{ marginTop: 12 }}><InlineAlert variant="danger" message={decideError} /></div>}
+          </>
+        )}
+      </Modal>
 
-      {/* ── Solicitar info modal ── */}
-      {infoModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setInfoModal(null)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Pedir más información</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
-              A: <strong>{infoModal.solicita}</strong> ({infoModal.solicitaRol})
-            </div>
-            <label style={{ display: "grid", gap: 4, marginBottom: 16 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Pregunta o información requerida</span>
+      <Modal
+        open={infoTarget !== null}
+        onClose={() => setInfoTarget(null)}
+        title="Pedir más información"
+        maxWidth={460}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setInfoTarget(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void copyInfoRequest()} disabled={!infoMessage.trim()}>
+              Copiar mensaje
+            </Button>
+          </>
+        }
+      >
+        {infoTarget && (
+          <>
+            <p className={s.modalLead}>
+              Para <strong>{infoTarget.solicita}</strong>
+              {infoTarget.solicitaRol ? ` (${infoTarget.solicitaRol})` : ""}
+            </p>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span className={s.fieldLabel}>¿Qué necesitas saber?</span>
               <textarea
+                className={s.textarea}
                 value={infoMessage}
                 onChange={(e) => setInfoMessage(e.target.value)}
                 rows={4}
-                placeholder={`¿Qué necesitas de ${infoModal.solicita}? Escribe tu pregunta aquí…`}
-                autoFocus
-                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+                placeholder={`Escribe tu pregunta para ${infoTarget.solicita}…`}
               />
             </label>
-            <div style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12, color: "var(--text-secondary)", marginBottom: 16 }}>
-              💡 La solicitud permanecerá en tu bandeja hasta que apruebes o rechaces. Contacta a {infoModal.solicita} por el canal habitual.
+            <div className={s.modalNote}>
+              La solicitud seguirá en tu bandeja hasta que la apruebes o rechaces. Copiaremos el mensaje para que lo
+              envíes por el <Link href="/erp/chat">Chat</Link>.
             </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setInfoModal(null)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => { setInfoModal(null); }} disabled={!infoMessage.trim()}>
-                Registrar pregunta
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </PageChrome>
   );
 }
