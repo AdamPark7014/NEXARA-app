@@ -9,6 +9,7 @@ import {
   type PlanoCotizacion,
 } from "@/lib/cotizaciones-api";
 import { mover } from "@/lib/cotizacion-documento";
+import { formatApiError } from "@/lib/erp-api";
 import { Hoja } from "./campos";
 import styles from "./editor.module.css";
 
@@ -66,7 +67,7 @@ export default function SeccionPlanos({
         const nombre = archivo.name.replace(/\.[a-z0-9]+$/i, "");
         onDetalle(await subirPlano(token, cotizacionId, archivo, nombre));
       } catch (e) {
-        onError(e instanceof Error ? e.message : "No se pudo subir el plano");
+        onError(formatApiError(e, "No se pudo subir el plano"));
       }
     }
     setSubiendo(null);
@@ -82,7 +83,7 @@ export default function SeccionPlanos({
       );
       onDetalle(null);
     } catch (e) {
-      onError(e instanceof Error ? e.message : "No se pudo guardar el orden de los planos");
+      onError(formatApiError(e, "No se pudo guardar el orden de los planos"));
     }
   }
 
@@ -91,7 +92,7 @@ export default function SeccionPlanos({
     try {
       onDetalle(await quitarPlano(token, cotizacionId, url));
     } catch (e) {
-      onError(e instanceof Error ? e.message : "No se pudo quitar el plano");
+      onError(formatApiError(e, "No se pudo quitar el plano"));
     }
   }
 
