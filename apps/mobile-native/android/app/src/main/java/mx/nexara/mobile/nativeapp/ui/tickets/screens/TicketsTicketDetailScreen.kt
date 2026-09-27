@@ -108,6 +108,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
@@ -536,21 +537,21 @@ fun TicketsTicketDetailScreen(
 
                                 TicketDetailRow("Prioridad", t.displayPriority())
 
-                                TicketDetailRow("Tipo", t.ticketType ?: t.urgency)
+                                TicketDetailRow("Tipo", (t.ticketType ?: t.urgency)?.takeIf { it.isNotBlank() }?.let(NxStatusLabels::label))
 
                                 TicketDetailRow("Responsable", responsable)
 
                                 if (location.isNotBlank()) TicketDetailRow("Ubicación", location)
 
-                                TicketDetailRow("Compromiso", t.dueAt?.take(16))
+                                TicketDetailRow("Compromiso", t.dueAt?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("SLA", t.slaDueAt?.take(16))
+                                TicketDetailRow("SLA", t.slaDueAt?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("Asignación", t.fechaAsignacion?.take(16))
+                                TicketDetailRow("Asignación", t.fechaAsignacion?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("Inicio", t.fechaInicio?.take(16))
+                                TicketDetailRow("Inicio", t.fechaInicio?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
-                                TicketDetailRow("Cierre", t.fechaFinalizacion?.take(16))
+                                TicketDetailRow("Cierre", t.fechaFinalizacion?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime))
 
                                 if (t.isOpen()) {
 
@@ -645,7 +646,7 @@ fun TicketsTicketDetailScreen(
 
                                     if (whenAt.isNotBlank()) {
 
-                                        Text(whenAt.take(16), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(NxFormat.dateTime(whenAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                                     }
 

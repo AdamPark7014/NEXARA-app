@@ -57,6 +57,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
@@ -238,7 +239,7 @@ private fun Encabezado(viatico: ViaticoDto) {
                 listOfNotNull(
                     etiquetaCategoria(viatico.categoria),
                     viatico.usuario?.nombre?.trim()?.takeIf { it.isNotEmpty() },
-                    viatico.fechaSolicitud?.take(10),
+                    viatico.fechaSolicitud?.takeIf { it.isNotBlank() }?.let(NxFormat::date),
                     viatico.actividad?.anNumber?.trim()?.takeIf { it.isNotEmpty() },
                     viatico.contabilidadRef?.trim()?.takeIf { it.isNotEmpty() },
                 ).joinToString(" · "),
