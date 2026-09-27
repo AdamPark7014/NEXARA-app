@@ -138,8 +138,11 @@ storeFile=$StoreFileName
   }
 
   Write-Host "Compilando bundleRelease (AAB)..." -ForegroundColor Cyan
-  $gradleTask = if ($Clean) { "clean bundleRelease" } else { "bundleRelease" }
-  & .\gradlew.bat --no-daemon $gradleTask
+  if ($Clean) {
+    & .\gradlew.bat --no-daemon clean bundleRelease
+  } else {
+    & .\gradlew.bat --no-daemon bundleRelease
+  }
   if ($LASTEXITCODE -ne 0) {
     throw "bundleRelease falló (exit $LASTEXITCODE)"
   }

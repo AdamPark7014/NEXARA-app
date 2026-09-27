@@ -274,13 +274,19 @@ gradle.taskGraph.whenReady {
     // pasó con el App bundle 10— y el rechazo llega días después de subir,
     // cuando ya nadie recuerda qué cambió. Se comprueba antes de generar el AAB.
     val manifiestoPrincipal = file("src/main/AndroidManifest.xml")
-    if (!manifiestoPrincipal.exists() || !manifiestoPrincipal.readText().contains("isMonitoringTool")) {
+    val manifestText = if (manifiestoPrincipal.exists()) manifiestoPrincipal.readText() else ""
+    // Requisito Play: meta-data isMonitoringTool con valor enterprise_management.
+    val hasMonitoringMeta =
+        manifestText.contains("android:name=\"isMonitoringTool\"") &&
+            manifestText.contains("android:value=\"enterprise_management\"")
+    if (!hasMonitoringMeta) {
         problems += """
-            |Falta la marca "isMonitoringTool" en src/main/AndroidManifest.xml.
-            |  Google Play rechaza la revisión por la política de stalkerware y
-            |  monitorización porque la app envía la ubicación durante la jornada.
-            |  Declárala dentro de <application>:
-            |      <meta-data android:name="isMonitoringTool" android:value="true" />
+            |Falta la meta-data de monitorización en <application> (src/main/AndroidManifest.xml).
+            |  Google Play rechaza la revisión por la política de stalkerware/monitorización si no se declara.
+            |  Declárala así dentro de <application>:
+            |      <meta-data
+            |          android:name="isMonitoringTool"
+            |          android:value="enterprise_management" />
         """.trimMargin()
     }
 

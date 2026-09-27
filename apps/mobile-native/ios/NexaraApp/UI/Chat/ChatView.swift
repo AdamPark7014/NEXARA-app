@@ -100,6 +100,28 @@ struct ChatView: View {
         return name.isEmpty ? "Chat" : name
     }
 
+    /// Typed binding for the thread sheet item to ease type-checking.
+    private var threadSheetItemBinding: Binding<ChatThreadItem?> {
+        Binding<ChatThreadItem?>(
+            get: {
+                guard let root = threadRoot else { return nil }
+                let id = ConsoleHelpers.mapInt64(root, "id") ?? 0
+                return id > 0 ? ChatThreadItem(id: id, message: root) : nil
+            },
+            set: { item in
+                if item == nil { threadRoot = nil; threadReplies = [] }
+            }
+        )
+    }
+
+    /// Typed binding for the edit alert presentation.
+    private var isEditingAlertPresented: Binding<Bool> {
+        Binding<Bool>(
+            get: { editingMessage != nil },
+            set: { if !$0 { editingMessage = nil } }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -166,16 +188,7 @@ struct ChatView: View {
             .sheet(item: $pdfItem) { item in
                 NavigationStack { PDFViewerScreen(title: item.title, data: item.data) }
             }
-            .sheet(item: Binding(
-                get: {
-                    guard let root = threadRoot else { return nil }
-                    let id = ConsoleHelpers.mapInt64(root, "id") ?? 0
-                    return id > 0 ? ChatThreadItem(id: id, message: root) : nil
-                },
-                set: { item in
-                    if item == nil { threadRoot = nil; threadReplies = [] }
-                }
-            )) { item in
+            .sheet(item: threadSheetItemBinding) { item in
                 threadSheet(root: item.message)
             }
             .sheet(item: $reactorsSheetItem) { item in
@@ -212,10 +225,7 @@ struct ChatView: View {
                     )
                 }
             }
-            .alert("Editar mensaje", isPresented: Binding(
-                get: { editingMessage != nil },
-                set: { if !$0 { editingMessage = nil } }
-            )) {
+            .alert("Editar mensaje", isPresented: isEditingAlertPresented) {
                 TextField("Mensaje", text: $editDraft)
                 Button("Guardar") { Task { await saveEdit() } }
                 Button("Cancelar", role: .cancel) { editingMessage = nil }
@@ -1208,7 +1218,7 @@ struct ChatView: View {
         guard parentId > 0, let channelId = selectedChannelId else { return }
         threadLoading = true
         do {
-            let page = try await ChatRepository.shared.listMessages(channelId: channelId, parentId: parentId, limit: 100)
+            let page = try await ChatRepository.shared.listMessages(channelId: channelId, limit: 100, parentId: parentId)
             threadReplies = page.messages
         } catch {
             self.error = error.toUserMessage()
@@ -1643,6 +1653,8 @@ private enum ChatMessageFormat {
         return reactionDayFormatter.string(from: d)
     }
 }
+
+// String.nilIfEmpty is provided globally in Support/String+NilIfEmpty.swift
 
 /// Ítem del sheet "quién reaccionó" (`.sheet(item:)` exige `Identifiable`).
 private struct ChatReactorsSheetItem: Identifiable {

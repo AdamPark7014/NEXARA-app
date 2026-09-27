@@ -230,9 +230,4 @@ final class ChatRepository {
     private struct EmptyBody: Encodable {}
 }
 
-private extension String {
-    var nilIfEmpty: String? {
-        let t = trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? nil : t
-    }
-}
+// String.nilIfEmpty is provided globally in Support/String+NilIfEmpty.swift
