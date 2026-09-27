@@ -19,12 +19,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -364,21 +367,42 @@ fun NxEmptyState(
     subtitle: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    icon: ImageVector? = Icons.Default.Inbox,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 32.dp, horizontal = 16.dp),
+            .padding(vertical = 36.dp, horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = NxColors.Slate)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
-        if (actionLabel != null && onAction != null) {
-            Spacer(Modifier.height(4.dp))
-            Button(onClick = onAction, colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand)) {
-                Text(actionLabel)
+        if (icon != null) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(NxColors.BrandTint, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = NxColors.Brand, modifier = Modifier.size(26.dp))
             }
+            Spacer(Modifier.height(4.dp))
+        }
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            color = NxColors.Slate,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = NxColors.Muted,
+            textAlign = TextAlign.Center,
+        )
+        if (actionLabel != null && onAction != null) {
+            Spacer(Modifier.height(6.dp))
+            NxPrimaryButton(text = actionLabel, onClick = onAction, modifier = Modifier)
         }
     }
 }
@@ -404,9 +428,12 @@ fun NxErrorBlock(message: String, onRetry: (() -> Unit)? = null) {
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("No se pudo cargar", fontWeight = FontWeight.SemiBold, color = NxColors.Danger)
-            Text(message, style = MaterialTheme.typography.bodySmall, color = NxColors.Slate)
+            Text(nxFriendlyError(message), style = MaterialTheme.typography.bodySmall, color = NxColors.Slate)
             if (onRetry != null) {
-                OutlinedButton(onClick = onRetry) { Text("Reintentar") }
+                OutlinedButton(
+                    onClick = onRetry,
+                    modifier = Modifier.heightIn(min = NxSpacing.TouchTarget),
+                ) { Text("Reintentar") }
             }
         }
     }
