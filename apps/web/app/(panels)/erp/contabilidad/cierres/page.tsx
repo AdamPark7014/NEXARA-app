@@ -125,7 +125,6 @@ export default function CierresPage() {
       setRows(Array.isArray(data) ? data : (data?.items ?? []));
     } catch (e) {
       setError(formatApiError(e));
-      setRows([]);
     } finally {
       setLoading(false);
     }

@@ -16,6 +16,7 @@ import { toast } from "@/components/Toast";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
 import { formatApiError } from "@/lib/erp-api";
+import { saveBlob, todayStamp } from "@/components/finance/download";
 import {
   FinanceField,
   FinanceFormGrid,
@@ -110,7 +111,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
 const MATCH_LABELS: Record<string, string> = {
   NOT_REQUIRED: "No aplica",
   PENDING: "Pendiente",
-  MATCHED: "OK",
+  MATCHED: "Coincide",
   VARIANCE: "Variación",
   WAIVED: "Eximido",
 };
@@ -150,7 +151,7 @@ export default function InvoiceDetailPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [payForm, setPayForm] = useState({
     amount: "",
-    paymentDate: new Date().toISOString().slice(0, 10),
+    paymentDate: todayStamp(),
     method: "SPEI",
     reference: "",
     notes: "",
@@ -167,6 +168,7 @@ export default function InvoiceDetailPage() {
   const [cancelReason, setCancelReason] = useState("02");
   const [substitutionUuid, setSubstitutionUuid] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [matching, setMatching] = useState(false);
 
@@ -183,7 +185,7 @@ export default function InvoiceDetailPage() {
       const data = await apiFetch(`accounting/invoices/${id}`, token);
       setInvoice(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar la factura");
+      setError(formatApiError(e, "No se pudo cargar la factura"));
     } finally { setLoading(false); }
   }, [token, id]);
 
@@ -203,15 +205,9 @@ export default function InvoiceDetailPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${invoice?.invoiceNumber ?? id}.xml`;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveBlob(await res.blob(), `${invoice?.invoiceNumber ?? id}.xml`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo descargar XML");
+      toast.error(formatApiError(e, "No se pudo descargar el XML"));
     }
   };
 
@@ -281,16 +277,17 @@ export default function InvoiceDetailPage() {
       const data = await apiFetch(`accounting/invoices/${id}/sat-status`, token);
       setSatStatus(data);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al consultar SAT");
+      toast.error(formatApiError(e, "No se pudo consultar el estado en el SAT"));
     } finally { setCheckingSat(false); }
   };
 
   const cancelInvoice = async () => {
     if (!token || !id) return;
     if (cancelReason === "01" && !substitutionUuid.trim()) {
-      toast.error("Motivo 01 requiere UUID del CFDI sustituto");
+      setCancelErr("Con el motivo 01 hay que indicar el UUID del CFDI que sustituye a éste.");
       return;
     }
+    setCancelErr(null);
     setCancelling(true);
     try {
       await apiFetch(`accounting/invoices/${id}/cancel`, token, {
@@ -304,7 +301,9 @@ export default function InvoiceDetailPage() {
       setShowCancel(false);
       void load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al cancelar");
+      const msg = formatApiError(e, "No se pudo cancelar la factura");
+      setCancelErr(msg);
+      toast.error(msg);
     } finally { setCancelling(false); }
   };
 
@@ -315,7 +314,7 @@ export default function InvoiceDetailPage() {
       toast.success(`Nota de crédito ${nc.invoiceNumber} creada en borrador`);
       router.push(`/erp/invoicing/${nc.id}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al crear nota de crédito");
+      toast.error(formatApiError(e, "No se pudo crear la nota de crédito"));
     }
   };
 
@@ -338,10 +337,10 @@ export default function InvoiceDetailPage() {
     setMatching(true);
     try {
       await apiFetch(`accounting/invoices/${id}/match/evaluate`, token, { method: "POST" });
-      toast.success("3-way match recalculado");
+      toast.success("Cotejo con orden de compra y recepción recalculado");
       void load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al evaluar match");
+      toast.error(formatApiError(e, "No se pudo reevaluar el cotejo"));
     } finally {
       setMatching(false);
     }
@@ -355,10 +354,10 @@ export default function InvoiceDetailPage() {
         method: "POST",
         body: JSON.stringify({ notes: "Eximido desde UI facturación" }),
       });
-      toast.success("Match eximido — ya puedes pagar");
+      toast.success("Cotejo eximido: ya puedes registrar el pago");
       void load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al eximir match");
+      toast.error(formatApiError(e, "No se pudo eximir el cotejo"));
     } finally {
       setMatching(false);
     }
@@ -384,8 +383,8 @@ export default function InvoiceDetailPage() {
     return Math.min(100, Math.round(((invoice.paidAmount ?? 0) / invoice.totalAmount) * 100));
   }, [invoice]);
 
-  if (loading) return <EmptyState icon={<LoadingIcon />} title="Cargando factura…" description="Consultando el CFDI." />;
-  if (error) return <EmptyState icon={<AlertIcon />} title="No se pudo cargar la factura" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />;
+  if (loading && !invoice) return <EmptyState icon={<LoadingIcon />} title="Cargando factura…" description="Consultando el CFDI." />;
+  if (error && !invoice) return <EmptyState icon={<AlertIcon />} title="No se pudo cargar la factura" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />;
   if (!invoice) return null;
 
   const isIncome = invoice.type === "ACCOUNTS_RECEIVABLE" || invoice.type === "INCOME";
@@ -416,6 +415,14 @@ export default function InvoiceDetailPage() {
   if (actionError) {
     notices.push({ id: "action", level: "critical", text: actionError, onDismiss: () => setActionError(null) });
   }
+  if (error) {
+    notices.push({
+      id: "reload",
+      level: "warning",
+      text: `No se pudo actualizar la factura; se muestran los datos anteriores. ${error}`,
+      onDismiss: () => setError(null),
+    });
+  }
   if (pacInfo?.productionWarning) {
     notices.push({
       id: "pac-prod",
@@ -430,13 +437,25 @@ export default function InvoiceDetailPage() {
     notices.push({
       id: "match",
       level: blocked ? "warning" : "info",
-      text: `3-way match OC–GR–factura: ${MATCH_LABELS[match] ?? match}.${
+      text: `Cotejo orden de compra – recepción – factura: ${MATCH_LABELS[match] ?? match}.${
         invoice.matchNotes ? ` ${invoice.matchNotes}` : blocked ? " Resuélvelo para poder pagar." : ""
       }`,
       secondaryAction: canEdit ? { label: "Reevaluar", onClick: () => void evaluateMatch(), busy: matching } : undefined,
       action:
         canEdit && (match === "VARIANCE" || match === "PENDING")
-          ? { label: "Eximir match", onClick: () => void waiveMatch(), busy: matching }
+          ? {
+              label: "Eximir cotejo",
+              busy: matching,
+              onClick: () =>
+                setConfirmState({
+                  title: "Eximir cotejo",
+                  message:
+                    "La factura quedará lista para pagarse aunque no coincida con la orden de compra o la recepción. La excepción queda registrada.",
+                  confirmLabel: "Eximir y permitir pago",
+                  danger: true,
+                  fn: waiveMatch,
+                }),
+            }
           : undefined,
     });
   }
@@ -510,7 +529,7 @@ export default function InvoiceDetailPage() {
                   size="sm"
                   variant={canStamp ? "ghost" : "primary"}
                   disabled={!matchAllowsPay}
-                  title={!matchAllowsPay ? "Resuelve el 3-way match antes de pagar" : undefined}
+                  title={!matchAllowsPay ? "Resuelve el cotejo con la orden de compra antes de pagar" : undefined}
                   onClick={openPayment}
                 >
                   Registrar pago
@@ -639,7 +658,7 @@ export default function InvoiceDetailPage() {
               <Button size="sm" variant="ghost" onClick={() => void createCreditNote()}>Nota de crédito</Button>
             )}
             {canEdit && invoice.cfdiUuid && !invoice.isCancelled && (
-              <Button size="sm" variant="secondary" onClick={() => setShowCancel(true)}>Cancelar CFDI</Button>
+              <Button size="sm" variant="secondary" onClick={() => { setCancelErr(null); setShowCancel(true); }}>Cancelar CFDI</Button>
             )}
           </>
         }
@@ -702,7 +721,7 @@ export default function InvoiceDetailPage() {
         footer={
           <>
             <Button size="sm" variant="ghost" onClick={() => setShowCancel(false)}>Cerrar</Button>
-            <Button size="sm" variant="primary" onClick={() => void cancelInvoice()} disabled={cancelling}>
+            <Button size="sm" variant="danger" onClick={() => void cancelInvoice()} disabled={cancelling}>
               {cancelling ? "Cancelando…" : "Confirmar cancelación"}
             </Button>
           </>
@@ -727,10 +746,22 @@ export default function InvoiceDetailPage() {
               fullWidth
               hint="UUID completo del CFDI que reemplaza a éste."
             >
-              <input value={substitutionUuid} onChange={(e) => setSubstitutionUuid(e.target.value)} placeholder="UUID del CFDI que sustituye" style={inp} />
+              <input
+                value={substitutionUuid}
+                onChange={(e) => { setSubstitutionUuid(e.target.value); setCancelErr(null); }}
+                placeholder="UUID del CFDI que sustituye"
+                aria-invalid={cancelErr && !substitutionUuid.trim() ? true : undefined}
+                autoComplete="off"
+                spellCheck={false}
+                style={inp}
+              />
             </FinanceField>
           )}
         </FinanceFormGrid>
+        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+          La cancelación se envía al SAT y no se puede deshacer.
+        </p>
+        {cancelErr && <div style={{ marginTop: 12 }}><InlineAlert variant="danger" message={cancelErr} /></div>}
       </Modal>
 
       <Modal
@@ -748,7 +779,7 @@ export default function InvoiceDetailPage() {
       >
         <FinanceFormGrid>
           <FinanceField label="Monto" hint="Pesos. Puede ser menor al saldo: queda como pago parcial.">
-            <input type="number" min="0.01" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))} style={inp} autoFocus />
+            <input type="number" inputMode="decimal" min="0.01" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))} style={inp} autoFocus />
           </FinanceField>
           <FinanceField label="Fecha de pago" hint="La del estado de cuenta, no la de captura.">
             <input type="date" value={payForm.paymentDate} onChange={(e) => setPayForm((f) => ({ ...f, paymentDate: e.target.value }))} style={inp} />

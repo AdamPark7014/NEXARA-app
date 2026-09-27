@@ -13,6 +13,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
+import { saveBlob } from "@/components/finance/download";
 import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { withTenantHeaders } from "@/lib/tenant";
@@ -190,13 +191,7 @@ export default function MovimientosPage() {
       const renglones = Number(res.headers.get("X-Ledger-Rows"));
       const recortado = res.headers.get("X-Ledger-Truncated") === "true";
       const nombre = `movimientos-${filters.from}-a-${filters.to}.csv`;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = nombre;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveBlob(await res.blob(), nombre);
       const cuantos = Number.isFinite(renglones) && renglones > 0 ? `${renglones} ` : "";
       setExportAviso(
         recortado

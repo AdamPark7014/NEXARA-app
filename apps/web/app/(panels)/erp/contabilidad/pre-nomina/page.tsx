@@ -15,6 +15,7 @@ import {
   FinanceFormGrid,
   financeInputStyle,
 } from "@/components/finance/FinanceModuleShell";
+import { todayStamp } from "@/components/finance/download";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { fetchPrenominaPreview, type PrenominaPreviewRow } from "@/lib/finance-api";
@@ -23,13 +24,13 @@ import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 const MODULO_COMPLETO = "/erp/finance/prenomina";
 
 function isoHoy() {
-  return new Date().toISOString().slice(0, 10);
+  return todayStamp();
 }
 
 function isoHaceDias(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  return todayStamp(d);
 }
 
 function horasYMinutos(minutos: number) {
