@@ -512,8 +512,10 @@ struct EvidenceCaptureFlowView: View {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.title3)
                                     .foregroundStyle(Color.white, Color.black.opacity(0.6))
+                                    .frame(width: NxMetrics.minTap, height: NxMetrics.minTap, alignment: .topTrailing)
+                                    .contentShape(Rectangle())
                             }
-                            .padding(4)
+                            .accessibilityLabel("Quitar foto")
                             .disabled(busy)
                         }
                         .overlay(alignment: .bottomLeading) {

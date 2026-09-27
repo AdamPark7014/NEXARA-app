@@ -92,7 +92,7 @@ struct ChipsDeViatico: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            NxStatusChip(text: viatico.estatus.isEmpty ? "—" : viatico.estatus, tone: viatico.tonoEstatus)
+            NxStatusChip(text: NxStatusText.label(viatico.estatus), tone: viatico.tonoEstatus)
             if let resumen = viatico.liquidacion?.resumenCorto {
                 NxStatusChip(text: resumen, tone: viatico.liquidacion?.tono ?? .neutral)
             }

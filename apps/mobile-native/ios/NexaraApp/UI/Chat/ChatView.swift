@@ -723,8 +723,13 @@ struct ChatView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis").font(.caption).foregroundStyle(.secondary)
+                    Image(systemName: "ellipsis")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Acciones del mensaje")
             }
             if !body.isEmpty {
                 Text(ChatMentionFormat.display(body)).font(.body)

@@ -17,6 +17,7 @@ struct MisActividadesView: View {
     @State private var data: MyActivitiesResponse?
     @State private var loading = true
     @State private var error: String?
+    @State private var actionError: String?
     @State private var pendingMove: PendingMove?
     @State private var highlightId: Int?
     @State private var showDone = false
@@ -38,9 +39,20 @@ struct MisActividadesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                statsRow
-                if let error {
-                    Text(error).font(.footnote).foregroundStyle(CorePalette.red)
+                if loading && data == nil {
+                    NxSkeletonRows(count: 3)
+                } else if let error, data == nil {
+                    NxErrorState(message: error) { Task { await load() } }
+                } else {
+                    statsRow
+                    if let error {
+                        NxStaleBanner(message: error) { Task { await load() } }
+                    }
+                }
+                if let actionError {
+                    NxIconText(systemName: "exclamationmark.triangle.fill", text: actionError)
+                        .font(.footnote)
+                        .foregroundStyle(CorePalette.red)
                 }
                 if let notice {
                     NxIconText(systemName: "checkmark.circle.fill", text: notice).font(.footnote).foregroundStyle(CorePalette.green)
@@ -61,6 +73,7 @@ struct MisActividadesView: View {
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
         .refreshable { await load() }
         .task { await load() }
         .sheet(item: $pendingMove) { move in
@@ -100,9 +113,11 @@ struct MisActividadesView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("MIS ACTIVIDADES")
-                .font(.caption2.weight(.heavy))
+            Text("Mis actividades")
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
                 .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
             Text(firstName.isEmpty ? "Tu día" : "Hola, \(firstName)")
                 .font(.title2.weight(.heavy))
             Text(subtitle)
@@ -119,12 +134,14 @@ struct MisActividadesView: View {
                     Button {
                         showSelfAssign = true
                     } label: {
-                        Label("Auto-asignarme", systemImage: "plus")
+                        Label("Asignarme una", systemImage: "plus")
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(NxBrand.primary)
                 }
             }
             .font(.subheadline)
+            .controlSize(.large)
         }
         .coreCard()
     }
@@ -166,9 +183,10 @@ struct MisActividadesView: View {
                 .foregroundStyle(.secondary)
             if data?.canSelfAssign == true {
                 Button { showSelfAssign = true } label: {
-                    Label("Auto-asignarme una actividad", systemImage: "plus")
+                    Label("Asignarme una actividad", systemImage: "plus")
                 }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             }
         }
         .frame(maxWidth: .infinity)
@@ -275,6 +293,7 @@ struct MisActividadesView: View {
                     .buttonStyle(.bordered)
                 }
                 .font(.subheadline)
+                .controlSize(.large)
 
                 if canReorder {
                     HStack(spacing: 6) {
@@ -287,7 +306,8 @@ struct MisActividadesView: View {
                         }
                     }
                     .buttonStyle(.bordered)
-                    .font(.caption)
+                    .font(.footnote)
+                    .controlSize(.large)
                 }
             }
         }
@@ -307,11 +327,11 @@ struct MisActividadesView: View {
         defer { iniciandoId = nil }
         do {
             try await CoreRepository.shared.iniciarActividad(activityId: item.id)
-            error = nil
+            actionError = nil
             notice = "Actividad iniciada. Sigue con la foto de entrada en «Abrir»."
             await load()
         } catch {
-            self.error = error.toUserMessage(fallback: "No se pudo iniciar la actividad")
+            actionError = error.toUserMessage(fallback: "No se pudo iniciar la actividad")
         }
     }
 
@@ -385,6 +405,7 @@ struct MisActividadesView: View {
                 }
                 .buttonStyle(.bordered)
                 .font(.caption)
+                .controlSize(.large)
             }
         }
         .coreCard()
@@ -408,6 +429,8 @@ struct MisActividadesView: View {
                 .font(.subheadline.weight(.semibold))
             }
             .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityHint(showDone ? "Ocultar la lista" : "Mostrar la lista")
 
             if showDone {
                 ForEach(done) { item in
@@ -418,7 +441,7 @@ struct MisActividadesView: View {
                             NxIconText(systemName: "checkmark", text: item.displayTitle, tint: CorePalette.green)
                                 .lineLimit(1)
                             Spacer()
-                            Text(CoreFormat.time(item.fechaFinalizacion) ?? (item.estatus ?? ""))
+                            Text(CoreFormat.time(item.fechaFinalizacion) ?? NxStatusText.label(item.estatus))
                                 .foregroundStyle(.secondary)
                         }
                         .font(.footnote)
