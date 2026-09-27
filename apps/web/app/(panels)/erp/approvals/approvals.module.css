@@ -1,0 +1,315 @@
+.chips {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 16px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  appearance: none;
+  font: inherit;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.chip:hover { border-color: var(--border-strong, var(--border)); }
+
+.chip[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+}
+
+.chip:focus-visible,
+.entityLink:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.chipCount {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip[aria-pressed="true"] .chipCount {
+  background: var(--primary);
+  color: var(--primary-foreground, #fff);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+  box-shadow: var(--nx-panel-elev-1);
+}
+
+.cardHighlighted {
+  border: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.tagHigh { background: var(--state-danger-bg); color: var(--state-danger-text); font-weight: 700; }
+.tagMedium { background: var(--state-warning-bg); color: var(--state-warning-text); font-weight: 700; }
+
+.waiting {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.waitingLate { color: var(--warning); font-weight: 700; }
+.waitingVeryLate { color: var(--danger); font-weight: 700; }
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--nx-font-display);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.cardDetail {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 6px 0 12px;
+  line-height: 1.5;
+}
+
+.fieldLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.fieldValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fieldValue span {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.entityLink {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  margin-left: auto;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.entityLink:hover { text-decoration: underline; }
+
+.chain {
+  background: color-mix(in srgb, var(--surface-2) 50%, transparent);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 0;
+}
+
+.chainTitle {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin: 0 0 12px;
+}
+
+.chainList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.stepRail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.stepDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  margin-top: 4px;
+  z-index: 1;
+}
+
+.stepLine {
+  position: absolute;
+  top: 16px;
+  bottom: -12px;
+  width: 2px;
+  background: var(--border);
+}
+
+.stepLineDone { background: var(--success); }
+
+.stepRole {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.stepNow {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--state-warning-bg);
+  color: var(--state-warning-text);
+}
+
+.stepInfo {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 3px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.skeletonCard {
+  height: 196px;
+  border-radius: 16px;
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2));
+  background-size: 200% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.45;
+}
+
+.textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.modalLead {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.modalNote {
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .card {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .textarea { font-size: 16px; }
+  .entityLink { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonCard { animation: none; }
+  .chip { transition: none; }
+}
