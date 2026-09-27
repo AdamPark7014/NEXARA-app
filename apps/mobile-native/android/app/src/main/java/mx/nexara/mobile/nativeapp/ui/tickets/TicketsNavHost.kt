@@ -22,7 +22,10 @@ import androidx.navigation.compose.rememberNavController
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLightStatusBarIcons
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
@@ -110,10 +113,19 @@ fun TicketsNavHost(
 
     val showBack = route != TicketsRoutes.Portal
 
+    NxLightStatusBarIcons()
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, color = Color.White) },
+                title = {
+                    Text(
+                        title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 colors = NxBrandTopAppBarColors(),
                 navigationIcon = {
                     if (showBack) {

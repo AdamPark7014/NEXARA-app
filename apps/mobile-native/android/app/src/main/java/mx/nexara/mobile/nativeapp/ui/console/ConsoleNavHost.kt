@@ -80,6 +80,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLightStatusBarIcons
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 import mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen
@@ -414,6 +415,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.Cotizaciones -> "Cotizaciones"
         ConsoleRoutes.CotizacionDetalle -> "Cotización"
         ConsoleRoutes.PagosEmpleados -> "Pagos a empleados"
+        ConsoleRoutes.Gastos -> "Gastos"
         ConsoleRoutes.Aprobaciones -> "Aprobaciones"
         ConsoleRoutes.Viaticos -> "Viáticos"
         ConsoleRoutes.NuevoViatico -> "Pedir viático"
@@ -427,9 +429,10 @@ fun ConsoleNavHost(
         else -> "NEXARA"
     }
 
-    val tabRoutes = tabs.map { it.first }.toSet()
+    val tabRoutes = remember(tabs) { tabs.map { it.first }.toSet() }
     val showBack = currentRoute != null && currentRoute !in tabRoutes
 
+    NxLightStatusBarIcons()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -438,6 +441,8 @@ fun ConsoleNavHost(
                         currentTitle,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = Color.White,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 },
                 colors = NxBrandTopAppBarColors(),
