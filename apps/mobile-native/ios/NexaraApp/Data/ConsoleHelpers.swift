@@ -65,10 +65,6 @@ enum ConsoleHelpers {
     }
 }
 
-extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
-
 extension CapturedMedia {
     var dataUrl: String { ConsoleHelpers.dataUrl(for: self) }
 }
