@@ -265,9 +265,10 @@ export default function ErpDashboardPage() {
         title={`${greetingFor(now.getHours())}, ${nombre}`}
         subtitle={
           <>
-            <span style={{ textTransform: "capitalize" }}>
-              {new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long" }).format(now)}
-            </span>
+            {(() => {
+              const fecha = new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long" }).format(now);
+              return fecha.charAt(0).toUpperCase() + fecha.slice(1);
+            })()}
             {" · así va el negocio hoy"}
           </>
         }

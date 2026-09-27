@@ -4,6 +4,8 @@
 import { buildApiUrl } from "@/lib/api-base";
 import { withTenantHeaders } from "@/lib/tenant";
 
+const INTERNAL_ROUTE_ERROR = /\bCannot (GET|POST|PUT|PATCH|DELETE) \//;
+
 export function formatApiError(err: unknown, fallback = "Error desconocido"): string {
   const raw = (err instanceof Error ? err.message : typeof err === "string" ? err : "").trim();
   if (!raw) return fallback;
@@ -16,12 +18,12 @@ export function formatApiError(err: unknown, fallback = "Error desconocido"): st
         : typeof parsed.error === "string"
           ? parsed.error
           : "";
-    return msg.trim() || fallback;
+    return msg.trim() && !INTERNAL_ROUTE_ERROR.test(msg) ? msg.trim() : fallback;
   } catch {
     /* plain text */
   }
-  // HTML de un proxy caído, JSON truncado o un volcado de pila: nada de eso se enseña.
-  if (/^\s*[{[<]/.test(raw) || /\n\s+at\s/.test(raw)) return fallback;
+  // HTML de un proxy caído, JSON truncado, un volcado de pila o la ruta interna del API: nada de eso se enseña.
+  if (/^\s*[{[<]/.test(raw) || /\n\s+at\s/.test(raw) || INTERNAL_ROUTE_ERROR.test(raw)) return fallback;
   return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
 }
 
