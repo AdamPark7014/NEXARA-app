@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Enterprise design system (paridad Android Nx*)
 
@@ -7,16 +8,41 @@ enum NxTone {
 
     var fg: Color {
         switch self {
-        case .neutral: return Color(red: 0.39, green: 0.45, blue: 0.55)
-        case .success: return Color(red: 0.06, green: 0.73, blue: 0.51)
-        case .warning: return Color(red: 0.96, green: 0.62, blue: 0.04)
-        case .danger:  return Color(red: 0.94, green: 0.27, blue: 0.27)
-        case .info:    return Color(red: 0.23, green: 0.51, blue: 0.96)
-        case .brand:   return NxBrand.primary
+        case .neutral: return NxTone.neutralFg
+        case .success: return NxTone.successFg
+        case .warning: return NxTone.warningFg
+        case .danger:  return NxTone.dangerFg
+        case .info:    return NxTone.infoFg
+        case .brand:   return NxBrand.adaptive
         }
     }
 
-    var bg: Color { fg.opacity(0.12) }
+    var bg: Color { fg.opacity(0.14) }
+
+    var systemImage: String {
+        switch self {
+        case .neutral: return "info.circle.fill"
+        case .success: return "checkmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .danger:  return "xmark.octagon.fill"
+        case .info:    return "info.circle.fill"
+        case .brand:   return "sparkles"
+        }
+    }
+
+    // Variante oscura más clara para que el texto sobre fondo negro pase contraste AA.
+    private static func dynamic(light: (CGFloat, CGFloat, CGFloat), dark: (CGFloat, CGFloat, CGFloat)) -> Color {
+        Color(uiColor: UIColor { traits in
+            let c = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: c.0, green: c.1, blue: c.2, alpha: 1)
+        })
+    }
+
+    private static let neutralFg = dynamic(light: (0.39, 0.45, 0.55), dark: (0.58, 0.64, 0.72))
+    private static let successFg = dynamic(light: (0.02, 0.59, 0.41), dark: (0.20, 0.83, 0.60))
+    private static let warningFg = dynamic(light: (0.85, 0.47, 0.02), dark: (0.98, 0.75, 0.14))
+    private static let dangerFg = dynamic(light: (0.86, 0.15, 0.15), dark: (0.97, 0.44, 0.44))
+    private static let infoFg = dynamic(light: (0.15, 0.39, 0.92), dark: (0.38, 0.65, 0.98))
 }
 
 struct NxKpi: Identifiable {
@@ -41,10 +67,12 @@ struct NxSectionHeader: View {
     var subtitle: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.headline)
+        VStack(alignment: .leading, spacing: NxSpacing.xxs) {
+            Text(title)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             if let subtitle, !subtitle.isEmpty {
-                Text(subtitle).font(.caption).foregroundColor(.secondary)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -54,27 +82,38 @@ struct NxKpiCard: View {
     let kpi: NxKpi
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(kpi.label).font(.caption).foregroundColor(.secondary)
-            Text(kpi.value).font(.title2.bold()).lineLimit(1)
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    if let hint = kpi.hint { Text(hint).font(.caption2).foregroundColor(.secondary) }
+        VStack(alignment: .leading, spacing: NxSpacing.xs + 2) {
+            HStack(spacing: NxSpacing.xs + 2) {
+                Circle().fill(kpi.tone.fg).frame(width: 6, height: 6)
+                Text(kpi.label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Text(kpi.value)
+                .font(.title2.weight(.bold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: NxSpacing.xxs) {
+                    if let hint = kpi.hint { Text(hint).font(.caption2).foregroundStyle(.secondary) }
                     if let delta = kpi.delta {
-                        Text(delta).font(.caption2.weight(.semibold)).foregroundColor(kpi.tone.fg)
+                        Text(delta).font(.caption2.weight(.semibold)).foregroundStyle(kpi.tone.fg)
                     }
                 }
-                Spacer()
+                Spacer(minLength: 0)
                 if kpi.sparkline.count >= 2 {
                     NxSparkline(values: kpi.sparkline, color: kpi.tone.fg)
                         .frame(width: 64, height: 28)
+                        .accessibilityHidden(true)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(NxSpacing.m + 2)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -129,20 +168,27 @@ struct NxAlertBanner: View {
     var onAction: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 10) {
-            Circle().fill(alert.tone.fg).frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(alert.title).font(.subheadline.weight(.semibold))
-                if let sub = alert.subtitle { Text(sub).font(.caption).foregroundColor(.secondary) }
+        HStack(alignment: .top, spacing: NxSpacing.m) {
+            Image(systemName: alert.tone.systemImage)
+                .foregroundStyle(alert.tone.fg)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: NxSpacing.xxs) {
+                Text(alert.title)
+                    .font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let sub = alert.subtitle { Text(sub).font(.caption).foregroundStyle(.secondary) }
             }
-            Spacer()
+            Spacer(minLength: 0)
             if let actionLabel, let onAction {
-                Button(actionLabel, action: onAction).font(.caption.bold()).foregroundColor(alert.tone.fg)
+                Button(actionLabel, action: onAction)
+                    .font(.caption.bold())
+                    .foregroundStyle(alert.tone.fg)
+                    .nxTapTarget()
             }
         }
-        .padding(14)
-        .background(alert.tone.bg)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(NxSpacing.m + 2)
+        .background(alert.tone.bg, in: RoundedRectangle(cornerRadius: NxRadius.m + 2, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -153,30 +199,51 @@ struct NxStatusChip: View {
     var body: some View {
         Text(text)
             .font(.caption2.weight(.semibold))
-            .foregroundColor(tone.fg)
+            .foregroundStyle(tone.fg)
+            .lineLimit(1)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(tone.bg)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(tone.bg, in: Capsule())
+            .accessibilityLabel("Estado: \(text)")
+    }
+}
+
+extension NxStatusChip {
+    /// Chip a partir del estado crudo del API, con etiqueta y color de campo.
+    init(status: String?) {
+        self.init(text: NxStatusText.label(status), tone: NxStatusText.tone(status))
     }
 }
 
 struct NxEmptyState: View {
     let title: String
     let subtitle: String
+    var systemImage: String? = nil
     var actionLabel: String? = nil
     var onAction: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 8) {
-            Text(title).font(.headline)
-            Text(subtitle).font(.caption).foregroundColor(.secondary).multilineTextAlignment(.center)
+        VStack(spacing: NxSpacing.s + 2) {
+            NxIconBadge(systemName: systemImage ?? "tray", tint: .secondary, size: 56, circle: true)
+                .padding(.bottom, NxSpacing.xs)
+            Text(title)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             if let actionLabel, let onAction {
-                Button(actionLabel, action: onAction).buttonStyle(.borderedProminent).tint(NxBrand.primary)
+                Button(actionLabel, action: onAction)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(NxBrand.primary)
+                    .padding(.top, NxSpacing.xs)
             }
         }
-        .padding(32)
+        .padding(NxSpacing.xxl)
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -188,15 +255,16 @@ struct NxDecisionActions: View {
     var onReject: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: NxSpacing.s) {
             Button(approveLabel, action: onApprove)
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(NxTone.success.fg)
                 .disabled(acting)
             Button(rejectLabel, role: .destructive, action: onReject)
                 .buttonStyle(.bordered)
                 .disabled(acting)
         }
+        .controlSize(.large)
     }
 }
 

@@ -252,27 +252,25 @@ struct CoreStatCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(value)")
                 .font(.title2.weight(.heavy))
+                .monospacedDigit()
                 .foregroundStyle(color ?? Color.primary)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+        .padding(NxSpacing.m)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: NxRadius.m + 2, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
     }
 }
 
 extension View {
     /// Tarjeta estándar de Core.
     func coreCard(highlight: Color? = nil) -> some View {
-        self
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(highlight ?? Color.clear, lineWidth: highlight == nil ? 0 : 1.5)
-            )
+        nxCard(padding: NxSpacing.m + 2, highlight: highlight)
     }
 }
