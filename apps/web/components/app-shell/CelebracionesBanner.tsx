@@ -125,22 +125,39 @@ export default function CelebracionesBanner({ token, userId }: Props) {
         }}
         aria-label="Ocultar aviso de celebraciones por hoy"
         title="Ocultar por hoy"
+        className="nx-celebra-x"
         style={{
           flex: "0 0 auto",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 30,
-          height: 30,
+          width: 32,
+          height: 32,
           borderRadius: 8,
           border: "none",
           background: "transparent",
-          color: "var(--text-secondary)",
+          color: "var(--ui-fg-2, var(--text-secondary))",
           cursor: "pointer",
         }}
       >
         <CloseIcon aria-hidden="true" sx={{ fontSize: 18 }} />
       </button>
+      <style jsx>{`
+        .nx-celebra-x:hover {
+          background: color-mix(in srgb, var(--ui-fg) 7%, transparent) !important;
+          color: var(--ui-fg) !important;
+        }
+        .nx-celebra-x:focus-visible {
+          outline: var(--ui-focus-outline);
+          outline-offset: 1px;
+        }
+        @media (pointer: coarse) {
+          .nx-celebra-x {
+            width: 44px !important;
+            height: 44px !important;
+          }
+        }
+      `}</style>
     </aside>
   );
 }
