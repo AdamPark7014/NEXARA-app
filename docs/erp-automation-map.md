@@ -32,6 +32,8 @@ Already automated
 - SLA impending and breach alerts
   - Every minute/5 min admin alerts: `apps/api/src/activities/ticket-alerts.service.ts` (`@Cron('*/1 * * * *')`, `@Cron('*/5 * * * *')`) → `NotificationsService.createNotification(...)`
   - Hourly company-wide SLA breach digest (domain events): `apps/api/src/common/cron/cron.service.ts` → `handleSlaBreachEscalate` (publishes `ACTIVITY` `alertType='sla_breach'`)
+  - DONE: same cron notifies the responsible person and the chain of command per breached activity via `NotificationHierarchyService.notifyTicketSlaBreach(...)` (high priority, ~2 h dedupe, link `/erp/actividades/[id]`); covered by `apps/api/src/common/cron/cron.service.sla-breach.spec.ts`
+- DONE: evidence review reminder (pending > 24 h): `apps/api/src/activities/evidence/activity-evidence-reminder.cron.ts` (daily 09:00 MX) → `NotificationsService.createNotification(...)` to the activity's responsible, 24 h dedupe per evidence
 - Overtime overrun alerts (per assignee): `apps/api/src/activities/activity-time-alerts.service.ts` (`@Cron('*/15 * * * *')`) → `NotificationHierarchyService.notifyActivityOvertime(...)`
 - Evidence workflow (status machine persisted)
   - Prisma model with multi-step states: `apps/api/prisma/schema.prisma` → `model ActivityEvidence` (`status`, `reviewStatus`, `completedAt`, review fields)
@@ -40,14 +42,13 @@ Already automated
   - `apps/api/src/domain-events/webhook-domain.listener.ts`: emits `activity.completed`, `ticket.sla_breach`, `activity.closure_{approved|rejected}` etc.
 
 Manual today / gaps
-- SLA breach in `cron.service.ts` raises domain events, but assignee/manager push for breaches relies on the admin-only alerts in `ticket-alerts.service.ts`.
-- Evidence review cadence is human-driven; no nudge to reviewers when evidence is pending too long per step or repeatedly rejected.
+- Evidence review: the 24 h pending reminder exists, but there is no nudge per step or for evidence that keeps getting rejected.
 
 Recommended automations
-- P0: Notify responsible chain on SLA breach using existing hierarchy
+- P0 (DONE): Notify responsible chain on SLA breach using existing hierarchy
   - Files to touch: `apps/api/src/common/cron/cron.service.ts` (in `handleSlaBreachEscalate`) to call `NotificationHierarchyService.notifyTicketSlaBreach(...)` (pattern mirrors `ActivityTimeAlertsService`).
   - Acceptance: When an activity with `ticketType` breaches, assignee and line managers receive a high-priority notification with link to `/erp/actividades/[id]`. Deduped within 2h.
-- P1: Evidence review reminder
+- P1 (DONE): Evidence review reminder
   - Files to touch: new small cron in `apps/api/src/activities/evidence/` that queries `ActivityEvidence.reviewStatus='PENDING' AND updatedAt < now()-24h` → `NotificationsService.createNotification(...)` to assigned reviewer.
   - Acceptance: Reviewer receives one reminder per pending evidence per day; dedupe window 24h; link to `/erp/actividades/[id]/evidencias`.
 - P2: Auto-close stale client survey requests
@@ -73,6 +74,12 @@ Recommended automations
 - P0: Prenómina prefill at period end
   - Files to touch: new cron (e.g. `hr-prenomina.cron.ts`) to iterate active companies on configured cadence and call `EmployeePaymentsService.preNomina(...)`, persisting a snapshot table or caching per user-period (without forcing final amounts).
   - Acceptance: At period close morning, RH sees pre-populated suggestions; notifications sent to RH role with link to `/erp/contabilidad/pre-nomina`.
+  - STATUS: evaluated, NOT implemented (too large / risky for an unattended cron). Blockers found:
+    - `createBorradorBatch` (`employee-payments.service.ts`) creates real `EmployeePayment` rows in `Borrador`, uses the crude attendance calc (lunch included; see the comment above `calculoCrudoDePeriodo` about unifying with the KPI calc) and is not idempotent per user-period.
+    - `Borrador` payments are a **blocker** in period close (`accounting/period-close.service.ts`, item `prenomina-sin-cerrar`) and feed the "Pre-nómina en borrador" alert (`accounting.service.ts`): an automatic batch would block every close until someone reviews it.
+    - `preNomina(viewer, ...)` needs a viewer: its scope comes from `KpisEquipoService.getEquipo` (org chart), so a cron needs a system viewer with full company scope.
+    - No payroll cadence exists in the schema (no cut-off day / frequency per company; `sueldoSemanal` only implies weekly), and recipients depend on role flags plus the per-company module policy for "Pagos a personal".
+  - Proposal: (1) add `nominaFrecuencia` + `nominaDiaCorte` to the company settings; (2) pure `periodoCerrado(hoy, frecuencia, diaCorte)` + tests; (3) cron Monday 08:00 MX that, per company with cadence set, notifies users with `contabilidad.manage`/HR (respecting the module policy) "La pre-nómina del periodo X está lista para revisar" linking to `/erp/contabilidad/pre-nomina?desde=&hasta=`, one per company-period (the screen already computes live data, so no snapshot is needed); (4) never create `EmployeePayment` rows until the two attendance calcs are unified.
 - P1: Open-attendance reminders to users + managers
   - Files: extend `CronService` to scan `attendanceDay.isOpen` and notify via `NotificationsService`, grouping by user and manager; dedupe per day.
 
@@ -136,15 +143,18 @@ Already automated
   - `apps/api/src/workflow/workflow.service.ts` handles `PURCHASE_ORDER` instances; `webhook-domain.listener.ts` emits `purchase_order.{confirmed|rejected}`
 - Goods receipt → accounting accrual and optional AP invoice creation:
   - `apps/api/src/procurement/procurement.service.ts` uses `AccountingService.postPurchaseReceiptAccrual(...)` and `createInvoiceFromGoodsReceipt(...)`
+- PO reminder for orders about to arrive (email to the creator only, upcoming window of 3 days, not overdue): `cron.service.ts::handlePOReminders`
+- DONE: overdue PO summary (past `expectedDate`, not fully received): `apps/api/src/procurement/purchase-order-overdue.cron.ts` (`@Cron('30 9 * * 1-5')`, MX TZ) with the pure selection/grouping/text logic in `apps/api/src/procurement/purchase-order-overdue.ts` (specs next to both)
 
 Manual today / gaps
-- No escalation for POs past `expectedDate` without full receipt (email exists for “upcoming”, not for overdue).
+- Overdue POs are now escalated (see DONE above). Not covered: escalation to a "procurement role" that is not in the buyer's chain of command, and per-supplier delay statistics.
 - Reabastecimiento alerts suggest purchase, but do not draft a Purchase Requisition automatically.
 
 Recommended automations
-- P0: Overdue PO receipt alerts
+- P0 (DONE): Overdue PO receipt alerts
   - Files: add cron in `cron.service.ts` to scan `PurchaseOrder.status IN (DRAFT, CONFIRMED, PARTIALLY_RECEIVED) AND expectedDate < now()`; notify creator/approver and procurement role with `/erp/procurement?tab=orders&id={id}`.
   - Acceptance: One alert per PO per day until fully received or canceled.
+  - As built: separate service (not `cron.service.ts`, to keep its constructor stable) registered in `ProcurementModule`. Scans `status IN (SENT, CONFIRMED, PARTIALLY_RECEIVED)` (DRAFT is excluded: nothing was ordered yet) with `expectedDate` before today in Mexico time and at least one line still pending. Sends **one summary per recipient per company per day** (not one per PO): the buyer (`createdBy`, falling back to `approvedBy`) gets their orders and each boss in the chain (`NotificationHierarchyService.cadenaDeMando`, the same helper the SLA alert uses) gets a team summary, restricted to active members of the PO's company. Day-level idempotency is checked against `Notification` (type `SLA_ALERT`, category `compras-atrasadas`, stamped with `companyId`). Reuses the `SLA_ALERT` enum value (icon `atraso`) to avoid a migration; a dedicated `PURCHASE_ORDER_OVERDUE` type would need `ALTER TYPE "NotificationType"`. Priority is high from 7 days late. Complements, and never overlaps, `handlePOReminders` (which only covers upcoming dates).
 - P1: Auto-draft Purchase Requisition from top shortages
   - Files: extend `ReabastecimientoService` with helper to produce top-N `RenglonReabastecimiento`; new service in `procurement/` to draft `PurchaseRequisition` lines (no submit); gated by feature flag.
   - Acceptance: Daily at 06:00, if shortages exist, a DRAFT PR with suggested quantities is created and requester notified; idempotent per day.
@@ -216,13 +226,13 @@ Recommended automations
 ## Summary of recommended automations (prioritized)
 
 - P0
-  - Activities SLA breach → notify assignee and managers (`cron.service.ts` + `NotificationHierarchy`)
-  - Procurement overdue receipt alerts (PO past `expectedDate`)
-  - HR prenómina prefill at period end
+  - DONE: Activities SLA breach → notify assignee and managers (`cron.service.ts` + `NotificationHierarchy`)
+  - DONE: Procurement overdue receipt alerts (PO past `expectedDate`)
+  - PENDING (evaluated, proposal in the HR section): HR prenómina prefill at period end
 - P1
   - Weekly AR/AP aging digests
   - Webhook delivery health digest
-  - Evidence review reminder after 24h pending
+  - DONE: Evidence review reminder after 24h pending
   - Auto-draft Purchase Requisition from top shortages (feature-flag)
   - Accounting period-close reminder if blockers persist > 3 days
 - P2

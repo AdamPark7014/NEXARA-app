@@ -14,6 +14,7 @@ import { SupplierEvaluationsController } from './supplier-evaluations.controller
 import { RfqController } from './rfq.controller.js';
 import { WholesaleService } from './wholesale.service.js';
 import { WholesaleController } from './wholesale.controller.js';
+import { PurchaseOrderOverdueCronService } from './purchase-order-overdue.cron.js';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { WholesaleController } from './wholesale.controller.js';
     SupplierEvaluationsController,
     RfqController,
   ],
-  providers: [ProcurementService, WholesaleService],
+  providers: [ProcurementService, WholesaleService, PurchaseOrderOverdueCronService],
   exports: [ProcurementService, WholesaleService],
 })
 export class ProcurementModule {}

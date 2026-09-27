@@ -236,6 +236,16 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Cadena de mando de una persona (jefes por organigrama, Christian y administradores de su
+   * departamento), sin ella misma. Es la misma que usan los avisos de SLA y de comidas; se expone
+   * para las tareas programadas que arman su propio resumen (p. ej. órdenes de compra atrasadas).
+   * Ojo: no filtra por empresa; quien la usa debe acotar a los miembros de la empresa que le toca.
+   */
+  async cadenaDeMando(userId: number): Promise<number[]> {
+    return this.shiftWatcherIds(userId);
+  }
+
+  /**
    * Notificar entrada/regreso de comida
    */
   async notifyLunchBreakChange(
