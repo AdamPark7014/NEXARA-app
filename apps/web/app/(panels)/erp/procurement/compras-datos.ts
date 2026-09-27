@@ -1,5 +1,5 @@
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
+import { errorLegible } from "@/lib/recursos-ui";
 
 /**
  * Tipos, etiquetas y llamadas de la pantalla de Compras. Viven aparte para que la
@@ -230,22 +230,7 @@ export function costosExtra(r: GoodsReceipt): number {
   );
 }
 
-/**
- * Mensaje para la persona: el `message` (o `error`) del cuerpo si lo hay; nunca
- * JSON ni HTML crudos.
- */
-export function errorLegible(err: unknown, fallback: string): string {
-  if (err instanceof Error) {
-    try {
-      const cuerpo = JSON.parse(err.message) as { error?: unknown };
-      if (typeof cuerpo.error === "string" && cuerpo.error.trim()) return cuerpo.error;
-    } catch {
-      /* texto plano */
-    }
-  }
-  const texto = formatApiError(err, fallback);
-  return /^\s*[{[<]/.test(texto) ? fallback : texto;
-}
+export { errorLegible };
 
 /** El error lleva el cuerpo de la respuesta; `errorLegible` saca de ahí el mensaje. */
 export async function apiFetch<T = unknown>(path: string, token: string, opts?: RequestInit): Promise<T> {
