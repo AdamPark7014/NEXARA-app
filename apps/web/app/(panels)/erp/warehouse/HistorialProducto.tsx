@@ -98,7 +98,7 @@ export default function HistorialProducto({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in srgb, var(--nx-ink, #0f172a) 45%, transparent)",
+        background: "rgba(0, 0, 0, 0.45)",
         zIndex: 80,
         display: "flex",
         justifyContent: "flex-end",
