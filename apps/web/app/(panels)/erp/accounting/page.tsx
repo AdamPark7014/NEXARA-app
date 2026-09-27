@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useCallback, useDeferredValue, useMemo } from "react";
 import Link from "next/link";
+import { useUrlQuery } from "@/components/finance/useUrlQuery";
+import { saveBlob, todayStamp } from "@/components/finance/download";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -139,6 +140,20 @@ interface BalanceSheetData {
 }
 
 const TIPOS = ["DIARIO", "EGRESOS", "INGRESOS", "AJUSTE"];
+const TIPO_LABEL: Record<string, string> = {
+  DIARIO: "Diario",
+  EGRESOS: "Egresos",
+  INGRESOS: "Ingresos",
+  AJUSTE: "Ajuste",
+};
+const tipoLabel = (t?: string) => (t ? (TIPO_LABEL[t] ?? t) : "");
+const ENTRY_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  BORRADOR: "Borrador",
+  POSTED: "Contabilizada",
+  CONTABILIZADA: "Contabilizada",
+  REVERSED: "Reversada",
+};
 const ACCOUNT_TYPES: Account["type"][] = ["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"];
 const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
   ASSET: "Activo",
@@ -172,7 +187,7 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 const emptyForm = {
   description: "",
   type: "DIARIO",
-  date: new Date().toISOString().slice(0, 10),
+  date: todayStamp(),
   reference: "",
   debitAccountId: "",
   creditAccountId: "",
@@ -257,11 +272,14 @@ export default function AccountingPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "accounting"), [user]);
   const token = user?.token ?? "";
-  const searchParams = useSearchParams();
+  const searchParams = useUrlQuery();
   const highlightId = searchParams.get("highlight");
   const tabParam = searchParams.get("tab") as TabKey | null;
 
-  const [tab, setTab] = useState<TabKey>(tabParam && TABS.some((t) => t.key === tabParam) ? tabParam : "polizas");
+  const [tab, setTab] = useState<TabKey>("polizas");
+  useEffect(() => {
+    if (tabParam && TABS.some((t) => t.key === tabParam)) setTab(tabParam);
+  }, [tabParam]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [financeInsights, setFinanceInsights] = useState<any>(null);
   const [financeInsightsLoading, setFinanceInsightsLoading] = useState(false);
@@ -373,7 +391,6 @@ export default function AccountingPage() {
       setItems(Array.isArray(data) ? data : (data.data ?? []));
     } catch (e) {
       setError(formatApiError(e, "No se pudieron cargar las pólizas"));
-      setItems([]);
     } finally { setLoading(false); }
   }, [token]);
 
@@ -537,13 +554,7 @@ export default function AccountingPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text().catch(() => "Error al generar el CSV"));
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `diot-${diotYear}-${String(diotMonth).padStart(2, "0")}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveBlob(await res.blob(), `diot-${diotYear}-${String(diotMonth).padStart(2, "0")}.csv`);
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo descargar el DIOT"));
     } finally {
@@ -559,13 +570,7 @@ export default function AccountingPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text().catch(() => "Error al generar la Balanza"));
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `balanza-${diotYear}-${String(diotMonth).padStart(2, "0")}.xml`;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveBlob(await res.blob(), `balanza-${diotYear}-${String(diotMonth).padStart(2, "0")}.xml`);
       toast.success("Balanza XML generada.");
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo generar la Balanza XML"));
@@ -582,13 +587,7 @@ export default function AccountingPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text().catch(() => "Error al generar el Catálogo de cuentas"));
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `catalogo-cuentas-${new Date().toISOString().slice(0, 10)}.xml`;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveBlob(await res.blob(), `catalogo-cuentas-${todayStamp()}.xml`);
       toast.success("Catálogo de cuentas XML generado.");
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo generar el Catálogo de cuentas"));
@@ -733,7 +732,8 @@ export default function AccountingPage() {
   const reverseEntry = async (id: number) => {
     if (!token) return;
     setConfirmState({
-      message: "¿Reversar esta póliza? Se generará una contrapóliza.",
+      title: "Reversar póliza",
+      message: "¿Reversar esta póliza? Se generará una contrapóliza con los mismos importes en sentido contrario.",
       confirmLabel: "Reversar",
       danger: true,
       fn: async () => {
@@ -883,13 +883,7 @@ export default function AccountingPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text().catch(() => "Error al generar el PDF"));
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveBlob(await res.blob(), `reportes-financieros-${todayStamp()}.pdf`);
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo generar el PDF"));
     } finally {
@@ -987,10 +981,11 @@ export default function AccountingPage() {
   /** Diferencia entre cargos y abonos de una póliza. Cero = cuadra. */
   const entryImbalance = (e: JournalEntry) => (e.totalDebit ?? 0) - (e.totalCredit ?? 0);
 
+  const deferredSearchQ = useDeferredValue(searchQ);
   const visibleItems = useMemo(() => {
     let rows = items;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
+    if (deferredSearchQ.trim()) {
+      const q = deferredSearchQ.trim().toLowerCase();
       rows = rows.filter((e) =>
         (e.description ?? "").toLowerCase().includes(q) ||
         (e.reference ?? "").toLowerCase().includes(q) ||
@@ -1003,13 +998,13 @@ export default function AccountingPage() {
       if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return rows;
-  }, [items, highlightId, searchQ, filterTipo]);
+  }, [items, highlightId, deferredSearchQ, filterTipo]);
 
   const journalColumns: Column<JournalEntry>[] = [
     {
       key: "description", label: "Concepto",
       render: e => {
-        const desc = (e.createdBy?.nombre ? `${e.type} · ${e.createdBy.nombre}` : e.type) ?? "";
+        const desc = e.createdBy?.nombre ? `${tipoLabel(e.type)} · ${e.createdBy.nombre}` : tipoLabel(e.type);
         return (
           <div>
             <div style={{ fontSize: 13 }}>{e.description ?? "—"}</div>
@@ -1035,13 +1030,17 @@ export default function AccountingPage() {
         if (!e.date) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
         const isDraft = e.status === "DRAFT" || e.status === "BORRADOR";
         const days = Math.floor((Date.now() - new Date(e.date).getTime()) / 86400000);
-        const color = days >= 14 ? "var(--state-danger-text, #b91c1c)" : days >= 7 ? "var(--state-warning-text, #b45309)" : "var(--text-tertiary)";
+        const color = days >= 14 ? "var(--state-danger-text)" : days >= 7 ? "var(--state-warning-text)" : "var(--text-tertiary)";
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
               {new Date(e.date).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
             </span>
-            {isDraft && <span style={{ fontSize: 11, color }}>{days}d sin contabilizar</span>}
+            {isDraft && days > 0 && (
+              <span style={{ fontSize: 11, color }}>
+                {days === 1 ? "1 día" : `${days} días`} sin contabilizar
+              </span>
+            )}
           </div>
         );
       },
@@ -1084,9 +1083,14 @@ export default function AccountingPage() {
 
   /** Totales del libro visible: lo que va al pie de la tabla de pólizas. */
   const journalTotals = useMemo(() => {
-    const debit = visibleItems.reduce((s, e) => s + (e.totalDebit ?? 0), 0);
-    const credit = visibleItems.reduce((s, e) => s + (e.totalCredit ?? 0), 0);
-    const descuadradas = visibleItems.filter((e) => Math.abs((e.totalDebit ?? 0) - (e.totalCredit ?? 0)) >= 0.01).length;
+    let debit = 0;
+    let credit = 0;
+    let descuadradas = 0;
+    for (const e of visibleItems) {
+      debit += e.totalDebit ?? 0;
+      credit += e.totalCredit ?? 0;
+      if (Math.abs((e.totalDebit ?? 0) - (e.totalCredit ?? 0)) >= 0.01) descuadradas += 1;
+    }
     return { debit, credit, diff: debit - credit, descuadradas };
   }, [visibleItems]);
 
@@ -1110,7 +1114,8 @@ export default function AccountingPage() {
           placeholder="Ej. 101.01"
           aria-label={`Agrupador SAT de la cuenta ${a.code}`}
           onBlur={e => void saveAccountAgrupador(a, e.target.value)}
-          style={{ width: "100%", padding: "4px 6px", fontSize: 12, border: `1px solid ${a.satAgrupador ? "var(--border)" : "var(--state-warning-border, #f59e0b)"}`, borderRadius: 6, background: "var(--surface)", color: "var(--foreground)" }}
+          inputMode="decimal"
+          style={{ width: "100%", minHeight: 30, padding: "3px 6px", fontSize: 16, fontVariantNumeric: "tabular-nums", border: `1px solid ${a.satAgrupador ? "var(--border)" : "var(--state-warning-border)"}`, borderRadius: 6, background: "var(--surface)", color: "var(--foreground)" }}
         />
       ) : (
         a.satAgrupador
@@ -1419,7 +1424,7 @@ export default function AccountingPage() {
                 </FinanceField>
                 <FinanceField label="Tipo">
                   <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={inp}>
-                    {TIPOS.map(t => <option key={t}>{t}</option>)}
+                    {TIPOS.map(t => <option key={t} value={t}>{tipoLabel(t)}</option>)}
                   </select>
                 </FinanceField>
                 <FinanceField label="Fecha" hint="Determina en qué periodo fiscal cae la póliza.">
@@ -1458,7 +1463,7 @@ export default function AccountingPage() {
               label: "Tipo",
               value: filterTipo,
               onChange: setFilterTipo,
-              options: TIPOS.map((t) => ({ value: t, label: t })),
+              options: TIPOS.map((t) => ({ value: t, label: tipoLabel(t) })),
               allowAll: true,
             }]}
             onClear={() => { setSearchQ(""); setFilterTipo(""); }}
@@ -1467,10 +1472,10 @@ export default function AccountingPage() {
               <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
                 { key: "reference", label: "Referencia", format: (v, e) => String(v ?? `P-${e.id}`) },
                 { key: "description", label: "Concepto" },
-                { key: "type", label: "Tipo" },
+                { key: "type", label: "Tipo", format: (v) => tipoLabel(v as string | undefined) },
                 { key: "totalDebit", label: "Cargo" },
                 { key: "totalCredit", label: "Abono" },
-                { key: "status", label: "Estado" },
+                { key: "status", label: "Estado", format: (v) => ENTRY_STATUS_LABEL[String(v ?? "")] ?? String(v ?? "") },
                 { key: "date", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
               ], "polizas-contables")}>Excel</Button>
             ) : undefined}
@@ -1488,9 +1493,9 @@ export default function AccountingPage() {
                 <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
               </div>
             )}
-            {loading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-            ) : !error ? (
+            {loading && items.length === 0 ? (
+              <div aria-busy="true" style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando pólizas…</div>
+            ) : !error || items.length > 0 ? (
               <>
                 <DataTable columns={journalColumns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin pólizas" emptyDescription="Registra la primera póliza contable." />
                 {visibleItems.length > 0 && (

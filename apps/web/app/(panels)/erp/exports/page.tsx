@@ -1,171 +1,185 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import InlineAlert from "@/components/ui/InlineAlert";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
+import { saveBlob, todayStamp } from "@/components/finance/download";
 
 type ExportFormat = "xlsx" | "pdf";
+
+type Grupo = "Finanzas" | "Comercial" | "Operación" | "Personas";
 
 type ExportCard = {
   key: string;
   label: string;
-  icon: string;
+  grupo: Grupo;
   desc: string;
   xlsxPath: (from: string, to: string) => string;
   pdfPath?: (from: string, to: string) => string;
+  /** Cómo usa el Excel el rango elegido; por omisión, el periodo completo. */
+  xlsxRango?: "sin-rango" | "dia-final";
+  /** Días máximos que acepta el servidor. */
+  maxDias?: number;
 };
 
 const ENTITIES: ExportCard[] = [
   {
     key: "invoices",
     label: "Facturas",
-    icon: "🧾",
-    desc: "Facturación emitida por periodo (issueDate)",
+    grupo: "Finanzas",
+    desc: "Facturación emitida en el periodo, por fecha de emisión.",
     xlsxPath: (from, to) => `exports/invoices?from=${from}&to=${to}&format=xlsx`,
   },
   {
+    key: "viatics",
+    label: "Viáticos",
+    grupo: "Finanzas",
+    desc: "Gastos de viaje aprobados y por aprobar.",
+    xlsxPath: () => "viatics/export/xlsx",
+    pdfPath: (from, to) => `viatics/report.pdf?from=${from}&to=${to}`,
+    xlsxRango: "sin-rango",
+  },
+  {
+    key: "cotizaciones",
+    label: "Cotizaciones",
+    grupo: "Comercial",
+    desc: "Folios, cliente, segmento, importes y firma.",
+    xlsxPath: (from, to) => `exports/cotizaciones?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
     key: "clients",
-    label: "Clientes CRM",
-    icon: "🏢",
-    desc: "Cuentas comerciales y datos de contacto",
+    label: "Clientes",
+    grupo: "Comercial",
+    desc: "Cuentas comerciales y datos de contacto.",
     xlsxPath: (from, to) => `exports/clients?from=${from}&to=${to}&format=xlsx`,
   },
   {
     key: "leads",
-    label: "Leads",
-    icon: "🎯",
-    desc: "Pipeline de captación comercial",
+    label: "Prospectos",
+    grupo: "Comercial",
+    desc: "Prospectos en seguimiento comercial.",
     xlsxPath: (from, to) => `exports/leads?from=${from}&to=${to}&format=xlsx`,
   },
   {
     key: "opportunities",
     label: "Oportunidades",
-    icon: "📈",
-    desc: "Oportunidades abiertas y cerradas",
+    grupo: "Comercial",
+    desc: "Oportunidades abiertas y cerradas.",
     xlsxPath: (from, to) => `exports/opportunities?from=${from}&to=${to}&format=xlsx`,
   },
   {
     key: "projects",
     label: "Proyectos",
-    icon: "🗂️",
-    desc: "Proyectos de venta e implementación",
+    grupo: "Comercial",
+    desc: "Proyectos de venta e implementación.",
     xlsxPath: (from, to) => `exports/projects?from=${from}&to=${to}&format=xlsx`,
   },
   {
-    key: "cotizaciones",
-    label: "Cotizaciones",
-    icon: "📄",
-    desc: "Folios, cliente, segmento, importes y firma",
-    xlsxPath: (from, to) => `exports/cotizaciones?from=${from}&to=${to}&format=xlsx`,
-  },
-  {
-    key: "kpis-equipo",
-    label: "KPIs del equipo",
-    icon: "📊",
-    desc: "Retardos, uniforme, horas laboradas contra productivas y tiempo extra (máximo 93 días)",
-    xlsxPath: (from, to) => `me/kpis/equipo/export.xlsx?desde=${from}&hasta=${to}`,
-  },
-  {
     key: "crm-activities",
-    label: "Actividades CRM",
-    icon: "📞",
-    desc: "Llamadas, visitas y seguimiento comercial",
+    label: "Actividades comerciales",
+    grupo: "Comercial",
+    desc: "Llamadas, visitas y seguimiento comercial.",
     xlsxPath: (from, to) => `exports/crm-activities?from=${from}&to=${to}&format=xlsx`,
   },
   {
     key: "activities",
-    label: "Actividades / OT",
-    icon: "🧰",
-    desc: "Órdenes de trabajo, técnicos, estados y tiempos",
+    label: "Actividades y órdenes de trabajo",
+    grupo: "Operación",
+    desc: "Órdenes de trabajo, técnicos, estados y tiempos.",
     xlsxPath: () => "activities/export/xlsx",
     pdfPath: (from, to) => `activities/report.pdf?from=${from}&to=${to}`,
-  },
-  {
-    key: "viatics",
-    label: "Viáticos",
-    icon: "💸",
-    desc: "Gastos de viaje aprobados y por aprobar",
-    xlsxPath: () => "viatics/export/xlsx",
-    pdfPath: (from, to) => `viatics/report.pdf?from=${from}&to=${to}`,
-  },
-  {
-    key: "attendance",
-    label: "Asistencia híbrida",
-    icon: "🕒",
-    desc: "Contraste checador ERP ↔ accesos ACS (día fin = Hasta)",
-    xlsxPath: (_from, to) => `attendance/hybrid/export.xlsx?date=${to}`,
+    xlsxRango: "sin-rango",
   },
   {
     key: "vehicles",
     label: "Vehículos",
-    icon: "🚐",
-    desc: "Flota activa, asignaciones y mantenimientos",
+    grupo: "Operación",
+    desc: "Flota activa, asignaciones y mantenimientos.",
     xlsxPath: () => "vehicles/export/xlsx",
+    xlsxRango: "sin-rango",
   },
   {
     key: "evidences",
     label: "Evidencias",
-    icon: "📷",
-    desc: "Archivos adjuntos y fotos de actividades",
+    grupo: "Operación",
+    desc: "Archivos adjuntos y fotos de actividades.",
     xlsxPath: () => "evidences/export/xlsx",
+    xlsxRango: "sin-rango",
+  },
+  {
+    key: "kpis-equipo",
+    label: "Indicadores del equipo",
+    grupo: "Personas",
+    desc: "Retardos, uniforme, horas laboradas contra productivas y tiempo extra.",
+    xlsxPath: (from, to) => `me/kpis/equipo/export.xlsx?desde=${from}&hasta=${to}`,
+    maxDias: 93,
+  },
+  {
+    key: "attendance",
+    label: "Asistencia híbrida",
+    grupo: "Personas",
+    desc: "Checador del ERP contra los accesos del control de acceso.",
+    xlsxPath: (_from, to) => `attendance/hybrid/export.xlsx?date=${to}`,
+    xlsxRango: "dia-final",
   },
   {
     key: "users",
     label: "Usuarios",
-    icon: "👥",
-    desc: "Personal, roles y datos de RRHH",
+    grupo: "Personas",
+    desc: "Personal, roles y datos de RRHH.",
     xlsxPath: (from, to) => `exports/users?from=${from}&to=${to}&format=xlsx`,
   },
 ];
 
-function toIso(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
+const GRUPOS: Grupo[] = ["Finanzas", "Comercial", "Operación", "Personas"];
 
 const PRESETS = [
   {
     label: "Esta semana",
     range: () => {
       const now = new Date();
-      const day = now.getDay();
       const monday = new Date(now);
-      monday.setDate(now.getDate() - ((day + 6) % 7));
-      return { from: toIso(monday), to: toIso(now) };
+      monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      return { from: todayStamp(monday), to: todayStamp(now) };
     },
   },
   {
     label: "Este mes",
     range: () => {
       const now = new Date();
-      return { from: toIso(new Date(now.getFullYear(), now.getMonth(), 1)), to: toIso(now) };
+      return { from: todayStamp(new Date(now.getFullYear(), now.getMonth(), 1)), to: todayStamp(now) };
     },
   },
   {
     label: "Mes anterior",
     range: () => {
       const now = new Date();
-      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const last = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { from: toIso(first), to: toIso(last) };
+      return {
+        from: todayStamp(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+        to: todayStamp(new Date(now.getFullYear(), now.getMonth(), 0)),
+      };
     },
   },
   {
     label: "Último trimestre",
     range: () => {
       const now = new Date();
-      return { from: toIso(new Date(now.getFullYear(), now.getMonth() - 3, 1)), to: toIso(now) };
+      return { from: todayStamp(new Date(now.getFullYear(), now.getMonth() - 3, 1)), to: todayStamp(now) };
     },
   },
   {
     label: "Este año",
     range: () => {
       const now = new Date();
-      return { from: toIso(new Date(now.getFullYear(), 0, 1)), to: toIso(now) };
+      return { from: todayStamp(new Date(now.getFullYear(), 0, 1)), to: todayStamp(now) };
     },
   },
 ];
@@ -176,29 +190,44 @@ function filenameFromDisposition(header: string | null, fallback: string) {
   return m?.[1] ? decodeURIComponent(m[1]) : fallback;
 }
 
+function formatFecha(iso: string) {
+  const d = new Date(`${iso}T12:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function problemaRango(from: string, to: string): string | null {
+  if (!from || !to) return "Elige las dos fechas para poder exportar.";
+  if (from > to) return "La fecha final es anterior a la inicial. Ponla en el mismo día o después.";
+  return null;
+}
+
+type Job = { entity: ExportCard; format: ExportFormat };
+
 export default function ExportsPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "exports"), [user]);
   const token = user?.token ?? "";
 
-  const [from, setFrom] = useState(() => new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [from, setFrom] = useState(() => todayStamp(new Date(Date.now() - 30 * 86400000)));
+  const [to, setTo] = useState(() => todayStamp());
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ text: string; job: Job } | null>(null);
+  const [busqueda, setBusqueda] = useState("");
   const [downloadLog, setDownloadLog] = useState<
-    { entity: string; format: string; from: string; to: string; ts: string }[]
+    { id: number; entity: string; format: string; from: string; to: string; ts: string }[]
   >([]);
 
+  const rangoInvalido = problemaRango(from, to);
+  const dias = rangoInvalido
+    ? 0
+    : Math.round((new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime()) / 86400000) + 1;
+
   const download = async (entity: ExportCard, format: ExportFormat) => {
-    if (!token) return;
-    const path =
-      format === "pdf"
-        ? entity.pdfPath?.(from, to)
-        : entity.xlsxPath(from, to);
-    if (!path) {
-      setError("Este reporte no tiene PDF disponible aún");
-      return;
-    }
+    if (!token || rangoInvalido) return;
+    const path = format === "pdf" ? entity.pdfPath?.(from, to) : entity.xlsxPath(from, to);
+    if (!path) return;
     const jobKey = `${entity.key}:${format}`;
     setDownloading(jobKey);
     setError(null);
@@ -207,23 +236,16 @@ export default function ExportsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       const ext = format === "pdf" ? "pdf" : "xlsx";
-      a.download = filenameFromDisposition(
-        res.headers.get("Content-Disposition"),
-        `${entity.key}-${from}-${to}.${ext}`,
+      saveBlob(
+        await res.blob(),
+        filenameFromDisposition(res.headers.get("Content-Disposition"), `${entity.key}-${from}-${to}.${ext}`),
       );
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
       setDownloadLog((prev) => [
         {
+          id: Date.now(),
           entity: entity.label,
-          format: format.toUpperCase(),
+          format: format === "pdf" ? "PDF" : "Excel",
           from,
           to,
           ts: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
@@ -231,76 +253,66 @@ export default function ExportsPage() {
         ...prev.slice(0, 4),
       ]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al exportar");
+      setError({
+        text: `No se pudo generar ${entity.label} (${format === "pdf" ? "PDF" : "Excel"}). ${formatApiError(e, "Intenta de nuevo en un momento.")}`,
+        job: { entity, format },
+      });
     } finally {
       setDownloading(null);
     }
   };
 
-  const days = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000);
-  const pdfCount = ENTITIES.filter((e) => e.pdfPath).length;
+  const q = useDeferredValue(busqueda).trim().toLowerCase();
+  const porGrupo = useMemo(() => {
+    const visibles = q
+      ? ENTITIES.filter((e) => `${e.label} ${e.desc} ${e.grupo}`.toLowerCase().includes(q))
+      : ENTITIES;
+    return GRUPOS.map((g) => ({ grupo: g, items: visibles.filter((e) => e.grupo === g) })).filter(
+      (g) => g.items.length > 0,
+    );
+  }, [q]);
 
-  const inp: React.CSSProperties = {
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "1px solid var(--border)",
-    background: "var(--surface)",
-    color: "var(--foreground)",
-    fontSize: 13,
-  };
+  const metrics: Metric[] = [
+    {
+      label: "Reportes disponibles",
+      value: ENTITIES.length,
+      hint: `${ENTITIES.filter((e) => e.pdfPath).length} también en PDF`,
+    },
+    {
+      label: "Periodo",
+      value: rangoInvalido ? "—" : `${dias} ${dias === 1 ? "día" : "días"}`,
+      hint: rangoInvalido ? "Rango incompleto" : `${formatFecha(from)} – ${formatFecha(to)}`,
+      tone: rangoInvalido ? "warning" : "default",
+    },
+    {
+      label: "Descargados",
+      value: downloadLog.length,
+      hint: "en esta sesión",
+    },
+  ];
 
   return (
     <>
-      <PageHeader eyebrow="ERP · Auditoría" title={cfg.title} subtitle={cfg.subtitle} />
+      <PageHeader
+        eyebrow="ERP · Finanzas"
+        title={cfg.title}
+        subtitle={cfg.subtitle}
+        density="ops"
+      />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: 12,
-          marginBottom: 18,
-        }}
-      >
-        <KpiCard label="Reportes disponibles" value={ENTITIES.length} icon="📦" />
-        <KpiCard
-          label="Periodo seleccionado"
-          value={`${days}d`}
-          icon="📅"
-          hint={`${from} → ${to}`}
-          variant={days > 0 ? "accent" : "warning"}
-        />
-        <KpiCard
-          label="Exportaciones en sesión"
-          value={downloadLog.length}
-          icon="⬇"
-          variant={downloadLog.length > 0 ? "positive" : "default"}
-        />
-        <KpiCard
-          label="Formatos"
-          value="XLSX / PDF"
-          icon="📊"
-          hint={`${ENTITIES.length} Excel · ${pdfCount} PDF`}
-        />
+      <div style={{ marginBottom: 18 }}>
+        <MetricStrip metrics={metrics} ariaLabel="Resumen de exportaciones" />
       </div>
 
       {cfg.viewMode !== "manage" && (
-        <div
-          style={{
-            padding: "10px 14px",
-            background: "var(--state-warning-bg)",
-            border: "1px solid var(--state-warning-border)",
-            borderRadius: 10,
-            marginBottom: 16,
-            fontSize: 13,
-            color: "var(--state-warning-text)",
-          }}
-        >
-          Las exportaciones solo incluyen los datos a los que tienes acceso según tu rol.
-        </div>
+        <InlineAlert
+          variant="info"
+          message="Las exportaciones solo incluyen los datos a los que tienes acceso según tu rol."
+        />
       )}
 
-      <Section title="Rango de fechas" subtitle="Aplica a packs contables/CRM, PDF de viáticos y usuarios">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+      <Section title="Periodo" subtitle="Aplica a los reportes que filtran por fecha. Los que no lo usan lo indican en su tarjeta.">
+        <div role="group" aria-label="Periodos rápidos" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
           {PRESETS.map((p) => {
             const r = p.range();
             const active = r.from === from && r.to === to;
@@ -308,22 +320,23 @@ export default function ExportsPage() {
               <button
                 key={p.label}
                 type="button"
+                aria-pressed={active}
+                className="nx-export-preset"
                 onClick={() => {
                   setFrom(r.from);
                   setTo(r.to);
                 }}
                 style={{
+                  minHeight: 32,
                   padding: "5px 12px",
                   borderRadius: 999,
-                  fontSize: 12,
+                  fontSize: 12.5,
                   fontWeight: 600,
                   cursor: "pointer",
                   border: active ? "1.5px solid var(--primary)" : "1.5px solid var(--border)",
-                  background: active
-                    ? "color-mix(in srgb, var(--primary) 12%, var(--surface))"
-                    : "var(--surface)",
+                  background: active ? "color-mix(in srgb, var(--primary) 12%, var(--surface))" : "var(--surface)",
                   color: active ? "var(--primary)" : "var(--text-secondary)",
-                  transition: "all 0.15s",
+                  transition: "border-color 0.15s, background 0.15s",
                 }}
               >
                 {p.label}
@@ -331,99 +344,123 @@ export default function ExportsPage() {
             );
           })}
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
           <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>Desde</span>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} />
+            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Desde</span>
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+              aria-invalid={rangoInvalido && !from ? true : undefined}
+              style={{ width: "auto" }}
+            />
           </label>
           <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>Hasta</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inp} />
+            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Hasta</span>
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+              aria-invalid={rangoInvalido ? true : undefined}
+              aria-describedby={rangoInvalido ? "export-rango-error" : undefined}
+              style={{ width: "auto" }}
+            />
           </label>
         </div>
+        {rangoInvalido && (
+          <p id="export-rango-error" role="alert" style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--state-danger-text)" }}>
+            {rangoInvalido}
+          </p>
+        )}
       </Section>
 
       {error && (
-        <div
-          style={{
-            padding: "10px 14px",
-            background: "var(--state-danger-bg)",
-            border: "1px solid var(--state-danger-border)",
-            borderRadius: 10,
-            marginBottom: 16,
-            fontSize: 13,
-            color: "var(--state-danger-text)",
-          }}
-        >
-          {error}
-        </div>
+        <InlineAlert
+          variant="danger"
+          message={error.text}
+          onDismiss={() => setError(null)}
+          action={
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!!downloading || !!rangoInvalido}
+              onClick={() => void download(error.job.entity, error.job.format)}
+            >
+              Reintentar
+            </Button>
+          }
+        />
       )}
 
-      <Section title="Reportes disponibles" subtitle="Solo Excel y PDF — CSV deshabilitado">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
-          {ENTITIES.map((e) => {
-            const xlsxBusy = downloading === `${e.key}:xlsx`;
-            const pdfBusy = downloading === `${e.key}:pdf`;
-            return (
-              <div
-                key={e.key}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 14,
-                  padding: "14px 16px",
-                  background: "var(--surface)",
-                  border: `1px solid ${xlsxBusy || pdfBusy ? "var(--primary)" : "var(--border)"}`,
-                  borderRadius: 12,
-                  transition: "border-color 0.15s",
-                }}
-              >
-                <span style={{ fontSize: 24, lineHeight: 1, marginTop: 2 }}>{e.icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{e.label}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2, lineHeight: 1.4 }}>
-                    {e.desc}
-                  </div>
-                  <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", marginTop: 4 }}>
-                    Excel{e.pdfPath ? " · PDF" : ""} · {days} días
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                    <Button
-                      size="sm"
-                      variant={xlsxBusy ? "primary" : "secondary"}
-                      onClick={() => void download(e, "xlsx")}
-                      disabled={!!downloading}
-                    >
-                      {xlsxBusy ? "Generando…" : "Excel"}
-                    </Button>
-                    {e.pdfPath ? (
-                      <Button
-                        size="sm"
-                        variant={pdfBusy ? "primary" : "secondary"}
-                        onClick={() => void download(e, "pdf")}
-                        disabled={!!downloading}
-                      >
-                        {pdfBusy ? "Generando…" : "PDF"}
-                      </Button>
-                    ) : null}
-                  </div>
+      <Section
+        title="Reportes"
+        subtitle="Excel o PDF según el reporte."
+        actions={
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar reporte…"
+            aria-label="Buscar reporte"
+            style={{ width: 220, maxWidth: "100%" }}
+          />
+        }
+      >
+        {porGrupo.length === 0 ? (
+          <EmptyState
+            variant="compact"
+            title="Ningún reporte coincide"
+            description={`No hay reportes que contengan «${busqueda.trim()}».`}
+            action={<Button size="sm" variant="secondary" onClick={() => setBusqueda("")}>Limpiar búsqueda</Button>}
+          />
+        ) : (
+          <div style={{ display: "grid", gap: 20 }}>
+            {porGrupo.map(({ grupo, items }) => (
+              <section key={grupo} aria-labelledby={`export-grupo-${grupo}`}>
+                <h3
+                  id={`export-grupo-${grupo}`}
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: 11,
+                    fontWeight: 650,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--text-tertiary)",
+                  }}
+                >
+                  {grupo}
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: 10 }}>
+                  {items.map((e) => (
+                    <ReportCard
+                      key={e.key}
+                      entity={e}
+                      dias={dias}
+                      downloading={downloading}
+                      rangoInvalido={!!rangoInvalido}
+                      onDownload={(format) => void download(e, format)}
+                    />
+                  ))}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              </section>
+            ))}
+          </div>
+        )}
       </Section>
 
       {downloadLog.length > 0 && (
-        <Section title="Exportaciones recientes" subtitle="En esta sesión">
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {downloadLog.map((l, i) => (
-              <div
-                key={i}
+        <Section title="Descargas recientes" subtitle="En esta sesión">
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
+            {downloadLog.map((l) => (
+              <li
+                key={l.id}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
+                  flexWrap: "wrap",
+                  gap: "4px 12px",
                   padding: "8px 12px",
                   background: "var(--surface)",
                   border: "1px solid var(--border)",
@@ -431,18 +468,109 @@ export default function ExportsPage() {
                   fontSize: 12.5,
                 }}
               >
-                <span style={{ color: "var(--success)", fontWeight: 700 }}>✓</span>
+                <span aria-hidden="true" style={{ color: "var(--success)", fontWeight: 700 }}>✓</span>
                 <span style={{ fontWeight: 600 }}>{l.entity}</span>
                 <span style={{ color: "var(--text-tertiary)" }}>{l.format}</span>
-                <span style={{ color: "var(--text-tertiary)", flex: 1 }}>
-                  {l.from} → {l.to}
+                <span style={{ color: "var(--text-tertiary)", flex: 1, fontVariantNumeric: "tabular-nums" }}>
+                  {formatFecha(l.from)} – {formatFecha(l.to)}
                 </span>
-                <span style={{ color: "var(--text-tertiary)" }}>{l.ts}</span>
-              </div>
+                <span style={{ color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{l.ts}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </Section>
       )}
+
+      <style>{`
+        .nx-export-preset:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: 2px;
+        }
+      `}</style>
     </>
+  );
+}
+
+function ReportCard({
+  entity: e,
+  dias,
+  downloading,
+  rangoInvalido,
+  onDownload,
+}: {
+  entity: ExportCard;
+  dias: number;
+  downloading: string | null;
+  rangoInvalido: boolean;
+  onDownload: (format: ExportFormat) => void;
+}) {
+  const xlsxBusy = downloading === `${e.key}:xlsx`;
+  const pdfBusy = downloading === `${e.key}:pdf`;
+  const excedeMax = e.maxDias != null && dias > e.maxDias;
+  const bloqueado = !!downloading || rangoInvalido;
+
+  const notaRango =
+    e.xlsxRango === "sin-rango"
+      ? e.pdfPath
+        ? "El Excel trae todo el histórico; el PDF usa el periodo."
+        : "Trae todo el histórico; no usa el periodo."
+      : e.xlsxRango === "dia-final"
+        ? "Usa solo el día final del periodo."
+        : e.maxDias
+          ? `Máximo ${e.maxDias} días.`
+          : null;
+
+  return (
+    <div
+      aria-busy={xlsxBusy || pdfBusy || undefined}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        padding: "12px 14px",
+        background: "var(--surface)",
+        border: `1px solid ${xlsxBusy || pdfBusy ? "var(--primary)" : "var(--border)"}`,
+        borderRadius: 12,
+        transition: "border-color 0.15s",
+      }}
+    >
+      <div style={{ fontWeight: 650, fontSize: 13.5, color: "var(--text-primary)" }}>{e.label}</div>
+      <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.45 }}>{e.desc}</div>
+      {notaRango && (
+        <div
+          style={{
+            fontSize: 11.5,
+            lineHeight: 1.4,
+            color: excedeMax ? "var(--state-danger-text)" : "var(--text-tertiary)",
+          }}
+        >
+          {excedeMax ? `El periodo tiene ${dias} días y este reporte acepta máximo ${e.maxDias}. Acórtalo para exportar.` : notaRango}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={xlsxBusy}
+          onClick={() => onDownload("xlsx")}
+          disabled={bloqueado || excedeMax}
+          aria-label={`Descargar ${e.label} en Excel`}
+        >
+          {xlsxBusy ? "Generando…" : "Excel"}
+        </Button>
+        {e.pdfPath ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={pdfBusy}
+            onClick={() => onDownload("pdf")}
+            disabled={bloqueado}
+            aria-label={`Descargar ${e.label} en PDF`}
+          >
+            {pdfBusy ? "Generando…" : "PDF"}
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }

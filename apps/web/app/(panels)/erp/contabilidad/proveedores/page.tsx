@@ -273,7 +273,6 @@ export default function ProveedoresPage() {
       setData(res);
     } catch (e) {
       setError(formatApiError(e));
-      setData(null);
     } finally {
       setLoading(false);
     }

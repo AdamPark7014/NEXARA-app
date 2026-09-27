@@ -33,13 +33,17 @@ type WorkspaceDashboard = {
   alerts: { id: string; severity: "warning" | "danger" | "info"; message: string; href?: string }[];
 };
 
+/** `YYYY-MM-DD` en hora local: `toISOString` salta al día siguiente por la noche. */
+function isoLocal(d: Date) {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 function defaultRange() {
   const to = new Date();
   const from = new Date(to.getFullYear(), to.getMonth(), 1);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  };
+  return { from: isoLocal(from), to: isoLocal(to) };
 }
 
 function formatMoney(n: number) {
@@ -117,8 +121,9 @@ export default function ContabilidadDashboardPage() {
       setData(json);
     } catch (e) {
       if (turno !== peticion.current) return;
+      // Las cifras anteriores se quedan: el aviso dice qué periodo falló y
+      // `periodoVigente` sigue rotulando el que sí está en pantalla.
       setError(formatApiError(e));
-      setData(null);
     } finally {
       if (turno === peticion.current) setLoading(false);
     }
@@ -157,7 +162,7 @@ export default function ContabilidadDashboardPage() {
 
   /** Valor de contexto: «…» cargando, «—» sin respuesta, la cifra si la hay. */
   const ctx = (valor: ReactNode): ReactNode =>
-    loading ? "…" : data ? valor : <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+    data ? valor : loading ? "…" : <span style={{ color: "var(--text-tertiary)" }}>—</span>;
 
   /**
    * `href` opcional: la API manda alertas sin destino (`alerts[].href`), y un
@@ -354,7 +359,7 @@ export default function ContabilidadDashboardPage() {
     // Tres estados distintos, tres señales distintas: «…» mientras carga, «—»
     // cuando no hubo respuesta (sin sesión o error) y la cifra cuando la hay.
     // Pintar «$0» sin datos sería inventarse un saldo.
-    const cargando: ReactNode | null = loading ? "…" : data ? null : "—";
+    const cargando: ReactNode | null = data ? null : loading ? "…" : "—";
     const cobrosVencidos = data?.agingReceivable.overdue ?? 0;
     const pagosVencidos = data?.agingPayable.overdue ?? 0;
 
@@ -387,6 +392,14 @@ export default function ContabilidadDashboardPage() {
         tone: pagosVencidos > 0 ? "danger" : "default",
         href: "/erp/contabilidad/cuentas-por-pagar",
       },
+      {
+        label: "Facturas del periodo",
+        value: cargando ?? (data?.invoicesPeriod.total ?? 0).toLocaleString("es-MX"),
+        hint: data
+          ? `${data.invoicesPeriod.issued} emitidas · ${data.invoicesPeriod.received} recibidas`
+          : "Sin dato",
+        href: "/erp/contabilidad/facturas",
+      },
     ];
   }, [loading, data]);
 
@@ -398,7 +411,7 @@ export default function ContabilidadDashboardPage() {
         subtitle={
           sinSesion
             ? "Entra con tu cuenta para ver cobros, pagos y banco."
-            : loading
+            : loading && !data
               ? "Cargando…"
               : modoArranque
                 ? "Todavía falta preparar lo básico. Empieza por el primer paso."
@@ -553,7 +566,10 @@ export default function ContabilidadDashboardPage() {
         <>
           {/* Nivel 1 — la tira: el estado del dinero en una sola línea. */}
           <div style={{ marginBottom: 18 }}>
-            <MetricStrip metrics={metrics} ariaLabel="En el banco, me deben y debo pagar" />
+            <MetricStrip
+              metrics={metrics}
+              ariaLabel="En el banco, me deben, debo pagar y facturas del periodo"
+            />
           </div>
 
           <div
@@ -573,8 +589,8 @@ export default function ContabilidadDashboardPage() {
               <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
                 No se pudo revisar: no hay sesión.
               </p>
-            ) : loading ? (
-              <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
+            ) : loading && !data ? (
+              <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
                 Revisando pendientes…
               </p>
             ) : attention.length === 0 ? (
@@ -683,7 +699,7 @@ export default function ContabilidadDashboardPage() {
                   {
                     href: "/erp/contabilidad/cuentas-por-cobrar",
                     title: "Cobrar",
-                    detail: loading
+                    detail: loading && !data
                       ? "…"
                       : data
                         ? data.agingReceivable.overdue > 0
@@ -694,7 +710,7 @@ export default function ContabilidadDashboardPage() {
                   {
                     href: "/erp/contabilidad/cuentas-por-pagar",
                     title: "Pagar",
-                    detail: loading
+                    detail: loading && !data
                       ? "…"
                       : data
                         ? data.agingPayable.overdue > 0
@@ -706,6 +722,11 @@ export default function ContabilidadDashboardPage() {
                     href: "/erp/contabilidad/conciliacion",
                     title: "Cuadrar banco",
                     detail: "Que el estado de cuenta coincida",
+                  },
+                  {
+                    href: "/erp/contabilidad/cierres",
+                    title: "Cerrar el mes",
+                    detail: "Revisar pendientes y bloquear el periodo",
                   },
                 ] as const
               ).map((card) => (
@@ -775,8 +796,8 @@ export default function ContabilidadDashboardPage() {
             />
           </dl>
               <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-                <QuietLink href="/erp/contabilidad/cierres">Cerrar el mes</QuietLink>
                 <QuietLink href="/erp/contabilidad/reportes">Ver informes</QuietLink>
+                <QuietLink href="/erp/contabilidad/polizas">Ver pólizas</QuietLink>
               </div>
             </section>
           </div>
@@ -860,10 +881,10 @@ function CampoFecha({
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         style={{
-          fontSize: 13,
+          fontSize: 16,
           padding: "6px 8px",
           borderRadius: 8,
-          border: `1px solid ${error ? "var(--state-danger-text, #b91c1c)" : "var(--border)"}`,
+          border: `1px solid ${error ? "var(--state-danger-text)" : "var(--border)"}`,
           background: "var(--surface)",
           color: "var(--text-primary)",
         }}
@@ -872,7 +893,7 @@ function CampoFecha({
         <span
           id={errorId}
           role="alert"
-          style={{ fontSize: 11, color: "var(--state-danger-text, #b91c1c)", lineHeight: 1.35 }}
+          style={{ fontSize: 11, color: "var(--state-danger-text)", lineHeight: 1.35 }}
         >
           {error}
         </span>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useUrlQuery } from "@/components/finance/useUrlQuery";
+import { todayStamp } from "@/components/finance/download";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot from "@/components/ui/StatusDot";
@@ -129,7 +130,7 @@ export default function InvoicingPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "invoicing"), [user]);
   const token = user?.token ?? "";
-  const searchParams = useSearchParams();
+  const searchParams = useUrlQuery();
   const highlightId = searchParams.get("highlight");
   const invoiceRef = searchParams.get("invoiceRef");
 
@@ -143,7 +144,7 @@ export default function InvoicingPage() {
   const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceRow | null>(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "", bankAccountId: "", stampComplement: true });
+  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: todayStamp(), method: "SPEI", reference: "", notes: "", bankAccountId: "", stampComplement: true });
   const [paymentErr, setPaymentErr] = useState<string | null>(null);
   /**
    * Sin la cuenta de destino el pago queda colgando: el movimiento del banco
@@ -181,14 +182,16 @@ export default function InvoicingPage() {
     cfdiUsage: "G03",
     satPaymentMethod: "PUE" as "PUE" | "PPD",
     satPaymentForm: "03",
-    issueDate: new Date().toISOString().slice(0, 10),
-    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    issueDate: todayStamp(),
+    dueDate: todayStamp(new Date(Date.now() + 30 * 86400000)),
     description: "",
     quantity: 1,
     unitPrice: 0,
     satProductKey: "80101500",
     satUnitKey: "E48",
   });
+  /** Filtro de tipo de la última carga buena: si un reintento falla con otro filtro, la lista vieja ya no aplica. */
+  const loadedFilterRef = useRef<string | null>(null);
 
   const inp = financeInputStyle;
 
@@ -205,10 +208,12 @@ export default function InvoicingPage() {
       if (apiType) params.set("type", apiType);
       const data = await apiFetch(`accounting/invoices?${params}`, token);
       setItems(Array.isArray(data) ? data : (data?.data ?? []));
+      loadedFilterRef.current = filter;
     } catch (e) {
       // El cuerpo crudo de Nest («{"message":["…"],"statusCode":400}») no es
       // una frase: `formatApiError` saca el motivo legible que va al vacío.
       setError(formatApiError(e, "Error al cargar facturación"));
+      if (loadedFilterRef.current !== filter) setItems([]);
     } finally { setLoading(false); }
   }, [token, filter]);
 
@@ -247,10 +252,11 @@ export default function InvoicingPage() {
   const [searchQ, setSearchQ] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
+  const deferredSearchQ = useDeferredValue(searchQ);
   const visibleItems = useMemo(() => {
     let rows = items;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
+    if (deferredSearchQ.trim()) {
+      const q = deferredSearchQ.trim().toLowerCase();
       rows = rows.filter((f) =>
         (f.invoiceNumber ?? "").toLowerCase().includes(q) ||
         (f.receptorName ?? "").toLowerCase().includes(q) ||
@@ -267,7 +273,7 @@ export default function InvoicingPage() {
       rows = rows.filter((f) => f.invoiceNumber.toLowerCase().includes(ref));
     }
     return rows;
-  }, [items, highlightId, invoiceRef, searchQ, filterStatus]);
+  }, [items, highlightId, invoiceRef, deferredSearchQ, filterStatus]);
 
   useEffect(() => {
     if (!showForm || !token) return;
@@ -286,10 +292,37 @@ export default function InvoicingPage() {
     }
   };
 
-  const facturadoMes = items.filter((f) => displayInvoiceType(f.type) === "INCOME" && f.status !== "CANCELLED").reduce((s, f) => s + Number(f.totalAmount), 0);
-  const porTimbrar = items.filter((f) => f.status === "DRAFT").length;
-  const canceladas = items.filter((f) => f.status === "CANCELLED").length;
-  const vencidas = items.filter((f) => f.status === "OVERDUE").length;
+  /** Un solo recorrido del libro para todas las cifras de la tira. */
+  const { facturadoMes, porTimbrar, canceladas, vencidas, incomeCount, cobrado, pendiente } = useMemo(() => {
+    let facturado = 0;
+    let cobradoSum = 0;
+    let pendienteSum = 0;
+    let ingresos = 0;
+    let borradores = 0;
+    let canceladasN = 0;
+    let vencidasN = 0;
+    for (const f of items) {
+      if (f.status === "DRAFT") borradores += 1;
+      if (f.status === "CANCELLED") canceladasN += 1;
+      if (f.status === "OVERDUE") vencidasN += 1;
+      if (displayInvoiceType(f.type) === "INCOME" && f.status !== "CANCELLED") {
+        const total = Number(f.totalAmount);
+        ingresos += 1;
+        facturado += total;
+        if (f.status === "PAID") cobradoSum += total;
+        else pendienteSum += total;
+      }
+    }
+    return {
+      facturadoMes: facturado,
+      porTimbrar: borradores,
+      canceladas: canceladasN,
+      vencidas: vencidasN,
+      incomeCount: ingresos,
+      cobrado: cobradoSum,
+      pendiente: pendienteSum,
+    };
+  }, [items]);
 
   const stamp = (inv: InvoiceRow) => {
     if (!token) return;
@@ -315,7 +348,12 @@ export default function InvoicingPage() {
 
   const cancel = async (inv: InvoiceRow) => {
     if (!token) return;
-    setConfirmState({ message: `¿Cancelar el CFDI ${inv.invoiceNumber}?`, confirmLabel: "Cancelar CFDI", fn: async () => {
+    setConfirmState({
+      title: "Cancelar CFDI",
+      message: `¿Cancelar el CFDI ${inv.invoiceNumber} ante el SAT?\n\nSe cancela con el motivo 02 (comprobante emitido con errores sin relación). La cancelación no se puede deshacer.`,
+      confirmLabel: "Cancelar CFDI",
+      danger: true,
+      fn: async () => {
     setActionError(null);
     try {
       await apiFetch(`accounting/invoices/${inv.id}/cancel`, token, { method: "PATCH", body: JSON.stringify({ cancelReason: "02" }) });
@@ -335,7 +373,7 @@ export default function InvoicingPage() {
     setPaymentTarget(inv);
     setPaymentForm({
       amount: pending > 0 ? String(pending) : "",
-      paymentDate: new Date().toISOString().slice(0, 10),
+      paymentDate: todayStamp(),
       method: "SPEI",
       reference: "",
       notes: "",
@@ -398,8 +436,8 @@ export default function InvoicingPage() {
       cfdiUsage: "G03",
       satPaymentMethod: "PUE",
       satPaymentForm: "03",
-      issueDate: new Date().toISOString().slice(0, 10),
-      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      issueDate: todayStamp(),
+      dueDate: todayStamp(new Date(Date.now() + 30 * 86400000)),
       description: "",
       quantity: 1,
       unitPrice: 0,
@@ -443,8 +481,8 @@ export default function InvoicingPage() {
         cfdiUsage: full.cfdiUsage ?? "G03",
         satPaymentMethod: full.satPaymentMethod === "PPD" ? "PPD" : "PUE",
         satPaymentForm: satForm,
-        issueDate: full.issueDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
-        dueDate: full.dueDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+        issueDate: full.issueDate?.slice(0, 10) ?? todayStamp(),
+        dueDate: full.dueDate?.slice(0, 10) ?? todayStamp(),
         description: item?.description ?? "",
         quantity: Number(item?.quantity ?? 1),
         unitPrice: Number(item?.unitPrice ?? 0),
@@ -601,13 +639,17 @@ export default function InvoicingPage() {
       render: (f) => {
         const days = Math.floor((Date.now() - new Date(f.issueDate).getTime()) / 86400000);
         const isPending = f.status !== "PAID" && f.status !== "CANCELLED";
-        const color = days >= 60 ? "var(--state-danger-text, #b91c1c)" : days >= 30 ? "var(--state-warning-text, #b45309)" : "var(--text-tertiary)";
+        const color = days >= 60 ? "var(--state-danger-text)" : days >= 30 ? "var(--state-warning-text)" : "var(--text-tertiary)";
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={{ fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
               {new Date(f.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
             </span>
-            {isPending && <span style={{ fontSize: 11, color }}>{days}d</span>}
+            {isPending && days > 0 && (
+              <span style={{ fontSize: 11, color, fontVariantNumeric: "tabular-nums" }} title="Días desde la emisión">
+                hace {days === 1 ? "1 día" : `${days} días`}
+              </span>
+            )}
           </div>
         );
       },
@@ -657,16 +699,13 @@ export default function InvoicingPage() {
    * cobrar», que es donde duele, y conserva su clic; «Canceladas» baja a
    * metadato de pie, que es su rango.
    * ---------------------------------------------------------------- */
-  const incomeInvoices = items.filter((f) => displayInvoiceType(f.type) === "INCOME" && f.status !== "CANCELLED");
-  const cobrado = incomeInvoices.filter((f) => f.status === "PAID").reduce((s, f) => s + Number(f.totalAmount), 0);
-  const pendiente = incomeInvoices.filter((f) => f.status !== "PAID").reduce((s, f) => s + Number(f.totalAmount), 0);
   const cobranzaPct = facturadoMes > 0 ? Math.round((cobrado / facturadoMes) * 100) : 0;
 
   const metrics: Metric[] = [
     {
       label: "Facturado",
       value: <MetricValue><Money value={facturadoMes} compact bold={false} /></MetricValue>,
-      hint: <MetricHint>{incomeInvoices.length} CFDI de ingreso</MetricHint>,
+      hint: <MetricHint>{incomeCount} CFDI de ingreso</MetricHint>,
     },
     {
       label: "Cobrado",
@@ -732,7 +771,8 @@ export default function InvoicingPage() {
     { key: "invoiceNumber", label: "Folio" },
     { key: "receptorName", label: "Cliente/Receptor", format: (v) => v ? String(v) : "—" },
     { key: "totalAmount", label: "Total" },
-    { key: "status", label: "Estado" },
+    { key: "cfdiUuid", label: "UUID", format: (v) => (v ? String(v) : "") },
+    { key: "status", label: "Estado", format: (v) => COMMERCIAL_LABEL[String(v ?? "")] ?? String(v ?? "").replace(/_/g, " ") },
     { key: "issueDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
   ], "facturas");
 
@@ -831,15 +871,27 @@ export default function InvoicingPage() {
         </select>
       </WorkToolbar>
 
-      {loading && (
+      {loading && items.length === 0 && (
         <EmptyState icon={<LoadingIcon />} title="Cargando facturas…" description="Consultando el libro de CFDI." />
       )}
-      {!loading && error && (
+      {!loading && error && items.length === 0 && (
         <EmptyState
           icon={<AlertIcon />}
           title="No se pudo cargar la facturación"
           description={error}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      )}
+      {error && items.length > 0 && (
+        <InlineAlert
+          variant="warning"
+          message={`No se pudo actualizar la lista; se muestran los datos anteriores. ${error}`}
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
+              {loading ? "Reintentando…" : "Reintentar"}
+            </Button>
+          }
         />
       )}
       {!loading && !error && visibleItems.length === 0 && hasFilters && (
@@ -868,7 +920,7 @@ export default function InvoicingPage() {
           }
         />
       )}
-      {!loading && !error && visibleItems.length > 0 && (
+      {visibleItems.length > 0 && (!loading || items.length > 0) && (
         <DataTable
           columns={columns}
           rows={visibleItems}
