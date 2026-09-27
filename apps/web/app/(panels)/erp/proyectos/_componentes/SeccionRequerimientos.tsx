@@ -96,7 +96,7 @@ export default function SeccionRequerimientos({ proyecto: p, token, hoy, ocupado
             aria-valuenow={r.porcentaje ?? 0}
             aria-valuetext={`${r.cumplidos} de ${r.total}`}
           >
-            <div className={styles.progressFill} style={{ width: `${r.porcentaje ?? 0}%`, background: "#16a34a" }} />
+            <div className={`${styles.progressFill} ${styles.progressFillOk}`} style={{ width: `${r.porcentaje ?? 0}%` }} />
           </div>
         ) : null}
 

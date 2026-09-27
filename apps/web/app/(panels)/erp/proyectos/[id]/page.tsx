@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useParams, useRouter } from "next/navigation";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { useUser } from "@/components/UserContext";
+import { Alert, Button, ButtonLink, EmptyState, LinkButton, Skeleton } from "@/components/base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { formatApiError } from "@/lib/erp-api";
 import {
   ESTADO_PROYECTO_LABEL,
   ESTADO_TONO,
@@ -74,16 +77,18 @@ function mensajeDeConfirmacion(p: ProyectoDetalle, accion: AccionDeEstado): stri
   }
 }
 
-function DetalleProyecto() {
+function esPestana(valor: string | null): valor is Pestana {
+  return PESTANAS.some((t) => t.id === valor);
+}
+
+export default function ProyectoDetallePage() {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
   const router = useRouter();
-  const search = useSearchParams();
   const { user, token } = useUser();
   const hoy = useMemo(() => hoyISO(), []);
 
-  const pestanaInicial = PESTANAS.find((t) => t.id === search.get("tab"))?.id ?? "resumen";
-  const [pestana, setPestana] = useState<Pestana>(pestanaInicial);
+  const [pestana, setPestana] = useState<Pestana>("resumen");
   const [proyecto, setProyecto] = useState<ProyectoDetalle | null>(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -95,6 +100,12 @@ function DetalleProyecto() {
   const [errorCambio, setErrorCambio] = useState<string | null>(null);
   const botonesPestana = useRef<Array<HTMLButtonElement | null>>([]);
 
+  // ?tab=cronograma abre directo en esa sección.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (esPestana(tab)) setPestana(tab);
+  }, []);
+
   const cargar = useCallback(async () => {
     if (!token || !Number.isInteger(id) || id <= 0) return;
     setCargando(true);
@@ -102,7 +113,7 @@ function DetalleProyecto() {
     try {
       setProyecto(await obtenerProyecto(token, id));
     } catch (e) {
-      setErrorCarga(e instanceof Error ? e.message : "No se pudo cargar el proyecto");
+      setErrorCarga(formatApiError(e, "No se pudo cargar el proyecto"));
     } finally {
       setCargando(false);
     }
@@ -144,7 +155,7 @@ function DetalleProyecto() {
       if (exito) setAviso(exito);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar el cambio");
+      setError(formatApiError(e, "No se pudo guardar el cambio"));
       return false;
     } finally {
       setOcupado(false);
@@ -153,7 +164,7 @@ function DetalleProyecto() {
 
   function elegirPestana(destino: Pestana) {
     setPestana(destino);
-    const qs = new URLSearchParams(search.toString());
+    const qs = new URLSearchParams(window.location.search);
     if (destino === "resumen") qs.delete("tab");
     else qs.set("tab", destino);
     const texto = qs.toString();
@@ -177,16 +188,27 @@ function DetalleProyecto() {
   if (!Number.isInteger(id) || id <= 0) {
     return (
       <div className={styles.wrap}>
-        <p className={styles.errorBox}>Ese proyecto no existe.</p>
-        <Link href="/erp/proyectos">← Volver a proyectos</Link>
+        <EmptyState
+          icon={<ErrorOutlineRoundedIcon />}
+          title="Ese proyecto no existe"
+          description="El enlace está incompleto o el proyecto ya no está disponible."
+          action={<ButtonLink href="/erp/proyectos">Volver a proyectos</ButtonLink>}
+        />
       </div>
     );
   }
 
   if (cargando && !proyecto) {
     return (
-      <div className={styles.wrap}>
-        <p className={styles.sub}>Cargando proyecto…</p>
+      <div className={styles.wrap} aria-busy="true" aria-label="Cargando proyecto">
+        <div className={styles.esqueleto}>
+          <Skeleton width={80} height={12} />
+          <Skeleton width="45%" height={24} />
+          <Skeleton width={260} height={14} />
+          <Skeleton width={200} height={22} radius={999} />
+        </div>
+        <Skeleton height={40} />
+        <Skeleton height={280} radius={12} />
       </div>
     );
   }
@@ -197,12 +219,21 @@ function DetalleProyecto() {
         <Link className={styles.migas} href="/erp/proyectos">
           ← Proyectos
         </Link>
-        <p className={styles.errorBox} role="alert">
-          {errorCarga ?? "No se pudo cargar el proyecto."}{" "}
-          <button type="button" className={styles.linkBtn} onClick={() => void cargar()}>
-            Reintentar
-          </button>
-        </p>
+        <div role="alert">
+          <EmptyState
+            icon={<ErrorOutlineRoundedIcon />}
+            title="No pudimos abrir el proyecto"
+            description={errorCarga ?? "Revisa tu conexión e inténtalo de nuevo."}
+            action={
+              <span className={styles.acciones}>
+                <Button variant="primary" onClick={() => void cargar()}>
+                  Reintentar
+                </Button>
+                <ButtonLink href="/erp/proyectos">Volver a proyectos</ButtonLink>
+              </span>
+            }
+          />
+        </div>
       </div>
     );
   }
@@ -260,12 +291,13 @@ function DetalleProyecto() {
     if (ok) setCambio(null);
   }
 
+  const etapasSinCumplir = p.milestones.filter(
+    (h) => h.status !== "CUMPLIDO" && h.status !== "CANCELADO" && !h.actualDate,
+  ).length;
   const pendientesAlTerminar = [
     p.resumen.avance.abiertas ? `${p.resumen.avance.abiertas} actividad(es) abierta(s)` : null,
     p.resumen.requerimientos.pendientes ? `${p.resumen.requerimientos.pendientes} requerimiento(s) pendiente(s)` : null,
-    p.milestones.filter((h) => h.status !== "CUMPLIDO" && h.status !== "CANCELADO" && !h.actualDate).length
-      ? `${p.milestones.filter((h) => h.status !== "CUMPLIDO" && h.status !== "CANCELADO" && !h.actualDate).length} etapa(s) sin cumplir`
-      : null,
+    etapasSinCumplir ? `${etapasSinCumplir} etapa(s) sin cumplir` : null,
   ].filter(Boolean);
 
   return (
@@ -282,7 +314,7 @@ function DetalleProyecto() {
               .join(" · ")}
           </p>
           <div className={styles.badges} style={{ marginTop: 8 }}>
-            <span className={claseTono(ESTADO_TONO[p.status] ?? "neutral")}>{ESTADO_PROYECTO_LABEL[p.status] ?? p.status}</span>
+            <span className={claseTono(ESTADO_TONO[p.status] ?? "neutral")}>{ESTADO_PROYECTO_LABEL[p.status] ?? "Sin estado"}</span>
             {p.resumen.etiqueta !== ESTADO_PROYECTO_LABEL[p.status] ? (
               <span className={claseTono(SALUD_TONO[p.resumen.salud] ?? "neutral")} title={p.resumen.motivo}>
                 {p.resumen.etiqueta}
@@ -400,6 +432,12 @@ function DetalleProyecto() {
         })}
       </div>
 
+      {errorCarga ? (
+        <Alert tone="warning" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
+          No se pudo actualizar el proyecto; ves la última versión cargada.
+        </Alert>
+      ) : null}
+
       <div className={styles.avisos} aria-live="polite">
         {error ? (
           <p className={styles.errorBox} role="alert">
@@ -435,13 +473,5 @@ function DetalleProyecto() {
 
       <ConfirmDialog state={confirmacion} onClose={() => setConfirmacion(null)} />
     </div>
-  );
-}
-
-export default function ProyectoDetallePage() {
-  return (
-    <Suspense fallback={<p className={styles.sub}>Cargando…</p>}>
-      <DetalleProyecto />
-    </Suspense>
   );
 }

@@ -187,7 +187,7 @@ export default function SeccionDocumentos({ proyecto: p, token, ocupado, mutar, 
                 <div className={styles.itemMain}>
                   <span className={styles.itemTitle}>{d.nombre}</span>
                   <div className={styles.badges}>
-                    <span className={styles.badge}>{TIPO_DOCUMENTO_LABEL[d.kind] ?? d.kind}</span>
+                    <span className={styles.badge}>{TIPO_DOCUMENTO_LABEL[d.kind] ?? "Otro documento"}</span>
                   </div>
                   <span className={styles.rowWrap}>
                     {[
