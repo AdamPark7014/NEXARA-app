@@ -7,9 +7,10 @@ import { AuditModule } from '../audit/audit.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { MeModule } from '../me/me.module.js';
 import { ExcelModule } from '../common/excel.module.js';
+import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
 
 @Module({
-  imports: [PrismaModule, AccountingModule, AuditModule, AuthModule, MeModule, ExcelModule],
+  imports: [PrismaModule, AccountingModule, AuditModule, AuthModule, MeModule, ExcelModule, ModulePolicyModule],
   controllers: [EmployeePaymentsController],
   providers: [EmployeePaymentsService],
 })

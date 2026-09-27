@@ -13,6 +13,11 @@ export type MeNavigation = {
   moduleKeys: string[];
   /** ModuleId web (access-matrix) — preferir para sidebar */
   webModuleIds: string[];
+  /**
+   * Módulos que la empresa le reserva a otros roles (política por empresa del API). Ganan sobre
+   * los comodines de ruta (`/erp/**`, `/erp/finance/**`) que de otro modo los abrirían.
+   */
+  hiddenModuleIds?: string[];
 };
 
 export async function fetchMeNavigation(
@@ -35,6 +40,7 @@ export async function fetchMeNavigation(
       paths: Array.isArray(data.paths) ? data.paths : [],
       moduleKeys,
       webModuleIds,
+      hiddenModuleIds: Array.isArray(data.hiddenModuleIds) ? data.hiddenModuleIds : [],
     };
   } catch {
     return null;
@@ -60,6 +66,13 @@ export function filterModulesByNavigation<T extends { id: string; panel?: string
   navigation: MeNavigation | null | undefined,
 ): T[] {
   if (!navigation) return modules;
+  const hidden = new Set(navigation.hiddenModuleIds ?? []);
+  if (hidden.size > 0) {
+    return filterModulesByNavigation(
+      modules.filter((m) => !hidden.has(m.id)),
+      { ...navigation, hiddenModuleIds: [] },
+    );
+  }
   const ids = navigation.webModuleIds?.length
     ? navigation.webModuleIds
     : navigation.moduleKeys;

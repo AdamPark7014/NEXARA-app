@@ -19,6 +19,7 @@ import {
   DashSkeleton,
 } from "@/components/dashboard/DashKit";
 import { useUser } from "@/components/UserContext";
+import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
 import { fetchExecutiveDashboard, type ExecutiveDashboard } from "@/lib/executive-api";
 import { listMyPendingApprovals, labelForEntityType, type PendingApproval } from "@/lib/workflow-api";
 import { formatApiError } from "@/lib/erp-api";
@@ -211,7 +212,16 @@ export default function ErpDashboardPage() {
   const { user, token } = useUser();
   const nombre = user?.nombre?.split(" ")[0] ?? "equipo";
   const v2Role = resolveV2RoleKey(user);
-  const { list: shortcuts, executive: isExecutive } = useMemo(() => shortcutsForRole(v2Role), [v2Role]);
+  const { list: allShortcuts, executive: isExecutive } = useMemo(() => shortcutsForRole(v2Role), [v2Role]);
+  // La empresa puede reservar «Pagos a empleados» a otros roles: el atajo sobra si no se puede abrir.
+  const { hidden: hiddenModules } = useHiddenModuleIds();
+  const shortcuts = useMemo(
+    () =>
+      hiddenModules.has("employee-payments")
+        ? allShortcuts.filter((s) => !s.href.startsWith("/erp/finance/employee-payments"))
+        : allShortcuts,
+    [allShortcuts, hiddenModules],
+  );
 
   const [now] = useState(() => new Date());
   const [exec, setExec] = useState<ExecutiveDashboard | null>(null);

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import ContextRail from "@/components/ui/ContextRail";
+import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
 
 /**
  * Rail para pantallas financieras que aún no viven bajo `/erp/contabilidad/*`
@@ -15,17 +16,18 @@ const FINANCE_LINKS = [
   { id: "banking", label: "Bancos", href: "/erp/banking" },
   { id: "viatics", label: "Viáticos", href: "/erp/finance/viatics" },
   { id: "expenses", label: "Gastos", href: "/erp/finance/expenses" },
-  { id: "payments", label: "Pagos a personal", href: "/erp/finance/employee-payments" },
+  { id: "payments", label: "Pagos a personal", href: "/erp/finance/employee-payments", moduleId: "employee-payments" },
   { id: "prenomina", label: "Pre-nómina", href: "/erp/finance/prenomina" },
 ] as const;
 
 export default function FinanceModuleRail() {
   const pathname = usePathname() ?? "";
+  const { hidden } = useHiddenModuleIds();
 
   return (
     <ContextRail
       ariaLabel="Módulos de finanzas"
-      items={FINANCE_LINKS.map((l) => ({
+      items={FINANCE_LINKS.filter((l) => !("moduleId" in l) || !hidden.has(l.moduleId)).map((l) => ({
         id: l.id,
         label: l.label,
         href: l.href,

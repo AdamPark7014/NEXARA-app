@@ -350,11 +350,11 @@ export class MeController {
    * Clientes (web/Android) consumen paneles + moduleKeys en lugar de matrices locales.
    */
   @Get('navigation')
-  navigation(@CurrentUser() user: any) {
+  navigation(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
       throw new UnauthorizedException('Token de usuario inválido');
     }
-    return this.me.navigation(Number(user.id));
+    return this.me.navigation(Number(user.id), companyId);
   }
 
   /**
