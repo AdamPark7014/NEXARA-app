@@ -11,13 +11,13 @@ enum ConsoleHelpers {
         let weekday = cal.component(.weekday, from: today)
         let start = cal.date(byAdding: .day, value: -(weekday - 2), to: today) ?? today
         let end = cal.date(byAdding: .day, value: 6 - (weekday - 2), to: today) ?? today
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        return (fmt.string(from: start), fmt.string(from: end))
+        return (NxFormat.apiDay(start), NxFormat.apiDay(end))
     }
 
+    private static let isoFormatter = ISO8601DateFormatter()
+
     static func isoNow() -> String {
-        ISO8601DateFormatter().string(from: Date())
+        isoFormatter.string(from: Date())
     }
 
     static func mapStr(_ m: [String: Any], _ keys: String...) -> String {

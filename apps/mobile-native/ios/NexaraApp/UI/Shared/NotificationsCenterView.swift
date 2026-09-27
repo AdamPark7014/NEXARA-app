@@ -252,20 +252,15 @@ struct NotificationsCenterView: View {
 
     private func timeAgo(_ iso: String) -> String {
         guard !iso.isEmpty else { return "" }
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var date = fmt.date(from: iso)
-        if date == nil {
-            fmt.formatOptions = [.withInternetDateTime]
-            date = fmt.date(from: iso)
-        }
-        guard let date else { return iso.prefix(16).description }
+        guard let date = NxFormat.parseISO(iso) else { return iso.prefix(16).description }
         let m = Int(Date().timeIntervalSince(date) / 60)
         if m < 1 { return "Hace un momento" }
         if m < 60 { return "Hace \(m) min" }
         let h = m / 60
-        if h < 24 { return "Hace \(h)h" }
-        return "Hace \(h / 24)d"
+        if h < 24 { return "Hace \(h) h" }
+        let d = h / 24
+        if d < 7 { return d == 1 ? "Ayer" : "Hace \(d) días" }
+        return NxFormat.day(date)
     }
 }
 
