@@ -1,0 +1,191 @@
+========================================================================
+CONTEXTO A DETALLE — CÓMO OPERA CHRISTIAN (para perfeccionar el ERP)
+Versión 2 · 2026-09-27
+========================================================================
+Objetivo: que el sistema Core refleje 100% cómo trabaja Christian, para que
+él funja solo como CEO (revisar y aprobar) y todo lo demás se automatice.
+
+Qué cambió respecto a la versión 1: se corrigió lo que el código no respalda,
+se añadieron los 7 formatos reales de cotización, el ritmo diario/semanal/
+quincenal/mensual del CEO, dónde aprueba HOY y dónde debería, y el estado de
+lo que ya se construyó (ver PENDIENTES-PARA-HIJO.md).
+
+------------------------------------------------------------------------
+1. LA EMPRESA
+------------------------------------------------------------------------
+- NEXARA = integrador de CCTV, redes/voz-datos, videowall/pantallas,
+  Fortinet (seguridad perimetral), control de acceso, telefonía/VoIP,
+  Starlink, cómputo y licenciamiento.
+- Emisor de facturas: New Engineering Expertise And Resource Advancement
+  S.A. de C.V. (RFC NEE240925V73), con domicilio en San Pedro Cholula, Pue.
+  Razones sociales relacionadas: Moravinelt, Cassipe.
+- Clientes vistos: producciones/eventos (ARTA), gobierno (poder judicial
+  estatal, penales, BUAP/CAASBUAP en licitaciones), retail y corporativos,
+  entre otros (Zacatlán, Cancún, Guadalajara...).
+- Distribuidor principal: Grupo CT (catálogo con sync cada 15 min; pedidos
+  por API); facturas de proveedor tipo VOFARI (F###).
+- Equipo de campo (ingenieros con certificados): llevan el «Kit de
+  herramientas y material IDC de campo» (18 renglones).
+
+------------------------------------------------------------------------
+2. EL RITMO DEL CEO (lo que Christian hace y cuándo)
+------------------------------------------------------------------------
+CADA DÍA (10-15 min):
+  1) «Hoy» (/erp/executive): indicadores de dirección.
+  2) «Aprobaciones» (/erp/approvals): dejar en cero lo que espera su visto
+     bueno.
+  3) Cotizaciones por aprobar: revisar el PDF interno (costo, margen, total).
+  4) Cobranza: facturas vencidas y a quién llamar.
+  5) Operación: actividades atrasadas y evidencias por validar.
+CADA SEMANA (lunes): compras atrasadas y stock bajo, pizarra de actividades,
+  cuentas por cobrar/pagar, avance de proyectos.
+CADA QUINCENA (15 y último día del mes): pre-nómina -> Pagos a personal
+  (SOLO el CEO lo ve) -> dispersión al banco.
+CADA MES: cierre contable (lista de bloqueos), que todo lo vendido esté
+  facturado, respaldo de la base de datos.
+Su panel local (NEXARA - Panel.html) resume esto y calcula el próximo corte.
+
+------------------------------------------------------------------------
+3. CÓMO COTIZA (7 formatos reales vistos en sus muestras)
+------------------------------------------------------------------------
+A) Presupuesto en el FORMATO DEL CLIENTE ("Formato Cotización V2"):
+   encabezado PROYECTO · FECHA · REGIÓN · RITM · REQUERIMIENTO · SP · OC;
+   catálogo CÓDIGO · EQUIPO · MARCA · MODELO · CANTIDAD · P.U. · IMPORTE ·
+   DESCRIPCIÓN en 4 grupos (Telecomunicaciones, Respaldo de energía,
+   CCTV/Cómputo/Pantallas/Proyección, Infraestructura) y una hoja de
+   levantamiento por zona (cámaras por modelo).
+B) Venta a GOBIERNO MULTI-SEDE ("Fortinet V5"): por cada sede una partida de
+   equipo y una de licencia; total cercano a 2.4 millones.
+C) ANEXO DE LICITACIÓN con PRECIOS ESCALONADOS: 5 rangos de cantidad
+   (mín/máx/precio) por centro de entrega, en MXN y USD (~870 filas).
+D) LICENCIAS con precio público y precio de compra (proveedor; ahorro a 2 años).
+E) MATERIALES + DESCRIPCIÓN TÉCNICA + personal y días (técnico, auxiliar,
+   3 días); incluye mantenimiento correctivo ("ARTA").
+F) CABLEADO POR PLANTA (nodos certificados, rack, organizadores, PDU;
+   pago "contado" con fecha de vencimiento) ("Cancún", 10 páginas).
+G) PDF INTERNO con costo del proveedor, margen bruto e IVA.
+Reglas: MXN + IVA 16%; garantía «Instalación Nexara: 90 días sobre mano de
+obra» y la del fabricante en equipos; el margen se calcula sobre el PRECIO
+DE VENTA (costo 3,426.84 -> venta 4,895.49 = 30%); versiona (R2, R3...).
+Folio en el sistema: NEX-<clave RH>-<consecutivo de 4 dígitos por persona>,
+y al enviar suma siglas de quienes intervinieron y -R2, -R3... (el formato
+NXR-AAAA-### es solo legado).
+
+------------------------------------------------------------------------
+4. CATÁLOGO REAL (minado de 331 documentos, por frecuencia)
+------------------------------------------------------------------------
+MARCAS: Lenovo, Hikvision, Samsung, APC, Cisco, Dell, Panduit, Microsoft/
+Office, Western Digital, ESET, UniFi/Ubiquiti, Yealink, HiLook, Starlink,
+Epson, Grandstream, Meraki, TP-Link, Fortinet/FortiGate, Hanwha, Kaspersky,
+Sophos, Aruba, Axis, Honeywell, Dahua, Bosch.
+SERVICIOS: mano de obra, instalación, soporte, mantenimiento, configuración,
+capacitación, póliza.
+FAMILIAS: CCTV, cómputo/servidores, pantallas/videowall, redes/cableado
+(fibra muy frecuente), energía/UPS, almacenamiento, licencias/software,
+seguridad perimetral, telefonía/VoIP, control de acceso, detección
+(alarma/incendio), conectividad satelital.
+YA CARGADO EN CÓDIGO (por desplegar): 9 plantillas, 53 conceptos de catálogo
+y el kit de campo IDC.
+
+------------------------------------------------------------------------
+5. LOS 5 PROCESOS (parametrizar TODO en estos)
+------------------------------------------------------------------------
+1) VENTA/SUMINISTRO (COMERCIAL): cotización -> aprobación -> firma del
+   cliente -> [oportunidad ganada + proyecto + pedido borrador a CT] ->
+   compra -> entrega -> FACTURA CFDI -> cobro.
+2) PROYECTO/OBRA (OBRA): levantamiento -> cotización multipartida -> firma ->
+   proyecto (actividades, ingenieros, kit de herramientas, evidencias) ->
+   factura por avance -> cobro.
+3) PÓLIZA/SERVICIO (SERVICIO): propuesta -> contrato (SLA, cuota mensual) ->
+   visitas programadas (órdenes automáticas) -> tickets/SLA -> factura
+   recurrente.
+4) LICITACIÓN (LICITACION): bases -> cotización con anexos y precios por
+   rango -> fallo -> contrato -> ejecución -> facturación (uso CFDI gobierno).
+5) OPERACIÓN INTERNA: asistencias -> pre-nómina -> PAGOS DE EMPLEADOS (SOLO
+   CEO) · compras/almacén · contabilidad/CFDI.
+Estado paso a paso (✅ existe / 🟡 a medias / ❌ falta): ver
+MODELO-AUTOMATIZACION-PARAMETRIZADO.md.
+
+------------------------------------------------------------------------
+6. DÓNDE APRUEBA HOY Y DÓNDE DEBERÍA
+------------------------------------------------------------------------
+Hoy hay TRES mecanismos separados:
+  a) Motor de workflow (alimenta /erp/approvals y la app Android): descuento
+     de cotización > 15%, gasto > $5,000, viático > $3,000 o fuera de política,
+     proyecto > $500,000, TODA orden de compra y cierre de actividad.
+     Hasta hoy sus pasos no tenían aprobador y la bandeja salía vacía; ya
+     quedó corregido para la dirección (por desplegar).
+  b) Cadena por jerarquía con el CEO como paso final: viáticos, multas,
+     vehículos.
+  c) Aprobación directa por permiso: gasto, OC, requisición, horas extra,
+     permisos y vacaciones.
+Reglas de tope escritas pero NO conectadas: cotizaciones (coord. de ventas
+$50k, Dir. Operaciones $250k, CEO $1M), compras (Dir. Admin $25k, CEO $200k),
+viáticos (Dir. Admin desde $10k). Christian debe confirmar los montos.
+
+------------------------------------------------------------------------
+7. FACTURACIÓN (estado y meta)
+------------------------------------------------------------------------
+- HOY: emite CFDI a mano en el portal gratuito del SAT (timbre SAT970701NN3).
+- ERP: módulo completo (apps/api/src/pac: Facturama/Finkok/SW, XML CFDI 4.0,
+  póliza contable) y tabla de facturas con los campos CFDI 4.0.
+- ESTÁ EN MOCK (PAC_PROVIDER=mock): 0 facturas reales. No existe todavía el
+  botón «facturar esta cotización».
+- SE ENCIENDE CON EL CSD DE LA EMPRESA (Certificado de Sello Digital) Y LA
+  CUENTA DEL PROVEEDOR, NO CON LA E.FIRMA. Por etapas: sandbox -> una factura
+  de prueba -> validar XML/PDF/UUID y póliza -> producción. Es un acto fiscal
+  irreversible: lo hacen el desarrollador y Christian juntos.
+- Hay una revisión previa que dice qué falta sin tocar nada:
+  GET /api/pac/readiness  ó  npm run pac:preflight.
+
+------------------------------------------------------------------------
+8. NÓMINA
+------------------------------------------------------------------------
+- Quincenal ("1QNA/2QNA ... DEL POZZO"), con IMSS, CLABE y dispersiones.
+- El ERP calcula la PRE-NÓMINA en pantalla (horas netas, extras aprobados) a
+  partir de asistencias reales; crear borradores es manual y usa otro cálculo.
+  El sistema NO conoce la quincena (periodos libres), ni CLABE/banco, ni
+  ISR/IMSS, ni CFDI de nómina.
+- REQUISITO CLAVE: "Pagos de empleados" lo ve SOLO el CEO. Ya se resolvió por
+  empresa (sin tocar la matriz global); la contadora conserva Facturación.
+  Falta desplegar y activar en la empresa de Nexara.
+
+------------------------------------------------------------------------
+9. ORGANIZACIÓN DE ARCHIVOS EN LA LAPTOP (ya aplicada por Claude)
+------------------------------------------------------------------------
+Documentos/ dividido por propósito, con subcarpetas por formato:
+  01 Cotizaciones · 02 Facturas · 03 Órdenes de Compra · 04 Nómina y Finanzas
+  05 Legal y Contratos · 06 Licitaciones · 07 Proyectos · 08 Levantamientos y
+  Planos · 09 Fichas Técnicas · 10 RRHH y CVs · 11 Fotos (WhatsApp/Escaneos/
+  Capturas) · 12 Presentaciones · 13 Videos · 14 Comprimidos · 15 Directorio
+  · 16 Reportes · 17 e.firma SAT personal · 18 Firma digitalizada · 99 Otros.
+Descargas queda vacía. Instaladores no instalados -> C:\Instaladores.
+SEGURIDAD: la e.firma personal tiene su contraseña en texto plano en un
+archivo dentro de «17 e.firma SAT personal». Debe cifrarse o pasarse a un
+gestor de contraseñas. La e.firma y su contraseña NO se comparten por chat ni
+con ningún asistente; si alguna vez se compartió, cambiar la contraseña en el
+SAT. El sistema no la necesita para facturar.
+
+------------------------------------------------------------------------
+10. ENTORNO / ARRANQUE
+------------------------------------------------------------------------
+- Al abrir la laptop se inician: WhatsApp, Claude (IA voz, suscripción),
+  GrokBot, Correo (Outlook), Core (ERP) y el Panel NEXARA.
+- Panel local: "NEXARA - Panel.html" en el Escritorio (hub con accesos,
+  lista diaria y próximo corte de nómina).
+- Servidor: Hetzner CCX23, Ubuntu 24.04, acceso "ssh nexara" (llave sin
+  passphrase); disco ~75%. Multi-tenant: mismo código sirve varias empresas.
+
+------------------------------------------------------------------------
+11. LO QUE FALTA — ver PENDIENTES-PARA-HIJO.md
+------------------------------------------------------------------------
+1. Desplegar y activar: Pagos solo CEO, plantillas/catálogo/kit, avisos.
+2. Definir topes de aprobación y asignar aprobadores; importe en la bandeja.
+3. Facturación: botón desde cotización + timbrado real por etapas.
+4. Nómina quincenal: calendario, aviso, un solo cálculo, CLABE y dispersión.
+5. Licitaciones: precios por rango, recordatorios de fechas, enlace a cotización.
+6. Facturación recurrente de pólizas.
+7. Importar nómina histórica y las 84 cotizaciones locales.
+8. Respaldo diario de las bases de datos.
+9. (Opcional) "Jarvis": panel con voz conectado a Claude — hoy cubierto por la
+   app de Claude; una integración por voz a Core sería desarrollo aparte.
