@@ -739,6 +739,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // GPS propio al fichar (SELF_ATTENDANCE); sin /api/gps/** amplio → no live team.
     { path: '/api/viaticos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/viatics/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    // Flotilla / detalle: soporte debe ver igual que ing_campo
+    { path: '/api/vehicles/**', methods: ['GET'], scope: 'read' },
     { path: '/integra/**', scope: 'write' },
     { path: '/api/integra/**', scope: 'write' },
   ],
@@ -794,6 +796,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/lunch-breaks/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
     { path: '/api/viaticos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/viatics/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    // Flotilla / detalle: encargado de soporte no debe tener menos que soporte
+    { path: '/api/vehicles/**', methods: ['GET'], scope: 'read' },
     { path: '/integra/**', scope: 'write' },
     { path: '/api/integra/**', scope: 'write' },
   ],
