@@ -179,7 +179,9 @@ struct NuevoViaticoView: View {
 
     /// Aparte: sin actividades se puede pedir igual un viático suelto.
     private func cargarActividades() async {
-        actividades = (try? await CoreRepository.shared.myActivities().open) ?? []
+        if let abiertas = try? await CoreRepository.shared.myActivities().open {
+            actividades = abiertas
+        }
     }
 
     private func pedir() {
@@ -206,7 +208,7 @@ struct NuevoViaticoView: View {
             } catch {
                 // La hoja se queda abierta con lo tecleado: nada que reescribir.
                 enviando = false
-                self.error = error.localizedDescription
+                self.error = error.toUserMessage()
             }
         }
     }
