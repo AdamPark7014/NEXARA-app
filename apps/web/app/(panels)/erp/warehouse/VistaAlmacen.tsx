@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState, useCallback, useDeferredValue, useMemo } from "react";
+import dynamic from "next/dynamic";
+import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -10,6 +10,10 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import PanelTabs from "@/components/ui/PanelTabs";
 import ContextRail from "@/components/ui/ContextRail";
+import InlineAlert from "@/components/ui/InlineAlert";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { ALMACEN_PATH, HERRAMIENTAS_PATH } from "@/lib/recursos-core";
@@ -50,12 +54,32 @@ import { etiquetaCantidad, previsualizarConversion } from "@/lib/empaque";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
-import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
+import { cantidad, fechaCorta, fechaHoraCorta } from "@/lib/recursos-ui";
+import {
+  CYCLE_COUNT_STATUS_LABEL,
+  MOVEMENT_TYPE_LABEL,
+  NIVEL_STOCK,
+  RESERVATION_STATUS_LABEL,
+  diasParaCaducar,
+  etiquetaMovimiento,
+  nivelStock,
+  varianteConteo,
+  varianteMovimiento,
+} from "./almacen-etiquetas";
+import type { TrazaProducto } from "./HistorialProducto";
+import s from "./almacen.module.css";
+
+// Se bajan solo cuando se abren: el resumen trae gráficas y el historial es un panel aparte.
+const InteligenciaInventario = dynamic(() => import("./InteligenciaInventario"), {
+  ssr: false,
+  loading: () => <SkeletonRows rows={6} label="Cargando resumen" />,
+});
+const HistorialProducto = dynamic(() => import("./HistorialProducto"), { ssr: false });
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
 const TABS = [
-  { key: "dashboard", label: "Inteligencia" },
+  { key: "dashboard", label: "Resumen" },
   { key: "inventario", label: "Inventario" },
   { key: "movimientos", label: "Movimientos" },
   { key: "lotes", label: "Lotes y caducidad" },
@@ -63,26 +87,44 @@ const TABS = [
   { key: "conteos", label: "Conteos y reservas" },
 ] as const;
 
-const CYCLE_COUNT_STATUS_LABEL: Record<string, string> = {
-  SCHEDULED: "Programado",
-  IN_PROGRESS: "En captura",
-  CLOSED: "Cerrado",
-  CANCELLED: "Cancelado",
-};
 type TabKey = (typeof TABS)[number]["key"];
 /** Las vistas que sabe pintar esta pantalla. La landing de Core (`/erp/almacen`) elige cuáles monta. */
 export type WarehouseView = TabKey;
 
-const MOVEMENT_TYPE_LABEL: Record<string, string> = {
-  RECEIPT: "Entrada",
-  DISPATCH: "Salida",
-  TRANSFER: "Traspaso",
-  ADJUSTMENT: "Ajuste",
-  RETURN: "Devolución",
-  SCRAP: "Merma",
-  PRODUCTION_IN: "Entrada producción",
-  PRODUCTION_OUT: "Salida producción",
+type TipoMovimiento = "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN";
+
+const MOVIMIENTO_VACIO = {
+  type: "RECEIPT" as TipoMovimiento,
+  productId: "",
+  warehouseId: "",
+  toWarehouseId: "",
+  quantity: 1,
+  unitCost: "",
+  reference: "",
+  notes: "",
+  /** Presentación en que se captura («Caja»). Vacío = unidad base. */
+  packagingId: "",
 };
+
+const TITULO_MOVIMIENTO: Record<TipoMovimiento, string> = {
+  RECEIPT: "Entrada de inventario",
+  DISPATCH: "Salida de inventario",
+  TRANSFER: "Traspaso entre almacenes",
+  RETURN: "Devolución a almacén",
+  ADJUSTMENT: "Ajuste de inventario (alta)",
+  ADJUSTMENT_OUT: "Ajuste de inventario (baja)",
+};
+
+const LOTE_VACIO = { lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" };
+
+function Campo({ label, children, ancho }: { label: string; children: React.ReactNode; ancho?: boolean }) {
+  return (
+    <label className={`${s.campo} ${ancho ? s.ancho : ""}`}>
+      <span className={s.etiqueta}>{label}</span>
+      {children}
+    </label>
+  );
+}
 
 export function VistaAlmacen({
   embedded,
@@ -97,37 +139,29 @@ export function VistaAlmacen({
   const { user } = useUser();
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "warehouse"), [user]);
   const token = user?.token ?? "";
-  const searchParams = useSearchParams();
+  const router = useRouter();
   // Montada en Core (`/erp/almacen`) o en su ruta vieja (`/erp/warehouse`): los enlaces siguen a la página.
   const pathname = usePathname() ?? "";
   const enCore = pathname === ALMACEN_PATH || pathname.startsWith(`${ALMACEN_PATH}/`);
   const almacenBase = enCore ? ALMACEN_PATH : "/erp/warehouse";
-  const productFilter = searchParams.get("productId");
-  const movementId = searchParams.get("movementId");
+  // Los avisos traen `?productId=` o `?movementId=`: se leen de la URL al montar.
+  const [productFilter, setProductFilter] = useState<string | null>(null);
+  const [movementId, setMovementId] = useState<string | null>(null);
 
   const [items, setItems] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cargadoUnaVez, setCargadoUnaVez] = useState(false);
   const [searchQ, setSearchQ] = useState("");
+  const busqueda = useDeferredValue(searchQ);
   const [filterEstado, setFilterEstado] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [showMovementForm, setShowMovementForm] = useState(false);
   const [editing, setEditing] = useState<StockRow | null>(null);
   const [minimo, setMinimo] = useState(5);
+  const [savingMinimo, setSavingMinimo] = useState(false);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
-  const [movement, setMovement] = useState({
-    type: "RECEIPT" as "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN",
-    productId: "",
-    warehouseId: "",
-    toWarehouseId: "",
-    quantity: 1,
-    unitCost: "",
-    reference: "",
-    notes: "",
-    /** Presentación en que se captura («Caja»). Vacío = unidad base. */
-    packagingId: "",
-  });
+  const [showMovementForm, setShowMovementForm] = useState(false);
+  const [movement, setMovement] = useState({ ...MOVIMIENTO_VACIO });
   // Norma de empaque del producto elegido: se captura en cajas y se guarda en piezas.
   const [empaques, setEmpaques] = useState<Empaque[]>([]);
   const [nuevoEmpaque, setNuevoEmpaque] = useState<{ nombre: string; piezas: string } | null>(null);
@@ -137,6 +171,7 @@ export function VistaAlmacen({
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
   const [savingWarehouse, setSavingWarehouse] = useState(false);
+  const [confirmar, setConfirmar] = useState<ConfirmState | null>(null);
 
   const [tab, setTab] = useState<TabKey>(() => embedded?.views?.[0] ?? "inventario");
   const [insights, setInsights] = useState<InventoryInsights | null>(null);
@@ -146,22 +181,16 @@ export function VistaAlmacen({
   const [movementsLoading, setMovementsLoading] = useState(false);
   const [movementTypeFilter, setMovementTypeFilter] = useState("");
   const [movementWarehouseFilter, setMovementWarehouseFilter] = useState("");
-  const [movementProductFilter, setMovementProductFilter] = useState(productFilter ?? "");
+  const [movementProductFilter, setMovementProductFilter] = useState("");
   const [movementFromDate, setMovementFromDate] = useState("");
   const [movementToDate, setMovementToDate] = useState("");
-  const [productTrace, setProductTrace] = useState<{
-    productId: number;
-    sku: string;
-    name: string;
-    levels: StockRow[];
-    movements: StockMovementRow[];
-  } | null>(null);
+  const [productTrace, setProductTrace] = useState<TrazaProducto | null>(null);
   const [productTraceLoading, setProductTraceLoading] = useState(false);
 
   const [lots, setLots] = useState<LotRow[]>([]);
   const [lotsLoading, setLotsLoading] = useState(false);
   const [showLotForm, setShowLotForm] = useState(false);
-  const [lotForm, setLotForm] = useState({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" });
+  const [lotForm, setLotForm] = useState({ ...LOTE_VACIO });
   const [savingLot, setSavingLot] = useState(false);
   const [lotSaveErr, setLotSaveErr] = useState<string | null>(null);
 
@@ -185,9 +214,24 @@ export function VistaAlmacen({
   const [reservationForm, setReservationForm] = useState({ productId: "", warehouseId: "", quantity: 1, reason: "", expiresAt: "" });
   const [savingReservation, setSavingReservation] = useState(false);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get("productId");
+    setProductFilter(pid);
+    setMovementId(params.get("movementId"));
+    if (pid) setMovementProductFilter(pid);
+  }, [pathname]);
+
+  /** Quita `?productId=` / `?movementId=` sin recargar la pantalla. */
+  const limpiarFiltroUrl = (query = "") => {
+    setProductFilter(null);
+    setMovementId(null);
+    router.replace(`${almacenBase}${query}`, { scroll: false });
+  };
+
   const loadWarehouses = useCallback(() => {
     if (!token) return;
-    void listWarehouses(token).then(setWarehouses).catch(() => setWarehouses([]));
+    void listWarehouses(token).then(setWarehouses).catch(() => undefined);
   }, [token]);
 
   const createWarehouse = async () => {
@@ -205,12 +249,16 @@ export function VistaAlmacen({
           city: warehouseForm.city.trim() || undefined,
         }),
       });
-      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      if (!res.ok) throw new Error(await res.text().catch(() => ""));
+      toast.success(`Almacén «${warehouseForm.name.trim()}» creado`);
       setShowWarehouseForm(false);
       setWarehouseForm({ name: "", code: "", address: "", city: "" });
       void loadWarehouses();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Error al crear almacén"); }
-    finally { setSavingWarehouse(false); }
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo crear el almacén"));
+    } finally {
+      setSavingWarehouse(false);
+    }
   };
 
   const load = useCallback(async () => {
@@ -220,23 +268,26 @@ export function VistaAlmacen({
     try {
       const levels = await listStockLevels(token);
       setItems(levels.map(mapStockLevelToRow));
+      setCargadoUnaVez(true);
     } catch (e) {
+      // Un refresco fallido deja a la vista lo que ya estaba cargado.
       setLoadError(formatApiError(e, "No se pudo cargar el inventario"));
-      setItems([]);
     } finally {
       setLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
-  useEffect(() => { loadWarehouses(); }, [loadWarehouses]);
+  useEffect(() => {
+    loadWarehouses();
+  }, [loadWarehouses]);
 
   useEffect(() => {
     if (!token) return;
-    void listCatalogProducts(token).then(setProducts).catch(() => setProducts([]));
+    void listCatalogProducts(token).then(setProducts).catch(() => undefined);
   }, [token]);
 
   const vistasVisibles = useMemo(
@@ -249,10 +300,6 @@ export function VistaAlmacen({
     if (movementId && vistasVisibles.some((t) => t.key === "movimientos")) setTab("movimientos");
   }, [movementId, vistasVisibles]);
 
-  useEffect(() => {
-    if (productFilter) setMovementProductFilter(productFilter);
-  }, [productFilter]);
-
   // Presentaciones del producto elegido en el formulario de movimiento.
   useEffect(() => {
     const productId = Number(movement.productId);
@@ -263,9 +310,15 @@ export function VistaAlmacen({
     let vigente = true;
     setNuevoEmpaque(null);
     void listarEmpaques(token, productId)
-      .then((res) => { if (vigente) setEmpaques(res); })
-      .catch(() => { if (vigente) setEmpaques([]); });
-    return () => { vigente = false; };
+      .then((res) => {
+        if (vigente) setEmpaques(res);
+      })
+      .catch(() => {
+        if (vigente) setEmpaques([]);
+      });
+    return () => {
+      vigente = false;
+    };
   }, [token, movement.productId]);
 
   /** Alta rápida de presentación: se descubre aquí, cuando el producto no la tiene. */
@@ -309,7 +362,7 @@ export function VistaAlmacen({
     setProductTrace({
       productId,
       sku: sku ?? "—",
-      name: name ?? `Producto #${productId}`,
+      name: name ?? "Producto",
       levels: [],
       movements: [],
     });
@@ -323,7 +376,7 @@ export function VistaAlmacen({
       setProductTrace({
         productId,
         sku: levels[0]?.sku ?? sku ?? "—",
-        name: levels[0]?.nombre ?? name ?? `Producto #${productId}`,
+        name: levels[0]?.nombre ?? name ?? "Producto",
         levels,
         movements: movs,
       });
@@ -335,12 +388,33 @@ export function VistaAlmacen({
     }
   }, [token]);
 
+  const cerrarHistorial = useCallback(() => setProductTrace(null), []);
+
+  const loadMovements = useCallback(async () => {
+    if (!token) return;
+    setMovementsLoading(true);
+    try {
+      const rows = await listStockMovements(token, {
+        type: movementTypeFilter || undefined,
+        warehouseId: movementWarehouseFilter ? Number(movementWarehouseFilter) : undefined,
+        productId: movementProductFilter ? Number(movementProductFilter) : undefined,
+        from: movementFromDate || undefined,
+        to: movementToDate ? `${movementToDate}T23:59:59.999` : undefined,
+      });
+      setMovements(rows);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudieron cargar los movimientos"));
+    } finally {
+      setMovementsLoading(false);
+    }
+  }, [token, movementTypeFilter, movementWarehouseFilter, movementProductFilter, movementFromDate, movementToDate]);
+
   const saveMovement = async () => {
     if (!token || !movement.productId || movement.quantity <= 0) return;
     if (movement.type === "TRANSFER") {
       if (!movement.warehouseId || !movement.toWarehouseId) return;
       if (movement.warehouseId === movement.toWarehouseId) {
-        toast.error("Origen y destino deben ser distintos");
+        toast.error("El almacén de origen y el de destino deben ser distintos");
         return;
       }
     } else if (!movement.warehouseId) {
@@ -371,7 +445,7 @@ export function VistaAlmacen({
       await createStockMovement(token, payload);
       const movedProductId = Number(movement.productId);
       setShowMovementForm(false);
-      setMovement({ type: "RECEIPT", productId: "", warehouseId: "", toWarehouseId: "", quantity: 1, unitCost: "", reference: "", notes: "", packagingId: "" });
+      setMovement({ ...MOVIMIENTO_VACIO });
       void load();
       if (tab === "movimientos") void loadMovements();
       if (productTrace?.productId === movedProductId) {
@@ -379,7 +453,7 @@ export function VistaAlmacen({
       }
       toast.success("Movimiento registrado");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al registrar movimiento");
+      toast.error(formatApiError(e, "No se pudo registrar el movimiento"));
     } finally {
       setSavingMovement(false);
     }
@@ -409,9 +483,9 @@ export function VistaAlmacen({
         from: forProduct ? undefined : (movementFromDate || undefined),
         to: forProduct ? undefined : (movementToDate || undefined),
       });
-      toast.success(forProduct ? "PDF historial de producto descargado" : "PDF de movimientos descargado");
+      toast.success(forProduct ? "Historial del producto descargado" : "Kárdex descargado");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+      toast.error(formatApiError(e, "No se pudo generar el PDF"));
     } finally {
       setExportingPdf(false);
     }
@@ -421,66 +495,53 @@ export function VistaAlmacen({
     if (!token) return;
     try {
       await downloadStockMovementSlipPdf(token, id);
-      toast.success("Comprobante PDF descargado");
+      toast.success("Comprobante descargado");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo generar el comprobante");
+      toast.error(formatApiError(e, "No se pudo generar el comprobante"));
     }
   };
 
-  const openEdit = (s: StockRow) => {
-    setEditing(s);
-    setMinimo(s.minimo);
-    setShowForm(true);
+  const openEdit = (row: StockRow) => {
+    setEditing(row);
+    setMinimo(row.minimo);
   };
 
-  const save = async () => {
+  const saveMinimo = async () => {
     if (!token || !editing) return;
+    setSavingMinimo(true);
     try {
       await updateStockLevelConfig(token, editing.id, { minStock: minimo, reorderPoint: minimo });
       setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, minimo } : i)));
-      setShowForm(false);
+      setEditing(null);
+      toast.success("Mínimo actualizado");
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo actualizar el mínimo de stock"));
+    } finally {
+      setSavingMinimo(false);
     }
   };
-
-  const loadMovements = useCallback(async () => {
-    if (!token) return;
-    setMovementsLoading(true);
-    try {
-      const rows = await listStockMovements(token, {
-        type: movementTypeFilter || undefined,
-        warehouseId: movementWarehouseFilter ? Number(movementWarehouseFilter) : undefined,
-        productId: movementProductFilter ? Number(movementProductFilter) : undefined,
-        from: movementFromDate || undefined,
-        to: movementToDate ? `${movementToDate}T23:59:59.999` : undefined,
-      });
-      setMovements(rows);
-    } catch (e) {
-      toast.error(formatApiError(e, "No se pudieron cargar los movimientos"));
-      setMovements([]);
-    } finally {
-      setMovementsLoading(false);
-    }
-  }, [token, movementTypeFilter, movementWarehouseFilter, movementProductFilter, movementFromDate, movementToDate]);
 
   const loadLots = useCallback(async () => {
     if (!token) return;
     setLotsLoading(true);
     try {
-      const rows = await listLots(token);
-      setLots(rows);
+      setLots(await listLots(token));
     } catch (e) {
       toast.error(formatApiError(e, "No se pudieron cargar los lotes"));
-      setLots([]);
     } finally {
       setLotsLoading(false);
     }
   }, [token]);
 
+  const abrirNuevoLote = () => {
+    setLotForm({ ...LOTE_VACIO });
+    setLotSaveErr(null);
+    setShowLotForm(true);
+  };
+
   const saveLot = async () => {
     if (!token || !lotForm.lotNumber.trim() || !lotForm.productId) {
-      setLotSaveErr("Número de lote y producto son obligatorios.");
+      setLotSaveErr("Escribe el número de lote y elige el producto.");
       return;
     }
     setSavingLot(true);
@@ -495,7 +556,8 @@ export function VistaAlmacen({
       });
       setLots((prev) => [created, ...prev]);
       setShowLotForm(false);
-      setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" });
+      setLotForm({ ...LOTE_VACIO });
+      toast.success("Lote registrado");
     } catch (e) {
       setLotSaveErr(formatApiError(e, "No se pudo crear el lote"));
     } finally {
@@ -507,11 +569,9 @@ export function VistaAlmacen({
     if (!token) return;
     setValuationLoading(true);
     try {
-      const rows = await getStockValuation(token, valuationWarehouseFilter ? Number(valuationWarehouseFilter) : undefined);
-      setValuation(rows);
+      setValuation(await getStockValuation(token, valuationWarehouseFilter ? Number(valuationWarehouseFilter) : undefined));
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo cargar la valuación"));
-      setValuation([]);
     } finally {
       setValuationLoading(false);
     }
@@ -523,8 +583,7 @@ export function VistaAlmacen({
     try {
       setInsights(await getInventoryInsights(token));
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo cargar inteligencia de inventario"));
-      setInsights(null);
+      toast.error(formatApiError(e, "No se pudo cargar el resumen del inventario"));
     } finally {
       setInsightsLoading(false);
     }
@@ -536,8 +595,7 @@ export function VistaAlmacen({
     try {
       setCycleCounts(await listCycleCounts(token));
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudieron cargar los conteos cíclicos"));
-      setCycleCounts([]);
+      toast.error(formatApiError(e, "No se pudieron cargar los conteos"));
     } finally {
       setCycleCountsLoading(false);
     }
@@ -550,7 +608,6 @@ export function VistaAlmacen({
       setReservations(await listReservations(token));
     } catch (e) {
       toast.error(formatApiError(e, "No se pudieron cargar las reservas"));
-      setReservations([]);
     } finally {
       setReservationsLoading(false);
     }
@@ -567,6 +624,7 @@ export function VistaAlmacen({
       });
       setShowScheduleForm(false);
       setScheduleForm({ warehouseId: "", scheduledFor: "", notes: "" });
+      toast.success("Conteo programado");
       void loadCycleCounts();
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo programar el conteo"));
@@ -586,17 +644,21 @@ export function VistaAlmacen({
 
   const submitCapture = async () => {
     if (!token || !activeCount) return;
-    const items = Object.entries(captureQty)
+    const capturados = Object.entries(captureQty)
       .filter(([, v]) => v.trim() !== "")
       .map(([productId, v]) => ({ productId: Number(productId), countedQty: Number(v) }));
-    if (!items.length) return;
+    if (!capturados.length) {
+      toast.error("Escribe al menos una cantidad contada");
+      return;
+    }
     setSavingCapture(true);
     try {
-      const updated = await recordCycleCountItems(token, activeCount.id, items);
+      const updated = await recordCycleCountItems(token, activeCount.id, capturados);
       setActiveCount(updated);
+      toast.success("Captura guardada");
       void loadCycleCounts();
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo capturar el conteo"));
+      toast.error(formatApiError(e, "No se pudo guardar la captura"));
     } finally {
       setSavingCapture(false);
     }
@@ -607,9 +669,10 @@ export function VistaAlmacen({
     setClosingCount(true);
     try {
       await closeCycleCount(token, activeCount.id);
-      toast.success("Conteo cerrado — varianzas ajustadas en stock");
+      toast.success("Conteo cerrado: las diferencias ya se ajustaron en el stock");
       setActiveCount(null);
       void loadCycleCounts();
+      void load();
       if (tab === "dashboard") void loadInsights();
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo cerrar el conteo"));
@@ -618,16 +681,31 @@ export function VistaAlmacen({
     }
   };
 
-  const submitCancelCount = async (id: number) => {
-    if (!token) return;
-    try {
-      await cancelCycleCount(token, id);
-      void loadCycleCounts();
-      if (activeCount?.id === id) setActiveCount(null);
-    } catch (e) {
-      toast.error(formatApiError(e, "No se pudo cancelar el conteo"));
-    }
-  };
+  const pedirCerrarConteo = () =>
+    setConfirmar({
+      title: "Cerrar conteo",
+      message: "Las diferencias entre lo contado y el sistema se ajustarán en el stock. Esto no se puede deshacer.",
+      confirmLabel: "Cerrar y ajustar",
+      danger: false,
+      fn: submitCloseCount,
+    });
+
+  const pedirCancelarConteo = (count: CycleCountRow) =>
+    setConfirmar({
+      title: "Cancelar conteo",
+      message: `¿Cancelar el conteo ${count.countNumber}? Lo capturado se descarta y el stock no cambia.`,
+      confirmLabel: "Cancelar conteo",
+      fn: async () => {
+        if (!token) return;
+        try {
+          await cancelCycleCount(token, count.id);
+          void loadCycleCounts();
+          if (activeCount?.id === count.id) setActiveCount(null);
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo cancelar el conteo"));
+        }
+      },
+    });
 
   const submitReservation = async () => {
     if (!token || !reservationForm.productId || !reservationForm.warehouseId || !reservationForm.reason.trim()) return;
@@ -642,6 +720,7 @@ export function VistaAlmacen({
       });
       setShowReservationForm(false);
       setReservationForm({ productId: "", warehouseId: "", quantity: 1, reason: "", expiresAt: "" });
+      toast.success("Stock reservado");
       void loadReservations();
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo crear la reserva"));
@@ -650,15 +729,22 @@ export function VistaAlmacen({
     }
   };
 
-  const submitReleaseReservation = async (id: number) => {
-    if (!token) return;
-    try {
-      await releaseReservation(token, id);
-      void loadReservations();
-    } catch (e) {
-      toast.error(formatApiError(e, "No se pudo liberar la reserva"));
-    }
-  };
+  const pedirLiberarReserva = (r: StockReservationRow) =>
+    setConfirmar({
+      title: "Liberar reserva",
+      message: `Se devuelven ${cantidad(r.quantity)} de «${r.product?.name ?? "este producto"}» al stock disponible.`,
+      confirmLabel: "Liberar",
+      danger: false,
+      fn: async () => {
+        if (!token) return;
+        try {
+          await releaseReservation(token, r.id);
+          void loadReservations();
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo liberar la reserva"));
+        }
+      },
+    });
 
   useEffect(() => {
     if (tab === "dashboard") void loadInsights();
@@ -683,179 +769,197 @@ export function VistaAlmacen({
     }
   }, [tab, loadCycleCounts, loadReservations]);
 
-  const sinStock = items.filter((s) => s.existencia === 0).length;
-  const bajoMinimo = items.filter((s) => s.existencia > 0 && s.existencia < s.minimo).length;
-  const valorTotal = items.reduce((sum, s) => sum + s.existencia * s.costo, 0);
+  /** «Actualizar» recarga el stock y la vista abierta, no solo el stock. */
+  const refrescar = () => {
+    void load();
+    if (tab === "dashboard") void loadInsights();
+    else if (tab === "movimientos") void loadMovements();
+    else if (tab === "lotes") void loadLots();
+    else if (tab === "valuacion") void loadValuation();
+    else if (tab === "conteos") {
+      void loadCycleCounts();
+      void loadReservations();
+    }
+  };
 
-  const stockEstado = (s: StockRow): "danger" | "warning" | "neutral" =>
-    s.existencia === 0 ? "danger" : s.existencia < s.minimo ? "warning" : "neutral";
+  const resumen = useMemo(() => {
+    let sinStock = 0;
+    let bajoMinimo = 0;
+    let valorTotal = 0;
+    const porCategoria: Record<string, number> = {};
+    for (const row of items) {
+      const nivel = nivelStock(row.existencia, row.minimo);
+      if (nivel === "agotado") sinStock += 1;
+      else if (nivel === "bajo") bajoMinimo += 1;
+      valorTotal += row.existencia * row.costo;
+      const cat = row.categoria || "Sin categoría";
+      porCategoria[cat] = (porCategoria[cat] ?? 0) + 1;
+    }
+    const categorias = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    return { sinStock, bajoMinimo, valorTotal, categorias };
+  }, [items]);
 
   const visibleItems = useMemo(() => {
     let rows = items;
     if (productFilter) {
       const pid = Number(productFilter);
-      if (!Number.isNaN(pid)) rows = rows.filter((s) => s.productId === pid);
+      if (!Number.isNaN(pid)) rows = rows.filter((r) => r.productId === pid);
     }
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      rows = rows.filter((s) =>
-        (s.nombre ?? "").toLowerCase().includes(q) ||
-        (s.sku ?? "").toLowerCase().includes(q) ||
-        (s.categoria ?? "").toLowerCase().includes(q)
+    const q = busqueda.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter((r) =>
+        (r.nombre ?? "").toLowerCase().includes(q) ||
+        (r.sku ?? "").toLowerCase().includes(q) ||
+        (r.categoria ?? "").toLowerCase().includes(q)
       );
     }
-    if (filterEstado === "sin_stock") rows = rows.filter((s) => s.existencia === 0);
-    else if (filterEstado === "bajo_minimo") rows = rows.filter((s) => s.existencia > 0 && s.existencia < s.minimo);
-    else if (filterEstado === "ok") rows = rows.filter((s) => s.existencia >= s.minimo);
+    if (filterEstado === "sin_stock") rows = rows.filter((r) => nivelStock(r.existencia, r.minimo) === "agotado");
+    else if (filterEstado === "bajo_minimo") rows = rows.filter((r) => nivelStock(r.existencia, r.minimo) === "bajo");
+    else if (filterEstado === "ok") rows = rows.filter((r) => r.existencia >= r.minimo);
     return rows;
-  }, [items, productFilter, searchQ, filterEstado]);
-
-  const inp: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 10px",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    background: "var(--surface)",
-    color: "var(--foreground)",
-    fontSize: 13,
-    boxSizing: "border-box",
-  };
+  }, [items, productFilter, busqueda, filterEstado]);
 
   const columns: Column<StockRow>[] = [
-    { key: "sku", label: "SKU", render: (s) => <code style={{ fontSize: 11.5 }}>{s.sku}</code>, width: 110 },
+    { key: "sku", label: "SKU", render: (r) => <code style={{ fontSize: 11.5 }}>{r.sku}</code>, width: 110 },
     {
       key: "nombre",
       label: "Producto",
-      render: (s) => (
+      render: (r) => (
         <button
           type="button"
-          onClick={() => s.productId && void openProductTrace(s.productId, s.sku, s.nombre)}
-          style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", color: "inherit" }}
+          className={s.productoBtn}
+          onClick={() => r.productId && void openProductTrace(r.productId, r.sku, r.nombre)}
           title="Ver historial de movimientos"
         >
-          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)" }}>{s.nombre}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            {s.categoria} · {s.ubicacion}
+          <div className={s.productoNombre}>{r.nombre}</div>
+          <div className={s.productoMeta}>
+            {r.categoria} · {r.ubicacion}
           </div>
         </button>
       ),
     },
     {
       key: "existencia",
-      label: "Stock",
-      render: (s) => {
-        const pct = s.minimo > 0 ? Math.min(100, (s.existencia / (s.minimo * 2)) * 100) : (s.existencia > 0 ? 50 : 0);
-        const color = s.existencia === 0 ? "var(--danger)" : s.existencia < s.minimo ? "var(--warning)" : "var(--success)";
+      label: "Existencia",
+      render: (r) => {
+        const nivel = NIVEL_STOCK[nivelStock(r.existencia, r.minimo)];
+        const pct = r.minimo > 0 ? Math.min(100, (r.existencia / (r.minimo * 2)) * 100) : (r.existencia > 0 ? 50 : 0);
         return (
-          <div style={{ minWidth: 130 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{s.existencia}</span>
-              <Tag variant={stockEstado(s)}>{s.existencia === 0 ? "Sin stock" : s.existencia < s.minimo ? "Bajo mín." : "OK"}</Tag>
+          <div className={s.stock}>
+            <div className={s.stockFila}>
+              <span className={s.stockNum}>{cantidad(r.existencia)}</span>
+              <Tag variant={nivel.variante} size="sm">{nivel.texto}</Tag>
             </div>
-            <div style={{ height: 4, borderRadius: 2, background: "var(--surface-2)", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width .3s" }} />
+            <div className={s.stockBarra} aria-hidden="true">
+              <div className={s.stockRelleno} style={{ width: `${pct}%`, background: nivel.color }} />
             </div>
           </div>
         );
       },
-      width: 160,
+      width: 170,
     },
-    { key: "minimo", label: "Mínimo", accessor: (s) => s.minimo, width: 80 },
-    { key: "costo", label: "Precio ref.", render: (s) => <Money value={s.costo} />, width: 110 },
+    { key: "minimo", label: "Mínimo", accessor: (r) => cantidad(r.minimo), width: 80, numeric: true },
+    { key: "costo", label: "Costo unit.", render: (r) => <Money value={r.costo} />, width: 110, numeric: true },
     {
       key: "id",
-      label: "",
-      render: (s) => (
-        <div style={{ display: "flex", gap: 2 }}>
-          {s.productId ? (
-            <button onClick={() => void openProductTrace(s.productId!, s.sku, s.nombre)} title="Historial" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "4px 6px" }}>
+      label: <span className={s.srOnly}>Acciones</span>,
+      render: (r) => (
+        <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+          {r.productId ? (
+            <button
+              type="button"
+              className={s.iconBtn}
+              onClick={() => void openProductTrace(r.productId!, r.sku, r.nombre)}
+              title="Historial"
+              aria-label={`Ver historial de ${r.nombre}`}
+            >
               ⏱
             </button>
           ) : null}
           {cfg.canEdit ? (
-            <button onClick={() => openEdit(s)} title="Editar mínimos" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
+            <button
+              type="button"
+              className={s.iconBtn}
+              onClick={() => openEdit(r)}
+              title="Editar mínimo"
+              aria-label={`Editar mínimo de ${r.nombre}`}
+            >
               ✎
             </button>
           ) : null}
         </div>
       ),
-      width: 72,
+      width: 84,
     },
   ];
 
   const movementColumns: Column<StockMovementRow>[] = [
     { key: "movementNumber", label: "Folio", render: (m) => <code style={{ fontSize: 11.5 }}>{m.movementNumber}</code>, width: 100 },
-    { key: "type", label: "Tipo", render: (m) => (
-      <Tag variant={m.type === "RECEIPT" || m.type === "PRODUCTION_IN" || m.type === "RETURN" || m.type === "ADJUSTMENT" ? "positive" : m.type === "SCRAP" ? "danger" : "default"}>
-        {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
-      </Tag>
-    ), width: 100 },
+    { key: "type", label: "Tipo", render: (m) => <Tag variant={varianteMovimiento(m.type)}>{etiquetaMovimiento(m.type)}</Tag>, width: 110 },
     { key: "sku", label: "SKU", render: (m) => <code style={{ fontSize: 11 }}>{m.product?.sku ?? "—"}</code>, width: 88 },
     { key: "product", label: "Producto", render: (m) => (
       <button
         type="button"
+        className={s.productoBtn}
+        disabled={!m.product?.id}
         onClick={() => m.product?.id && void openProductTrace(m.product.id, m.product.sku, m.product.name)}
-        style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: m.product?.id ? "pointer" : "default" }}
       >
         <div style={{ fontSize: 13, color: m.product?.id ? "var(--primary)" : undefined }}>{m.product?.name ?? "—"}</div>
-        {m.lot ? <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Lote {m.lot.lotNumber}</div> : null}
+        {m.lot ? <div className={s.productoMeta}>Lote {m.lot.lotNumber}</div> : null}
       </button>
     ) },
     { key: "route", label: "Almacén", render: (m) => (
       <span style={{ fontSize: 12 }}>{m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}</span>
     ), width: 160 },
     // «2 cajas · 24 pz»: lo que se tecleó y lo que de verdad se movió.
-    { key: "quantity", label: "Cant.", render: (m) => (
-      <strong style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-        {etiquetaCantidad(m)}
-      </strong>
+    { key: "quantity", label: "Cantidad", render: (m) => (
+      <strong style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>{etiquetaCantidad(m)}</strong>
     ), width: 118, numeric: true },
     { key: "balance", label: "Saldo", render: (m) => (
-      <span style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: "var(--text-secondary)" }} title="Existencia antes → después">
+      <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }} title="Existencia antes → después">
         {stockMovementBalanceLabel(m)}
       </span>
     ), width: 90, numeric: true },
     { key: "document", label: "Referencia", render: (m) => (
       <span style={{ fontSize: 11.5 }} title={m.notes ?? undefined}>{stockMovementDocumentLabel(m)}</span>
     ), width: 130 },
-    { key: "createdAt", label: "Fecha/hora", render: (m) => (
-      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+    { key: "createdAt", label: "Fecha", render: (m) => (
+      <time dateTime={m.createdAt} style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{fechaHoraCorta(m.createdAt)}</time>
     ), width: 120 },
-    { key: "createdBy", label: "Usuario", accessor: (m) => m.createdBy?.nombre ?? "—", width: 100 },
+    { key: "createdBy", label: "Registró", accessor: (m) => m.createdBy?.nombre ?? "—", width: 100 },
     {
       key: "actions",
-      label: "",
-      width: 56,
+      label: <span className={s.srOnly}>Comprobante</span>,
+      width: 64,
       render: (m) => (
-        <button
-          type="button"
-          title="Comprobante PDF"
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={`Descargar comprobante ${m.movementNumber}`}
           onClick={(e) => { e.stopPropagation(); void downloadMovementSlip(m.id); }}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--primary)", padding: "4px 6px", fontWeight: 600 }}
         >
           PDF
-        </button>
+        </Button>
       ),
     },
   ];
 
-  const today = new Date();
+  const ahora = Date.now();
   const lotColumns: Column<LotRow>[] = [
     { key: "lotNumber", label: "Lote", render: (l) => <code style={{ fontSize: 12 }}>{l.lotNumber}</code>, width: 130 },
     { key: "product", label: "Producto", render: (l) => (
       <div>
         <div style={{ fontSize: 13 }}>{l.product?.name ?? "—"}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{l.product?.sku}</div>
+        <div className={s.productoMeta}>{l.product?.sku}</div>
       </div>
     ) },
-    { key: "manufacturingDate", label: "Fabricación", render: (l) => l.manufacturingDate ? <span style={{ fontSize: 12 }}>{new Date(l.manufacturingDate).toLocaleDateString("es-MX")}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 120 },
-    { key: "expirationDate", label: "Caducidad", width: 150, render: (l) => {
-      if (!l.expirationDate) return <span style={{ color: "var(--text-tertiary)" }}>Sin caducidad</span>;
-      const exp = new Date(l.expirationDate);
-      const days = Math.floor((exp.getTime() - today.getTime()) / 86400000);
-      const variant = days < 0 ? "danger" : days <= 30 ? "warning" : "positive";
-      const text = days < 0 ? `Vencido hace ${Math.abs(days)}d` : days <= 30 ? `Vence en ${days}d` : exp.toLocaleDateString("es-MX");
-      return <Tag variant={variant}>{text}</Tag>;
+    { key: "manufacturingDate", label: "Fabricación", render: (l) => l.manufacturingDate ? <span style={{ fontSize: 12 }}>{fechaCorta(l.manufacturingDate)}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 120 },
+    { key: "expirationDate", label: "Caducidad", width: 160, render: (l) => {
+      const dias = diasParaCaducar(l.expirationDate, ahora);
+      if (dias == null) return <span style={{ color: "var(--text-tertiary)" }}>Sin caducidad</span>;
+      if (dias < 0) return <Tag variant="danger">Caducó hace {Math.abs(dias)} días</Tag>;
+      if (dias <= 30) return <Tag variant="warning">{dias === 0 ? "Caduca hoy" : `Caduca en ${dias} días`}</Tag>;
+      return <span style={{ fontSize: 12 }}>{fechaCorta(l.expirationDate)}</span>;
     } },
     { key: "notes", label: "Notas", accessor: (l) => l.notes ?? "—" },
   ];
@@ -864,14 +968,14 @@ export function VistaAlmacen({
     { key: "product", label: "Producto", render: (v) => (
       <div>
         <div style={{ fontSize: 13 }}>{v.product?.name ?? "—"}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{v.product?.sku}</div>
+        <div className={s.productoMeta}>{v.product?.sku}</div>
       </div>
     ) },
     { key: "warehouse", label: "Almacén", accessor: (v) => v.warehouse?.name ?? "—", width: 150 },
-    { key: "quantity", label: "Cantidad", render: (v) => Number(v.quantity), width: 90, numeric: true },
-    { key: "availableQty", label: "Disponible", render: (v) => Number(v.availableQty), width: 100, numeric: true },
-    { key: "unitCost", label: "Costo unit.", render: (v) => <Money value={Number(v.unitCost ?? 0)} compact />, width: 110, numeric: true },
-    { key: "totalValue", label: "Valor total", render: (v) => <Money value={v.totalValue} compact />, width: 130, numeric: true },
+    { key: "quantity", label: "Cantidad", render: (v) => cantidad(v.quantity), width: 90, numeric: true },
+    { key: "availableQty", label: "Disponible", render: (v) => cantidad(v.availableQty), width: 100, numeric: true },
+    { key: "unitCost", label: "Costo unit.", render: (v) => <Money value={Number(v.unitCost ?? 0)} />, width: 110, numeric: true },
+    { key: "totalValue", label: "Valor total", render: (v) => <Money value={v.totalValue} />, width: 130, numeric: true },
   ];
 
   const cycleCountColumns: Column<CycleCountRow>[] = [
@@ -879,29 +983,25 @@ export function VistaAlmacen({
     { key: "warehouse", label: "Almacén", accessor: (c) => c.warehouse?.name ?? "—", width: 150 },
     {
       key: "status", label: "Estado", width: 130,
-      render: (c) => (
-        <Tag variant={c.status === "CLOSED" ? "positive" : c.status === "CANCELLED" ? "default" : c.status === "IN_PROGRESS" ? "warning" : "neutral"}>
-          {CYCLE_COUNT_STATUS_LABEL[c.status] ?? c.status}
-        </Tag>
-      ),
+      render: (c) => <Tag variant={varianteConteo(c.status)}>{CYCLE_COUNT_STATUS_LABEL[c.status] ?? "Sin estado"}</Tag>,
     },
-    { key: "scheduledFor", label: "Programado", render: (c) => <span style={{ fontSize: 12 }}>{new Date(c.scheduledFor).toLocaleDateString("es-MX")}</span>, width: 110 },
+    { key: "scheduledFor", label: "Fecha", render: (c) => <span style={{ fontSize: 12 }}>{fechaCorta(c.scheduledFor)}</span>, width: 110 },
     {
-      key: "progress", label: "Captura", width: 110,
+      key: "progress", label: "Contados", width: 110, numeric: true,
       render: (c) => {
         const total = c._count?.items ?? c.items?.length ?? 0;
         const done = (c.items ?? []).filter((i) => i.countedQty != null).length;
-        return <span style={{ fontSize: 12 }}>{done}/{total}</span>;
+        return <span style={{ fontSize: 12 }}>{done} de {total}</span>;
       },
     },
     {
-      key: "actions", label: "", width: 190,
+      key: "actions", label: <span className={s.srOnly}>Acciones</span>, width: 200,
       render: (c) => (
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
           {(c.status === "SCHEDULED" || c.status === "IN_PROGRESS") && (
             <>
               <Button size="sm" variant="secondary" onClick={() => openCapture(c)}>Capturar</Button>
-              <Button size="sm" variant="ghost" onClick={() => void submitCancelCount(c.id)}>Cancelar</Button>
+              <Button size="sm" variant="ghost" onClick={() => pedirCancelarConteo(c)}>Cancelar</Button>
             </>
           )}
           {c.status === "CLOSED" && (
@@ -916,46 +1016,66 @@ export function VistaAlmacen({
     { key: "product", label: "Producto", render: (r) => (
       <div>
         <div style={{ fontSize: 13 }}>{r.product?.name ?? "—"}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.product?.sku}</div>
+        <div className={s.productoMeta}>{r.product?.sku}</div>
       </div>
     ) },
     { key: "warehouse", label: "Almacén", accessor: (r) => r.warehouse?.name ?? "—", width: 140 },
-    { key: "quantity", label: "Cantidad", render: (r) => <strong style={{ fontSize: 13 }}>{Number(r.quantity)}</strong>, width: 90, numeric: true },
+    { key: "quantity", label: "Cantidad", render: (r) => <strong style={{ fontSize: 13 }}>{cantidad(r.quantity)}</strong>, width: 90, numeric: true },
     { key: "reason", label: "Motivo", accessor: (r) => r.reason },
     {
       key: "status", label: "Estado", width: 110,
-      render: (r) => <Tag variant={r.status === "ACTIVE" ? "warning" : r.status === "CONSUMED" ? "positive" : "default"}>{r.status === "ACTIVE" ? "Activa" : r.status === "CONSUMED" ? "Consumida" : "Liberada"}</Tag>,
+      render: (r) => (
+        <Tag variant={r.status === "ACTIVE" ? "warning" : r.status === "CONSUMED" ? "positive" : "default"}>
+          {RESERVATION_STATUS_LABEL[r.status] ?? "Liberada"}
+        </Tag>
+      ),
     },
-    { key: "expiresAt", label: "Expira", render: (r) => r.expiresAt ? <span style={{ fontSize: 12 }}>{new Date(r.expiresAt).toLocaleDateString("es-MX")}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 110 },
+    { key: "expiresAt", label: "Vence", render: (r) => r.expiresAt ? <span style={{ fontSize: 12 }}>{fechaCorta(r.expiresAt)}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 110 },
     {
-      key: "actions", label: "", width: 90,
-      render: (r) => r.status === "ACTIVE" ? <Button size="sm" variant="ghost" onClick={() => void submitReleaseReservation(r.id)}>Liberar</Button> : null,
+      key: "actions", label: <span className={s.srOnly}>Acciones</span>, width: 90,
+      render: (r) => r.status === "ACTIVE" ? <Button size="sm" variant="ghost" onClick={() => pedirLiberarReserva(r)}>Liberar</Button> : null,
     },
   ];
 
   const activeCountItems = activeCount?.items ?? [];
   const activeCountClosed = activeCount?.status === "CLOSED" || activeCount?.status === "CANCELLED";
 
-  const totalValuation = useMemo(() => valuation.reduce((s, v) => s + v.totalValue, 0), [valuation]);
-  const expiringLotsCount = useMemo(() => lots.filter((l) => {
-    if (!l.expirationDate) return false;
-    const days = Math.floor((new Date(l.expirationDate).getTime() - Date.now()) / 86400000);
-    return days <= 30;
-  }).length, [lots]);
+  const totalValuation = useMemo(() => valuation.reduce((sum, v) => sum + v.totalValue, 0), [valuation]);
+  const expiringLotsCount = useMemo(
+    () => lots.filter((l) => {
+      const dias = diasParaCaducar(l.expirationDate);
+      return dias != null && dias <= 30;
+    }).length,
+    [lots],
+  );
+
+  const recargando = loading && cargadoUnaVez;
+  const abrirEntrada = () => setShowMovementForm(true);
 
   const acciones = (
     <div style={{ display: "flex", gap: embedded ? 6 : 8, flexWrap: "wrap" }}>
-      <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
+      <Button variant="ghost" size="sm" onClick={refrescar} disabled={recargando}>
+        {recargando ? "Actualizando…" : "Actualizar"}
+      </Button>
       {cfg.canCreate && (
         <>
           <Button variant="secondary" size="sm" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
-          <Button variant="primary" size="sm" onClick={() => setShowMovementForm(true)}>
+          <Button variant="primary" size="sm" onClick={abrirEntrada}>
             {embedded ? "Entrada" : "Entrada de stock"}
           </Button>
         </>
       )}
     </div>
   );
+
+  const elegido = empaques.find((e) => String(e.id) === movement.packagingId);
+  const previa = previsualizarConversion(
+    movement.quantity,
+    elegido ? { ...elegido, piezasPorUnidad: Number(elegido.piezasPorUnidad) } : null,
+  );
+  const esEntrada = movement.type === "RECEIPT" || movement.type === "ADJUSTMENT" || movement.type === "RETURN";
+  const movimientoIncompleto =
+    !movement.productId || !movement.warehouseId || movement.quantity <= 0 || (movement.type === "TRANSFER" && !movement.toWarehouseId);
 
   return (
     <>
@@ -987,18 +1107,9 @@ export function VistaAlmacen({
       />}
 
       {/* Embedded: acciones van en la misma fila que las sub-pestañas (sin barra extra bajo PageHeader). */}
-      {vistasVisibles.length > 1 && (
+      {vistasVisibles.length > 1 ? (
         embedded ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-              marginBottom: 8,
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 220px", minWidth: 0 }}>
               <PanelTabs
                 ariaLabel="Vistas de almacén"
@@ -1017,584 +1128,394 @@ export function VistaAlmacen({
             tabs={vistasVisibles.map((t) => ({ key: t.key, label: t.label }))}
           />
         )
-      )}
+      ) : null}
 
       {/* ── Nuevo almacén (disponible desde cualquier pestaña) ── */}
-      {showWarehouseForm && (
-        <div style={{ background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", padding: 18, marginBottom: 18, boxShadow: "var(--nx-panel-elev-1)" }}>
-          <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 13 }}>Nuevo almacén</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre *</span>
-              <input value={warehouseForm.name} onChange={e => setWarehouseForm(f => ({ ...f, name: e.target.value }))} placeholder="Almacén Central, Bodega Norte…" style={inp} />
-            </label>
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Código (opcional)</span>
-              <input value={warehouseForm.code} onChange={e => setWarehouseForm(f => ({ ...f, code: e.target.value }))} placeholder="ALM-01, BODEGA-N…" style={inp} />
-            </label>
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Ciudad</span>
-              <input value={warehouseForm.city} onChange={e => setWarehouseForm(f => ({ ...f, city: e.target.value }))} placeholder="CDMX, Monterrey…" style={inp} />
-            </label>
-            <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Dirección</span>
-              <input value={warehouseForm.address} onChange={e => setWarehouseForm(f => ({ ...f, address: e.target.value }))} placeholder="Av. Insurgentes 123…" style={inp} />
-            </label>
-          </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
-            <Button variant="ghost" onClick={() => setShowWarehouseForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void createWarehouse()} disabled={savingWarehouse || !warehouseForm.name.trim()}>
-              {savingWarehouse ? "Creando…" : "Crear almacén"}
+      <Modal
+        open={showWarehouseForm}
+        onClose={() => setShowWarehouseForm(false)}
+        title="Nuevo almacén"
+        maxWidth={560}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowWarehouseForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void createWarehouse()} disabled={!warehouseForm.name.trim()} loading={savingWarehouse}>
+              Crear almacén
             </Button>
-          </div>
-        </div>
-      )}
+          </>
+        }
+      >
+        <form className={s.rejilla} onSubmit={(e) => { e.preventDefault(); void createWarehouse(); }}>
+          <Campo label="Nombre" ancho>
+            <input className={s.input} value={warehouseForm.name} onChange={(e) => setWarehouseForm((f) => ({ ...f, name: e.target.value }))} placeholder="Almacén Central, Bodega Norte…" required />
+          </Campo>
+          <Campo label="Código (opcional)">
+            <input className={s.input} value={warehouseForm.code} onChange={(e) => setWarehouseForm((f) => ({ ...f, code: e.target.value }))} placeholder="ALM-01" autoCapitalize="characters" />
+          </Campo>
+          <Campo label="Ciudad (opcional)">
+            <input className={s.input} value={warehouseForm.city} onChange={(e) => setWarehouseForm((f) => ({ ...f, city: e.target.value }))} placeholder="CDMX, Monterrey…" />
+          </Campo>
+          <Campo label="Dirección (opcional)" ancho>
+            <input className={s.input} value={warehouseForm.address} onChange={(e) => setWarehouseForm((f) => ({ ...f, address: e.target.value }))} placeholder="Av. Insurgentes 123…" />
+          </Campo>
+        </form>
+      </Modal>
 
       {/* ── Entrada/salida/traspaso de stock (disponible desde cualquier pestaña) ── */}
-      {showMovementForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>
-            {movement.type === "RECEIPT" ? "Entrada de inventario"
-              : movement.type === "DISPATCH" ? "Salida de inventario"
-              : movement.type === "TRANSFER" ? "Traspaso entre almacenes"
-              : movement.type === "RETURN" ? "Devolución a almacén"
-              : movement.type === "ADJUSTMENT_OUT" ? "Ajuste de inventario (baja)"
-              : "Ajuste de inventario (alta)"}
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo de movimiento *</span>
-              <select
-                value={movement.type}
-                onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as typeof m.type, toWarehouseId: "" }))}
-                style={inp}
-              >
-                <option value="RECEIPT">Entrada (recepción)</option>
-                <option value="DISPATCH">Salida (despacho)</option>
-                <option value="TRANSFER">Traspaso</option>
-                <option value="RETURN">Devolución</option>
-                <option value="ADJUSTMENT">Ajuste (alta)</option>
-                <option value="ADJUSTMENT_OUT">Ajuste (baja)</option>
-              </select>
-            </label>
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Producto *</span>
-              <select value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value }))} style={inp}>
-                <option value="">Seleccionar…</option>
-                {products.length === 0 && <option disabled>Sin productos — agrégalos en CRM → Productos</option>}
-                {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-              </select>
-            </label>
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
-                {movement.type === "RECEIPT" || movement.type === "ADJUSTMENT" || movement.type === "RETURN"
-                  ? "Almacén destino *"
-                  : movement.type === "TRANSFER"
-                    ? "Almacén origen *"
-                    : "Almacén origen *"}
-              </span>
-              <select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))} style={inp}>
-                <option value="">Seleccionar…</option>
-                {warehouses.length === 0 && <option disabled>Sin almacenes — usa &quot;Nuevo almacén&quot; arriba</option>}
-                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </label>
-            {movement.type === "TRANSFER" && (
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén destino *</span>
-                <select value={movement.toWarehouseId} onChange={(e) => setMovement((m) => ({ ...m, toWarehouseId: e.target.value }))} style={inp}>
-                  <option value="">Seleccionar…</option>
-                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-              </label>
-            )}
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad *</span>
-              <input type="number" min={0} step="any" value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} style={inp} />
-            </label>
-            {movement.productId && (
-              <div style={{ display: "grid", gap: 4 }}>
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Presentación</span>
-                  <select
-                    value={movement.packagingId}
-                    onChange={(e) => setMovement((m) => ({ ...m, packagingId: e.target.value }))}
-                    style={inp}
-                    disabled={empaques.length === 0}
-                  >
-                    <option value="">Piezas</option>
-                    {empaques.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.nombre} ({Number(e.piezasPorUnidad)} pz)
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {(() => {
-                  const elegido = empaques.find((e) => String(e.id) === movement.packagingId);
-                  const previa = previsualizarConversion(
-                    movement.quantity,
-                    elegido ? { ...elegido, piezasPorUnidad: Number(elegido.piezasPorUnidad) } : null,
-                  );
-                  return previa ? (
-                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
-                      {previa.texto}
-                    </span>
-                  ) : null;
-                })()}
-                {nuevoEmpaque ? (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    <input
-                      value={nuevoEmpaque.nombre}
-                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, nombre: e.target.value } : n))}
-                      placeholder="Caja"
-                      aria-label="Nombre de la presentación"
-                      style={{ ...inp, flex: "1 1 96px", minWidth: 0 }}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={nuevoEmpaque.piezas}
-                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, piezas: e.target.value } : n))}
-                      placeholder="100"
-                      aria-label="Piezas que trae"
-                      style={{ ...inp, flex: "0 1 88px", minWidth: 0 }}
-                    />
-                    <Button size="sm" variant="secondary" onClick={() => void guardarEmpaque()} loading={guardandoEmpaque}>
-                      Guardar
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setNuevoEmpaque(null)}>
-                      Cancelar
-                    </Button>
-                  </div>
-                ) : (
-                  cfg.canCreate && (
-                    <button
-                      type="button"
-                      onClick={() => setNuevoEmpaque({ nombre: "", piezas: "" })}
-                      style={{
-                        justifySelf: "start",
-                        appearance: "none",
-                        border: "none",
-                        background: "transparent",
-                        padding: 0,
-                        fontSize: 11.5,
-                        fontWeight: 650,
-                        color: "var(--primary)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {empaques.length === 0 ? "Registrar una presentación" : "Nueva presentación"}
-                    </button>
-                  )
-                )}
-              </div>
-            )}
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Costo unitario</span>
-              <input type="number" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} style={inp} />
-            </label>
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia / documento</span>
-              <input value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, venta, ajuste inicial…" style={inp} />
-            </label>
-            <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo / notas</span>
-              <input value={movement.notes} onChange={(e) => setMovement((m) => ({ ...m, notes: e.target.value }))} placeholder="Por qué se mueve el stock…" style={inp} />
-            </label>
-          </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-            <Button variant="ghost" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
-            <Button
-              variant="primary"
-              onClick={() => void saveMovement()}
-              disabled={
-                savingMovement
-                || !movement.productId
-                || !movement.warehouseId
-                || (movement.type === "TRANSFER" && !movement.toWarehouseId)
-              }
-            >
-              {savingMovement ? "Registrando…" : "Registrar movimiento"}
+      <Modal
+        open={showMovementForm}
+        onClose={() => setShowMovementForm(false)}
+        title={TITULO_MOVIMIENTO[movement.type]}
+        maxWidth={640}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveMovement()} disabled={movimientoIncompleto} loading={savingMovement}>
+              Registrar movimiento
             </Button>
-          </div>
-        </div>
-      )}
+          </>
+        }
+      >
+        <form className={s.rejilla} onSubmit={(e) => { e.preventDefault(); void saveMovement(); }}>
+          <Campo label="Tipo de movimiento">
+            <select
+              className={s.input}
+              value={movement.type}
+              onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as TipoMovimiento, toWarehouseId: "" }))}
+            >
+              <option value="RECEIPT">Entrada (recepción)</option>
+              <option value="DISPATCH">Salida (despacho)</option>
+              <option value="TRANSFER">Traspaso</option>
+              <option value="RETURN">Devolución</option>
+              <option value="ADJUSTMENT">Ajuste (alta)</option>
+              <option value="ADJUSTMENT_OUT">Ajuste (baja)</option>
+            </select>
+          </Campo>
+          <Campo label="Producto">
+            <select className={s.input} value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value, packagingId: "" }))}>
+              <option value="">{products.length ? "Elige el producto" : "No hay productos en el catálogo"}</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+            </select>
+          </Campo>
+          <Campo label={esEntrada ? "Almacén destino" : "Almacén origen"}>
+            <select className={s.input} value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))}>
+              <option value="">{warehouses.length ? "Elige el almacén" : "Primero crea un almacén"}</option>
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          </Campo>
+          {movement.type === "TRANSFER" && (
+            <Campo label="Almacén destino">
+              <select className={s.input} value={movement.toWarehouseId} onChange={(e) => setMovement((m) => ({ ...m, toWarehouseId: e.target.value }))}>
+                <option value="">Elige el almacén</option>
+                {warehouses.filter((w) => String(w.id) !== movement.warehouseId).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </Campo>
+          )}
+          <Campo label="Cantidad">
+            <input className={`${s.input} ${s.num}`} type="number" inputMode="decimal" min={0} step="any" value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} />
+          </Campo>
+          {movement.productId && (
+            <div className={s.campo}>
+              <Campo label="Presentación">
+                <select
+                  className={s.input}
+                  value={movement.packagingId}
+                  onChange={(e) => setMovement((m) => ({ ...m, packagingId: e.target.value }))}
+                  disabled={empaques.length === 0}
+                >
+                  <option value="">Piezas</option>
+                  {empaques.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nombre} ({Number(e.piezasPorUnidad)} pz)
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+              {previa ? <span className={s.ayuda}>{previa.texto}</span> : null}
+              {nuevoEmpaque ? (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    className={s.input}
+                    value={nuevoEmpaque.nombre}
+                    onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, nombre: e.target.value } : n))}
+                    placeholder="Caja"
+                    aria-label="Nombre de la presentación"
+                    style={{ flex: "1 1 96px", minWidth: 0, width: "auto" }}
+                  />
+                  <input
+                    className={s.input}
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="any"
+                    value={nuevoEmpaque.piezas}
+                    onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, piezas: e.target.value } : n))}
+                    placeholder="Piezas"
+                    aria-label="Piezas que trae"
+                    style={{ flex: "0 1 96px", minWidth: 0, width: "auto" }}
+                  />
+                  <Button size="sm" variant="secondary" onClick={() => void guardarEmpaque()} loading={guardandoEmpaque}>
+                    Guardar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setNuevoEmpaque(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                cfg.canCreate && (
+                  <button type="button" className={s.enlace} onClick={() => setNuevoEmpaque({ nombre: "", piezas: "" })}>
+                    {empaques.length === 0 ? "+ Registrar una presentación (caja, paquete…)" : "+ Nueva presentación"}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+          <Campo label="Costo unitario (opcional)">
+            <input className={`${s.input} ${s.num}`} type="number" inputMode="decimal" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} placeholder="$0.00" />
+          </Campo>
+          <Campo label="Referencia o documento (opcional)">
+            <input className={s.input} value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, venta, ajuste inicial…" />
+          </Campo>
+          <Campo label="Motivo o notas (opcional)" ancho>
+            <input className={s.input} value={movement.notes} onChange={(e) => setMovement((m) => ({ ...m, notes: e.target.value }))} placeholder="Por qué se mueve el stock…" />
+          </Campo>
+        </form>
+      </Modal>
+
+      {/* ── Mínimo de stock ── */}
+      <Modal
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        title="Mínimo de stock"
+        maxWidth={420}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveMinimo()} loading={savingMinimo}>Guardar</Button>
+          </>
+        }
+      >
+        {editing && (
+          <form className={s.rejilla} style={{ gridTemplateColumns: "minmax(0, 1fr)" }} onSubmit={(e) => { e.preventDefault(); void saveMinimo(); }}>
+            <p className={s.nota} style={{ margin: 0 }}>
+              <strong>{editing.nombre}</strong> · {editing.ubicacion} · hoy hay {cantidad(editing.existencia)}
+            </p>
+            <Campo label="Avisar cuando queden menos de">
+              <input className={`${s.input} ${s.num}`} type="number" inputMode="numeric" min={0} value={minimo} onChange={(e) => setMinimo(+e.target.value)} autoFocus />
+            </Campo>
+          </form>
+        )}
+      </Modal>
 
       {tab === "dashboard" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {insightsLoading && <div style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Calculando inteligencia de inventario…</div>}
-          {insights && (
-            <>
-              <StatStrip
-                stats={[
-                  { label: "Valor inventario", value: `$${insights.kpis.totalValue.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`, big: true },
-                  { label: "SKU×ubicación", value: insights.kpis.skuLocations, sub: `${insights.kpis.fillHealthyPct}% healthy` },
-                  { label: "Rotación proxy", value: `${insights.kpis.turnoverAnnualProxy}x`, sub: "COGS 30d ×12 / valor", tone: "accent" },
-                  { label: "Bajo mínimo", value: insights.kpis.lowStock, tone: insights.kpis.lowStock ? "warning" : "positive" },
-                  { label: "Sin stock", value: insights.kpis.zeroStock, tone: insights.kpis.zeroStock ? "danger" : "default" },
-                  { label: "Dead stock", value: insights.kpis.deadStock, sub: `$${insights.kpis.deadStockValue.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`, tone: insights.kpis.deadStock ? "warning" : "default" },
-                ]}
-              />
-              {insights.alerts.map((a) => (
-                <div
-                  key={a.message}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    fontSize: 13,
-                    background: a.severity === "danger" ? "var(--state-danger-bg)" : "var(--state-warning-bg)",
-                    border: `1px solid ${a.severity === "danger" ? "var(--state-danger-border)" : "var(--state-warning-border)"}`,
-                    color: a.severity === "danger" ? "var(--state-danger-text)" : "var(--state-warning-text)",
-                  }}
-                >
-                  {a.message}
-                </div>
-              ))}
-              <DashGrid>
-                <DashCol span={6}>
-                  <DashPanel title="Entradas vs salidas · 14d" subtitle="Unidades movidas">
-                    <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80 }}>
-                      {insights.trends.outflow14d.map((p, i) => {
-                        const inflow = insights.trends.inflow14d[i]?.qty ?? 0;
-                        const max = Math.max(1, ...insights.trends.outflow14d.map((x) => x.qty), ...insights.trends.inflow14d.map((x) => x.qty));
-                        return (
-                          <div key={p.date} style={{ flex: 1, display: "flex", gap: 1, alignItems: "flex-end" }} title={`${p.date}: in ${inflow} / out ${p.qty}`}>
-                            <div style={{ flex: 1, height: `${Math.max(2, (inflow / max) * 70)}px`, background: "var(--success)", borderRadius: 2, opacity: 0.85 }} />
-                            <div style={{ flex: 1, height: `${Math.max(2, (p.qty / max) * 70)}px`, background: "var(--primary)", borderRadius: 2 }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ marginTop: 10, display: "flex", gap: 12, fontSize: 11, color: "var(--text-tertiary)" }}>
-                      <span><span style={{ color: "var(--success)" }}>■</span> Entradas</span>
-                      <span><span style={{ color: "var(--primary)" }}>■</span> Salidas</span>
-                    </div>
-                  </DashPanel>
-                </DashCol>
-                <DashCol span={6}>
-                  <DashPanel title="Aging de movimiento" subtitle="Días desde último movimiento">
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                      {[
-                        { label: "0–30d", value: insights.aging.d0_30 },
-                        { label: "30–60d", value: insights.aging.d30_60 },
-                        { label: "60–90d", value: insights.aging.d60_90 },
-                        { label: "90d+", value: insights.aging.d90_plus },
-                      ].map((b) => (
-                        <div key={b.label} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{b.label}</div>
-                          <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{b.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <DashPill tone="accent">ABC A: {insights.kpis.abcA}</DashPill>
-                      <DashPill tone="neutral">B: {insights.kpis.abcB}</DashPill>
-                      <DashPill tone="warning">C: {insights.kpis.abcC}</DashPill>
-                    </div>
-                  </DashPanel>
-                </DashCol>
-                <DashCol span={6}>
-                  <DashPanel title="Top movers 30d" subtitle="Mayor despacho">
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
-                      {insights.topMovers.map((m) => (
-                        <div key={m.productId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5 }}>
-                          <div>
-                            <strong>{m.name}</strong>
-                            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.sku}</div>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontWeight: 700 }}>{m.dispatched30d}</div>
-                            <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
-                              {m.daysOfCover != null ? `${m.daysOfCover}d cover` : "sin consumo"}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {!insights.topMovers.length && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin despachos en 30d</span>}
-                    </div>
-                  </DashPanel>
-                </DashCol>
-                <DashCol span={6}>
-                  <DashPanel title="Sugerencias de reorden" subtitle="Basado en mínimo / máximo">
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
-                      {insights.reorderSuggestions.map((r) => (
-                        <div key={`${r.productId}-${r.warehouse}`} style={{ fontSize: 12.5, borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <strong>{r.name}</strong>
-                            <span>+{r.suggestedQty}</span>
-                          </div>
-                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                            {r.warehouse} · on hand {r.onHand} · est. ${r.estimatedCost.toLocaleString("es-MX")}
-                          </div>
-                        </div>
-                      ))}
-                      {!insights.reorderSuggestions.length && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin sugerencias — stock saludable</span>}
-                    </div>
-                  </DashPanel>
-                </DashCol>
-                <DashCol span={6}>
-                  <DashPanel title="Slow / dead movers" subtitle="Mayor idle time">
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto" }}>
-                      {insights.slowMovers.map((m) => (
-                        <div key={m.productId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
-                          <span>{m.name}</span>
-                          <span style={{ color: "var(--text-tertiary)" }}>{m.idleDays ?? "∞"}d · ${m.value.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </DashPanel>
-                </DashCol>
-                <DashCol span={6}>
-                  <DashPanel title="Por almacén" subtitle="Valor y alertas">
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {insights.byWarehouse.map((w) => (
-                        <div key={w.name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, fontSize: 12.5, alignItems: "center" }}>
-                          <span>{w.name}</span>
-                          <span style={{ fontVariantNumeric: "tabular-nums" }}>${w.value.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</span>
-                          <Tag variant={w.low ? "warning" : "positive"}>{w.low} alertas</Tag>
-                        </div>
-                      ))}
-                    </div>
-                  </DashPanel>
-                </DashCol>
-              </DashGrid>
-            </>
-          )}
-          {!insightsLoading && !insights && (
-            <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13 }}>No hay datos de inteligencia disponibles.</div>
-          )}
-        </div>
+        <InteligenciaInventario insights={insights} loading={insightsLoading} onRetry={() => void loadInsights()} />
       )}
 
       {tab === "inventario" && (
-      <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 16 }}>
-        <KpiCard label="Sin stock" value={sinStock} variant={sinStock > 0 ? "danger" : "positive"} hint={sinStock > 0 ? "Requieren reposición urgente" : "Todo disponible"} />
-        <KpiCard label="Bajo mínimo" value={bajoMinimo} variant={bajoMinimo > 0 ? "warning" : "positive"} hint={bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles OK"} />
-        <KpiCard label="Valor inventario" value={<Money value={valorTotal} compact />} hint={`${items.length} SKUs en catálogo`} variant="accent" />
-        <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" />
-      </div>
+        <>
+          <div className={s.kpis}>
+            <KpiCard label="Agotados" value={resumen.sinStock} variant={resumen.sinStock > 0 ? "danger" : "positive"} hint={resumen.sinStock > 0 ? "Hay que reponerlos ya" : "Todo tiene existencia"} />
+            <KpiCard label="Bajo mínimo" value={resumen.bajoMinimo} variant={resumen.bajoMinimo > 0 ? "warning" : "positive"} hint={resumen.bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles sanos"} />
+            <KpiCard label="Valor del inventario" value={<Money value={resumen.valorTotal} compact />} hint={`${cantidad(items.length)} registros de stock`} variant="accent" />
+            <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" />
+          </div>
 
-      {items.length > 0 && (() => {
-        const byCategory = Object.entries(
-          items.reduce<Record<string, number>>((acc, s) => { const k = s.categoria || "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
-        ).sort((a, b) => b[1] - a[1]).slice(0, 6);
-        return (
-          <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", boxShadow: "var(--nx-panel-elev-1)" }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>SKUs por categoría</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {byCategory.map(([cat, count]) => (
-                <div key={cat} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--panel-accent, var(--primary))", borderRadius: 3, transition: "width .35s ease" }} />
+          {resumen.categorias.length > 0 && (
+            <div className={s.panel} style={{ padding: "10px 14px", marginBottom: 16 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Productos por categoría</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {resumen.categorias.map(([cat, count]) => (
+                  <div key={cat} style={{ display: "grid", gridTemplateColumns: "minmax(0, 130px) 1fr 36px", gap: 10, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cat}>{cat}</span>
+                    <div className={s.stockBarra} style={{ height: 6 }} aria-hidden="true">
+                      <div className={s.stockRelleno} style={{ width: `${(count / items.length) * 100}%`, background: "var(--panel-accent, var(--primary))" }} />
+                    </div>
+                    <span className={s.num} style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
                   </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {showForm && editing && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ fontSize: 13, margin: "0 0 12px", fontWeight: 600 }}>{editing.nombre}</p>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Stock mínimo / reorden</label>
-          <input type="number" min={0} value={minimo} onChange={(e) => setMinimo(+e.target.value)} style={{ ...inp, maxWidth: 200 }} />
-          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={save}>Guardar</Button>
-          </div>
-        </div>
-      )}
-
-      <FilterToolbar
-        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por SKU, nombre o categoría…" }}
-        selects={[{
-          label: "Estado",
-          value: filterEstado,
-          onChange: setFilterEstado,
-          options: [
-            { value: "sin_stock", label: "Sin stock" },
-            { value: "bajo_minimo", label: "Bajo mínimo" },
-            { value: "ok", label: "Stock OK" },
-          ],
-          allowAll: true,
-        }]}
-        onClear={() => { setSearchQ(""); setFilterEstado(""); }}
-        resultCount={loading ? null : visibleItems.length}
-        rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
-            { key: "sku", label: "SKU" },
-            { key: "nombre", label: "Producto" },
-            { key: "categoria", label: "Categoría" },
-            { key: "existencia", label: "Stock" },
-            { key: "minimo", label: "Mínimo" },
-            { key: "costo", label: "Precio ref." },
-            { key: "ubicacion", label: "Ubicación" },
-          ], "inventario")}>Excel</Button>
-        ) : undefined}
-      />
-
-      <Section title={loading ? "Cargando…" : `${visibleItems.length} registros de stock`}>
-        {productFilter && (
-          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-            Filtrando producto <strong>#{productFilter}</strong>.{" "}
-            <Link href={almacenBase} style={{ color: "var(--primary)" }}>Ver todo el inventario</Link>
-          </p>
-        )}
-        {movementId && (
-          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-            Enlace desde movimiento de stock <strong>#{movementId}</strong>.
-          </p>
-        )}
-        {loadError && (
-          <div role="alert" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 8, fontSize: 12 }}>
-            {loadError} <Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>
-          </div>
-        )}
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : !loadError ? (
-          <DataTable
-            columns={columns}
-            rows={visibleItems}
-            rowKey={(s) => s.id}
-            emptyTitle="Sin stock registrado"
-            emptyDescription="Crea un almacén y registra la primera entrada para empezar el inventario."
-            emptyAction={
-              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                <Button size="sm" variant="secondary" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
-                <Button size="sm" variant="primary" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+                ))}
               </div>
-            }
+            </div>
+          )}
+
+          <FilterToolbar
+            search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por SKU, nombre o categoría…" }}
+            selects={[{
+              label: "Estado",
+              value: filterEstado,
+              onChange: setFilterEstado,
+              options: [
+                { value: "sin_stock", label: "Agotado" },
+                { value: "bajo_minimo", label: "Bajo mínimo" },
+                { value: "ok", label: "Suficiente" },
+              ],
+              allowAll: true,
+            }]}
+            onClear={() => { setSearchQ(""); setFilterEstado(""); }}
+            resultCount={cargadoUnaVez ? visibleItems.length : null}
+            rightActions={items.length > 0 ? (
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
+                { key: "sku", label: "SKU" },
+                { key: "nombre", label: "Producto" },
+                { key: "categoria", label: "Categoría" },
+                { key: "existencia", label: "Existencia" },
+                { key: "minimo", label: "Mínimo" },
+                { key: "costo", label: "Costo unit." },
+                { key: "ubicacion", label: "Ubicación" },
+              ], "inventario")}>Excel</Button>
+            ) : undefined}
           />
-        ) : null}
-      </Section>
-      </>
+
+          <Section title={cargadoUnaVez ? `Existencias · ${cantidad(visibleItems.length)}` : "Cargando existencias…"}>
+            {productFilter && (
+              <p className={s.nota}>
+                Mostrando un solo producto.{" "}
+                <button type="button" className={s.enlace} onClick={() => limpiarFiltroUrl()}>Ver todo el inventario</button>
+              </p>
+            )}
+            {loadError && (
+              <InlineAlert
+                variant={cargadoUnaVez ? "warning" : "danger"}
+                message={cargadoUnaVez ? `${loadError}. Se muestra lo último que cargó.` : loadError}
+                action={<Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>}
+              />
+            )}
+            {!cargadoUnaVez ? (
+              loadError ? null : <SkeletonRows rows={6} label="Cargando existencias" />
+            ) : (
+              <DataTable
+                columns={columns}
+                rows={visibleItems}
+                rowKey={(r) => r.id}
+                ariaLabel="Existencias"
+                emptyTitle={items.length ? "Ningún producto coincide" : "Aún no hay stock registrado"}
+                emptyDescription={
+                  items.length
+                    ? "Prueba con otra búsqueda o quita el filtro de estado."
+                    : "Crea un almacén y registra la primera entrada para empezar el inventario."
+                }
+                emptyAction={
+                  items.length ? (
+                    <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterEstado(""); }}>Quitar filtros</Button>
+                  ) : cfg.canCreate ? (
+                    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                      <Button size="sm" variant="secondary" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
+                      <Button size="sm" variant="primary" onClick={abrirEntrada}>Entrada de stock</Button>
+                    </div>
+                  ) : undefined
+                }
+              />
+            )}
+          </Section>
+        </>
       )}
 
       {tab === "movimientos" && (
         <Section
           title="Movimientos de inventario"
-          subtitle="Quién, cuándo, de/hacia qué almacén y saldo."
+          subtitle="Quién, cuándo, de qué almacén a cuál y cómo quedó el saldo."
           actions={
-            embedded || cfg.canCreate ? (
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                {embedded && (
-                  <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
-                )}
-                {cfg.canCreate ? (
-                  <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>
-                    Registrar
-                  </Button>
-                ) : null}
-              </div>
+            cfg.canCreate ? (
+              <Button variant="primary" size="sm" iconLeft="+" onClick={abrirEntrada}>
+                Registrar
+              </Button>
             ) : undefined
           }
         >
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-              alignItems: "center",
-              marginBottom: 8,
-              padding: "6px 10px",
-              borderRadius: 10,
-              border: "1px solid var(--border)",
-              background: "color-mix(in srgb, var(--surface-2) 55%, var(--surface))",
-            }}
-          >
-              <select value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)} style={{ ...inp, width: 200, maxWidth: "100%" }}>
-                <option value="">Todos los productos</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-              </select>
-              <select value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)} style={{ ...inp, width: 160, maxWidth: "100%" }}>
-                <option value="">Todos los almacenes</option>
-                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-              <select value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)} style={{ ...inp, width: 140, maxWidth: "100%" }}>
-                <option value="">Todos los tipos</option>
-                {Object.entries(MOVEMENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-              <input type="date" value={movementFromDate} onChange={(e) => setMovementFromDate(e.target.value)} style={{ ...inp, width: 140 }} title="Desde" />
-              <input type="date" value={movementToDate} onChange={(e) => setMovementToDate(e.target.value)} style={{ ...inp, width: 140 }} title="Hasta" />
-              {hasMovementFilters && (
-                <Button variant="ghost" size="sm" onClick={clearMovementFilters}>Limpiar filtros</Button>
-              )}
-              {visibleMovements.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconLeft="⬇"
-                  onClick={() => exportToExcel(
-                    visibleMovements.map((m) => ({
-                      folio: m.movementNumber,
-                      tipo: MOVEMENT_TYPE_LABEL[m.type] ?? m.type,
-                      sku: m.product?.sku ?? "",
-                      producto: m.product?.name ?? "",
-                      origen: m.fromWarehouse?.name ?? "",
-                      destino: m.toWarehouse?.name ?? "",
-                      cantidad: Number(m.quantity),
-                      saldo: stockMovementBalanceLabel(m),
-                      documento: stockMovementDocumentLabel(m),
-                      notas: m.notes ?? "",
-                      costo: Number(m.totalCost ?? 0),
-                      fecha: new Date(m.createdAt).toLocaleString("es-MX"),
-                      quien: m.createdBy?.nombre ?? "",
-                    })),
-                    [
-                      { key: "folio", label: "Folio" },
-                      { key: "tipo", label: "Tipo" },
-                      { key: "sku", label: "SKU" },
-                      { key: "producto", label: "Producto" },
-                      { key: "origen", label: "Origen" },
-                      { key: "destino", label: "Destino" },
-                      { key: "cantidad", label: "Cantidad" },
-                      { key: "saldo", label: "Saldo antes→después" },
-                      { key: "documento", label: "Documento" },
-                      { key: "notas", label: "Notas" },
-                      { key: "costo", label: "Costo" },
-                      { key: "fecha", label: "Fecha" },
-                      { key: "quien", label: "Registró" },
-                    ],
-                    "movimientos-inventario",
-                    "Movimientos de inventario",
-                  )}
-                >
-                  Excel
-                </Button>
-              )}
+          <div className={s.filtros} role="group" aria-label="Filtros de movimientos">
+            <select className={s.input} aria-label="Producto" value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)}>
+              <option value="">Todos los productos</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+            </select>
+            <select className={s.input} aria-label="Almacén" value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)}>
+              <option value="">Todos los almacenes</option>
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+            <select className={s.input} aria-label="Tipo de movimiento" value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)}>
+              <option value="">Todos los tipos</option>
+              {Object.entries(MOVEMENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            <input className={s.input} type="date" aria-label="Desde" title="Desde" value={movementFromDate} onChange={(e) => setMovementFromDate(e.target.value)} />
+            <input className={s.input} type="date" aria-label="Hasta" title="Hasta" value={movementToDate} min={movementFromDate || undefined} onChange={(e) => setMovementToDate(e.target.value)} />
+            {hasMovementFilters && (
+              <Button variant="ghost" size="sm" onClick={clearMovementFilters}>Limpiar filtros</Button>
+            )}
+            <span style={{ flex: 1 }} />
+            {visibleMovements.length > 0 && (
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
-                iconLeft="📄"
-                onClick={() => void downloadMovementsPdf()}
-                disabled={exportingPdf || movementsLoading || visibleMovements.length === 0}
+                iconLeft="⬇"
+                onClick={() => exportToExcel(
+                  visibleMovements.map((m) => ({
+                    folio: m.movementNumber,
+                    tipo: etiquetaMovimiento(m.type),
+                    sku: m.product?.sku ?? "",
+                    producto: m.product?.name ?? "",
+                    origen: m.fromWarehouse?.name ?? "",
+                    destino: m.toWarehouse?.name ?? "",
+                    cantidad: Number(m.quantity),
+                    saldo: stockMovementBalanceLabel(m),
+                    documento: stockMovementDocumentLabel(m),
+                    notas: m.notes ?? "",
+                    costo: Number(m.totalCost ?? 0),
+                    fecha: new Date(m.createdAt).toLocaleString("es-MX"),
+                    quien: m.createdBy?.nombre ?? "",
+                  })),
+                  [
+                    { key: "folio", label: "Folio" },
+                    { key: "tipo", label: "Tipo" },
+                    { key: "sku", label: "SKU" },
+                    { key: "producto", label: "Producto" },
+                    { key: "origen", label: "Origen" },
+                    { key: "destino", label: "Destino" },
+                    { key: "cantidad", label: "Cantidad" },
+                    { key: "saldo", label: "Saldo antes → después" },
+                    { key: "documento", label: "Documento" },
+                    { key: "notas", label: "Notas" },
+                    { key: "costo", label: "Costo" },
+                    { key: "fecha", label: "Fecha" },
+                    { key: "quien", label: "Registró" },
+                  ],
+                  "movimientos-inventario",
+                  "Movimientos de inventario",
+                )}
               >
-                {exportingPdf ? "PDF…" : "PDF kardex"}
+                Excel
               </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void downloadMovementsPdf()}
+              disabled={movementsLoading || visibleMovements.length === 0}
+              loading={exportingPdf}
+            >
+              Kárdex PDF
+            </Button>
           </div>
           {movementId && (
-            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-              Resaltando movimiento <strong>#{movementId}</strong>.{" "}
-              <Link href={`${almacenBase}?tab=movimientos`} style={{ color: "var(--primary)" }}>Quitar filtro</Link>
+            <p className={s.nota}>
+              El movimiento del aviso aparece primero.{" "}
+              <button type="button" className={s.enlace} onClick={() => limpiarFiltroUrl("?tab=movimientos")}>Quitar resaltado</button>
             </p>
           )}
-          {movementsLoading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          {movementsLoading && movements.length === 0 ? (
+            <SkeletonRows rows={6} label="Cargando movimientos" />
           ) : (
             <DataTable
               columns={movementColumns}
               rows={visibleMovements}
               rowKey={(m) => m.id}
-              emptyTitle="Sin movimientos"
-              emptyDescription="Registra una entrada, salida o traspaso para ver el historial aquí."
-              emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowMovementForm(true)}>Registrar movimiento</Button> : undefined}
+              ariaLabel="Movimientos de inventario"
+              emptyTitle={hasMovementFilters ? "Ningún movimiento con esos filtros" : "Aún no hay movimientos"}
+              emptyDescription={hasMovementFilters ? "Cambia las fechas o quita algún filtro." : "Registra una entrada, salida o traspaso para ver el historial aquí."}
+              emptyAction={
+                hasMovementFilters ? (
+                  <Button size="sm" variant="secondary" onClick={clearMovementFilters}>Limpiar filtros</Button>
+                ) : cfg.canCreate ? (
+                  <Button size="sm" variant="primary" onClick={abrirEntrada}>Registrar movimiento</Button>
+                ) : undefined
+              }
             />
           )}
         </Section>
@@ -1603,7 +1524,7 @@ export function VistaAlmacen({
       {tab === "lotes" && (
         <Section
           title="Lotes y caducidad"
-          subtitle="Trazabilidad por lote de fabricación, con alerta cuando se acerca la fecha de caducidad."
+          subtitle="Trazabilidad por lote, con aviso cuando se acerca la fecha de caducidad."
           actions={
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {lots.length > 0 && (
@@ -1629,80 +1550,61 @@ export function VistaAlmacen({
                 )}>Excel</Button>
               )}
               {cfg.canCreate ? (
-                <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" }); setShowLotForm(true); }}>
-                  Nuevo lote
-                </Button>
+                <Button variant="primary" size="sm" iconLeft="+" onClick={abrirNuevoLote}>Nuevo lote</Button>
               ) : null}
             </div>
           }
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
-            <KpiCard label="Lotes registrados" value={lots.length} icon="🧾" />
+          <div className={s.kpis}>
+            <KpiCard label="Lotes registrados" value={lots.length} />
             <KpiCard
-              label="Por vencer / vencidos"
+              label="Por caducar o caducados"
               value={expiringLotsCount}
               variant={expiringLotsCount > 0 ? "warning" : "positive"}
-              hint="Caducidad en 30 días o menos"
-              icon={expiringLotsCount > 0 ? "⏰" : "✅"}
+              hint="Caducan en 30 días o menos"
             />
           </div>
           {showLotForm && (
-            <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Número de lote</label>
-                <input value={lotForm.lotNumber} onChange={(e) => setLotForm((f) => ({ ...f, lotNumber: e.target.value }))} placeholder="LOTE-2026-001" style={inp} />
+            <form className={s.panel} onSubmit={(e) => { e.preventDefault(); void saveLot(); }}>
+              <p className={s.panelTitulo}>Nuevo lote</p>
+              <div className={s.rejilla}>
+                <Campo label="Número de lote">
+                  <input className={s.input} value={lotForm.lotNumber} onChange={(e) => setLotForm((f) => ({ ...f, lotNumber: e.target.value }))} placeholder="LOTE-2026-001" autoFocus />
+                </Campo>
+                <Campo label="Producto">
+                  <select className={s.input} value={lotForm.productId} onChange={(e) => setLotForm((f) => ({ ...f, productId: e.target.value }))}>
+                    <option value="">Elige el producto</option>
+                    {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+                  </select>
+                </Campo>
+                <Campo label="Fecha de fabricación (opcional)">
+                  <input className={s.input} type="date" value={lotForm.manufacturingDate} onChange={(e) => setLotForm((f) => ({ ...f, manufacturingDate: e.target.value }))} />
+                </Campo>
+                <Campo label="Fecha de caducidad (opcional)">
+                  <input className={s.input} type="date" value={lotForm.expirationDate} min={lotForm.manufacturingDate || undefined} onChange={(e) => setLotForm((f) => ({ ...f, expirationDate: e.target.value }))} />
+                </Campo>
+                <Campo label="Notas (opcional)" ancho>
+                  <input className={s.input} value={lotForm.notes} onChange={(e) => setLotForm((f) => ({ ...f, notes: e.target.value }))} />
+                </Campo>
+                {lotSaveErr && <div className={s.error} role="alert">{lotSaveErr}</div>}
               </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Producto</label>
-                <select value={lotForm.productId} onChange={(e) => setLotForm((f) => ({ ...f, productId: e.target.value }))} style={inp}>
-                  <option value="">— Seleccionar —</option>
-                  {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-                </select>
+              <div className={s.acciones}>
+                <Button variant="secondary" onClick={() => { setShowLotForm(false); setLotSaveErr(null); }}>Cancelar</Button>
+                <Button type="submit" variant="primary" loading={savingLot}>Crear lote</Button>
               </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fecha de fabricación (opcional)</label>
-                <input type="date" value={lotForm.manufacturingDate} onChange={(e) => setLotForm((f) => ({ ...f, manufacturingDate: e.target.value }))} style={inp} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fecha de caducidad (opcional)</label>
-                <input type="date" value={lotForm.expirationDate} onChange={(e) => setLotForm((f) => ({ ...f, expirationDate: e.target.value }))} style={inp} />
-              </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Notas (opcional)</label>
-                <input value={lotForm.notes} onChange={(e) => setLotForm((f) => ({ ...f, notes: e.target.value }))} style={inp} />
-              </div>
-              {lotSaveErr && (
-                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--danger)" }}>{lotSaveErr}</div>
-              )}
-              <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <Button variant="ghost" onClick={() => { setShowLotForm(false); setLotSaveErr(null); }}>Cancelar</Button>
-                <Button variant="primary" onClick={() => void saveLot()} disabled={savingLot}>{savingLot ? "Guardando…" : "Crear lote"}</Button>
-              </div>
-            </div>
+            </form>
           )}
-          {lotsLoading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          {lotsLoading && lots.length === 0 ? (
+            <SkeletonRows rows={5} label="Cargando lotes" />
           ) : (
             <DataTable
               columns={lotColumns}
               rows={lots}
               rowKey={(l) => l.id}
-              emptyTitle="Sin lotes"
-              emptyDescription="Registra el primer lote para trazabilidad y control de caducidad."
-              emptyAction={
-                cfg.canCreate ? (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => {
-                      setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" });
-                      setShowLotForm(true);
-                    }}
-                  >
-                    Nuevo lote
-                  </Button>
-                ) : undefined
-              }
+              ariaLabel="Lotes"
+              emptyTitle="Aún no hay lotes"
+              emptyDescription="Registra el primer lote para rastrear fabricación y caducidad."
+              emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={abrirNuevoLote}>Nuevo lote</Button> : undefined}
             />
           )}
         </Section>
@@ -1711,10 +1613,10 @@ export function VistaAlmacen({
       {tab === "valuacion" && (
         <Section
           title="Valuación de inventario"
-          subtitle="Costo unitario y valor total por producto y almacén, según el método de valuación configurado."
+          subtitle="Costo unitario y valor total por producto y almacén, con el método de valuación configurado."
           actions={
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <select value={valuationWarehouseFilter} onChange={(e) => setValuationWarehouseFilter(e.target.value)} style={{ ...inp, width: 200 }}>
+              <select className={s.input} aria-label="Almacén" value={valuationWarehouseFilter} onChange={(e) => setValuationWarehouseFilter(e.target.value)} style={{ width: 200 }}>
                 <option value="">Todos los almacenes</option>
                 {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
@@ -1748,23 +1650,24 @@ export function VistaAlmacen({
             </div>
           }
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
-            <KpiCard label="Valor total en valuación" value={<Money value={totalValuation} compact />} variant="accent" icon="💰" />
-            <KpiCard label="SKUs valuados" value={valuation.length} icon="📦" />
+          <div className={s.kpis}>
+            <KpiCard label="Valor total" value={<Money value={totalValuation} compact />} variant="accent" />
+            <KpiCard label="Productos valuados" value={valuation.length} />
           </div>
-          {valuationLoading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          {valuationLoading && valuation.length === 0 ? (
+            <SkeletonRows rows={5} label="Cargando valuación" />
           ) : (
             <DataTable
               columns={valuationColumns}
               rows={valuation}
               rowKey={(v) => v.id}
+              ariaLabel="Valuación"
               emptyTitle="Sin datos de valuación"
-              emptyDescription="Registra stock en un almacén para calcular valor de inventario."
+              emptyDescription="Registra stock en un almacén para calcular el valor del inventario."
               emptyAction={
-                <Button size="sm" variant="secondary" onClick={() => { setTab("inventario"); setShowMovementForm(true); }}>
-                  Entrada de stock
-                </Button>
+                cfg.canCreate ? (
+                  <Button size="sm" variant="secondary" onClick={abrirEntrada}>Entrada de stock</Button>
+                ) : undefined
               }
             />
           )}
@@ -1775,65 +1678,73 @@ export function VistaAlmacen({
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <Section
             title="Conteos cíclicos"
-            subtitle="Programa un conteo físico, captura lo encontrado y cierra: la varianza ajusta el stock automáticamente."
+            subtitle="Programa un conteo físico, captura lo que encuentres y ciérralo: la diferencia se ajusta sola en el stock."
             actions={cfg.canCreate ? (
               <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowScheduleForm(true)}>Programar conteo</Button>
             ) : undefined}
           >
             {showScheduleForm && (
-              <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén *</span>
-                  <select value={scheduleForm.warehouseId} onChange={(e) => setScheduleForm((f) => ({ ...f, warehouseId: e.target.value }))} style={inp}>
-                    <option value="">Seleccionar…</option>
-                    {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                  </select>
-                </label>
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha programada *</span>
-                  <input type="date" value={scheduleForm.scheduledFor} onChange={(e) => setScheduleForm((f) => ({ ...f, scheduledFor: e.target.value }))} style={inp} />
-                </label>
-                <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Notas</span>
-                  <input value={scheduleForm.notes} onChange={(e) => setScheduleForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Conteo trimestral, auditoría sorpresa…" style={inp} />
-                </label>
-                <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <Button variant="ghost" onClick={() => setShowScheduleForm(false)}>Cancelar</Button>
-                  <Button variant="primary" onClick={() => void submitSchedule()} disabled={savingSchedule || !scheduleForm.warehouseId || !scheduleForm.scheduledFor}>
-                    {savingSchedule ? "Programando…" : "Programar (snapshot de stock actual)"}
+              <form className={s.panel} onSubmit={(e) => { e.preventDefault(); void submitSchedule(); }}>
+                <p className={s.panelTitulo}>Programar conteo</p>
+                <div className={s.rejilla}>
+                  <Campo label="Almacén">
+                    <select className={s.input} value={scheduleForm.warehouseId} onChange={(e) => setScheduleForm((f) => ({ ...f, warehouseId: e.target.value }))}>
+                      <option value="">Elige el almacén</option>
+                      {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Fecha">
+                    <input className={s.input} type="date" value={scheduleForm.scheduledFor} onChange={(e) => setScheduleForm((f) => ({ ...f, scheduledFor: e.target.value }))} />
+                  </Campo>
+                  <Campo label="Notas (opcional)" ancho>
+                    <input className={s.input} value={scheduleForm.notes} onChange={(e) => setScheduleForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Conteo trimestral, auditoría sorpresa…" />
+                  </Campo>
+                  <span className={`${s.ayuda} ${s.ancho}`}>Se toma la existencia de hoy como punto de partida para comparar.</span>
+                </div>
+                <div className={s.acciones}>
+                  <Button variant="secondary" onClick={() => setShowScheduleForm(false)}>Cancelar</Button>
+                  <Button type="submit" variant="primary" disabled={!scheduleForm.warehouseId || !scheduleForm.scheduledFor} loading={savingSchedule}>
+                    Programar conteo
                   </Button>
                 </div>
-              </div>
+              </form>
             )}
 
             {activeCount && (
-              <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
-                    Conteo {activeCount.countNumber} · {activeCount.warehouse?.name} · <Tag variant={activeCount.status === "CLOSED" ? "positive" : "warning"}>{CYCLE_COUNT_STATUS_LABEL[activeCount.status]}</Tag>
+              <div className={s.panel}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                  <p className={s.panelTitulo} style={{ margin: 0 }}>
+                    Conteo {activeCount.countNumber} · {activeCount.warehouse?.name}{" "}
+                    <Tag variant={varianteConteo(activeCount.status)}>{CYCLE_COUNT_STATUS_LABEL[activeCount.status] ?? "Sin estado"}</Tag>
                   </p>
                   <Button variant="ghost" size="sm" onClick={() => setActiveCount(null)}>Cerrar panel</Button>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+                <div className={s.conteoFila} style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }} aria-hidden="true">
+                  <span>Producto</span><span>Sistema</span><span>Contado</span><span>Diferencia</span>
+                </div>
+                <div className={s.conteoLista}>
                   {activeCountItems.map((it) => {
                     const counted = captureQty[it.productId] ?? "";
                     const variance = counted !== "" ? Number(counted) - Number(it.expectedQty) : (it.varianceQty != null ? Number(it.varianceQty) : null);
+                    const nombre = it.product?.name ?? "Producto";
                     return (
-                      <div key={it.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px 110px 90px", gap: 10, alignItems: "center", fontSize: 12.5, borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
-                        <div>
-                          <strong>{it.product?.name ?? `Producto #${it.productId}`}</strong>
-                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{it.product?.sku}</div>
+                      <div key={it.id} className={s.conteoFila}>
+                        <div style={{ minWidth: 0 }}>
+                          <strong>{nombre}</strong>
+                          <div className={s.productoMeta}>{it.product?.sku}</div>
                         </div>
-                        <span style={{ color: "var(--text-tertiary)" }}>Esp. {Number(it.expectedQty)}</span>
+                        <span className={s.num} style={{ color: "var(--text-tertiary)" }}>{cantidad(it.expectedQty)}</span>
                         <input
+                          className={`${s.input} ${s.num}`}
                           type="number"
+                          inputMode="decimal"
                           disabled={activeCountClosed}
                           value={counted}
                           onChange={(e) => setCaptureQty((q) => ({ ...q, [it.productId]: e.target.value }))}
                           placeholder="Contado"
-                          style={{ ...inp, padding: "6px 8px" }}
+                          aria-label={`Cantidad contada de ${nombre}`}
                         />
-                        <span style={{ fontWeight: 700, color: variance == null ? "var(--text-tertiary)" : variance === 0 ? "var(--success)" : variance > 0 ? "var(--primary)" : "var(--danger)" }}>
+                        <span className={s.num} style={{ fontWeight: 700, color: variance == null ? "var(--text-tertiary)" : variance === 0 ? "var(--success)" : variance > 0 ? "var(--primary)" : "var(--danger)" }}>
                           {variance == null ? "—" : variance > 0 ? `+${variance}` : variance}
                         </span>
                       </div>
@@ -1841,23 +1752,24 @@ export function VistaAlmacen({
                   })}
                 </div>
                 {!activeCountClosed && (
-                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
-                    <Button variant="secondary" onClick={() => void submitCapture()} disabled={savingCapture}>{savingCapture ? "Guardando…" : "Guardar captura"}</Button>
-                    <Button variant="primary" onClick={() => void submitCloseCount()} disabled={closingCount}>{closingCount ? "Cerrando…" : "Cerrar conteo y ajustar stock"}</Button>
+                  <div className={s.acciones}>
+                    <Button variant="secondary" onClick={() => void submitCapture()} loading={savingCapture}>Guardar captura</Button>
+                    <Button variant="primary" onClick={pedirCerrarConteo} loading={closingCount}>Cerrar y ajustar stock</Button>
                   </div>
                 )}
               </div>
             )}
 
-            {cycleCountsLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+            {cycleCountsLoading && cycleCounts.length === 0 ? (
+              <SkeletonRows rows={4} label="Cargando conteos" />
             ) : (
               <DataTable
                 columns={cycleCountColumns}
                 rows={cycleCounts}
                 rowKey={(c) => c.id}
+                ariaLabel="Conteos cíclicos"
                 emptyTitle="Sin conteos programados"
-                emptyDescription="Programa un conteo cíclico para validar el stock físico contra el sistema."
+                emptyDescription="Programa un conteo para comparar el stock físico contra el sistema."
                 emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowScheduleForm(true)}>Programar conteo</Button> : undefined}
               />
             )}
@@ -1865,56 +1777,55 @@ export function VistaAlmacen({
 
           <Section
             title="Reservas de stock"
-            subtitle="Reduce el disponible sin mover físico — útil para apartar stock a una cotización u orden antes de despachar."
+            subtitle="Aparta stock para una cotización u orden sin sacarlo del almacén."
             actions={cfg.canCreate ? (
               <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowReservationForm(true)}>Nueva reserva</Button>
             ) : undefined}
           >
             {showReservationForm && (
-              <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Producto *</span>
-                  <select value={reservationForm.productId} onChange={(e) => setReservationForm((f) => ({ ...f, productId: e.target.value }))} style={inp}>
-                    <option value="">Seleccionar…</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-                  </select>
-                </label>
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén *</span>
-                  <select value={reservationForm.warehouseId} onChange={(e) => setReservationForm((f) => ({ ...f, warehouseId: e.target.value }))} style={inp}>
-                    <option value="">Seleccionar…</option>
-                    {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                  </select>
-                </label>
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad *</span>
-                  <input type="number" min={1} value={reservationForm.quantity} onChange={(e) => setReservationForm((f) => ({ ...f, quantity: +e.target.value }))} style={inp} />
-                </label>
-                <label style={{ display: "grid", gap: 4 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Expira (opcional)</span>
-                  <input type="date" value={reservationForm.expiresAt} onChange={(e) => setReservationForm((f) => ({ ...f, expiresAt: e.target.value }))} style={inp} />
-                </label>
-                <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo *</span>
-                  <input value={reservationForm.reason} onChange={(e) => setReservationForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Cotización COT-000123, orden de cliente…" style={inp} />
-                </label>
-                <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <Button variant="ghost" onClick={() => setShowReservationForm(false)}>Cancelar</Button>
-                  <Button variant="primary" onClick={() => void submitReservation()} disabled={savingReservation || !reservationForm.productId || !reservationForm.warehouseId || !reservationForm.reason.trim()}>
-                    {savingReservation ? "Reservando…" : "Crear reserva"}
+              <form className={s.panel} onSubmit={(e) => { e.preventDefault(); void submitReservation(); }}>
+                <p className={s.panelTitulo}>Nueva reserva</p>
+                <div className={s.rejilla}>
+                  <Campo label="Producto">
+                    <select className={s.input} value={reservationForm.productId} onChange={(e) => setReservationForm((f) => ({ ...f, productId: e.target.value }))}>
+                      <option value="">Elige el producto</option>
+                      {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Almacén">
+                    <select className={s.input} value={reservationForm.warehouseId} onChange={(e) => setReservationForm((f) => ({ ...f, warehouseId: e.target.value }))}>
+                      <option value="">Elige el almacén</option>
+                      {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  </Campo>
+                  <Campo label="Cantidad">
+                    <input className={`${s.input} ${s.num}`} type="number" inputMode="decimal" min={1} value={reservationForm.quantity} onChange={(e) => setReservationForm((f) => ({ ...f, quantity: +e.target.value }))} />
+                  </Campo>
+                  <Campo label="Vence (opcional)">
+                    <input className={s.input} type="date" value={reservationForm.expiresAt} onChange={(e) => setReservationForm((f) => ({ ...f, expiresAt: e.target.value }))} />
+                  </Campo>
+                  <Campo label="Motivo" ancho>
+                    <input className={s.input} value={reservationForm.reason} onChange={(e) => setReservationForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Cotización COT-000123, orden de cliente…" />
+                  </Campo>
+                </div>
+                <div className={s.acciones}>
+                  <Button variant="secondary" onClick={() => setShowReservationForm(false)}>Cancelar</Button>
+                  <Button type="submit" variant="primary" disabled={!reservationForm.productId || !reservationForm.warehouseId || !reservationForm.reason.trim()} loading={savingReservation}>
+                    Reservar
                   </Button>
                 </div>
-              </div>
+              </form>
             )}
-            {reservationsLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+            {reservationsLoading && reservations.length === 0 ? (
+              <SkeletonRows rows={4} label="Cargando reservas" />
             ) : (
               <DataTable
                 columns={reservationColumns}
                 rows={reservations}
                 rowKey={(r) => r.id}
+                ariaLabel="Reservas de stock"
                 emptyTitle="Sin reservas activas"
-                emptyDescription="Reserva stock para apartarlo de una cotización u orden sin despacharlo todavía."
+                emptyDescription="Reserva stock para apartarlo a una cotización u orden sin despacharlo todavía."
                 emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowReservationForm(true)}>Nueva reserva</Button> : undefined}
               />
             )}
@@ -1923,163 +1834,16 @@ export function VistaAlmacen({
       )}
 
       {productTrace && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Historial de ${productTrace.name}`}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.45)",
-            zIndex: 80,
-            display: "flex",
-            justifyContent: "flex-end",
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setProductTrace(null); }}
-        >
-          <aside
-            style={{
-              width: "min(560px, 100%)",
-              height: "100%",
-              background: "var(--surface)",
-              borderLeft: "1px solid var(--border)",
-              boxShadow: "-8px 0 32px rgba(0,0,0,.12)",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <header style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-              <div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 600 }}>Historial de producto</div>
-                <h2 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 750 }}>{productTrace.name}</h2>
-                <code style={{ fontSize: 12, color: "var(--text-secondary)" }}>{productTrace.sku}</code>
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void downloadMovementsPdf({ productId: productTrace.productId })}
-                  disabled={exportingPdf}
-                >
-                  {exportingPdf ? "PDF…" : "PDF"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconLeft="⬇"
-                  onClick={() => exportToExcel(
-                    productTrace.movements.map((m) => ({
-                      folio: m.movementNumber,
-                      tipo: MOVEMENT_TYPE_LABEL[m.type] ?? m.type,
-                      origen: m.fromWarehouse?.name ?? "",
-                      destino: m.toWarehouse?.name ?? "",
-                      cantidad: Number(m.quantity),
-                      saldoOrigen: m.fromQtyBefore != null ? `${Number(m.fromQtyBefore)} → ${Number(m.fromQtyAfter)}` : "",
-                      saldoDestino: m.toQtyBefore != null ? `${Number(m.toQtyBefore)} → ${Number(m.toQtyAfter)}` : "",
-                      documento: stockMovementDocumentLabel(m),
-                      notas: m.notes ?? "",
-                      fecha: new Date(m.createdAt).toLocaleString("es-MX"),
-                      quien: m.createdBy?.nombre ?? "",
-                    })),
-                    [
-                      { key: "folio", label: "Folio" },
-                      { key: "tipo", label: "Tipo" },
-                      { key: "origen", label: "Origen" },
-                      { key: "destino", label: "Destino" },
-                      { key: "cantidad", label: "Cantidad" },
-                      { key: "saldoOrigen", label: "Saldo origen" },
-                      { key: "saldoDestino", label: "Saldo destino" },
-                      { key: "documento", label: "Documento" },
-                      { key: "notas", label: "Notas" },
-                      { key: "fecha", label: "Fecha" },
-                      { key: "quien", label: "Registró" },
-                    ],
-                    `historial-${productTrace.sku}`,
-                    `Historial ${productTrace.sku}`,
-                  )}
-                >
-                  Excel
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setProductTrace(null)}>Cerrar</Button>
-              </div>
-            </header>
-            <div style={{ padding: 16, overflow: "auto", flex: 1 }}>
-              {productTraceLoading ? (
-                <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando historial…</div>
-              ) : (
-                <>
-                  <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: 0.3 }}>Existencia por almacén</p>
-                  {productTrace.levels.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 16 }}>Sin niveles de stock registrados.</p>
-                  ) : (
-                    <div style={{ display: "grid", gap: 8, marginBottom: 20 }}>
-                      {productTrace.levels.map((lv) => (
-                        <div key={lv.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13 }}>
-                          <span>{lv.ubicacion}</span>
-                          <strong style={{ fontVariantNumeric: "tabular-nums" }}>{lv.existencia}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: 0.3 }}>
-                    Línea de tiempo ({productTrace.movements.length})
-                  </p>
-                  {productTrace.movements.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Aún no hay movimientos para este producto.</p>
-                  ) : (
-                    <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
-                      {productTrace.movements.map((m) => (
-                        <li
-                          key={m.id}
-                          style={{
-                            border: "1px solid var(--border)",
-                            borderRadius: 10,
-                            padding: "12px 14px",
-                            background: "var(--surface)",
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                              <code style={{ fontSize: 11 }}>{m.movementNumber}</code>
-                              <Tag variant={m.type === "RECEIPT" || m.type === "PRODUCTION_IN" || m.type === "RETURN" || m.type === "ADJUSTMENT" ? "positive" : m.type === "SCRAP" ? "danger" : "default"}>
-                                {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
-                              </Tag>
-                            </div>
-                            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                              {new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 13, marginBottom: 4 }}>
-                            <strong style={{ fontVariantNumeric: "tabular-nums" }}>{Number(m.quantity)}</strong>
-                            {" · "}
-                            {m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}
-                          </div>
-                          <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "grid", gap: 2 }}>
-                            {m.fromQtyBefore != null && (
-                              <span>Origen: {Number(m.fromQtyBefore)} → {Number(m.fromQtyAfter)}</span>
-                            )}
-                            {m.toQtyBefore != null && (
-                              <span>Destino: {Number(m.toQtyBefore)} → {Number(m.toQtyAfter)}</span>
-                            )}
-                            <span>Documento: {stockMovementDocumentLabel(m)}</span>
-                            <span>Registró: {m.createdBy?.nombre ?? "—"}</span>
-                            {m.notes ? <span>Notas: {m.notes}</span> : null}
-                            {m.lot ? <span>Lote: {m.lot.lotNumber}</span> : null}
-                            {Number(m.totalCost ?? 0) > 0 ? (
-                              <span>Costo total: ${Number(m.totalCost).toLocaleString("es-MX", { maximumFractionDigits: 2 })}</span>
-                            ) : null}
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </>
-              )}
-            </div>
-          </aside>
-        </div>
+        <HistorialProducto
+          traza={productTrace}
+          loading={productTraceLoading}
+          exportingPdf={exportingPdf}
+          onPdf={() => void downloadMovementsPdf({ productId: productTrace.productId })}
+          onClose={cerrarHistorial}
+        />
       )}
+
+      <ConfirmDialog state={confirmar} onClose={() => setConfirmar(null)} />
     </>
   );
 }

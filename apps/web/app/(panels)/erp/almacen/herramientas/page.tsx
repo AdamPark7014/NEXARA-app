@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import PanelTabs from "@/components/ui/PanelTabs";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -26,39 +26,34 @@ import ToolRequestForm from "@/components/ToolRequestForm";
 type ManagerTab = "inventory" | "kits" | "requests" | "renewals" | "approvals";
 type LoanTab = "mykit" | "myrequests";
 
-function parseManagerTab(value: string | null): ManagerTab {
-  if (value === "kits" || value === "requests" || value === "renewals" || value === "inventory" || value === "approvals") {
-    return value;
-  }
-  return "inventory";
-}
-
 export default function ToolsPage() {
   const { user } = useUser();
-  const searchParams = useSearchParams();
+  const pathname = usePathname();
   // También se monta en Core (`/erp/almacen/herramientas`).
-  const enCore = isCoreMount(usePathname());
+  const enCore = isCoreMount(pathname);
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
   // Email helpers (vía section-views): manage ≠ OPS_MANAGER; request ≠ campo genérico.
   const canManage = cfg.viewMode === "manage" || cfg.viewMode === "manage_execute" || cfg.canApprove;
   const canRequest = cfg.canCreate;
-  const highlightId = searchParams.get("highlight");
 
-  const [managerTab, setManagerTab] = useState<ManagerTab>(() => {
-    const tab = parseManagerTab(searchParams.get("tab"));
-    if (searchParams.get("tab")) return tab;
-    return highlightId ? "approvals" : "inventory";
-  });
-  const [loanTab, setLoanTab] = useState<LoanTab>(() =>
-    highlightId && !canManage ? "myrequests" : "mykit",
-  );
+  // `?tab=` y `?highlight=` se leen de la URL al montar (sin useSearchParams).
+  const [urlTab, setUrlTab] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setUrlTab(params.get("tab"));
+    setHighlightId(params.get("highlight"));
+  }, [pathname]);
+
+  const [managerTab, setManagerTab] = useState<ManagerTab>("inventory");
+  const [loanTab, setLoanTab] = useState<LoanTab>("mykit");
   // Christian/Iván + loan-creator: una familia de tabs a la vez.
   const [pane, setPane] = useState<"manage" | "loan">(() =>
     canManage ? "manage" : "loan",
   );
 
   useEffect(() => {
-    const tab = searchParams.get("tab");
+    const tab = urlTab;
     if (tab === "renewals" || tab === "requests" || tab === "kits" || tab === "inventory" || tab === "approvals") {
       setManagerTab(tab);
       setPane("manage");
@@ -77,7 +72,7 @@ export default function ToolsPage() {
       setLoanTab("myrequests");
       setPane("loan");
     }
-  }, [highlightId, canManage, canRequest, searchParams]);
+  }, [highlightId, canManage, canRequest, urlTab]);
 
   const showManagePane = canManage && (!canRequest || pane === "manage");
   const showLoanPane = canRequest && (!canManage || pane === "loan");
@@ -134,7 +129,7 @@ export default function ToolsPage() {
         <div style={{ marginBottom: 12 }}>
           <InlineAlert
             variant="info"
-            message={`Vienes de un aviso sobre la solicitud #${highlightId}: está resaltada en la lista.`}
+            message="Vienes de un aviso: la solicitud está resaltada en la lista."
           />
         </div>
       )}

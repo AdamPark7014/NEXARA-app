@@ -11,12 +11,14 @@ import AlmacenPage from "./page";
  * cada una tiene su propia prueba (y la de stock es la pantalla de almacén de siempre).
  */
 
-let searchParams = new URLSearchParams("");
+/** La portada lee `?tab=` de `window.location` al montar. */
+function ponerUrl(query: string) {
+  window.history.replaceState(null, "", `/erp/almacen${query ? `?${query}` : ""}`);
+}
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => "/erp/almacen",
-  useSearchParams: () => searchParams,
 }));
 
 vi.mock("@/components/UserContext", () => ({
@@ -53,7 +55,7 @@ vi.mock("@/components/ToolMyKitPanel", () => ({ default: () => <div data-testid=
 
 describe("portada de almacén", () => {
   it("enseña las seis pestañas del frente (incluye Escáner)", () => {
-    searchParams = new URLSearchParams("");
+    ponerUrl("");
     render(<AlmacenPage />);
     const pestanas = screen.getAllByRole("tab").map((t) => t.textContent);
     expect(pestanas).toEqual([
@@ -67,7 +69,7 @@ describe("portada de almacén", () => {
   });
 
   it("abre en inventario y monta ahí las vistas de stock", () => {
-    searchParams = new URLSearchParams("");
+    ponerUrl("");
     render(<AlmacenPage />);
     expect(screen.getByTestId("almacen-stock").textContent).toBe(
       "inventario,dashboard,lotes,valuacion,conteos",
@@ -75,27 +77,27 @@ describe("portada de almacén", () => {
   });
 
   it("movimientos monta la pantalla de almacén con una sola vista", async () => {
-    searchParams = new URLSearchParams("");
+    ponerUrl("");
     render(<AlmacenPage />);
     await userEvent.click(screen.getByRole("tab", { name: "Movimientos" }));
     expect(screen.getByTestId("almacen-stock").textContent).toBe("movimientos");
   });
 
   it("escáner monta el panel HID", async () => {
-    searchParams = new URLSearchParams("");
+    ponerUrl("");
     render(<AlmacenPage />);
     await userEvent.click(screen.getByRole("tab", { name: "Escáner" }));
     expect(screen.getByTestId("panel-scanner")).toBeInTheDocument();
   });
 
   it("un aviso con ?tab=reabastecimiento cae en esa pestaña", () => {
-    searchParams = new URLSearchParams("tab=reabastecimiento&productId=3");
+    ponerUrl("tab=reabastecimiento&productId=3");
     render(<AlmacenPage />);
     expect(screen.getByTestId("panel-reabastecimiento")).toBeInTheDocument();
   });
 
   it("herramientas enseña el mostrador y las solicitudes a quien administra", async () => {
-    searchParams = new URLSearchParams("");
+    ponerUrl("");
     render(<AlmacenPage />);
     await userEvent.click(screen.getByRole("tab", { name: "Herramientas" }));
     expect(screen.getByTestId("panel-recoleccion")).toBeInTheDocument();
@@ -103,7 +105,7 @@ describe("portada de almacén", () => {
   });
 
   it("kits enseña las revisiones y los kits del equipo", async () => {
-    searchParams = new URLSearchParams("");
+    ponerUrl("");
     render(<AlmacenPage />);
     await userEvent.click(screen.getByRole("tab", { name: "Kits" }));
     expect(screen.getByTestId("panel-inspecciones")).toBeInTheDocument();
@@ -111,7 +113,7 @@ describe("portada de almacén", () => {
   });
 
   it("una pestaña que no existe no rompe la portada", () => {
-    searchParams = new URLSearchParams("tab=inventado");
+    ponerUrl("tab=inventado");
     render(<AlmacenPage />);
     expect(screen.getByTestId("almacen-stock")).toBeInTheDocument();
   });
