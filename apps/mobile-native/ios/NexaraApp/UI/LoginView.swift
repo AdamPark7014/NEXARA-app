@@ -105,7 +105,10 @@ struct LoginView: View {
                                 Button { showPassword.toggle() } label: {
                                     Image(systemName: showPassword ? "eye.slash" : "eye")
                                         .foregroundColor(.secondary)
+                                        .frame(width: NxMetrics.minTap, height: 28)
+                                        .contentShape(Rectangle())
                                 }
+                                .accessibilityLabel(showPassword ? "Ocultar contraseña" : "Mostrar contraseña")
                             }
                             .padding(12)
                             .background(Color(.secondarySystemGroupedBackground))

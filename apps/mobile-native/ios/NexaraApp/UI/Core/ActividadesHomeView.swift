@@ -42,7 +42,7 @@ struct ActividadesHomeView: View {
             if isCeo {
                 TeamBoardView(board: board, error: boardError, loading: !loaded, myId: myId, onReload: { await loadBoard() })
             } else if !loaded {
-                ProgressView("Cargando actividades…")
+                NxLoadingState(text: "Cargando actividades…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if teamMates.isEmpty {
                 MisActividadesView()
@@ -123,19 +123,17 @@ struct TeamBoardView: View {
                 }
 
                 if loading && board == nil {
-                    ProgressView("Cargando…")
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 30)
+                    NxLoadingState(text: "Cargando tu equipo…")
                 } else if let error, board == nil {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(CorePalette.red)
+                    NxErrorState(message: error) { Task { await onReload() } }
                 } else if users.isEmpty {
-                    Text("Nadie en tu equipo por ahora.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    NxEmptyState(
+                        title: "Nadie en tu equipo por ahora",
+                        subtitle: "Cuando alguien quede a tu cargo lo verás aquí.",
+                        systemImage: "person.3"
+                    )
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 158), spacing: 12)], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 158), spacing: NxSpacing.m)], spacing: NxSpacing.m) {
                         ForEach(users) { user in
                             NavigationLink {
                                 TeamMemberDetailView(userId: user.id, nombre: user.nombre, isSelf: user.id == myId)
@@ -149,6 +147,7 @@ struct TeamBoardView: View {
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
         .refreshable { await onReload() }
     }
 }
@@ -188,7 +187,7 @@ private struct TeamPersonCard: View {
                     .font(.subheadline.weight(.bold))
                     .lineLimit(1)
                 if isSelf {
-                    Text("TÚ")
+                    Text("Tú")
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(Color.accentColor)
                 }
@@ -239,16 +238,19 @@ private struct TeamPersonCard: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 10)
+        .padding(.vertical, NxSpacing.l)
+        .padding(.horizontal, NxSpacing.s + 2)
         .background(
             isSelf ? Color.accentColor.opacity(0.06) : Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 18)
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(isSelf ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(isSelf ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.06), lineWidth: isSelf ? 2 : 0.5)
         )
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Abre el día de \(isSelf ? "ti" : CoreFormat.shortName(user.nombre))")
     }
 }
 
@@ -418,11 +420,10 @@ struct TeamMemberDetailView: View {
                     }
                 }
             } else if loading {
-                Section { ProgressView("Cargando…") }
+                Section { NxLoadingState() }
             } else if let error {
                 Section {
-                    Text(error).foregroundStyle(CorePalette.red)
-                    Button("Reintentar") { Task { await load() } }
+                    NxErrorState(message: error) { Task { await load() } }
                 }
             }
 
@@ -478,7 +479,10 @@ struct TeamMemberDetailView: View {
             async let memberTask = CoreRepository.shared.teamBoardUser(userId: userId)
             async let historyTask = CoreRepository.shared.teamBoardHistory(userId: userId)
             member = try await memberTask
-            history = (try? await historyTask) ?? []
+            // Si el historial falla en un refresco, se queda el que ya se veía.
+            if let nuevo = try? await historyTask {
+                history = nuevo
+            }
             error = nil
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo cargar a esta persona")
