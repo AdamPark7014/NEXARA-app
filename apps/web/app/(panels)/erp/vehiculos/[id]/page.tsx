@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
 import { Tag } from "@/components/ui/DataTable";
+import { SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { VEHICULOS_PATH } from "@/lib/recursos-core";
@@ -49,6 +50,7 @@ export default function VehiculoDetallePage() {
     try {
       setDatos(await obtenerVehiculo(token, id));
     } catch (e) {
+      // Si ya había ficha, se queda: el aviso de arriba ofrece reintentar.
       setError(formatApiError(e, "No se pudo cargar el vehículo"));
     } finally {
       setCargando(false);
@@ -61,12 +63,18 @@ export default function VehiculoDetallePage() {
 
   const vehiculo = datos?.vehiculo;
   const estado = etiquetaEstatus(vehiculo?.estatus);
+  const primeraCarga = cargando && !datos;
+  const reintentar = (
+    <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+      Reintentar
+    </Button>
+  );
 
   return (
     <div className={styles.wrap}>
       <PageHeader
         eyebrow={<Link href={VEHICULOS_PATH} className={styles.migas}>← Flotilla</Link>}
-        title={vehiculo?.nombre || (cargando ? "Cargando…" : "Vehículo")}
+        title={vehiculo?.nombre || (primeraCarga ? "Cargando…" : "Vehículo")}
         subtitle={vehiculo?.placas || undefined}
         density="ops"
         meta={
@@ -84,17 +92,23 @@ export default function VehiculoDetallePage() {
         }
         actions={
           <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
-            Actualizar
+            {cargando && datos ? "Actualizando…" : "Actualizar"}
           </Button>
         }
       />
 
-      {error && <InlineAlert message={error} variant="danger" />}
+      {error && datos && <InlineAlert message={error} variant="warning" action={reintentar} />}
+
+      {primeraCarga && (
+        <Section title="Estado" dense>
+          <SkeletonRows rows={2} label="Cargando vehículo" />
+        </Section>
+      )}
 
       {vehiculo && (
         <Section title="Estado" dense>
           <div className={styles.datos}>
-            <Dato label="Con" valor={vehiculo.conductor?.nombre ?? "Nadie"} />
+            <Dato label="Lo trae" valor={vehiculo.conductor?.nombre ?? "Nadie"} />
             <Dato label="Desde" valor={formatoFecha(vehiculo.desde)} />
             <Dato label="Devuelve" valor={formatoFecha(vehiculo.proximaDevolucion)} />
             <Dato label="Odómetro" valor={formatoKm(vehiculo.odometroUltimo)} />
@@ -103,26 +117,26 @@ export default function VehiculoDetallePage() {
         </Section>
       )}
 
-      <Section title={cargando ? "Historial" : `Historial · ${datos?.historial.length ?? 0} viajes`}>
-        {cargando && <EmptyState title="Cargando…" variant="compact" />}
-        {!cargando && error && (
+      <Section title={!datos ? "Historial" : `Historial · ${datos.historial.length} viajes`}>
+        {primeraCarga && <SkeletonRows rows={3} label="Cargando historial" />}
+        {!cargando && error && !datos && (
           <EmptyState
-            title="No se pudo cargar"
+            title="No se pudo cargar el vehículo"
             description={error}
             variant="compact"
-            action={
-              <Button size="sm" variant="secondary" onClick={() => void cargar()}>
-                Reintentar
-              </Button>
-            }
+            action={reintentar}
           />
         )}
-        {!cargando && !error && (datos?.historial.length ?? 0) === 0 && (
-          <EmptyState title="Sin viajes" description="Este vehículo aún no se usa." variant="compact" />
+        {datos && datos.historial.length === 0 && (
+          <EmptyState
+            title="Sin viajes"
+            description="Cuando alguien registre una salida, aquí verás el recorrido y sus fotos."
+            variant="compact"
+          />
         )}
-        {!cargando && !error && (datos?.historial.length ?? 0) > 0 && (
+        {datos && datos.historial.length > 0 && (
           <div style={{ display: "grid", gap: 12 }}>
-            {datos!.historial.map((viaje) => (
+            {datos.historial.map((viaje) => (
               <Viaje key={`${viaje.origen}-${viaje.id}`} viaje={viaje} onFoto={setFoto} />
             ))}
           </div>
@@ -138,14 +152,18 @@ export default function VehiculoDetallePage() {
         {foto && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element -- evidencia servida por la API */}
-            <img className={styles.visorImg} src={urlFoto(foto.url)} alt={foto.slot} />
+            <img
+              className={styles.visorImg}
+              src={urlFoto(foto.url)}
+              alt={ETIQUETA_SLOT[foto.slot as SlotChecklist] || foto.slot}
+            />
             <p className={styles.mini} style={{ marginTop: 8 }}>
-              {formatoFecha(foto.capturedAt)}
+              Tomada el {formatoFecha(foto.capturedAt)}
               {foto.lat !== null && foto.lng !== null && (
                 <>
                   {" · "}
                   <a href={googleMapsLink(foto.lat, foto.lng)} target="_blank" rel="noopener noreferrer">
-                    ver punto
+                    Ver ubicación en el mapa
                   </a>
                 </>
               )}

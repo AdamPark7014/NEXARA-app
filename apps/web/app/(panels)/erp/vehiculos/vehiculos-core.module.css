@@ -91,9 +91,9 @@
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  background: var(--state-warning-bg, #fffbeb);
-  color: var(--state-warning-text, #b45309);
-  border: 1px solid var(--state-warning-border, #f59e0b);
+  background: var(--state-warning-bg);
+  color: var(--state-warning-text);
+  border: 1px solid var(--state-warning-border);
   white-space: nowrap;
 }
 
@@ -252,13 +252,36 @@
 .pasoNumActivo {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-primary, #fff);
 }
 
 .pasoNumHecho {
-  background: var(--success, #16a34a);
-  border-color: var(--success, #16a34a);
-  color: #fff;
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--on-primary, #fff);
+}
+
+.progreso {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin: -6px 0 14px;
+}
+
+.progresoBarra {
+  height: 100%;
+  background: var(--primary);
+  border-radius: inherit;
+  transition: width 220ms var(--nx-ease-out, ease-out);
+}
+
+.pasoActual {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .pasoSep {
@@ -300,14 +323,34 @@
   color: inherit;
 }
 
+.slot:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.slot:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .slotLleno {
   border-style: solid;
-  border-color: color-mix(in srgb, var(--success, #16a34a) 55%, var(--border));
-  background: color-mix(in srgb, var(--success, #16a34a) 7%, var(--surface));
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+  background: color-mix(in srgb, var(--success) 7%, var(--surface));
 }
 
 .slotGrande {
   min-height: 132px;
+}
+
+.slotIcono {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-tertiary);
+}
+
+.slotLleno .slotEstado {
+  color: var(--state-success-text, var(--success));
+  font-weight: 700;
 }
 
 .slotLabel {
@@ -387,16 +430,22 @@
   padding: 8px 14px;
   cursor: pointer;
   border-right: 1px solid var(--border);
-  min-width: 46px;
+  min-width: 52px;
+  min-height: 44px;
 }
 
 .segmento:last-child {
   border-right: none;
 }
 
+.segmento:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
 .segmentoActivo {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary, #fff);
 }
 
 .resumen {
@@ -533,4 +582,210 @@
   justify-content: flex-end;
   gap: 8px;
   padding-top: 4px;
+}
+
+/* ─── Filtros de la flotilla ─────────────────────────────────────────── */
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--nx-panel-hairline, var(--border));
+}
+
+.busqueda {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 360px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.busqueda:focus-visible,
+.input:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--ring-soft);
+}
+
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.chipActivo {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  color: var(--primary);
+}
+
+.chipCuenta {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.cuerpoLista {
+  padding: 12px 16px 16px;
+}
+
+/* ─── Tarjetas (teléfono) ────────────────────────────────────────────── */
+
+.tarjetas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tarjeta:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.tarjetaPie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Teléfono: controles de 44 px, letra de 16 px y acción fija ─────── */
+
+@media (max-width: 640px) {
+  .input,
+  .busqueda {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .busqueda {
+    max-width: none;
+  }
+
+  .segmentado {
+    display: flex;
+    width: 100%;
+  }
+
+  .segmento {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 4px;
+  }
+
+  .rejilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .slot {
+    min-height: 112px;
+    justify-content: center;
+  }
+
+  .slotPrevia {
+    height: 76px;
+  }
+
+  .slotGrande {
+    min-height: 200px;
+  }
+
+  .slotGrande .slotPrevia {
+    height: 160px;
+  }
+
+  .foto {
+    width: 110px;
+  }
+
+  .foto img {
+    height: 80px;
+  }
+
+  .fotoTablero {
+    width: 150px;
+  }
+
+  .fotoTablero img {
+    height: 110px;
+  }
+
+  .accionesFijas {
+    position: sticky;
+    bottom: -16px;
+    margin: 12px -18px -16px;
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 2;
+  }
+
+  .accionesFijas > * {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
+
+  .chip {
+    min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progresoBarra {
+    transition: none;
+  }
 }
