@@ -11,41 +11,84 @@ import SwiftUI
 struct CoreMoreHubView: View {
     let modules: [CoreExtraModule]
 
-    var body: some View {
+    private static let order: [CoreExtraModule.Group] = [.hoy, .recursos, .finanzas, .gobierno]
+
+    private var sections: [CoreMoreHubSection] {
         let grouped = Dictionary(grouping: modules, by: { $0.group })
-        let order: [CoreExtraModule.Group] = [.hoy, .recursos, .finanzas, .gobierno]
+        return Self.order.compactMap { group in
+            guard let items = grouped[group], !items.isEmpty else { return nil }
+            return CoreMoreHubSection(group: group, modules: items)
+        }
+    }
+
+    var body: some View {
         List {
-            ForEach(order.filter { (grouped[$0] ?? []).isEmpty == false }, id: \.rawValue) { group in
-                Section(group.rawValue) {
-                    ForEach(grouped[group] ?? []) { module in
+            ForEach(sections) { section in
+                Section {
+                    ForEach(section.modules) { module in
                         NavigationLink {
                             CoreExtraDestination(module: module)
                         } label: {
-                            HStack(spacing: 12) {
-                                NxIconBadge(systemName: module.systemImage, size: 36)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(module.title)
-                                        .font(.body.weight(.semibold))
-                                    Text(module.summary)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                if !CoreExtraDestination.tienePantallaNativa(module) {
-                                    Spacer(minLength: 4)
-                                    Text("En la web")
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .padding(.vertical, 4)
+                            CoreMoreHubRow(module: module)
                         }
                     }
+                } header: {
+                    Text(section.group.rawValue)
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .overlay {
+            if modules.isEmpty {
+                ContentUnavailableView(
+                    "Sin módulos adicionales",
+                    systemImage: "square.grid.2x2",
+                    description: Text("Tu rol no tiene módulos extra. Si necesitas uno, pídelo a tu jefe.")
+                )
+            }
+        }
         .navigationTitle("Más")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct CoreMoreHubSection: Identifiable {
+    let group: CoreExtraModule.Group
+    let modules: [CoreExtraModule]
+    var id: String { group.rawValue }
+}
+
+private struct CoreMoreHubRow: View {
+    let module: CoreExtraModule
+
+    private var nativo: Bool { CoreExtraDestination.tienePantallaNativa(module) }
+
+    var body: some View {
+        HStack(spacing: NxSpacing.m) {
+            NxIconBadge(systemName: module.systemImage, size: 40)
+            VStack(alignment: .leading, spacing: NxSpacing.xxs) {
+                Text(module.title)
+                    .font(.body.weight(.semibold))
+                Text(module.summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            if !nativo {
+                Spacer(minLength: NxSpacing.xs)
+                Label("En la web", systemImage: "safari")
+                    .labelStyle(.titleAndIcon)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, NxSpacing.s)
+                    .padding(.vertical, NxSpacing.xxs + 1)
+                    .background(Color.secondary.opacity(0.12), in: Capsule())
+            }
+        }
+        .padding(.vertical, NxSpacing.xs)
+        .frame(minHeight: NxMetrics.minTap)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(nativo ? "Abre el módulo" : "Se abre en la web de NEXARA")
     }
 }
 
@@ -58,9 +101,9 @@ struct CoreModulePlaceholderView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: NxSpacing.l) {
                 NxIconBadge(systemName: module.systemImage, size: 88, circle: true)
-                    .padding(.top, 40)
+                    .padding(.top, NxSpacing.xxl + NxSpacing.s)
                 Text(module.title)
                     .font(.title2.bold())
                     .multilineTextAlignment(.center)
@@ -68,24 +111,25 @@ struct CoreModulePlaceholderView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                Text("Disponible pronto en la app — ábrelo en la web")
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 8)
+                Label("Por ahora este módulo se usa desde la web, con tu misma cuenta.", systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .nxCard(padding: NxSpacing.m)
+                    .padding(.top, NxSpacing.s)
                 Button {
                     openURL(module.webURL)
                 } label: {
                     Label("Abrir en la web", systemImage: "safari")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(NxBrand.primary)
-                .padding(.top, 8)
+                .buttonStyle(NxPrimaryButtonStyle())
+                .padding(.top, NxSpacing.s)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, NxSpacing.xl)
+            .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle(module.title)
         .navigationBarTitleDisplayMode(.inline)
     }
