@@ -33,12 +33,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
+type Photo = { src: string; srcSet?: string; alt: string };
+
 type Capability = {
   id: string;
   icon: PublicIconName;
   title: string;
   text: string;
+  /** Fotografía real de /public/fotos que ilustra el servicio. */
+  photo: Photo;
 };
+
+/** Tamaños de las fotos de servicio: 3 columnas en escritorio, 2 en tablet, 1 en móvil. */
+const SERVICE_SIZES = "(max-width: 640px) 100vw, (max-width: 1080px) 50vw, 420px";
 
 const CAPABILITIES: Capability[] = [
   {
@@ -46,38 +53,44 @@ const CAPABILITIES: Capability[] = [
     icon: "camera",
     title: "Videovigilancia Inteligente",
     text: "Cobertura diseñada por riesgo, cámaras IP, NVR/VMS y evidencia confiable cuando se necesita.",
+    photo: { src: "/fotos/monitoreo-pantallas-cctv.jpg", alt: "Operador revisando cámaras de videovigilancia en pantallas" },
   },
   {
     id: "redes",
     icon: "wifi",
     title: "Redes Empresariales y Wi‑Fi",
     text: "Cableado certificado, switching administrable y Wi‑Fi estable, todo documentado.",
+    photo: { src: "/fotos/campo-instalacion-ap-altura.jpg", alt: "Técnico NEXARA instalando un punto de acceso en altura" },
   },
   {
     id: "computo",
     icon: "server",
     title: "Infraestructura Tecnológica",
     text: "Racks, servidores, respaldos y equipos de trabajo estandarizados y listos para operar.",
+    photo: {
+      src: "/fotos/cableado-interno-pc-guantes-taller-1200.webp",
+      srcSet: "/fotos/cableado-interno-pc-guantes-taller-1200.webp 1200w, /fotos/cableado-interno-pc-guantes-taller-1920.webp 1920w",
+      alt: "Cableado interno de un equipo de cómputo en el taller NEXARA",
+    },
   },
   {
     id: "soporte",
     icon: "headset",
     title: "Soporte y Gestión TI",
     text: "Mesa de ayuda con SLA, atención remota y en sitio. Continuidad para tu operación.",
+    photo: {
+      src: "/fotos/tecnicos-mantenimiento-pc-colaboracion-1200.webp",
+      srcSet: "/fotos/tecnicos-mantenimiento-pc-colaboracion-1200.webp 1200w, /fotos/tecnicos-mantenimiento-pc-colaboracion-1920.webp 1920w",
+      alt: "Técnicos NEXARA dando mantenimiento a un equipo de cómputo",
+    },
   },
   {
     id: "software",
     icon: "code",
     title: "Desarrollo de Plataformas",
     text: "Portales, automatización e indicadores, implementados por fases con objetivos claros.",
+    photo: { src: "/fotos/monitoreo-videowall.jpg", alt: "Video wall con indicadores de operación" },
   },
-];
-
-const PROMISES = [
-  "Diagnóstico en sitio antes de la propuesta",
-  "Alcance cerrado y calendario visible",
-  "Instalación documentada con evidencia",
-  "Soporte con SLA después del arranque",
 ];
 
 /** Logos reales en /public/marcas — decorativos, el grupo lleva la etiqueta. */
@@ -122,8 +135,10 @@ const INDUSTRIA_BLURBS: Record<string, { risk: string; text: string }> = {
   },
 };
 
+type EvidenceItem = Photo & { sizes?: string; kicker: string; caption: string; tall?: boolean };
+
 /** Evidencia fija: fotografías reales de instalaciones NEXARA (en /public/fotos). */
-const EVIDENCE = [
+const EVIDENCE: EvidenceItem[] = [
   {
     src: "/fotos/rack-servidores-led.jpg",
     alt: "Rack de servidores y switching instalado por NEXARA",
@@ -132,21 +147,32 @@ const EVIDENCE = [
     tall: true,
   },
   {
-    src: "/fotos/descarga-equipo-camioneta-nexara-1920.webp",
+    src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1200.webp",
     srcSet:
-      "/fotos/descarga-equipo-camioneta-nexara-1200.webp 1200w, /fotos/descarga-equipo-camioneta-nexara-1920.webp 1920w",
-    sizes: "(max-width: 980px) 100vw, 640px",
-    alt: "Personal de NEXARA descargando cajas de equipo técnico desde una camioneta",
-    kicker: "Logística",
-    caption: "Entrega de equipo en sitio, listo para instalar.",
-    tall: false,
+      "/fotos/tecnico-nexara-entrega-equipo-sitio-1200.webp 1200w, /fotos/tecnico-nexara-entrega-equipo-sitio-1920.webp 1920w",
+    alt: "Técnico NEXARA entregando equipo en sitio",
+    kicker: "Entrega en sitio",
+    caption: "Equipo entregado en sitio, listo para instalar.",
   },
   {
-    src: "/fotos/monitoreo-videowall.jpg",
-    alt: "Centro de monitoreo con video wall de CCTV",
+    src: "/fotos/sala-monitoreo-videowall-nexara-1200.webp",
+    srcSet:
+      "/fotos/sala-monitoreo-videowall-nexara-1200.webp 1200w, /fotos/sala-monitoreo-videowall-nexara-1920.webp 1920w",
+    alt: "Sala de monitoreo con video wall de videovigilancia",
     kicker: "Monitoreo",
     caption: "Centro de monitoreo con video wall de videovigilancia.",
-    tall: false,
+  },
+  {
+    src: "/fotos/control-acceso-torniquetes.jpg",
+    alt: "Torniquetes con control de acceso instalados por NEXARA",
+    kicker: "Control de acceso",
+    caption: "Torniquetes con reconocimiento facial en operación.",
+  },
+  {
+    src: "/fotos/campo-enlace-antena-ciudad.jpg",
+    alt: "Técnico NEXARA instalando un enlace de antena sobre la ciudad",
+    kicker: "Enlaces",
+    caption: "Enlace inalámbrico punto a punto instalado en azotea.",
   },
 ];
 
@@ -262,11 +288,53 @@ export default async function NexaraPage() {
       <HomeHero bootstrap={heroBootstrap} />
 
       <div className={styles.homeBody}>
-        {/* Por qué NEXARA: foto real + promesas */}
+        {/* 1. Trabajo real: lo visual primero, bajando del video */}
+        <section className={shared.section} aria-label="Trabajo real en sitio" data-reveal="up">
+          <div className={shared.inner}>
+            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
+              <p className={shared.eyebrow}>Trabajo real</p>
+              <h2 className={shared.sectionTitle}>
+                Instalaciones que <span className={shared.sectionTitleAccent}>operan hoy</span>
+              </h2>
+              <p className={shared.sectionLead}>
+                Fotografía de proyectos reales de NEXARA, no banco de imágenes.
+              </p>
+            </header>
+            <div className={styles.mosaic5}>
+              {EVIDENCE.map((e) => (
+                <figure
+                  key={e.src}
+                  className={`${shared.photoFrame} ${e.tall ? styles.mosaicTall : styles.mosaicWide}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={e.src}
+                    srcSet={e.srcSet}
+                    sizes={e.srcSet ? (e.tall ? "(max-width: 980px) 100vw, 440px" : "(max-width: 980px) 50vw, 440px") : undefined}
+                    alt={e.alt}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <figcaption className={shared.photoCaption}>
+                    <span className={shared.photoCaptionKicker}>{e.kicker}</span>
+                    {e.caption}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+            <p className={styles.sectionMore}>
+              <Link href="/proyectos" className={shared.linkArrow}>
+                Ver casos de campo <PublicIcon name="arrowRight" size={16} />
+              </Link>
+            </p>
+          </div>
+        </section>
+
+        {/* 2. Por qué NEXARA: foto real + método en tres pasos + cifras */}
         <section className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Por qué NEXARA" data-reveal="up">
           <div className={shared.inner}>
             <div className={shared.split}>
-              <figure className={`${shared.photoFrame} ${shared.ar43} ${shared.splitMedia}`}>
+              <figure className={`${shared.photoFrame} ${styles.whyPhoto} ${shared.splitMedia}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={splitPhoto.src} alt={splitPhoto.alt} loading="lazy" decoding="async" />
                 <span className={shared.photoBadge}>Proyecto real</span>
@@ -278,15 +346,23 @@ export default async function NexaraPage() {
                     Una sola firma del diagnóstico <span className={shared.sectionTitleAccent}>al soporte</span>
                   </h2>
                   <p className={shared.sectionLead}>
-                    Diseñamos, instalamos y operamos con el mismo equipo. Sin intermediarios, sin alcances
-                    abiertos y con evidencia de cada entrega.
+                    Diseñamos, instalamos y operamos con el mismo equipo: alcance cerrado, evidencia de cada
+                    entrega y soporte con SLA después del arranque.
                   </p>
                 </header>
-                <ul className={`${shared.checkList} ${shared.checkListSingle}`}>
-                  {PROMISES.map((p) => (
-                    <li key={p}>{p}</li>
+                <ol className={styles.stepList} aria-label="Cómo trabajamos">
+                  {proceso.map((p) => (
+                    <li key={p.num} className={styles.stepListItem}>
+                      <span className={styles.stepListNum} aria-hidden>
+                        {p.num}
+                      </span>
+                      <div>
+                        <h3 className={styles.stepListTitle}>{p.title}</h3>
+                        <p className={styles.stepListText}>{p.text}</p>
+                      </div>
+                    </li>
                   ))}
-                </ul>
+                </ol>
                 <ul className={shared.factsInline} aria-label="Cifras de operación">
                   {metricas.map((m) => (
                     <li key={`${m.value}-${m.label}`}>
@@ -308,49 +384,7 @@ export default async function NexaraPage() {
           </div>
         </section>
 
-        {/* Evidencia real */}
-        <section className={shared.section} aria-label="Trabajo real en sitio" data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-              <p className={shared.eyebrow}>Trabajo real</p>
-              <h2 className={shared.sectionTitle}>
-                Instalaciones que <span className={shared.sectionTitleAccent}>operan hoy</span>
-              </h2>
-              <p className={shared.sectionLead}>
-                Fotografía de proyectos reales de NEXARA, no banco de imágenes.
-              </p>
-            </header>
-            <div className={shared.mosaic}>
-              {EVIDENCE.map((e) => (
-                <figure
-                  key={e.src}
-                  className={`${shared.photoFrame} ${e.tall ? shared.mosaicTall : shared.mosaicWide}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={e.src}
-                    {...(e as any).srcSet ? { srcSet: (e as any).srcSet } : {}}
-                    {...(e as any).sizes ? { sizes: (e as any).sizes } : {}}
-                    alt={e.alt}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <figcaption className={shared.photoCaption}>
-                    <span className={shared.photoCaptionKicker}>{e.kicker}</span>
-                    {e.caption}
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-            <p className={styles.sectionMore}>
-              <Link href="/proyectos" className={shared.linkArrow}>
-                Ver casos de campo <PublicIcon name="arrowRight" size={16} />
-              </Link>
-            </p>
-          </div>
-        </section>
-
-        {/* Servicios (después de evidencia) */}
+        {/* 3. Servicios: tarjetas con fotografía real */}
         <section className={shared.section} aria-label="Servicios" data-reveal="up">
           <div className={shared.inner}>
             <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
@@ -363,55 +397,50 @@ export default async function NexaraPage() {
                 Diseñamos, instalamos y operamos.
               </p>
             </header>
-            <div className={shared.iconGrid} data-reveal-stagger>
+            <div className={styles.serviceGrid} data-reveal-stagger>
               {CAPABILITIES.map((c) => (
-                <Link key={c.id} href={`/servicios#${c.id}`} className={shared.iconCard} data-reveal="up">
-                  <span className={shared.iconTile}>
-                    <PublicIcon name={c.icon} />
-                  </span>
-                  <h3 className={shared.iconCardTitle}>{c.title}</h3>
-                  <p className={shared.iconCardText}>{c.text}</p>
-                  <span className={shared.iconCardLink}>
-                    Ver servicio <PublicIcon name="arrowRight" size={16} />
-                  </span>
+                <Link key={c.id} href={`/servicios#${c.id}`} className={styles.serviceCard} data-reveal="up">
+                  <div className={styles.serviceMedia}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={c.photo.src}
+                      srcSet={c.photo.srcSet}
+                      sizes={c.photo.srcSet ? SERVICE_SIZES : undefined}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <span className={`${shared.iconTile} ${styles.serviceTile}`}>
+                      <PublicIcon name={c.icon} />
+                    </span>
+                  </div>
+                  <div className={styles.serviceBody}>
+                    <h3 className={shared.iconCardTitle}>{c.title}</h3>
+                    <p className={shared.iconCardText}>{c.text}</p>
+                    <span className={shared.iconCardLink}>
+                      Ver servicio <PublicIcon name="arrowRight" size={16} />
+                    </span>
+                  </div>
                 </Link>
               ))}
-              <Link href="/soluciones" className={`${shared.iconCard} ${shared.iconCardDark}`} data-reveal="up">
-                <span className={shared.iconTile}>
-                  <PublicIcon name="layers" />
-                </span>
-                <h3 className={shared.iconCardTitle}>¿Tu operación es distinta?</h3>
-                <p className={shared.iconCardText}>
-                  Soluciones por industria: retail, manufactura, hospitalidad, salud, educación y gobierno.
-                </p>
-                <span className={shared.iconCardLink}>
-                  Ver soluciones <PublicIcon name="arrowRight" size={16} />
-                </span>
+              <Link href="/soluciones" className={styles.serviceCard} data-reveal="up">
+                <div className={styles.serviceMedia}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/fotos/control-acceso-terminal-facial.jpg" alt="" loading="lazy" decoding="async" />
+                  <span className={`${shared.iconTile} ${styles.serviceTile}`}>
+                    <PublicIcon name="layers" />
+                  </span>
+                </div>
+                <div className={styles.serviceBody}>
+                  <h3 className={shared.iconCardTitle}>¿Tu operación es distinta?</h3>
+                  <p className={shared.iconCardText}>
+                    Soluciones por industria: retail, manufactura, hospitalidad, salud, educación y gobierno.
+                  </p>
+                  <span className={shared.iconCardLink}>
+                    Ver soluciones <PublicIcon name="arrowRight" size={16} />
+                  </span>
+                </div>
               </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Método (banda navy) */}
-        <section className={`${shared.section} ${shared.sectionNavy}`} aria-label="Cómo trabajamos" data-reveal="up">
-          <div className={shared.inner}>
-            <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-              <p className={shared.eyebrow}>Cómo trabajamos</p>
-              <h2 className={shared.sectionTitle}>
-                De diagnóstico a <span className={shared.sectionTitleAccent}>operación</span>
-              </h2>
-              <p className={shared.sectionLead}>
-                Tres fases, alcance cerrado y un solo responsable de principio a fin.
-              </p>
-            </header>
-            <div className={shared.stepsRow} data-reveal-stagger>
-              {proceso.map((p) => (
-                <article key={p.num} className={shared.stepItemOpen} data-reveal="up">
-                  <span className={shared.stepNumOpen}>{p.num}</span>
-                  <h3 className={shared.stepTitleOpen}>{p.title}</h3>
-                  <p className={shared.stepTextOpen}>{p.text}</p>
-                </article>
-              ))}
             </div>
           </div>
         </section>

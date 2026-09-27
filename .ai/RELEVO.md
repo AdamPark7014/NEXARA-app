@@ -1,6 +1,6 @@
 # RELEVO
 
-- **Último turno:** cursor
+- **Último turno:** claude-code (sitio público) — antes: cursor (consolidación en `main`)
 - **Fecha:** 2026-09-27
 - **Regla:** se trabaja **siempre directo en `main`**: sin ramas, worktrees ni PRs (Adam es el único programador).
   Está en las reglas de Cursor, `~/.claude/CLAUDE.md`, `C:\dev\CLAUDE.md`, `FUSION-PROTOCOL.md` y la plantilla EXEC-PACKET.
@@ -9,6 +9,24 @@
 - **Respaldo de todo lo borrado:** `C:\dev\.ai\archivo-nexara-2026-09-27\` — `todas-las-ramas.bundle`
   (224 ramas) + parches/zips de los 39 worktrees con cambios (`final\` = copia justo antes de borrar).
   Recuperar una rama: `git fetch C:\dev\.ai\archivo-nexara-2026-09-27\todas-las-ramas.bundle "refs/heads/<rama>:refs/heads/<rama>"`.
+
+## Hecho (Claude, 27-09 12:30-13:10): Inicio «visual primero» + mapa repinta con el tema
+- Adam: bajando del video quiere ver imágenes antes que texto y sintetizar. Nuevo orden de Inicio:
+  hero → **Trabajo real** (mosaico de 5 fotos: 1 vertical + 4 horizontales, `styles.mosaic5`) →
+  **Por qué NEXARA** (foto 3:4 `styles.whyPhoto` + método en tres pasos integrado como lista
+  `stepList` + cifras + CTAs; **desaparece la banda «Cómo trabajamos»** de solo texto) → **Servicios**
+  como tarjetas con fotografía real (`styles.serviceCard`, caja 16:10, tile de icono colgando) →
+  Industrias → Fabricantes → Cobertura → CTA. Archivos: `nexara/page.tsx`, `nexara/home-sections.module.css`.
+- `BrandMap`: el conmutador de tema no repintaba el mapa (la guarda `isStyleLoaded()` es falsa mientras
+  cargan teselas). Ahora repinta directo y, si el estilo no está listo, en el siguiente `idle`.
+- Verificado en local (3005) a 1536/820/375: sin scroll horizontal, tarjetas de servicio con media
+  uniforme (244 px a 1536), mosaico 2 filas = alto de la foto vertical, contraste sin fallas en ambos temas.
+- **Entorno:** el puerto 3000 lo ocupa el contenedor Docker `nexara-web-dev` (`next start`, build fijo:
+  **no refleja cambios de código**). Para ver cambios en vivo: entrada `nexara-web-alt` de
+  `C:\dev\.claude\launch.json` (Next dev en el **3005**). El digest de Ollama deja `apps/web/.ai/`
+  (excluido vía `.git/info/exclude`, no commitear).
+- Regla «solo main» revisada: `GIT-SOLO-MAIN.md`, hook `git-solo-main-guard.ps1` y `~/.claude/CLAUDE.md`
+  coinciden; queda además en la memoria de Claude como regla por defecto.
 
 ## Hecho: consolidación en `main` (tarde)
 - Fusionadas las 5 ramas con código nuevo sin conflicto: `ci-fixes` (CI, seeds, guardia release Android),

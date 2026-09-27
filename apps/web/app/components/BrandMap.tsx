@@ -190,8 +190,17 @@ export default function BrandMap({ compact = false, overlay = true, className }:
           if (map) restyle(map);
         });
         // Cambio de tema en vivo: repinta sin recargar.
+        // `isStyleLoaded()` es falso mientras haya teselas cargando, así que no sirve de
+        // guarda: repintamos directo y, si el estilo aún no está listo, en el siguiente `idle`.
         const onTheme = () => {
-          if (map && map.isStyleLoaded()) restyle(map);
+          if (!map) return;
+          try {
+            restyle(map);
+          } catch {
+            map.once("idle", () => {
+              if (map) restyle(map);
+            });
+          }
         };
         window.addEventListener("nexara:public-theme", onTheme);
         themeCleanup = () => window.removeEventListener("nexara:public-theme", onTheme);
