@@ -21,12 +21,14 @@
     "prisma:seed": "prisma db seed",
     "seed:play-reviewer": "ts-node -P ./prisma/tsconfig.seed.json ./prisma/seed-play-reviewer.ts",
     "seed:play-demo": "ts-node -P ./prisma/tsconfig.seed.json ./prisma/seed-play-demo-data.ts",
+    "seed:plantillas": "ts-node --transpile-only -P ./prisma/tsconfig.seed.json ./prisma/seed-nexara-plantillas.ts",
     "audit:org-users": "node ./scripts/audit-org-users.mjs",
     "generate:vapid": "web-push generate-vapid-keys",
     "integra:isapi:scan": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-scan.ts",
     "integra:isapi:seed": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-seed.ts",
     "integra:isapi:sync": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-sync.ts",
-    "integra:isapi:publish": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-publish.ts"
+    "integra:isapi:publish": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-publish.ts",
+    "pac:preflight": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/pac/pac-preflight.cli.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

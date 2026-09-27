@@ -35,8 +35,8 @@ describe('normalizarRequisitos', () => {
       { descripcion: 'Taladro', productId: 5, toolId: 9 },
     ]);
     expect(res).toEqual([
-      { id: null, descripcion: 'Escalera', cantidad: 2, productId: null, toolId: null, orden: 0 },
-      { id: null, descripcion: 'Taladro', cantidad: 1, productId: 5, toolId: 9, orden: 1 },
+      { id: null, descripcion: 'Escalera', cantidad: 2, productId: null, toolId: null, toolSource: null, orden: 0 },
+      { id: null, descripcion: 'Taladro', cantidad: 1, productId: 5, toolId: 9, toolSource: null, orden: 1 },
     ]);
   });
 
