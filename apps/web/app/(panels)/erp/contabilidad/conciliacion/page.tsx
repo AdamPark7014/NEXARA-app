@@ -1112,7 +1112,7 @@ function AyudaTeclado() {
 }
 
 const selectStyle: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 16,
   padding: "6px 8px",
   borderRadius: 8,
   border: "1px solid var(--border)",
