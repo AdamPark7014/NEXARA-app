@@ -282,6 +282,8 @@
   --ui-primary: var(--ui-brand);
   --ui-primary-hover: var(--ui-brand-hover);
   --ui-primary-soft: var(--ui-brand-soft);
+  /* Texto e iconos sobre relleno de acción (primario, peligro, acento). */
+  --on-primary: #fff;
   --ui-text-primary: var(--ui-fg);
   --ui-text-secondary: var(--ui-fg-2);
   --ui-text-tertiary: var(--ui-fg-3);

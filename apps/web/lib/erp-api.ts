@@ -5,19 +5,24 @@ import { buildApiUrl } from "@/lib/api-base";
 import { withTenantHeaders } from "@/lib/tenant";
 
 export function formatApiError(err: unknown, fallback = "Error desconocido"): string {
-  if (err instanceof Error) {
-    const raw = err.message.trim();
-    if (!raw) return fallback;
-    try {
-      const parsed = JSON.parse(raw) as { message?: string | string[] };
-      if (Array.isArray(parsed.message)) return parsed.message.join(", ");
-      if (typeof parsed.message === "string") return parsed.message;
-    } catch {
-      /* plain text */
-    }
-    return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
+  const raw = (err instanceof Error ? err.message : typeof err === "string" ? err : "").trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as { message?: unknown; error?: unknown };
+    const msg = Array.isArray(parsed.message)
+      ? parsed.message.filter((m): m is string => typeof m === "string").join(", ")
+      : typeof parsed.message === "string"
+        ? parsed.message
+        : typeof parsed.error === "string"
+          ? parsed.error
+          : "";
+    return msg.trim() || fallback;
+  } catch {
+    /* plain text */
   }
-  return fallback;
+  // HTML de un proxy caído, JSON truncado o un volcado de pila: nada de eso se enseña.
+  if (/^\s*[{[<]/.test(raw) || /\n\s+at\s/.test(raw)) return fallback;
+  return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
 }
 
 export function asList<T>(payload: unknown): T[] {
