@@ -734,7 +734,7 @@ export default function MisActividadesPage() {
                   borderRadius: 12,
                   border: "1px solid var(--border)",
                   fontFamily: "inherit",
-                  fontSize: 14,
+                  fontSize: 16,
                   resize: "vertical",
                   background: "var(--surface)",
                   color: "inherit",
