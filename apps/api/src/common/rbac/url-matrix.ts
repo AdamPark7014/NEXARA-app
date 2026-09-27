@@ -1016,6 +1016,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/cotizaciones/**', methods: ['GET'], scope: 'read' },
     VISTA_PREVIA_COTIZACION_URL_RULE,
     { path: '/api/accounting/**', scope: 'write' },
+    // Preparación del timbrado (solo lectura; el controlador además restringe por rol).
+    { path: '/api/pac/readiness', methods: ['GET'], scope: 'read' },
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
     { path: '/api/employee-payments/**', methods: ['GET', 'POST'], scope: 'write' },

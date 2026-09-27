@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { digitoRfcCorrecto } from './rfc-checksum.js';
 
 /**
  * Servicios REST del SAT (consulta pública, sin e.firma).
@@ -431,19 +432,8 @@ export class SatService {
     };
   }
 
-  /** Algoritmo de dígito verificador del RFC (SAT). */
+  /** Algoritmo de dígito verificador del RFC (SAT): ver `rfc-checksum.ts`. */
   private checkRfcChecksum(rfc: string): boolean {
-    const base = rfc.slice(0, -1);
-    const checkChar = rfc.slice(-1);
-    const dict = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÑ';
-    let sum = 0;
-    for (let i = 0; i < base.length; i++) {
-      const idx = dict.indexOf(base[i]);
-      if (idx < 0) return false;
-      sum += idx * (base.length + 1 - i);
-    }
-    const remainder = sum % 11;
-    const expected = remainder === 0 ? '0' : remainder === 1 ? 'A' : String(11 - remainder);
-    return checkChar === expected;
+    return digitoRfcCorrecto(rfc);
   }
 }

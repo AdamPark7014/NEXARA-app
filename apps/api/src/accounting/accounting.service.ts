@@ -1877,7 +1877,8 @@ export class AccountingService {
             quantity: qty,
             unitPrice,
             taxRate: Number(line.tax),
-            ivaRate: Number(line.tax) || 16,
+            // Solo un IVA ausente cae a 16 %: una línea al 0 % (exenta/tasa cero) se factura al 0 %.
+            ivaRate: line.tax == null ? 16 : Number(line.tax),
             productId: line.productId ?? undefined,
             unitName: sat.unitName,
             satProductKey: sat.satProductKey,
@@ -1938,6 +1939,10 @@ export class AccountingService {
     if (!invoice.emisorRegime) cfdiErrors.push('régimen fiscal del emisor');
     if (!invoice.cfdiUsage) cfdiErrors.push('uso de CFDI');
     if (!invoice.items?.length) cfdiErrors.push('al menos un concepto');
+    const issuerProfile = await this.getInvoiceIssuerProfile();
+    if (!issuerProfile.emisorZipCode) {
+      cfdiErrors.push('CP fiscal del emisor (LugarExpedicion — configurar en perfil de empresa o ajustes fiscales)');
+    }
     const itemsWithoutSatKey = invoice.items?.filter(
       (it) => !it.satProductKey || !it.satUnitKey,
     ) || [];
@@ -1952,10 +1957,6 @@ export class AccountingService {
 
     const emisorRfc = invoice.emisorRfc as string;
     const receptorRfc = invoice.receptorRfc as string;
-    const issuerProfile = await this.getInvoiceIssuerProfile();
-    if (!issuerProfile.emisorZipCode) {
-      cfdiErrors.push('CP fiscal del emisor (LugarExpedicion — configurar en perfil de empresa o ajustes fiscales)');
-    }
 
     // Claim atómico DRAFT → STAMPING para evitar doble timbrado concurrente.
     const claim = await this.prisma.invoice.updateMany({
@@ -2018,6 +2019,15 @@ export class AccountingService {
         data: { status: 'DRAFT' },
       });
       throw err;
+    }
+
+    if (!stamp.uuid) {
+      // El PAC pudo haber timbrado aunque no devolvió el UUID: revertir a borrador invitaría a un
+      // segundo timbrado. Se deja en STAMPING (bloquea reintentos) hasta que alguien lo revise.
+      throw new BadRequestException(
+        `El proveedor de timbrado (${stamp.provider}) respondió sin UUID. La factura ${invoice.invoiceNumber} ` +
+          'quedó en «timbrando» para evitar un doble timbrado: revisa en el portal del proveedor si se emitió antes de reintentar.',
+      );
     }
 
     const persist = await this.prisma.invoice.updateMany({
