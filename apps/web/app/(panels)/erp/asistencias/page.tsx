@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import PanelTabs from "@/components/ui/PanelTabs";
 import Section from "@/components/ui/Section";
-import KpiCard from "@/components/ui/KpiCard";
+import KpiCard, { type KpiVariant } from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
@@ -16,9 +16,9 @@ import ComidasPanel from "@/components/asistencias/ComidasPanel";
 import UniformeControl from "@/components/kpis/UniformeControl";
 import { KPIS_PATH } from "@/lib/kpis-equipo";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl, getSocketBaseUrl, parseResponseJson } from "@/lib/api-base";
+import { getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
-import { attendanceMapUrl } from "@/lib/gps-map-links";
+import { attendanceMapUrl, googleMapsPointUrl, toCoord } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { erpFetch } from "@/lib/erp-api";
@@ -47,6 +47,7 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import styles from "./asistencias.module.css";
 
 // Tres pantallas pesadas que solo ve quien tiene equipo: se cargan cuando se abren
 // su pestaña, no en cada visita a Asistencias.
@@ -110,21 +111,12 @@ interface TrajectoryPoint {
 
 const ESTADO_META: Record<Estado, { label: string; color: string }> = {
   PRESENTE: { label: "En jornada", color: "#16a34a" },
-  COMPLETO: { label: "Completó", color: "#2563eb" },
+  COMPLETO: { label: "Ya salió", color: "#2563eb" },
   JUSTIFICADA: { label: "Falta justificada", color: "#7c3aed" },
   AUSENTE: { label: "Sin checada", color: "#94a3b8" },
 };
 
 const ESTADO_ORDER: Record<Estado, number> = { PRESENTE: 0, COMPLETO: 1, JUSTIFICADA: 2, AUSENTE: 3 };
-
-async function apiFetch<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(buildApiUrl(path), {
-    credentials: "include",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  return (await parseResponseJson<T>(res)) as T;
-}
 
 function todayIso() {
   return new Date().toLocaleDateString("sv-SE");
@@ -135,7 +127,6 @@ function fmtTime(iso?: string | null) {
   return new Date(iso).toLocaleTimeString("es-MX", {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
   });
 }
 
@@ -185,50 +176,32 @@ function latestByType(
   return filtered.reduce((max, a) => (a.timestamp > max.timestamp ? a : max)).timestamp;
 }
 
-function FilterChip({
-  active,
-  label,
-  count,
-  color,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  count: number;
-  color?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "6px 12px",
-        borderRadius: 999,
-        border: active ? `1.5px solid ${color ?? "var(--primary)"}` : "1px solid var(--border)",
-        background: active
-          ? `color-mix(in srgb, ${color ?? "var(--primary)"} 12%, var(--surface))`
-          : "var(--surface)",
-        color: active ? color ?? "var(--primary)" : "var(--text-secondary)",
-        fontSize: 12,
-        fontWeight: active ? 700 : 550,
-        cursor: "pointer",
-        fontFamily: "inherit",
-      }}
-    >
-      {color ? (
-        <span
-          aria-hidden
-          style={{ width: 8, height: 8, borderRadius: "50%", background: color }}
-        />
-      ) : null}
-      {label}
-      <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{count}</span>
-    </button>
+/** Reloj que avanza solo mientras la jornada sigue abierta; el resto de la página no se vuelve a pintar. */
+function useAhora(activo: boolean): number {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    if (!activo) return;
+    setAhora(Date.now());
+    const id = window.setInterval(() => setAhora(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [activo]);
+  return ahora;
+}
+
+function LiveTimer({ since, until }: { since?: string | null; until?: string | null }) {
+  const ahora = useAhora(Boolean(since) && !until);
+  return <>{fmtHms(elapsedMs(since, until, ahora))}</>;
+}
+
+type Jornada = { checkIn?: string; checkOut?: string; abierta: boolean };
+
+function LiveTotal({ jornadas }: { jornadas: Jornada[] }) {
+  const ahora = useAhora(jornadas.some((j) => j.abierta && j.checkIn));
+  const total = jornadas.reduce(
+    (sum, j) => sum + elapsedMs(j.checkIn, j.abierta ? null : j.checkOut, ahora),
+    0,
   );
+  return <>{fmtHms(total)}</>;
 }
 
 /** Marcas del servidor en una checada: sin conexión, revisar, fuera de sitio, cierre, corregida. */
@@ -242,7 +215,7 @@ function InsigniasChecada({ checada }: { checada?: ChecadaValidable }) {
           key={i.clave}
           title={i.detalle}
           style={{
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             lineHeight: 1.4,
             color: i.color,
@@ -266,13 +239,15 @@ function BotonCorregir({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       style={{
-        marginTop: 4,
+        marginTop: 2,
+        minHeight: 40,
         background: "none",
         border: "none",
-        padding: 0,
+        padding: "0 8px 0 0",
         cursor: "pointer",
-        fontSize: 10.5,
+        fontSize: 12.5,
         fontWeight: 650,
+        fontFamily: "inherit",
         color: "var(--primary)",
       }}
     >
@@ -312,7 +287,9 @@ export default function ErpAsistenciasPage() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refrescando, setRefrescando] = useState(false);
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(null);
   // Salida de emergencia: a quién le está registrando la checada un jefe.
   const [registrandoPara, setRegistrandoPara] = useState<{ id: number; nombre: string } | null>(null);
 
@@ -345,10 +322,19 @@ export default function ErpAsistenciasPage() {
         );
         const list = Array.isArray(raw) ? raw : (raw?.users ?? []);
         // Christian/Adam/Claudia/cuenta demo no son empleados: no deben verse como "sin checada".
-        setMembers(list.filter((u) => !isNonEmployeeEmail(u.email)));
+        const equipo = list.filter((u) => !isNonEmployeeEmail(u.email));
+        setMembers(equipo);
+        setRefreshError(null);
+        setActualizadoEn(new Date());
       } catch (e) {
-        setMembers([]);
-        if (!quiet) setError(e instanceof Error ? e.message : "No se pudo cargar el equipo");
+        const texto = formatApiError(e, "No se pudo cargar la asistencia de tu equipo.");
+        // Un refresco silencioso que falla no borra la lista: solo avisa.
+        if (quiet) {
+          setRefreshError(texto);
+        } else {
+          setMembers([]);
+          setError(texto);
+        }
       } finally {
         if (!quiet) setLoading(false);
       }
@@ -361,34 +347,30 @@ export default function ErpAsistenciasPage() {
     setLoading(true);
     setError(null);
     try {
-      if (canLiveGps) {
-        const team = await apiFetch<LocationRecord[]>("gps/team", token);
-        setTeamGps(Array.isArray(team) ? team : []);
-      } else {
-        setTeamGps([]);
-      }
-      if (canSeeOwnTrajectory) {
-        const [pts, hist] = await Promise.all([
-          apiFetch<TrajectoryPoint[]>(`gps/trajectory?date=${dateFilter}`, token),
-          apiFetch<typeof dayAttendances>(`attendance/history?date=${dateFilter}`, token).catch(() => []),
-        ]);
-        setTrajectory(Array.isArray(pts) ? pts : []);
-        setDayAttendances(Array.isArray(hist) ? hist : []);
-      } else {
-        setTrajectory([]);
-        setDayAttendances([]);
-      }
+      const [team, pts, hist] = await Promise.all([
+        canLiveGps ? erpFetch<LocationRecord[]>("gps/team", token) : Promise.resolve([] as LocationRecord[]),
+        canSeeOwnTrajectory
+          ? erpFetch<TrajectoryPoint[]>(`gps/trajectory?date=${dateFilter}`, token)
+          : Promise.resolve([] as TrajectoryPoint[]),
+        canSeeOwnTrajectory
+          ? erpFetch<typeof dayAttendances>(`attendance/history?date=${dateFilter}`, token).catch(() => [])
+          : Promise.resolve([] as typeof dayAttendances),
+      ]);
+      setTeamGps(Array.isArray(team) ? team : []);
+      setTrajectory(Array.isArray(pts) ? pts : []);
+      setDayAttendances(Array.isArray(hist) ? hist : []);
     } catch (e) {
       setTeamGps([]);
       setTrajectory([]);
-      setError(e instanceof Error ? e.message : "No se pudo cargar trayectoria");
+      setError(formatApiError(e, "No se pudo cargar el recorrido del día."));
     } finally {
       setLoading(false);
     }
   }, [token, dateFilter, canLiveGps, canSeeOwnTrajectory]);
 
   useEffect(() => {
-    // Comidas carga lo suyo en ComidasPanel (lunch-breaks/today exigía ATTENDANCE_MANAGE).
+    // Comidas carga lo suyo en ComidasPanel.
+    setError(null);
     if (tab === "equipo") void loadEquipo();
     else if (tab === "trayectoria") void loadTrayectoria();
   }, [tab, loadEquipo, loadTrayectoria]);
@@ -413,7 +395,9 @@ export default function ErpAsistenciasPage() {
       if (payload?.model === "Attendance" || payload?.model === "AttendanceDay") bump();
     });
 
-    const id = window.setInterval(bump, 15_000);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") bump();
+    }, 15_000);
     return () => {
       window.removeEventListener("focus", bump);
       window.removeEventListener("attendance:updated", bump);
@@ -465,7 +449,19 @@ export default function ErpAsistenciasPage() {
   const completos = mapped.filter((m) => m.estado === "COMPLETO").length;
   const ausentes = mapped.filter((m) => m.estado === "AUSENTE").length;
   const justificadas = mapped.filter((m) => m.estado === "JUSTIFICADA").length;
-  const hasOpenJornada = presentes > 0;
+  const jornadas = useMemo<Jornada[]>(
+    () => mapped.map((m) => ({ checkIn: m.checkIn, checkOut: m.checkOut, abierta: m.estado === "PRESENTE" })),
+    [mapped],
+  );
+
+  const refrescar = async () => {
+    setRefrescando(true);
+    try {
+      await loadEquipo(true);
+    } finally {
+      setRefrescando(false);
+    }
+  };
 
   // Faltas justificadas: solo Christian (y su equivalente) las marca o las quita; la API lo vuelve a exigir.
   const puedeJustificar = isCeoEquivalentEmail(user?.email);
@@ -588,21 +584,15 @@ export default function ErpAsistenciasPage() {
     });
   };
 
-  useEffect(() => {
-    if (!hasOpenJornada) return;
-    setNowMs(Date.now());
-    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [hasOpenJornada]);
-
-  const productividadMs = useMemo(
-    () =>
-      mapped.reduce(
-        (sum, m) => sum + elapsedMs(m.checkIn, m.estado === "PRESENTE" ? null : m.checkOut, nowMs),
-        0,
-      ),
-    [mapped, nowMs],
-  );
+  const kpis: { key: FilterEstado; label: string; value: number; variant: KpiVariant }[] = [
+    { key: "TODOS", label: "Todo el equipo", value: mapped.length, variant: "default" },
+    { key: "PRESENTE", label: "En jornada", value: presentes, variant: presentes > 0 ? "accent" : "default" },
+    { key: "COMPLETO", label: "Ya salieron", value: completos, variant: completos > 0 ? "positive" : "default" },
+    ...(justificadas > 0 || puedeJustificar
+      ? [{ key: "JUSTIFICADA" as const, label: "Falta justificada", value: justificadas, variant: "default" as const }]
+      : []),
+    { key: "AUSENTE", label: "Sin checada", value: ausentes, variant: ausentes > 0 ? "danger" : "positive" },
+  ];
 
   const filtered = useMemo(
     () => (filterEstado === "TODOS" ? mapped : mapped.filter((m) => m.estado === filterEstado)),
@@ -612,26 +602,33 @@ export default function ErpAsistenciasPage() {
   const sectionTitle =
     filterEstado === "TODOS"
       ? `Equipo del día (${filtered.length})`
-      : `${ESTADO_META[filterEstado].label} (${filtered.length})`;
+      : `${kpis.find((k) => k.key === filterEstado)?.label ?? ESTADO_META[filterEstado].label} (${filtered.length})`;
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Personas"
-        title="Asistencias"
-        subtitle="Tu checada (foto + GPS) · equipo · comidas · trayectoria"
+        eyebrow="Asistencias"
+        title="Asistencia del día"
+        subtitle={
+          isManager
+            ? "Quién llegó, a qué hora y cuánto lleva trabajando tu equipo."
+            : "Tu jornada y tus comidas del día."
+        }
         actions={
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
             {isManager ? (
               <Link
                 href={KPIS_PATH}
+                className={styles.control}
                 style={{
+                  display: "inline-flex",
+                  alignItems: "center",
                   padding: "7px 12px",
                   borderRadius: 8,
                   border: "1px solid var(--nx-panel-hairline)",
                   background: "var(--nx-panel-surface-overlay)",
                   color: "var(--primary)",
-                  fontSize: 12.5,
+                  fontSize: 13,
                   fontWeight: 700,
                   textDecoration: "none",
                   whiteSpace: "nowrap",
@@ -642,16 +639,18 @@ export default function ErpAsistenciasPage() {
             ) : null}
             <input
               type="date"
+              aria-label="Día"
               value={dateFilter}
               max={todayIso()}
               onChange={(e) => setDateFilter(e.target.value)}
+              className={`${styles.control} ${styles.dateInput}`}
               style={{
                 padding: "7px 10px",
                 border: "1px solid var(--nx-panel-hairline)",
                 borderRadius: 8,
                 background: "var(--nx-panel-surface-overlay)",
                 color: "var(--text-primary)",
-                fontSize: 12.5,
+                fontSize: 14,
                 fontFamily: "inherit",
               }}
             />
@@ -659,40 +658,62 @@ export default function ErpAsistenciasPage() {
         }
       />
 
-      <PanelTabs
-        ariaLabel="Asistencias unificadas"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { key: "equipo", label: "Equipo del día" },
-          { key: "comidas", label: "Comidas" },
-          // Quién intentó checar y no pudo, y el horario de cada quien: quien tiene equipo.
-          ...(isManager
-            ? [
-                { key: "rechazos" as const, label: "Rechazos" },
-                { key: "horarios" as const, label: "Horarios" },
-              ]
-            : []),
-          // Mapa del equipo y recorridos: solo dirección.
-          ...(canLiveGps ? [{ key: "trayectoria" as const, label: "Trayectoria" }] : []),
-        ]}
-      />
+      <div className={styles.tabs}>
+        <PanelTabs
+          ariaLabel="Secciones de asistencia"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { key: "equipo", label: isManager ? "Equipo del día" : "Mi jornada" },
+            { key: "comidas", label: "Comidas" },
+            // Quién intentó checar y no pudo, y el horario de cada quien: quien tiene equipo.
+            ...(isManager
+              ? [
+                  { key: "rechazos" as const, label: "Checadas rechazadas" },
+                  { key: "horarios" as const, label: "Horarios" },
+                ]
+              : []),
+            // Mapa del equipo y recorridos: solo dirección.
+            ...(canLiveGps ? [{ key: "trayectoria" as const, label: "Recorrido del día" }] : []),
+          ]}
+        />
+      </div>
 
-      {error && (
-        <div
-          role="alert"
-          style={{
-            marginBottom: 12,
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: "1px solid var(--danger)",
-            color: "var(--danger)",
-            fontSize: 13,
-          }}
-        >
-          {error}
+      <p className={styles.tabHint}>
+        {tab === "equipo"
+          ? isManager
+            ? "Aquí ves la entrada, la salida y el tiempo trabajado de tu equipo. Toca una tarjeta para ver qué está haciendo cada quien."
+            : "Aquí ves tu jornada. La entrada y la salida se registran desde la app NEXARA."
+          : tab === "comidas"
+            ? isManager
+              ? "Aquí ves tus comidas y las de tu equipo."
+              : "Aquí ves tus comidas del día."
+            : tab === "rechazos"
+              ? "Aquí ves quién intentó checar y no pudo, y por qué."
+              : tab === "horarios"
+                ? "Aquí ves el horario de cada persona de tu equipo."
+                : "Aquí ves dónde está tu equipo ahora y tu propio recorrido del día."}
+      </p>
+
+      {error ? (
+        <div style={{ marginBottom: 12 }}>
+          <InlineAlert
+            variant="danger"
+            message={error}
+            action={
+              tab === "equipo" || tab === "trayectoria" ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void (tab === "equipo" ? loadEquipo() : loadTrayectoria())}
+                >
+                  Reintentar
+                </Button>
+              ) : undefined
+            }
+          />
         </div>
-      )}
+      ) : null}
 
       {tab === "equipo" && (
         <>
@@ -727,43 +748,79 @@ export default function ErpAsistenciasPage() {
               <EmptyState
                 icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
                 title="Vista de equipo"
-                description="Disponible para managers (CEO / subtree)."
+                description="Aquí aparece la asistencia de tu equipo cuando tienes personas a tu cargo."
               />
             )
           ) : (
             <>
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  flexWrap: "wrap",
                   gap: 10,
-                  marginBottom: 12,
                   marginTop: canRegister ? 16 : 0,
+                  marginBottom: 10,
                 }}
               >
-                <KpiCard
-                  label="Total equipo"
-                  value={mapped.length}
-                  onClick={() => setFilterEstado("TODOS")}
-                />
-                <KpiCard
-                  label="En jornada"
-                  value={presentes}
-                  variant={presentes > 0 ? "accent" : "default"}
-                  onClick={() => setFilterEstado("PRESENTE")}
-                />
-                <KpiCard
-                  label="Completaron"
-                  value={completos}
-                  variant={completos > 0 ? "positive" : "default"}
-                  onClick={() => setFilterEstado("COMPLETO")}
-                />
-                <KpiCard
-                  label="Sin checada"
-                  value={ausentes}
-                  variant={ausentes > 0 ? "danger" : "positive"}
-                  onClick={() => setFilterEstado("AUSENTE")}
-                />
+                {actualizadoEn ? (
+                  <span className={styles.actualizado}>
+                    Actualizado {actualizadoEn.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className={styles.control}
+                  onClick={() => void refrescar()}
+                  disabled={refrescando || loading}
+                >
+                  <span className={refrescando ? styles.girando : undefined} aria-hidden>
+                    ↻
+                  </span>{" "}
+                  Actualizar
+                </Button>
+              </div>
+
+              {refreshError ? (
+                <div style={{ marginBottom: 12 }}>
+                  <InlineAlert
+                    variant="warning"
+                    message={`No se pudo actualizar; ves los datos de las ${
+                      actualizadoEn
+                        ? actualizadoEn.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
+                        : "última carga"
+                    }. ${refreshError}`}
+                    action={
+                      <Button size="sm" variant="secondary" onClick={() => void refrescar()} disabled={refrescando}>
+                        Reintentar
+                      </Button>
+                    }
+                  />
+                </div>
+              ) : null}
+
+              <div className={styles.kpis} role="group" aria-label="Filtrar por estado">
+                {kpis.map((k) => {
+                  const activo = filterEstado === k.key;
+                  const elegir = () => setFilterEstado(activo && k.key !== "TODOS" ? "TODOS" : k.key);
+                  return (
+                    <div
+                      key={k.key}
+                      className={`${styles.kpi} ${activo ? styles.kpiActivo : ""}`}
+                      aria-current={activo ? "true" : undefined}
+                      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          elegir();
+                        }
+                      }}
+                    >
+                      <KpiCard label={k.label} value={k.value} variant={k.variant} onClick={elegir} />
+                    </div>
+                  );
+                })}
               </div>
 
               <div
@@ -782,17 +839,17 @@ export default function ErpAsistenciasPage() {
                 <div>
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
                       color: "var(--text-tertiary)",
                     }}
                   >
-                    Productividad del día
+                    Horas trabajadas hoy
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                    Suma de jornadas abiertas y cerradas · se actualiza cada segundo
+                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>
+                    Todo tu equipo junto, en vivo
                   </div>
                 </div>
                 <div
@@ -805,59 +862,33 @@ export default function ErpAsistenciasPage() {
                     letterSpacing: "-0.02em",
                   }}
                 >
-                  {fmtHms(productividadMs)}
+                  <LiveTotal jornadas={jornadas} />
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-                <FilterChip
-                  active={filterEstado === "TODOS"}
-                  label="Todos"
-                  count={mapped.length}
-                  onClick={() => setFilterEstado("TODOS")}
-                />
-                <FilterChip
-                  active={filterEstado === "PRESENTE"}
-                  label="En jornada"
-                  count={presentes}
-                  color={ESTADO_META.PRESENTE.color}
-                  onClick={() => setFilterEstado("PRESENTE")}
-                />
-                <FilterChip
-                  active={filterEstado === "COMPLETO"}
-                  label="Completó"
-                  count={completos}
-                  color={ESTADO_META.COMPLETO.color}
-                  onClick={() => setFilterEstado("COMPLETO")}
-                />
-                {justificadas > 0 || puedeJustificar ? (
-                  <FilterChip
-                    active={filterEstado === "JUSTIFICADA"}
-                    label="Falta justificada"
-                    count={justificadas}
-                    color={ESTADO_META.JUSTIFICADA.color}
-                    onClick={() => setFilterEstado("JUSTIFICADA")}
+              <Section title={sectionTitle} subtitle="Toca una tarjeta para ver qué está haciendo cada quien.">
+                {loading && (
+                  <EmptyState
+                    icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />}
+                    title="Cargando…"
+                    description="Consultando la asistencia de tu equipo."
                   />
-                ) : null}
-                <FilterChip
-                  active={filterEstado === "AUSENTE"}
-                  label="Sin checada"
-                  count={ausentes}
-                  color={ESTADO_META.AUSENTE.color}
-                  onClick={() => setFilterEstado("AUSENTE")}
-                />
-              </div>
-
-              <Section title={sectionTitle} subtitle="Toca una tarjeta para abrir la pizarra de la persona.">
-                {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando…" description="Consultando asistencia del subtree." />}
-                {!loading && filtered.length === 0 && (
+                )}
+                {!loading && !error && filtered.length === 0 && (
                   <EmptyState
                     icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-                    title={mapped.length === 0 ? "Sin registros" : "Nadie en este filtro"}
+                    title={mapped.length === 0 ? "Nadie en tu equipo este día" : "Nadie en este grupo"}
                     description={
                       mapped.length === 0
-                        ? "Nadie en el alcance para esta fecha."
-                        : "Prueba otro chip o el KPI de arriba."
+                        ? "Cuando alguien de tu equipo registre su entrada, aparece aquí."
+                        : "Toca «Todo el equipo» arriba para ver a todos."
+                    }
+                    action={
+                      mapped.length > 0 ? (
+                        <Button size="sm" variant="secondary" onClick={() => setFilterEstado("TODOS")}>
+                          Ver todo el equipo
+                        </Button>
+                      ) : undefined
                     }
                   />
                 )}
@@ -883,6 +914,7 @@ export default function ErpAsistenciasPage() {
                       return (
                         <article
                           key={m.userId}
+                          className={styles.card}
                           style={{
                             display: "flex",
                             flexDirection: "column",
@@ -932,9 +964,11 @@ export default function ErpAsistenciasPage() {
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <Link
                                 href={`/erp/pizarra/${m.userId}`}
+                                className={styles.cardLink}
+                                aria-label={`${m.nombre}: ver qué está haciendo`}
                                 style={{
                                   fontWeight: 750,
-                                  fontSize: 14,
+                                  fontSize: 15,
                                   color: "inherit",
                                   textDecoration: "none",
                                   display: "block",
@@ -947,14 +981,14 @@ export default function ErpAsistenciasPage() {
                               </Link>
                               <div
                                 style={{
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   color: "var(--text-tertiary)",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                {[m.roleName, m.department].filter(Boolean).join(" · ") || "—"}
+                                {[m.roleName, m.department].filter(Boolean).join(" · ") || "Equipo NEXARA"}
                               </div>
                             </div>
                             <span
@@ -985,7 +1019,7 @@ export default function ErpAsistenciasPage() {
                             <div>
                               <div
                                 style={{
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: 650,
                                   color: "var(--text-tertiary)",
                                   letterSpacing: "0.04em",
@@ -1016,7 +1050,7 @@ export default function ErpAsistenciasPage() {
                             <div>
                               <div
                                 style={{
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: 650,
                                   color: "var(--text-tertiary)",
                                   letterSpacing: "0.04em",
@@ -1045,7 +1079,7 @@ export default function ErpAsistenciasPage() {
                             <div style={{ textAlign: "right", alignSelf: "center", minWidth: 88 }}>
                               <div
                                 style={{
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: 650,
                                   color: "var(--text-tertiary)",
                                   textTransform: "uppercase",
@@ -1091,15 +1125,14 @@ export default function ErpAsistenciasPage() {
                                   letterSpacing: "-0.02em",
                                 }}
                               >
-                                {m.estado === "AUSENTE"
-                                  ? "—"
-                                  : fmtHms(
-                                      elapsedMs(
-                                        m.checkIn,
-                                        m.estado === "PRESENTE" ? null : m.checkOut,
-                                        nowMs,
-                                      ),
-                                    )}
+                                {m.estado === "AUSENTE" || !m.checkIn ? (
+                                  "—"
+                                ) : (
+                                  <LiveTimer
+                                    since={m.checkIn}
+                                    until={m.estado === "PRESENTE" ? null : m.checkOut}
+                                  />
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1195,20 +1228,21 @@ export default function ErpAsistenciasPage() {
                             </div>
                           ) : null}
 
-                          {(m.entryMapUrl || m.exitMapUrl) && (
-                            <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
-                              {m.entryMapUrl && (
-                                <a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>
-                                  Mapa entrada
+                          {/* AttendanceGpsDayPanel no se pinta en tu propia tarjeta sin recorrido: ahí los mapas van aparte. */}
+                          {m.userId === user?.id && !canSeeOwnTrajectory && (m.entryMapUrl || m.exitMapUrl) ? (
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              {m.entryMapUrl ? (
+                                <a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer" className={styles.mapButton} style={{ marginTop: 0 }}>
+                                  📍 Entrada en mapa
                                 </a>
-                              )}
-                              {m.exitMapUrl && (
-                                <a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>
-                                  Mapa salida
+                              ) : null}
+                              {m.exitMapUrl ? (
+                                <a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer" className={styles.mapButton} style={{ marginTop: 0 }}>
+                                  📍 Salida en mapa
                                 </a>
-                              )}
+                              ) : null}
                             </div>
-                          )}
+                          ) : null}
 
                           {(m.estado === "PRESENTE" || m.estado === "COMPLETO") && (
                             <AttendanceGpsDayPanel
@@ -1369,10 +1403,10 @@ export default function ErpAsistenciasPage() {
       {tab === "trayectoria" && canLiveGps && (
         <>
           {canLiveGps && (
-            <Section title="GPS del equipo" subtitle="Unidades con jornada abierta (gps/team).">
-              {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando…" description="Telemetría del equipo." />}
-              {!loading && teamGps.length === 0 && (
-                <EmptyState icon={<SatelliteAltOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin ubicaciones" description="Nadie comparte GPS ahora." />
+            <Section title="Dónde está tu equipo" subtitle="Personas con jornada abierta que comparten su ubicación.">
+              {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando…" description="Buscando la ubicación de tu equipo." />}
+              {!loading && !error && teamGps.length === 0 && (
+                <EmptyState icon={<SatelliteAltOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin ubicaciones" description="Nadie está compartiendo su ubicación ahora." />
               )}
               {!loading && teamGps.length > 0 && (
                 <div
@@ -1383,36 +1417,50 @@ export default function ErpAsistenciasPage() {
                     marginBottom: 16,
                   }}
                 >
-                  {teamGps.map((item) => (
-                    <article
-                      key={item.id}
-                      style={{
-                        background: "var(--surface)",
-                        border: `1.5px solid ${item.estaActivo ? "#3b82f6" : "var(--border)"}`,
-                        borderRadius: 16,
-                        padding: 14,
-                        boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
-                      }}
-                    >
-                      <div style={{ fontWeight: 750, fontSize: 13 }}>{item.usuario?.nombre ?? "—"}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                        {item.usuario?.role?.nombre ?? item.usuario?.department?.nombre ?? ""}
-                      </div>
-                      <div style={{ fontFamily: "monospace", fontSize: 11.5, marginTop: 8 }}>
-                        {item.latitud != null && item.longitud != null
-                          ? `${Number(item.latitud).toFixed(5)}, ${Number(item.longitud).toFixed(5)}`
-                          : "Sin coordenadas"}
-                      </div>
-                    </article>
-                  ))}
+                  {teamGps.map((item) => {
+                    const lat = toCoord(item.latitud);
+                    const lng = toCoord(item.longitud);
+                    return (
+                      <article
+                        key={item.id}
+                        style={{
+                          background: "var(--surface)",
+                          border: `1.5px solid ${item.estaActivo ? "#3b82f6" : "var(--border)"}`,
+                          borderRadius: 16,
+                          padding: 14,
+                          boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 750, fontSize: 14 }}>{item.usuario?.nombre ?? "Sin nombre"}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                          {item.usuario?.role?.nombre ?? item.usuario?.department?.nombre ?? ""}
+                          {item.ultimaActualizacion ? ` · a las ${fmtTime(item.ultimaActualizacion)}` : ""}
+                        </div>
+                        {lat != null && lng != null ? (
+                          <a
+                            href={googleMapsPointUrl(lat, lng)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.mapButton}
+                          >
+                            📍 Ver en mapa
+                          </a>
+                        ) : (
+                          <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 10 }}>
+                            Sin ubicación por ahora
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </Section>
           )}
           {canSeeOwnTrajectory ? (
-            <Section title={`Mi trayecto · ${trajectory.length} puntos`} subtitle="Entrada, GPS y salida del día.">
+            <Section title="Mi recorrido del día" subtitle="Tu entrada, por dónde pasaste y tu salida.">
               {loading ? (
-                <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando trayecto…" description="" />
+                <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando recorrido…" description="" />
               ) : (
                 <GpsTrajectoryPreview trajectory={trajectory} attendances={dayAttendances} />
               )}
@@ -1420,8 +1468,8 @@ export default function ErpAsistenciasPage() {
           ) : (
             <EmptyState
               icon={<PlaceOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-              title="Sin trayecto propio"
-              description="Los encargados ven el GPS del día en las tarjetas de sus subordinados (pestaña Equipo), no el suyo."
+              title="Tu recorrido no se muestra aquí"
+              description="El recorrido de cada persona de tu equipo está en su tarjeta, en «Equipo del día»."
             />
           )}
         </>
