@@ -16,12 +16,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
+import PanelTabs from "@/components/ui/PanelTabs";
 import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
+import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
+import { formatApiError } from "@/lib/erp-api";
 import { listUsers, type ApiUserRow } from "@/lib/users-api";
 import { resolveV2RoleKey } from "@/lib/rbac";
 import {
@@ -53,17 +56,11 @@ import {
   type MeetingType,
 } from "@/lib/meetings-api";
 import PersonalCalendar from "@/components/calendar/PersonalCalendar";
-import { useSearchParams } from "next/navigation";
+import s from "./reuniones.module.css";
 
 type Tab = "mios" | "reuniones" | "vencidos" | "lecciones" | "agenda";
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "mios", label: "Mis acuerdos" },
-  { id: "reuniones", label: "Reuniones" },
-  { id: "agenda", label: "Agenda" },
-  { id: "vencidos", label: "Vencidos" },
-  { id: "lecciones", label: "Lecciones aprendidas" },
-];
+const TAB_IDS: Tab[] = ["mios", "reuniones", "agenda", "vencidos", "lecciones"];
 
 const KIND_ICON: Record<AgreementKind, string> = {
   ACUERDO: "🤝",
@@ -71,51 +68,74 @@ const KIND_ICON: Record<AgreementKind, string> = {
   RIESGO: "⚠️",
 };
 
-const inp: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 10px",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  background: "var(--surface)",
-  color: "var(--foreground)",
-  fontSize: 13,
-  boxSizing: "border-box",
+const STATUS_ACTION_LABEL: Record<AgreementStatus, string> = {
+  PENDIENTE: "Marcar pendiente",
+  EN_PROCESO: "Marcar en proceso",
+  CUMPLIDO: "Marcar cumplido",
+  CANCELADO: "Cancelar",
 };
 
-const label: React.CSSProperties = {
-  display: "block",
-  fontSize: 11.5,
-  fontWeight: 600,
-  color: "var(--muted-foreground)",
-  marginBottom: 4,
+const MEETING_STATUS_VARIANT: Record<string, "positive" | "neutral" | "accent"> = {
+  REALIZADA: "positive",
+  CANCELADA: "neutral",
+  PROGRAMADA: "accent",
 };
+
+const nuevaJuntaVacia = () => ({
+  tipo: suggestedTypeForToday(),
+  fecha: todayInput(),
+  titulo: "",
+  horaInicio: "",
+  asistentes: [] as number[],
+});
+
+const acuerdoVacio = { tipo: "ACUERDO" as AgreementKind, descripcion: "", responsableId: "", fechaCompromiso: "" };
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString("es-MX")} ${n === 1 ? one : many}`;
+
+function SkeletonList({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className={s.list} aria-busy="true" aria-label="Cargando">
+      {Array.from({ length: rows }, (_, i) => <div key={i} className={s.skeleton} />)}
+    </div>
+  );
+}
 
 export default function ReunionesPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
 
-  const searchParams = useSearchParams();
-  const initialTab = (searchParams.get("tab") as Tab | null);
-  const [tab, setTab] = useState<Tab>(
-    initialTab && ["mios", "reuniones", "vencidos", "lecciones", "agenda"].includes(initialTab)
-      ? initialTab
-      : "mios",
-  );
+  const [tab, setTab] = useState<Tab>("mios");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
 
   const [mios, setMios] = useState<Agreement[]>([]);
   const [miosVencidos, setMiosVencidos] = useState(0);
   const [reuniones, setReuniones] = useState<MeetingRow[]>([]);
-  const [vencidos, setVencidos] = useState<Agreement[]>([]);
-  const [lecciones, setLecciones] = useState<Agreement[]>([]);
+  const [vencidos, setVencidos] = useState<Agreement[] | null>(null);
+  const [lecciones, setLecciones] = useState<Agreement[] | null>(null);
   const [busquedaLeccion, setBusquedaLeccion] = useState("");
 
   const [detalle, setDetalle] = useState<MeetingDetail | null>(null);
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
   const [detalleCargando, setDetalleCargando] = useState(false);
 
   const [personas, setPersonas] = useState<ApiUserRow[]>([]);
   const puedeConvocar = useMemo(() => canLeadMeetings(resolveV2RoleKey(user)), [user]);
+
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab") as Tab | null;
+    if (t && TAB_IDS.includes(t)) setTab(t);
+  }, []);
+
+  const cambiarTab = useCallback((next: Tab) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "mios") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url.toString());
+  }, []);
 
   // ── Carga ───────────────────────────────────────────────────────────────
 
@@ -128,8 +148,9 @@ export default function ReunionesPage() {
       setMios(propios?.acuerdos ?? []);
       setMiosVencidos(propios?.vencidos ?? 0);
       setReuniones(juntas);
+      setLoaded(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar el ritmo operativo");
+      setError(formatApiError(e, "No pudimos cargar tus reuniones y acuerdos."));
     } finally {
       setLoading(false);
     }
@@ -161,34 +182,52 @@ export default function ReunionesPage() {
 
   useEffect(() => {
     if (!token) return;
-    if (tab === "vencidos" && vencidos.length === 0) {
+    if (tab === "vencidos" && vencidos === null) {
       listOverdueAgreements(token)
         .then((r) => setVencidos(r?.acuerdos ?? []))
-        .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+        .catch((e) => {
+          setVencidos([]);
+          setError(formatApiError(e, "No pudimos cargar los acuerdos fuera de fecha."));
+        });
     }
-    if (tab === "lecciones" && lecciones.length === 0) {
+    if (tab === "lecciones" && lecciones === null) {
       listLessons(token)
         .then(setLecciones)
-        .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+        .catch((e) => {
+          setLecciones([]);
+          setError(formatApiError(e, "No pudimos cargar las lecciones aprendidas."));
+        });
     }
-    // Sólo al cambiar de pestaña: recargar en cada render pediría lo mismo sin parar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, token]);
+  }, [tab, token, vencidos, lecciones]);
 
   const abrirDetalle = async (id: number) => {
     if (!token) return;
+    setDetalleAbierto(true);
     setDetalleCargando(true);
     try {
       setDetalle(await getMeeting(token, id));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo abrir la reunión");
+      toast.error(formatApiError(e, "No se pudo abrir la reunión."));
+      setDetalleAbierto(false);
     } finally {
       setDetalleCargando(false);
     }
   };
 
+  const cerrarDetalle = () => {
+    setDetalleAbierto(false);
+    setDetalle(null);
+    setNuevoAcuerdo(acuerdoVacio);
+  };
+
   const refrescarDetalle = async () => {
-    if (detalle) await abrirDetalle(detalle.id);
+    if (detalle) {
+      try {
+        setDetalle(await getMeeting(token, detalle.id));
+      } catch {
+        /* El detalle anterior sigue visible; la lista se refresca abajo. */
+      }
+    }
     await cargar();
   };
 
@@ -196,13 +235,13 @@ export default function ReunionesPage() {
 
   const [convocando, setConvocando] = useState(false);
   const [guardandoJunta, setGuardandoJunta] = useState(false);
-  const [nueva, setNueva] = useState<{
-    tipo: MeetingType;
-    fecha: string;
-    titulo: string;
-    horaInicio: string;
-    asistentes: number[];
-  }>({ tipo: suggestedTypeForToday(), fecha: todayInput(), titulo: "", horaInicio: "", asistentes: [] });
+  const [nueva, setNueva] = useState(nuevaJuntaVacia);
+  const [filtroPersonas, setFiltroPersonas] = useState("");
+
+  const personasVisibles = useMemo(() => {
+    const q = filtroPersonas.trim().toLowerCase();
+    return q ? personas.filter((p) => p.nombre.toLowerCase().includes(q)) : personas;
+  }, [personas, filtroPersonas]);
 
   const convocar = async () => {
     if (!token) return;
@@ -217,18 +256,13 @@ export default function ReunionesPage() {
       });
       toast.success("Reunión convocada");
       setConvocando(false);
-      setNueva({
-        tipo: suggestedTypeForToday(),
-        fecha: todayInput(),
-        titulo: "",
-        horaInicio: "",
-        asistentes: [],
-      });
+      setNueva(nuevaJuntaVacia());
+      setFiltroPersonas("");
       await cargar();
-      setTab("reuniones");
+      cambiarTab("reuniones");
       await abrirDetalle(creada.id);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo convocar");
+      toast.error(formatApiError(e, "No se pudo convocar la reunión."));
     } finally {
       setGuardandoJunta(false);
     }
@@ -236,12 +270,7 @@ export default function ReunionesPage() {
 
   // ── Registrar acuerdo / lección / riesgo ────────────────────────────────
 
-  const [nuevoAcuerdo, setNuevoAcuerdo] = useState<{
-    tipo: AgreementKind;
-    descripcion: string;
-    responsableId: string;
-    fechaCompromiso: string;
-  }>({ tipo: "ACUERDO", descripcion: "", responsableId: "", fechaCompromiso: "" });
+  const [nuevoAcuerdo, setNuevoAcuerdo] = useState(acuerdoVacio);
   const [guardandoAcuerdo, setGuardandoAcuerdo] = useState(false);
 
   const registrarAcuerdo = async () => {
@@ -254,12 +283,12 @@ export default function ReunionesPage() {
         responsableId: nuevoAcuerdo.responsableId ? Number(nuevoAcuerdo.responsableId) : null,
         fechaCompromiso: nuevoAcuerdo.fechaCompromiso || null,
       });
-      setNuevoAcuerdo({ tipo: "ACUERDO", descripcion: "", responsableId: "", fechaCompromiso: "" });
-      setLecciones([]);
+      setNuevoAcuerdo(acuerdoVacio);
+      setLecciones(null);
       await refrescarDetalle();
-      toast.success("Registrado");
+      toast.success(`${AGREEMENT_KIND_LABEL[nuevoAcuerdo.tipo]} registrado`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo registrar");
+      toast.error(formatApiError(e, "No se pudo registrar."));
     } finally {
       setGuardandoAcuerdo(false);
     }
@@ -269,10 +298,10 @@ export default function ReunionesPage() {
     if (!token) return;
     try {
       await updateMyAgreement(token, a.id, estado);
-      toast.success(AGREEMENT_STATUS_LABEL[estado]);
+      toast.success(`Acuerdo: ${AGREEMENT_STATUS_LABEL[estado].toLowerCase()}`);
       await cargar();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo actualizar");
+      toast.error(formatApiError(e, "No se pudo actualizar el acuerdo."));
     }
   };
 
@@ -280,164 +309,147 @@ export default function ReunionesPage() {
     if (!token || !detalle) return;
     try {
       await updateAgreement(token, detalle.id, a.id, { estado });
+      setVencidos(null);
       await refrescarDetalle();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo actualizar");
+      toast.error(formatApiError(e, "No se pudo actualizar el acuerdo."));
     }
   };
 
+  const [cerrandoJunta, setCerrandoJunta] = useState(false);
   const cerrarJunta = async () => {
     if (!token || !detalle) return;
+    setCerrandoJunta(true);
     try {
       const cerrada = await closeMeeting(token, detalle.id, detalle.notas ?? undefined);
       setDetalle(cerrada);
-      toast.success("Junta cerrada");
+      toast.success("Reunión marcada como realizada");
       await cargar();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo cerrar");
+      toast.error(formatApiError(e, "No se pudo cerrar la reunión."));
+    } finally {
+      setCerrandoJunta(false);
     }
   };
 
   // ── Derivados ───────────────────────────────────────────────────────────
 
-  const proximas = useMemo(
-    () => reuniones.filter((r) => r.estado === "PROGRAMADA").length,
-    [reuniones],
-  );
+  const proximas = useMemo(() => reuniones.filter((r) => r.estado === "PROGRAMADA").length, [reuniones]);
 
   const buscarLecciones = async () => {
     if (!token) return;
     try {
       setLecciones(await listLessons(token, busquedaLeccion));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo buscar");
+      toast.error(formatApiError(e, "No se pudo buscar."));
     }
   };
 
   if (!token) {
-    return <EmptyState title="Sesión requerida" description="Inicia sesión para ver el ritmo operativo." />;
+    return <EmptyState title="Inicia sesión" description="Necesitas iniciar sesión para ver tus reuniones y acuerdos." />;
   }
+
+  const primeraCarga = !loaded && loading;
 
   return (
     <>
       <PageHeader
-        eyebrow="Ritmo operativo"
+        eyebrow="Hoy"
         title="Reuniones y acuerdos"
         subtitle="La diaria de las 10:00, la planeación del lunes, la revisión del miércoles y la junta de cierre del viernes."
-        actions={
-          puedeConvocar ? (
-            <Button onClick={() => setConvocando(true)}>Convocar reunión</Button>
-          ) : null
-        }
+        actions={puedeConvocar ? <Button variant="primary" iconLeft="＋" onClick={() => setConvocando(true)}>Convocar reunión</Button> : null}
       />
 
-      {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
-
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginBottom: 20 }}>
-        <KpiCard label="Acuerdos míos abiertos" value={mios.length} icon="🤝" />
-        <KpiCard
-          label="Míos fuera de fecha"
-          value={miosVencidos}
-          icon="⏰"
-          variant={miosVencidos > 0 ? "danger" : "default"}
+      {error && (
+        <InlineAlert
+          variant={loaded ? "warning" : "danger"}
+          message={error}
+          onDismiss={() => setError(null)}
+          action={<Button size="sm" variant="secondary" onClick={() => void cargar()}>Reintentar</Button>}
         />
-        <KpiCard label="Reuniones programadas" value={proximas} icon="📅" />
-        <KpiCard label="Reuniones registradas" value={reuniones.length} icon="🗂️" />
-      </div>
+      )}
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
-        {TABS.map((t) => (
-          <Button
-            key={t.id}
-            size="sm"
-            variant={tab === t.id ? "primary" : "secondary"}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-            {t.id === "mios" && miosVencidos > 0 ? ` · ${miosVencidos} tarde` : ""}
-          </Button>
-        ))}
-      </div>
+      {loaded && (
+        <div className={s.metrics}>
+          <MetricStrip
+            ariaLabel="Resumen de reuniones"
+            metrics={[
+              { label: "mis acuerdos abiertos", value: mios.length, onClick: () => cambiarTab("mios") },
+              { label: "míos fuera de fecha", value: miosVencidos, tone: miosVencidos > 0 ? "danger" : "default", onClick: () => cambiarTab("mios") },
+              { label: "reuniones programadas", value: proximas, onClick: () => cambiarTab("reuniones") },
+              { label: "reuniones registradas", value: reuniones.length, onClick: () => cambiarTab("reuniones") },
+            ]}
+          />
+        </div>
+      )}
 
-      {loading ? (
-        <Section title="Cargando…">
-          <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>Un momento.</p>
-        </Section>
-      ) : tab === "agenda" ? (
-        <PersonalCalendar />
+      <PanelTabs
+        ariaLabel="Secciones de reuniones"
+        value={tab}
+        onChange={cambiarTab}
+        tabs={[
+          { key: "mios", label: "Mis acuerdos", badge: miosVencidos > 0 ? `${miosVencidos} tarde` : mios.length || undefined },
+          { key: "reuniones", label: "Reuniones" },
+          { key: "agenda", label: "Agenda" },
+          { key: "vencidos", label: "Fuera de fecha" },
+          { key: "lecciones", label: "Lecciones aprendidas" },
+        ]}
+      />
+
+      {tab === "agenda" ? (
+        <PersonalCalendar embedded />
       ) : tab === "mios" ? (
-        <Section
-          title="Lo que me toca"
-          subtitle="Acuerdos en los que soy responsable y siguen abiertos."
-        >
-          {mios.length === 0 ? (
-            <EmptyState
-              icon="✅"
-              title="Nada pendiente"
-              description="No tienes acuerdos abiertos a tu nombre."
-            />
+        <Section title="Lo que me toca" subtitle="Acuerdos a tu nombre que siguen abiertos.">
+          {primeraCarga ? (
+            <SkeletonList />
+          ) : mios.length === 0 ? (
+            <EmptyState icon="✅" title="Nada pendiente" description="No tienes acuerdos abiertos a tu nombre." />
           ) : (
-            <ListaAcuerdos
-              acuerdos={mios}
-              mostrarReunion
-              onEstado={cambiarEstadoPropio}
-              estadosDisponibles={["EN_PROCESO", "CUMPLIDO"]}
-            />
+            <ListaAcuerdos acuerdos={mios} mostrarReunion onEstado={cambiarEstadoPropio} estadosDisponibles={["EN_PROCESO", "CUMPLIDO"]} />
           )}
         </Section>
       ) : tab === "reuniones" ? (
-        <Section title="Reuniones" subtitle="Las últimas 200, de la más reciente a la más antigua.">
-          {reuniones.length === 0 ? (
+        <Section title="Reuniones" subtitle="De la más reciente a la más antigua.">
+          {primeraCarga ? (
+            <SkeletonList />
+          ) : reuniones.length === 0 ? (
             <EmptyState
               icon="📅"
               title="Todavía no hay reuniones"
-              description="Convoca la primera y la agenda se genera sola según el tipo."
+              description="Convoca la primera: la agenda se genera sola según el tipo."
+              action={puedeConvocar ? <Button variant="primary" onClick={() => setConvocando(true)}>Convocar reunión</Button> : undefined}
             />
           ) : (
-            <div style={{ display: "grid", gap: 8 }}>
+            <ul className={s.list}>
               {reuniones.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => abrirDetalle(r.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "10px 12px",
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    background: "var(--surface)",
-                    color: "var(--foreground)",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ fontSize: 18 }}>📅</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontWeight: 600, fontSize: 13.5 }}>{r.titulo}</span>
-                    <span style={{ display: "block", fontSize: 12, color: "var(--muted-foreground)" }}>
-                      {MEETING_TYPE_LABEL[r.tipo]} · {formatMeetingDate(r.fecha)}
-                      {r.horaInicio ? ` · ${r.horaInicio}` : ""}
-                      {r.facilitador ? ` · ${r.facilitador.nombre}` : ""}
+                <li key={r.id}>
+                  <button type="button" className={s.meeting} onClick={() => void abrirDetalle(r.id)}>
+                    <span className={s.meetingIcon} aria-hidden="true">📅</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span className={s.meetingTitle}>{r.titulo}</span>
+                      <span className={s.meetingMeta}>
+                        {MEETING_TYPE_LABEL[r.tipo]} · {formatMeetingDate(r.fecha)}
+                        {r.horaInicio ? ` · ${r.horaInicio}` : ""}
+                        {r.facilitador ? ` · ${r.facilitador.nombre}` : ""}
+                      </span>
                     </span>
-                  </span>
-                  <Pill tone={r.estado === "REALIZADA" ? "ok" : r.estado === "CANCELADA" ? "off" : "info"}>
-                    {MEETING_STATUS_LABEL[r.estado]}
-                  </Pill>
-                  <span style={{ fontSize: 12, color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>
-                    {r.acuerdos} acuerdos · {r.asistentes} personas
-                  </span>
-                </button>
+                    <span className={s.meetingSide}>
+                      <Tag variant={MEETING_STATUS_VARIANT[r.estado] ?? "neutral"}>{MEETING_STATUS_LABEL[r.estado]}</Tag>
+                      <span className={s.count}>
+                        {plural(r.acuerdos, "acuerdo", "acuerdos")} · {plural(r.asistentes, "persona", "personas")}
+                      </span>
+                    </span>
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </Section>
       ) : tab === "vencidos" ? (
-        <Section
-          title="Acuerdos fuera de fecha"
-          subtitle="El tablero con el que arranca la junta de cierre."
-        >
-          {vencidos.length === 0 ? (
+        <Section title="Acuerdos fuera de fecha" subtitle="El tablero con el que arranca la junta de cierre.">
+          {vencidos === null ? (
+            <SkeletonList />
+          ) : vencidos.length === 0 ? (
             <EmptyState icon="🎯" title="Nada fuera de fecha" description="Todos los acuerdos van en tiempo." />
           ) : (
             <ListaAcuerdos acuerdos={vencidos} mostrarReunion mostrarResponsable />
@@ -448,25 +460,38 @@ export default function ReunionesPage() {
           title="Lecciones aprendidas"
           subtitle="Lo que se dijo el viernes y antes se olvidaba el lunes."
           actions={
-            <div style={{ display: "flex", gap: 6 }}>
+            <form
+              role="search"
+              style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void buscarLecciones();
+              }}
+            >
               <input
+                className={s.input}
+                type="search"
+                aria-label="Buscar lecciones"
                 value={busquedaLeccion}
                 onChange={(e) => setBusquedaLeccion(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && buscarLecciones()}
-                placeholder="Buscar…"
-                style={{ ...inp, width: 200 }}
+                placeholder="Buscar lecciones…"
+                style={{ width: 220, maxWidth: "100%" }}
               />
-              <Button size="sm" variant="secondary" onClick={buscarLecciones}>
-                Buscar
-              </Button>
-            </div>
+              <Button size="sm" variant="secondary" type="submit">Buscar</Button>
+            </form>
           }
         >
-          {lecciones.length === 0 ? (
+          {lecciones === null ? (
+            <SkeletonList />
+          ) : lecciones.length === 0 ? (
             <EmptyState
               icon="💡"
-              title="Sin lecciones registradas"
-              description="En la junta de cierre, registra lo aprendido: queda escrito y ligado al servicio del que salió."
+              title={busquedaLeccion ? "Sin coincidencias" : "Sin lecciones registradas"}
+              description={
+                busquedaLeccion
+                  ? "Prueba con otras palabras."
+                  : "En la junta de cierre, registra lo aprendido: queda escrito y ligado al servicio del que salió."
+              }
             />
           ) : (
             <ListaAcuerdos acuerdos={lecciones} mostrarReunion />
@@ -482,153 +507,119 @@ export default function ReunionesPage() {
         maxWidth={560}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setConvocando(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={convocar} loading={guardandoJunta} disabled={!nueva.fecha}>
+            <Button variant="secondary" onClick={() => setConvocando(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void convocar()} loading={guardandoJunta} disabled={!nueva.fecha}>
               Convocar
             </Button>
           </>
         }
       >
-        <div style={{ display: "grid", gap: 12 }}>
-          <div>
-            <span style={label}>Tipo</span>
-            <select
-              value={nueva.tipo}
-              onChange={(e) => setNueva({ ...nueva, tipo: e.target.value as MeetingType })}
-              style={inp}
-            >
+        <div style={{ display: "grid", gap: 14 }}>
+          <label>
+            <span className={s.fieldLabel}>Tipo de reunión</span>
+            <select className={s.input} value={nueva.tipo} onChange={(e) => setNueva({ ...nueva, tipo: e.target.value as MeetingType })}>
               {MEETING_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {MEETING_TYPE_LABEL[t]} — {MEETING_TYPE_CADENCE[t]}
                 </option>
               ))}
             </select>
-            <p style={{ fontSize: 11.5, color: "var(--muted-foreground)", marginTop: 5 }}>
-              El título, la hora y la agenda se generan del tipo si los dejas en blanco.
-            </p>
+            <p className={s.hint}>Si dejas en blanco el título o la hora, se toman del tipo de reunión junto con la agenda.</p>
+          </label>
+
+          <div className={s.row2}>
+            <label>
+              <span className={s.fieldLabel}>Fecha</span>
+              <input className={s.input} type="date" value={nueva.fecha} onChange={(e) => setNueva({ ...nueva, fecha: e.target.value })} />
+            </label>
+            <label>
+              <span className={s.fieldLabel}>Hora · opcional</span>
+              <input className={s.input} type="time" value={nueva.horaInicio} onChange={(e) => setNueva({ ...nueva, horaInicio: e.target.value })} />
+            </label>
           </div>
 
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
-            <div>
-              <span style={label}>Fecha</span>
+          <label>
+            <span className={s.fieldLabel}>Título · opcional</span>
+            <input className={s.input} value={nueva.titulo} onChange={(e) => setNueva({ ...nueva, titulo: e.target.value })} placeholder={MEETING_TYPE_LABEL[nueva.tipo]} />
+          </label>
+
+          {personas.length > 0 && (
+            <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
+              <legend className={s.fieldLabel}>
+                Convocados · {nueva.asistentes.length} {nueva.asistentes.length === 1 ? "persona" : "personas"}
+              </legend>
               <input
-                type="date"
-                value={nueva.fecha}
-                onChange={(e) => setNueva({ ...nueva, fecha: e.target.value })}
-                style={inp}
+                className={s.input}
+                type="search"
+                aria-label="Buscar persona"
+                placeholder="Buscar persona…"
+                value={filtroPersonas}
+                onChange={(e) => setFiltroPersonas(e.target.value)}
               />
-            </div>
-            <div>
-              <span style={label}>Hora (opcional)</span>
-              <input
-                type="time"
-                value={nueva.horaInicio}
-                onChange={(e) => setNueva({ ...nueva, horaInicio: e.target.value })}
-                style={inp}
-              />
-            </div>
-          </div>
-
-          <div>
-            <span style={label}>Título (opcional)</span>
-            <input
-              value={nueva.titulo}
-              onChange={(e) => setNueva({ ...nueva, titulo: e.target.value })}
-              placeholder={MEETING_TYPE_LABEL[nueva.tipo]}
-              style={inp}
-            />
-          </div>
-
-          <div>
-            <span style={label}>Convocados ({nueva.asistentes.length})</span>
-            <div
-              style={{
-                maxHeight: 190,
-                overflowY: "auto",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                padding: 8,
-              }}
-            >
-              {personas.map((p) => (
-                <label
-                  key={p.id}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px", fontSize: 13 }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={nueva.asistentes.includes(p.id)}
-                    onChange={(e) =>
-                      setNueva({
-                        ...nueva,
-                        asistentes: e.target.checked
-                          ? [...nueva.asistentes, p.id]
-                          : nueva.asistentes.filter((x) => x !== p.id),
-                      })
-                    }
-                  />
-                  {p.nombre}
-                </label>
-              ))}
-            </div>
-          </div>
+              <div className={s.people}>
+                {personasVisibles.length === 0 ? (
+                  <p className={s.hint} style={{ padding: 8 }}>Nadie coincide con la búsqueda.</p>
+                ) : (
+                  personasVisibles.map((p) => (
+                    <label key={p.id} className={s.person}>
+                      <input
+                        type="checkbox"
+                        checked={nueva.asistentes.includes(p.id)}
+                        onChange={(e) =>
+                          setNueva({
+                            ...nueva,
+                            asistentes: e.target.checked ? [...nueva.asistentes, p.id] : nueva.asistentes.filter((x) => x !== p.id),
+                          })
+                        }
+                      />
+                      {p.nombre}
+                    </label>
+                  ))
+                )}
+              </div>
+            </fieldset>
+          )}
         </div>
       </Modal>
 
       {/* ── Detalle de reunión ───────────────────────────────────────── */}
       <Modal
-        open={Boolean(detalle)}
-        onClose={() => setDetalle(null)}
+        open={detalleAbierto}
+        onClose={cerrarDetalle}
         title={detalle?.titulo ?? "Reunión"}
         maxWidth={720}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDetalle(null)}>
-              Cerrar
-            </Button>
+            <Button variant="secondary" onClick={cerrarDetalle}>Cerrar</Button>
             {detalle?.estado === "PROGRAMADA" && (
-              <Button onClick={cerrarJunta}>Marcar como realizada</Button>
+              <Button variant="primary" onClick={() => void cerrarJunta()} loading={cerrandoJunta}>
+                Marcar como realizada
+              </Button>
             )}
           </>
         }
       >
         {detalleCargando || !detalle ? (
-          <p style={{ fontSize: 13, color: "var(--muted-foreground)" }}>Cargando…</p>
+          <SkeletonList rows={3} />
         ) : (
           <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
               {MEETING_TYPE_LABEL[detalle.tipo]} · {formatMeetingDate(detalle.fecha)}
               {detalle.horaInicio ? ` · ${detalle.horaInicio}` : ""}
               {detalle.facilitador ? ` · conduce ${detalle.facilitador.nombre}` : ""}
-            </div>
+            </p>
 
             {detalle.agenda && (
               <div>
-                <span style={label}>Agenda</span>
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    fontFamily: "inherit",
-                    fontSize: 13,
-                    background: "var(--muted)",
-                    padding: 10,
-                    borderRadius: 8,
-                  }}
-                >
-                  {detalle.agenda}
-                </pre>
+                <span className={s.fieldLabel}>Agenda</span>
+                <pre className={s.agenda}>{detalle.agenda}</pre>
               </div>
             )}
 
             <div>
-              <span style={label}>Acuerdos, lecciones y riesgos ({detalle.acuerdos.length})</span>
+              <span className={s.fieldLabel}>Acuerdos, lecciones y riesgos · {detalle.acuerdos.length}</span>
               {detalle.acuerdos.length === 0 ? (
-                <p style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>
-                  Todavía no se registró nada de esta reunión.
-                </p>
+                <p className={s.hint}>Todavía no se registró nada de esta reunión.</p>
               ) : (
                 <ListaAcuerdos
                   acuerdos={detalle.acuerdos}
@@ -639,15 +630,14 @@ export default function ReunionesPage() {
               )}
             </div>
 
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, display: "grid", gap: 10 }}>
-              <span style={label}>Registrar</span>
-              <div style={{ display: "grid", gap: 10, gridTemplateColumns: "150px 1fr" }}>
+            <div className={s.divider}>
+              <span className={s.fieldLabel} style={{ marginBottom: 0 }}>Registrar algo nuevo</span>
+              <div className={s.rowKind}>
                 <select
+                  className={s.input}
+                  aria-label="Tipo de registro"
                   value={nuevoAcuerdo.tipo}
-                  onChange={(e) =>
-                    setNuevoAcuerdo({ ...nuevoAcuerdo, tipo: e.target.value as AgreementKind })
-                  }
-                  style={inp}
+                  onChange={(e) => setNuevoAcuerdo({ ...nuevoAcuerdo, tipo: e.target.value as AgreementKind })}
                 >
                   {(Object.keys(AGREEMENT_KIND_LABEL) as AgreementKind[]).map((k) => (
                     <option key={k} value={k}>
@@ -656,57 +646,49 @@ export default function ReunionesPage() {
                   ))}
                 </select>
                 <input
+                  className={s.input}
+                  aria-label="Descripción"
                   value={nuevoAcuerdo.descripcion}
                   onChange={(e) => setNuevoAcuerdo({ ...nuevoAcuerdo, descripcion: e.target.value })}
                   placeholder={
-                    nuevoAcuerdo.tipo === "ACUERDO"
-                      ? "Qué se acordó hacer"
-                      : nuevoAcuerdo.tipo === "LECCION"
-                        ? "Qué aprendimos"
-                        : "Qué riesgo detectamos"
+                    nuevoAcuerdo.tipo === "ACUERDO" ? "Qué se acordó hacer" : nuevoAcuerdo.tipo === "LECCION" ? "Qué aprendimos" : "Qué riesgo detectamos"
                   }
-                  style={inp}
                 />
               </div>
 
               {nuevoAcuerdo.tipo === "ACUERDO" && (
-                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 160px" }}>
-                  <select
-                    value={nuevoAcuerdo.responsableId}
-                    onChange={(e) =>
-                      setNuevoAcuerdo({ ...nuevoAcuerdo, responsableId: e.target.value })
-                    }
-                    style={inp}
-                  >
-                    <option value="">Responsable…</option>
-                    {personas.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    value={nuevoAcuerdo.fechaCompromiso}
-                    onChange={(e) =>
-                      setNuevoAcuerdo({ ...nuevoAcuerdo, fechaCompromiso: e.target.value })
-                    }
-                    style={inp}
-                  />
-                </div>
-              )}
-
-              {nuevoAcuerdo.tipo === "ACUERDO" && (
-                <p style={{ fontSize: 11.5, color: "var(--muted-foreground)", margin: 0 }}>
-                  Un acuerdo necesita responsable. Una lección y un riesgo, no: son conocimiento,
-                  no tarea.
-                </p>
+                <>
+                  <div className={s.rowOwner}>
+                    <select
+                      className={s.input}
+                      aria-label="Responsable"
+                      value={nuevoAcuerdo.responsableId}
+                      onChange={(e) => setNuevoAcuerdo({ ...nuevoAcuerdo, responsableId: e.target.value })}
+                    >
+                      <option value="">Responsable…</option>
+                      {personas.map((p) => (
+                        <option key={p.id} value={p.id}>{p.nombre}</option>
+                      ))}
+                    </select>
+                    <input
+                      className={s.input}
+                      type="date"
+                      aria-label="Fecha compromiso"
+                      value={nuevoAcuerdo.fechaCompromiso}
+                      onChange={(e) => setNuevoAcuerdo({ ...nuevoAcuerdo, fechaCompromiso: e.target.value })}
+                    />
+                  </div>
+                  <p className={s.hint} style={{ margin: 0 }}>
+                    Un acuerdo necesita responsable. Una lección o un riesgo no: son conocimiento, no tarea.
+                  </p>
+                </>
               )}
 
               <div>
                 <Button
                   size="sm"
-                  onClick={registrarAcuerdo}
+                  variant="primary"
+                  onClick={() => void registrarAcuerdo()}
                   loading={guardandoAcuerdo}
                   disabled={!nuevoAcuerdo.descripcion.trim()}
                 >
@@ -723,31 +705,6 @@ export default function ReunionesPage() {
 
 // ── Piezas ────────────────────────────────────────────────────────────────
 
-function Pill({ children, tone }: { children: React.ReactNode; tone: "ok" | "warn" | "off" | "info" }) {
-  const colores: Record<string, { bg: string; fg: string }> = {
-    ok: { bg: "color-mix(in srgb, #16a34a 16%, transparent)", fg: "#15803d" },
-    warn: { bg: "color-mix(in srgb, #dc2626 16%, transparent)", fg: "#b91c1c" },
-    off: { bg: "var(--muted)", fg: "var(--muted-foreground)" },
-    info: { bg: "color-mix(in srgb, var(--primary) 16%, transparent)", fg: "var(--primary-strong)" },
-  };
-  const c = colores[tone];
-  return (
-    <span
-      style={{
-        padding: "2px 8px",
-        borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 600,
-        background: c.bg,
-        color: c.fg,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
 function ListaAcuerdos({
   acuerdos,
   mostrarReunion = false,
@@ -762,64 +719,39 @@ function ListaAcuerdos({
   estadosDisponibles?: AgreementStatus[];
 }) {
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <ul className={s.list}>
       {acuerdos.map((a) => (
-        <div
-          key={a.id}
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 10,
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderLeft: a.vencido ? "3px solid #dc2626" : "1px solid var(--border)",
-            borderRadius: 10,
-            background: "var(--surface)",
-          }}
-        >
-          <span style={{ fontSize: 16, lineHeight: "20px" }}>{KIND_ICON[a.tipo]}</span>
+        <li key={a.id} className={`${s.item} ${a.vencido ? s.itemLate : ""}`}>
+          <span className={s.itemIcon} aria-label={AGREEMENT_KIND_LABEL[a.tipo]} role="img">{KIND_ICON[a.tipo]}</span>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.45 }}>{a.descripcion}</p>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 8,
-                marginTop: 5,
-                fontSize: 11.5,
-                color: "var(--muted-foreground)",
-              }}
-            >
+          <div style={{ minWidth: 0 }}>
+            <p className={s.itemText}>{a.descripcion}</p>
+            <div className={s.itemMeta}>
               {mostrarResponsable && a.responsable && <span>👤 {a.responsable.nombre}</span>}
-              {a.fechaCompromiso && <span>📆 {formatMeetingDate(a.fechaCompromiso)}</span>}
-              {a.activity && (
-                <span>
-                  🔧 {a.activity.anNumber} · {a.activity.titulo}
-                </span>
-              )}
-              {mostrarReunion && a.meeting && (
-                <span>
-                  📅 {a.meeting.titulo} · {formatMeetingDate(a.meeting.fecha)}
-                </span>
-              )}
+              {a.fechaCompromiso && <span>📆 Para el {formatMeetingDate(a.fechaCompromiso)}</span>}
+              {a.activity && <span>🔧 {a.activity.anNumber} · {a.activity.titulo}</span>}
+              {mostrarReunion && a.meeting && <span>📅 {a.meeting.titulo} · {formatMeetingDate(a.meeting.fecha)}</span>}
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            {a.vencido && <Pill tone="warn">{a.diasVencido} d tarde</Pill>}
-            {a.tipo === "ACUERDO" && <Pill tone={a.estado === "CUMPLIDO" ? "ok" : "info"}>{AGREEMENT_STATUS_LABEL[a.estado]}</Pill>}
+          <div className={s.itemSide}>
+            {a.vencido && <Tag variant="danger">{a.diasVencido === 1 ? "1 día tarde" : `${a.diasVencido} días tarde`}</Tag>}
+            {a.tipo === "ACUERDO" && (
+              <Tag variant={a.estado === "CUMPLIDO" ? "positive" : a.estado === "CANCELADO" ? "neutral" : "accent"}>
+                {AGREEMENT_STATUS_LABEL[a.estado]}
+              </Tag>
+            )}
             {onEstado &&
               estadosDisponibles
                 .filter((e) => e !== a.estado)
                 .map((e) => (
                   <Button key={e} size="sm" variant="ghost" onClick={() => onEstado(a, e)}>
-                    {AGREEMENT_STATUS_LABEL[e]}
+                    {STATUS_ACTION_LABEL[e]}
                   </Button>
                 ))}
           </div>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
