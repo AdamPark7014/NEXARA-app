@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useUrlQuery } from "@/components/finance/useUrlQuery";
+import { todayStamp } from "@/components/finance/download";
+import ReceiptCapture from "@/components/finance/ReceiptCapture";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
-import FileDropzone from "@/components/ui/FileDropzone";
 import InlineAlert from "@/components/ui/InlineAlert";
 import ListExportActions from "@/components/ui/ListExportActions";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -61,7 +62,7 @@ const emptyForm = {
   monto: 0,
   categoria: "Servicios",
   esRecurrente: false,
-  fecha: new Date().toISOString().slice(0, 10),
+  fecha: "",
 };
 
 /* ── Estilos locales del contrato de diseño (.ai/DISENO-FINANZAS.md) ──────── */
@@ -264,7 +265,7 @@ function BreakdownTable({
 
 export default function ExpensesPage() {
   const { user, isContextReady } = useUser();
-  const searchParams = useSearchParams();
+  const searchParams = useUrlQuery();
   const highlightId = searchParams.get("highlight");
   const cfg = useMemo(() => getErpExpensesSectionConfig(user), [user]);
   const token = user?.token ?? "";
@@ -277,6 +278,7 @@ export default function ExpensesPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [tab, setTab] = useState<"lista" | "analytics">("lista");
   const [searchQ, setSearchQ] = useState("");
+  const deferredQ = useDeferredValue(searchQ);
   const [filterCat, setFilterCat] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
@@ -370,8 +372,8 @@ export default function ExpensesPage() {
 
   const visibleItems = useMemo(() => {
     let result = scopedItems;
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
+    if (deferredQ.trim()) {
+      const q = deferredQ.trim().toLowerCase();
       result = result.filter(
         (e) =>
           (e.concepto ?? "").toLowerCase().includes(q) ||
@@ -387,7 +389,7 @@ export default function ExpensesPage() {
       if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return result;
-  }, [scopedItems, searchQ, filterCat, filterEstado, highlightId]);
+  }, [scopedItems, deferredQ, filterCat, filterEstado, highlightId]);
 
   /**
    * Regla 1: la tira responde a lo que la persona viene a saber — cuánto falta
@@ -435,7 +437,7 @@ export default function ExpensesPage() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ ...emptyForm });
+    setForm({ ...emptyForm, fecha: todayStamp() });
     setEvidenceFile(null);
     setSaveErr(null);
     setFormErrors({});
@@ -449,7 +451,7 @@ export default function ExpensesPage() {
       monto: e.monto ?? 0,
       categoria: e.categoria ?? "Servicios",
       esRecurrente: e.esRecurrente ?? false,
-      fecha: e.fecha?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+      fecha: e.fecha?.slice(0, 10) ?? todayStamp(),
     });
     setEvidenceFile(null);
     setSaveErr(null);
@@ -847,7 +849,7 @@ export default function ExpensesPage() {
         kpis={showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de gastos" /> : undefined}
         tabs={[
           { id: "lista", label: "Lista" },
-          { id: "analytics", label: "Analytics" },
+          { id: "analytics", label: "Análisis" },
         ]}
         activeTab={tab}
         onTabChange={(id) => setTab(id as "lista" | "analytics")}
@@ -1095,7 +1097,9 @@ export default function ExpensesPage() {
             <input
               type="number"
               min={0}
-              value={form.monto}
+              step="0.01"
+              inputMode="decimal"
+              value={form.monto || ""}
               aria-invalid={Boolean(formErrors.monto)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, monto: Number(e.target.value) }));
@@ -1130,7 +1134,7 @@ export default function ExpensesPage() {
             </span>
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
-            <FileDropzone
+            <ReceiptCapture
               file={evidenceFile}
               onFile={(f) => {
                 setEvidenceFile(f);
@@ -1139,6 +1143,8 @@ export default function ExpensesPage() {
               label="Comprobante"
               required={!editing}
               hint={editing ? "Opcional · reemplaza el archivo actual" : "PDF o imagen del ticket o la factura"}
+              showCamera={narrow}
+              disabled={saving}
             />
             {formErrors.evidencia && (
               <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text)", marginTop: 6 }}>

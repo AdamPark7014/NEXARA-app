@@ -2,11 +2,11 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
+import ReceiptCapture from "@/components/finance/ReceiptCapture";
 import {
   ApprovalTrail,
   BreakdownTable,
   LiquidacionResumen,
-  ReceiptCapture,
   RepartoEditor,
   SelectorMultiple,
   categoriaLabel,
