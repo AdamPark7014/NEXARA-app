@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import { FINISHED_ACTIVITY_WHERE } from '../activities/activity-status.js';
+import { ACTIVITY_STATUS, FINISHED_ACTIVITY_WHERE, statusVariants } from '../activities/activity-status.js';
+import { workDateColumn } from '../common/time/workday.js';
 import { kpiFallback } from '../common/kpi-fallback.js';
 import type { SalesLeadStatus } from '@prisma/client';
 
@@ -13,6 +14,27 @@ import type { SalesLeadStatus } from '@prisma/client';
  * vez que se pedia el KPI. Con el tipo puesto, un valor inventado no compila.
  */
 const LEADS_ABIERTOS: SalesLeadStatus[] = ['NEW', 'QUALIFIED', 'NURTURING'];
+
+/**
+ * Actividades vivas. `Asignada` se escribía aquí como `Asignado` (masculino), grafía que el
+ * resto del sistema ya no usa: `statusVariants` acepta las dos, así que ninguna fila queda fuera.
+ */
+const ESTATUS_ABIERTOS = [
+  ...new Set([
+    ...statusVariants(ACTIVITY_STATUS.PENDIENTE),
+    ...statusVariants(ACTIVITY_STATUS.ASIGNADA),
+    ...statusVariants(ACTIVITY_STATUS.EN_PROCESO),
+  ]),
+];
+
+/** Facturas que todavía se deben cobrar o pagar. `OVERDUE` casi nunca se escribe: se ve por fecha. */
+const FACTURA_CON_SALDO = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] as const;
+
+/** Saldo pendiente = importe menos lo ya cobrado/pagado. */
+export function saldoPendiente(suma: { totalAmount?: unknown; paidAmount?: unknown } | null | undefined): number {
+  const saldo = Number(suma?.totalAmount || 0) - Number(suma?.paidAmount || 0);
+  return Math.round(Math.max(0, saldo) * 100) / 100;
+}
 
 @Injectable()
 export class ExecutiveService {
@@ -106,10 +128,10 @@ export class ExecutiveService {
         where: { ...tw, status: 'ACTIVE' as any, deletedAt: null },
       }).catch(kpiFallback('executive.service.ts:90', 0)),
       this.prisma.activity.count({
-        where: { ...tw, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
+        where: { ...tw, estatus: { in: ESTATUS_ABIERTOS } },
       }).catch(kpiFallback('executive.service.ts:93', 0)),
       this.prisma.activity.count({
-        where: { ...tw, estatus: { in: ['Pendiente', 'En Proceso'] }, fechaEntregaEsperada: { lt: now } },
+        where: { ...tw, estatus: { in: ESTATUS_ABIERTOS }, fechaEntregaEsperada: { lt: now } },
       }).catch(kpiFallback('executive.service.ts:96', 0)),
       this.prisma.activity.count({
         where: { ...tw, ...FINISHED_ACTIVITY_WHERE, fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
@@ -120,22 +142,30 @@ export class ExecutiveService {
         _count: { _all: true },
       }).catch(() => ({ _sum: { totalAmount: 0 }, _count: { _all: 0 } } as any)),
       this.prisma.invoice.aggregate({
-        where: { ...tw, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
-        _sum: { totalAmount: true },
-      }).catch(() => ({ _sum: { totalAmount: 0 } } as any)),
+        where: { ...tw, deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: [...FACTURA_CON_SALDO] } },
+        _sum: { totalAmount: true, paidAmount: true },
+      }).catch(kpiFallback('executive.service.ts:cxc', { _sum: { totalAmount: 0, paidAmount: 0 } } as any)),
       this.prisma.invoice.aggregate({
-        where: { ...tw, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
-        _sum: { totalAmount: true },
-      }).catch(() => ({ _sum: { totalAmount: 0 } } as any)),
+        where: { ...tw, deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: [...FACTURA_CON_SALDO] } },
+        _sum: { totalAmount: true, paidAmount: true },
+      }).catch(kpiFallback('executive.service.ts:cxp', { _sum: { totalAmount: 0, paidAmount: 0 } } as any)),
+      // Cobranza vencida: por fecha de vencimiento (el estado `OVERDUE` nunca se escribe, así que
+      // contarlo daba siempre cero). Solo lo que se nos debe; lo que debemos no es «por cobrar».
       this.prisma.invoice.count({
-        where: { ...tw, status: 'OVERDUE' as any },
+        where: {
+          ...tw,
+          deletedAt: null,
+          type: 'ACCOUNTS_RECEIVABLE',
+          status: { in: [...FACTURA_CON_SALDO] },
+          dueDate: { lt: workDateColumn(now) },
+        },
       }).catch(kpiFallback('executive.service.ts:115', 0)),
       this.prisma.bankAccount.aggregate({
         where: { ...tw, isActive: true },
         _sum: { currentBalance: true },
       }).catch(() => ({ _sum: { currentBalance: 0 } } as any)),
       this.prisma.activity.count({
-        where: { ...tw, ticketType: { not: null }, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
+        where: { ...tw, ticketType: { not: null }, estatus: { in: ESTATUS_ABIERTOS } },
       }).catch(kpiFallback('executive.service.ts:122', 0)),
       this.prisma.activity.count({
         where: { ...tw, ticketType: { not: null }, ...FINISHED_ACTIVITY_WHERE, fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
@@ -155,11 +185,16 @@ export class ExecutiveService {
       }).catch(kpiFallback('executive.service.ts:138', 0)),
       this.prisma.purchaseRequisition.count({ where: { ...tw, status: 'SUBMITTED' } }).catch(kpiFallback('executive.service.ts:139', 0)),
       this.prisma.purchaseOrder.count({ where: { ...tw, status: { in: ['DRAFT', 'SENT'] } } }).catch(kpiFallback('executive.service.ts:140', 0)),
-      // stockItem is optional / may lack companyId — scope defensively if field exists
-      (this.prisma as any).stockItem?.findMany({
-        where: { ...tw, currentQuantity: { lte: { _ref: 'minQuantity' } as any } },
-        take: 5,
-      }).catch(kpiFallback('executive.service.ts:145', [])) ?? [],
+      // Existencias por debajo del mínimo (el calculado por reabastecimiento o, si no hay, el capturado).
+      // Antes consultaba `stockItem`, un modelo que no existe: siempre salía cero.
+      this.prisma
+        .$queryRaw<Array<{ n: number }>>`
+          SELECT COUNT(*)::int AS n FROM stock_levels
+          WHERE "companyId" = ${tenantId}
+            AND COALESCE("minCalculado", "minStock") > 0
+            AND quantity <= COALESCE("minCalculado", "minStock")`
+        .then((rows) => Number(rows?.[0]?.n ?? 0))
+        .catch(kpiFallback('executive.service.ts:stock', 0)),
       this.prisma.salesOpportunity.groupBy({
         by: ['ownerId'],
         where: { ...tw, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
@@ -203,9 +238,9 @@ export class ExecutiveService {
         pipelineValue: Number(pipelineValue._sum?.value || 0),
         pipelineCount: pipelineValue._count?._all || 0,
         cashOnHand: Number(cashOnHand._sum?.currentBalance || 0),
-        arOutstanding: Number((arOutstanding._sum as any)?.totalAmount || 0),
-        apOutstanding: Number((apOutstanding._sum as any)?.totalAmount || 0),
-        workingCapital: Number((arOutstanding._sum as any)?.totalAmount || 0) - Number((apOutstanding._sum as any)?.totalAmount || 0),
+        arOutstanding: saldoPendiente(arOutstanding._sum),
+        apOutstanding: saldoPendiente(apOutstanding._sum),
+        workingCapital: saldoPendiente(arOutstanding._sum) - saldoPendiente(apOutstanding._sum),
       },
       sales: {
         hotLeads,
@@ -232,7 +267,7 @@ export class ExecutiveService {
       procurement: {
         pendingRequisitions,
         pendingPOs,
-        lowStockItems: lowStockItems.length || 0,
+        lowStockItems,
       },
       clientsCount: activeClients,
       teamSize: activeUsers,
@@ -251,7 +286,7 @@ export class ExecutiveService {
         revenueMoMChange,
         otOverdue,
         overdueInvoices,
-        lowStockCount: lowStockItems.length || 0,
+        lowStockCount: lowStockItems,
         hotLeads,
         upcomingVisits,
       }),

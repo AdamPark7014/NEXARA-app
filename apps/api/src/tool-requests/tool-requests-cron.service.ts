@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { ToolRequestsService } from './tool-requests.service';
 
 @Injectable()
@@ -10,7 +11,7 @@ export class ToolRequestsCronService {
    * Se ejecuta cada día a las 8:00 AM
    * Verifica herramientas próximas a vencerse y envía notificaciones
    */
-  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: WORKDAY_TIMEZONE })
   async checkExpiringToolsDaily() {
     console.log('🔔 Iniciando verificación diaria de herramientas próximas a vencer...');
     try {
@@ -27,7 +28,7 @@ export class ToolRequestsCronService {
    * Media hora después del aviso de vencimientos para no soltar dos notificaciones de
    * herramientas en el mismo minuto a la misma gente.
    */
-  @Cron('30 8 * * *')
+  @Cron('30 8 * * *', { timeZone: WORKDAY_TIMEZONE })
   async avisarKitsPorInspeccionar() {
     try {
       const total = await this.toolRequestsService.avisarKitsPorInspeccionarTodasLasEmpresas();
