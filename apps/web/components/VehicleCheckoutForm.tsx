@@ -61,6 +61,15 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
   const [combustible, setCombustible] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const previasRef = useRef<Record<string, string>>({});
+  const raizRef = useRef<HTMLDivElement>(null);
+  const pasoPrevio = useRef<Paso>(1);
+
+  // En el teléfono el paso nuevo empieza arriba, no a media rejilla.
+  useEffect(() => {
+    if (pasoPrevio.current === paso) return;
+    pasoPrevio.current = paso;
+    raizRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  }, [paso]);
 
   useEffect(() => {
     previasRef.current = previas;
@@ -177,10 +186,18 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
   };
 
   const titulo = mode === "salida" ? "Salida del vehículo" : "Devolución del vehículo";
+  const fotosVuelta = SLOTS_VUELTA.length - faltantesVuelta.length;
+  const totalFotos = SLOTS_VUELTA.length + 1;
 
   return (
-    <div>
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{titulo}</div>
+    <div ref={raizRef}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{titulo}</div>
+      <p className={styles.pasoActual} aria-live="polite">
+        Paso {paso} de {PASOS.length} · {PASOS[paso - 1].titulo}
+      </p>
+      <div className={styles.progreso} aria-hidden="true">
+        <div className={styles.progresoBarra} style={{ width: `${(paso / PASOS.length) * 100}%` }} />
+      </div>
 
       <ol className={styles.pasos} aria-label="Pasos">
         {PASOS.map((p, i) => (
@@ -205,9 +222,12 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
         <section aria-label="Fotos del vehículo">
           <p className={styles.notaCaptura}>
             Fotos del momento, tomadas con la cámara
-            <span className={styles.info} title={AYUDA_CAPTURA} role="img" aria-label="Cómo se toman las fotos">
+            <span className={styles.info} title={AYUDA_CAPTURA} role="img" aria-label={AYUDA_CAPTURA}>
               i
             </span>
+          </p>
+          <p className={styles.pasoActual}>
+            {fotosVuelta} de {SLOTS_VUELTA.length} fotos listas
           </p>
           <div className={styles.rejilla}>
             {SLOTS_VUELTA.map((slot) => (
@@ -227,7 +247,7 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
         <section aria-label="Foto del tablero">
           <p className={styles.notaCaptura}>
             Odómetro y gasolina en una sola foto
-            <span className={styles.info} title={AYUDA_CAPTURA} role="img" aria-label="Cómo se toma la foto">
+            <span className={styles.info} title={AYUDA_CAPTURA} role="img" aria-label={AYUDA_CAPTURA}>
               i
             </span>
           </p>
@@ -244,13 +264,15 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
       {paso === 3 && (
         <section aria-label="Kilometraje y combustible">
           <label className={styles.campo}>
-            <span className={styles.campoLabel}>Kilometraje</span>
+            <span className={styles.campoLabel}>Kilometraje del tablero</span>
             <input
-              className={styles.input}
+              className={`${styles.input} ${styles.num}`}
               type="number"
               inputMode="numeric"
+              enterKeyHint="next"
               min={0}
               step={1}
+              placeholder="Ej. 120345"
               value={odometroKm}
               onChange={(e) => {
                 setOdometroKm(e.target.value);
@@ -288,10 +310,13 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
       {paso === 4 && (
         <section aria-label="Confirmar">
           <div className={styles.resumen}>
-            <Dato label="Fotos" valor={`${Object.keys(files).length} de 7`} />
+            <Dato label="Fotos" valor={`${Object.keys(files).length} de ${totalFotos}`} />
             <Dato label="Kilometraje" valor={formatoKm(kmNumero)} />
             <Dato label="Combustible" valor={combustible || "—"} />
           </div>
+          <p className={styles.mini} style={{ margin: "0 0 10px" }}>
+            Revisa las fotos. Toca cualquiera para repetirla.
+          </p>
           <div className={styles.rejilla}>
             {[...SLOTS_VUELTA, SLOT_TABLERO].map((slot) => (
               <SlotFoto
@@ -306,18 +331,18 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
         </section>
       )}
 
-      <div className={styles.acciones}>
+      <div className={`${styles.acciones} ${styles.accionesFijas}`}>
         {paso > 1 && (
-          <Button variant="ghost" onClick={retroceder} disabled={loading}>
+          <Button variant="secondary" size="lg" onClick={retroceder} disabled={loading}>
             Atrás
           </Button>
         )}
         {paso < 4 ? (
-          <Button variant="primary" onClick={avanzar}>
+          <Button variant="primary" size="lg" onClick={avanzar}>
             Siguiente
           </Button>
         ) : (
-          <Button variant="primary" loading={loading} onClick={() => void enviar()}>
+          <Button variant="primary" size="lg" loading={loading} onClick={() => void enviar()}>
             {mode === "salida" ? "Registrar salida" : "Registrar devolución"}
           </Button>
         )}
@@ -360,9 +385,14 @@ function SlotFoto({
         // eslint-disable-next-line @next/next/no-img-element -- blob local, sin optimizar
         <img className={styles.slotPrevia} src={previa} alt={`Foto ${etiqueta}`} />
       ) : (
-        <span className={styles.slotEstado}>Tomar foto</span>
+        <span className={styles.slotIcono} aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
+        </span>
       )}
-      {file && <span className={styles.slotEstado}>Lista</span>}
+      <span className={styles.slotEstado}>{file ? "✓ Lista · tocar para repetir" : "Tomar foto"}</span>
       <input
         className={styles.slotInput}
         type="file"

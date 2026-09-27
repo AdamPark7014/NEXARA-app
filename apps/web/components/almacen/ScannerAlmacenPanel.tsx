@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { createStockMovement, listWarehouses } from "@/lib/stock-api";
+import { formatApiError } from "@/lib/erp-api";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -60,17 +61,18 @@ const MIN_SCAN_LEN = 3;
 /** El error va atado al campo del código: sin esto se anuncia suelto. */
 const ERROR_ID = "escaner-almacen-error";
 
+/** Se usa de pie, con guantes o en tableta: 44 px de alto y 16 px (iOS no hace zoom). */
 const campo: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
-  minHeight: 36,
-  padding: "7px 10px",
+  minHeight: 44,
+  padding: "9px 12px",
   borderRadius: 8,
   border: "1px solid var(--border)",
   background: "var(--surface)",
   color: "inherit",
   font: "inherit",
-  fontSize: 14,
+  fontSize: 16,
 };
 
 export default function ScannerAlmacenPanel() {
@@ -136,12 +138,16 @@ export default function ScannerAlmacenPanel() {
         const res = await fetch(buildApiUrl(`stock/barcode/${encodeURIComponent(q)}`), {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 404) {
+          setError(`No encontramos el código ${q}. Revisa que esté dado de alta en el producto o su empaque.`);
+          return;
+        }
         if (!res.ok) throw new Error(await res.text());
         setHit((await res.json()) as Match);
         setCode("");
         bufferRef.current = "";
       } catch (e) {
-        setError(e instanceof Error ? e.message : "No se encontró el código");
+        setError(formatApiError(e, "No se pudo buscar el código. Intenta de nuevo."));
       } finally {
         setLoading(false);
         inputRef.current?.focus();
@@ -220,7 +226,7 @@ export default function ScannerAlmacenPanel() {
       setHit(null);
       setQty("1");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo registrar el movimiento");
+      setError(formatApiError(e, "No se pudo registrar el movimiento"));
     } finally {
       setSaving(false);
       inputRef.current?.focus();
@@ -260,7 +266,7 @@ export default function ScannerAlmacenPanel() {
           disabled={loading || saving}
           style={{ ...campo, flex: "1 1 220px", maxWidth: 360 }}
         />
-        <Button type="submit" variant="primary" loading={loading} disabled={!code.trim() || saving}>
+        <Button type="submit" variant="primary" size="lg" loading={loading} disabled={!code.trim() || saving}>
           Buscar
         </Button>
       </form>
@@ -358,16 +364,18 @@ export default function ScannerAlmacenPanel() {
             style={{
               display: "flex",
               justifyContent: "flex-end",
+              flexWrap: "wrap",
               gap: 8,
               paddingTop: 12,
               borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
             }}
           >
-            <Button variant="ghost" onClick={() => setHit(null)} disabled={saving}>
+            <Button variant="ghost" size="lg" onClick={() => setHit(null)} disabled={saving}>
               Cancelar
             </Button>
             <Button
               variant="primary"
+              size="lg"
               onClick={() => void confirmarMovimiento()}
               disabled={confirmDisabled}
               loading={saving}

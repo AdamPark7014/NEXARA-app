@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import PanelTabs from "@/components/ui/PanelTabs";
 import { useUser } from "@/components/UserContext";
@@ -45,7 +45,8 @@ function pestanaValida(valor: string | null): Pestana | null {
 
 export default function AlmacenPage() {
   const { user } = useUser();
-  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "warehouse"), [user]);
   const herramientasCfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
   const gestionaHerramientas =
@@ -54,16 +55,27 @@ export default function AlmacenPage() {
     || herramientasCfg.canApprove;
   const puedePedirHerramientas = herramientasCfg.canCreate;
 
-  const highlightId = searchParams.get("highlight");
-  const [tab, setTab] = useState<Pestana>(
-    () => pestanaValida(searchParams.get("tab")) ?? "inventario",
-  );
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Pestana>("inventario");
 
   // Los avisos traen `?tab=`: reabastecimiento, una recolección o una revisión de kit.
   useEffect(() => {
-    const desdeUrl = pestanaValida(searchParams.get("tab"));
+    const params = new URLSearchParams(window.location.search);
+    const desdeUrl = pestanaValida(params.get("tab"));
     if (desdeUrl) setTab(desdeUrl);
-  }, [searchParams]);
+    setHighlightId(params.get("highlight"));
+  }, [pathname]);
+
+  // La pestaña queda en la URL para que recargar o compartir el enlace caiga en el mismo sitio.
+  const cambiarTab = useCallback(
+    (siguiente: Pestana) => {
+      setTab(siguiente);
+      const params = new URLSearchParams(window.location.search);
+      params.set("tab", siguiente);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router],
+  );
 
   return (
     <>
@@ -77,7 +89,7 @@ export default function AlmacenPage() {
       <PanelTabs
         ariaLabel="Secciones de almacén"
         value={tab}
-        onChange={setTab}
+        onChange={cambiarTab}
         tabs={PESTANAS.map((p) => ({ key: p.key, label: p.label }))}
       />
 
