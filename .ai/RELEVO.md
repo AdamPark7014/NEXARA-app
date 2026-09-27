@@ -1,6 +1,6 @@
 # RELEVO
 
-- **Último turno:** claude-code (sitio público) — antes: cursor (consolidación en `main`)
+- **Último turno:** claude-code (selectores de cotización) — antes: claude-code (sitio público), cursor (consolidación en `main`)
 - **Fecha:** 2026-09-27
 - **Regla:** se trabaja **siempre directo en `main`**: sin ramas, worktrees ni PRs (Adam es el único programador).
   Está en las reglas de Cursor, `~/.claude/CLAUDE.md`, `C:\dev\CLAUDE.md`, `FUSION-PROTOCOL.md` y la plantilla EXEC-PACKET.
@@ -9,6 +9,19 @@
 - **Respaldo de todo lo borrado:** `C:\dev\.ai\archivo-nexara-2026-09-27\` — `todas-las-ramas.bundle`
   (224 ramas) + parches/zips de los 39 worktrees con cambios (`final\` = copia justo antes de borrar).
   Recuperar una rama: `git fetch C:\dev\.ai\archivo-nexara-2026-09-27\todas-las-ramas.bundle "refs/heads/<rama>:refs/heads/<rama>"`.
+
+## Hecho (Claude, 27-09 17:40): listas desplegables de cotización que no dejaban scrollear
+- Adam (captura de `/erp/cotizaciones/nueva`): el selector de cliente no deja scrollear. Causa: `onBlur`
+  cierra la lista a los 150 ms y tocar/arrastrar la barra de scroll del `<ul>` quita el foco al input; además
+  `ClienteCombo` recortaba a 8 clientes (`slice(0, 8)`) y con teclado la opción activa no seguía en pantalla.
+- Arreglo en `_editor/SeccionPortada.tsx` (`onMouseDown` con `preventDefault` en la lista, hasta 100
+  coincidencias, `scrollIntoView` solo al navegar con teclado para no pelear con la rueda) y el mismo
+  `onMouseDown` en la lista de catálogo de `_editor/TablaPartidas.tsx`.
+- Verificado: web `tsc` 0. **No probado en navegador** (la página exige sesión). Adam dijo «y así»: puede haber
+  más pantallas con problemas de scroll; falta que indique cuáles.
+- **Sin subir a GitHub ni desplegar:** `main` local va 4 commits por delante de `origin/main` (readiness CFDI,
+  9 plantillas de cotización + seed, aviso diario de OC atrasadas, «Pagos a personal»; 49 archivos). Subirlos
+  y correr `deploy/update.sh` los publica todos, incluido el cron que avisa a compradores. Decidir con Adam.
 
 ## Hecho (Claude, 27-09 12:30-13:10): Inicio «visual primero» + mapa repinta con el tema
 - Adam: bajando del video quiere ver imágenes antes que texto y sintetizar. Nuevo orden de Inicio:
