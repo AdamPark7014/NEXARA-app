@@ -1,0 +1,20 @@
+/* OpsActivityForm en tono Core (asignar / auto-asignarse desde el teléfono).
+   En pantallas táctiles los campos llevan 16px (iOS no hace zoom al enfocar)
+   y al menos 44px de alto. El tono «ops» no usa esta clase. */
+
+@media (max-width: 720px), (pointer: coarse) {
+  .core input:not([type="checkbox"]):not([type="radio"]),
+  .core select,
+  .core textarea {
+    font-size: 16px;
+  }
+
+  .core input:not([type="checkbox"]):not([type="radio"]),
+  .core select {
+    min-height: 44px;
+  }
+
+  .core button {
+    min-height: 40px;
+  }
+}
