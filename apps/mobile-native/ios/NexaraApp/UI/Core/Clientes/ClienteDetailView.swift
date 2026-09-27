@@ -131,8 +131,10 @@ struct ClienteDetailView: View {
                         }
                     }
                     ForEach(addable) { s in
-                        Button("+ \(s.shortTitle)") { Task { await addSector(s) } }
-                            .disabled(busy)
+                        Button { Task { await addSector(s) } } label: {
+                            Label("Agregar a \(s.shortTitle)", systemImage: "plus.circle")
+                        }
+                        .disabled(busy)
                     }
                 }
 
@@ -143,19 +145,26 @@ struct ClienteDetailView: View {
                 if permisos.puedeDesactivar || permisos.puedeEliminar {
                     estatusSection(client)
                 }
-            } else if error == nil {
-                Section { ProgressView("Cargando…") }
+            } else if let error {
+                Section {
+                    NxErrorState(message: error) { Task { await load() } }
+                }
+            } else {
+                Section { NxLoadingState(text: "Cargando cliente…") }
             }
 
             if let notice {
-                Section { Text(notice).font(.footnote).foregroundColor(.green) }
-            }
-            if let error {
                 Section {
-                    Text(error).font(.footnote).foregroundColor(.red)
-                    if client == nil {
-                        Button("Reintentar") { Task { await load() } }
-                    }
+                    NxIconText(systemName: "checkmark.circle.fill", text: notice)
+                        .font(.footnote)
+                        .foregroundStyle(CorePalette.green)
+                }
+            }
+            if let error, client != nil {
+                Section {
+                    NxIconText(systemName: "exclamationmark.triangle.fill", text: error)
+                        .font(.footnote)
+                        .foregroundStyle(CorePalette.red)
                 }
             }
         }
@@ -213,10 +222,12 @@ struct ClienteDetailView: View {
     private func projectsSection(_ client: CoreSalesClient) -> some View {
         Section("Proyectos (\(projects.count))") {
             if client.serviceClientId == nil {
-                Text("Falta puente operativo.").foregroundColor(.secondary)
+                Text("Este cliente todavía no está ligado a operación; pide que lo den de alta para crear proyectos.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             } else {
                 if projects.isEmpty {
-                    Text("Sin proyectos aún.").foregroundColor(.secondary)
+                    Text("Aún no tiene proyectos.").foregroundStyle(.secondary)
                 } else {
                     ForEach(projects) { p in
                         projectRow(p)
@@ -224,6 +235,8 @@ struct ClienteDetailView: View {
                 }
                 if mySectors.contains(.proyecto) {
                     TextField("Nombre del proyecto", text: $projectTitle)
+                        .textInputAutocapitalization(.sentences)
+                        .submitLabel(.done)
                     DatePicker("Inicio", selection: $projectStart, displayedComponents: .date)
                         .environment(\.locale, Locale(identifier: "es_MX"))
                     Button(busy ? "Creando…" : "Crear proyecto") {
@@ -274,8 +287,9 @@ struct ClienteDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .imageScale(.large)
-                        .accessibilityLabel("Opciones del proyecto")
+                        .nxTapTarget()
                 }
+                .accessibilityLabel("Opciones de \(p.title)")
                 .disabled(busy)
             }
         }
@@ -303,13 +317,13 @@ struct ClienteDetailView: View {
         do {
             let c = try await ClientesRepository.shared.detail(id: clientId)
             client = c
-            if let serviceId = c.serviceClientId {
-                projects = (try? await ClientesRepository.shared.projects(serviceClientId: serviceId)) ?? []
+            if c.serviceClientId != nil {
+                await reloadProjects()
             } else {
                 projects = []
             }
         } catch {
-            self.error = error.toUserMessage(fallback: "No se pudo cargar")
+            self.error = error.toUserMessage(fallback: "No se pudo cargar el cliente")
         }
         // Sin permisos confirmados no se ofrece nada: el API vuelve a decidir en cada acción.
         permisos = (try? await ClientesRepository.shared.permissions()) ?? .ninguno
@@ -383,14 +397,14 @@ struct ClienteDetailView: View {
         do {
             if let updated = try await ClientesRepository.shared.addSector(clientId: clientId, sector: sector) {
                 client = updated
-                if updated.clientSectors.contains(.proyecto), let serviceId = updated.serviceClientId {
-                    projects = (try? await ClientesRepository.shared.projects(serviceClientId: serviceId)) ?? []
+                if updated.clientSectors.contains(.proyecto) {
+                    await reloadProjects()
                 }
             } else {
                 notice = "Sin conexión: el sector se agregará al recuperar la red."
             }
         } catch {
-            self.error = error.toUserMessage(fallback: "No se pudo agregar sector")
+            self.error = error.toUserMessage(fallback: "No se pudo agregar el sector")
         }
     }
 
@@ -399,14 +413,9 @@ struct ClienteDetailView: View {
               let vendorId = session.currentUser.flatMap({ Int($0.id) }) else { return }
         let title = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard title.count >= 3 else {
-            error = "Título muy corto"
+            error = "Escribe un nombre de al menos 3 letras."
             return
         }
-        let fmt = DateFormatter()
-        fmt.calendar = Calendar(identifier: .gregorian)
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.timeZone = .current
-        fmt.dateFormat = "yyyy-MM-dd"
         busy = true
         error = nil
         notice = nil
@@ -416,7 +425,7 @@ struct ClienteDetailView: View {
                 title: title,
                 serviceClientId: serviceId,
                 vendorId: vendorId,
-                startDate: fmt.string(from: projectStart)
+                startDate: NxFormat.apiDay(projectStart)
             )
             projectTitle = ""
             await load()
