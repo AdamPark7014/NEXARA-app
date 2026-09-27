@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatApiError } from "@/lib/erp-api";
 
 /**
  * Piezas chicas compartidas por las pantallas de Recursos (almacén, vehículos,
@@ -82,4 +83,21 @@ const NUMERO = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 });
 export function cantidad(valor: number | string | null | undefined): string {
   const n = Number(valor ?? 0);
   return Number.isFinite(n) ? NUMERO.format(n) : FALTA;
+}
+
+/**
+ * Mensaje para la persona: el `message` (o `error`) del cuerpo si lo hay; nunca
+ * JSON ni HTML crudos.
+ */
+export function errorLegible(err: unknown, fallback: string): string {
+  if (err instanceof Error) {
+    try {
+      const cuerpo = JSON.parse(err.message) as { error?: unknown };
+      if (typeof cuerpo.error === "string" && cuerpo.error.trim()) return cuerpo.error;
+    } catch {
+      /* texto plano */
+    }
+  }
+  const texto = formatApiError(err, fallback);
+  return /^\s*[{[<]/.test(texto) ? fallback : texto;
 }
