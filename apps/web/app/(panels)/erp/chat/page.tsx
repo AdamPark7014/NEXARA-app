@@ -1,18 +1,26 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import WorkspaceChat from "@/components/WorkspaceChat";
 import { useUser } from "@/components/UserContext";
+import EmptyState from "@/components/ui/EmptyState";
+import Button from "@/components/ui/Button";
 
 export default function ChatPage() {
+  const router = useRouter();
   const { user } = useUser();
   const token = user?.token ?? "";
   const userId = Number(user?.id ?? 0);
 
   if (!token || userId <= 0) {
     return (
-      <div style={{ padding: 24, color: "var(--text-secondary)", fontSize: 14 }}>
-        Inicia sesión para usar el chat.
-      </div>
+      <EmptyState
+        variant="page"
+        icon="💬"
+        title="Chat del equipo"
+        description="Tu sesión no está activa. Vuelve a iniciar sesión para conversar con tu equipo."
+        action={<Button variant="primary" onClick={() => router.replace("/login")}>Iniciar sesión</Button>}
+      />
     );
   }
 
