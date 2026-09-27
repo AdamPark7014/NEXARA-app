@@ -53,6 +53,10 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     case herramientas = "erp-herramientas"
     case vehiculos = "erp-vehiculos"
     case organigrama = "erp-organigrama"
+    case gastos = "erp-gastos"
+    case aprobaciones = "erp-aprobaciones"
+    case pagosEmpleados = "erp-pagos-empleados"
+    case documentos = "erp-documentos"
     /// Viáticos. La clave NO sale de `CORE_EXTRA_MODULES` —ahí no está—, sino de
     /// la que `me/navigation` ya emite para cualquier ruta que contenga
     /// `viatic` (`navigation-module-map.ts`: `viatics`, `my-viatics`).
@@ -62,7 +66,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .executive: return "Hoy"
+        case .executive: return "Ejecutivo"
         case .cotizaciones: return "Cotizaciones"
         case .proyectos: return "Proyectos"
         case .kpisEquipo: return "KPIs del equipo"
@@ -70,13 +74,17 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "Herramientas"
         case .vehiculos: return "Vehículos"
         case .organigrama: return "Organigrama"
+        case .gastos: return "Gastos"
+        case .aprobaciones: return "Aprobaciones"
+        case .pagosEmpleados: return "Pagos a empleados"
+        case .documentos: return "Documentos"
         case .viaticos: return "Viáticos"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .executive: return "chart.bar"
+        case .executive: return "chart.line.uptrend.xyaxis"
         case .cotizaciones: return "doc.text"
         case .proyectos: return "folder"
         case .kpisEquipo: return "chart.bar"
@@ -84,6 +92,10 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "wrench.and.screwdriver"
         case .vehiculos: return "car"
         case .organigrama: return "person.3"
+        case .gastos: return "creditcard"
+        case .aprobaciones: return "checkmark.seal"
+        case .pagosEmpleados: return "wallet.pass"
+        case .documentos: return "doc.richtext"
         case .viaticos: return "banknote"
         }
     }
@@ -99,6 +111,10 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "/erp/almacen/herramientas"
         case .vehiculos: return "/erp/vehiculos"
         case .organigrama: return "/erp/organigrama"
+        case .gastos: return "/erp/finance/expenses"
+        case .aprobaciones: return "/erp/approvals"
+        case .pagosEmpleados: return "/erp/finance/employee-payments"
+        case .documentos: return "/erp/documents"
         case .viaticos: return "/erp/finance/viatics"
         }
     }
@@ -106,7 +122,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     /// Una línea para la lista del hub «Más».
     var summary: String {
         switch self {
-        case .executive: return "KPIs del negocio — vista de dirección."
+        case .executive: return "KPIs del negocio, vista de dirección."
         case .cotizaciones: return "Propuestas técnicas: folio, envío y seguimiento."
         case .proyectos: return "Cronograma, alcance, equipo y documentos."
         case .kpisEquipo: return "Retardos, uniforme y horas del equipo."
@@ -114,6 +130,10 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "Solicita herramienta, revisa tu kit y tus préstamos."
         case .vehiculos: return "Solicita un vehículo; entrega y recepción con fotos."
         case .organigrama: return "Quién reporta a quién en NEXARA."
+        case .gastos: return "Gastos de la operación: captura, comprobación y estado."
+        case .aprobaciones: return "Lo que espera tu visto bueno, en un solo sitio."
+        case .pagosEmpleados: return "Pagos y anticipos al personal, con su comprobante."
+        case .documentos: return "Manuales, planos y papeles de la operación."
         case .viaticos: return "Pide un viático con la foto del ticket, repártelo y compruébalo."
         }
     }
