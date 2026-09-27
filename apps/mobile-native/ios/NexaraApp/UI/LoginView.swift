@@ -85,7 +85,9 @@ struct LoginView: View {
                             TextField("correo@empresa.com", text: $email)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.emailAddress)
+                                .textContentType(.username)
                                 .autocorrectionDisabled()
+                                .submitLabel(.next)
                                 .padding(12)
                                 .background(Color(.secondarySystemGroupedBackground))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -102,6 +104,13 @@ struct LoginView: View {
                                     }
                                 }
                                 .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .textContentType(.password)
+                                .submitLabel(.go)
+                                .onSubmit {
+                                    guard !email.isEmpty, !password.isEmpty, !isLoading else { return }
+                                    Task { await doLogin() }
+                                }
                                 Button { showPassword.toggle() } label: {
                                     Image(systemName: showPassword ? "eye.slash" : "eye")
                                         .foregroundColor(.secondary)
@@ -129,7 +138,9 @@ struct LoginView: View {
                         .tint(accent)
 
                         if let err = errorMessage {
-                            Text(err).foregroundColor(.red).font(.footnote)
+                            NxIconText(systemName: "exclamationmark.triangle.fill", text: err)
+                                .font(.footnote)
+                                .foregroundStyle(CorePalette.red)
                         }
 
                         Button {
