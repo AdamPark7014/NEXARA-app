@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { formatApiError } from "@/lib/erp-api";
 import { listSalesClients, provisionSalesServiceClient, type SalesClient } from "@/lib/sales-api";
 import { listarCotizaciones, type CotizacionRow } from "@/lib/cotizaciones-api";
 import {
@@ -47,17 +48,26 @@ function mover<T>(lista: T[], desde: number, hacia: number): T[] {
   return copia;
 }
 
-function AsistenteNuevoProyecto() {
+export default function NuevoProyectoPage() {
   const router = useRouter();
-  const search = useSearchParams();
   const { user, token } = useUser();
   const hoy = useMemo(() => hoyISO(), []);
 
-  const [b, setB] = useState<BorradorProyecto>(() => ({
-    ...borradorVacio(hoy, user?.id ? String(user.id) : ""),
-    clienteId: search.get("clienteId") ?? "",
-    cotizacionId: search.get("cotizacionId") ?? "",
-  }));
+  const [b, setB] = useState<BorradorProyecto>(() => borradorVacio(hoy, user?.id ? String(user.id) : ""));
+
+  // Desde una cotización o un cliente: /erp/proyectos/nuevo?clienteId=…&cotizacionId=…
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    const clienteId = qs.get("clienteId") ?? "";
+    const cotizacionId = qs.get("cotizacionId") ?? "";
+    if (clienteId || cotizacionId) {
+      setB((prev) => ({
+        ...prev,
+        clienteId: prev.clienteId || clienteId,
+        cotizacionId: prev.cotizacionId || cotizacionId,
+      }));
+    }
+  }, []);
   const [paso, setPaso] = useState<PasoAlta>("datos");
   const [mostrarErrores, setMostrarErrores] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -91,7 +101,7 @@ function AsistenteNuevoProyecto() {
         setClientes([...rows].sort((x, y) => x.name.localeCompare(y.name, "es")));
         setErrorClientes(null);
       })
-      .catch((e) => vivo && setErrorClientes(e instanceof Error ? e.message : "No se pudieron cargar los clientes"))
+      .catch((e) => vivo && setErrorClientes(formatApiError(e, "No se pudieron cargar los clientes")))
       .finally(() => vivo && setCargandoClientes(false));
     listarCotizaciones(token)
       .then((rows) => vivo && setCotizaciones(rows))
@@ -179,16 +189,17 @@ function AsistenteNuevoProyecto() {
           setClientes((prev) => prev.map((c) => (c.id === cliente.id ? { ...c, serviceClientId: clientId } : c)));
         } catch (e) {
           throw new Error(
-            `«${cliente.name}» todavía no está activo en operación y no se pudo activar (${
-              e instanceof Error ? e.message : "sin detalle"
-            }). Pídeselo a administración o elige otro cliente.`,
+            `«${cliente.name}» todavía no está activo en operación y no se pudo activar (${formatApiError(
+              e,
+              "sin detalle",
+            )}). Pídeselo a administración o elige otro cliente.`,
           );
         }
       }
       const creado = await crearProyecto(token, cuerpoDeAlta(b, clientId));
       router.replace(`/erp/proyectos/${creado.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear el proyecto");
+      setError(formatApiError(e, "No se pudo crear el proyecto"));
       setGuardando(false);
     }
   }
@@ -587,7 +598,7 @@ function AsistenteNuevoProyecto() {
         )}
 
         {b.etapas.some((e) => e.plannedDate) ? (
-          <div className={styles.panel} style={{ background: "var(--bg)" }}>
+          <div className={`${styles.panel} ${styles.panelHundido}`}>
             <h3 className={styles.panelTitle}>Así se ve el cronograma</h3>
             <LineaDeTiempo
               inicio={b.startDate}
@@ -634,7 +645,7 @@ function AsistenteNuevoProyecto() {
         {TIPOS_ALCANCE.map((kind) => {
           const renglones = b.alcance.filter((a) => a.kind === kind);
           return (
-            <section key={kind} className={styles.panel} style={{ background: "var(--bg)" }} aria-labelledby={`alc-${kind}`}>
+            <section key={kind} className={`${styles.panel} ${styles.panelHundido}`} aria-labelledby={`alc-${kind}`}>
               <div className={styles.panelHead}>
                 <div>
                   <h3 id={`alc-${kind}`} className={styles.panelTitle}>
@@ -911,14 +922,14 @@ function AsistenteNuevoProyecto() {
         ) : null}
 
         <div className={styles.resumenAlta}>
-          <div className={styles.panel} style={{ background: "var(--bg)" }}>
+          <div className={`${styles.panel} ${styles.panelHundido}`}>
             <h3 className={styles.panelTitle}>{b.title.trim() || "Sin nombre"}</h3>
             <span className={styles.rowWrap}>Cliente: {clienteElegido?.name ?? "—"}</span>
             <span className={styles.rowWrap}>Tipo: {getServiceProjectTypeLabel(b.projectType)}</span>
             {b.siteCount ? <span className={styles.rowWrap}>Sitios: {b.siteCount}</span> : null}
             <span className={styles.rowWrap}>Responsable: {nombrePersona(b.responsableId) || "—"}</span>
           </div>
-          <div className={styles.panel} style={{ background: "var(--bg)" }}>
+          <div className={`${styles.panel} ${styles.panelHundido}`}>
             <h3 className={styles.panelTitle}>Fechas y dinero</h3>
             <span className={styles.rowWrap}>
               Plan: {formatoFecha(b.startDate)} → {b.endDate ? formatoFecha(b.endDate) : "sin fin planeado"}
@@ -931,7 +942,7 @@ function AsistenteNuevoProyecto() {
               {cotizacionElegida && b.importarAlcance ? " (se trae su alcance)" : ""}
             </span>
           </div>
-          <div className={styles.panel} style={{ background: "var(--bg)" }}>
+          <div className={`${styles.panel} ${styles.panelHundido}`}>
             <h3 className={styles.panelTitle}>Plan de trabajo</h3>
             <span className={styles.rowWrap}>{b.etapas.filter((e) => e.name.trim()).length} etapas en el cronograma</span>
             <span className={styles.rowWrap}>
@@ -1058,13 +1069,5 @@ function AsistenteNuevoProyecto() {
         </div>
       </form>
     </div>
-  );
-}
-
-export default function NuevoProyectoPage() {
-  return (
-    <Suspense fallback={<p className={styles.sub}>Cargando…</p>}>
-      <AsistenteNuevoProyecto />
-    </Suspense>
   );
 }

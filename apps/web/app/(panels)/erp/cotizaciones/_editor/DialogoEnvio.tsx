@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { CotizacionDetalle } from "@/lib/cotizaciones-api";
 import { esCorreo } from "@/lib/cotizacion-documento";
 import { folioAlEnviar } from "@/lib/cotizacion-folio";
+import { formatApiError } from "@/lib/erp-api";
 import Dialogo from "./Dialogo";
 import styles from "./editor.module.css";
 
@@ -72,7 +73,7 @@ export default function DialogoEnvio({
     try {
       await onEnviar({ email: para.trim(), cc: cc.validos, message: mensaje.trim() });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo enviar");
+      setError(formatApiError(e, "No se pudo enviar"));
       setEnviando(false);
     }
   }

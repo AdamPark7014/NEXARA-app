@@ -1,12 +1,5 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 
 export default function ClientesCorporativoRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/erp/clientes?sector=corporativo");
-  }, [router]);
-  return null;
+  redirect("/erp/clientes?sector=corporativo");
 }

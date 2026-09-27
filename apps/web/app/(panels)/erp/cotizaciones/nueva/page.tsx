@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import EditorCotizacion from "../_editor/EditorCotizacion";
 
 /**
@@ -9,17 +8,18 @@ import EditorCotizacion from "../_editor/EditorCotizacion";
  * ofrecen; `?plantilla=` la aplica directo). Se guarda sola en cuanto tiene cliente (ahí se emite el
  * folio). «Hacer cotización» desde una actividad comercial llega con `?activityId=`.
  */
-function NuevaCotizacion() {
-  const search = useSearchParams();
-  const activityId = Number(search.get("activityId")) || null;
-  const plantillaId = Number(search.get("plantilla")) || null;
-  return <EditorCotizacion inicial={null} activityId={activityId} plantillaId={plantillaId} />;
-}
-
 export default function NuevaCotizacionPage() {
-  return (
-    <Suspense fallback={null}>
-      <NuevaCotizacion />
-    </Suspense>
-  );
+  const [origen, setOrigen] = useState<{ activityId: number | null; plantillaId: number | null } | null>(null);
+
+  // El editor arranca con los parámetros ya leídos: la plantilla y la actividad se aplican al montar.
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    setOrigen({
+      activityId: Number(qs.get("activityId")) || null,
+      plantillaId: Number(qs.get("plantilla")) || null,
+    });
+  }, []);
+
+  if (!origen) return null;
+  return <EditorCotizacion inicial={null} activityId={origen.activityId} plantillaId={origen.plantillaId} />;
 }

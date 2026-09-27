@@ -2,7 +2,29 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import FolderOffOutlinedIcon from "@mui/icons-material/FolderOffOutlined";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { useUser } from "@/components/UserContext";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  EmptyState,
+  LinkButton,
+  PageHead,
+  Skeleton,
+} from "@/components/base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import ClientSectorIcon from "@/components/erp/ClientSectorIcon";
+import { formatApiError } from "@/lib/erp-api";
 import {
   ALL_CLIENT_SECTORS,
   canSeeClientesModule,
@@ -24,13 +46,6 @@ import {
   type ClientPermissions,
   type SalesClient,
 } from "@/lib/sales-api";
-import ClientSectorIcon from "@/components/erp/ClientSectorIcon";
-import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
-import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import { IconLabel } from "@/components/ui/IconBadge";
 import {
   createOperationalProject,
   deactivateOperationalProject,
@@ -41,7 +56,105 @@ import {
   reactivateOperationalProject,
   type OperationalProject,
 } from "@/lib/ops-operational-api";
+import { nombreSector } from "../sectores";
 import styles from "../clientes-core.module.css";
+
+const VACIO = {
+  name: "",
+  legalName: "",
+  taxId: "",
+  fiscalAddress: "",
+  fiscalZipCode: "",
+  fiscalRegime: "",
+  billingEmail: "",
+  billingPhone: "",
+  notes: "",
+};
+
+type Edicion = typeof VACIO;
+
+const RFC_MX = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Avisos que no bloquean el guardado: hay clientes extranjeros con datos fuera del formato del SAT. */
+function avisosEdicion(edit: Edicion): Partial<Record<keyof Edicion, string>> {
+  const e: Partial<Record<keyof Edicion, string>> = {};
+  const rfc = edit.taxId.trim().toUpperCase();
+  if (rfc && !RFC_MX.test(rfc)) e.taxId = "Revisa el RFC: son 12 caracteres (empresa) o 13 (persona física)";
+  if (edit.billingEmail.trim() && !EMAIL.test(edit.billingEmail.trim())) e.billingEmail = "Revisa el correo";
+  if (edit.fiscalZipCode.trim() && !/^\d{5}$/.test(edit.fiscalZipCode.trim())) e.fiscalZipCode = "El código postal lleva 5 dígitos";
+  return e;
+}
+
+function fechaCorta(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+function Dato({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <>
+      <dt>{label}</dt>
+      <dd>{children || <span className={styles.vacio}>Sin capturar</span>}</dd>
+    </>
+  );
+}
+
+function Campo({
+  id,
+  label,
+  error,
+  aviso,
+  hint,
+  children,
+  full,
+}: {
+  id: string;
+  label: string;
+  error?: string;
+  aviso?: string;
+  hint?: string;
+  children: React.ReactNode;
+  full?: boolean;
+}) {
+  return (
+    <div className={`${styles.field} ${full ? styles.fieldFull : ""}`}>
+      <label htmlFor={id}>{label}</label>
+      {children}
+      {error ? (
+        <span id={`${id}-error`} className={styles.fieldError} role="alert">
+          {error}
+        </span>
+      ) : aviso ? (
+        <span id={`${id}-error`} className={styles.fieldAviso}>
+          {aviso}
+        </span>
+      ) : hint ? (
+        <span id={`${id}-hint`} className={styles.fieldHint}>
+          {hint}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function Cargando() {
+  return (
+    <div className={styles.wrap} aria-busy="true" aria-label="Cargando cliente">
+      <div className={styles.skeletonHead}>
+        <Skeleton width={90} height={12} />
+        <Skeleton width="42%" height={24} />
+        <Skeleton width={220} height={14} />
+      </div>
+      <div className={styles.detalle}>
+        <Skeleton height={240} radius={12} />
+        <Skeleton height={240} radius={12} />
+      </div>
+    </div>
+  );
+}
 
 export default function ClienteDetallePage() {
   const params = useParams();
@@ -51,24 +164,17 @@ export default function ClienteDetallePage() {
 
   const [client, setClient] = useState<SalesClient | null>(null);
   const [projects, setProjects] = useState<OperationalProject[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [projectTitle, setProjectTitle] = useState("");
+  const [projectError, setProjectError] = useState<string | null>(null);
   const [projectStart, setProjectStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [permisos, setPermisos] = useState<ClientPermissions>(NO_CLIENT_PERMISSIONS);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [editando, setEditando] = useState(false);
-  const [edit, setEdit] = useState({
-    name: "",
-    legalName: "",
-    taxId: "",
-    fiscalAddress: "",
-    fiscalZipCode: "",
-    fiscalRegime: "",
-    billingEmail: "",
-    billingPhone: "",
-    notes: "",
-  });
+  const [intentoGuardar, setIntentoGuardar] = useState(false);
+  const [edit, setEdit] = useState<Edicion>(VACIO);
 
   useEffect(() => {
     if (!token) return;
@@ -87,13 +193,15 @@ export default function ClienteDetallePage() {
     [client],
   );
   const hasProyecto = clientSectors.includes("PROYECTO");
-  const addable = ALL_CLIENT_SECTORS.filter(
-    (s) => mySectors.includes(s) && !clientSectors.includes(s),
+  const addable = useMemo(
+    () => ALL_CLIENT_SECTORS.filter((s) => mySectors.includes(s) && !clientSectors.includes(s)),
+    [mySectors, clientSectors],
   );
+  const avisos = useMemo(() => avisosEdicion(edit), [edit]);
 
   const load = useCallback(async () => {
     if (!token || !Number.isFinite(id)) return;
-    setError(null);
+    setLoadError(null);
     try {
       const c = await getSalesClient(token, id);
       setClient(c);
@@ -108,7 +216,7 @@ export default function ClienteDetallePage() {
         setProjects([]);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setLoadError(formatApiError(e, "No se pudo cargar el cliente"));
     }
   }, [token, id]);
 
@@ -127,7 +235,7 @@ export default function ClienteDetallePage() {
     try {
       setClient(await addSalesClientSector(token, id, sector));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo agregar sector");
+      setError(formatApiError(e, "No se pudo agregar el sector"));
     } finally {
       setBusy(false);
     }
@@ -137,10 +245,11 @@ export default function ClienteDetallePage() {
     e.preventDefault();
     if (!token || !client?.serviceClientId || !user?.id) return;
     if (projectTitle.trim().length < 3) {
-      setError("Título muy corto");
+      setProjectError("El nombre del proyecto necesita al menos 3 letras");
       return;
     }
     setBusy(true);
+    setProjectError(null);
     setError(null);
     try {
       await createOperationalProject(token, {
@@ -153,7 +262,7 @@ export default function ClienteDetallePage() {
       setProjectTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear el proyecto");
+      setProjectError(formatApiError(err, "No se pudo crear el proyecto"));
     } finally {
       setBusy(false);
     }
@@ -173,14 +282,16 @@ export default function ClienteDetallePage() {
       notes: client.notes ?? "",
     });
     setError(null);
+    setIntentoGuardar(false);
     setEditando(true);
   };
 
   const onGuardarEdicion = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
+    setIntentoGuardar(true);
     if (edit.name.trim().length < 2) {
-      setError("Escribe el nombre comercial");
+      document.getElementById("edit-name")?.focus();
       return;
     }
     setBusy(true);
@@ -194,7 +305,7 @@ export default function ClienteDetallePage() {
       setEditando(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar el cliente");
+      setError(formatApiError(err, "No se pudo guardar el cliente"));
     } finally {
       setBusy(false);
     }
@@ -216,7 +327,7 @@ export default function ClienteDetallePage() {
           await (activar ? reactivateSalesClient(token, id) : deactivateSalesClient(token, id));
           await load();
         } catch (err) {
-          setError(err instanceof Error ? err.message : "No se pudo cambiar el estatus del cliente");
+          setError(formatApiError(err, "No se pudo cambiar el estatus del cliente"));
         }
       },
     });
@@ -236,7 +347,7 @@ export default function ClienteDetallePage() {
           await deleteSalesClient(token, id);
           router.push("/erp/clientes");
         } catch (err) {
-          setError(err instanceof Error ? err.message : "No se pudo eliminar el cliente");
+          setError(formatApiError(err, "No se pudo eliminar el cliente"));
         }
       },
     });
@@ -258,7 +369,7 @@ export default function ClienteDetallePage() {
           await (activar ? reactivateOperationalProject(token, p.id) : deactivateOperationalProject(token, p.id));
           await load();
         } catch (err) {
-          setError(err instanceof Error ? err.message : "No se pudo cambiar el estatus del proyecto");
+          setError(formatApiError(err, "No se pudo cambiar el estatus del proyecto"));
         }
       },
     });
@@ -277,344 +388,375 @@ export default function ClienteDetallePage() {
           await deleteOperationalProject(token, p.id);
           await load();
         } catch (err) {
-          setError(err instanceof Error ? err.message : "No se pudo eliminar el proyecto");
+          setError(formatApiError(err, "No se pudo eliminar el proyecto"));
         }
       },
     });
   };
 
-  if (!Number.isFinite(id)) return <p className={styles.error}>Cliente no válido.</p>;
-  if (!client && !error) return <p className={styles.sub}>Cargando…</p>;
-  if (!client) return <p className={styles.error}>{error}</p>;
+  if (!Number.isFinite(id)) {
+    return (
+      <div className={styles.wrap}>
+        <EmptyState
+          icon={<ErrorOutlineRoundedIcon />}
+          title="Este cliente no existe"
+          description="El enlace está incompleto o el cliente ya no está en el padrón."
+          action={<ButtonLink href="/erp/clientes">Volver a clientes</ButtonLink>}
+        />
+      </div>
+    );
+  }
+  if (!client && loadError) {
+    return (
+      <div className={styles.wrap}>
+        <EmptyState
+          icon={<ErrorOutlineRoundedIcon />}
+          title="No pudimos abrir el cliente"
+          description={loadError}
+          action={
+            <span className={styles.acciones}>
+              <Button variant="primary" onClick={() => void load()}>
+                Reintentar
+              </Button>
+              <ButtonLink href="/erp/clientes">Volver a clientes</ButtonLink>
+            </span>
+          }
+        />
+      </div>
+    );
+  }
+  if (!client) return <Cargando />;
 
   const inactivo = isInactiveClient(client.status);
+  const errorNombre = intentoGuardar && edit.name.trim().length < 2 ? "Escribe el nombre comercial" : undefined;
+  const aria = (campo: keyof Edicion, invalido: boolean) =>
+    invalido ? { "aria-invalid": true, "aria-describedby": `edit-${campo}-error` } : {};
 
   return (
     <div className={styles.wrap}>
-      <button type="button" className={styles.ghostBtn} onClick={() => router.push("/erp/clientes")}>
-        ← Clientes
-      </button>
-
-      <div className={styles.top}>
-        <div>
-          <h1 className={styles.title}>
-            {client.name}
-            {inactivo ? (
-              <span className={styles.chip} style={{ marginLeft: 10, fontSize: 12, verticalAlign: "middle" }}>
-                Inactivo
-              </span>
-            ) : null}
-          </h1>
-          <p className={styles.sub}>Encargado: {client.owner?.nombre || "—"}</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {permisos.puedeEditar && !editando ? (
-            <button type="button" className={styles.ghostBtn} disabled={busy} onClick={abrirEdicion}>
-              <IconLabel icon={EditOutlinedIcon} size={15} gap={5}>
-                Editar
-              </IconLabel>
-            </button>
-          ) : null}
-          {permisos.puedeDesactivar ? (
-            <button
-              type="button"
-              className={styles.ghostBtn}
-              disabled={busy}
-              onClick={() => pedirCambioEstatus(inactivo)}
-            >
-              <IconLabel icon={inactivo ? RestartAltOutlinedIcon : BlockOutlinedIcon} size={15} gap={5}>
-                {inactivo ? "Reactivar" : "Desactivar"}
-              </IconLabel>
-            </button>
-          ) : null}
-          {permisos.puedeEliminar ? (
-            <button
-              type="button"
-              className={styles.ghostBtn}
-              disabled={busy}
-              onClick={pedirEliminar}
-              style={{ color: "var(--danger)" }}
-            >
-              <IconLabel icon={DeleteOutlineOutlinedIcon} size={15} gap={5}>
+      <PageHead
+        back={{ href: "/erp/clientes", label: "Clientes" }}
+        title={client.name}
+        description={client.legalName && client.legalName !== client.name ? client.legalName : undefined}
+        meta={
+          <>
+            <Badge tone={inactivo ? "neutral" : "success"} dot>
+              {inactivo ? "Inactivo" : "Activo"}
+            </Badge>
+            {clientSectors.map((s) => (
+              <Badge key={s} tone="outline">
+                {nombreSector(s)}
+              </Badge>
+            ))}
+            <span className={styles.metaDato}>Encargado: {client.owner?.nombre || "sin asignar"}</span>
+          </>
+        }
+        actions={
+          <>
+            {permisos.puedeEliminar ? (
+              <Button variant="ghost" className={styles.peligro} disabled={busy} onClick={pedirEliminar}>
+                <DeleteOutlineOutlinedIcon aria-hidden="true" />
                 Eliminar
-              </IconLabel>
-            </button>
-          ) : null}
-        </div>
-      </div>
+              </Button>
+            ) : null}
+            {permisos.puedeDesactivar ? (
+              <Button variant="ghost" disabled={busy} onClick={() => pedirCambioEstatus(inactivo)}>
+                {inactivo ? <RestartAltOutlinedIcon aria-hidden="true" /> : <BlockOutlinedIcon aria-hidden="true" />}
+                {inactivo ? "Reactivar" : "Desactivar"}
+              </Button>
+            ) : null}
+            {permisos.puedeEditar && !editando ? (
+              <Button variant="primary" disabled={busy} onClick={abrirEdicion}>
+                <EditOutlinedIcon aria-hidden="true" />
+                Editar datos
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      {editando ? (
-        <form className={styles.panel} onSubmit={(e) => void onGuardarEdicion(e)}>
-          <div className={styles.fieldLabel}>Editar datos</div>
-          <div className={styles.field}>
-            <label htmlFor="edit-name">Nombre comercial *</label>
-            <input
-              id="edit-name"
-              className={styles.input}
-              required
-              value={edit.name}
-              onChange={(e) => setEdit((f) => ({ ...f, name: e.target.value }))}
-            />
-          </div>
-          <div className={styles.grid2}>
-            <div className={styles.field}>
-              <label htmlFor="edit-legal">Razón social</label>
-              <input
-                id="edit-legal"
-                className={styles.input}
-                value={edit.legalName}
-                onChange={(e) => setEdit((f) => ({ ...f, legalName: e.target.value }))}
-              />
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="edit-rfc">RFC</label>
-              <input
-                id="edit-rfc"
-                className={styles.input}
-                value={edit.taxId}
-                onChange={(e) => setEdit((f) => ({ ...f, taxId: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="edit-address">Dirección fiscal</label>
-            <input
-              id="edit-address"
-              className={styles.input}
-              value={edit.fiscalAddress}
-              onChange={(e) => setEdit((f) => ({ ...f, fiscalAddress: e.target.value }))}
-            />
-          </div>
-          <div className={styles.grid2}>
-            <div className={styles.field}>
-              <label htmlFor="edit-cp">CP fiscal</label>
-              <input
-                id="edit-cp"
-                className={styles.input}
-                value={edit.fiscalZipCode}
-                onChange={(e) => setEdit((f) => ({ ...f, fiscalZipCode: e.target.value }))}
-              />
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="edit-regimen">Régimen fiscal</label>
-              <input
-                id="edit-regimen"
-                className={styles.input}
-                value={edit.fiscalRegime}
-                onChange={(e) => setEdit((f) => ({ ...f, fiscalRegime: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className={styles.grid2}>
-            <div className={styles.field}>
-              <label htmlFor="edit-email">Email facturación</label>
-              <input
-                id="edit-email"
-                type="email"
-                className={styles.input}
-                value={edit.billingEmail}
-                onChange={(e) => setEdit((f) => ({ ...f, billingEmail: e.target.value }))}
-              />
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="edit-phone">Teléfono</label>
-              <input
-                id="edit-phone"
-                className={styles.input}
-                value={edit.billingPhone}
-                onChange={(e) => setEdit((f) => ({ ...f, billingPhone: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="edit-notes">Notas</label>
-            <textarea
-              id="edit-notes"
-              className={styles.textarea}
-              value={edit.notes}
-              onChange={(e) => setEdit((f) => ({ ...f, notes: e.target.value }))}
-            />
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit" className={styles.primaryBtn} disabled={busy}>
-              {busy ? "Guardando…" : "Guardar cambios"}
-            </button>
-            <button type="button" className={styles.ghostBtn} disabled={busy} onClick={() => setEditando(false)}>
-              Cancelar
-            </button>
-          </div>
-        </form>
+      {error ? (
+        <Alert tone="danger" role="alert" action={<LinkButton onClick={() => setError(null)}>Cerrar</LinkButton>}>
+          {error}
+        </Alert>
+      ) : null}
+      {loadError ? (
+        <Alert tone="warning" role="status" action={<LinkButton onClick={() => void load()}>Reintentar</LinkButton>}>
+          No se pudo actualizar la información; ves la última versión cargada.
+        </Alert>
       ) : null}
 
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
 
-      <section className={styles.panel}>
-        <div className={styles.fieldLabel}>Fiscal</div>
-        <dl className={styles.dl}>
-          <dt>Razón social</dt>
-          <dd>{client.legalName || "—"}</dd>
-          <dt>RFC</dt>
-          <dd>{client.taxId || "—"}</dd>
-          <dt>Dirección</dt>
-          <dd>{client.fiscalAddress || "—"}</dd>
-          <dt>CP / régimen</dt>
-          <dd>
-            {[client.fiscalZipCode, client.fiscalRegime].filter(Boolean).join(" · ") || "—"}
-          </dd>
-          <dt>Contacto</dt>
-          <dd>
-            {[client.billingEmail, client.billingPhone].filter(Boolean).join(" · ") || "—"}
-          </dd>
-        </dl>
-      </section>
-
-      <section className={styles.panel}>
-        <div className={styles.fieldLabel}>Sectores</div>
-        <div className={styles.sectorPick}>
-          {clientSectors.map((s) => (
-            <span key={s} className={styles.chip}>
-              <ClientSectorIcon icon={CLIENT_SECTOR_META[s].icon} size={14} />
-              {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
-            </span>
-          ))}
-        </div>
-        {addable.length > 0 ? (
-          <div className={styles.sectorPick}>
-            {addable.map((s) => (
-              <button
-                key={s}
-                type="button"
-                disabled={busy}
-                className={styles.sectorPickBtn}
-                onClick={() => void addSector(s)}
-              >
-                + {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
-      {hasProyecto ? (
-        <section className={styles.panel}>
-          <div className={styles.fieldLabel}>Proyectos ({projects.length})</div>
-          {!client.serviceClientId ? (
-            <p className={styles.sub} style={{ margin: 0 }}>
-              Falta puente operativo.
-            </p>
-          ) : (
-            <>
-              {projects.length === 0 ? (
-                <p className={styles.sub} style={{ margin: 0 }}>
-                  Sin proyectos aún.
-                </p>
-              ) : (
-                <div className={styles.list}>
-                  {projects.map((p) => {
-                    const proyectoInactivo = isInactiveOperationalProject(p.status);
-                    const detalle = [
-                      proyectoInactivo ? null : formatOperationalProjectStatus(p.status),
-                      p.startDate
-                        ? `Inicio ${new Date(p.startDate).toLocaleDateString("es-MX", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                            timeZone: "UTC",
-                          })}`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ");
-                    return (
-                      <div
-                        key={p.id}
-                        className={styles.row}
-                        style={{
-                          cursor: "default",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div className={styles.rowName}>
-                            {p.title}
-                            {proyectoInactivo ? (
-                              <span className={styles.chip} style={{ marginLeft: 8, fontSize: 11 }}>
-                                Inactivo
-                              </span>
-                            ) : null}
-                          </div>
-                          {detalle ? <div className={styles.rowSub}>{detalle}</div> : null}
-                        </div>
-                        {permisos.puedeDesactivar || permisos.puedeEliminar ? (
-                          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                            {permisos.puedeDesactivar ? (
-                              <button
-                                type="button"
-                                className={styles.ghostBtn}
-                                disabled={busy}
-                                onClick={() => pedirCambioEstatusProyecto(p, proyectoInactivo)}
-                              >
-                                <IconLabel
-                                  icon={proyectoInactivo ? RestartAltOutlinedIcon : BlockOutlinedIcon}
-                                  size={15}
-                                  gap={5}
-                                >
-                                  {proyectoInactivo ? "Reactivar" : "Desactivar"}
-                                </IconLabel>
-                              </button>
-                            ) : null}
-                            {permisos.puedeEliminar ? (
-                              <button
-                                type="button"
-                                className={styles.ghostBtn}
-                                disabled={busy}
-                                onClick={() => pedirEliminarProyecto(p)}
-                                style={{ color: "var(--danger)" }}
-                              >
-                                <IconLabel icon={DeleteOutlineOutlinedIcon} size={15} gap={5}>
-                                  Eliminar
-                                </IconLabel>
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {canSeeClientSector(user?.email, "PROYECTO") ? (
-                <form
-                  onSubmit={(e) => void onCreateProject(e)}
-                  style={{ display: "grid", gap: 8, marginTop: 4 }}
-                >
-                  <input
-                    className={styles.input}
-                    value={projectTitle}
-                    onChange={(e) => setProjectTitle(e.target.value)}
-                    placeholder="Nombre del proyecto"
-                  />
-                  <div className={styles.grid2}>
+      <div className={styles.detalle}>
+        {editando ? (
+          <Card as="div" className={styles.span2}>
+            <form onSubmit={(e) => void onGuardarEdicion(e)} noValidate>
+              <div className={styles.cardPad}>
+                <CardHead title="Editar datos" subtitle="Lo que captures aquí se usa en cotizaciones y facturas." />
+                <div className={styles.formGrid}>
+                  <Campo id="edit-name" label="Nombre comercial *" error={errorNombre} full>
                     <input
-                      type="date"
-                      className={styles.input}
-                      value={projectStart}
-                      onChange={(e) => setProjectStart(e.target.value)}
+                      id="edit-name"
+                      className={`${styles.input} ${errorNombre ? styles.inputError : ""}`}
+                      required
+                      autoComplete="organization"
+                      value={edit.name}
+                      onChange={(e) => setEdit((f) => ({ ...f, name: e.target.value }))}
+                      {...aria("name", Boolean(errorNombre))}
                     />
-                    <button type="submit" className={styles.primaryBtn} disabled={busy}>
-                      Crear proyecto
-                    </button>
-                  </div>
-                </form>
-              ) : null}
-            </>
-          )}
-        </section>
-      ) : null}
+                  </Campo>
+                  <Campo id="edit-legalName" label="Razón social" hint="Como aparece en la constancia fiscal">
+                    <input
+                      id="edit-legalName"
+                      className={styles.input}
+                      value={edit.legalName}
+                      onChange={(e) => setEdit((f) => ({ ...f, legalName: e.target.value }))}
+                    />
+                  </Campo>
+                  <Campo id="edit-taxId" label="RFC" aviso={avisos.taxId}>
+                    <input
+                      id="edit-taxId"
+                      className={`${styles.input} ${styles.mono}`}
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      maxLength={13}
+                      value={edit.taxId}
+                      onChange={(e) => setEdit((f) => ({ ...f, taxId: e.target.value }))}
+                      {...aria("taxId", Boolean(avisos.taxId))}
+                    />
+                  </Campo>
+                  <Campo id="edit-fiscalAddress" label="Dirección fiscal" full>
+                    <input
+                      id="edit-fiscalAddress"
+                      className={styles.input}
+                      autoComplete="street-address"
+                      value={edit.fiscalAddress}
+                      onChange={(e) => setEdit((f) => ({ ...f, fiscalAddress: e.target.value }))}
+                    />
+                  </Campo>
+                  <Campo id="edit-fiscalZipCode" label="Código postal fiscal" aviso={avisos.fiscalZipCode}>
+                    <input
+                      id="edit-fiscalZipCode"
+                      className={styles.input}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      maxLength={5}
+                      value={edit.fiscalZipCode}
+                      onChange={(e) => setEdit((f) => ({ ...f, fiscalZipCode: e.target.value }))}
+                      {...aria("fiscalZipCode", Boolean(avisos.fiscalZipCode))}
+                    />
+                  </Campo>
+                  <Campo id="edit-fiscalRegime" label="Régimen fiscal" hint="Clave del SAT, por ejemplo 601">
+                    <input
+                      id="edit-fiscalRegime"
+                      className={styles.input}
+                      value={edit.fiscalRegime}
+                      onChange={(e) => setEdit((f) => ({ ...f, fiscalRegime: e.target.value }))}
+                    />
+                  </Campo>
+                  <Campo id="edit-billingEmail" label="Correo de facturación" aviso={avisos.billingEmail}>
+                    <input
+                      id="edit-billingEmail"
+                      type="email"
+                      className={styles.input}
+                      autoComplete="email"
+                      value={edit.billingEmail}
+                      onChange={(e) => setEdit((f) => ({ ...f, billingEmail: e.target.value }))}
+                      {...aria("billingEmail", Boolean(avisos.billingEmail))}
+                    />
+                  </Campo>
+                  <Campo id="edit-billingPhone" label="Teléfono">
+                    <input
+                      id="edit-billingPhone"
+                      type="tel"
+                      className={styles.input}
+                      autoComplete="tel"
+                      value={edit.billingPhone}
+                      onChange={(e) => setEdit((f) => ({ ...f, billingPhone: e.target.value }))}
+                    />
+                  </Campo>
+                  <Campo id="edit-notes" label="Notas" hint="Solo las ve tu equipo" full>
+                    <textarea
+                      id="edit-notes"
+                      className={styles.textarea}
+                      value={edit.notes}
+                      onChange={(e) => setEdit((f) => ({ ...f, notes: e.target.value }))}
+                    />
+                  </Campo>
+                </div>
+              </div>
+              <div className={styles.saveBar}>
+                <Button disabled={busy} onClick={() => setEditando(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary" disabled={busy} aria-busy={busy || undefined}>
+                  {busy ? "Guardando…" : "Guardar cambios"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        ) : (
+          <Card pad>
+            <CardHead title="Datos fiscales" subtitle="Se usan en cotizaciones y facturas." />
+            <dl className={styles.dl}>
+              <Dato label="Razón social">{client.legalName}</Dato>
+              <Dato label="RFC">{client.taxId ? <span className={styles.mono}>{client.taxId}</span> : null}</Dato>
+              <Dato label="Dirección">{client.fiscalAddress}</Dato>
+              <Dato label="Código postal">{client.fiscalZipCode}</Dato>
+              <Dato label="Régimen">{client.fiscalRegime}</Dato>
+              <Dato label="Correo">
+                {client.billingEmail ? <a href={`mailto:${client.billingEmail}`}>{client.billingEmail}</a> : null}
+              </Dato>
+              <Dato label="Teléfono">
+                {client.billingPhone ? <a href={`tel:${client.billingPhone}`}>{client.billingPhone}</a> : null}
+              </Dato>
+            </dl>
+            {client.notes ? <p className={styles.notas}>{client.notes}</p> : null}
+          </Card>
+        )}
 
-      {error ? <p className={styles.error}>{error}</p> : null}
+        {!editando ? (
+          <Card pad>
+            <CardHead title="Sectores" subtitle="Dónde se puede elegir a este cliente." />
+            <div className={styles.sectorPick}>
+              {clientSectors.map((s) => (
+                <span key={s} className={styles.sectorChip}>
+                  <ClientSectorIcon icon={CLIENT_SECTOR_META[s].icon} size={15} />
+                  {nombreSector(s)}
+                </span>
+              ))}
+            </div>
+            {addable.length > 0 ? (
+              <>
+                <p className={styles.fieldHint}>Súmalo a otro sector sin duplicarlo:</p>
+                <div className={styles.sectorPick}>
+                  {addable.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={busy}
+                      className={styles.sectorPickBtn}
+                      onClick={() => void addSector(s)}
+                    >
+                      <AddRoundedIcon aria-hidden="true" fontSize="inherit" />
+                      {nombreSector(s)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </Card>
+        ) : null}
+
+        {hasProyecto ? (
+          <Card pad className={styles.span2}>
+            <CardHead
+              title={projects.length ? `Proyectos · ${projects.length}` : "Proyectos"}
+              subtitle="Los proyectos operativos de este cliente."
+            />
+            {!client.serviceClientId ? (
+              <Alert tone="info" role="status">
+                Este cliente todavía no está enlazado con operaciones, así que aún no se le pueden crear proyectos.
+              </Alert>
+            ) : (
+              <>
+                {projects.length === 0 ? (
+                  <EmptyState
+                    icon={<FolderOffOutlinedIcon />}
+                    title="Sin proyectos todavía"
+                    description={
+                      canSeeClientSector(user?.email, "PROYECTO") ? "Crea el primero con el formulario de abajo." : undefined
+                    }
+                  />
+                ) : (
+                  <ul className={styles.proyectos}>
+                    {projects.map((p) => {
+                      const proyectoInactivo = isInactiveOperationalProject(p.status);
+                      const inicio = fechaCorta(p.startDate);
+                      return (
+                        <li key={p.id} className={styles.proyecto}>
+                          <div className={styles.proyectoTexto}>
+                            <span className={styles.proyectoNombre}>{p.title}</span>
+                            <span className={styles.proyectoSub}>
+                              <Badge tone={proyectoInactivo ? "neutral" : "info"} dot>
+                                {proyectoInactivo ? "Inactivo" : formatOperationalProjectStatus(p.status)}
+                              </Badge>
+                              {inicio ? <span>Inicio {inicio}</span> : null}
+                            </span>
+                          </div>
+                          {permisos.puedeDesactivar || permisos.puedeEliminar ? (
+                            <div className={styles.acciones}>
+                              {permisos.puedeDesactivar ? (
+                                <Button
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => pedirCambioEstatusProyecto(p, proyectoInactivo)}
+                                >
+                                  {proyectoInactivo ? (
+                                    <RestartAltOutlinedIcon aria-hidden="true" />
+                                  ) : (
+                                    <BlockOutlinedIcon aria-hidden="true" />
+                                  )}
+                                  {proyectoInactivo ? "Reactivar" : "Desactivar"}
+                                </Button>
+                              ) : null}
+                              {permisos.puedeEliminar ? (
+                                <Button
+                                  variant="ghost"
+                                  icon
+                                  className={styles.peligro}
+                                  disabled={busy}
+                                  onClick={() => pedirEliminarProyecto(p)}
+                                  aria-label={`Eliminar el proyecto ${p.title}`}
+                                  title="Eliminar proyecto"
+                                >
+                                  <DeleteOutlineOutlinedIcon aria-hidden="true" />
+                                </Button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {canSeeClientSector(user?.email, "PROYECTO") ? (
+                  <form className={styles.nuevoProyecto} onSubmit={(e) => void onCreateProject(e)} noValidate>
+                    <Campo id="proyecto-nombre" label="Nuevo proyecto" error={projectError ?? undefined}>
+                      <input
+                        id="proyecto-nombre"
+                        className={`${styles.input} ${projectError ? styles.inputError : ""}`}
+                        value={projectTitle}
+                        onChange={(e) => {
+                          setProjectTitle(e.target.value);
+                          if (projectError) setProjectError(null);
+                        }}
+                        placeholder="Nombre del proyecto"
+                        aria-invalid={projectError ? true : undefined}
+                        aria-describedby={projectError ? "proyecto-nombre-error" : undefined}
+                      />
+                    </Campo>
+                    <Campo id="proyecto-inicio" label="Inicio">
+                      <input
+                        id="proyecto-inicio"
+                        type="date"
+                        className={styles.input}
+                        value={projectStart}
+                        onChange={(e) => setProjectStart(e.target.value)}
+                      />
+                    </Campo>
+                    <Button type="submit" variant="secondary" disabled={busy} className={styles.nuevoProyectoBtn}>
+                      <AddRoundedIcon aria-hidden="true" />
+                      Crear proyecto
+                    </Button>
+                  </form>
+                ) : null}
+              </>
+            )}
+          </Card>
+        ) : null}
+      </div>
     </div>
   );
 }

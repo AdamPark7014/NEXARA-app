@@ -15,6 +15,7 @@ import {
   type CotizacionDetalle,
   type VersionCotizacion,
 } from "@/lib/cotizaciones-api";
+import { formatApiError } from "@/lib/erp-api";
 import { Ayuda } from "./campos";
 import Dialogo from "./Dialogo";
 import FolioExplicado from "./FolioExplicado";
@@ -58,7 +59,7 @@ export default function Seguimiento({
         if (vivo) setCompaneros(lista);
       })
       .catch((e) => {
-        if (vivo) onError(e instanceof Error ? e.message : "No se pudo leer quién puede cotizar");
+        if (vivo) onError(formatApiError(e, "No se pudo leer quién puede cotizar"));
       });
     return () => {
       vivo = false;
@@ -80,7 +81,7 @@ export default function Seguimiento({
       onAviso(aviso);
       return true;
     } catch (e) {
-      onError(e instanceof Error ? e.message : "No se pudo completar");
+      onError(formatApiError(e, "No se pudo completar"));
       return false;
     } finally {
       setOcupado(false);

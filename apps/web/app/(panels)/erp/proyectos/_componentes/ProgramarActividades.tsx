@@ -10,6 +10,7 @@ import {
   type ResultadoProgramacion,
 } from "@/lib/proyectos-api";
 import { aInputFecha } from "@/lib/proyecto-plan";
+import { formatApiError } from "@/lib/erp-api";
 import { rangosSeEmpalman, reencadenar, resumenDelRango } from "@/lib/actividad-periodo";
 import { PersonaSelect } from "./personas";
 import type { SeccionProps } from "./tipos";
@@ -93,7 +94,7 @@ export default function ProgramarActividades({ proyecto: p, token, ocupado, pers
       setSitios(propuesta.proyecto.siteCount && propuesta.proyecto.siteCount > 0 ? propuesta.proyecto.siteCount : null);
       setPorSitio(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo preparar la programación");
+      setError(formatApiError(e, "No se pudo preparar la programación"));
     } finally {
       setCargando(false);
     }

@@ -177,20 +177,20 @@ export default function LineaDeTiempo({
 
       <div className={styles.ganttLegend} aria-hidden="true">
         <span className={styles.ganttLegendItem}>
-          <span className={styles.swatch} style={{ background: "color-mix(in srgb, var(--primary) 30%, transparent)", border: "1px solid var(--primary)" }} />
+          <span className={`${styles.swatch} ${styles.swatchPlan}`} />
           Plan del proyecto
         </span>
         <span className={styles.ganttLegendItem}>
-          <span className={styles.swatch} style={{ background: "#16a34a" }} />
+          <span className={`${styles.swatch} ${styles.swatchReal}`} />
           Fechas reales / etapa cumplida
         </span>
         <span className={styles.ganttLegendItem}>
-          <span className={styles.swatch} style={{ background: "color-mix(in srgb, #dc2626 70%, transparent)" }} />
+          <span className={`${styles.swatch} ${styles.swatchVencida}`} />
           Etapa vencida
         </span>
         {posHoy !== null ? (
           <span className={styles.ganttLegendItem}>
-            <span className={styles.swatch} style={{ background: "#dc2626", width: 2, height: 12 }} />
+            <span className={`${styles.swatch} ${styles.swatchHoy}`} />
             Hoy
           </span>
         ) : null}
