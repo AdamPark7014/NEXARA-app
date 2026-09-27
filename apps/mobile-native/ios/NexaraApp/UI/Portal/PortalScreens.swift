@@ -1014,37 +1014,90 @@ struct PortalInventoryDetailView: View {
     @State private var saving = false
     @State private var message: String?
     @State private var error: String?
+    @State private var loadError: String?
+    @State private var loadingPdf = false
 
     var body: some View {
         ScrollView {
             if let d = detail {
-                VStack(alignment: .leading, spacing: 10) {
-                    if let message { Text(message).foregroundColor(.green).font(.footnote) }
-                    if let error { Text(error).foregroundColor(.red).font(.footnote) }
-                    Text(d.displayTitle).font(.title3).bold()
-                    NxStatusChip(status: d.status)
+                VStack(alignment: .leading, spacing: NxSpacing.m) {
+                    if let message {
+                        NxIconText(systemName: "checkmark.circle.fill", text: message)
+                            .font(.footnote)
+                            .foregroundStyle(CorePalette.green)
+                    }
+                    if let error {
+                        NxIconText(systemName: "exclamationmark.triangle.fill", text: error)
+                            .font(.footnote)
+                            .foregroundStyle(CorePalette.red)
+                    }
+                    VStack(alignment: .leading, spacing: NxSpacing.s) {
+                        Text(d.displayTitle).font(.title3.weight(.bold))
+                        NxStatusChip(status: d.status)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .nxCard()
+
                     if !d.items.isEmpty {
-                        Text("Ítems (\(d.items.count))").font(.headline).padding(.top, 8)
-                        ForEach(d.items) { it in
-                            Text(it.displayName).font(.subheadline)
+                        VStack(alignment: .leading, spacing: NxSpacing.s) {
+                            Text("Artículos (\(d.items.count))")
+                                .font(.headline)
+                                .accessibilityAddTraits(.isHeader)
+                            ForEach(d.items) { it in
+                                Text(it.displayName)
+                                    .font(.subheadline)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                if it.id != d.items.last?.id { Divider() }
+                            }
                         }
+                        .nxCard()
                     }
-                    TextField("Notas", text: $notes, axis: .vertical).lineLimit(2...5)
-                    Toggle("Marcar completado", isOn: $markCompleted)
-                    Toggle("Confirmar diferencia", isOn: $confirmDifference)
-                    HStack {
+
+                    VStack(alignment: .leading, spacing: NxSpacing.m) {
+                        TextField("Notas", text: $notes, axis: .vertical)
+                            .lineLimit(2...5)
+                            .textFieldStyle(.roundedBorder)
+                        Toggle("Marcar como completado", isOn: $markCompleted)
+                        Toggle("Confirmar la diferencia", isOn: $confirmDifference)
                         Button(saving ? "Guardando…" : "Sincronizar") { Task { await sync() } }
-                            .buttonStyle(.borderedProminent).tint(NxBrand.primary)
-                        Button("Aprobar") { Task { await decide("APPROVE") } }.buttonStyle(.bordered)
-                        Button("Rechazar", role: .destructive) { Task { await decide("REJECT") } }
+                            .buttonStyle(NxPrimaryButtonStyle())
+                            .disabled(saving)
+                        HStack(spacing: NxSpacing.s) {
+                            Button("Aprobar") { Task { await decide("APPROVE") } }
+                                .buttonStyle(.bordered)
+                                .tint(CorePalette.green)
+                                .frame(maxWidth: .infinity)
+                            Button("Rechazar", role: .destructive) { Task { await decide("REJECT") } }
+                                .buttonStyle(.bordered)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .controlSize(.large)
+                        .disabled(saving)
                     }
-                    Button("Reporte PDF") { Task { reportData = try? await TicketsRepository.shared.inventoryReportPdf(id: inventoryId) } }
-                        .buttonStyle(.bordered)
+                    .nxCard()
+
+                    Button {
+                        Task { await openReport() }
+                    } label: {
+                        Label(loadingPdf ? "Preparando reporte…" : "Ver reporte PDF", systemImage: "doc.richtext")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(NxSecondaryButtonStyle())
+                    .disabled(loadingPdf)
                 }
                 .padding()
-            } else { ProgressView() }
+            } else if let loadError {
+                NxErrorState(message: loadError) { Task { await load() } }
+                    .padding(.top, 40)
+            } else {
+                NxLoadingState(text: "Cargando inventario…")
+                    .padding(.top, 40)
+            }
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Inventario")
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await load() }
         .task { await load() }
         .sheet(item: Binding(
             get: { reportData.map { PDFSheetItem(data: $0) } },
@@ -1055,10 +1108,32 @@ struct PortalInventoryDetailView: View {
     }
 
     private func load() async {
-        guard let d = try? await TicketsRepository.shared.portalInventoryDetail(id: inventoryId) else { return }
-        detail = d
-        notes = d.notes
-        markCompleted = d.status.uppercased() == "COMPLETED"
+        do {
+            let d = try await TicketsRepository.shared.portalInventoryDetail(id: inventoryId)
+            let firstLoad = detail == nil
+            detail = d
+            loadError = nil
+            if firstLoad {
+                notes = d.notes
+                markCompleted = d.status.uppercased() == "COMPLETED"
+            }
+        } catch {
+            if detail == nil {
+                loadError = error.toUserMessage(fallback: "No se pudo cargar el inventario")
+            } else {
+                self.error = error.toUserMessage(fallback: "No se pudo actualizar el inventario")
+            }
+        }
+    }
+
+    private func openReport() async {
+        loadingPdf = true
+        defer { loadingPdf = false }
+        do {
+            reportData = try await TicketsRepository.shared.inventoryReportPdf(id: inventoryId)
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo abrir el reporte")
+        }
     }
 
     private func sync() async {
