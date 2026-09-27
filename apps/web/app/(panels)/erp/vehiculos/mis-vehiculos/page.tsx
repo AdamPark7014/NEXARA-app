@@ -287,7 +287,6 @@ export default function MisVehiculosPage() {
         onClose={() => setCaptura(null)}
         title={captura?.titulo}
         maxWidth={620}
-        dirty={enviando}
       >
         {captura && (
           <VehicleCheckoutForm
