@@ -158,7 +158,11 @@ export class EmployeePaymentsService {
     viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
     rango: { desde: string; hasta: string },
     companyId?: number | null,
+    opciones: { verMontos?: boolean } = {},
   ) {
+    // Si la empresa dejó «Pagos a personal» para pocos roles, quien no lo ve tampoco ve aquí lo
+    // capturado: ni se consulta. Las horas y los avisos no cambian.
+    const verMontos = opciones.verMontos !== false;
     const datos = await this.kpis.getEquipo(viewer, companyId ?? null, rango, null);
     const userIds = datos.personas.map((p) => p.persona.id);
 
@@ -167,16 +171,18 @@ export class EmployeePaymentsService {
         where: { id: { in: userIds.length ? userIds : [-1] } },
         select: { id: true, employeeNumber: true },
       }),
-      this.prisma.employeePayment.findMany({
-        where: {
-          userId: { in: userIds.length ? userIds : [-1] },
-          deletedAt: null,
-          periodFrom: { gte: this.toDate(rango.desde) ?? undefined },
-          periodTo: { lte: this.toDate(rango.hasta) ?? undefined },
-          ...companyWhere(companyId ?? null),
-        },
-        select: { userId: true, amount: true },
-      }),
+      verMontos
+        ? this.prisma.employeePayment.findMany({
+            where: {
+              userId: { in: userIds.length ? userIds : [-1] },
+              deletedAt: null,
+              periodFrom: { gte: this.toDate(rango.desde) ?? undefined },
+              periodTo: { lte: this.toDate(rango.hasta) ?? undefined },
+              ...companyWhere(companyId ?? null),
+            },
+            select: { userId: true, amount: true },
+          })
+        : Promise.resolve([] as Array<{ userId: number; amount: unknown }>),
     ]);
 
     const numeroPor = new Map(personas.map((p) => [p.id, p.employeeNumber]));
@@ -207,6 +213,8 @@ export class EmployeePaymentsService {
       supuestos: datos.supuestos,
       filas,
       resumen: resumenPreNomina(filas),
+      /** `true` cuando esta empresa reserva los montos de pagos y a quien consulta no le tocan. */
+      montosOcultos: !verMontos,
     };
   }
 

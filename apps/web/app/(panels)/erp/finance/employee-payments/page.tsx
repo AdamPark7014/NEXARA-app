@@ -19,6 +19,7 @@ import {
   financeInputStyle,
 } from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
+import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
 import { toast } from "@/components/Toast";
 import { getApiAssetOrigin } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
@@ -297,7 +298,30 @@ function BreakdownTable({
   );
 }
 
+/**
+ * «Pagos a personal» puede estar reservado a la dirección en esta empresa (política del API). Si es
+ * así se avisa con claridad en vez de dejar abrir una pantalla cuyas consultas responderían 403.
+ */
 export default function EmployeePaymentsPage() {
+  const { hidden, listo } = useHiddenModuleIds();
+  if (listo && hidden.has("employee-payments")) {
+    return (
+      <div style={{ padding: 24, maxWidth: 640 }}>
+        <InlineAlert
+          variant="warning"
+          title="Pagos a personal está reservado a la dirección"
+          message="En esta empresa solo la dirección general consulta y captura estos pagos. Si necesitas verlos, pídele acceso."
+        />
+        <div style={{ marginTop: 16 }}>
+          <Link href="/erp">Volver al inicio</Link>
+        </div>
+      </div>
+    );
+  }
+  return <EmployeePaymentsContent />;
+}
+
+function EmployeePaymentsContent() {
   const { user, isContextReady } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "employee-payments"), [user]);
   const token = user?.token ?? "";

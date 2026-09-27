@@ -12,6 +12,7 @@ import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
 import { PeerRequestsService } from './peer-requests.service.js';
 import { HorasExtraService } from './horas-extra.service.js';
+import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { HorasExtraService } from './horas-extra.service.js';
     ActivityEvidenceModule,
     ActivityToolsModule,
     NotificationsModule,
+    ModulePolicyModule,
   ],
   controllers: [MeController],
   providers: [

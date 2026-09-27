@@ -20,6 +20,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
 import { EmployeePaymentsService } from './employee-payments.service.js';
 import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
 import { UpdateEmployeePaymentDto } from './dto/update-employee-payment.dto.js';
@@ -33,7 +34,17 @@ export class EmployeePaymentsController {
   constructor(
     private readonly service: EmployeePaymentsService,
     private readonly excel: ExcelExportService,
+    private readonly policy: ModulePolicyService,
   ) {}
+
+  /**
+   * Una empresa puede dejar «Pagos a personal» solo para ciertos roles (p. ej. la dirección) con la
+   * política `rbac.module_roles`. Va dentro de cada endpoint y no en un guard porque la empresa
+   * activa la resuelve el `TenantInterceptor`, que corre después de los guards.
+   */
+  private gate(user: any, companyId: number | null) {
+    return this.policy.exigir('employee-payments', user, companyId);
+  }
 
   private validateFiles(files?: any[]) {
     if (!files?.length) return;
@@ -49,13 +60,14 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Get('calculate-from-attendance')
-  calculateFromAttendance(
+  async calculateFromAttendance(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Query('userId') userId: string,
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
+    await this.gate(user, companyId);
     if (!userId) throw new BadRequestException('userId requerido');
     return this.service.calculateFromAttendance(this.viewer(user), +userId, from, to, companyId);
   }
@@ -67,13 +79,15 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get('pre-nomina')
-  preNomina(
+  async preNomina(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Query('desde') desde: string,
     @Query('hasta') hasta: string,
   ) {
-    return this.service.preNomina(this.viewer(user), this.rango(desde, hasta), companyId);
+    // Las horas siguen siendo de RH y contabilidad; los montos capturados, solo de quien ve Pagos.
+    const verMontos = await this.policy.puedeUsar('employee-payments', user, companyId);
+    return this.service.preNomina(this.viewer(user), this.rango(desde, hasta), companyId, { verMontos });
   }
 
   /** La misma pre-nómina en Excel, con el tema corporativo y los totales con fórmulas. */
@@ -88,13 +102,14 @@ export class EmployeePaymentsController {
     @Query('hasta') hasta: string,
   ) {
     const rango = this.rango(desde, hasta);
-    const datos = await this.service.preNomina(this.viewer(user), rango, companyId);
+    const verMontos = await this.policy.puedeUsar('employee-payments', user, companyId);
+    const datos = await this.service.preNomina(this.viewer(user), rango, companyId, { verMontos });
     const r = datos.resumen;
     const buffer = await this.excel.exportarReporte({
       titulo: 'Pre-nómina',
       subtitulo: `Del ${rango.desde} al ${rango.hasta}`,
       hoja: 'Pre-nómina',
-      columnas: COLUMNAS_PRE_NOMINA,
+      columnas: verMontos ? COLUMNAS_PRE_NOMINA : COLUMNAS_PRE_NOMINA.filter((c) => c.clave !== 'montoCapturado'),
       filas: datos.filas,
       generadoPor: user?.nombre ?? null,
       generadoEn: new Date(datos.generadoAt),
@@ -174,13 +189,14 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get('analytics')
-  analytics(
+  async analytics(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('userId') userId?: string,
   ) {
+    await this.gate(user, companyId);
     const parsedUserId = userId ? Number(userId) : undefined;
     if (userId && Number.isNaN(parsedUserId)) throw new BadRequestException('Empleado invalido');
     return this.service.analytics(user, { from, to, userId: parsedUserId }, companyId);
@@ -197,6 +213,7 @@ export class EmployeePaymentsController {
     @Query('userId') userId?: string,
     @Res() res?: Response,
   ) {
+    await this.gate(user, companyId);
     const parsedUserId = userId ? Number(userId) : undefined;
     if (userId && Number.isNaN(parsedUserId)) throw new BadRequestException('Empleado invalido');
     const buffer = await this.service.reportPdf(
@@ -216,7 +233,7 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get()
-  findAll(
+  async findAll(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
@@ -225,6 +242,7 @@ export class EmployeePaymentsController {
     @Query('status') status?: string,
     @Query() query?: PaginationQueryDto,
   ) {
+    await this.gate(user, companyId);
     const parsedUserId = userId ? Number(userId) : undefined;
     if (userId && Number.isNaN(parsedUserId)) {
       throw new BadRequestException('Empleado invalido');
@@ -236,12 +254,13 @@ export class EmployeePaymentsController {
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Post()
   @UseInterceptors(FilesInterceptor('files', 10, { dest: getUploadSubdir(__dirname, 'employee-payments') }))
-  create(
+  async create(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Body() body: CreateEmployeePaymentDto & { concepto?: string; status?: string },
     @UploadedFiles() files: any[],
   ) {
+    await this.gate(user, companyId);
     this.validateFiles(files);
     const evidenceUrls = (files || []).map((file) => `/uploads/employee-payments/${file.filename}`);
     return this.service.create(user, body, evidenceUrls, companyId);
@@ -250,11 +269,12 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Patch(':id/pagado')
-  markPagado(
+  async markPagado(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    await this.gate(user, companyId);
     return this.service.markPagado(+id, user?.id, companyId);
   }
 
@@ -262,13 +282,14 @@ export class EmployeePaymentsController {
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Patch(':id')
   @UseInterceptors(FilesInterceptor('files', 10, { dest: getUploadSubdir(__dirname, 'employee-payments') }))
-  update(
+  async update(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Body() body: UpdateEmployeePaymentDto,
     @UploadedFiles() files: any[],
   ) {
+    await this.gate(user, companyId);
     this.validateFiles(files);
     const evidenceUrls = (files || []).map((file) => `/uploads/employee-payments/${file.filename}`);
     return this.service.update(+id, body, evidenceUrls.length ? evidenceUrls : undefined, user?.id, companyId);
@@ -277,11 +298,12 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Delete(':id')
-  remove(
+  async remove(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    await this.gate(user, companyId);
     return this.service.remove(+id, user?.id, companyId);
   }
 }
