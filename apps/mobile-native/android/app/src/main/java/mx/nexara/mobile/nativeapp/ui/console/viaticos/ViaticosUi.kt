@@ -30,6 +30,7 @@ import mx.nexara.mobile.nativeapp.data.api.ViaticoDto
 import mx.nexara.mobile.nativeapp.data.api.ViaticoLiquidacionDto
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.fg
 import kotlin.math.abs
@@ -260,7 +261,7 @@ fun ChipsDeViatico(viatico: ViaticoDto) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NxStatusChip(viatico.estatus ?: "—", tonoEstatus(viatico.estatus))
+        NxStatusChip(viatico.estatus?.let { NxStatusLabels.label(it) } ?: "—", tonoEstatus(viatico.estatus))
         resumenLiquidacion(viatico.liquidacion)?.let { (texto, tono) ->
             NxStatusChip(texto, tono)
         }

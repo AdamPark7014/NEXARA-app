@@ -3,7 +3,7 @@ package mx.nexara.mobile.nativeapp.ui.tickets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,7 +22,10 @@ import androidx.navigation.compose.rememberNavController
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLightStatusBarIcons
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
@@ -110,10 +113,19 @@ fun TicketsNavHost(
 
     val showBack = route != TicketsRoutes.Portal
 
+    NxLightStatusBarIcons()
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, color = Color.White) },
+                title = {
+                    Text(
+                        title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 colors = NxBrandTopAppBarColors(),
                 navigationIcon = {
                     if (showBack) {
@@ -124,7 +136,7 @@ fun TicketsNavHost(
                 },
                 actions = {
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar sesión")
                     }
                 },
             )

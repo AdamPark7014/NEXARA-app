@@ -46,7 +46,7 @@ object CoreActivityRules {
     const val MORADO = 0xFF7C3AEDL
     const val GRIS = 0xFF94A3B8L
 
-    private val ES_MX: Locale = Locale("es", "MX")
+    private val ES_MX: Locale = Locale.forLanguageTag("es-MX")
 
     /** Etiqueta sin emoji + color de la web + ícono opcional ([NxGlyph], se pinta en la UI). */
     data class Tone(val label: String, val color: Long? = null, val glyph: NxGlyph? = null)

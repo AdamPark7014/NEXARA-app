@@ -1,43 +1,40 @@
 package mx.nexara.mobile.nativeapp.ui.tickets.screens
 
 import android.app.Application
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.ConfirmationNumber
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -53,11 +50,24 @@ import mx.nexara.mobile.nativeapp.data.api.ClientPortalTicketDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterBar
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterPill
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSegmented
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -129,6 +139,10 @@ class TicketsTicketsViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    fun dismissError() {
+        _state.update { it.copy(error = null) }
+    }
 }
 
 internal fun resolveTicketDateRange(range: String): Pair<String?, String?> {
@@ -143,6 +157,17 @@ internal fun resolveTicketDateRange(range: String): Pair<String?, String?> {
     return start to end
 }
 
+private val DATE_RANGES = listOf("today" to "Hoy", "7d" to "7 días", "30d" to "30 días", "all" to "Todos")
+
+private val TICKET_FILTERS = listOf(
+    "todos" to "Todos",
+    "abiertos" to "Abiertos",
+    "cerrados" to "Cerrados",
+    "alta" to "Alta prioridad",
+    "aging" to "Más de 48 h",
+)
+
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketsTicketsScreen(
@@ -152,87 +177,91 @@ fun TicketsTicketsScreen(
 ) {
     val vm: TicketsTicketsViewModel = viewModel()
     val state by vm.state.collectAsState()
-    var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf("todos") }
+    var query by rememberSaveable { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf("todos") }
     var projectMenuExpanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Top,
+    val tickets = state.tickets
+    val kpis = remember(tickets) {
+        val open = tickets.count { it.isOpen() }
+        val high = tickets.count { it.isOpen() && it.isHighPriority() }
+        val aging = tickets.count { it.isOpen() && ticketAgeHours(it) >= 48 }
+        listOf(
+            NxKpi("Abiertos", "$open", tone = if (open > 0) NxTone.Warning else NxTone.Success),
+            NxKpi("Alta prioridad", "$high", tone = if (high > 0) NxTone.Danger else NxTone.Neutral),
+            NxKpi("Más de 48 h", "$aging", hint = "Sin cierre", tone = if (aging > 0) NxTone.Danger else NxTone.Info),
+            NxKpi("Total", "${tickets.size}", tone = NxTone.Brand),
+        )
+    }
+    val filtered = remember(tickets, filter, query) {
+        val q = query.trim().lowercase()
+        tickets.filter { t ->
+            val matchFilter = when (filter) {
+                "abiertos" -> t.isOpen()
+                "cerrados" -> !t.isOpen()
+                "alta" -> t.isOpen() && t.isHighPriority()
+                "aging" -> t.isOpen() && ticketAgeHours(t) >= 48
+                else -> true
+            }
+            val matchQuery = q.isBlank() || buildString {
+                append(t.titulo ?: ""); append(" ")
+                append(t.anNumber ?: ""); append(" ")
+                append(t.branchName ?: ""); append(" ")
+                append(t.estatus ?: "")
+            }.lowercase().contains(q)
+            matchFilter && matchQuery
+        }
+    }
+
+    NxScreenScaffold(
+        modifier = modifier,
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-        ) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-            OutlinedButton(onClick = { vm.refresh(initial = false) }, modifier = Modifier.weight(1f)) { Text("Actualizar") }
-        }
-
-        if (state.isLoading) {
-            NxLoadingBlock("Cargando tickets…")
-            return@Column
-        }
-
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = { vm.refresh(initial = false) },
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+        when {
+            state.isLoading -> NxSkeletonList(
+                itemCount = 6,
+                itemHeight = 92.dp,
+                modifier = Modifier.fillMaxWidth().padding(NxSpacing.ListPadding),
+            )
+            tickets.isEmpty() && !state.error.isNullOrBlank() -> NxErrorState(
+                message = state.error,
+                onRetry = { vm.refresh(initial = true) },
+            )
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = NxSpacing.ListPadding,
+                verticalArrangement = Arrangement.spacedBy(NxSpacing.ListGap),
             ) {
-                item {
-                    Text("Tickets", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Prioridad · antigüedad · estado operativo",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                if (!state.error.isNullOrBlank()) {
-                    item {
-                        Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                        Button(onClick = { vm.refresh(initial = true) }) { Text("Reintentar") }
+                state.error?.takeIf { it.isNotBlank() }?.let { msg ->
+                    item(key = "refresh-error") {
+                        NxRefreshErrorBanner(
+                            message = msg,
+                            onRetry = { vm.refresh(initial = false) },
+                            onDismiss = vm::dismissError,
+                        )
                     }
                 }
 
-                item {
-                    val open = state.tickets.count { it.isOpen() }
-                    val high = state.tickets.count { it.isOpen() && it.isHighPriority() }
-                    val aging = state.tickets.count { it.isOpen() && ticketAgeHours(it) >= 48 }
-                    NxKpiGrid(
-                        items = listOf(
-                            NxKpi("Abiertos", "$open", tone = if (open > 0) NxTone.Warning else NxTone.Success),
-                            NxKpi("Alta prioridad", "$high", tone = if (high > 0) NxTone.Danger else NxTone.Neutral),
-                            NxKpi(">48h", "$aging", hint = "Sin cierre", tone = if (aging > 0) NxTone.Danger else NxTone.Info),
-                            NxKpi("Total", "${state.tickets.size}", tone = NxTone.Brand),
-                        ),
+                item(key = "header") {
+                    NxSectionHeader(
+                        title = "Tickets",
+                        subtitle = "Prioridad, antigüedad y estado de cada servicio.",
                     )
                 }
 
-                item {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        listOf("today" to "Hoy", "7d" to "7 días", "30d" to "30 días", "all" to "Todos").forEach { (key, label) ->
-                            FilterChip(
-                                selected = state.dateRange == key,
-                                onClick = { vm.setDateRange(key) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
+                item(key = "kpis") { NxKpiGrid(items = kpis) }
+
+                item(key = "range") {
+                    NxSegmented(
+                        options = DATE_RANGES.map { it.second },
+                        selectedIndex = DATE_RANGES.indexOfFirst { it.first == state.dateRange }.coerceAtLeast(0),
+                        onSelect = { i -> vm.setDateRange(DATE_RANGES[i].first) },
+                    )
                 }
 
                 if (state.projects.isNotEmpty()) {
-                    item {
+                    item(key = "project") {
                         val selectedTitle = state.projects.firstOrNull { it.id == state.projectId }?.title ?: "Todos los proyectos"
                         ExposedDropdownMenuBox(
                             expanded = projectMenuExpanded,
@@ -242,10 +271,12 @@ fun TicketsTicketsScreen(
                                 value = selectedTitle,
                                 onValueChange = {},
                                 readOnly = true,
+                                singleLine = true,
                                 label = { Text("Proyecto") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = projectMenuExpanded) },
+                                shape = RoundedCornerShape(NxDimens.PanelRadius),
                                 modifier = Modifier
-                                    .menuAnchor()
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                                     .fillMaxWidth(),
                             )
                             ExposedDropdownMenu(
@@ -273,112 +304,118 @@ fun TicketsTicketsScreen(
                     }
                 }
 
-                item {
-                    OutlinedTextField(
+                item(key = "search") {
+                    NxSearchField(
                         value = query,
                         onValueChange = { query = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Buscar AN, título o sucursal") },
-                        singleLine = true,
+                        placeholder = "Buscar folio, título o sucursal",
                     )
                 }
 
-                item {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        listOf(
-                            "todos" to "Todos",
-                            "abiertos" to "Abiertos",
-                            "cerrados" to "Cerrados",
-                            "alta" to "Alta",
-                            "aging" to ">48h",
-                        ).forEach { (key, label) ->
-                            FilterChip(
+                item(key = "filters") {
+                    NxFilterBar(contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                        TICKET_FILTERS.forEach { (key, label) ->
+                            NxFilterPill(
+                                label = label,
+                                count = null,
                                 selected = filter == key,
-                                onClick = { filter = key },
-                                label = { Text(label) },
+                                onClick = { filter = if (filter == key && key != "todos") "todos" else key },
                             )
                         }
                     }
                 }
 
-                val q = query.trim().lowercase()
-                val filtered = state.tickets.filter { t ->
-                    val matchFilter = when (filter) {
-                        "abiertos" -> t.isOpen()
-                        "cerrados" -> !t.isOpen()
-                        "alta" -> t.isOpen() && t.isHighPriority()
-                        "aging" -> t.isOpen() && ticketAgeHours(t) >= 48
-                        else -> true
-                    }
-                    val matchQuery = q.isBlank() || buildString {
-                        append(t.titulo ?: ""); append(" ")
-                        append(t.anNumber ?: ""); append(" ")
-                        append(t.branchName ?: ""); append(" ")
-                        append(t.estatus ?: "")
-                    }.lowercase().contains(q)
-                    matchFilter && matchQuery
-                }
-
                 if (filtered.isEmpty()) {
-                    item {
-                        Text("No hay tickets con este filtro.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    item(key = "empty") {
+                        NxEmptyState(
+                            title = if (tickets.isEmpty()) "Sin tickets" else "Sin resultados",
+                            subtitle = if (tickets.isEmpty()) {
+                                "No hay tickets en este periodo."
+                            } else {
+                                "Ningún ticket coincide con el filtro o la búsqueda."
+                            },
+                            icon = Icons.Outlined.ConfirmationNumber,
+                        )
                     }
                 } else {
-                    items(filtered, key = { it.id }) { t ->
-                        val ageH = ticketAgeHours(t)
-                        val tone = when {
-                            !t.isOpen() -> NxTone.Success
-                            t.isHighPriority() || ageH >= 72 -> NxTone.Danger
-                            ageH >= 48 -> NxTone.Warning
-                            else -> NxTone.Info
-                        }
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(2.dp),
-                        ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(
-                                        t.titulo ?: "Ticket #${t.id}",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    NxStatusChip(t.estatus ?: "—", tone)
-                                }
-                                val meta = buildList {
-                                    t.anNumber?.takeIf { it.isNotBlank() }?.let { add(it) }
-                                    t.displayPriority().takeIf { it != "—" }?.let { add("Prioridad $it") }
-                                    t.branchName?.takeIf { it.isNotBlank() }?.let { add(it) }
-                                    if (t.isOpen()) add("${ageH}h abiertos")
-                                }.joinToString(" · ")
-                                if (meta.isNotBlank()) {
-                                    Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                                }
-                                if (t.isOpen() && ageH >= 48) {
-                                    NxIconText(
-                                        text = "Fuera de ventana operativa (>48h)",
-                                        icon = Icons.Outlined.WarningAmber,
-                                        color = Color(0xFFEF4444),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                                OutlinedButton(onClick = { onOpenTicket(t.id) }) { Text("Ver detalle") }
-                            }
-                        }
+                    items(filtered, key = { it.id }, contentType = { "ticket" }) { t ->
+                        TicketRow(ticket = t, onOpen = { onOpenTicket(t.id) })
                     }
                 }
-
-                item { Spacer(Modifier.height(8.dp)) }
             }
         }
     }
+}
+
+@Composable
+private fun TicketRow(ticket: ClientPortalTicketDto, onOpen: () -> Unit) {
+    val t = ticket
+    val ageH = remember(t.id, t.fechaAsignacion, t.fechaInicio) { ticketAgeHours(t) }
+    val open = t.isOpen()
+    val tone = when {
+        !open -> NxTone.Success
+        t.isHighPriority() || ageH >= 72 -> NxTone.Danger
+        ageH >= 48 -> NxTone.Warning
+        else -> NxTone.Info
+    }
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
+        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+        elevation = CardDefaults.cardElevation(NxDimens.PanelElevation),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        t.titulo?.takeIf { it.isNotBlank() } ?: "Ticket #${t.id}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = NxColors.Slate,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NxStatusChip(NxStatusLabels.label(t.estatus), tone)
+                }
+                val meta = buildList {
+                    t.anNumber?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    NxStatusLabels.priority(t.displayPriority())?.let { add("Prioridad $it") }
+                    t.branchName?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    if (open) add(ticketAgeText(ageH))
+                }.joinToString(" · ")
+                if (meta.isNotBlank()) {
+                    Text(meta, color = NxColors.Muted, style = MaterialTheme.typography.bodySmall)
+                }
+                if (open && ageH >= 48) {
+                    NxIconText(
+                        text = "Fuera de ventana operativa (más de 48 h)",
+                        icon = Icons.Outlined.WarningAmber,
+                        color = NxColors.Danger,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "Ver detalle",
+                tint = NxColors.Muted,
+            )
+        }
+    }
+}
+
+private fun ticketAgeText(hours: Long): String = when {
+    hours < 1 -> "Abierto hace menos de 1 h"
+    hours < 48 -> "Abierto hace $hours h"
+    else -> "Abierto hace ${hours / 24} días"
 }
 
 internal fun ticketAgeHours(t: ClientPortalTicketDto): Long {

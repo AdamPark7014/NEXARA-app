@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -261,8 +263,8 @@ fun NxFilterPill(
                 },
                 shape,
             )
-            .clickable(onClick = onClick)
-            .heightIn(min = 36.dp)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .heightIn(min = 40.dp)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -310,8 +312,8 @@ fun NxSegmented(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
                     .background(if (on) NxColors.Brand else Color.Transparent)
-                    .clickable { onSelect(i) }
-                    .heightIn(min = 32.dp)
+                    .selectable(selected = on, role = Role.Tab) { onSelect(i) }
+                    .heightIn(min = 40.dp)
                     .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {

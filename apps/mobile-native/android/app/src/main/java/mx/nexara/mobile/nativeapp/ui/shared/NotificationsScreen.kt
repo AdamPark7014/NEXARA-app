@@ -516,7 +516,7 @@ private fun LazyListScope.feedItems(
         state.feedItems.isEmpty() -> item {
             NxEmptyState(title = "Sin actividad reciente", subtitle = "Aquí verás lo último que pasó en tu equipo.")
         }
-        else -> items(state.feedItems.size) { idx ->
+        else -> items(state.feedItems.size, contentType = { "feed" }) { idx ->
             val item = state.feedItems[idx]
             val title = (item["title"] as? String).orEmpty().ifBlank { "Evento" }
             val subtitle = (item["subtitle"] as? String).orEmpty()

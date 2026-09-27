@@ -42,10 +42,12 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 
@@ -215,14 +217,14 @@ private fun TarjetaViatico(
     val titulo = viatico.motivo?.trim()?.takeIf { it.isNotEmpty() }
         ?: etiquetaCategoria(viatico.categoria)
     val persona = viatico.usuario?.nombre?.trim().orEmpty()
-    val fecha = viatico.fechaSolicitud?.take(10).orEmpty()
+    val fecha = viatico.fechaSolicitud?.takeIf { it.isNotBlank() }?.let(NxFormat::date).orEmpty()
     val actividad = viatico.actividad?.anNumber?.trim().orEmpty()
 
     val descripcion = buildString {
         if (mostrarPersona && persona.isNotEmpty()) append("$persona. ")
         append("$titulo. ")
         append("${Dinero.pesos(vigente)}. ")
-        append("${viatico.estatus ?: "sin estado"}. ")
+        append("${NxStatusLabels.label(viatico.estatus)}. ")
         resumenLiquidacion(viatico.liquidacion)?.let { append("${it.first}. ") }
     }
 
