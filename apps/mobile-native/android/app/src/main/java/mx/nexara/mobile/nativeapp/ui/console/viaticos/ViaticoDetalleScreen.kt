@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -352,7 +352,7 @@ private fun BloqueReparto(
                     onClick = onRepartir,
                     modifier = Modifier.fillMaxWidth().heightIn(min = AlturaToque),
                 ) {
-                    Icon(Icons.Default.CallSplit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Filled.CallSplit, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
                     Text(if (partes.isEmpty()) "Repartir entre actividades" else "Cambiar el reparto")
                 }
@@ -410,7 +410,7 @@ private fun Acciones(
                 colors = ButtonDefaults.buttonColors(containerColor = NxColors.Success),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
             ) {
-                Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
                 Text("Comprobar con tickets", fontWeight = FontWeight.Bold)
             }
