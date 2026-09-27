@@ -67,11 +67,11 @@ export default function FlujoActividadesPage() {
                 setRango(r);
               }}
             />
-            <InfoPopover label="¿Cómo se lee?" title="Pipeline">
+            <InfoPopover label="¿Cómo se lee?" title="Cómo avanzan las actividades">
               <ul>
-                <li>Asignadas → Iniciadas → En evidencia → Cerradas.</li>
-                <li>Peer rechazadas: solicitudes de equipo rechazadas (no OT del jefe).</li>
-                <li>SLA: contra fin de periodo o fecha máxima.</li>
+                <li>Asignadas → Iniciadas → Con evidencias → Cerradas.</li>
+                <li>Rechazadas entre compañeros: solicitudes que un compañero no aceptó (no cuenta las que asigna el jefe).</li>
+                <li>A tiempo: se cerró antes del fin del periodo o de la fecha máxima.</li>
               </ul>
             </InfoPopover>
           </>
@@ -94,7 +94,7 @@ export default function FlujoActividadesPage() {
         <>
           <FlujoKpiStrip workflow={w} detalleHref={null} />
           <StatRow cols={3}>
-            <Stat label="A tiempo (SLA)" value={w.slaOnTime} tone="brand" />
+            <Stat label="A tiempo" value={w.slaOnTime} tone="brand" />
             <Stat label="Tarde / vencidas" value={w.slaLate} tone={w.slaLate ? "danger" : "default"} />
             <Stat label="% a tiempo" value={formatPct(w.slaPct)} />
           </StatRow>

@@ -23,6 +23,8 @@ import { ROLES } from "@/lib/rbac";
 import { activityStatusVariant } from "@/lib/activity-status";
 import { countEvidenceFiles } from "@/lib/evidence-display";
 import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
+import { formatApiError } from "@/lib/erp-api";
+import { chargeLabel, estatusUi } from "@/lib/activity-labels";
 import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
@@ -178,10 +180,10 @@ export default function ActivityDetailPage() {
       const missing = getMissingEvidence(e);
       if (missing) {
         setMissingEvidence(missing);
-        setSaveErr("No se puede finalizar: faltan evidencias mínimas");
+        setSaveErr("No se puede terminar todavía: faltan evidencias.");
         return;
       }
-      setSaveErr(e instanceof Error ? e.message : "Error al guardar");
+      setSaveErr(formatApiError(e, "No se pudieron guardar los cambios. Intenta de nuevo."));
     } finally {
       setSaving(false);
     }
@@ -195,22 +197,24 @@ export default function ActivityDetailPage() {
   const inp: React.CSSProperties = {
     width: "100%", padding: "8px 12px", borderRadius: 8,
     border: "1px solid var(--border)", background: "var(--surface-2)",
-    color: "var(--foreground)", fontSize: 13,
+    color: "var(--foreground)", fontSize: 16, minHeight: 44, boxSizing: "border-box",
   };
+  const campos2: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 };
+  const estatusLabel = estatusUi(activity.estatus).label;
 
   const evidenceCount = countEvidenceFiles(activity.activityEvidence);
 
   const isCancelOrReschedule = /cancel|rechaz/i.test(activity.estatus);
   const activityFlow: { key: string; label: string; icon: SvgIconComponent }[] = isCancelOrReschedule
     ? [
-        { key: "Pendiente", label: "Pendiente", icon: EventOutlinedIcon },
-        { key: flowStepForStatus(activity.estatus), label: flowStepForStatus(activity.estatus), icon: /cancel/i.test(activity.estatus) ? CancelOutlinedIcon : BlockOutlinedIcon },
+        { key: "Pendiente", label: "Por empezar", icon: EventOutlinedIcon },
+        { key: flowStepForStatus(activity.estatus), label: /cancel/i.test(activity.estatus) ? "Cancelada" : "Regresada", icon: /cancel/i.test(activity.estatus) ? CancelOutlinedIcon : BlockOutlinedIcon },
       ]
     : [
-        { key: "Pendiente", label: "Pendiente", icon: EventOutlinedIcon },
-        { key: "En Proceso", label: "En proceso", icon: SettingsOutlinedIcon },
-        { key: "Por Validar", label: "Por validar", icon: RateReviewOutlinedIcon },
-        { key: "Finalizada", label: "Finalizada", icon: TaskAltIcon },
+        { key: "Pendiente", label: "Por empezar", icon: EventOutlinedIcon },
+        { key: "En Proceso", label: "En curso", icon: SettingsOutlinedIcon },
+        { key: "Por Validar", label: "En revisión", icon: RateReviewOutlinedIcon },
+        { key: "Finalizada", label: "Terminada", icon: TaskAltIcon },
       ];
   const activeFlowKey = flowStepForStatus(activity.estatus);
   const activeFlowIdx = Math.max(0, activityFlow.findIndex((s) => s.key === activeFlowKey));
@@ -295,7 +299,7 @@ export default function ActivityDetailPage() {
         <div style={{ marginBottom: 14 }}>
           <InlineAlert
             variant="warning"
-            message="Faltan evidencias para marcar la OT como completada"
+            message="Faltan evidencias para marcar la actividad como terminada"
             onDismiss={() => setMissingEvidence(null)}
           />
           <ul style={{ margin: "0 0 10px", paddingLeft: 20, fontSize: 13, color: "var(--text-secondary)" }}>
@@ -309,7 +313,7 @@ export default function ActivityDetailPage() {
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
-        <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+        <KpiCard label="Estado" value={estatusLabel} variant={activityStatusVariant(activity.estatus)} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
         <KpiCard label="Prioridad" value={priorityDisplay} variant={/urgente|alta/i.test(priorityDisplay) ? (/urgente/i.test(priorityDisplay) ? "danger" : "warning") : "default"} icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
         <KpiCard label="Evidencias" value={evidenceCount} icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} hint="Archivos adjuntos" />
         {planVsReal ? (
@@ -329,31 +333,21 @@ export default function ActivityDetailPage() {
         ) : null}
         {despacho ? (
           <KpiCard
-            label="Ejecuta"
+            label="La hace"
             value={ejecutaLabel}
             icon={<EngineeringOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-            hint={`Despacho · coordina ${activity.responsable?.nombre ?? "—"}`}
+            hint={activity.responsable?.nombre ? `La reparte ${activity.responsable.nombre}` : "Se reparte al equipo"}
           />
         ) : (
           <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon={<EngineeringOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
         )}
       </div>
 
-      <DetailSection title="Contexto de la OT">
+      <DetailSection title="De qué se trata">
         <DetailFieldGrid>
           <DetailField
-            label="Modo"
-            value={hasProject ? "Con proyecto" : "Sin proyecto"}
-          />
-          <DetailField
             label="Encargo"
-            value={
-              despacho
-                ? "Despacho a equipo"
-                : activity.assignmentCharge === "ejecucion"
-                  ? "Ejecución directa"
-                  : "—"
-            }
+            value={chargeLabel(activity.assignmentCharge) ?? "—"}
           />
           <DetailField
             label="Proyecto"
@@ -369,19 +363,19 @@ export default function ActivityDetailPage() {
               )
             }
           />
-          <DetailField label="Tipo de ticket" value={activity.ticketTypeCustom || activity.ticketType || "—"} />
+          <DetailField label="Tipo" value={activity.ticketTypeCustom || activity.ticketType || "—"} />
           <DetailField label="Tipo de trabajo" value={workTypeLabel(activity.workType)} />
         </DetailFieldGrid>
       </DetailSection>
 
       {/* Status flow stepper */}
       <div style={{ marginBottom: 16, padding: "14px 20px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Flujo de la OT</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Avance de la actividad</div>
         <div style={{ display: "flex", alignItems: "center" }}>
           {activityFlow.map((step, idx) => {
             const done = idx < activeFlowIdx;
             const active = idx === activeFlowIdx;
-            const isBad = active && (step.key === "CANCELADA" || step.key === "REPROGRAMAR");
+            const isBad = active && (step.key === "Cancelada" || step.key === "Rechazada");
             const color = isBad ? "var(--danger)" : (done || active) ? "var(--success)" : "var(--text-tertiary)";
             const bg = isBad
               ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))"
@@ -418,10 +412,12 @@ export default function ActivityDetailPage() {
       <DetailSection title="Información general">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Tag variant={activityStatusVariant(activity.estatus)}>{activity.estatus.replace(/_/g, " ")}</Tag>
+            <Tag variant={activityStatusVariant(activity.estatus)}>{estatusLabel}</Tag>
             {priorityDisplay !== "—" && <Tag variant="warning">{priorityDisplay}</Tag>}
-            {activity.ticketType && <Tag variant="neutral">{activity.ticketType}</Tag>}
-            {despacho && <Tag variant="accent">Despacho a equipo</Tag>}
+            {activity.ticketTypeCustom || activity.ticketType ? (
+              <Tag variant="neutral">{activity.ticketTypeCustom || activity.ticketType}</Tag>
+            ) : null}
+            {despacho && <Tag variant="accent">{chargeLabel("despacho")}</Tag>}
             <Tag variant={hasProject ? "accent" : "neutral"}>{hasProject ? "Con proyecto" : "Sin proyecto"}</Tag>
           </div>
           {canEdit && !editing && (
@@ -448,10 +444,10 @@ export default function ActivityDetailPage() {
               {despacho ? (
                 <>
                   <DetailField
-                    label="Coordina (despacho)"
+                    label="La reparte"
                     value={coordinan.join(" → ") || activity.responsable?.nombre}
                   />
-                  <DetailField label="Ejecuta" value={ejecutaLabel} />
+                  <DetailField label="La hace" value={ejecutaLabel} />
                 </>
               ) : (
                 <DetailField label="Responsable" value={activity.responsable?.nombre} />
@@ -471,7 +467,7 @@ export default function ActivityDetailPage() {
               ) : null}
               {activity.acsEnteredAt && (
                 <DetailField
-                  label="ACS"
+                  label="Llegada al sitio"
                   value={
                     <span style={{ color: "var(--success, #15803d)", fontWeight: 600 }}>
                       {(() => {
@@ -486,9 +482,9 @@ export default function ActivityDetailPage() {
                             ? ` · ${activity.acsEnteredByUser.nombre}`
                             : "";
                           const door = activity.acsEntryDoor ? ` (${activity.acsEntryDoor})` : "";
-                          return `Entró por ACS a las ${hhmm}${who}${door}`;
+                          return `Entró por el control de acceso a las ${hhmm}${who}${door}`;
                         } catch {
-                          return "Entró por ACS";
+                          return "Entró por el control de acceso";
                         }
                       })()}
                       {activity.acsLeftSite && activity.acsExitedAt
@@ -520,9 +516,9 @@ export default function ActivityDetailPage() {
               <div><strong>Sucursal:</strong> {branch || activity.branchAddress || "—"}</div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={campos2}>
               <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Estado *</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Estado *</span>
                 <select value={form.estatus} onChange={(e) => setForm((f) => ({ ...f, estatus: e.target.value }))} style={inp}>
                   {/* Cancelar tiene su propio botón con motivo obligatorio (solo superiores). */}
                   {STATUSES.filter((s) => s !== "Cancelada" || /cancel/i.test(activity.estatus)).map((s) => (
@@ -540,45 +536,41 @@ export default function ActivityDetailPage() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={campos2}>
               <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha inicio</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha inicio</span>
                 <input type="datetime-local" value={form.fechaInicio} onChange={(e) => setForm((f) => ({ ...f, fechaInicio: e.target.value }))} style={inp} />
               </label>
               <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Entrega esperada</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Entrega esperada</span>
                 <input type="date" value={form.fechaEntregaEsperada} onChange={(e) => setForm((f) => ({ ...f, fechaEntregaEsperada: e.target.value }))} style={inp} />
               </label>
             </div>
 
             <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha finalización</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha finalización</span>
               <input type="datetime-local" value={form.fechaFinalizacion} onChange={(e) => setForm((f) => ({ ...f, fechaFinalizacion: e.target.value }))} style={inp} />
             </label>
 
             <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
               <textarea value={form.descripcion} onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
                 rows={3} placeholder="Descripción de la actividad…"
                 style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }} />
             </label>
 
             <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Indicaciones / Notas internas</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Indicaciones / Notas internas</span>
               <textarea value={form.indicaciones} onChange={(e) => setForm((f) => ({ ...f, indicaciones: e.target.value }))}
                 rows={3} placeholder="Instrucciones para el ingeniero, accesos, contactos…"
                 style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }} />
             </label>
 
-            {saveErr && (
-              <div style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
-                {saveErr}
-              </div>
-            )}
+            {saveErr && <InlineAlert variant="danger" message={saveErr} />}
 
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setEditing(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void saveEdit()} disabled={saving || !form.estatus}>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <Button size="lg" variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
+              <Button size="lg" variant="primary" onClick={() => void saveEdit()} disabled={!form.estatus} loading={saving}>
                 {saving ? "Guardando…" : "Guardar cambios"}
               </Button>
             </div>
