@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import { IconLabel } from "@/components/ui/IconBadge";
+import { Skeleton } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -31,21 +31,66 @@ import {
   SemaforoDot,
 } from "@/components/pizarra/PizarraKpi";
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
-import { labelForAssignmentCharge } from "@/lib/activity-kinds";
+import { chargeLabel, estatusUi, formatHourMinute, initials, kindLabel } from "@/lib/activity-labels";
 import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
 import { FotoProtegida, VisorPdf } from "@/components/ops/EquipoEvidencias";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0] ?? "")
-    .join("")
-    .toUpperCase();
-}
+const btnPrimary: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  minHeight: 48,
+  padding: "12px 16px",
+  borderRadius: 14,
+  border: "none",
+  background: "var(--primary)",
+  color: "#fff",
+  fontWeight: 750,
+  fontSize: 15,
+  textDecoration: "none",
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+
+const btnSecondary: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  minHeight: 44,
+  padding: "8px 14px",
+  borderRadius: 12,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  color: "inherit",
+  fontWeight: 650,
+  fontSize: 14,
+  textDecoration: "none",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  whiteSpace: "nowrap",
+};
+
+const card: CSSProperties = {
+  padding: 18,
+  borderRadius: 18,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  display: "grid",
+  gap: 12,
+};
+
+const cardTitle: CSSProperties = {
+  margin: 0,
+  fontSize: 12,
+  fontWeight: 750,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--text-secondary)",
+};
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -59,9 +104,33 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
     >
       <div style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>{label}</div>
       <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>{value}</div>
-      {hint ? (
-        <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-secondary)" }}>{hint}</div>
-      ) : null}
+      {hint ? <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-secondary)" }}>{hint}</div> : null}
+    </div>
+  );
+}
+
+function FichaCargando() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Cargando perfil"
+      style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 16 }}
+    >
+      <Skeleton width={150} height={20} />
+      <div style={{ ...card, gridTemplateColumns: "auto 1fr", alignItems: "center", gap: 16 }}>
+        <Skeleton width={80} height={80} radius={40} />
+        <div style={{ display: "grid", gap: 8 }}>
+          <Skeleton width="60%" height={22} />
+          <Skeleton width="40%" height={14} />
+          <Skeleton width={110} height={26} radius={999} />
+        </div>
+      </div>
+      <Skeleton height={48} radius={14} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+        <Skeleton height={92} radius={16} />
+        <Skeleton height={92} radius={16} />
+        <Skeleton height={92} radius={16} />
+      </div>
     </div>
   );
 }
@@ -74,32 +143,71 @@ export default function PizarraPersonaPage() {
   const isSelf = me?.id != null && me.id === userId;
   const [user, setUser] = useState<TeamBoardUser | null>(null);
   const [history, setHistory] = useState<TeamBoardHistoryItem[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [pdfAbierto, setPdfAbierto] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [asignada, setAsignada] = useState(false);
   const [preset, setPreset] = useState<RangoPreset>("hoy");
   const [rango, setRango] = useState<BoardRange>({});
+  const hayDatos = useRef(false);
   const desde = rango.desde ?? null;
   const hasta = rango.hasta ?? null;
+
+  // Al volver de asignar (`?asignada=<id>`). Sin useSearchParams: evita el error de Suspense en build.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("asignada")) setAsignada(true);
+  }, []);
+
+  const cerrarAviso = () => {
+    setAsignada(false);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("asignada");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    } catch {
+      /* sin History API: basta con ocultarlo */
+    }
+  };
+
+  useEffect(() => {
+    hayDatos.current = false;
+    setUser(null);
+  }, [userId]);
 
   const load = useCallback(async () => {
     if (!token || !Number.isFinite(userId)) {
       setLoading(false);
-      setError("Persona no válida.");
+      setError("No encontramos a esta persona.");
       return;
     }
     setLoading(true);
-    setError(null);
     try {
       const [card, hist] = await Promise.all([
         fetchTeamBoardUser(token, userId, { desde, hasta }),
-        fetchTeamBoardHistory(token, userId).catch(() => [] as TeamBoardHistoryItem[]),
+        fetchTeamBoardHistory(token, userId).then(
+          (h) => ({ ok: true as const, items: Array.isArray(h) ? h : [] }),
+          (e: unknown) => ({ ok: false as const, error: formatApiError(e, "No se pudo cargar el historial") }),
+        ),
       ]);
+      hayDatos.current = true;
       setUser(card);
-      setHistory(Array.isArray(hist) ? hist : []);
+      if (hist.ok) {
+        setHistory(hist.items);
+        setHistoryError(null);
+      } else {
+        setHistoryError(hist.error);
+      }
+      setError(null);
+      setRefreshError(null);
+      setUpdatedAt(Date.now());
     } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar el perfil"));
-      setUser(null);
+      const msg = formatApiError(e, "No se pudo cargar el perfil");
+      if (hayDatos.current) setRefreshError(msg);
+      else setError(msg);
     } finally {
       setLoading(false);
     }
@@ -111,82 +219,134 @@ export default function PizarraPersonaPage() {
 
   useEffect(() => {
     if (!token) return;
-    const id = window.setInterval(() => void load(), 30_000);
-    return () => window.clearInterval(id);
+    const tick = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    const id = window.setInterval(tick, 30_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [token, load]);
 
-  if (loading && !user) {
-    return <p style={{ color: "var(--text-secondary)" }}>Cargando perfil…</p>;
-  }
+  if (loading && !user && !error) return <FichaCargando />;
 
-  if (error || !user) {
+  if (!user) {
     return (
-      <div style={{ display: "grid", gap: 12, maxWidth: 480 }}>
-        <p style={{ color: "#dc2626", margin: 0 }}>{error || "No encontrado"}</p>
-        <Link href="/erp/pizarra" style={{ fontWeight: 700, color: "var(--primary)" }}>
-          ← Volver a Actividades
-        </Link>
+      <div style={{ maxWidth: 480, margin: "24px auto", display: "grid", gap: 12, textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: 16, fontWeight: 750 }}>No pudimos abrir este perfil</p>
+        <p style={{ margin: 0, fontSize: 14, color: "var(--text-secondary)" }}>{error || "No encontramos a esta persona."}</p>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+          <button type="button" style={{ ...btnPrimary, minHeight: 44 }} onClick={() => void load()} disabled={loading}>
+            {loading ? "Cargando…" : "Reintentar"}
+          </button>
+          <Link href="/erp/pizarra" style={btnSecondary}>
+            ← Volver al equipo
+          </Link>
+        </div>
       </div>
     );
   }
 
   const color = STATUS_COLORS[user.status];
   const act = user.currentActivity;
+  const actEstatus = act ? estatusUi(act.estatus) : null;
   const src = user.avatarUrl ? resolveAssetUrl(user.avatarUrl) : null;
   const actCfg = getActivitiesSectionConfig(me);
   const canAssign =
     hasPermission(me, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
 
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <button
         type="button"
         onClick={() => router.push("/erp/pizarra")}
         style={{
           alignSelf: "flex-start",
+          minHeight: 44,
           border: "none",
           background: "transparent",
           color: "var(--text-secondary)",
           fontWeight: 650,
-          fontSize: 13,
+          fontSize: 14,
           cursor: "pointer",
-          padding: 0,
+          padding: "8px 0",
           fontFamily: "inherit",
         }}
       >
-        ← Equipo
+        ← Volver al equipo
       </button>
+
+      {asignada ? (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            padding: "10px 8px 10px 14px",
+            borderRadius: 14,
+            border: "1px solid color-mix(in srgb, var(--success) 40%, var(--border))",
+            background: "color-mix(in srgb, var(--success) 10%, var(--surface))",
+            color: "var(--success)",
+            fontWeight: 750,
+            fontSize: 14,
+          }}
+        >
+          <span>✅ Actividad asignada</span>
+          <button
+            type="button"
+            onClick={cerrarAviso}
+            aria-label="Cerrar aviso"
+            style={{
+              minWidth: 40,
+              minHeight: 40,
+              border: "none",
+              background: "transparent",
+              color: "inherit",
+              fontSize: 18,
+              cursor: "pointer",
+              borderRadius: 10,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       <header
         style={{
           display: "flex",
-          gap: 18,
+          gap: 16,
           alignItems: "center",
-          flexWrap: "wrap",
-          padding: "20px 18px",
+          padding: "18px 16px",
           borderRadius: 20,
           border: "1px solid var(--border)",
           background: "var(--surface)",
         }}
       >
         {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={src}
             alt=""
-            width={96}
-            height={96}
-            style={{ width: 96, height: 96, borderRadius: "50%", objectFit: "cover" }}
+            width={80}
+            height={80}
+            style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", flex: "0 0 auto" }}
           />
         ) : (
           <div
             aria-hidden
             style={{
-              width: 96,
-              height: 96,
+              width: 80,
+              height: 80,
+              flex: "0 0 auto",
               borderRadius: "50%",
               display: "grid",
               placeItems: "center",
-              fontSize: 28,
+              fontSize: 26,
               fontWeight: 800,
               color: "var(--primary)",
               background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
@@ -196,17 +356,19 @@ export default function PizarraPersonaPage() {
           </div>
         )}
         <div style={{ minWidth: 0, flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>{user.nombre}</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+            {user.nombre}
+          </h1>
           <div style={{ marginTop: 4, fontSize: 14, color: "var(--text-secondary)" }}>
-            {user.puesto || user.email}
+            {user.puesto || "Equipo NEXARA"}
           </div>
           <div
             style={{
-              marginTop: 12,
+              marginTop: 10,
               display: "inline-flex",
               alignItems: "center",
               gap: 8,
-              padding: "6px 12px",
+              padding: "5px 12px",
               borderRadius: 999,
               background: `color-mix(in srgb, ${color} 14%, transparent)`,
               color,
@@ -214,11 +376,44 @@ export default function PizarraPersonaPage() {
               fontSize: 13,
             }}
           >
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
+            <span aria-hidden style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
             {STATUS_LABELS[user.status]}
           </div>
         </div>
       </header>
+
+      {!isSelf && canAssign ? (
+        <Link href={`/erp/pizarra/${user.id}/asignar`} style={btnPrimary}>
+          ＋ Asignar actividad
+        </Link>
+      ) : isSelf ? (
+        <Link href="/erp/pizarra?vista=mias" style={{ ...btnSecondary, minHeight: 48 }}>
+          Ver mis actividades →
+        </Link>
+      ) : null}
+
+      {refreshError ? (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            flexWrap: "wrap",
+            padding: "8px 8px 8px 14px",
+            borderRadius: 12,
+            background: "color-mix(in srgb, #d97706 10%, var(--surface))",
+            border: "1px solid color-mix(in srgb, #d97706 35%, var(--border))",
+            fontSize: 13,
+          }}
+        >
+          <span>No se pudo actualizar. Ves lo de las {formatHourMinute(updatedAt)}.</span>
+          <button type="button" style={btnSecondary} onClick={() => void load()} disabled={loading}>
+            Reintentar
+          </button>
+        </div>
+      ) : null}
 
       <RangoSelector
         preset={preset}
@@ -233,64 +428,48 @@ export default function PizarraPersonaPage() {
         <Stat
           label={preset === "hoy" ? "Entrada hoy" : "Última entrada"}
           value={formatClock(user.clockInAt)}
-          hint={user.clockInAt ? "Check-in" : "Sin registro"}
+          hint={user.clockInAt ? "Entrada registrada" : "Sin registro"}
         />
-        <Stat
-          label="Horas trabajadas"
-          value={formatMinutes(user.workedMinutes)}
-          hint="Entrada a salida, sin la comida"
-        />
+        <Stat label="Horas trabajadas" value={formatMinutes(user.workedMinutes)} hint="Entrada a salida, sin la comida" />
         <Stat
           label="En actividad"
           value={formatMinutes(user.activityElapsedMinutes)}
-          hint={
-            user.activityStartedAt
-              ? `Desde ${formatClock(user.activityStartedAt)} (entrada real)`
-              : "Sin actividad iniciada"
-          }
+          hint={user.activityStartedAt ? `Desde las ${formatClock(user.activityStartedAt)}` : "Sin actividad iniciada"}
         />
       </div>
 
       <KpiStrip kpis={user.kpis} />
 
-      <section
-        style={{
-          padding: 18,
-          borderRadius: 18,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-          display: "grid",
-          gap: 10,
-        }}
-      >
-        <div style={{ fontSize: 12, fontWeight: 750, letterSpacing: 0.04, color: "var(--text-secondary)" }}>
-          ACTIVIDAD EN CURSO
-        </div>
-        {act ? (
+      <section style={card}>
+        <h2 style={cardTitle}>Actividad en curso</h2>
+        {act && actEstatus ? (
           <>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>{act.anNumber}</div>
-            <div style={{ fontSize: 16, lineHeight: 1.4 }}>{act.titulo}</div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Estatus: {act.estatus}</div>
-            {act.periodo ? (
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 650,
-                  color: act.periodo.estado === "vencida" ? "#dc2626" : "var(--text-secondary)",
-                }}
-              >
-                {act.periodo.etiqueta}
-              </div>
-            ) : null}
-            <Link
-              href={`/erp/actividades/${act.id}`}
-              style={{ marginTop: 4, fontWeight: 700, color: "var(--primary)", width: "fit-content" }}
-            >
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.3 }}>{act.titulo}</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>Folio {act.anNumber}</div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <Chip color={actEstatus.color ?? "var(--text-secondary)"} style={{ fontSize: 12, fontWeight: 650 }}>
+                {actEstatus.label}
+              </Chip>
+              {act.periodo ? (
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 650,
+                    color: act.periodo.estado === "vencida" ? "var(--danger)" : "var(--text-secondary)",
+                  }}
+                >
+                  {act.periodo.etiqueta}
+                </span>
+              ) : null}
+            </div>
+            <Link href={`/erp/actividades/${act.id}`} style={{ ...btnSecondary, justifySelf: "start" }}>
               Abrir actividad →
             </Link>
           </>
         ) : (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Sin actividad abierta en este momento.</div>
+          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>No tiene nada abierto en este momento.</div>
         )}
       </section>
 
@@ -304,79 +483,102 @@ export default function PizarraPersonaPage() {
         />
       ) : null}
 
-      <section
-        style={{
-          padding: 18,
-          borderRadius: 18,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-          display: "grid",
-          gap: 12,
-        }}
-      >
-        <div style={{ fontSize: 12, fontWeight: 750, letterSpacing: 0.04, color: "var(--text-secondary)" }}>
-          HISTORIAL DE ACTIVIDADES
-        </div>
-        {history.length === 0 ? (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Sin historial todavía.</div>
+      <section style={card}>
+        <h2 style={cardTitle}>Historial de actividades</h2>
+        {historyError && history.length === 0 ? (
+          <div
+            role="alert"
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}
+          >
+            <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>No se pudo cargar el historial.</span>
+            <button type="button" style={btnSecondary} onClick={() => void load()} disabled={loading}>
+              Reintentar
+            </button>
+          </div>
+        ) : history.length === 0 ? (
+          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Todavía no tiene actividades registradas.</div>
         ) : (
           history.map((h) => {
-            const open = expandedId === h.id;
             const ev = h.evidence;
+            const open = Boolean(ev) && expandedId === h.id;
+            const est = estatusUi(h.estatus);
+            const encargo = chargeLabel(h.assignmentCharge);
             const labels = digitalFormLabels(h.coreKind);
-            const chargeLabel = labelForAssignmentCharge(h.assignmentCharge);
             const formData =
               ev?.serviceSheetData && typeof ev.serviceSheetData === "object"
                 ? (ev.serviceSheetData as Record<string, string>)
                 : {};
+            const meta = [
+              ev ? `Avance ${ev.progressPct}%` : null,
+              h.minutosPlan != null ? `Plan ${formatMinutes(h.minutosPlan)}` : null,
+              h.minutosReales != null ? `Real ${formatMinutes(h.minutosReales)}` : null,
+            ].filter(Boolean);
+            const resumen = (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+                  <span style={{ paddingTop: 6 }}>
+                    <SemaforoDot semaforo={h.semaforo} />
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.35 }}>{h.titulo}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 1 }}>Folio {h.anNumber}</div>
+                  </div>
+                  {ev ? (
+                    <span aria-hidden style={{ fontSize: 14, color: "var(--text-secondary)", paddingTop: 2 }}>
+                      {open ? "▾" : "▸"}
+                    </span>
+                  ) : null}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                  <Chip color={est.color ?? "var(--text-secondary)"} style={{ fontSize: 12 }}>
+                    {est.label}
+                  </Chip>
+                  <Chip color="var(--text-secondary)" style={{ fontSize: 12 }}>
+                    {kindLabel(h)}
+                  </Chip>
+                  {encargo ? (
+                    <Chip color="var(--text-secondary)" style={{ fontSize: 12 }}>
+                      {encargo}
+                    </Chip>
+                  ) : null}
+                  <PrioridadChip prioridad={h.prioridad} />
+                  {h.retirado ? (
+                    <Chip color="#64748b" title="La sacaron del equipo de esta actividad" style={{ fontSize: 12 }}>
+                      Ya no está en el equipo
+                    </Chip>
+                  ) : null}
+                </div>
+                {meta.length ? (
+                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 6 }}>{meta.join(" · ")}</div>
+                ) : null}
+              </>
+            );
             return (
               <div
                 key={h.id}
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 14,
-                  padding: 12,
-                  display: "grid",
-                  gap: 8,
-                }}
+                style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}
               >
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(open ? null : h.id)}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    padding: 0,
-                    fontFamily: "inherit",
-                    color: "inherit",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                    <SemaforoDot semaforo={h.semaforo} />
-                    <span style={{ fontWeight: 800, fontSize: 14 }}>
-                      {h.anNumber} · {h.titulo}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-                    <PrioridadChip prioridad={h.prioridad} />
-                    {h.retirado ? (
-                      <Chip color="#64748b" title="La sacaron del equipo de esta actividad">
-                        Retirado
-                      </Chip>
-                    ) : null}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
-                    {h.estatus}
-                    {ev ? ` · avance ${ev.progressPct}%` : ""}
-                    {h.coreKind ? ` · ${h.coreKind}` : ""}
-                    {h.coreKind === "tarea" && h.ticketTypeCustom ? ` · ${h.ticketTypeCustom}` : ""}
-                    {chargeLabel ? ` · ${chargeLabel.badge}` : ""}
-                    {h.minutosPlan != null ? ` · plan ${formatMinutes(h.minutosPlan)}` : ""}
-                    {h.minutosReales != null ? ` · real ${formatMinutes(h.minutosReales)}` : ""}
-                  </div>
-                </button>
+                {ev ? (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(open ? null : h.id)}
+                    aria-expanded={open}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      padding: 0,
+                      fontFamily: "inherit",
+                      color: "inherit",
+                      minHeight: 44,
+                    }}
+                  >
+                    {resumen}
+                  </button>
+                ) : (
+                  <div>{resumen}</div>
+                )}
                 {open && ev ? (
                   <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -401,7 +603,7 @@ export default function PizarraPersonaPage() {
                           >
                             <FotoProtegida
                               url={foto.url}
-                              alt={`${foto.label} · ${h.anNumber}`}
+                              alt={`${foto.label} · ${h.titulo}`}
                               alto={104}
                               style={{ width: 104, height: 104, objectFit: "cover", display: "block" }}
                             />
@@ -428,19 +630,34 @@ export default function PizarraPersonaPage() {
                         )}
                       </dl>
                     ) : null}
-                    {ev.serviceSheetPdfUrl ? (
-                      <div style={{ display: "grid", gap: 6 }}>
-                        <div style={{ fontSize: 12, fontWeight: 800 }}>
-                          <IconLabel icon={DescriptionOutlinedIcon} size={16}>
-                            Hoja de servicio
-                          </IconLabel>
-                        </div>
-                        <VisorPdf url={ev.serviceSheetPdfUrl} alto="500px" />
-                      </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {ev.serviceSheetPdfUrl ? (
+                        <>
+                          <a
+                            href={resolveAssetUrl(ev.serviceSheetPdfUrl) ?? ev.serviceSheetPdfUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={btnSecondary}
+                          >
+                            📄 Abrir hoja de servicio
+                          </a>
+                          <button
+                            type="button"
+                            style={btnSecondary}
+                            aria-expanded={pdfAbierto === h.id}
+                            onClick={() => setPdfAbierto(pdfAbierto === h.id ? null : h.id)}
+                          >
+                            {pdfAbierto === h.id ? "Ocultar vista previa" : "Ver aquí"}
+                          </button>
+                        </>
+                      ) : null}
+                      <Link href={`/erp/actividades/${h.id}`} style={btnSecondary}>
+                        Abrir actividad →
+                      </Link>
+                    </div>
+                    {ev.serviceSheetPdfUrl && pdfAbierto === h.id ? (
+                      <VisorPdf url={ev.serviceSheetPdfUrl} alto="500px" />
                     ) : null}
-                    <Link href={`/erp/actividades/${h.id}`} style={{ fontWeight: 700, color: "var(--primary)" }}>
-                      Abrir actividad →
-                    </Link>
                   </div>
                 ) : null}
               </div>
@@ -448,25 +665,6 @@ export default function PizarraPersonaPage() {
           })
         )}
       </section>
-
-      <div style={{ display: "grid", gap: 10 }}>
-        {!isSelf && canAssign ? (
-          <Link
-            href={`/erp/pizarra/${user.id}/asignar`}
-            style={{
-              textAlign: "center",
-              padding: "14px 12px",
-              borderRadius: 14,
-              background: "var(--primary)",
-              color: "#fff",
-              fontWeight: 750,
-              textDecoration: "none",
-            }}
-          >
-            Asignar actividad
-          </Link>
-        ) : null}
-      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import CelebrationOutlinedIcon from "@mui/icons-material/CelebrationOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
 import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
@@ -16,10 +17,13 @@ import SolicitudesEquipoView from "@/components/pizarra/SolicitudesEquipoView";
 import FlujoKpiStrip from "@/components/pizarra/FlujoKpiStrip";
 import CentroOperativo from "@/components/pizarra/CentroOperativo";
 import EquipoPersonaCard, { rejillaEquipo } from "@/components/pizarra/EquipoPersonaCard";
-import ResumenEquipo from "@/components/pizarra/ResumenEquipo";
-import { hayFlujo } from "@/components/pizarra/equipo-estado";
+import ResumenEquipo, { type FiltroEquipo } from "@/components/pizarra/ResumenEquipo";
+import { ARO_DE_ESTADO, ARO_LABEL, hayFlujo } from "@/components/pizarra/equipo-estado";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
+import { formatHourMinute } from "@/lib/activity-labels";
+import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { getActivitiesSectionConfig } from "@/lib/section-views";
 import {
   fetchTeamBoard,
   type BoardRange,
@@ -60,6 +64,11 @@ export default function PizarraPage() {
   const [data, setData] = useState<TeamBoardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Falló un refresco con datos ya en pantalla: se conservan y solo se avisa. */
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [filtro, setFiltro] = useState<FiltroEquipo>("todos");
+  const hayDatos = useRef(false);
   const [vista, setVista] = useState<Vista>("mias");
   const [preset, setPreset] = useState<RangoPreset>("hoy");
   const [rango, setRango] = useState<BoardRange>({});
@@ -88,12 +97,17 @@ export default function PizarraPage() {
       return;
     }
     setLoading(true);
-    setError(null);
     try {
-      setData(await fetchTeamBoard(token, { desde, hasta }));
+      const board = await fetchTeamBoard(token, { desde, hasta });
+      hayDatos.current = true;
+      setData(board);
+      setError(null);
+      setRefreshError(null);
+      setUpdatedAt(Date.now());
     } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar Actividades"));
-      setData(null);
+      const msg = formatApiError(e, "No se pudo cargar Actividades");
+      if (hayDatos.current) setRefreshError(msg);
+      else setError(msg);
     } finally {
       setLoading(false);
     }
@@ -103,10 +117,18 @@ export default function PizarraPage() {
     void load();
   }, [load]);
 
+  // Cada 30 s mientras la pestaña está a la vista; al volver a ella, refresca de inmediato.
   useEffect(() => {
     if (!token) return;
-    const id = window.setInterval(() => void load(), 30_000);
-    return () => window.clearInterval(id);
+    const tick = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    const id = window.setInterval(tick, 30_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [token, load]);
 
   const users = useMemo(() => {
@@ -119,6 +141,14 @@ export default function PizarraPage() {
       return 0;
     });
   }, [data?.users, user?.id]);
+
+  const visibles = useMemo(
+    () => (filtro === "todos" ? users : users.filter((u) => (ARO_DE_ESTADO[u.status] ?? "retraso") === filtro)),
+    [users, filtro],
+  );
+
+  const actCfg = getActivitiesSectionConfig(user);
+  const puedeAsignar = hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
 
   const isCeo = isCeoEmail(user?.email);
   const otros = users.filter((u) => u.id !== user?.id).length;
@@ -216,6 +246,7 @@ export default function PizarraPage() {
               {verEquipo ? (
                 <Button
                   variant="primary"
+                  className={p.soloEscritorio}
                   onClick={() => setCentro(true)}
                   disabled={users.length === 0}
                   title="Pantalla completa para dejarla puesta en una pantalla de la oficina"
@@ -224,9 +255,14 @@ export default function PizarraPage() {
                   Centro operativo
                 </Button>
               ) : null}
-              <Button onClick={() => void load()} disabled={loading || !token}>
-                <RefreshIcon aria-hidden="true" />
-                Actualizar
+              {updatedAt ? (
+                <span className={p.actualizado} aria-live="polite">
+                  Actualizado {formatHourMinute(updatedAt)}
+                </span>
+              ) : null}
+              <Button className={p.tap} onClick={() => void load()} disabled={loading || !token} aria-busy={loading}>
+                <RefreshIcon aria-hidden="true" className={loading ? p.girando : undefined} />
+                {loading ? "Actualizando…" : "Actualizar"}
               </Button>
             </>
           )
@@ -267,21 +303,71 @@ export default function PizarraPage() {
             </>
           ) : (
             <>
-              <ResumenEquipo users={users} />
+              {refreshError && data ? (
+                <div className={p.aviso}>
+                  <Alert
+                    tone="warning"
+                    role="status"
+                    action={
+                      <Button className={p.tap} onClick={() => void load()} disabled={loading}>
+                        Reintentar
+                      </Button>
+                    }
+                  >
+                    No se pudo actualizar. Sigues viendo lo de las {formatHourMinute(updatedAt)}.
+                  </Alert>
+                </div>
+              ) : null}
+
+              <ResumenEquipo users={users} filtro={filtro} onFiltro={setFiltro} />
 
               {loading && !data ? (
                 <TarjetasCargando />
-              ) : error ? (
-                <Alert tone="danger" role="alert">
+              ) : error && !data ? (
+                <Alert
+                  tone="danger"
+                  role="alert"
+                  action={
+                    <Button variant="primary" className={p.tap} onClick={() => void load()} disabled={loading}>
+                      Reintentar
+                    </Button>
+                  }
+                >
                   {error}
                 </Alert>
               ) : users.length === 0 ? (
-                <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu equipo" />
+                <EmptyState
+                  icon={<GroupsOutlinedIcon />}
+                  title="Nadie en tu equipo todavía"
+                  description="Cuando tengas gente a tu cargo, aquí verás qué está haciendo cada quien."
+                />
+              ) : visibles.length === 0 ? (
+                <EmptyState
+                  icon={filtro === "retraso" ? <CelebrationOutlinedIcon /> : <GroupsOutlinedIcon />}
+                  title={
+                    filtro === "retraso"
+                      ? "Nadie con retraso 🎉"
+                      : `Nadie en «${filtro === "todos" ? "Todos" : ARO_LABEL[filtro]}» ahora`
+                  }
+                  action={
+                    <Button className={p.tap} onClick={() => setFiltro("todos")}>
+                      Ver a todo el equipo
+                    </Button>
+                  }
+                />
               ) : (
                 <div className={rejillaEquipo}>
-                  {users.map((u) => (
-                    <EquipoPersonaCard key={u.id} user={u} isSelf={u.id === user?.id} />
-                  ))}
+                  {visibles.map((u) => {
+                    const yo = u.id === user?.id;
+                    return (
+                      <EquipoPersonaCard
+                        key={u.id}
+                        user={u}
+                        isSelf={yo}
+                        asignarHref={puedeAsignar && !yo ? `/erp/pizarra/${u.id}/asignar` : undefined}
+                      />
+                    );
+                  })}
                 </div>
               )}
 

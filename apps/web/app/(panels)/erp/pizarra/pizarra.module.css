@@ -12,6 +12,50 @@
   margin-bottom: var(--ui-s4);
 }
 
+.aviso {
+  margin-bottom: var(--ui-s3);
+}
+
+.actualizado {
+  align-self: center;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.girando {
+  animation: girar 0.9s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Con dedo, los botones de la cabecera y de los avisos llegan a 44px
+   (min-height gana a la altura fija del botón base). */
+@media (pointer: coarse) {
+  .tap {
+    min-height: 44px;
+  }
+}
+
+/* El centro operativo es para la pantalla de la oficina: en el teléfono no aporta. */
+@media (max-width: 720px) {
+  .pagina .soloEscritorio {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girando {
+    animation: none;
+  }
+}
+
 /* Mismo tamaño y forma que la tarjeta real: al llegar los datos nada salta. */
 .esqueleto {
   display: grid;

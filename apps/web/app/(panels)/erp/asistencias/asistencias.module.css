@@ -1,0 +1,129 @@
+.tabs [role="tab"] {
+  min-height: 40px;
+}
+
+@media (pointer: coarse) {
+  .tabs [role="tab"] {
+    min-height: 44px;
+  }
+}
+
+.tabHint {
+  margin: -4px 0 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.control {
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+@media (pointer: coarse) {
+  .control {
+    min-height: 44px;
+  }
+
+  .dateInput {
+    font-size: 16px !important;
+  }
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.kpi {
+  border-radius: 14px;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.15s ease;
+}
+
+.kpi :global(.nx-kpi) {
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.kpiActivo {
+  outline-color: var(--primary);
+}
+
+.card {
+  position: relative;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.card:hover {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.cardLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+}
+
+.cardLink:focus-visible {
+  outline: none;
+}
+
+.cardLink:focus-visible::after {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.card :is(button, input, textarea, select, [role="button"], a:not(.cardLink)) {
+  position: relative;
+  z-index: 1;
+}
+
+.mapButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+@media (pointer: coarse) {
+  .mapButton {
+    min-height: 44px;
+  }
+}
+
+.actualizado {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.girando {
+  display: inline-block;
+  animation: girar 0.9s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girando {
+    animation: none;
+  }
+}
