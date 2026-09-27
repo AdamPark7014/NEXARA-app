@@ -195,8 +195,8 @@ private fun AsignacionActivaCard(
             NxStatusChip(if (activa.esInventario) "Inventario" else "Solicitud", NxTone.Brand)
         }
         val fechas = listOfNotNull(
-            activa.inicio?.take(16)?.replace('T', ' '),
-            activa.fin?.take(16)?.replace('T', ' '),
+            activa.inicio?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
+            activa.fin?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
         ).joinToString(" → ")
         if (fechas.isNotBlank()) {
             Text(fechas, fontSize = 12.5.sp, color = NxColors.Muted)

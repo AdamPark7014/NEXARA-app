@@ -32,9 +32,11 @@ import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 @Composable
 fun ActivityInfoTab(
     a: ActivityDto,
@@ -180,13 +182,13 @@ fun ActivityInfoTab(
                         val branch = listOfNotNull(a.branchName, a.branchCity, a.branchState).filter { it.isNotBlank() }.joinToString(" · ")
                         if (branch.isNotBlank()) ADetailRow("Sucursal", branch)
                         if (!a.branchAddress.isNullOrBlank()) ADetailRow("Dirección", a.branchAddress!!)
-                        if (!a.prioridad.isNullOrBlank()) ADetailRow("Prioridad", a.prioridad!!)
-                        if (!a.ticketType.isNullOrBlank()) ADetailRow("Tipo de servicio", a.ticketType!!)
-                        ADetailRow("Asignación", a.fechaAsignacion?.take(16)?.replace('T', ' ') ?: "—")
-                        ADetailRow("Inicio", a.fechaInicio?.take(16)?.replace('T', ' ') ?: "—")
+                        NxStatusLabels.priority(a.prioridad)?.let { ADetailRow("Prioridad", it) }
+                        if (!a.ticketType.isNullOrBlank()) ADetailRow("Tipo de servicio", NxStatusLabels.label(a.ticketType))
+                        ADetailRow("Asignación", NxFormat.dateTime(a.fechaAsignacion))
+                        ADetailRow("Inicio", NxFormat.dateTime(a.fechaInicio))
                         ActivityPeriodo.cuandoTexto(a.periodo, null)?.let { ADetailRow("Periodo", it) }
-                        ADetailRow("Entrega esperada", a.fechaEntregaEsperada?.take(10) ?: "—")
-                        ADetailRow("Finalización", a.fechaFinalizacion?.take(16)?.replace('T', ' ') ?: "—")
+                        ADetailRow("Entrega esperada", NxFormat.date(a.fechaEntregaEsperada))
+                        ADetailRow("Finalización", NxFormat.dateTime(a.fechaFinalizacion))
                     }
                 }
             }
