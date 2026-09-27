@@ -61,7 +61,11 @@ struct ViaticosView: View {
 
     var body: some View {
         List {
-            if let error {
+            if let error, todos.isEmpty, !cargando {
+                Section {
+                    NxErrorState(message: error) { Task { await cargar() } }
+                }
+            } else if let error {
                 Section {
                     NxAlertBanner(
                         alert: NxAlert(
@@ -92,7 +96,7 @@ struct ViaticosView: View {
             }
 
             if cargando && todos.isEmpty {
-                Section { ProgressView().frame(maxWidth: .infinity) }
+                Section { NxSkeletonRows(count: 4) }
             }
 
             Section {
@@ -117,18 +121,20 @@ struct ViaticosView: View {
                 }
             }
 
-            if !cargando, visibles.isEmpty {
+            if !cargando, visibles.isEmpty, error == nil || !todos.isEmpty {
                 Section {
                     if hayEquipo, pestana == .equipo {
                         NxEmptyState(
                             title: "Nada por autorizar",
-                            subtitle: "Tu equipo no tiene viáticos esperando decisión."
+                            subtitle: "Tu equipo no tiene viáticos esperando decisión.",
+                            systemImage: "checkmark.seal"
                         )
                     } else {
                         NxEmptyState(
                             title: "Todavía no pides viáticos",
                             subtitle: "Pon la gasolina, toma la foto del ticket y pídelo aquí mismo. "
                                 + "No hace falta esperar a llegar a una computadora.",
+                            systemImage: "fuelpump",
                             actionLabel: "Pedir un viático",
                             onAction: { pidiendo = true }
                         )
@@ -189,7 +195,7 @@ struct ViaticosView: View {
             error = nil
         } catch {
             // Se conserva lo que ya estaba: el aviso va arriba, no en su lugar.
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage(fallback: "No se pudieron cargar los viáticos")
         }
         cargando = false
     }
