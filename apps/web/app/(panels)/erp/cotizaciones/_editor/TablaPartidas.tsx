@@ -659,7 +659,12 @@ function FilaNueva({
           aria-autocomplete="list"
         />
         {ofertas.length ? (
-          <ul className={styles.sugerencias} role="listbox" aria-label="Catálogo">
+          <ul
+            className={styles.sugerencias}
+            role="listbox"
+            aria-label="Catálogo"
+            onMouseDown={(e) => e.preventDefault()}
+          >
             {ofertas.map((o, i) => (
               <li
                 key={o.id}

@@ -37,6 +37,7 @@ export function ClienteCombo({
   const [activo, setActivo] = useState(0);
   const listaId = useId();
   const pedido = useRef(false);
+  const porTeclado = useRef(false);
 
   const cargar = () => {
     if (pedido.current || !token) return;
@@ -57,8 +58,14 @@ export function ClienteCombo({
     const filtrados = q
       ? todos.filter((c) => `${c.name} ${c.legalName ?? ""}`.toLowerCase().includes(q))
       : todos;
-    return filtrados.slice(0, 8);
+    return filtrados.slice(0, 100);
   }, [clientes, doc.clientName]);
+
+  useEffect(() => {
+    if (!porTeclado.current) return;
+    porTeclado.current = false;
+    document.getElementById(`${listaId}-${activo}`)?.scrollIntoView({ block: "nearest" });
+  }, [activo, listaId]);
 
   const elegir = (c: SalesClient) => {
     cambiar((d) => ({
@@ -79,9 +86,11 @@ export function ClienteCombo({
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      porTeclado.current = true;
       setActivo((a) => Math.min(coincidencias.length - 1, a + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      porTeclado.current = true;
       setActivo((a) => Math.max(0, a - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
@@ -125,7 +134,12 @@ export function ClienteCombo({
         }}
       />
       {mostrar ? (
-        <ul id={listaId} role="listbox" className={styles.opciones}>
+        <ul
+          id={listaId}
+          role="listbox"
+          className={styles.opciones}
+          onMouseDown={(e) => e.preventDefault()}
+        >
           {coincidencias.map((c, i) => (
             <li
               key={c.id}
