@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { todayStamp } from "@/components/finance/download";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -78,8 +79,14 @@ const TIPOS_CUENTA = [
 
 const MONEDAS = ["MXN", "USD", "EUR"];
 
+const RECONCILIATION_LABEL: Record<string, string> = {
+  MATCHED: "Conciliado",
+  PENDING: "Por conciliar",
+  UNMATCHED: "Por conciliar",
+};
+
 const emptyTxForm = {
-  transactionDate: new Date().toISOString().slice(0, 10),
+  transactionDate: todayStamp(),
   description: "",
   amount: 0,
   isDebit: true,
@@ -110,6 +117,9 @@ export default function BankingPage() {
   const [txForm, setTxForm] = useState({ ...emptyTxForm });
   const [savingTx, setSavingTx] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  /** Sube para volver a pedir los movimientos de la cuenta elegida. */
+  const [txReload, setTxReload] = useState(0);
+  const selectedId = selected?.id ?? null;
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -118,31 +128,36 @@ export default function BankingPage() {
       const data = await apiFetch("accounting/banking/accounts", token);
       const list: BankAccount[] = Array.isArray(data) ? data : [];
       setAccounts(list);
-      if (list.length && !selected) setSelected(list[0]);
+      // La cuenta elegida se refresca con su saldo nuevo; si ya no existe, se toma la primera.
+      setSelected((prev) => (prev ? (list.find((a) => a.id === prev.id) ?? list[0] ?? null) : (list[0] ?? null)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar cuentas bancarias");
+      setError(formatApiError(e, "No se pudieron cargar las cuentas bancarias"));
     } finally { setLoading(false); }
-  }, [token, selected]);
+  }, [token]);
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!token || !selected) return;
+    if (!token || selectedId == null) return;
+    let vivo = true;
     setLoadingTx(true);
     setTxError(null);
-    apiFetch(`accounting/banking/accounts/${selected.id}/transactions?limit=100`, token)
-      .then((data) => setTxs(Array.isArray(data) ? data : (data?.data ?? [])))
+    apiFetch(`accounting/banking/accounts/${selectedId}/transactions?limit=100`, token)
+      .then((data) => { if (vivo) setTxs(Array.isArray(data) ? data : (data?.data ?? [])); })
       .catch((e) => {
+        if (!vivo) return;
         setTxError(formatApiError(e, "No se pudieron cargar los movimientos"));
         setTxs([]);
       })
-      .finally(() => setLoadingTx(false));
-  }, [token, selected]);
+      .finally(() => { if (vivo) setLoadingTx(false); });
+    return () => { vivo = false; };
+  }, [token, selectedId, txReload]);
 
+  const deferredTxSearch = useDeferredValue(txSearch);
   const visibleTxs = useMemo(() => {
     let rows = txs;
-    if (txSearch.trim()) {
-      const q = txSearch.toLowerCase();
+    if (deferredTxSearch.trim()) {
+      const q = deferredTxSearch.trim().toLowerCase();
       rows = rows.filter((t) =>
         (t.description ?? "").toLowerCase().includes(q) ||
         (t.counterpartyName ?? "").toLowerCase().includes(q) ||
@@ -152,9 +167,64 @@ export default function BankingPage() {
     if (txFilterType === "debit") rows = rows.filter((t) => t.isDebit);
     if (txFilterType === "credit") rows = rows.filter((t) => !t.isDebit);
     return rows;
-  }, [txs, txSearch, txFilterType]);
+  }, [txs, deferredTxSearch, txFilterType]);
 
-  const totalBalance = accounts.reduce((s, a) => s + Number(a.currentBalance), 0);
+  /** Suma de abonos y cargos de lo que está a la vista: el pie de la tabla. */
+  const txTotals = useMemo(() => {
+    let abonos = 0;
+    let cargos = 0;
+    for (const t of visibleTxs) {
+      const monto = Number(t.amount);
+      if (t.isDebit) cargos += monto;
+      else abonos += monto;
+    }
+    return { abonos, cargos, neto: abonos - cargos };
+  }, [visibleTxs]);
+
+  const totalBalance = useMemo(
+    () => accounts.reduce((s, a) => s + Number(a.currentBalance), 0),
+    [accounts],
+  );
+
+  const metrics: Metric[] = useMemo(() => {
+    const activas = accounts.filter((a) => a.isActive).length;
+    const inactivas = accounts.length - activas;
+    const negativas = accounts.filter((a) => Number(a.currentBalance) < 0).length;
+    const masLiquida = accounts.length > 0
+      ? accounts.reduce((max, a) => (Number(a.currentBalance) > Number(max.currentBalance) ? a : max), accounts[0])
+      : null;
+    const porConciliar = txs.filter((t) => t.reconciliationStatus !== "MATCHED").length;
+    return [
+      {
+        label: "Saldo total",
+        value: <Money value={totalBalance} compact bold={false} />,
+        hint: `${accounts.length} cuenta${accounts.length === 1 ? "" : "s"} registrada${accounts.length === 1 ? "" : "s"}`,
+        tone: totalBalance < 0 ? "danger" : "default",
+      },
+      {
+        label: "Cuentas activas",
+        value: activas,
+        hint: inactivas > 0 ? `${inactivas} inactiva${inactivas === 1 ? "" : "s"}` : "ninguna inactiva",
+      },
+      {
+        label: "En negativo",
+        value: negativas,
+        hint: negativas > 0 ? "saldo por debajo de cero" : "sin cuentas sobregiradas",
+        tone: negativas > 0 ? "danger" : "default",
+      },
+      {
+        label: "Más líquida",
+        value: <span style={{ fontSize: 15 }}>{masLiquida?.name ?? "—"}</span>,
+        hint: masLiquida ? masLiquida.bankName : "sin cuentas",
+      },
+      {
+        label: "Por conciliar",
+        value: porConciliar,
+        hint: selected ? `movimientos de ${selected.name}` : "selecciona una cuenta",
+        tone: porConciliar > 0 ? "warning" : "default",
+      },
+    ];
+  }, [accounts, txs, totalBalance, selected]);
 
   const openNewAccount = () => { setEditingAccount(null); setForm({ ...emptyForm }); setFormErr(null); setShowForm(true); };
   const openEditAccount = (a: BankAccount) => {
@@ -239,12 +309,12 @@ export default function BankingPage() {
         }),
       });
       setShowTxForm(false);
-      setTxForm({ ...emptyTxForm });
-      const data = await apiFetch(`accounting/banking/accounts/${selected.id}/transactions?limit=100`, token);
-      setTxs(Array.isArray(data) ? data : (data?.data ?? []));
+      setTxForm({ ...emptyTxForm, transactionDate: todayStamp() });
+      toast.success("Movimiento registrado");
+      setTxReload((n) => n + 1);
       void load();
     } catch (e) {
-      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(formatApiError(e, "No se pudo registrar el movimiento"));
     } finally { setSavingTx(false); }
   };
 
@@ -268,7 +338,7 @@ export default function BankingPage() {
             ),
           );
         } catch (e) {
-          toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+          toast.error(formatApiError(e, "No se pudo conciliar el movimiento"));
         }
       },
     });
@@ -342,55 +412,34 @@ export default function BankingPage() {
       />
       <FinanceModuleRail />
 
-      {(() => {
-        const activas = accounts.filter((a) => a.isActive).length;
-        const inactivas = accounts.length - activas;
-        const negativas = accounts.filter((a) => Number(a.currentBalance) < 0).length;
-        const masLiquida = accounts.length > 0
-          ? accounts.reduce((max, a) => (Number(a.currentBalance) > Number(max.currentBalance) ? a : max), accounts[0])
-          : null;
-        const porConciliar = txs.filter((t) => t.reconciliationStatus !== "MATCHED").length;
-        const metrics: Metric[] = [
-          {
-            label: "Saldo total",
-            value: <Money value={totalBalance} compact bold={false} />,
-            hint: `${accounts.length} cuenta${accounts.length === 1 ? "" : "s"} registrada${accounts.length === 1 ? "" : "s"}`,
-            tone: totalBalance < 0 ? "danger" : "default",
-          },
-          {
-            label: "Cuentas activas",
-            value: activas,
-            hint: inactivas > 0 ? `${inactivas} inactiva${inactivas === 1 ? "" : "s"}` : "ninguna inactiva",
-          },
-          {
-            label: "En negativo",
-            value: negativas,
-            hint: negativas > 0 ? "saldo por debajo de cero" : "sin cuentas sobregiradas",
-            tone: negativas > 0 ? "danger" : "default",
-          },
-          {
-            label: "Más líquida",
-            value: <span style={{ fontSize: 15 }}>{masLiquida?.name ?? "—"}</span>,
-            hint: masLiquida ? masLiquida.bankName : "sin cuentas",
-          },
-          {
-            label: "Por conciliar",
-            value: porConciliar,
-            hint: selected ? `movimientos de ${selected.name}` : "selecciona una cuenta",
-            tone: porConciliar > 0 ? "warning" : "default",
-          },
-        ];
-        return (
-          <div style={{ marginBottom: 18 }}>
-            <MetricStrip metrics={metrics} ariaLabel="Resumen de bancos" />
-          </div>
-        );
-      })()}
+      <div style={{ marginBottom: 18 }}>
+        <MetricStrip metrics={metrics} ariaLabel="Resumen de bancos" />
+      </div>
 
-      {loading && <EmptyState icon="⏳" title="Cargando cuentas…" description="Consultando cuentas bancarias." />}
-      {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+      {loading && accounts.length === 0 && (
+        <EmptyState title="Cargando cuentas…" description="Consultando cuentas bancarias." />
+      )}
+      {!loading && error && accounts.length === 0 && (
+        <EmptyState
+          title="No se pudieron cargar las cuentas"
+          description={error}
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      )}
+      {error && accounts.length > 0 && (
+        <InlineAlert
+          variant="warning"
+          message={`No se pudo actualizar; se muestran los saldos anteriores. ${error}`}
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
+              {loading ? "Reintentando…" : "Reintentar"}
+            </Button>
+          }
+        />
+      )}
 
-      {!loading && !error && (
+      {(accounts.length > 0 || (!loading && !error)) && (
         <>
           <Section title="Cuentas" subtitle="El saldo manda; elige una cuenta para ver sus movimientos.">
             {accounts.length === 0 && (
@@ -411,8 +460,10 @@ export default function BankingPage() {
                 return (
                   <div key={a.id} style={{ position: "relative" }}>
                     <button
+                      type="button"
                       onClick={() => setSelected(a)}
                       aria-pressed={isSelected}
+                      className="nx-bank-card"
                       style={{
                         width: "100%",
                         textAlign: "left",
@@ -435,7 +486,7 @@ export default function BankingPage() {
                           fontWeight: 600,
                           fontVariantNumeric: "tabular-nums",
                           lineHeight: 1.15,
-                          color: saldo < 0 ? "var(--state-danger-text, #b91c1c)" : "var(--text-primary)",
+                          color: saldo < 0 ? "var(--state-danger-text)" : "var(--text-primary)",
                         }}
                       >
                         <Money value={saldo} bold={false} />
@@ -449,10 +500,12 @@ export default function BankingPage() {
                     </button>
                     {cfg.canCreate && (
                       <button
+                        type="button"
                         onClick={() => openEditAccount(a)}
                         title="Editar cuenta"
                         aria-label={`Editar ${a.name}`}
-                        style={{ position: "absolute", top: 10, right: 10, background: "transparent", border: "none", cursor: "pointer", fontSize: 12, color: "var(--text-tertiary)", padding: 2 }}
+                        className="nx-bank-edit"
+                        style={{ position: "absolute", top: 6, right: 6, width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)" }}
                       >
                         ✎
                       </button>
@@ -491,15 +544,44 @@ export default function BankingPage() {
                     { key: "counterpartyName", label: "Contraparte" },
                     { key: "amount", label: "Monto" },
                     { key: "isDebit", label: "Tipo", format: (v) => v ? "Cargo" : "Abono" },
-                    { key: "reconciliationStatus", label: "Estado" },
+                    { key: "reconciliationStatus", label: "Estado", format: (v) => RECONCILIATION_LABEL[String(v ?? "")] ?? "Por conciliar" },
                   ], `movimientos-${selected.name.toLowerCase().replace(/\s+/g, "-")}`)}>Excel</Button>
                 ) : undefined}
               />
-              {loadingTx
-                ? <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              {loadingTx && txs.length === 0
+                ? <div aria-busy="true" style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando movimientos…</div>
                 : txError
-                  ? <EmptyState icon="⚠️" title="Error al cargar movimientos" description={txError} action={<Button size="sm" variant="secondary" onClick={() => setSelected({ ...selected! })}>Reintentar</Button>} />
-                  : <DataTable columns={txColumns} rows={visibleTxs} rowKey={(t) => t.id} emptyTitle="Sin movimientos" emptyDescription="No hay transacciones registradas para esta cuenta." />
+                  ? <EmptyState title="No se pudieron cargar los movimientos" description={txError} action={<Button size="sm" variant="secondary" onClick={() => setTxReload((n) => n + 1)}>Reintentar</Button>} />
+                  : (
+                    <>
+                      <DataTable
+                        columns={txColumns}
+                        rows={visibleTxs}
+                        rowKey={(t) => t.id}
+                        ariaLabel={`Movimientos de ${selected.name}`}
+                        emptyTitle={txs.length > 0 ? "Ningún movimiento con estos filtros" : "Sin movimientos"}
+                        emptyDescription={txs.length > 0 ? "Cambia la búsqueda o el tipo para ver más." : "Registra el primer movimiento o importa el estado de cuenta."}
+                      />
+                      {visibleTxs.length > 0 && (
+                        <div className="nx-bank-totals" aria-label="Totales de los movimientos visibles">
+                          <div>
+                            <span>Abonos</span>
+                            <strong><Money value={txTotals.abonos} bold={false} /></strong>
+                          </div>
+                          <div>
+                            <span>Cargos</span>
+                            <strong>−<Money value={txTotals.cargos} bold={false} /></strong>
+                          </div>
+                          <div>
+                            <span>Neto</span>
+                            <strong style={{ color: txTotals.neto < 0 ? "var(--state-danger-text)" : undefined }}>
+                              <Money value={txTotals.neto} bold={false} />
+                            </strong>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
               }
             </Section>
           )}
@@ -533,7 +615,7 @@ export default function BankingPage() {
             <input value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} placeholder="SPEI recibido, comisión bancaria…" style={inp} />
           </FinanceField>
           <FinanceField label="Monto" hint="Pesos, siempre en positivo. El tipo decide el signo.">
-            <input type="number" min={0} step="0.01" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} />
+            <input type="number" inputMode="decimal" min={0} step="0.01" value={txForm.amount || ""} placeholder="0.00" onChange={(e) => setTxForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} />
           </FinanceField>
           <FinanceField label="Contraparte" optional hint="Quién envía o recibe el dinero.">
             <input value={txForm.counterpartyName} onChange={(e) => setTxForm((f) => ({ ...f, counterpartyName: e.target.value }))} style={inp} />
@@ -592,6 +674,42 @@ export default function BankingPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+
+      <style>{`
+        .nx-bank-card:hover { border-color: color-mix(in srgb, var(--primary) 30%, var(--border)) !important; }
+        .nx-bank-card:focus-visible,
+        .nx-bank-edit:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: 2px;
+        }
+        .nx-bank-edit:hover { background: var(--surface-2) !important; color: var(--text-primary) !important; }
+        .nx-bank-totals {
+          display: flex;
+          justify-content: flex-end;
+          flex-wrap: wrap;
+          gap: 28px;
+          padding: 10px 16px;
+          margin-top: -1px;
+          border: 1px solid var(--nx-panel-hairline, var(--border));
+          border-top: none;
+          border-radius: 0 0 var(--nx-panel-radius) var(--nx-panel-radius);
+          background: var(--surface-2, var(--surface));
+        }
+        .nx-bank-totals > div { text-align: right; }
+        .nx-bank-totals span {
+          display: block;
+          font-size: 10.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--text-tertiary);
+        }
+        .nx-bank-totals strong {
+          font-size: 14px;
+          font-weight: 600;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+        }
+      `}</style>
     </>
   );
 }
