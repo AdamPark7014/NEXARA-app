@@ -123,7 +123,7 @@ export default function ContabilidadDashboardPage() {
       if (turno !== peticion.current) return;
       // Las cifras anteriores se quedan: el aviso dice qué periodo falló y
       // `periodoVigente` sigue rotulando el que sí está en pantalla.
-      setError(formatApiError(e));
+      setError(formatApiError(e, "El servidor no respondió."));
     } finally {
       if (turno === peticion.current) setLoading(false);
     }
