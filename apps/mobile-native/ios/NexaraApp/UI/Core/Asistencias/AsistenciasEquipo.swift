@@ -39,15 +39,14 @@ struct AsistenciasEquipoSection: View {
             }
             header
             if vm.teamLoading && vm.rows.isEmpty {
-                ProgressView("Consultando la asistencia de tu gente…")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                NxLoadingState(text: "Consultando la asistencia de tu gente…")
             } else if vm.filteredRows.isEmpty {
                 NxEmptyState(
                     title: vm.rows.isEmpty ? "Sin registros" : "Nadie en este filtro",
                     subtitle: vm.rows.isEmpty
                         ? "Nadie en tu alcance para esta fecha."
                         : "Prueba otro filtro o toca un KPI de arriba.",
+                    systemImage: vm.rows.isEmpty ? "person.crop.circle.badge.clock" : "line.3.horizontal.decrease.circle",
                     actionLabel: "Actualizar",
                     onAction: { Task { await vm.loadTeam(quiet: false) } }
                 )

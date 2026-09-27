@@ -141,19 +141,20 @@ struct ComidasView: View {
                 } else if let myDay, myDay.debeRegistrar {
                     myDayCard(myDay)
                 } else if let myDayError {
-                    Text(myDayError).font(.footnote).foregroundStyle(CorePalette.red)
+                    NxStaleBanner(message: myDayError) { Task { await load() } }
                 } else if loading {
-                    ProgressView("Cargando tu comida…").frame(maxWidth: .infinity)
+                    NxLoadingState(text: "Cargando tu comida…")
                 }
 
                 if let team, team.hasTeam {
                     teamSection(team)
                 } else if let teamError, isCeo {
-                    Text(teamError).font(.footnote).foregroundStyle(CorePalette.red)
+                    NxErrorState(message: teamError) { Task { await loadTeam() } }
                 }
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Comidas")
         .task { await load() }
         .task { await tickEvery30s() }
@@ -267,6 +268,7 @@ struct ComidasView: View {
                 Label("Salir a comer", systemImage: "fork.knife").bold().frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
         .coreCard()
     }
@@ -300,6 +302,7 @@ struct ComidasView: View {
                 Label("Ya regresé", systemImage: "arrow.uturn.backward").bold().frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
         .coreCard()
     }
@@ -443,24 +446,29 @@ struct ComidasView: View {
                             Text(option.count.map { "\(option.label) \($0)" } ?? option.label)
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
+                                .padding(.vertical, 8)
                                 .foregroundStyle(filter == option.key ? Color.white : Color.primary)
                                 .background(
                                     filter == option.key ? Color.accentColor : Color(.secondarySystemGroupedBackground),
                                     in: Capsule()
                                 )
+                                .frame(minHeight: NxMetrics.minTap)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(filter == option.key ? [.isSelected] : [])
                     }
                 }
             }
             if let teamError {
-                Text(teamError).font(.footnote).foregroundStyle(CorePalette.red)
+                NxStaleBanner(message: teamError) { Task { await loadTeam() } }
             }
             if rows.isEmpty {
                 Text("Nadie en este filtro.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, NxSpacing.l)
             }
             ForEach(rows) { row in
                 LunchTeamRowCard(
@@ -622,12 +630,14 @@ private struct LunchTeamRowCard: View {
                     .tint(CorePalette.red)
             }
             .font(.subheadline)
+            .controlSize(.large)
         } else {
             Button("Cambiar decisión") {
                 onReview(record, record.revisionEstado == "APROBADA" ? "rechazar" : "aprobar")
             }
             .buttonStyle(.bordered)
             .font(.subheadline)
+            .controlSize(.large)
         }
     }
 }
