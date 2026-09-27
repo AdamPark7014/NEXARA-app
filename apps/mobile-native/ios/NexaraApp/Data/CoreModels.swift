@@ -460,9 +460,7 @@ enum CoreFormat {
     }
 
     static func isoString(_ date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.string(from: date)
+        NxFormat.isoString(date)
     }
 }
 

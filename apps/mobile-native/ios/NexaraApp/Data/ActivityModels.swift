@@ -81,24 +81,40 @@ enum ActivityParse {
         return nil
     }
 
-    static func isoDate(_ value: String) -> Date? {
-        guard !value.isEmpty else { return nil }
+    // `CoreFormat.date` pasa por aquí en cada fila de cada lista: crear los
+    // formatters en cada llamada se notaba al hacer scroll.
+    private static let isoFractional: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: value) { return d }
+        return f
+    }()
+    private static let isoPlain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: value) { return d }
+        return f
+    }()
+    private static let dayOnly: DateFormatter = {
         let df = DateFormatter()
         df.locale = Locale(identifier: "es_MX")
         df.dateFormat = "yyyy-MM-dd"
-        return df.date(from: String(value.prefix(10)))
-    }
-
-    static func fmtDate(_ date: Date) -> String {
+        return df
+    }()
+    private static let shortDate: DateFormatter = {
         let df = DateFormatter()
         df.locale = Locale(identifier: "es_MX")
         df.dateStyle = .short
-        return df.string(from: date)
+        return df
+    }()
+
+    static func isoDate(_ value: String) -> Date? {
+        guard !value.isEmpty else { return nil }
+        if let d = isoFractional.date(from: value) { return d }
+        if let d = isoPlain.date(from: value) { return d }
+        return dayOnly.date(from: String(value.prefix(10)))
+    }
+
+    static func fmtDate(_ date: Date) -> String {
+        shortDate.string(from: date)
     }
 
     static func fmtIso(_ value: String) -> String {

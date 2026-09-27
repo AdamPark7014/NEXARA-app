@@ -261,17 +261,7 @@ private struct PortalHelpArticleDetail: View {
 
     private func formatPublishedAt(_ raw: String) -> String {
         guard !raw.isEmpty else { return "" }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var date = iso.date(from: raw)
-        if date == nil {
-            iso.formatOptions = [.withInternetDateTime]
-            date = iso.date(from: raw)
-        }
-        guard let date else { return String(raw.prefix(10)) }
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "es_MX")
-        fmt.dateFormat = "d MMM yyyy"
-        return fmt.string(from: date)
+        guard let date = NxFormat.parseISO(raw) else { return String(raw.prefix(10)) }
+        return NxFormat.day(date)
     }
 }
