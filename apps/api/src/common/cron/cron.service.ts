@@ -454,6 +454,12 @@ export class CronService {
       const list = byCompany.get(t.companyId) || [];
       list.push(t);
       byCompany.set(t.companyId, list);
+      // Notificar a responsable y jefes por cada actividad vencida (dedupe interno ~2 h).
+      if (t.responsableId && Number(t.responsableId) > 0) {
+        void this.notificationHierarchy
+          .notifyTicketSlaBreach({ activityId: t.id, userId: Number(t.responsableId) })
+          .catch((err) => this.logger.warn(`SLA breach notify hierarchy: ${err instanceof Error ? err.message : String(err)}`));
+      }
     }
     for (const [companyId, tickets] of byCompany) {
       this.domainEvents.publishEntityLifecycle('updated', {
