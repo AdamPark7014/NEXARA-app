@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/components/Toast';
+import { formatApiError } from '@/lib/erp-api';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
 import { evidenceStepLabel, isEvidenceLocked, rejectedStepsList } from '@/lib/evidence-lock';
 import {
@@ -368,7 +369,7 @@ const ActivityEvidenceFlow = () => {
         setError(null);
       } catch (err) {
         setActividades([]);
-        setError(err instanceof Error ? err.message : 'No se pudieron cargar tus actividades.');
+        setError(formatApiError(err, 'No se pudieron cargar tus actividades.'));
       }
     };
 
@@ -641,7 +642,7 @@ const ActivityEvidenceFlow = () => {
         }),
       );
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : 'No se pudo subir imagen');
+      setError(formatApiError(uploadError, 'No se pudo subir la foto. Intenta de nuevo.'));
     } finally {
       setInventoryUploadingKey(null);
     }
@@ -1034,7 +1035,7 @@ const ActivityEvidenceFlow = () => {
         setError(errorData.message || 'Error al guardar evidencias');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar');
+      setError(formatApiError(err, 'No se pudo guardar. Intenta de nuevo.'));
     } finally {
       setLoading(false);
     }
@@ -1098,7 +1099,7 @@ const ActivityEvidenceFlow = () => {
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al procesar PDF');
+      setError(formatApiError(err, 'No se pudo preparar la hoja de servicio. Intenta de nuevo.'));
       setLoading(false);
     }
   };
@@ -1138,7 +1139,7 @@ const ActivityEvidenceFlow = () => {
         setError(errorData.message || 'Error al guardar plantilla');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar');
+      setError(formatApiError(err, 'No se pudo guardar. Intenta de nuevo.'));
     } finally {
       setLoading(false);
     }

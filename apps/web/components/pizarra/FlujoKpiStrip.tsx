@@ -5,7 +5,7 @@ import { Stat, StatRow } from "@/components/base";
 import type { WorkflowPipeline } from "@/lib/team-board-api";
 import { formatPct } from "@/lib/team-board-api";
 
-/** Franja profesional de pipeline (mismo lenguaje visual que asistencias/indicadores). */
+/** Franja de avance de actividades (mismo lenguaje visual que asistencias/indicadores). */
 export default function FlujoKpiStrip({
   workflow,
   detalleHref = "/erp/pizarra/flujo",
@@ -26,15 +26,15 @@ export default function FlujoKpiStrip({
       <StatRow cols={6}>
         <Stat label="Asignadas" value={workflow.assigned} />
         <Stat label="Iniciadas" value={workflow.started} />
-        <Stat label="En evidencia" value={workflow.evidence} />
+        <Stat label="Con evidencias" value={workflow.evidence} />
         <Stat label="Cerradas" value={workflow.closed} tone="brand" />
         <Stat
-          label="Peer rechazadas"
+          label="Rechazadas entre compañeros"
           value={workflow.peerRejected}
           tone={workflow.peerRejected > 0 ? "warning" : "default"}
         />
         <Stat
-          label="SLA a tiempo"
+          label="A tiempo"
           value={formatPct(workflow.slaPct)}
           title={`${workflow.slaOnTime} a tiempo · ${workflow.slaLate} tarde`}
           tone={workflow.slaLate > 0 ? "danger" : "default"}

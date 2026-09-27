@@ -19,6 +19,7 @@ import {
   type TeamBoardUser,
   type WorkflowPipeline,
 } from "@/lib/team-board-api";
+import { chargeLabel } from "@/lib/activity-labels";
 
 /** El aro de la foto. Es el estado: se reconoce sin leer una sola palabra. */
 export type EstadoAro = "trabajando" | "retraso" | "libre";
@@ -126,7 +127,8 @@ export function contextoActividad(u: TeamBoardUser, ahora: number = Date.now()):
   const abierta = u.openActivities?.[0];
   if (abierta) {
     partes.push(abierta.anNumber);
-    if (abierta.assignmentCharge) partes.push(abierta.assignmentCharge);
+    const encargo = chargeLabel(abierta.assignmentCharge);
+    if (encargo) partes.push(encargo);
     if (abierta.periodo?.multiDia && abierta.periodo.etiqueta) partes.push(abierta.periodo.etiqueta);
   }
 

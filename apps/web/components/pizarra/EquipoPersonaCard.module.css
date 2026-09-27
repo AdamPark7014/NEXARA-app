@@ -123,6 +123,64 @@
   white-space: nowrap;
 }
 
+/* El estado también en texto: el aro no basta para quien no distingue colores. */
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 600;
+  color: var(--estado-fg, var(--ui-fg-2));
+}
+
+.estado::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--estado-dot, var(--ui-border-strong));
+}
+
+.estadoTrabajando { --estado-fg: var(--ui-success-text); --estado-dot: var(--ui-success); }
+.estadoRetraso { --estado-fg: var(--ui-warning-text); --estado-dot: var(--ui-warning); }
+.estadoLibre { --estado-fg: var(--ui-info-text); --estado-dot: var(--ui-info); }
+
+/* Tarjeta + «＋ Asignar»: el botón va fuera del enlace de la tarjeta (no se anidan enlaces). */
+.celda {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.asignar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--ui-s3);
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-brand-border);
+  background: var(--ui-brand-bg);
+  color: var(--ui-brand-text);
+  font-size: var(--ui-fs-body);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.asignar:hover {
+  border-color: var(--ui-brand);
+  color: var(--ui-brand-text);
+}
+
+.asignar:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
 /* Lo que importa — qué está haciendo — cabe entero en dos renglones. */
 .actividad {
   margin-top: var(--ui-s2);
@@ -186,6 +244,9 @@
 @media (pointer: coarse) {
   .aro {
     --foto: 80px;
+  }
+  .asignar {
+    min-height: 44px;
   }
 }
 

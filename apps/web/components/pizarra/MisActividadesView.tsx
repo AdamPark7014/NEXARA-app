@@ -19,11 +19,20 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CheckIcon from "@mui/icons-material/Check";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { useUser } from "@/components/UserContext";
-import { ACTIVITY_KINDS, isCeoEmail, type ActivityIconKey, type ActivityKind } from "@/lib/activity-kinds";
+import { isCeoEmail } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
 import IniciarActividad from "@/components/pizarra/IniciarActividad";
-import { normalizarPrioridad, puedeIniciar, SEMAFORO_UI, textoPlanVsReal } from "@/lib/actividad-tiempos";
+import { puedeIniciar, SEMAFORO_UI, textoPlanVsReal } from "@/lib/actividad-tiempos";
+import {
+  estatusUi,
+  formatMinutes,
+  formatWhen,
+  kindIcon,
+  kindLabel,
+  priorityUi,
+  shortName,
+} from "@/lib/activity-labels";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import { IconBadge, IconLabel } from "@/components/ui/IconBadge";
 import {
@@ -33,27 +42,7 @@ import {
   type MyActivityItem,
 } from "@/lib/my-activities-api";
 
-const PRIORITY_UI: Record<string, { color: string; label: string }> = {
-  ALTA: { color: "#dc2626", label: "Urgente" },
-  MEDIA: { color: "#d97706", label: "Esta semana" },
-  BAJA: { color: "#16a34a", label: "Puede esperar" },
-};
-
 const MIN_REASON = 10;
-
-/** Estatus del backend → etiqueta clara para campo. */
-const ESTATUS_UI: Array<[RegExp, { label: string; color?: string }]> = [
-  [/proceso/i, { label: "En curso", color: "#2563eb" }],
-  [/validar/i, { label: "En revisión", color: "#7c3aed" }],
-  [/rechazada/i, { label: "Te la regresaron", color: "#dc2626" }],
-  [/finalizada|completada|aprobada/i, { label: "Terminada", color: "#16a34a" }],
-  [/cancelada/i, { label: "Cancelada" }],
-];
-
-function estatusUi(estatus: string): { label: string; color?: string } {
-  for (const [re, ui] of ESTATUS_UI) if (re.test(estatus)) return ui;
-  return { label: "Por empezar" };
-}
 
 /** Avance de quien ejecuta, según su evidencia. */
 function avanceUi(status?: string | null): { label: string; color?: string } {
@@ -72,49 +61,8 @@ function avanceUi(status?: string | null): { label: string; color?: string } {
   }
 }
 
-function priorityUi(p?: string | null) {
-  return PRIORITY_UI[normalizarPrioridad(p)] ?? PRIORITY_UI.MEDIA;
-}
-
-function kindLabel(item: MyActivityItem): string {
-  const meta = item.coreKind ? ACTIVITY_KINDS[item.coreKind as ActivityKind] : null;
-  const base = meta ? meta.title : "Actividad";
-  return item.coreKind === "tarea" && item.ticketTypeCustom ? `${base} · ${item.ticketTypeCustom}` : base;
-}
-
-/** Clave de icono del tipo (sin tipo → icono genérico en ActivityKindIcon). */
-function kindIcon(item: MyActivityItem): ActivityIconKey | null {
-  const meta = item.coreKind ? ACTIVITY_KINDS[item.coreKind as ActivityKind] : null;
-  return meta ? meta.icon : null;
-}
-
 /** Icono en línea con texto corrido (se alinea con la línea base). */
 const INLINE_ICON_SX = { fontSize: 16, verticalAlign: "-0.22em", mr: "5px" } as const;
-
-function formatWhen(iso?: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString("es-MX", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatMinutes(min?: number | null): string | null {
-  if (min == null || !Number.isFinite(min) || min <= 0) return null;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h <= 0) return `${m} min`;
-  return m ? `${h} h ${m} min` : `${h} h`;
-}
-
-function shortName(name?: string | null): string {
-  return (name || "").split(/\s+/).slice(0, 2).join(" ");
-}
 
 const btnPrimary: CSSProperties = {
   border: "none",
@@ -786,7 +734,7 @@ export default function MisActividadesPage() {
                   borderRadius: 12,
                   border: "1px solid var(--border)",
                   fontFamily: "inherit",
-                  fontSize: 14,
+                  fontSize: 16,
                   resize: "vertical",
                   background: "var(--surface)",
                   color: "inherit",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatApiError } from "@/lib/erp-api";
 import { PersonFaceThumb, prefetchPersonFace } from "@/components/presence/_PersonFace";
 import {
   fetchOccupancy,
@@ -48,7 +49,7 @@ export function EnSitioStrip({
         setNote(data.note || null);
         setError(null);
       } catch (e) {
-        if (!stop) setError(e instanceof Error ? e.message : "No se pudo cargar ocupación");
+        if (!stop) setError(formatApiError(e, "No se pudo cargar quién está en sitio"));
       }
     };
     void load();

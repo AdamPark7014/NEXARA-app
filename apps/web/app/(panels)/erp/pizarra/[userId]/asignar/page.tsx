@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -27,22 +28,155 @@ import { formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
+import { Skeleton } from "@/components/base";
+import { CHARGE_LABEL, initials, shortName } from "@/lib/activity-labels";
 import {
   fetchTeamBoard,
   fetchTeamBoardUser,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
 
-const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), { ssr: false });
+const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), {
+  ssr: false,
+  loading: () => (
+    <div aria-busy="true" aria-label="Cargando formulario" style={{ display: "grid", gap: 10 }}>
+      <Skeleton height={44} radius={10} />
+      <Skeleton height={44} radius={10} />
+      <Skeleton height={88} radius={10} />
+    </div>
+  ),
+});
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0] ?? "")
-    .join("")
-    .toUpperCase();
+/** Ayuda de cada encargo en palabras de campo (el título se queda igual). */
+const CHARGE_HELP: Record<AssignmentCharge, string> = {
+  ejecucion: `${CHARGE_LABEL.ejecucion}: queda a su cargo y la realiza en persona.`,
+  despacho: "La reparte a su gente: queda a su cargo coordinar quién la hace.",
+};
+
+type PasoId = "tipo" | "encargo" | "tiempo" | "equipo" | "datos";
+
+const stepTitle: CSSProperties = {
+  margin: 0,
+  fontSize: 14,
+  fontWeight: 750,
+  color: "var(--text-secondary)",
+};
+
+const fieldLabel: CSSProperties = { fontSize: 13, fontWeight: 650, color: "var(--text-secondary)" };
+
+const textareaStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  fontFamily: "inherit",
+  fontSize: 16,
+  lineHeight: 1.4,
+  resize: "vertical",
+  background: "var(--surface)",
+  color: "inherit",
+  boxSizing: "border-box",
+};
+
+const numberStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  font: "inherit",
+  fontSize: 16,
+  fontWeight: 700,
+  background: "var(--surface)",
+  color: "inherit",
+  boxSizing: "border-box",
+};
+
+const primaryButton: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: 44,
+  padding: "10px 16px",
+  border: "none",
+  borderRadius: 12,
+  background: "var(--primary)",
+  color: "#fff",
+  fontWeight: 750,
+  fontSize: 14,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+
+const secondaryButton: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  justifySelf: "start",
+  minHeight: 44,
+  padding: "8px 14px",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  color: "inherit",
+  fontWeight: 650,
+  fontSize: 14,
+  textDecoration: "none",
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+
+const nextHint: CSSProperties = { fontSize: 14, color: "var(--text-secondary)", margin: 0 };
+
+function TeamErrorBox({ error }: { error: { activityId: number; text: string } }) {
+  return (
+    <div
+      role="alert"
+      style={{
+        padding: "12px 14px",
+        borderRadius: 14,
+        border: "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
+        background: "color-mix(in srgb, #d97706 9%, var(--surface))",
+        display: "grid",
+        gap: 8,
+        fontSize: 13.5,
+        lineHeight: 1.45,
+      }}
+    >
+      <span>
+        <strong>La actividad ya se creó</strong>, pero no se pudo sumar a todo el equipo: {error.text}
+      </span>
+      <span style={{ color: "var(--text-secondary)" }}>
+        No la vuelvas a crear: abre la actividad y revisa quién quedó.
+      </span>
+      <Link href={`/erp/actividades/${error.activityId}`} style={secondaryButton}>
+        Abrir la actividad →
+      </Link>
+    </div>
+  );
+}
+
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-grid",
+        placeItems: "center",
+        width: 24,
+        height: 24,
+        marginRight: 8,
+        borderRadius: "50%",
+        background: "var(--primary)",
+        color: "#fff",
+        fontSize: 12.5,
+        fontWeight: 800,
+        verticalAlign: "middle",
+      }}
+    >
+      {n}
+    </span>
+  );
 }
 
 async function addTeamMember(
@@ -100,7 +234,8 @@ export default function AsignarActividadPage() {
   const [planHoras, setPlanHoras] = useState(1);
   const [planMinutos, setPlanMinutos] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [teamError, setTeamError] = useState<string | null>(null);
+  /** La actividad ya existe pero falló sumar al equipo: no se debe volver a crear. */
+  const [teamError, setTeamError] = useState<{ activityId: number; text: string } | null>(null);
 
   const horasPlan = horasPlanDe(planHoras, planMinutos);
   const planValido = horasPlan > 0;
@@ -134,7 +269,6 @@ export default function AsignarActividadPage() {
     : ejecucionOnly
       ? "ejecucion"
       : charge;
-  const chargeMeta = effectiveCharge ? ASSIGNMENT_CHARGES[effectiveCharge] : null;
 
   const bridgeNeeded =
     kind === "servicio" &&
@@ -243,8 +377,9 @@ export default function AsignarActividadPage() {
   };
 
   const handleSuccess = async (activityId: number) => {
+    const fichaAsignada = `/erp/pizarra/${userId}?asignada=${activityId}`;
     if (!token) {
-      router.push(`/erp/pizarra/${userId}`);
+      router.push(fichaAsignada);
       return;
     }
     setTeamError(null);
@@ -259,7 +394,7 @@ export default function AsignarActividadPage() {
           "LEAD",
           horasPlan,
         );
-        router.push(`/erp/pizarra/${userId}`);
+        router.push(fichaAsignada);
         return;
       }
 
@@ -267,7 +402,7 @@ export default function AsignarActividadPage() {
       if (ejecucionOnly) {
         // Siempre se manda: aunque no haya indicaciones, el tiempo estimado sí va.
         await addTeamMember(token, activityId, userId, leadNotes.trim(), "LEAD", horasPlan);
-        router.push(`/erp/pizarra/${userId}`);
+        router.push(fichaAsignada);
         return;
       }
 
@@ -300,18 +435,36 @@ export default function AsignarActividadPage() {
         await addTeamMember(token, activityId, id, extraNotes[id], rol, horasPlan);
       }
     } catch (e) {
-      setTeamError(formatApiError(e, "Actividad creada, pero falló al sumar el equipo"));
+      setTeamError({ activityId, text: formatApiError(e, "error de conexión") });
       return;
     }
-    router.push(`/erp/pizarra/${userId}`);
+    router.push(fichaAsignada);
   };
 
   if (!Number.isFinite(userId)) {
-    return <p style={{ color: "#dc2626" }}>Persona no válida.</p>;
+    return (
+      <p role="alert" style={{ color: "var(--danger)", fontSize: 14 }}>
+        No encontramos a esta persona.
+      </p>
+    );
   }
 
   const avatarSrc = person?.avatarUrl ? resolveAssetUrl(person.avatarUrl) : null;
-  const displayName = person?.nombre ?? `Persona #${userId}`;
+  const displayName = person?.nombre ?? "Cargando…";
+  const nombreCorto = person ? shortName(person.nombre) : "esta persona";
+
+  // Pasos en el orden en que aparecen: se numeran seguidos, sin saltos.
+  const verEncargo = Boolean(kind) && !bridgeNeeded && (despachoOnly || ejecucionOnly || offerCharge);
+  const verTiempo = Boolean(kindMeta) && !bridgeNeeded && chargeReady;
+  const verEquipo = verTiempo && planValido && !despachoOnly && !ejecucionOnly;
+  const pasos: PasoId[] = [
+    "tipo",
+    ...(verEncargo ? (["encargo"] as const) : []),
+    ...(verTiempo ? (["tiempo"] as const) : []),
+    ...(verEquipo ? (["equipo"] as const) : []),
+    ...(verTiempo && planValido ? (["datos"] as const) : []),
+  ];
+  const paso = (id: PasoId) => pasos.indexOf(id) + 1;
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -320,13 +473,14 @@ export default function AsignarActividadPage() {
         onClick={() => router.push(`/erp/pizarra/${userId}`)}
         style={{
           alignSelf: "flex-start",
+          minHeight: 44,
           border: "none",
           background: "transparent",
           color: "var(--text-secondary)",
           fontWeight: 650,
-          fontSize: 13,
+          fontSize: 14,
           cursor: "pointer",
-          padding: 0,
+          padding: "8px 0",
           fontFamily: "inherit",
         }}
       >
@@ -368,7 +522,7 @@ export default function AsignarActividadPage() {
               background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
             }}
           >
-            {initials(displayName)}
+            {person ? initials(person.nombre) : ""}
           </div>
         )}
         <div style={{ minWidth: 0 }}>
@@ -381,24 +535,46 @@ export default function AsignarActividadPage() {
               textTransform: "uppercase",
             }}
           >
-            Responsable
+            Asignar actividad a
           </div>
           <h1 style={{ margin: "2px 0 0", fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
             {displayName}
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            {person?.puesto || person?.email || "Elige el tipo y completa los datos"}
+            {person?.puesto || "Elige el tipo y completa los datos"}
           </p>
         </div>
       </header>
 
-      {loadError ? <p style={{ color: "#dc2626", margin: 0, fontSize: 13 }}>{loadError}</p> : null}
-      {teamError ? <p style={{ color: "#d97706", margin: 0, fontSize: 13 }}>{teamError}</p> : null}
+      {loadError ? (
+        <div
+          role="alert"
+          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 14, color: "var(--danger)" }}
+        >
+          <span>{loadError}</span>
+          <button type="button" onClick={() => void load()} style={secondaryButton}>
+            Reintentar
+          </button>
+        </div>
+      ) : null}
+      {teamError ? <TeamErrorBox error={teamError} /> : null}
 
       <section>
-        <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-          1 · Tipo de actividad
-        </div>
+        <h2 style={{ ...stepTitle, marginBottom: 10 }}>
+          <StepBadge n={paso("tipo")} />
+          Tipo de actividad
+        </h2>
+        {!person && !loadError ? (
+          <div
+            aria-busy="true"
+            aria-label="Cargando tipos"
+            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}
+          >
+            <Skeleton height={112} radius={16} />
+            <Skeleton height={112} radius={16} />
+            <Skeleton height={112} radius={16} />
+          </div>
+        ) : null}
         <div
           style={{
             display: "grid",
@@ -414,6 +590,7 @@ export default function AsignarActividadPage() {
                 key={id}
                 type="button"
                 onClick={() => setKind(id)}
+                aria-pressed={selected}
                 style={{
                   textAlign: "left",
                   padding: "14px 12px",
@@ -430,18 +607,18 @@ export default function AsignarActividadPage() {
               >
                 <ActivityKindIcon kind={opt.icon} variant="badge" size={36} />
                 <div style={{ marginTop: 8, fontWeight: 800, fontSize: 14 }}>{opt.title}</div>
-                <div style={{ marginTop: 4, fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.35 }}>
+                <div style={{ marginTop: 4, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.35 }}>
                   {opt.help}
                 </div>
               </button>
             );
           })}
         </div>
-        <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-          Solo se muestran tipos válidos para {displayName}. Campo David: tarea/proyecto/obra · Soporte
-          Antonio: tarea/proyecto/servicio · Josué (obra): todo menos servicio · Daniela/Mónica:
-          tarea/comercial · Encargados: + comercial.
-        </p>
+        {person ? (
+          <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+            Solo ves los tipos que {nombreCorto} puede recibir.
+          </p>
+        ) : null}
       </section>
 
       {kind && despachoOnly && !bridgeNeeded ? (
@@ -456,57 +633,36 @@ export default function AsignarActividadPage() {
           }}
         >
           <div>
-            <div style={{ fontSize: 13, fontWeight: 750, color: "var(--text-secondary)" }}>
-              2 · Encargo a {displayName.split(/\s+/).slice(0, 2).join(" ")}
-            </div>
-            <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 800 }}>Despacho a equipo</p>
-            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-              Solo en servicios: le dejas la actividad y cuántas personas ocupas; él manda a Antonio y
-              Antonio elige al soporte.
+            <h2 style={stepTitle}>
+              <StepBadge n={paso("encargo")} />
+              Encargo a {nombreCorto}
+            </h2>
+            <p style={{ margin: "8px 0 0", fontSize: 15, fontWeight: 800 }}>Despacho a equipo</p>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+              La reparte a su gente. En servicios le dejas la actividad y cuántas personas ocupas; él se la
+              manda a Antonio y Antonio elige al soporte.
             </p>
           </div>
           <label style={{ display: "grid", gap: 4, maxWidth: 220 }}>
-            <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-              Personas que se ocupan *
-            </span>
+            <span style={fieldLabel}>Personas que se ocupan *</span>
             <input
               type="number"
+              inputMode="numeric"
               min={1}
               max={50}
               value={headcount}
               onChange={(e) => setHeadcount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "1px solid var(--border)",
-                font: "inherit",
-                fontSize: 15,
-                fontWeight: 700,
-                background: "var(--surface)",
-                color: "inherit",
-              }}
+              style={numberStyle}
             />
           </label>
           <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-              Indicaciones para {displayName.split(/\s+/).slice(0, 2).join(" ")} (opcional)
-            </span>
+            <span style={fieldLabel}>Indicaciones para {nombreCorto} (opcional)</span>
             <textarea
               value={leadNotes}
               onChange={(e) => setLeadNotes(e.target.value)}
               rows={2}
-              placeholder="Qué debe coordinar / contexto…"
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: "1px solid var(--border)",
-                fontFamily: "inherit",
-                fontSize: 13,
-                resize: "vertical",
-                background: "var(--surface)",
-                color: "inherit",
-              }}
+              placeholder="Qué debe coordinar, contexto…"
+              style={textareaStyle}
             />
           </label>
         </section>
@@ -524,34 +680,23 @@ export default function AsignarActividadPage() {
           }}
         >
           <div>
-            <div style={{ fontSize: 13, fontWeight: 750, color: "var(--text-secondary)" }}>
-              2 · Encargo a {displayName.split(/\s+/).slice(0, 2).join(" ")}
-            </div>
-            <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 800 }}>Ejecución directa</p>
-            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-              Actividad personal suya: la hace él, sin despacho a equipo.
+            <h2 style={stepTitle}>
+              <StepBadge n={paso("encargo")} />
+              Encargo a {nombreCorto}
+            </h2>
+            <p style={{ margin: "8px 0 0", fontSize: 15, fontWeight: 800 }}>Ejecución directa</p>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+              {CHARGE_LABEL.ejecucion}, sin repartirla a nadie más.
             </p>
           </div>
           <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-              Indicaciones (opcional)
-            </span>
+            <span style={fieldLabel}>Indicaciones (opcional)</span>
             <textarea
               value={leadNotes}
               onChange={(e) => setLeadNotes(e.target.value)}
               rows={2}
               placeholder="Qué debe hacer…"
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: "1px solid var(--border)",
-                fontFamily: "inherit",
-                fontSize: 13,
-                resize: "vertical",
-                background: "var(--surface)",
-                color: "inherit",
-              }}
+              style={textareaStyle}
             />
           </label>
         </section>
@@ -559,9 +704,10 @@ export default function AsignarActividadPage() {
 
       {kind && offerCharge && !bridgeNeeded ? (
         <section>
-          <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-            2 · Encargo a {displayName.split(/\s+/).slice(0, 2).join(" ")}
-          </div>
+          <h2 style={{ ...stepTitle, marginBottom: 10 }}>
+            <StepBadge n={paso("encargo")} />
+            Encargo a {nombreCorto}
+          </h2>
           <div
             style={{
               display: "grid",
@@ -577,6 +723,7 @@ export default function AsignarActividadPage() {
                   key={id}
                   type="button"
                   onClick={() => setCharge(id)}
+                  aria-pressed={selected}
                   style={{
                     textAlign: "left",
                     padding: "14px 14px",
@@ -592,8 +739,8 @@ export default function AsignarActividadPage() {
                   }}
                 >
                   <div style={{ fontWeight: 800, fontSize: 15 }}>{opt.title}</div>
-                  <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                    {opt.help}
+                  <div style={{ marginTop: 6, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                    {CHARGE_HELP[id]}
                   </div>
                 </button>
               );
@@ -614,31 +761,21 @@ export default function AsignarActividadPage() {
             lineHeight: 1.45,
           }}
         >
-          <strong>Servicios van primero a Antonio</strong> (puente de sistemas). Él agenda día/hora a
-          Carolina o Alejandro.
+          <strong>Los servicios van primero a Antonio.</strong> Él agenda el día y la hora con Carolina o
+          Alejandro.
           {antonioOnBoard ? (
             <div style={{ marginTop: 10 }}>
               <button
                 type="button"
                 onClick={() => router.push(`/erp/pizarra/${antonioOnBoard.id}/asignar`)}
-                style={{
-                  border: "none",
-                  background: "var(--primary)",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: 12.5,
-                  padding: "8px 12px",
-                  borderRadius: 10,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
+                style={primaryButton}
               >
-                Ir a asignar a {antonioOnBoard.nombre.split(/\s+/).slice(0, 2).join(" ")} →
+                Ir a asignar a {shortName(antonioOnBoard.nombre)} →
               </button>
             </div>
           ) : (
-            <p style={{ margin: "8px 0 0", fontSize: 12 }}>
-              No aparece Antonio en el tablero; revisa el seed / jerarquía.
+            <p style={{ margin: "8px 0 0", fontSize: 13 }}>
+              No encontramos a Antonio en el tablero. Avísale a dirección.
             </p>
           )}
         </div>
@@ -658,58 +795,43 @@ export default function AsignarActividadPage() {
           }}
         >
           <div>
-            <div style={{ fontSize: 13, fontWeight: 750, color: "var(--text-secondary)" }}>
-              Tiempo estimado *
-            </div>
-            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+            <h2 style={stepTitle}>
+              <StepBadge n={paso("tiempo")} />
+              ¿Cuánto tiempo toma? *
+            </h2>
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
               Cuánto debería tomarle. Con esto se compara el tiempo real y se avisa si se pasa.
             </p>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <label style={{ display: "grid", gap: 4, width: 130 }}>
-              <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>Horas</span>
+              <span style={fieldLabel}>Horas</span>
               <input
                 type="number"
+                inputMode="numeric"
                 min={0}
                 max={99}
                 value={planHoras}
                 onChange={(e) => setPlanHoras(Math.max(0, Math.min(99, Number(e.target.value) || 0)))}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid var(--border)",
-                  font: "inherit",
-                  fontSize: 15,
-                  fontWeight: 700,
-                  background: "var(--surface)",
-                  color: "inherit",
-                }}
+                style={numberStyle}
               />
             </label>
             <label style={{ display: "grid", gap: 4, width: 130 }}>
-              <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>Minutos</span>
+              <span style={fieldLabel}>Minutos</span>
               <input
                 type="number"
+                inputMode="numeric"
                 min={0}
                 max={59}
                 step={5}
                 value={planMinutos}
                 onChange={(e) => setPlanMinutos(Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid var(--border)",
-                  font: "inherit",
-                  fontSize: 15,
-                  fontWeight: 700,
-                  background: "var(--surface)",
-                  color: "inherit",
-                }}
+                style={numberStyle}
               />
             </label>
           </div>
           {!planValido ? (
-            <p style={{ margin: 0, fontSize: 12.5, color: "#d97706" }}>
+            <p style={{ margin: 0, fontSize: 13, color: "#b45309" }}>
               Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede.
             </p>
           ) : null}
@@ -727,26 +849,26 @@ export default function AsignarActividadPage() {
               background: "var(--surface)",
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-              {offerCharge ? "3" : "2"} · Equipo{" "}
-              {effectiveCharge === "despacho" ? "(ejecutor / apoyo)" : "extra (opcional)"}
-            </div>
-            <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
+            <h2 style={{ ...stepTitle, marginBottom: 6 }}>
+              <StepBadge n={paso("equipo")} />
+              {effectiveCharge === "despacho" ? "¿Quién la hace?" : "¿Alguien más ayuda? (opcional)"}
+            </h2>
+            <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
               {effectiveCharge === "despacho"
                 ? kind === "proyecto"
-                  ? `Despacho: puedes sumar instaladores y soporte. Si mezclas ambos, se asigna también al otro coordinador (p. ej. Antonio) además de ${displayName.split(/\s+/).slice(0, 2).join(" ")} y a los subordinados elegidos.`
-                  : `Como despacho, suma a quien debe ejecutarla bajo ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Si no eliges a nadie, queda pendiente de que él la asigne.`
+                  ? `Puedes sumar instaladores y soporte. Si mezclas a los dos equipos, también se avisa al otro encargado (por ejemplo Antonio), además de ${nombreCorto}.`
+                  : `Suma a quien la hará con ${nombreCorto}. Si no eliges a nadie, ${nombreCorto} la reparte después.`
                 : kind === "servicio" && isServicioBridgeEmail(person?.email)
-                ? "Como puente, suma a Carolina o Alejandro (día/hora ya van en el formulario)."
+                ? "Suma a Carolina o Alejandro (el día y la hora van en el formulario)."
                 : kind === "servicio"
                   ? "Solo soporte (Antonio, Carolina, Alejandro)."
                   : kind === "obra"
                     ? "Solo instaladores de campo (Joan, Israel, Juan José)."
                     : kind === "proyecto"
-                      ? "Soporte e instaladores pueden colaborar en el proyecto. Si hay ambos lados, se suman ambos coordinadores."
+                      ? "Soporte e instaladores pueden colaborar. Si hay gente de los dos lados, se avisa a los dos encargados."
                       : effectiveCharge === "ejecucion"
-                        ? `Ejecución directa de ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Puedes sumar apoyo opcional.`
-                        : `El responsable es ${displayName}. Puedes sumar apoyo.`}
+                        ? `${nombreCorto} la hace. Si quieres, suma a alguien de apoyo.`
+                        : `${nombreCorto} queda como responsable. Si quieres, suma a alguien de apoyo.`}
             </p>
             {autoPeerCoordinators.length > 0 ? (
               <div
@@ -761,14 +883,14 @@ export default function AsignarActividadPage() {
                   lineHeight: 1.45,
                 }}
               >
-                <strong>Coordinadores automáticos:</strong> además del responsable, se asignará como LEAD a{" "}
-                {autoPeerCoordinators.map((u) => u.nombre.split(/\s+/).slice(0, 2).join(" ")).join(", ")}{" "}
-                (por el equipo cruzado instaladores / soporte).
+                <strong>Se suman encargados:</strong> además de {nombreCorto}, también se avisará a{" "}
+                {autoPeerCoordinators.map((u) => shortName(u.nombre)).join(", ")} para coordinar (hay gente de
+                instalación y de soporte).
               </div>
             ) : null}
             {teamForExtras.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-                No hay más personas en el tablero para sumar ahora.
+              <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
+                No hay más personas disponibles para sumar ahora.
               </p>
             ) : (
               <>
@@ -782,11 +904,13 @@ export default function AsignarActividadPage() {
                       type="button"
                       onClick={() => toggleExtra(u.id)}
                       title={u.nombre}
+                      aria-pressed={on}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 8,
-                        padding: "6px 10px 6px 6px",
+                        minHeight: 44,
+                        padding: "6px 12px 6px 6px",
                         borderRadius: 999,
                         border: on ? "1.5px solid var(--primary)" : "1px solid var(--border)",
                         background: on
@@ -795,10 +919,15 @@ export default function AsignarActividadPage() {
                         cursor: "pointer",
                         fontFamily: "inherit",
                         color: "inherit",
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 650,
                       }}
                     >
+                      {on ? (
+                        <span aria-hidden style={{ color: "var(--primary)", fontWeight: 800 }}>
+                          ✓
+                        </span>
+                      ) : null}
                       {src ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -833,7 +962,7 @@ export default function AsignarActividadPage() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {u.nombre.split(/\s+/).slice(0, 2).join(" ")}
+                        {shortName(u.nombre)}
                       </span>
                     </button>
                   );
@@ -841,56 +970,29 @@ export default function AsignarActividadPage() {
               </div>
               {extraIds.length > 0 ? (
                 <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={{ display: "block", fontSize: 12 }}>
-                    <span style={{ fontWeight: 650, color: "var(--text-secondary)" }}>
-                      Indicaciones para {displayName.split(/\s+/).slice(0, 2).join(" ")}{" "}
-                      (responsable, opcional)
-                    </span>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={fieldLabel}>Indicaciones para {nombreCorto} (responsable, opcional)</span>
                     <textarea
                       value={leadNotes}
                       onChange={(e) => setLeadNotes(e.target.value)}
                       rows={2}
-                      style={{
-                        width: "100%",
-                        marginTop: 4,
-                        padding: 8,
-                        borderRadius: 10,
-                        border: "1px solid var(--border)",
-                        fontFamily: "inherit",
-                        fontSize: 13,
-                        resize: "vertical",
-                        background: "var(--surface)",
-                        color: "inherit",
-                      }}
-                      placeholder={`Qué debe hacer ${displayName.split(/\s+/).slice(0, 2).join(" ")}…`}
+                      style={textareaStyle}
+                      placeholder={`Qué debe hacer ${nombreCorto}…`}
                     />
                   </label>
                   {extraIds.map((id) => {
                     const u = teamForExtras.find((x) => x.id === id);
                     if (!u) return null;
                     return (
-                      <label key={id} style={{ display: "block", fontSize: 12 }}>
-                        <span style={{ fontWeight: 650, color: "var(--text-secondary)" }}>
-                          Indicaciones para {u.nombre.split(/\s+/).slice(0, 2).join(" ")} (opcional)
-                        </span>
+                      <label key={id} style={{ display: "grid", gap: 4 }}>
+                        <span style={fieldLabel}>Indicaciones para {shortName(u.nombre)} (opcional)</span>
                         <textarea
                           value={extraNotes[id] ?? ""}
                           onChange={(e) =>
                             setExtraNotes((prev) => ({ ...prev, [id]: e.target.value }))
                           }
                           rows={2}
-                          style={{
-                            width: "100%",
-                            marginTop: 4,
-                            padding: 8,
-                            borderRadius: 10,
-                            border: "1px solid var(--border)",
-                            fontFamily: "inherit",
-                            fontSize: 13,
-                            resize: "vertical",
-                            background: "var(--surface)",
-                            color: "inherit",
-                          }}
+                          style={textareaStyle}
                           placeholder="Qué debe hacer esta persona…"
                         />
                       </label>
@@ -911,19 +1013,27 @@ export default function AsignarActividadPage() {
               background: "var(--surface)",
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 12, color: "var(--text-secondary)" }}>
-              {despachoOnly || ejecucionOnly ? "3" : offerCharge ? "4" : "3"} ·{" "}
-              <ActivityKindIcon kind={kindMeta.icon} size={16} /> {kindMeta.title}
-              {chargeMeta ? ` · ${chargeMeta.badge}` : ""}
-              {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
-            </div>
+            <h2 style={{ ...stepTitle, marginBottom: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+              <StepBadge n={paso("datos")} />
+              <ActivityKindIcon kind={kindMeta.icon} size={16} />
+              <span>
+                {kindMeta.title}
+                {effectiveCharge ? ` · ${CHARGE_LABEL[effectiveCharge]}` : ""}
+                {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
+              </span>
+            </h2>
+            {teamError ? (
+              <div style={{ marginBottom: 12 }}>
+                <TeamErrorBox error={teamError} />
+              </div>
+            ) : null}
             <OpsActivityForm
               key={`${kind}-${effectiveCharge ?? "none"}-${despachoOnly ? headcount : "x"}`}
               tone="core"
               coreKind={kind ?? undefined}
               assignmentCharge={effectiveCharge ?? undefined}
               initialResponsableId={userId}
-            extraTeamIds={extraIds}
+              extraTeamIds={extraIds}
               hideResponsableSelect
               forcedProjectMode={kindMeta.projectMode}
               hideProjectModePicker
@@ -935,19 +1045,13 @@ export default function AsignarActividadPage() {
             />
           </section>
         </>
-      ) : kindMeta && !bridgeNeeded && chargeReady && !planValido ? (
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-          Indica el tiempo estimado para continuar.
-        </p>
-      ) : kindMeta && !bridgeNeeded && offerCharge && !charge ? (
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-          Elige el encargo (ejecución directa o despacho a equipo) para continuar.
-        </p>
-      ) : (
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-          Elige un tipo para continuar.
-        </p>
-      )}
+      ) : bridgeNeeded ? null : kindMeta && chargeReady && !planValido ? (
+        <p style={nextHint}>Indica el tiempo estimado para continuar.</p>
+      ) : kindMeta && offerCharge && !charge ? (
+        <p style={nextHint}>Elige si la hace {nombreCorto} o si la reparte a su equipo para continuar.</p>
+      ) : person ? (
+        <p style={nextHint}>Elige un tipo para continuar.</p>
+      ) : null}
     </div>
   );
 }
