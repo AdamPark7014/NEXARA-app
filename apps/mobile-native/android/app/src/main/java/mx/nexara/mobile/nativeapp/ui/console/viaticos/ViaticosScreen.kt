@@ -46,6 +46,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusLabels
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 
@@ -222,7 +223,7 @@ private fun TarjetaViatico(
         if (mostrarPersona && persona.isNotEmpty()) append("$persona. ")
         append("$titulo. ")
         append("${Dinero.pesos(vigente)}. ")
-        append("${viatico.estatus ?: "sin estado"}. ")
+        append("${NxStatusLabels.label(viatico.estatus)}. ")
         resumenLiquidacion(viatico.liquidacion)?.let { append("${it.first}. ") }
     }
 
