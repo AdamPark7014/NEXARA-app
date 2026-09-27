@@ -10,6 +10,21 @@ import { matchesAutoApproveCondition } from './workflow-auto-approve-condition.j
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { appUrls } from '../common/app-urls.js';
 
+/**
+ * Quien puede decidir cualquier paso aunque no sea su aprobador: el equipo de desarrollo y los roles
+ * con acceso de administración de consola (la dirección). Es el mismo criterio con el que `decide`
+ * autoriza, para que la bandeja muestre exactamente lo que esa persona puede resolver.
+ */
+export function esAprobadorDeRespaldo(
+  actor: { roleKey?: string | null; role?: { nombre?: string | null; accesoConsoleAdmin?: boolean | null } | null } | null | undefined,
+): boolean {
+  return (
+    actor?.roleKey === 'super_admin' ||
+    Boolean(actor?.role?.accesoConsoleAdmin) ||
+    (actor?.role?.nombre || '').toLowerCase().includes('super')
+  );
+}
+
 @Injectable()
 export class WorkflowService {
   private readonly logger = new Logger(WorkflowService.name);
@@ -126,11 +141,8 @@ export class WorkflowService {
       },
     });
 
-    // Notificar al aprobador del paso 1
-    const firstStep = def.steps[0];
-    if (firstStep.approverUserId) {
-      await this.notifyApprover(firstStep.approverUserId, instance.id, def.name, dto.entityType, dto.entityId);
-    }
+    // Notificar al aprobador del paso 1 (o, si el paso no tiene aprobador, a quien puede decidirlo)
+    await this.notifyStep(def.steps[0], instance.id, def.name, dto.entityType, dto.entityId, tenantId);
 
     void this.tryAutoApproveChain(instance.id, tenantId).catch((err) =>
       this.logger.warn(
@@ -200,8 +212,13 @@ export class WorkflowService {
     // bandeja `/erp/approvals` pueda dibujar el timeline (paso 1 ✓, paso 2 ✓, paso 3 ⏳…).
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { roleId: true, role: { select: { nombre: true } } },
+      select: { roleId: true, roleKey: true, role: { select: { nombre: true, accesoConsoleAdmin: true } } },
     });
+    // Los pasos sin aprobador (los que trae la siembra) no le tocan a nadie en particular: los puede
+    // decidir la dirección (`decide` ya la deja), pero antes no le aparecían en la bandeja.
+    const sinAprobador = esAprobadorDeRespaldo(user)
+      ? [{ step: { approverUserId: null, approverRoleId: null } }]
+      : [];
     return this.prisma.workflowApproval.findMany({
       where: {
         status: 'PENDING',
@@ -209,6 +226,7 @@ export class WorkflowService {
         OR: [
           { step: { approverUserId: userId } },
           { step: { approverRoleId: user?.roleId ?? -1 } },
+          ...sinAprobador,
         ],
       },
       include: {
@@ -271,10 +289,7 @@ export class WorkflowService {
       where: { id: userId },
       select: { id: true, roleId: true, roleKey: true, role: { select: { nombre: true, accesoConsoleAdmin: true } } },
     });
-    const isElevated =
-      actor?.roleKey === 'super_admin' ||
-      Boolean(actor?.role?.accesoConsoleAdmin) ||
-      (actor?.role?.nombre || '').toLowerCase().includes('super');
+    const isElevated = esAprobadorDeRespaldo(actor);
     const isApprover =
       isElevated ||
       approval.step.approverUserId === userId ||
@@ -335,9 +350,14 @@ export class WorkflowService {
           approvals: { create: { stepId: nextStep.id, status: 'PENDING' } },
         },
       });
-      if (nextStep.approverUserId) {
-        await this.notifyApprover(nextStep.approverUserId, approval.instanceId, approval.instance.workflow.name, approval.instance.entityType, approval.instance.entityId);
-      }
+      await this.notifyStep(
+        nextStep,
+        approval.instanceId,
+        approval.instance.workflow.name,
+        approval.instance.entityType,
+        approval.instance.entityId,
+        tenantId,
+      );
       void this.tryAutoApproveChain(approval.instanceId, tenantId).catch((err) =>
         this.logger.warn(
           `Auto-approve chain: ${err instanceof Error ? err.message : err}`,
@@ -493,15 +513,14 @@ export class WorkflowService {
           approvals: { create: { stepId: nextStep.id, status: 'PENDING' } },
         },
       });
-      if (nextStep.approverUserId) {
-        await this.notifyApprover(
-          nextStep.approverUserId,
-          approval.instanceId,
-          approval.instance.workflow.name,
-          approval.instance.entityType,
-          approval.instance.entityId,
-        );
-      }
+      await this.notifyStep(
+        nextStep,
+        approval.instanceId,
+        approval.instance.workflow.name,
+        approval.instance.entityType,
+        approval.instance.entityId,
+        approval.instance.companyId,
+      );
       return { complete: false, cancelled: false };
     }
 
@@ -554,15 +573,66 @@ export class WorkflowService {
     });
   }
 
-  private async notifyApprover(userId: number, instanceId: number, workflowName: string, entityType: string, entityId: number) {
+  /**
+   * Avisa a quien le toca un paso: su aprobador por persona, o —si el paso no tiene ni persona ni
+   * rol— a quienes pueden decidirlo (la dirección). Un paso por rol no avisa a nadie en particular,
+   * como hasta ahora.
+   */
+  private async notifyStep(
+    step: { approverUserId: number | null; approverRoleId?: number | null },
+    instanceId: number,
+    workflowName: string,
+    entityType: string,
+    entityId: number,
+    companyId: number,
+  ) {
+    if (step.approverUserId) {
+      await this.notifyApprover(step.approverUserId, instanceId, workflowName, entityType, entityId, companyId);
+      return;
+    }
+    if (step.approverRoleId != null) return;
     try {
+      const respaldo = await this.prisma.user.findMany({
+        where: {
+          isActive: true,
+          role: { accesoConsoleAdmin: true },
+          companyMemberships: { some: { companyId } },
+        },
+        select: { id: true },
+      });
+      for (const u of respaldo) {
+        await this.notifyApprover(u.id, instanceId, workflowName, entityType, entityId, companyId);
+      }
+    } catch {
+      // silent
+    }
+  }
+
+  private async notifyApprover(
+    userId: number,
+    instanceId: number,
+    workflowName: string,
+    entityType: string,
+    entityId: number,
+    companyId?: number,
+  ) {
+    try {
+      // El importe va en el aviso: para aprobar desde el teléfono hay que saber de cuánto es.
+      let importe = '';
+      if (companyId != null) {
+        const ctx = await this.buildEntityContext(entityType, entityId, companyId).catch(() => ({}));
+        const monto = Number((ctx as { amount?: unknown }).amount ?? (ctx as { budget?: unknown }).budget);
+        if (Number.isFinite(monto) && monto > 0) {
+          importe = ` por ${monto.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}`;
+        }
+      }
       await this.notifications.createNotification({
         userId,
         type: 'WORKFLOW_PENDING',
         category: 'workflow',
         channel: 'approvals',
         title: '🛡️ Aprobación pendiente',
-        message: `Tienes una solicitud de aprobación: ${workflowName} — ${entityType} #${entityId}`,
+        message: `Tienes una solicitud de aprobación: ${workflowName} — ${entityType} #${entityId}${importe}`,
         entityType,
         relatedEntityId: entityId,
         relatedUrl: appUrls.erpApprovals(instanceId),

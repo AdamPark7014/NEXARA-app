@@ -10,6 +10,7 @@ import { DomainEventBusService } from '../../domain-events/domain-event-bus.serv
 import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
 import { normalizarPrioridad } from '../../activities/actividad-tiempos.js';
 import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
+import { WORKDAY_TIMEZONE } from '../time/workday.js';
 
 @Injectable()
 export class CronService {
@@ -40,7 +41,8 @@ export class CronService {
   }
 
   // ── Facturas vencidas — cada día 8AM ─────────────────────────────
-  @Cron('0 8 * * *', { name: 'overdue-invoices' })
+  // Las tareas «de la mañana» corren en hora de México: sin `timeZone` salían a las 02:00 (UTC del contenedor).
+  @Cron('0 8 * * *', { name: 'overdue-invoices', timeZone: WORKDAY_TIMEZONE })
   async handleOverdueInvoices() {
     this.logger.log('Verificando facturas vencidas...');
     const overdue = await this.prisma.invoice.findMany({
@@ -102,7 +104,7 @@ export class CronService {
   }
 
   // ── Órdenes de compra próximas a vencer — cada día 9AM ──────────
-  @Cron('0 9 * * *', { name: 'po-reminders' })
+  @Cron('0 9 * * *', { name: 'po-reminders', timeZone: WORKDAY_TIMEZONE })
   async handlePOReminders() {
     this.logger.log('Verificando órdenes de compra próximas...');
     const threeDaysFromNow = new Date(Date.now() + 3 * 86400000);
@@ -128,7 +130,7 @@ export class CronService {
   }
 
   // ── Mantenimiento preventivo — cada día 7AM ─────────────────────
-  @Cron('0 7 * * *', { name: 'maintenance-reminders' })
+  @Cron('0 7 * * *', { name: 'maintenance-reminders', timeZone: WORKDAY_TIMEZONE })
   async handleMaintenanceReminders() {
     this.logger.log('Verificando mantenimientos pendientes...');
     const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000);
@@ -165,7 +167,7 @@ export class CronService {
   }
 
   // ── Alertas de margen de proyectos — cada día 10AM ─────────────
-  @Cron('0 10 * * *', { name: 'project-margin-alerts' })
+  @Cron('0 10 * * *', { name: 'project-margin-alerts', timeZone: WORKDAY_TIMEZONE })
   async handleProjectMarginAlerts() {
     this.logger.log('Verificando proyectos con riesgo de margen...');
     const activeProjects = await this.prisma.salesProject.findMany({
@@ -226,7 +228,7 @@ export class CronService {
   }
 
   // ── Vehículos por vencer — 8AM y 4PM ───────────────────────────
-  @Cron('0 8,16 * * *', { name: 'vehicle-usage-expiring' })
+  @Cron('0 8,16 * * *', { name: 'vehicle-usage-expiring', timeZone: WORKDAY_TIMEZONE })
   async handleVehicleUsageExpiring() {
     this.logger.log('Verificando asignaciones de vehículo por vencer...');
     try {

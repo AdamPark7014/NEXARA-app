@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { ReabastecimientoService } from './reabastecimiento.service.js';
 
 /**
@@ -16,7 +17,7 @@ export class ReabastecimientoCronService {
 
   constructor(private readonly reabastecimiento: ReabastecimientoService) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  @Cron(CronExpression.EVERY_DAY_AT_3AM, { timeZone: WORKDAY_TIMEZONE })
   async recalcularDiario() {
     try {
       const res = await this.reabastecimiento.recalcularTodasLasEmpresas();
