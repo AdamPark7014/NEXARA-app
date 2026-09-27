@@ -1,0 +1,192 @@
+/* Controles del organigrama. El lienzo y el árbol siguen con estilos en línea:
+   el ajuste de zoom mide esas cajas directamente. */
+
+.herramientas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.busqueda {
+  flex: 1 1 220px;
+  min-width: 160px;
+  max-width: 360px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 16px;
+}
+
+.busqueda:focus-visible,
+.zoomBtn:focus-visible,
+.chip:focus-visible,
+.editar:focus-visible,
+.select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.zoom {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.zoomBtn {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoomBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.zoomPorcentaje {
+  min-width: 56px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.chipCuenta {
+  opacity: 0.7;
+  font-weight: 600;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rotulo {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+}
+
+.coincidencias {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sinCoincidencias {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.editar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.editar:hover {
+  color: var(--primary);
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.select {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .busqueda {
+    max-width: none;
+    min-height: 44px;
+  }
+
+  .zoomBtn,
+  .editar {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .editar {
+    width: 44px;
+    height: 44px;
+    top: 0;
+    right: 0;
+  }
+
+  .chip {
+    min-height: 40px;
+  }
+
+  .select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

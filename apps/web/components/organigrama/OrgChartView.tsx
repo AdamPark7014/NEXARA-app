@@ -11,19 +11,25 @@ import {
   useEffect,
   useState,
   useCallback,
+  useDeferredValue,
   useMemo,
   useRef,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
+import Button from "@/components/ui/Button";
+import InlineAlert from "@/components/ui/InlineAlert";
+import EmptyState from "@/components/ui/EmptyState";
 import { Tag } from "@/components/ui/DataTable";
+import { SkeletonRows } from "@/components/base";
 import HrModuleRail from "@/components/hr/HrModuleRail";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
+import { errorLegible } from "@/lib/recursos-ui";
 import MetricStrip from "@/components/ui/MetricStrip";
+import s from "./organigrama.module.css";
 import {
   type OrgChartNode,
   ANCHO_TARJETA,
@@ -87,9 +93,11 @@ function Avatar({ url, name }: { url?: string | null; name: string }) {
   const src = url ? resolveAssetUrl(url) : "";
   if (src) {
     return (
+      // El nombre ya va escrito al lado: la foto es decorativa para el lector de pantalla.
       <img
         src={src}
-        alt={name}
+        alt=""
+        loading="lazy"
         style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
       />
     );
@@ -180,28 +188,33 @@ function NodeCard({
       setEditing(false);
       onRefresh();
     } catch (e: unknown) {
-      setSaveErr(e instanceof Error ? e.message : "Error al guardar");
+      setSaveErr(errorLegible(e, "No se pudo guardar el cambio. Intenta de nuevo."));
     } finally {
       setSaving(false);
     }
   };
 
-  const descendants = new Set<number>();
-  function collectDesc(n: OrgChartNode) {
-    descendants.add(n.id);
-    n.children.forEach(collectDesc);
-  }
-  collectDesc(node);
-  const managerOptions = allUsers.filter((u) => !descendants.has(u.id));
+  /** Solo se calcula con el editor abierto: recorrer descendientes por cada tarjeta pesaba. */
+  const managerOptions = useMemo(() => {
+    if (!editing) return [];
+    const descendants = new Set<number>();
+    const collectDesc = (n: OrgChartNode) => {
+      descendants.add(n.id);
+      n.children.forEach(collectDesc);
+    };
+    collectDesc(node);
+    return allUsers.filter((u) => !descendants.has(u.id));
+  }, [editing, node, allUsers]);
   const puesto = orgNodeSubtitle(node);
   const aCargo = contarSubordinados(node);
 
   return (
     <div
+      data-org-id={node.id}
       style={{
         position: "relative",
         padding: "8px 10px",
-        paddingRight: canEditOrg ? 32 : 10,
+        paddingRight: canEditOrg ? 40 : 10,
         background: isRoot
           ? "color-mix(in srgb, var(--primary) 10%, transparent)"
           : "var(--surface)",
@@ -237,22 +250,10 @@ function NodeCard({
           }}
           title={`Colocar a ${node.nombre} en el organigrama`}
           aria-label={`Colocar a ${node.nombre} en el organigrama`}
-          style={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 14,
-            color: "var(--text-tertiary)",
-            padding: "4px 6px",
-            flexShrink: 0,
-            minHeight: 28,
-            lineHeight: 1,
-          }}
+          aria-expanded={editing}
+          className={s.editar}
         >
-          ✎
+          <span aria-hidden>✎</span>
         </button>
       )}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -322,16 +323,9 @@ function NodeCard({
             id={`jefe-${node.id}`}
             value={selectedManager}
             onChange={(e) => setSelectedManager(e.target.value)}
-            style={{
-              fontSize: 12,
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: "6px 8px",
-              background: "var(--surface)",
-              color: "var(--foreground)",
-            }}
+            className={s.select}
           >
-            <option value="">— Sin jefe (raíz) —</option>
+            <option value="">— Nadie: encabeza el organigrama —</option>
             {managerOptions.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.nombre}
@@ -349,14 +343,7 @@ function NodeCard({
             id={`lateral-${node.id}`}
             value={selectedLateral}
             onChange={(e) => setSelectedLateral(e.target.value)}
-            style={{
-              fontSize: 12,
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: "6px 8px",
-              background: "var(--surface)",
-              color: "var(--foreground)",
-            }}
+            className={s.select}
           >
             <option value="">— En su lugar del árbol —</option>
             {managerOptions.map((u) => (
@@ -371,44 +358,17 @@ function NodeCard({
             persona ni cuenta como gente suya.
           </div>
           {saveErr && (
-            <div style={{ fontSize: 11, color: "var(--danger)" }}>{saveErr}</div>
+            <div role="alert" style={{ fontSize: 11.5, color: "var(--danger)", lineHeight: 1.35 }}>
+              {saveErr}
+            </div>
           )}
-          <div style={{ display: "flex", gap: 6 }}>
-            <button
-              type="button"
-              onClick={() => void guardarColocacion()}
-              disabled={saving}
-              style={{
-                fontSize: 11,
-                padding: "6px 12px",
-                borderRadius: 6,
-                cursor: "pointer",
-                background: "var(--primary)",
-                color: "#fff",
-                border: "none",
-                fontWeight: 600,
-                opacity: saving ? 0.6 : 1,
-                minHeight: 32,
-              }}
-            >
-              {saving ? "Guardando…" : "Guardar"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              style={{
-                fontSize: 11,
-                padding: "6px 12px",
-                borderRadius: 6,
-                cursor: "pointer",
-                background: "var(--surface-2)",
-                color: "var(--foreground)",
-                border: "1px solid var(--border)",
-                minHeight: 32,
-              }}
-            >
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <Button size="md" variant="primary" onClick={() => void guardarColocacion()} loading={saving}>
+              Guardar
+            </Button>
+            <Button size="md" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
               Cancelar
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -659,36 +619,19 @@ export type OrgChartViewProps = {
 };
 
 const TITULO = "Organigrama";
-const SUBTITULO = "Jerarquía corporativa y líneas de reporte.";
+const SUBTITULO = "Quién reporta a quién.";
 
-const zoomBtnStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 700,
-  minWidth: 36,
-  minHeight: 36,
-  padding: "0 10px",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "var(--foreground)",
-  cursor: "pointer",
-  lineHeight: 1,
-};
-
-const chipStyle = (active: boolean): CSSProperties => ({
-  fontSize: 12,
-  fontWeight: active ? 700 : 500,
-  padding: "6px 12px",
-  borderRadius: 999,
-  border: active ? "1.5px solid var(--primary)" : "1px solid var(--border)",
-  background: active
-    ? "color-mix(in srgb, var(--primary) 14%, var(--surface))"
-    : "var(--surface)",
-  color: active ? "var(--primary)" : "var(--text-secondary)",
-  cursor: "pointer",
-  minHeight: 32,
-  lineHeight: 1.2,
-});
+/** Colores por área, todos derivados de los tokens del tema (claro y oscuro). */
+const COLORES_AREA = [
+  "var(--primary)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--danger)",
+  "color-mix(in srgb, var(--primary) 50%, var(--success))",
+  "color-mix(in srgb, var(--primary) 45%, var(--surface))",
+  "color-mix(in srgb, var(--warning) 50%, var(--danger))",
+  "color-mix(in srgb, var(--text-tertiary) 80%, var(--surface))",
+];
 
 export default function OrgChartView({
   canEditOrg,
@@ -700,8 +643,10 @@ export default function OrgChartView({
 
   const [roots, setRoots] = useState<OrgChartNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reintentando, setReintentando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const busquedaDiferida = useDeferredValue(searchQuery);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   /** Ancho natural del arbol, para poder ajustarlo al hueco disponible. */
@@ -725,19 +670,29 @@ export default function OrgChartView({
   const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
   const [panning, setPanning] = useState(false);
 
+  /**
+   * Solo la primera carga pinta el esqueleto. Recargar tras guardar una colocación
+   * deja el árbol a la vista (y el zoom y el desplazamiento donde estaban); si falla,
+   * se queda lo último que cargó y el aviso ofrece reintentar.
+   */
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
     setError(null);
     try {
       const data = await apiFetch("users/orgchart", token);
       setRoots(Array.isArray(data) ? data : []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(errorLegible(e, "No se pudo cargar el organigrama"));
     } finally {
       setLoading(false);
     }
   }, [token]);
+
+  const reintentar = async () => {
+    setReintentando(true);
+    await load();
+    setReintentando(false);
+  };
 
   useEffect(() => {
     void load();
@@ -778,7 +733,7 @@ export default function OrgChartView({
     [byDept],
   );
 
-  const q = norm(searchQuery);
+  const q = norm(busquedaDiferida);
   const hasSearch = q.length > 0;
   const hasDept = selectedDept != null;
   const hasActiveFilter = hasSearch || hasDept;
@@ -875,7 +830,31 @@ export default function OrgChartView({
     // cambiar el lienzo, y esa caja también tiene que enterarse.
     if (contentRef.current) observador.observe(contentRef.current);
     return () => observador.disconnect();
-  }, [ajustarAlAncho, medir, roots, selectedDept, searchQuery, compacto]);
+  }, [ajustarAlAncho, medir, roots, selectedDept, busquedaDiferida, compacto]);
+
+  /**
+   * Al buscar, lleva la vista a la primera coincidencia: con el árbol ancho, la
+   * persona buscada podía quedar fuera de pantalla aunque se resaltara.
+   */
+  const primeraCoincidencia = useMemo(() => {
+    if (!hasSearch || !matchIds || matchIds.size === 0) return null;
+    return matchIds.values().next().value ?? null;
+  }, [hasSearch, matchIds]);
+
+  useEffect(() => {
+    if (primeraCoincidencia == null) return;
+    const caja = canvasRef.current;
+    if (!caja) return;
+    const marco = requestAnimationFrame(() => {
+      const tarjeta = caja.querySelector<HTMLElement>(`[data-org-id="${primeraCoincidencia}"]`);
+      if (!tarjeta) return;
+      const rCaja = caja.getBoundingClientRect();
+      const rTarjeta = tarjeta.getBoundingClientRect();
+      caja.scrollLeft += rTarjeta.left - rCaja.left - (caja.clientWidth - rTarjeta.width) / 2;
+      caja.scrollTop += rTarjeta.top - rCaja.top - 24;
+    });
+    return () => cancelAnimationFrame(marco);
+  }, [primeraCoincidencia]);
 
   /**
    * Ampliar y alejar dejando quieto lo que se está mirando. Antes el zoom crecía
@@ -945,8 +924,8 @@ export default function OrgChartView({
         title={TITULO}
         subtitle={
           canEditOrg
-            ? `${SUBTITULO} Haz clic en ✎ en cualquier nodo para reasignar su jefe.`
-            : `${SUBTITULO} Solo RH y Dirección pueden reasignar jefes.`
+            ? `${SUBTITULO} Toca ✎ en una tarjeta para cambiar a quién reporta o dónde se dibuja.`
+            : `${SUBTITULO} Solo RH y Dirección pueden cambiar a quién reporta cada persona.`
         }
       />
 
@@ -954,15 +933,7 @@ export default function OrgChartView({
 
       {!loading && allUsers.length > 0 && (() => {
         const total = allUsers.length;
-        const colors = [
-          "var(--primary)",
-          "var(--success)",
-          "var(--warning)",
-          "#a855f7",
-          "#0ea5e9",
-          "#f59e0b",
-          "var(--danger)",
-        ];
+        const colors = COLORES_AREA;
         return (
           <div style={{ marginBottom: 10 }}>
             <div
@@ -976,7 +947,7 @@ export default function OrgChartView({
                   {
                     label: "Sin jefe",
                     value: withoutManager,
-                    hint: orphanRoots > 0 ? `${orphanRoots} con jefe inválido` : "raíces",
+                    hint: orphanRoots > 0 ? `${orphanRoots} con un jefe que ya no existe` : "encabezan el árbol",
                     tone: orphanRoots > 0 ? "warning" : "default",
                   },
                   { label: "Niveles", value: levels },
@@ -1080,75 +1051,45 @@ export default function OrgChartView({
       })()}
 
       {error && (
-        <div
-          style={{
-            padding: 12,
-            borderRadius: 10,
-            marginBottom: 12,
-            background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-            color: "var(--danger)",
-            fontSize: 13,
-          }}
-        >
-          {error}
+        <div style={{ marginBottom: 12 }}>
+          <InlineAlert
+            variant={roots.length > 0 ? "warning" : "danger"}
+            message={roots.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void reintentar()} loading={reintentando}>
+                Reintentar
+              </Button>
+            }
+          />
         </div>
       )}
 
       <Section title={loading ? "Cargando…" : `${allUsers.length} personas`} dense>
         {loading ? (
-          <div style={{ padding: 20, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            Cargando organigrama…
-          </div>
+          <SkeletonRows rows={5} label="Cargando organigrama" />
         ) : roots.length === 0 ? (
-          <div style={{ padding: 20, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            No hay usuarios en la base de datos aún.
-          </div>
+          error ? null : (
+            <EmptyState
+              title="Aún no hay nadie en el organigrama"
+              description="Cuando RH dé de alta al personal y le asigne jefe, el árbol aparece aquí."
+            />
+          )
         ) : (
           <>
-            {/* Toolbar: search + zoom + dept chips */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
+            <div className={s.herramientas}>
+              <div className={s.fila}>
                 <input
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar persona o puesto…"
                   aria-label="Buscar persona o puesto"
-                  style={{
-                    flex: "1 1 200px",
-                    minWidth: 160,
-                    maxWidth: 360,
-                    fontSize: 16,
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    background: "var(--surface)",
-                    color: "var(--foreground)",
-                    minHeight: 36,
-                  }}
+                  className={s.busqueda}
                 />
-                <div
-                  role="group"
-                  aria-label="Zoom"
-                  style={{ display: "inline-flex", gap: 4, alignItems: "center" }}
-                >
+                <div role="group" aria-label="Zoom" className={s.zoom}>
                   <button
                     type="button"
-                    style={zoomBtnStyle}
+                    className={s.zoomBtn}
                     onClick={() => bumpZoom(-ZOOM_STEP)}
                     disabled={zoom <= ZOOM_MIN}
                     title="Alejar"
@@ -1158,7 +1099,7 @@ export default function OrgChartView({
                   </button>
                   <button
                     type="button"
-                    style={{ ...zoomBtnStyle, minWidth: 52, fontWeight: 600, fontSize: 12 }}
+                    className={`${s.zoomBtn} ${s.zoomPorcentaje}`}
                     onClick={() => {
                       zoomManual.current = false;
                       ajustarAlAncho();
@@ -1170,7 +1111,7 @@ export default function OrgChartView({
                   </button>
                   <button
                     type="button"
-                    style={zoomBtnStyle}
+                    className={s.zoomBtn}
                     onClick={() => bumpZoom(ZOOM_STEP)}
                     disabled={zoom >= ZOOM_MAX}
                     title="Acercar"
@@ -1181,7 +1122,7 @@ export default function OrgChartView({
                 </div>
                 <button
                   type="button"
-                  style={chipStyle(compacto)}
+                  className={s.chip}
                   aria-pressed={compacto}
                   onClick={() => setCompactoManual(!compacto)}
                   title={
@@ -1192,37 +1133,37 @@ export default function OrgChartView({
                 >
                   {compacto ? "Compacto" : "Extendido"}
                 </button>
-                {hasActiveFilter && (
-                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                {hasActiveFilter && (matchIds?.size ?? 0) > 0 && (
+                  <span className={s.coincidencias} role="status">
                     {matchIds?.size ?? 0} coincidencia{(matchIds?.size ?? 0) === 1 ? "" : "s"}
                   </span>
                 )}
               </div>
 
-              {deptEntries.length > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 6,
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "var(--text-tertiary)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      marginRight: 2,
+              {hasActiveFilter && (matchIds?.size ?? 0) === 0 && (
+                <p className={s.sinCoincidencias} role="status">
+                  Nadie coincide{hasSearch ? ` con «${busquedaDiferida.trim()}»` : ""}
+                  {hasDept ? ` en ${selectedDept}` : ""}.
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedDept(null);
                     }}
                   >
-                    Área
-                  </span>
+                    Quitar filtros
+                  </Button>
+                </p>
+              )}
+
+              {deptEntries.length > 0 && (
+                <div className={s.fila} role="group" aria-label="Filtrar por área" style={{ gap: 6 }}>
+                  <span className={s.rotulo} aria-hidden>Área</span>
                   <button
                     type="button"
-                    style={chipStyle(selectedDept === null)}
+                    className={s.chip}
+                    aria-pressed={selectedDept === null}
                     onClick={() => setSelectedDept(null)}
                   >
                     Todas
@@ -1231,22 +1172,14 @@ export default function OrgChartView({
                     <button
                       key={dept}
                       type="button"
-                      style={chipStyle(selectedDept === dept)}
+                      className={s.chip}
+                      aria-pressed={selectedDept === dept}
                       onClick={() =>
                         setSelectedDept((cur) => (cur === dept ? null : dept))
                       }
                     >
                       {dept}
-                      <span
-                        style={{
-                          marginLeft: 6,
-                          opacity: 0.7,
-                          fontWeight: 600,
-                          fontSize: 11,
-                        }}
-                      >
-                        {count}
-                      </span>
+                      <span className={s.chipCuenta}>{count}</span>
                     </button>
                   ))}
                 </div>
