@@ -130,17 +130,11 @@ struct PortalHelpView: View {
     @ViewBuilder
     private var contentBody: some View {
         if vm.isLoading {
-            ProgressView("Cargando artículos…")
-                .frame(maxWidth: .infinity)
-                .padding(.top, 40)
+            NxLoadingState(text: "Cargando artículos…")
+                .padding(.top, 24)
         } else if let err = vm.error {
-            VStack(spacing: 12) {
-                Text(err).foregroundStyle(.red).font(.footnote)
-                Button("Reintentar") { vm.refresh(initial: true) }
-                    .buttonStyle(.bordered)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 24)
+            NxErrorState(message: err) { vm.refresh(initial: true) }
+                .padding(.top, 24)
         } else if let article = vm.selected {
             PortalHelpArticleDetail(
                 article: article,
@@ -261,17 +255,7 @@ private struct PortalHelpArticleDetail: View {
 
     private func formatPublishedAt(_ raw: String) -> String {
         guard !raw.isEmpty else { return "" }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var date = iso.date(from: raw)
-        if date == nil {
-            iso.formatOptions = [.withInternetDateTime]
-            date = iso.date(from: raw)
-        }
-        guard let date else { return String(raw.prefix(10)) }
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "es_MX")
-        fmt.dateFormat = "d MMM yyyy"
-        return fmt.string(from: date)
+        guard let date = NxFormat.parseISO(raw) else { return String(raw.prefix(10)) }
+        return NxFormat.day(date)
     }
 }

@@ -46,6 +46,7 @@ struct ChatSearchSheet: View {
                         Button { query = ""; results = []; error = nil } label: {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                         }
+                        .accessibilityLabel("Borrar búsqueda")
                     }
                 }
                 .padding(10)

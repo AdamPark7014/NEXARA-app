@@ -127,24 +127,31 @@ struct PortalTicket: Hashable, Identifiable {
         return out
     }
 
+    private static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let isoPlain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+    private static let naiveUtcFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        return f
+    }()
+
     /// Horas desde asignación / creación (aprox. ISO prefix).
     var ageHours: Int {
         let src = assignedAt.isEmpty ? createdAt : assignedAt
         guard src.count >= 10 else { return 0 }
-        let df = ISO8601DateFormatter()
-        df.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var date = df.date(from: src)
-        if date == nil {
-            df.formatOptions = [.withInternetDateTime]
-            date = df.date(from: src)
-        }
-        if date == nil {
-            let simple = DateFormatter()
-            simple.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            simple.timeZone = TimeZone(secondsFromGMT: 0)
-            date = simple.date(from: String(src.prefix(19)))
-        }
-        guard let date else { return 0 }
+        guard let date = Self.isoFractional.date(from: src)
+            ?? Self.isoPlain.date(from: src)
+            ?? Self.naiveUtcFormatter.date(from: String(src.prefix(19)))
+        else { return 0 }
         return max(0, Int(Date().timeIntervalSince(date) / 3600))
     }
 

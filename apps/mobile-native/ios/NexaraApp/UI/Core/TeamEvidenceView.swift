@@ -110,13 +110,9 @@ struct TeamEvidenceView: View {
                     )
                 }
             } else if loading {
-                ProgressView("Cargando evidencias…")
-                    .frame(maxWidth: .infinity)
+                NxLoadingState(text: "Cargando evidencias…")
             } else if let error {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(CorePalette.red)
-                Button("Reintentar") { Task { await load() } }
+                NxErrorState(message: error) { Task { await load() } }
             }
         }
         .task(id: refreshToken) { await load() }

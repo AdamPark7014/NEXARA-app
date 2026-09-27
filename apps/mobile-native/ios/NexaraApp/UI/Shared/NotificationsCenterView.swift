@@ -28,7 +28,7 @@ struct NotificationsCenterView: View {
             Section {
                 Picker("Vista", selection: $showFeed) {
                     Text("Bandeja").tag(false)
-                    Text("Feed").tag(true)
+                    Text("Actividad").tag(true)
                 }
                 .pickerStyle(.segmented)
                 .listRowInsets(EdgeInsets())
@@ -46,24 +46,34 @@ struct NotificationsCenterView: View {
             }
             if let message {
                 Section {
-                    Text(message).foregroundColor(.green).font(.footnote)
+                    NxIconText(systemName: "checkmark.circle.fill", text: message, tint: NxTone.success.fg)
+                        .font(.footnote)
                 }
             }
             if let error {
                 Section {
-                    Text(error).foregroundColor(.red)
-                    Button("Reintentar") { Task { await load() } }
+                    NxStaleBanner(message: error) {
+                        Task { if showFeed { await loadFeed() } else { await load() } }
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
             }
             if isLoading && rows.isEmpty && !showFeed {
-                Section { ProgressView() }
+                Section {
+                    NxLoadingState(text: "Cargando notificaciones…")
+                }
             } else if showFeed {
                 if feedItems.isEmpty && error == nil {
                     Section {
-                        Text("Sin actividad reciente").foregroundColor(.secondary)
+                        ContentUnavailableView(
+                            "Sin actividad reciente",
+                            systemImage: "clock.arrow.circlepath",
+                            description: Text("Aquí verás lo último que pasó en tus actividades.")
+                        )
                     }
                 } else {
-                    Section("Feed de actividad") {
+                    Section("Actividad reciente") {
                         ForEach(feedItems.indices, id: \.self) { idx in
                             let item = feedItems[idx]
                             VStack(alignment: .leading, spacing: 4) {
@@ -77,22 +87,22 @@ struct NotificationsCenterView: View {
                 }
             } else if rows.isEmpty && error == nil {
                 Section {
-                    VStack(spacing: 10) {
-                        NxIconBadge(systemName: "bell.badge", size: 56, circle: true)
-                        Text("Sin notificaciones").foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                    ContentUnavailableView(
+                        "Estás al día",
+                        systemImage: "bell.badge",
+                        description: Text("No tienes notificaciones.")
+                    )
                 }
             } else {
-                Section("\(unread) sin leer") {
+                Section(unread == 0 ? "Todo leído" : (unread == 1 ? "1 sin leer" : "\(unread) sin leer")) {
                     if filteredRows.isEmpty {
-                        Text("Sin notificaciones en esta categoría").foregroundColor(.secondary)
+                        Text("Sin notificaciones en esta categoría").foregroundStyle(.secondary)
                     }
                     ForEach(filteredRows, id: \.notifKey) { n in
                         notificationRow(n)
                             .contentShape(Rectangle())
                             .onTapGesture { open(n) }
+                            .accessibilityAddTraits(.isButton)
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
                                     Task { await deleteItem(n) }
@@ -120,11 +130,16 @@ struct NotificationsCenterView: View {
                 Button { Task { await load() } } label: {
                     Image(systemName: "arrow.clockwise")
                 }
+                .accessibilityLabel("Actualizar")
                 if unread > 0 {
                     Button("Leer todo") { Task { await markAll() } }
                         .disabled(saving)
                 }
             }
+        }
+        .refreshable {
+            if showFeed { await loadFeed() } else { await load() }
+            await NotificationsBadgeStore.shared.refresh()
         }
         .task {
             await load()
@@ -165,8 +180,7 @@ struct NotificationsCenterView: View {
                             .clipShape(Capsule())
                     }
                     if ConsoleHelpers.mapStr(n, "priority").lowercased() == "high" {
-                        Text("ALTA").font(.caption2).bold()
-                            .foregroundColor(.red)
+                        NxStatusChip(text: "Urgente", tone: .danger)
                     }
                 }
                 .font(.caption2)
@@ -220,7 +234,7 @@ struct NotificationsCenterView: View {
             await load()
             await NotificationsBadgeStore.shared.refresh()
         } catch {
-            message = error.toUserMessage()
+            self.error = error.toUserMessage()
         }
     }
 
@@ -252,20 +266,15 @@ struct NotificationsCenterView: View {
 
     private func timeAgo(_ iso: String) -> String {
         guard !iso.isEmpty else { return "" }
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var date = fmt.date(from: iso)
-        if date == nil {
-            fmt.formatOptions = [.withInternetDateTime]
-            date = fmt.date(from: iso)
-        }
-        guard let date else { return iso.prefix(16).description }
+        guard let date = NxFormat.parseISO(iso) else { return iso.prefix(16).description }
         let m = Int(Date().timeIntervalSince(date) / 60)
         if m < 1 { return "Hace un momento" }
         if m < 60 { return "Hace \(m) min" }
         let h = m / 60
-        if h < 24 { return "Hace \(h)h" }
-        return "Hace \(h / 24)d"
+        if h < 24 { return "Hace \(h) h" }
+        let d = h / 24
+        if d < 7 { return d == 1 ? "Ayer" : "Hace \(d) días" }
+        return NxFormat.day(date)
     }
 }
 

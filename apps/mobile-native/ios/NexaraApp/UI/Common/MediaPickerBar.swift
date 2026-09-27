@@ -17,9 +17,10 @@ struct MediaPickerBar: View {
     @State private var showPhotoPicker = false
     @State private var showDocPicker = false
     @State private var photoItems: [PhotosPickerItem] = []
+    @State private var importError: String?
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: NxSpacing.s + 2) {
             Button {
                 showCamera = true
             } label: {
@@ -35,7 +36,7 @@ struct MediaPickerBar: View {
                 Label("Galería", systemImage: "photo.on.rectangle")
             }
             .buttonStyle(.bordered)
-            .onChange(of: photoItems) { newItems in
+            .onChange(of: photoItems) { _, newItems in
                 guard !newItems.isEmpty else { return }
                 Task {
                     var results: [CapturedMedia] = []
@@ -59,6 +60,15 @@ struct MediaPickerBar: View {
                 Label("Archivo", systemImage: "paperclip")
             }
             .buttonStyle(.bordered)
+        }
+        .controlSize(.large)
+        .alert(
+            "No se pudo adjuntar",
+            isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })
+        ) {
+            Button("Entendido", role: .cancel) { importError = nil }
+        } message: {
+            Text(importError ?? "")
         }
         .sheet(isPresented: $showCamera) {
             CameraCaptureView { image in
@@ -91,8 +101,8 @@ struct MediaPickerBar: View {
                     }
                 }
                 if !results.isEmpty { onPicked(results) }
-            case .failure(let err):
-                print("fileImporter error: \(err)")
+            case .failure:
+                importError = "No se pudo leer el archivo. Intenta con otro o vuelve a elegirlo."
             }
         }
     }

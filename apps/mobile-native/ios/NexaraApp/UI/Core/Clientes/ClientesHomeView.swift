@@ -91,6 +91,7 @@ struct ClientesHomeView: View {
         }
         .task { await loadPermisos() }
         .onChange(of: sector) { _, _ in
+            items = []
             Task { await load() }
         }
     }
@@ -131,26 +132,31 @@ struct ClientesHomeView: View {
                 }
             }
 
-            if let error {
+            if let error, !items.isEmpty {
                 Section {
-                    Text(error).foregroundColor(.red).font(.footnote)
-                    Button("Reintentar") { Task { await load() } }
+                    NxStaleBanner(message: error) { Task { await load() } }
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                 }
             }
 
             if loading && items.isEmpty {
-                Section { ProgressView("Cargando…") }
-            } else if visible.isEmpty && error == nil {
+                Section { NxSkeletonRows(count: 5) }
+            } else if let error, items.isEmpty {
                 Section {
-                    VStack(spacing: 8) {
-                        Text(query.isEmpty ? "Nadie en este sector todavía." : "Sin coincidencias.")
-                            .foregroundColor(.secondary)
-                        if query.isEmpty && permisos.puedeAgregar {
-                            Button("Crear el primero") { showNuevo = true }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    NxErrorState(message: error) { Task { await load() } }
+                }
+            } else if visible.isEmpty {
+                Section {
+                    NxEmptyState(
+                        title: query.isEmpty ? "Nadie en este sector todavía" : "Sin coincidencias",
+                        subtitle: query.isEmpty
+                            ? "Cuando se registre un cliente aparecerá aquí."
+                            : "Prueba con otro nombre, RFC o encargado.",
+                        systemImage: query.isEmpty ? "person.2" : "magnifyingglass",
+                        actionLabel: query.isEmpty && permisos.puedeAgregar ? "Crear el primero" : nil,
+                        onAction: { showNuevo = true }
+                    )
                 }
             } else {
                 Section {
@@ -196,14 +202,26 @@ struct ClientesHomeView: View {
                 }
             }
             Spacer(minLength: 8)
-            Text(showOwner ? (ownerName.isEmpty ? "Sin encargado" : ownerName) : "Ver →")
-                .font(.caption2.weight(.semibold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Color(.tertiarySystemFill), in: Capsule())
+            if showOwner {
+                Text(ownerName.isEmpty ? "Sin encargado" : ownerName)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color(.tertiarySystemFill), in: Capsule())
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .padding(.top, 2)
+                .accessibilityHidden(true)
         }
+        .frame(minHeight: NxMetrics.minTap)
         .contentShape(Rectangle())
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Abre la ficha del cliente")
     }
 
     private func load() async {
@@ -219,8 +237,7 @@ struct ClientesHomeView: View {
             items = rows
         } catch {
             guard sector == requested else { return }
-            self.error = error.toUserMessage(fallback: "No se pudieron cargar")
-            items = []
+            self.error = error.toUserMessage(fallback: "No se pudieron cargar los clientes")
         }
         loading = false
     }

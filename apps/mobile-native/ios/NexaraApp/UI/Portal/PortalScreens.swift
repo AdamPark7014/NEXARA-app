@@ -64,7 +64,17 @@ struct PortalBranchesView: View {
 
     var body: some View {
         List {
-            if isLoading { ProgressView() }
+            if isLoading && branches.isEmpty {
+                NxLoadingState(text: "Cargando sucursales…")
+                    .listRowSeparator(.hidden)
+            } else if branches.isEmpty {
+                ContentUnavailableView(
+                    "Sin sucursales",
+                    systemImage: "building.2",
+                    description: Text("Agrega tu primera sucursal con el botón +.")
+                )
+                .listRowSeparator(.hidden)
+            }
             ForEach(branches) { b in
                 Button {
                     onEdit(b.id)
@@ -90,7 +100,12 @@ struct PortalBranchesView: View {
             }
         }
         .navigationTitle("Sucursales")
-        .toolbar { ToolbarItem(placement: .primaryAction) { Button { onNew() } label: { Image(systemName: "plus") } } }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { onNew() } label: { Image(systemName: "plus") }
+                    .accessibilityLabel("Nueva sucursal")
+            }
+        }
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -98,7 +113,10 @@ struct PortalBranchesView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        branches = (try? await TicketsRepository.shared.portalBranches()) ?? []
+        // Un refresco fallido no borra la lista que ya se veía.
+        if let nuevas = try? await TicketsRepository.shared.portalBranches() {
+            branches = nuevas
+        }
     }
 }
 
@@ -131,15 +149,30 @@ struct PortalBranchEditView: View {
     var body: some View {
         Form {
             if isLoading && branchId != nil {
-                ProgressView("Cargando sucursal…")
+                NxLoadingState(text: "Cargando sucursal…")
             }
-            if let message { Text(message).foregroundColor(.green).font(.footnote) }
-            if let error { Text(error).foregroundColor(.red).font(.footnote) }
+            if let message {
+                NxIconText(systemName: "checkmark.circle.fill", text: message)
+                    .font(.footnote)
+                    .foregroundStyle(CorePalette.green)
+            }
+            if let error {
+                NxIconText(systemName: "exclamationmark.triangle.fill", text: error)
+                    .font(.footnote)
+                    .foregroundStyle(CorePalette.red)
+            }
             Section("Datos") {
                 TextField("Nombre *", text: $name)
+                    .submitLabel(.next)
                 TextField("Número de sucursal *", text: $branchNumber)
-                TextField("Usuario (email) *", text: $portalEmail).keyboardType(.emailAddress)
-                TextField(branchId == nil ? "Password *" : "Password (opcional)", text: $portalPassword)
+                    .submitLabel(.next)
+                TextField("Usuario (correo) *", text: $portalEmail)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SecureField(branchId == nil ? "Contraseña *" : "Contraseña (opcional)", text: $portalPassword)
+                    .textContentType(.newPassword)
             }
             Section("Dirección") {
                 TextField("Dirección", text: $address)
@@ -257,7 +290,10 @@ struct PortalRequestsView: View {
         .navigationTitle(selected == nil ? "Solicitudes" : "")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                if selected == nil { Button { onNew() } label: { Image(systemName: "plus") } }
+                if selected == nil {
+                    Button { onNew() } label: { Image(systemName: "plus") }
+                        .accessibilityLabel("Nueva solicitud")
+                }
             }
         }
         .task { await reload() }
@@ -266,19 +302,37 @@ struct PortalRequestsView: View {
 
     private var listBody: some View {
         List {
-            if isLoading { ProgressView() }
+            if isLoading && items.isEmpty {
+                NxLoadingState(text: "Cargando solicitudes…")
+                    .listRowSeparator(.hidden)
+            } else if items.isEmpty {
+                ContentUnavailableView {
+                    Label("Sin solicitudes", systemImage: "tray")
+                } description: {
+                    Text("Pide un servicio y aquí verás en qué va.")
+                } actions: {
+                    Button("Nueva solicitud") { onNew() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(NxBrand.primary)
+                }
+                .listRowSeparator(.hidden)
+            }
             ForEach(items) { r in
                 Button { selected = r } label: {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: NxSpacing.xs + 2) {
                         Text(String(r.displayTitle.prefix(80)))
-                            .font(.subheadline).bold().foregroundColor(.primary)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
                         HStack {
                             OpsStatusChip(text: r.status.isEmpty ? r.urgency : r.status)
                             Spacer()
-                            Text(String(r.createdAt.prefix(10)))
-                                .font(.caption2).foregroundColor(.secondary)
+                            Text(NxFormat.parseISO(r.createdAt).map { NxFormat.friendly($0) } ?? String(r.createdAt.prefix(10)))
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
+                    .padding(.vertical, NxSpacing.xxs)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -289,16 +343,18 @@ struct PortalRequestsView: View {
     private func reqDetail(_ r: ClientTicketRequest) -> some View {
         List {
             Section {
-                Button("← Solicitudes") { selected = nil }
+                Button { selected = nil } label: {
+                    Label("Volver a solicitudes", systemImage: "chevron.backward")
+                }
             }
             Section("Solicitud") {
                 if !r.displayTitle.isEmpty { Text(r.displayTitle).font(.subheadline) }
-                rRow("Estado", r.status)
-                rRow("Urgencia", r.urgency)
-                rRow("Tipo", r.requestType)
+                rRow("Estado", r.status.isEmpty ? "" : NxStatusText.label(r.status))
+                rRow("Urgencia", r.urgency.isEmpty ? "" : NxStatusText.label(r.urgency))
+                rRow("Tipo", r.requestType.isEmpty ? "" : NxStatusText.label(r.requestType))
                 rRow("Sucursal", r.branchName)
-                rRow("Creada", String(r.createdAt.prefix(10)))
-                rRow("Vence", String(r.dueAt.prefix(10)))
+                rRow("Creada", r.createdAt.isEmpty ? "" : (NxFormat.parseISO(r.createdAt).map { NxFormat.day($0) } ?? String(r.createdAt.prefix(10))))
+                rRow("Vence", r.dueAt.isEmpty ? "" : (NxFormat.parseISO(r.dueAt).map { NxFormat.day($0) } ?? String(r.dueAt.prefix(10))))
             }
             if !r.isClosed, r.id > 0 {
                 Section("Acciones") {
@@ -326,10 +382,9 @@ struct PortalRequestsView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        do {
-            items = try await TicketsRepository.shared.portalRequests()
-        } catch {
-            items = []
+        // Un refresco fallido no borra la lista que ya se veía.
+        if let nuevas = try? await TicketsRepository.shared.portalRequests() {
+            items = nuevas
         }
     }
 
@@ -466,6 +521,8 @@ struct PortalTicketsView: View {
     @State private var query = ""
     @State private var filter = "todos" // todos | abiertos | alta | aging
     @State private var isLoading = true
+    @State private var loaded = false
+    @State private var loadError: String?
 
     private var openCount: Int { tickets.filter(\.isOpen).count }
     private var highCount: Int { tickets.filter { $0.isOpen && $0.isHighPriority }.count }
@@ -500,36 +557,77 @@ struct PortalTicketsView: View {
                           tone: openCount > 0 ? .warning : .success),
                     NxKpi(label: "Alta prioridad", value: "\(highCount)",
                           tone: highCount > 0 ? .danger : .neutral),
-                    NxKpi(label: ">48h", value: "\(agingCount)", hint: "Sin cierre",
+                    NxKpi(label: "Más de 48 h", value: "\(agingCount)", hint: "Sin cierre",
                           tone: agingCount > 0 ? .danger : .info),
                     NxKpi(label: "Total", value: "\(tickets.count)", tone: .brand),
                 ])
-                TextField("Buscar AN, título o sucursal", text: $query)
-                    .textFieldStyle(.roundedBorder)
+                HStack(spacing: NxSpacing.s) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    TextField("Buscar AN, título o sucursal", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                    if !query.isEmpty {
+                        Button { query = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .accessibilityLabel("Borrar búsqueda")
+                    }
+                }
+                .padding(.horizontal, NxSpacing.m)
+                .frame(minHeight: NxMetrics.minTap)
+                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: NxSpacing.s) {
                         ForEach([
                             ("todos", "Todos"),
                             ("abiertos", "Abiertos"),
-                            ("alta", "Alta"),
-                            ("aging", ">48h"),
+                            ("alta", "Urgentes"),
+                            ("aging", "Más de 48 h"),
                         ], id: \.0) { key, label in
-                            Button(label) { filter = key }
-                                .buttonStyle(.bordered)
-                                .tint(filter == key ? NxBrand.primary : Color.secondary)
+                            let activo = filter == key
+                            Button { filter = key } label: {
+                                Text(label)
+                                    .font(.subheadline.weight(activo ? .semibold : .regular))
+                                    .padding(.horizontal, NxSpacing.m + 2)
+                                    .frame(minHeight: 36)
+                                    .foregroundStyle(activo ? Color.white : Color.primary)
+                                    .background(
+                                        activo ? NxBrand.primary : Color(.tertiarySystemFill),
+                                        in: Capsule()
+                                    )
+                                    .contentShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(activo ? .isSelected : [])
                         }
                     }
                 }
             }
             .padding()
 
-            if isLoading {
-                Spacer(); ProgressView(); Spacer()
+            if isLoading && !loaded {
+                NxSkeletonRows(count: 5)
+                    .padding(.horizontal)
+                Spacer(minLength: 0)
+            } else if let loadError, !loaded {
+                NxErrorState(message: loadError) { Task { await reload() } }
             } else if filtered.isEmpty {
-                Text("No hay tickets con este filtro.")
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView(
+                    tickets.isEmpty ? "Sin tickets" : "Nada con este filtro",
+                    systemImage: "ticket",
+                    description: Text(tickets.isEmpty
+                        ? "Cuando levantes una solicitud la verás aquí."
+                        : "Prueba otro filtro o borra la búsqueda.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                if let loadError {
+                    NxStaleBanner(message: loadError) { Task { await reload() } }
+                        .padding(.horizontal)
+                }
                 List(filtered) { t in
                     Button {
                         onOpen(t.id)
@@ -549,21 +647,21 @@ struct PortalTicketsView: View {
                                 .lineLimit(2)
                                 Spacer()
                                 NxStatusChip(
-                                    text: t.status.isEmpty ? "—" : t.status,
+                                    text: NxStatusText.label(t.status),
                                     tone: tone
                                 )
                             }
                             let meta = [
                                 t.anNumber,
-                                t.priority.isEmpty ? "" : "Prioridad \(t.priority)",
+                                t.priority.isEmpty ? "" : "Prioridad \(NxStatusText.label(t.priority).lowercased())",
                                 t.branchName,
-                                open ? "\(ageH)h abiertos" : "",
+                                open ? "\(ageH) h abierto" : "",
                             ].filter { !$0.isEmpty }.joined(separator: " · ")
                             if !meta.isEmpty {
                                 Text(meta).font(.caption).foregroundColor(.secondary)
                             }
                             if open && ageH >= 48 {
-                                NxIconText(systemName: "exclamationmark.triangle.fill", text: "Fuera de ventana operativa (>48h)")
+                                NxIconText(systemName: "exclamationmark.triangle.fill", text: "Lleva más de 48 h sin cerrarse")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundColor(.red)
                             }
@@ -582,7 +680,13 @@ struct PortalTicketsView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        tickets = (try? await TicketsRepository.shared.portalTickets()) ?? []
+        do {
+            tickets = try await TicketsRepository.shared.portalTickets()
+            loaded = true
+            loadError = nil
+        } catch {
+            loadError = error.toUserMessage()
+        }
     }
 }
 
@@ -590,49 +694,85 @@ struct PortalTicketDetailView: View {
     let ticketId: Int64
     @State private var ticket: PortalTicket?
     @State private var reportData: Data?
+    @State private var loadError: String?
+    @State private var downloading = false
+    @State private var downloadError: String?
 
     var body: some View {
         ScrollView {
             if let t = ticket {
                 let ageH = t.ageHours
                 let open = t.isOpen
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(t.displayTitle).font(.title3).bold()
-                    detailRow("Estado", t.status)
-                    detailRow("Prioridad", t.displayPriority)
-                    detailRow("Sucursal", t.branchName)
-                    detailRow("Asignación", String(t.assignedAt.prefix(16)))
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Operación / SLA").font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: NxSpacing.m) {
+                    VStack(alignment: .leading, spacing: NxSpacing.s) {
+                        Text(t.displayTitle)
+                            .font(.title3.weight(.bold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: NxSpacing.s) {
+                            NxStatusChip(status: t.status)
+                            if !t.anNumber.isEmpty {
+                                Text(t.anNumber)
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: NxSpacing.s) {
+                        detailRow("Prioridad", NxStatusText.label(t.displayPriority))
+                        detailRow("Sucursal", t.branchName)
+                        detailRow("Asignado", friendlyDate(t.assignedAt))
+                    }
+                    .nxCard()
+                    VStack(alignment: .leading, spacing: NxSpacing.s) {
+                        Text("Tiempo de atención")
+                            .font(.subheadline.weight(.semibold))
+                            .accessibilityAddTraits(.isHeader)
                         if open {
-                            detailRow("Antigüedad", "\(ageH) horas abiertos")
+                            detailRow("Abierto desde hace", "\(ageH) h")
                             if ageH >= 48 {
-                                Text("Fuera de ventana operativa (>48h)")
+                                NxIconText(systemName: "exclamationmark.triangle.fill", text: "Lleva más de 48 h sin cerrarse", tint: NxTone.danger.fg)
                                     .font(.caption.weight(.semibold))
-                                    .foregroundColor(.red)
                             } else {
-                                Text("Dentro de ventana operativa")
+                                NxIconText(systemName: "checkmark.circle", text: "Dentro del tiempo esperado", tint: NxTone.success.fg)
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
                             }
                         } else {
-                            detailRow("Cierre", String(t.completedAt.prefix(16)))
+                            detailRow("Cerrado", friendlyDate(t.completedAt))
                         }
                         let sla = t.slaDueAt.isEmpty ? t.dueAt : t.slaDueAt
-                        if !sla.isEmpty { detailRow("SLA / vencimiento", String(sla.prefix(16))) }
+                        if !sla.isEmpty { detailRow("Vence", friendlyDate(sla)) }
                     }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    Button("Descargar reporte PDF") { Task { await downloadPdf() } }
-                        .buttonStyle(.borderedProminent).tint(NxBrand.primary)
+                    .nxCard()
+                    Button {
+                        Task { await downloadPdf() }
+                    } label: {
+                        if downloading {
+                            ProgressView().tint(.white)
+                        } else {
+                            Label("Ver reporte PDF", systemImage: "doc.richtext")
+                        }
+                    }
+                    .buttonStyle(NxPrimaryButtonStyle())
+                    .disabled(downloading)
+                    if let downloadError {
+                        Text(downloadError)
+                            .font(.footnote)
+                            .foregroundStyle(NxTone.danger.fg)
+                    }
                 }
                 .padding()
-            } else { ProgressView().padding(.top, 40) }
+            } else if let loadError {
+                NxErrorState(message: loadError) { Task { await load() } }
+                    .padding(.top, NxSpacing.xxl)
+            } else {
+                NxLoadingState(text: "Cargando ticket…").padding(.top, NxSpacing.xxl)
+            }
         }
-        .navigationTitle("Detalle ticket")
-        .task { ticket = try? await TicketsRepository.shared.portalTicket(id: ticketId) }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Ticket")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load() }
         .sheet(item: Binding(
             get: { reportData.map { PDFSheetItem(data: $0) } },
             set: { reportData = $0?.data }
@@ -642,11 +782,37 @@ struct PortalTicketDetailView: View {
     }
 
     @ViewBuilder private func detailRow(_ k: String, _ v: String) -> some View {
-        if !v.isEmpty { HStack { Text(k).foregroundColor(.secondary); Spacer(); Text(v) } }
+        if !v.isEmpty && v != "—" {
+            LabeledContent(k) {
+                Text(v).multilineTextAlignment(.trailing)
+            }
+        }
+    }
+
+    private func friendlyDate(_ iso: String) -> String {
+        guard !iso.isEmpty else { return "" }
+        guard let date = NxFormat.parseISO(iso) else { return String(iso.prefix(16)) }
+        return NxFormat.friendly(date)
+    }
+
+    private func load() async {
+        do {
+            ticket = try await TicketsRepository.shared.portalTicket(id: ticketId)
+            loadError = nil
+        } catch {
+            loadError = error.toUserMessage()
+        }
     }
 
     private func downloadPdf() async {
-        reportData = try? await TicketsRepository.shared.ticketReportPdf(id: ticketId)
+        downloading = true
+        downloadError = nil
+        defer { downloading = false }
+        do {
+            reportData = try await TicketsRepository.shared.ticketReportPdf(id: ticketId)
+        } catch {
+            downloadError = error.toUserMessage()
+        }
     }
 }
 
@@ -662,14 +828,30 @@ struct PortalFeedbackView: View {
 
     var body: some View {
         List {
-            if let message { Text(message).foregroundColor(.green).font(.footnote) }
-            if let error { Text(error).foregroundColor(.red).font(.footnote) }
-            if isLoading { ProgressView() }
+            if let message {
+                NxIconText(systemName: "checkmark.circle.fill", text: message, tint: NxTone.success.fg)
+                    .font(.footnote)
+            }
+            if let error {
+                NxIconText(systemName: "exclamationmark.triangle.fill", text: error, tint: NxTone.danger.fg)
+                    .font(.footnote)
+            }
+            if isLoading && items.isEmpty {
+                NxLoadingState(text: "Cargando servicios por calificar…")
+                    .listRowSeparator(.hidden)
+            } else if items.isEmpty {
+                ContentUnavailableView(
+                    "Todo calificado",
+                    systemImage: "star.bubble",
+                    description: Text("Cuando terminemos un servicio te pediremos tu opinión aquí.")
+                )
+                .listRowSeparator(.hidden)
+            }
             ForEach(items) { f in
                 Section {
                     Text(f.displayTitle).font(.headline)
-                    Text(String(f.completedAt.prefix(10)))
-                        .font(.caption).foregroundColor(.secondary)
+                    Text(NxFormat.parseISO(f.completedAt).map { "Terminado el \(NxFormat.day($0))" } ?? String(f.completedAt.prefix(10)))
+                        .font(.caption).foregroundStyle(.secondary)
                     if f.id > 0 {
                         let id = f.id
                         Picker("Calificación", selection: binding(for: id).rating) {
@@ -688,7 +870,7 @@ struct PortalFeedbackView: View {
                 }
             }
         }
-        .navigationTitle("Feedback pendiente")
+        .navigationTitle("Calificar servicios")
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -728,14 +910,16 @@ struct PortalFeedbackView: View {
         Picker(label, selection: binding) {
             Text("Sí").tag("YES")
             Text("No").tag("NO")
-            Text("N/A").tag("NA")
+            Text("No aplica").tag("NA")
         }
     }
 
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await TicketsRepository.shared.pendingFeedbackItems()) ?? []
+        if let nuevos = try? await TicketsRepository.shared.pendingFeedbackItems() {
+            items = nuevos
+        }
         for f in items where drafts[f.id] == nil {
             drafts[f.id] = FeedbackDraft()
         }
@@ -752,7 +936,7 @@ struct PortalFeedbackView: View {
                 wasOnTime: d.wasOnTime, wasFriendly: d.wasFriendly, wasSolved: d.wasSolved,
                 comments: d.comments.nilIfEmpty
             )
-            message = "Feedback enviado"
+            message = "¡Gracias! Tu calificación se envió."
             await reload()
         } catch { self.error = error.toUserMessage() }
     }
@@ -785,10 +969,23 @@ struct PortalInventoriesView: View {
     var body: some View {
         VStack(spacing: 0) {
             TextField("Buscar inventario…", text: $search)
-                .textFieldStyle(.roundedBorder).padding()
+                .textFieldStyle(.roundedBorder)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                .padding()
                 .onSubmit { Task { await reload() } }
-            if isLoading {
-                Spacer(); ProgressView(); Spacer()
+            if isLoading && items.isEmpty {
+                NxSkeletonRows(count: 4).padding(.horizontal)
+                Spacer(minLength: 0)
+            } else if items.isEmpty {
+                ContentUnavailableView(
+                    search.isEmpty ? "Sin inventarios" : "Sin resultados",
+                    systemImage: "shippingbox",
+                    description: Text(search.isEmpty
+                        ? "Los conteos de inventario de tus sucursales aparecerán aquí."
+                        : "Prueba con otra palabra.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(items) { inv in
                     Button {
@@ -816,7 +1013,9 @@ struct PortalInventoriesView: View {
         isLoading = true
         defer { isLoading = false }
         let q = search.isEmpty ? nil : search
-        items = (try? await TicketsRepository.shared.portalInventories(search: q)) ?? []
+        if let nuevos = try? await TicketsRepository.shared.portalInventories(search: q) {
+            items = nuevos
+        }
     }
 }
 
@@ -830,37 +1029,90 @@ struct PortalInventoryDetailView: View {
     @State private var saving = false
     @State private var message: String?
     @State private var error: String?
+    @State private var loadError: String?
+    @State private var loadingPdf = false
 
     var body: some View {
         ScrollView {
             if let d = detail {
-                VStack(alignment: .leading, spacing: 10) {
-                    if let message { Text(message).foregroundColor(.green).font(.footnote) }
-                    if let error { Text(error).foregroundColor(.red).font(.footnote) }
-                    Text(d.displayTitle).font(.title3).bold()
-                    Text("Estado: \(d.status)").font(.caption)
+                VStack(alignment: .leading, spacing: NxSpacing.m) {
+                    if let message {
+                        NxIconText(systemName: "checkmark.circle.fill", text: message)
+                            .font(.footnote)
+                            .foregroundStyle(CorePalette.green)
+                    }
+                    if let error {
+                        NxIconText(systemName: "exclamationmark.triangle.fill", text: error)
+                            .font(.footnote)
+                            .foregroundStyle(CorePalette.red)
+                    }
+                    VStack(alignment: .leading, spacing: NxSpacing.s) {
+                        Text(d.displayTitle).font(.title3.weight(.bold))
+                        NxStatusChip(status: d.status)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .nxCard()
+
                     if !d.items.isEmpty {
-                        Text("Ítems (\(d.items.count))").font(.headline).padding(.top, 8)
-                        ForEach(d.items) { it in
-                            Text(it.displayName).font(.subheadline)
+                        VStack(alignment: .leading, spacing: NxSpacing.s) {
+                            Text("Artículos (\(d.items.count))")
+                                .font(.headline)
+                                .accessibilityAddTraits(.isHeader)
+                            ForEach(d.items) { it in
+                                Text(it.displayName)
+                                    .font(.subheadline)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                if it.id != d.items.last?.id { Divider() }
+                            }
                         }
+                        .nxCard()
                     }
-                    TextField("Notas", text: $notes, axis: .vertical).lineLimit(2...5)
-                    Toggle("Marcar completado", isOn: $markCompleted)
-                    Toggle("Confirmar diferencia", isOn: $confirmDifference)
-                    HStack {
+
+                    VStack(alignment: .leading, spacing: NxSpacing.m) {
+                        TextField("Notas", text: $notes, axis: .vertical)
+                            .lineLimit(2...5)
+                            .textFieldStyle(.roundedBorder)
+                        Toggle("Marcar como completado", isOn: $markCompleted)
+                        Toggle("Confirmar la diferencia", isOn: $confirmDifference)
                         Button(saving ? "Guardando…" : "Sincronizar") { Task { await sync() } }
-                            .buttonStyle(.borderedProminent).tint(NxBrand.primary)
-                        Button("Aprobar") { Task { await decide("APPROVE") } }.buttonStyle(.bordered)
-                        Button("Rechazar", role: .destructive) { Task { await decide("REJECT") } }
+                            .buttonStyle(NxPrimaryButtonStyle())
+                            .disabled(saving)
+                        HStack(spacing: NxSpacing.s) {
+                            Button("Aprobar") { Task { await decide("APPROVE") } }
+                                .buttonStyle(.bordered)
+                                .tint(CorePalette.green)
+                                .frame(maxWidth: .infinity)
+                            Button("Rechazar", role: .destructive) { Task { await decide("REJECT") } }
+                                .buttonStyle(.bordered)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .controlSize(.large)
+                        .disabled(saving)
                     }
-                    Button("Reporte PDF") { Task { reportData = try? await TicketsRepository.shared.inventoryReportPdf(id: inventoryId) } }
-                        .buttonStyle(.bordered)
+                    .nxCard()
+
+                    Button {
+                        Task { await openReport() }
+                    } label: {
+                        Label(loadingPdf ? "Preparando reporte…" : "Ver reporte PDF", systemImage: "doc.richtext")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(NxSecondaryButtonStyle())
+                    .disabled(loadingPdf)
                 }
                 .padding()
-            } else { ProgressView() }
+            } else if let loadError {
+                NxErrorState(message: loadError) { Task { await load() } }
+                    .padding(.top, 40)
+            } else {
+                NxLoadingState(text: "Cargando inventario…")
+                    .padding(.top, 40)
+            }
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Inventario")
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await load() }
         .task { await load() }
         .sheet(item: Binding(
             get: { reportData.map { PDFSheetItem(data: $0) } },
@@ -871,10 +1123,32 @@ struct PortalInventoryDetailView: View {
     }
 
     private func load() async {
-        guard let d = try? await TicketsRepository.shared.portalInventoryDetail(id: inventoryId) else { return }
-        detail = d
-        notes = d.notes
-        markCompleted = d.status.uppercased() == "COMPLETED"
+        do {
+            let d = try await TicketsRepository.shared.portalInventoryDetail(id: inventoryId)
+            let firstLoad = detail == nil
+            detail = d
+            loadError = nil
+            if firstLoad {
+                notes = d.notes
+                markCompleted = d.status.uppercased() == "COMPLETED"
+            }
+        } catch {
+            if detail == nil {
+                loadError = error.toUserMessage(fallback: "No se pudo cargar el inventario")
+            } else {
+                self.error = error.toUserMessage(fallback: "No se pudo actualizar el inventario")
+            }
+        }
+    }
+
+    private func openReport() async {
+        loadingPdf = true
+        defer { loadingPdf = false }
+        do {
+            reportData = try await TicketsRepository.shared.inventoryReportPdf(id: inventoryId)
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo abrir el reporte")
+        }
     }
 
     private func sync() async {

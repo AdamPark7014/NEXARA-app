@@ -6,7 +6,11 @@ struct ChatView: View {
     var initialChannelId: Int64? = nil
     var initialMessageId: Int64? = nil
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var channels: [[String: Any]] = []
+    /// El canal del enlace o del push se abre una vez; si luego vuelve a la
+    /// lista, refrescar no debe regresarlo a ese canal.
+    @State private var didApplyInitialChannel = false
     @State private var selectedChannelId: Int64?
     @State private var messages: [[String: Any]] = []
     @State private var hasMoreMessages = false
@@ -86,26 +90,64 @@ struct ChatView: View {
         ChatListBuilder.build(messages: rootMessages)
     }
 
+    /// En iPhone (ancho compacto) la lista y la conversación no caben lado a
+    /// lado: se ve una u otra, como Mensajes.
+    private var isCompact: Bool { horizontalSizeClass == .compact }
+
+    private var compactTitle: String {
+        guard isCompact, let ch = selectedChannel else { return "Chat" }
+        let name = ConsoleHelpers.mapStr(ch, "name", "nombre")
+        return name.isEmpty ? "Chat" : name
+    }
+
     var body: some View {
         NavigationStack {
-            HStack(spacing: 0) {
-                channelList
-                Divider()
-                messagePane
+            Group {
+                if isCompact {
+                    if selectedChannelId == nil {
+                        channelList
+                    } else {
+                        messagePane
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        channelList
+                            .frame(minWidth: 220, maxWidth: 300)
+                        Divider()
+                        messagePane
+                    }
+                }
             }
-            .navigationTitle("Chat")
+            .navigationTitle(compactTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if isCompact && selectedChannelId != nil {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            selectedChannelId = nil
+                            replyTo = nil
+                            threadRoot = nil
+                            threadReplies = []
+                        } label: {
+                            Label("Canales", systemImage: "chevron.backward")
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .accessibilityLabel("Volver a los canales")
+                    }
+                }
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button { searchScopedToChannel = false; showSearch = true } label: {
                         Image(systemName: "magnifyingglass")
                     }
+                    .accessibilityLabel("Buscar mensajes")
                     Button { showDmPicker = true; Task { await loadColleagues() } } label: {
                         Image(systemName: "person.bubble")
                     }
+                    .accessibilityLabel("Mensaje directo")
                     Button { showCreateChannel = true } label: {
                         Image(systemName: "plus.bubble")
                     }
+                    .accessibilityLabel("Crear canal")
                 }
             }
             .task { await loadChannels() }
@@ -186,34 +228,49 @@ struct ChatView: View {
     private var channelList: some View {
         VStack(spacing: 0) {
             if refreshingChannels {
-                ProgressView().padding(4)
+                ProgressView().padding(NxSpacing.xs)
             }
-            List {
-                if loading && channels.isEmpty {
-                    ProgressView()
-                }
-                ForEach(Array(sortedChannels.enumerated()), id: \.offset) { _, ch in
-                    let id = ConsoleHelpers.mapInt64(ch, "id") ?? 0
-                    channelRow(ch)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedChannelId = id
-                            replyTo = nil
-                            threadRoot = nil
-                            threadReplies = []
-                            Task { await loadMessages(channelId: id, markRead: true) }
-                        }
-                        .listRowBackground(
-                            id == selectedChannelId
-                                ? NxBrand.primary.opacity(0.12)
-                                : Color(.systemBackground)
-                        )
-                }
+            if isCompact {
+                channelListContent.listStyle(.plain)
+            } else {
+                channelListContent.listStyle(.sidebar)
             }
-            .listStyle(.sidebar)
-            .refreshable { await loadChannels(refresh: true) }
         }
-        .frame(minWidth: 220, maxWidth: 300)
+    }
+
+    private var channelListContent: some View {
+        List {
+            if loading && channels.isEmpty {
+                NxLoadingState(text: "Cargando canales…")
+                    .listRowSeparator(.hidden)
+            } else if !loading && channels.isEmpty {
+                ContentUnavailableView(
+                    "Sin conversaciones",
+                    systemImage: "bubble.left.and.bubble.right",
+                    description: Text(error ?? "Crea un canal o escribe un mensaje directo a un compañero.")
+                )
+                .listRowSeparator(.hidden)
+            }
+            ForEach(sortedChannels, id: \.chatRowId) { ch in
+                let id = ch.chatRowId
+                channelRow(ch)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedChannelId = id
+                        replyTo = nil
+                        threadRoot = nil
+                        threadReplies = []
+                        Task { await loadMessages(channelId: id, markRead: true) }
+                    }
+                    .accessibilityAddTraits(.isButton)
+                    .listRowBackground(
+                        id == selectedChannelId && !isCompact
+                            ? NxBrand.primary.opacity(0.12)
+                            : Color(.systemBackground)
+                    )
+            }
+        }
+        .refreshable { await loadChannels(refresh: true) }
     }
 
     private func channelRow(_ ch: [String: Any]) -> some View {
@@ -258,8 +315,11 @@ struct ChatView: View {
                     Image(systemName: isFav ? "star.fill" : "star")
                         .font(.caption)
                         .foregroundStyle(isFav ? NxBrand.primary : Color.secondary.opacity(0.5))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(isFav ? "Quitar de favoritos" : "Marcar como favorito")
                 if unread > 0 {
                     Text(unread > 99 ? "99+" : "\(unread)")
                         .font(.caption2.bold())
@@ -307,9 +367,9 @@ struct ChatView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 4)
                         }
-                        ForEach(Array(messageListItems.enumerated()), id: \.offset) { _, item in
+                        ForEach(messageListItems, id: \.rowId) { item in
                             switch item {
-                            case .date(let label):
+                            case .date(_, let label):
                                 ChatDateDivider(label: label)
                             case .message(let msg):
                                 let mid = ConsoleHelpers.mapInt64(msg, "id") ?? 0
@@ -381,7 +441,9 @@ struct ChatView: View {
             if !pinned.isEmpty {
                 Button { showPins.toggle() } label: {
                     Image(systemName: showPins ? "pin.fill" : "pin")
+                        .nxTapTarget()
                 }
+                .accessibilityLabel(showPins ? "Ocultar mensajes fijados" : "Mostrar mensajes fijados")
             }
             Menu {
                 if !isDirect {
@@ -408,10 +470,12 @@ struct ChatView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
+                    .nxTapTarget()
             }
+            .accessibilityLabel("Opciones del canal")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, NxSpacing.m)
+        .padding(.vertical, NxSpacing.xs)
         .background(Color(.secondarySystemBackground))
     }
 
@@ -451,8 +515,11 @@ struct ChatView: View {
             }
             Spacer()
             Button { replyTo = nil } label: {
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+                    .nxTapTarget()
             }
+            .accessibilityLabel("Cancelar respuesta")
         }
         .padding(8)
         .background(NxBrand.primary.opacity(0.08))
@@ -480,13 +547,17 @@ struct ChatView: View {
                     .onChange(of: draft) { _, value in onDraftChange(value) }
                 Button { showDocPicker = true } label: {
                     Image(systemName: "paperclip")
+                        .nxTapTarget()
                 }
+                .accessibilityLabel("Adjuntar archivo")
                 .disabled(sending || uploading || selectedChannelId == nil)
                 Button {
                     Task { await sendMessage() }
                 } label: {
                     Image(systemName: "paperplane.fill")
+                        .nxTapTarget()
                 }
+                .accessibilityLabel("Enviar mensaje")
                 .disabled(
                     sending || uploading ||
                     draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
@@ -494,7 +565,9 @@ struct ChatView: View {
                 )
             }
         }
-        .padding()
+        .padding(.horizontal, NxSpacing.m)
+        .padding(.vertical, NxSpacing.s)
+        .background(.bar)
     }
 
     /// «Fulano está escribiendo…», con la misma caducidad que la web (2.8 s).
@@ -564,7 +637,9 @@ struct ChatView: View {
                         .lineLimit(1...4)
                     Button { showThreadDocPicker = true } label: {
                         Image(systemName: "paperclip")
+                            .nxTapTarget()
                     }
+                    .accessibilityLabel("Adjuntar archivo")
                     .disabled(sending || uploading || selectedChannelId == nil)
                     Button("Enviar") { Task { await sendThreadMessage() } }
                     .disabled(
@@ -648,8 +723,13 @@ struct ChatView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis").font(.caption).foregroundStyle(.secondary)
+                    Image(systemName: "ellipsis")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Acciones del mensaje")
             }
             if !body.isEmpty {
                 Text(ChatMentionFormat.display(body)).font(.body)
@@ -822,10 +902,11 @@ struct ChatView: View {
         error = nil
         do {
             channels = try await ChatRepository.shared.listChannels()
-            if let preset = initialChannelId, preset > 0 {
+            if !didApplyInitialChannel, let preset = initialChannelId, preset > 0 {
+                didApplyInitialChannel = true
                 selectedChannelId = preset
                 await loadMessages(channelId: preset, markRead: true)
-            } else if selectedChannelId == nil, let first = sortedChannels.first {
+            } else if selectedChannelId == nil, !isCompact, let first = sortedChannels.first {
                 let id = ConsoleHelpers.mapInt64(first, "id")
                 if let id, id > 0 {
                     selectedChannelId = id
@@ -1352,8 +1433,26 @@ struct ChatView: View {
 // MARK: – Helpers
 
 private enum ChatListItem {
-    case date(String)
+    case date(key: String, label: String)
     case message([String: Any])
+
+    /// Id estable para `ForEach`: el del mensaje, no su posición. Con la
+    /// posición, cada mensaje nuevo o cada página vieja redibujaba la lista entera.
+    var rowId: String {
+        switch self {
+        case .date(let key, _):
+            return "d-\(key)"
+        case .message(let msg):
+            let id = ConsoleHelpers.mapInt64(msg, "id") ?? 0
+            if id > 0 { return "m-\(id)" }
+            return "m0-\(ConsoleHelpers.mapStr(msg, "createdAt"))-\(ConsoleHelpers.mapStr(msg, "body", "content"))"
+        }
+    }
+}
+
+private extension Dictionary where Key == String, Value == Any {
+    /// Id del canal para `ForEach`.
+    var chatRowId: Int64 { ConsoleHelpers.mapInt64(self, "id") ?? 0 }
 }
 
 private enum ChatListBuilder {
@@ -1364,7 +1463,7 @@ private enum ChatListBuilder {
             let created = ConsoleHelpers.mapStr(msg, "createdAt")
             let day = ChatChannelFormat.dayKey(created)
             if day != lastDay {
-                items.append(.date(ChatChannelFormat.dayLabel(created)))
+                items.append(.date(key: day, label: ChatChannelFormat.dayLabel(created)))
                 lastDay = day
             }
             items.append(.message(msg))
@@ -1407,23 +1506,36 @@ private enum ChatChannelFormat {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // Se llaman por cada fila y cada burbuja: los formatters viven una sola vez.
+    private static let hourFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
+    }()
+    private static let dayMonthFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "dd/MM"; return f
+    }()
+    private static let dayKeyFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+    }()
+    private static let dayLabelFormatter: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "es_MX"); f.dateFormat = "EEEE d MMM"; return f
+    }()
+
     static func channelTime(_ iso: String) -> String {
         guard let d = parse(iso) else { return "" }
-        let cal = Calendar.current
-        if cal.isDateInToday(d) {
-            let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d)
+        if Calendar.current.isDateInToday(d) {
+            return hourFormatter.string(from: d)
         }
-        let f = DateFormatter(); f.dateFormat = "dd/MM"; return f.string(from: d)
+        return dayMonthFormatter.string(from: d)
     }
 
     static func messageTime(_ iso: String) -> String {
         guard let d = parse(iso) else { return "" }
-        let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d)
+        return hourFormatter.string(from: d)
     }
 
     static func dayKey(_ iso: String) -> String {
         guard let d = parse(iso) else { return iso }
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d)
+        return dayKeyFormatter.string(from: d)
     }
 
     static func dayLabel(_ iso: String) -> String {
@@ -1431,17 +1543,11 @@ private enum ChatChannelFormat {
         let cal = Calendar.current
         if cal.isDateInToday(d) { return "Hoy" }
         if cal.isDateInYesterday(d) { return "Ayer" }
-        let f = DateFormatter(); f.locale = Locale(identifier: "es_MX")
-        f.dateFormat = "EEEE d MMM"; return f.string(from: d).capitalized
+        return dayLabelFormatter.string(from: d).capitalized
     }
 
     private static func parse(_ iso: String) -> Date? {
-        guard !iso.isEmpty else { return nil }
-        let isoF = ISO8601DateFormatter()
-        isoF.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = isoF.date(from: iso) { return d }
-        isoF.formatOptions = [.withInternetDateTime]
-        return isoF.date(from: iso)
+        NxFormat.parseISO(iso)
     }
 }
 
@@ -1513,13 +1619,15 @@ private enum ChatMessageFormat {
 
     /// Parsea el `reactedAt` ISO 8601 del API (con o sin fracción de segundos).
     static func parseReactedAt(_ iso: String?) -> Date? {
-        guard let iso, !iso.isEmpty else { return nil }
-        let isoF = ISO8601DateFormatter()
-        isoF.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = isoF.date(from: iso) { return d }
-        isoF.formatOptions = [.withInternetDateTime]
-        return isoF.date(from: iso)
+        NxFormat.parseISO(iso)
     }
+
+    private static let reactionDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_MX")
+        f.dateFormat = "d MMM"
+        return f
+    }()
 
     /// "hace 5 min" / "hace 2 h" / "hace 3 d" para el sheet de reactores.
     static func relativeReactionTime(_ iso: String?) -> String {
@@ -1532,15 +1640,8 @@ private enum ChatMessageFormat {
         if hours < 24 { return "hace \(hours) h" }
         let days = hours / 24
         if days < 7 { return "hace \(days) d" }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "es_MX")
-        f.dateFormat = "d MMM"
-        return f.string(from: d)
+        return reactionDayFormatter.string(from: d)
     }
-}
-
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 /// Ítem del sheet "quién reaccionó" (`.sheet(item:)` exige `Identifiable`).

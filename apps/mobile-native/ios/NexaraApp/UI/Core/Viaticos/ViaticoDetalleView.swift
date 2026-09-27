@@ -87,7 +87,7 @@ struct ViaticoDetalleView: View {
                 }
                 acciones(viatico)
             } else if cargando {
-                Section { ProgressView().frame(maxWidth: .infinity) }
+                Section { NxLoadingState(text: "Cargando viático…") }
             }
         }
         .listStyle(.insetGrouped)
@@ -296,7 +296,7 @@ struct ViaticoDetalleView: View {
             viatico = try await ViaticosRepository.shared.detalle(id: viaticoId)
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         cargando = false
     }
@@ -312,7 +312,7 @@ struct ViaticoDetalleView: View {
                 onCambio()
             } catch {
                 enviando = false
-                aviso = error.localizedDescription
+                aviso = error.toUserMessage()
             }
         }
     }
@@ -452,7 +452,7 @@ struct HojaComprobarViatico: View {
                 dismiss()
             } catch {
                 enviando = false
-                self.error = error.localizedDescription
+                self.error = error.toUserMessage()
             }
         }
     }
@@ -594,7 +594,7 @@ struct HojaDecisionViatico: View {
                 dismiss()
             } catch {
                 enviando = false
-                self.error = error.localizedDescription
+                self.error = error.toUserMessage()
             }
         }
     }

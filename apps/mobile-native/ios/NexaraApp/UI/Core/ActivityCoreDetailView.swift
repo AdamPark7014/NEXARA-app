@@ -146,16 +146,10 @@ struct ActivityCoreDetailView: View {
 
             Group {
                 if loading && raw.isEmpty {
-                    ProgressView("Cargando actividad…")
+                    NxLoadingState(text: "Cargando actividad…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error, raw.isEmpty {
-                    ContentUnavailableView {
-                        Label("No se pudo cargar", systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(error)
-                    } actions: {
-                        Button("Reintentar") { Task { await load() } }
-                    }
+                    NxErrorState(message: error) { Task { await load() } }
                 } else {
                     switch tab {
                     case .detalle:

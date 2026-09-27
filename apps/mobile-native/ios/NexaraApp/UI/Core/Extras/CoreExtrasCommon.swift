@@ -166,10 +166,9 @@ struct CoreExtrasCargando: View {
     var body: some View {
         HStack {
             Spacer()
-            ProgressView().controlSize(.large)
+            NxLoadingState()
             Spacer()
         }
-        .padding(.vertical, 32)
         .listRowSeparator(.hidden)
     }
 }
@@ -180,15 +179,7 @@ struct CoreExtrasError: View {
     let reintentar: () -> Void
 
     var body: some View {
-        ContentUnavailableView {
-            Label("No se pudo cargar", systemImage: "exclamationmark.triangle")
-        } description: {
-            Text(mensaje)
-        } actions: {
-            Button("Reintentar", action: reintentar)
-                .buttonStyle(.borderedProminent)
-                .tint(NxBrand.primary)
-        }
+        NxErrorState(message: mensaje, retry: reintentar)
     }
 }
 
