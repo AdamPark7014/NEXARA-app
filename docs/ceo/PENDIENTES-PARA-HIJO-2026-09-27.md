@@ -17,7 +17,7 @@
 
 Verificación: API `tsc` 0 errores, jest **215 suites / 2,638 pruebas** en verde; web `tsc` 0 errores, vitest 601 ok / 6 fallas **previas** (4 en `HerramientasChecklist.spec.tsx`, 2 de `enc_soporte` en RBAC).
 
-## B. Desplegar (en este orden; cada paso es reversible salvo el último)
+## B. Desplegar (en este orden; todos los pasos son reversibles)
 ```bash
 # 1. Subir
 git pull --rebase origin main && git push origin main
