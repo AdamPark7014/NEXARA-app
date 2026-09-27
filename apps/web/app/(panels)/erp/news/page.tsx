@@ -3,16 +3,22 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
+import PanelTabs from "@/components/ui/PanelTabs";
+import InlineAlert from "@/components/ui/InlineAlert";
+import Modal from "@/components/ui/Modal";
+import { FormField, FormGrid } from "@/components/ui/FormField";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { toast } from "@/components/Toast";
+import s from "./news.module.css";
 
 type Tab = "comunicados" | "newsletter";
 
@@ -39,11 +45,23 @@ interface NewsletterSubscriber {
   subscribedAt: string;
 }
 
+const ESTADOS = ["Borrador", "Programado", "Enviado"] as const;
+const PRIORIDADES = ["Normal", "Alta", "Crítica"] as const;
+const AUDIENCIAS = ["Todo NEXARA", "Comercial", "Operaciones", "Ingeniería", "NOC", "Administración", "Dirección"];
+
 const ESTADO_VARIANT: Record<string, "neutral" | "warning" | "positive"> = {
   Borrador: "neutral", Programado: "warning", Enviado: "positive",
 };
 const PRIORIDAD_VARIANT: Record<string, "neutral" | "warning" | "danger"> = {
   Normal: "neutral", Alta: "warning", Crítica: "danger",
+};
+
+const dateFmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" });
+const dateTimeFmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmt = (f: Intl.DateTimeFormat, iso?: string | null) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : f.format(d);
 };
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
@@ -56,50 +74,33 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 }
 
 const EMPTY_FORM = { titulo: "", cuerpo: "", audiencia: "Todo NEXARA", prioridad: "Normal", estado: "Borrador", scheduledAt: "" };
-
-function TabButton({ active, onClick, icon, label, count }: { active: boolean; onClick: () => void; icon: string; label: string; count: number }) {
-  return (
-    <button type="button" role="tab" aria-selected={active} onClick={onClick} style={{
-      display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8,
-      background: active ? "var(--surface)" : "transparent",
-      border: active ? "1px solid var(--border)" : "1px solid transparent",
-      color: active ? "var(--foreground)" : "var(--text-secondary)",
-      fontWeight: 600, fontSize: 13, cursor: "pointer",
-      boxShadow: active ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
-    }}>
-      <span>{icon}</span><span>{label}</span>
-      <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 999,
-        background: active ? "color-mix(in srgb, var(--primary) 12%, transparent)" : "var(--surface-2)",
-        color: active ? "var(--primary)" : "var(--text-secondary)", fontWeight: 700 }}>
-        {count}
-      </span>
-    </button>
-  );
-}
+type FormState = typeof EMPTY_FORM;
 
 export default function ComunicacionesInternasPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "news"), [user]);
   const token = user?.token ?? "";
 
-  const [tab, setTab]         = useState<Tab>("comunicados");
+  const [tab, setTab] = useState<Tab>("comunicados");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
-  const [items, setItems]     = useState<Comunicado[]>([]);
+  const [items, setItems] = useState<Comunicado[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing]   = useState<Comunicado | null>(null);
-  const [form, setForm]         = useState({ ...EMPTY_FORM });
-  const [saving, setSaving]     = useState(false);
-  const [subs, setSubs]         = useState<NewsletterSubscriber[]>([]);
+  const [editing, setEditing] = useState<Comunicado | null>(null);
+  const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
+  const [formDirty, setFormDirty] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [subs, setSubs] = useState<NewsletterSubscriber[] | null>(null);
   const [subsLoading, setSubsLoading] = useState(false);
   const [subsErr, setSubsErr] = useState<string | null>(null);
-  const [subSearch, setSubSearch]     = useState("");
+  const [subSearch, setSubSearch] = useState("");
   const [comSearch, setComSearch] = useState("");
   const [comEstado, setComEstado] = useState("");
   const [comPrioridad, setComPrioridad] = useState("");
 
-  const loadSubs = useCallback(async (q?: string) => {
+  const loadSubs = useCallback(async (q: string) => {
     if (!token) return;
     setSubsLoading(true);
     setSubsErr(null);
@@ -108,42 +109,53 @@ export default function ComunicacionesInternasPage() {
       const data = await apiFetch(`newsletter${qs}`, token);
       setSubs(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
-      setSubsErr(e instanceof Error ? e.message : "No se pudo cargar la lista");
-    } finally { setSubsLoading(false); }
+      setSubsErr(formatApiError(e, "No pudimos cargar la lista de suscriptores."));
+    } finally {
+      setSubsLoading(false);
+    }
   }, [token]);
 
-  useEffect(() => { if (tab === "newsletter") void loadSubs(); }, [tab, loadSubs]);
+  useEffect(() => {
+    if (tab !== "newsletter") return;
+    const t = window.setTimeout(() => void loadSubs(subSearch.trim()), subSearch ? 300 : 0);
+    return () => window.clearTimeout(t);
+  }, [tab, subSearch, loadSubs]);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setError(null);
     try {
       const data = await apiFetch("internal-comunicados?limit=50", token);
       setItems(Array.isArray(data) ? data : (data.data ?? []));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(formatApiError(e, "No pudimos cargar los comunicados."));
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const openNew = () => { setEditing(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
+  const openForm = (next: FormState, target: Comunicado | null) => {
+    setEditing(target);
+    setForm(next);
+    setFormDirty(false);
+    setFormError(null);
+    setShowForm(true);
+  };
+
+  const openNew = () => openForm({ ...EMPTY_FORM }, null);
 
   const openEdit = async (c: Comunicado) => {
-    setEditing(c);
-    setShowForm(true);
-    setForm({
-      titulo: c.titulo,
-      cuerpo: "",
-      audiencia: c.audiencia,
-      prioridad: c.prioridad,
-      estado: c.estado,
-      scheduledAt: c.scheduledAt?.slice(0, 16) ?? "",
-    });
+    openForm(
+      { titulo: c.titulo, cuerpo: "", audiencia: c.audiencia, prioridad: c.prioridad, estado: c.estado, scheduledAt: c.scheduledAt?.slice(0, 16) ?? "" },
+      c,
+    );
     try {
-      const full = await apiFetch(`internal-comunicados/${c.id}`, token) as Comunicado & { cuerpo?: string };
+      const full = (await apiFetch(`internal-comunicados/${c.id}`, token)) as Comunicado & { cuerpo?: string };
       setForm({
         titulo: full.titulo ?? c.titulo,
         cuerpo: full.cuerpo ?? "",
@@ -153,278 +165,303 @@ export default function ComunicacionesInternasPage() {
         scheduledAt: full.scheduledAt?.slice(0, 16) ?? "",
       });
     } catch (e) {
-      toast.error("No se pudo cargar el contenido: " + (e instanceof Error ? e.message : "error"));
+      setFormError(`No pudimos cargar el texto completo. ${formatApiError(e, "")}`.trim());
     }
   };
 
   const save = async () => {
-    if (!form.titulo || !form.audiencia) return toast.warning("Título y audiencia son requeridos.");
+    if (!form.titulo.trim() || !form.audiencia) {
+      setFormError("Escribe un título y elige a quién va dirigido.");
+      return;
+    }
     setSaving(true);
+    setFormError(null);
     try {
       const body: Record<string, unknown> = { ...form };
       if (!body.scheduledAt) delete body.scheduledAt;
       else body.scheduledAt = new Date(form.scheduledAt).toISOString();
       if (editing) {
         const updated = await apiFetch(`internal-comunicados/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
-        setItems(prev => prev.map(c => c.id === editing.id ? { ...c, ...updated } : c));
+        setItems((prev) => prev?.map((c) => (c.id === editing.id ? { ...c, ...updated } : c)) ?? prev);
+        toast.success("Comunicado actualizado.");
       } else {
         const created = await apiFetch("internal-comunicados", token, { method: "POST", body: JSON.stringify(body) });
-        setItems(prev => [created, ...prev]);
+        setItems((prev) => [created, ...(prev ?? [])]);
+        toast.success("Comunicado creado.");
       }
       setShowForm(false);
     } catch (e: unknown) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "Error"));
+      setFormError(formatApiError(e, "No se pudo guardar. Intenta de nuevo."));
     } finally {
       setSaving(false);
     }
   };
 
-  const enviar = async (id: number) => {
-    setConfirmState({ message: "¿Enviar este comunicado ahora?", confirmLabel: "Enviar", fn: async () => {
-    try {
-      const updated = await apiFetch(`internal-comunicados/${id}/enviar`, token, { method: "PATCH" });
-      setItems(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
-    } catch (e: unknown) {
-      toast.error("Error al enviar: " + (e instanceof Error ? e.message : "error"));
-    }
-  } });
+  const enviar = (c: Comunicado) => {
+    setConfirmState({
+      message: `¿Enviar «${c.titulo}» ahora a ${c.audiencia}?`,
+      confirmLabel: "Enviar ahora",
+      fn: async () => {
+        try {
+          const updated = await apiFetch(`internal-comunicados/${c.id}/enviar`, token, { method: "PATCH" });
+          setItems((prev) => prev?.map((x) => (x.id === c.id ? { ...x, ...updated } : x)) ?? prev);
+          toast.success("Comunicado enviado.");
+        } catch (e: unknown) {
+          toast.error(`No se pudo enviar. ${formatApiError(e, "")}`.trim());
+        }
+      },
+    });
   };
 
-  const remove = async (id: number) => {
-    setConfirmState({ message: "¿Eliminar este comunicado?", fn: async () => {
-    try {
-      await apiFetch(`internal-comunicados/${id}`, token, { method: "DELETE" });
-      setItems(prev => prev.filter(c => c.id !== id));
-    } catch (e: unknown) {
-      toast.error("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
-    }
-  } });
+  const remove = (c: Comunicado) => {
+    setConfirmState({
+      message: `¿Eliminar «${c.titulo}»? Esta acción no se puede deshacer.`,
+      fn: async () => {
+        try {
+          await apiFetch(`internal-comunicados/${c.id}`, token, { method: "DELETE" });
+          setItems((prev) => prev?.filter((x) => x.id !== c.id) ?? prev);
+        } catch (e: unknown) {
+          toast.error(`No se pudo eliminar. ${formatApiError(e, "")}`.trim());
+        }
+      },
+    });
   };
 
-  const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [key]: e.target.value }));
-
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "8px 10px", fontSize: 13,
-    border: "1px solid var(--border)", borderRadius: 8,
-    background: "var(--surface)", color: "var(--foreground)", boxSizing: "border-box",
+  const field = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const value = e.target.value;
+    setForm((f) => ({ ...f, [key]: value }));
+    setFormDirty(true);
   };
+
+  const rows = useMemo(() => items ?? [], [items]);
 
   const visibleComunicados = useMemo(() => {
-    let rows = items;
-    if (comSearch.trim()) {
-      const q = comSearch.toLowerCase();
-      rows = rows.filter((c) => c.titulo.toLowerCase().includes(q) || (c.audiencia ?? "").toLowerCase().includes(q) || (c.autor?.nombre ?? "").toLowerCase().includes(q));
-    }
-    if (comEstado) rows = rows.filter((c) => c.estado === comEstado);
-    if (comPrioridad) rows = rows.filter((c) => c.prioridad === comPrioridad);
-    return rows;
-  }, [items, comSearch, comEstado, comPrioridad]);
+    const q = comSearch.trim().toLowerCase();
+    return rows.filter((c) =>
+      (!q || c.titulo.toLowerCase().includes(q) || (c.audiencia ?? "").toLowerCase().includes(q) || (c.autor?.nombre ?? "").toLowerCase().includes(q)) &&
+      (!comEstado || c.estado === comEstado) &&
+      (!comPrioridad || c.prioridad === comPrioridad),
+    );
+  }, [rows, comSearch, comEstado, comPrioridad]);
 
-  const enviados  = items.filter(c => c.estado === "Enviado");
-  const borradores= items.filter(c => c.estado === "Borrador");
-  const progr     = items.filter(c => c.estado === "Programado");
-  const totalLect = items.reduce((s, c) => s + c.lecturas, 0);
+  const stats = useMemo(() => {
+    const out = { enviados: 0, programados: 0, borradores: 0, lecturas: 0 };
+    for (const c of rows) {
+      if (c.estado === "Enviado") out.enviados++;
+      else if (c.estado === "Programado") out.programados++;
+      else if (c.estado === "Borrador") out.borradores++;
+      out.lecturas += c.lecturas;
+    }
+    return out;
+  }, [rows]);
 
   const columns: Column<Comunicado>[] = [
-    { key: "titulo", label: "Título", render: c => <strong style={{ fontSize: 13 }}>{c.titulo}</strong> },
-    { key: "audiencia", label: "Audiencia", render: c => <Tag variant="neutral">{c.audiencia}</Tag>, width: 150 },
-    { key: "autor", label: "Autor", accessor: c => c.autor?.nombre ?? "—", width: 130 },
-    { key: "prioridad", label: "Prioridad", render: c => <Tag variant={PRIORIDAD_VARIANT[c.prioridad] ?? "neutral"}>{c.prioridad}</Tag>, width: 100 },
-    { key: "estado", label: "Estado", render: c => <Tag variant={ESTADO_VARIANT[c.estado] ?? "neutral"}>{c.estado}</Tag>, width: 100 },
+    { key: "titulo", label: "Título", render: (c) => <span className={s.title}>{c.titulo}</span> },
+    { key: "audiencia", label: "Para", render: (c) => <Tag variant="neutral">{c.audiencia}</Tag>, width: 150 },
+    { key: "autor", label: "Autor", accessor: (c) => c.autor?.nombre ?? "—", width: 140 },
+    { key: "prioridad", label: "Prioridad", render: (c) => <Tag variant={PRIORIDAD_VARIANT[c.prioridad] ?? "neutral"}>{c.prioridad}</Tag>, width: 100 },
+    { key: "estado", label: "Estado", render: (c) => <Tag variant={ESTADO_VARIANT[c.estado] ?? "neutral"}>{c.estado}</Tag>, width: 110 },
     {
-      key: "lecturas", label: "Lecturas", width: 90, align: "right" as const,
-      render: c => <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--text-secondary)" }}>
-        {c.estado === "Enviado" ? `${c.lecturas}/${c.totalDestinatarios}` : "—"}
-      </span>,
+      key: "sentAt",
+      label: "Fecha",
+      width: 140,
+      render: (c) => (
+        <span className={s.muted}>
+          {c.estado === "Enviado" ? fmt(dateFmt, c.sentAt ?? c.createdAt) : c.scheduledAt ? `Sale ${fmt(dateTimeFmt, c.scheduledAt)}` : fmt(dateFmt, c.createdAt)}
+        </span>
+      ),
     },
     {
-      key: "id", label: "", width: 120,
-      render: c => (
-        <div style={{ display: "flex", gap: 4 }}>
+      key: "lecturas",
+      label: "Leído por",
+      width: 100,
+      align: "right" as const,
+      render: (c) => (
+        <span className={s.muted}>
+          {c.estado === "Enviado" ? `${c.lecturas.toLocaleString("es-MX")} de ${c.totalDestinatarios.toLocaleString("es-MX")}` : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "id",
+      label: "",
+      width: 150,
+      render: (c) => (
+        <div className={s.rowActions}>
           {c.estado !== "Enviado" && cfg.canApprove && (
-            <button onClick={() => enviar(c.id)} title="Enviar ahora" style={{
-              fontSize: 11, padding: "3px 7px", borderRadius: 6, cursor: "pointer",
-              background: "color-mix(in srgb, var(--primary) 12%, transparent)",
-              color: "var(--primary)", border: "1px solid color-mix(in srgb, var(--primary) 30%, transparent)", fontWeight: 600,
-            }}>Enviar</button>
+            <Button size="sm" variant="secondary" onClick={() => enviar(c)}>Enviar</Button>
           )}
-          {cfg.canEdit && <button onClick={() => void openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "3px 6px" }}>✎</button>}
-          {cfg.canDelete && <button onClick={() => remove(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "3px 6px" }}>✕</button>}
+          {cfg.canEdit && (
+            <button type="button" className={s.iconBtn} onClick={() => void openEdit(c)} title="Editar" aria-label={`Editar ${c.titulo}`}>
+              <span aria-hidden="true">✎</span>
+            </button>
+          )}
+          {cfg.canDelete && (
+            <button type="button" className={`${s.iconBtn} ${s.iconDanger}`} onClick={() => remove(c)} title="Eliminar" aria-label={`Eliminar ${c.titulo}`}>
+              <span aria-hidden="true">✕</span>
+            </button>
+          )}
         </div>
       ),
     },
   ];
 
+  const subColumns = useMemo<Column<NewsletterSubscriber>[]>(() => [
+    { key: "email", label: "Correo", width: 240 },
+    { key: "name", label: "Nombre", accessor: (x) => x.name ?? "—" },
+    { key: "source", label: "Origen", render: (x) => <Tag variant="neutral">{x.source ?? "Sitio web"}</Tag>, width: 130 },
+    { key: "subscribedAt", label: "Desde", render: (x) => <span className={s.muted}>{fmt(dateFmt, x.subscribedAt)}</span>, width: 130 },
+  ], []);
+
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Comunicación"
+        eyebrow="Hoy"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        actions={
-          cfg.canCreate ? <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button> : undefined
-        }
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button> : undefined}
       />
 
-      {error && (
-        <div style={{ padding: 12, borderRadius: 10, background: "color-mix(in srgb, var(--danger) 10%, transparent)", color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>
-          {error}
+      {items !== null && (
+        <div className={s.metrics}>
+          <MetricStrip
+            ariaLabel="Resumen de comunicados"
+            metrics={[
+              { label: "enviados", value: stats.enviados, tone: "success", onClick: () => { setTab("comunicados"); setComEstado("Enviado"); } },
+              { label: "programados", value: stats.programados, hint: "por salir", onClick: () => { setTab("comunicados"); setComEstado("Programado"); } },
+              { label: "borradores", value: stats.borradores, hint: "en edición", onClick: () => { setTab("comunicados"); setComEstado("Borrador"); } },
+              { label: "lecturas", value: stats.lecturas.toLocaleString("es-MX"), hint: "de todos los comunicados" },
+            ]}
+          />
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Enviados" value={enviados.length} hint="Total histórico" variant="positive" icon="📤" />
-        <KpiCard label="Programados" value={progr.length} hint="Pendientes de envío" variant="default" icon="📅" />
-        <KpiCard label="Borradores" value={borradores.length} hint="En edición" variant="default" icon="📝" />
-        <KpiCard label="Lecturas totales" value={totalLect} hint="Suma de todos los comunicados" variant="accent" icon="👁️" />
-      </div>
-
-      {items.length > 0 && (() => {
-        const total = items.length;
-        const statusRows = [
-          { label: "Enviados", count: enviados.length, color: "var(--success)" },
-          { label: "Programados", count: progr.length, color: "var(--primary)" },
-          { label: "Borradores", count: borradores.length, color: "var(--warning)" },
-        ].filter(r => r.count > 0);
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estado</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {statusRows.map(r => (
-                <div key={r.label} style={{ display: "grid", gridTemplateColumns: "100px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      <div style={{ display: "flex", gap: 6, padding: "4px 4px", background: "var(--surface-2)", borderRadius: 10, alignSelf: "flex-start", marginBottom: 16, width: "fit-content" }}>
-        <TabButton active={tab === "comunicados"} onClick={() => setTab("comunicados")} icon="📣" label="Comunicados" count={items.length} />
-        <TabButton active={tab === "newsletter"} onClick={() => setTab("newsletter")} icon="📰" label="Newsletter" count={0} />
-      </div>
-
-      {showForm && tab === "comunicados" && (
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 20, marginBottom: 18 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
-            {editing ? "Editar comunicado" : "Nuevo comunicado"}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Título *</label>
-              <input style={inputStyle} value={form.titulo} onChange={field("titulo")} placeholder="ej. Nueva política de viáticos" />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Audiencia *</label>
-              <select style={inputStyle} value={form.audiencia} onChange={field("audiencia")}>
-                {["Todo NEXARA", "Comercial", "Operaciones", "Ingeniería", "NOC", "Administración", "Dirección"].map(a => <option key={a}>{a}</option>)}
-              </select>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Prioridad</label>
-              <select style={inputStyle} value={form.prioridad} onChange={field("prioridad")}>
-                {["Normal", "Alta", "Crítica"].map(p => <option key={p}>{p}</option>)}
-              </select>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Programar envío (opcional)</label>
-              <input type="datetime-local" style={inputStyle} value={form.scheduledAt} onChange={field("scheduledAt")} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Cuerpo del mensaje</label>
-              <textarea style={{ ...inputStyle, minHeight: 100, resize: "vertical" }} value={form.cuerpo} onChange={field("cuerpo")} placeholder="Escribe el comunicado…" />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            <Button variant="primary" onClick={save}>{saving ? "Guardando…" : (editing ? "Guardar" : "Crear comunicado")}</Button>
-            <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-          </div>
-        </div>
-      )}
+      <PanelTabs
+        ariaLabel="Secciones de comunicación"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { key: "comunicados", label: "📣 Comunicados", badge: items?.length || undefined },
+          { key: "newsletter", label: "📰 Boletín", badge: subs?.length || undefined },
+        ]}
+      />
 
       {tab === "comunicados" ? (
-        <Section title={`Comunicados internos (${visibleComunicados.length})`} subtitle="Avisos puntuales al equipo. Haz clic en Enviar para despachar inmediatamente.">
+        <Section title="Comunicados internos" subtitle="Avisos para el equipo. Usa «Enviar» para mandarlos al momento.">
+          {error && (
+            <InlineAlert
+              variant={items ? "warning" : "danger"}
+              message={items ? `No pudimos actualizar; mostramos la última versión. ${error}` : error}
+              action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+            />
+          )}
           <FilterToolbar
-            search={{ value: comSearch, onChange: setComSearch, placeholder: "Buscar por título, audiencia o autor…" }}
+            search={{ value: comSearch, onChange: setComSearch, placeholder: "Buscar por título, destinatarios o autor…" }}
             selects={[
-              {
-                label: "Estado",
-                value: comEstado,
-                onChange: setComEstado,
-                options: ["Borrador", "Programado", "Enviado"].map((v) => ({ value: v, label: v })),
-                allowAll: true,
-              },
-              {
-                label: "Prioridad",
-                value: comPrioridad,
-                onChange: setComPrioridad,
-                options: ["Normal", "Alta", "Crítica"].map((v) => ({ value: v, label: v })),
-                allowAll: true,
-              },
+              { label: "Estado", value: comEstado, onChange: setComEstado, options: ESTADOS.map((v) => ({ value: v, label: v })), allowAll: true, allLabel: "Todos los estados" },
+              { label: "Prioridad", value: comPrioridad, onChange: setComPrioridad, options: PRIORIDADES.map((v) => ({ value: v, label: v })), allowAll: true, allLabel: "Todas las prioridades" },
             ]}
             onClear={() => { setComSearch(""); setComEstado(""); setComPrioridad(""); }}
-            resultCount={loading ? null : visibleComunicados.length}
-            rightActions={items.length > 0 ? (
+            resultCount={items === null ? null : visibleComunicados.length}
+            rightActions={rows.length > 0 ? (
               <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleComunicados, [
-                { key: "id", label: "ID" },
                 { key: "titulo", label: "Título" },
-                { key: "audiencia", label: "Audiencia" },
+                { key: "audiencia", label: "Para" },
                 { key: "prioridad", label: "Prioridad" },
                 { key: "estado", label: "Estado" },
                 { key: "lecturas", label: "Lecturas" },
                 { key: "autor", label: "Autor", format: (v) => (v as Comunicado["autor"])?.nombre ?? "—" },
-                { key: "sentAt", label: "Enviado", format: (v) => v ? String(v).slice(0, 10) : "—" },
+                { key: "sentAt", label: "Enviado", format: (v) => (v ? fmt(dateFmt, String(v)) : "—") },
               ], "comunicados-internos")}>Excel</Button>
             ) : undefined}
           />
-          {loading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          {items === null && loading ? (
+            <div className={s.skeleton} aria-busy="true" aria-label="Cargando comunicados" />
           ) : (
             <DataTable
               columns={columns}
               rows={visibleComunicados}
-              rowKey={c => c.id}
-              emptyTitle="Sin comunicados"
-              emptyDescription="Crea el primero con el botón superior."
+              rowKey={(c) => c.id}
+              emptyTitle={rows.length > 0 ? "Sin coincidencias" : "Aún no hay comunicados"}
+              emptyDescription={rows.length > 0 ? "Prueba con otra búsqueda o quita los filtros." : cfg.canCreate ? "Crea el primero con «Nuevo comunicado»." : "Cuando haya avisos para el equipo aparecerán aquí."}
             />
           )}
         </Section>
       ) : (
-        <Section title="Suscriptores del newsletter" subtitle="Captados desde el formulario público del sitio web — exporta la lista para tu siguiente envío.">
-          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
-            <input
-              value={subSearch}
-              onChange={(e) => { setSubSearch(e.target.value); void loadSubs(e.target.value); }}
-              placeholder="Buscar por email o nombre…"
-              style={{ flex: 1, maxWidth: 320, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+        <Section title="Suscriptores del boletín" subtitle="Personas registradas desde el formulario del sitio web. Exporta la lista para tu próximo envío.">
+          <FilterToolbar
+            search={{ value: subSearch, onChange: setSubSearch, placeholder: "Buscar por correo o nombre…" }}
+            onClear={() => setSubSearch("")}
+            resultCount={subs === null ? null : subs.length}
+            rightActions={subs && subs.length > 0 ? (
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(subs, [
+                { key: "email", label: "Correo" },
+                { key: "name", label: "Nombre", format: (v) => (v ? String(v) : "—") },
+                { key: "source", label: "Origen", format: (v) => (v ? String(v) : "Sitio web") },
+                { key: "subscribedAt", label: "Desde", format: (v) => fmt(dateFmt, String(v)) },
+              ], "suscriptores-boletin")}>Excel</Button>
+            ) : undefined}
+          />
+          {subsErr && (
+            <InlineAlert
+              variant="danger"
+              message={subsErr}
+              action={<Button size="sm" variant="secondary" onClick={() => void loadSubs(subSearch.trim())}>Reintentar</Button>}
             />
-            <KpiCard label="Suscriptores" value={subs.length} />
-          </div>
-          {subsErr && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{subsErr}</p>}
-          {subsLoading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          )}
+          {subs === null && subsLoading ? (
+            <div className={s.skeleton} aria-busy="true" aria-label="Cargando suscriptores" />
           ) : (
             <DataTable
-              columns={[
-                { key: "email", label: "Email", width: 240 },
-                { key: "name", label: "Nombre", accessor: (s: NewsletterSubscriber) => s.name ?? "—" },
-                { key: "source", label: "Origen", render: (s: NewsletterSubscriber) => <Tag variant="neutral">{s.source ?? "web"}</Tag>, width: 120 },
-                { key: "subscribedAt", label: "Suscrito", render: (s: NewsletterSubscriber) => <span style={{ fontSize: 12 }}>{new Date(s.subscribedAt).toLocaleDateString("es-MX")}</span>, width: 110 },
-              ]}
-              rows={subs}
-              rowKey={(s: NewsletterSubscriber) => s.id}
-              emptyTitle="Sin suscriptores"
-              emptyDescription="Aún nadie se ha registrado desde el formulario público."
+              columns={subColumns}
+              rows={subs ?? []}
+              rowKey={(x) => x.id}
+              emptyTitle={subSearch ? "Sin coincidencias" : "Sin suscriptores"}
+              emptyDescription={subSearch ? "Nadie coincide con esa búsqueda." : "Aún nadie se ha registrado desde el sitio web."}
             />
           )}
         </Section>
       )}
+
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? "Editar comunicado" : "Nuevo comunicado"}
+        dirty={formDirty && !saving}
+        maxWidth={640}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void save()} loading={saving}>
+              {editing ? "Guardar cambios" : "Crear comunicado"}
+            </Button>
+          </>
+        }
+      >
+        {formError && <InlineAlert variant="danger" message={formError} />}
+        <FormGrid>
+          <FormField label="Título" fullWidth>
+            <input className={s.input} value={form.titulo} onChange={field("titulo")} placeholder="Ej. Nueva política de viáticos" required />
+          </FormField>
+          <FormField label="Para">
+            <select className={s.input} value={form.audiencia} onChange={field("audiencia")}>
+              {AUDIENCIAS.map((a) => <option key={a}>{a}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Prioridad">
+            <select className={s.input} value={form.prioridad} onChange={field("prioridad")}>
+              {PRIORIDADES.map((p) => <option key={p}>{p}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Programar envío" optional hint="Déjalo vacío para enviarlo manualmente." fullWidth>
+            <input type="datetime-local" className={s.input} value={form.scheduledAt} onChange={field("scheduledAt")} />
+          </FormField>
+          <FormField label="Mensaje" fullWidth>
+            <textarea className={`${s.input} ${s.textarea}`} value={form.cuerpo} onChange={field("cuerpo")} placeholder="Escribe el comunicado…" />
+          </FormField>
+        </FormGrid>
+      </Modal>
+
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
