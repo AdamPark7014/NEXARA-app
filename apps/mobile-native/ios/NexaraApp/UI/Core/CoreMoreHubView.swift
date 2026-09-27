@@ -12,30 +12,34 @@ struct CoreMoreHubView: View {
     let modules: [CoreExtraModule]
 
     var body: some View {
+        let grouped = Dictionary(grouping: modules, by: { $0.group })
+        let order: [CoreExtraModule.Group] = [.hoy, .recursos, .finanzas, .gobierno]
         List {
-            ForEach(modules) { module in
-                NavigationLink {
-                    // Un solo sitio decide a dónde va cada módulo, para que la
-                    // lista y los enlaces entrantes no se contradigan.
-                    CoreExtraDestination(module: module)
-                } label: {
-                    HStack(spacing: 12) {
-                        NxIconBadge(systemName: module.systemImage, size: 36)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(module.title)
-                                .font(.body.weight(.semibold))
-                            Text(module.summary)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        if !CoreExtraDestination.tienePantallaNativa(module) {
-                            Spacer(minLength: 4)
-                            Text("En la web")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
+            ForEach(order.filter { (grouped[$0] ?? []).isEmpty == false }, id: \.rawValue) { group in
+                Section(group.rawValue) {
+                    ForEach(grouped[group] ?? []) { module in
+                        NavigationLink {
+                            CoreExtraDestination(module: module)
+                        } label: {
+                            HStack(spacing: 12) {
+                                NxIconBadge(systemName: module.systemImage, size: 36)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(module.title)
+                                        .font(.body.weight(.semibold))
+                                    Text(module.summary)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                if !CoreExtraDestination.tienePantallaNativa(module) {
+                                    Spacer(minLength: 4)
+                                    Text("En la web")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 4)
                         }
                     }
-                    .padding(.vertical, 4)
                 }
             }
         }

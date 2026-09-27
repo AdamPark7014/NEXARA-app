@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import mx.nexara.mobile.nativeapp.ui.console.ConsoleRoutes
 import mx.nexara.mobile.nativeapp.ui.console.CoreExtraModule
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
@@ -49,6 +51,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
 /** Icono de cada módulo de «Más». */
 fun CoreExtraModule.icon(): ImageVector = when (this) {
+    CoreExtraModule.EXECUTIVE -> Icons.Default.Insights
     CoreExtraModule.COTIZACIONES -> Icons.Default.RequestQuote
     CoreExtraModule.PROYECTOS -> Icons.Default.Folder
     CoreExtraModule.KPIS_EQUIPO -> Icons.Default.Insights
@@ -77,6 +80,89 @@ fun MoreHubScreen(
     modules: List<CoreExtraModule>,
     onOpen: (CoreExtraModule) -> Unit,
 ) {
+    // Agrupar por «Hoy», «Recursos», «Finanzas», «Gobierno», en ese orden.
+    val order = listOf(
+        CoreExtraModule.Group.HOY,
+        CoreExtraModule.Group.RECURSOS,
+        CoreExtraModule.Group.FINANZAS,
+        CoreExtraModule.Group.GOBIERNO,
+    )
+    val grouped = modules.groupBy { it.group }
+    val groupsInOrder = order.filter { grouped[it]?.isNotEmpty() == true }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        groupsInOrder.forEachIndexed { gi, group ->
+            item(key = "header-${group.name}") {
+                GroupHeader(title = group.title, topPadding = if (gi == 0) 0.dp else 8.dp)
+            }
+            val list = grouped[group] ?: emptyList()
+            itemsIndexed(list, key = { _, it -> it.key }) { idx, module ->
+                if (idx > 0) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
+                }
+                ExtraCard(module = module, onOpen = onOpen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupHeader(title: String, topPadding: Dp = 0.dp) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = topPadding, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ExtraCard(module: CoreExtraModule, onOpen: (CoreExtraModule) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onOpen(module) },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(
+                module.icon(),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(module.label, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    module.summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!ConsoleRoutes.tienePantallaNativa(module)) {
+                NxStatusChip("En la web", NxTone.Neutral)
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OldFlatList(modules: List<CoreExtraModule>, onOpen: (CoreExtraModule) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
