@@ -30,6 +30,7 @@ import type { ExecutiveDashboard } from "@/lib/executive-api";
 import { CommandCenterRail } from "@/components/command-center/CommandCenterRail";
 import { buildExecutiveDynamicWidgets, buildExecutiveBiDrillLinks } from "@/lib/executive-widgets";
 import { ExecutiveBiDrillPanel } from "@/components/command-center/ExecutiveBiDrillPanel";
+import TuDiaPanel from "@/components/executive/TuDiaPanel";
 
 /**
  * Vista ejecutiva — pantalla principal de dirección.
@@ -177,6 +178,8 @@ export default function ExecutivePage() {
           </>
         }
       />
+
+      <TuDiaPanel token={token} />
 
       <CommandCenterRail panel="erp" extraWidgets={dynamicWidgets} ariaLabel="Atajos y pendientes" />
 

@@ -19,7 +19,7 @@ const LEADS_ABIERTOS: SalesLeadStatus[] = ['NEW', 'QUALIFIED', 'NURTURING'];
  * Actividades vivas. `Asignada` se escribía aquí como `Asignado` (masculino), grafía que el
  * resto del sistema ya no usa: `statusVariants` acepta las dos, así que ninguna fila queda fuera.
  */
-const ESTATUS_ABIERTOS = [
+export const ESTATUS_ABIERTOS = [
   ...new Set([
     ...statusVariants(ACTIVITY_STATUS.PENDIENTE),
     ...statusVariants(ACTIVITY_STATUS.ASIGNADA),
@@ -28,7 +28,7 @@ const ESTATUS_ABIERTOS = [
 ];
 
 /** Facturas que todavía se deben cobrar o pagar. `OVERDUE` casi nunca se escribe: se ve por fecha. */
-const FACTURA_CON_SALDO = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] as const;
+export const FACTURA_CON_SALDO = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] as const;
 
 /** Saldo pendiente = importe menos lo ya cobrado/pagado. */
 export function saldoPendiente(suma: { totalAmount?: unknown; paidAmount?: unknown } | null | undefined): number {
