@@ -70,7 +70,9 @@ Reglas de seguridad: nadie puede dar de alta un tipo que no le concediste, y nin
 4. Que active **quién da de alta a quién** (Antonio, David, Luis).
 5. **Respaldo diario** de la base de datos (es lo más importante que falta).
 
-> **Pendiente de tu decisión:** dónde guardar las contraseñas de las cuentas que se creen (una «bóveda» solo para ti). Ver la pregunta que te hizo tu desarrollador.
+### Acceso a cuentas (solo tú)
+En **Usuarios** aparece el botón **«Acceso a cuentas»** solo para tu cuenta. Vuelves a escribir **tu** contraseña y durante **5 minutos** puedes ponerle una contraseña nueva a cualquier cuenta de la empresa (menos la tuya y la de desarrollo); la ves **una sola vez** para entregarla y esa persona queda con las sesiones cerradas. Cada entrada y cada restablecimiento quedan en la auditoría, sin la contraseña.
+Importante: el sistema **no puede mostrarte la contraseña que alguien ya tiene** —de cada quien solo se guarda una huella irreversible—, por eso lo que puedes hacer es **poner una nueva y verla**. Una «bóveda» que guarde y te muestre las contraseñas (las de hoy y las de cada alta nueva) **todavía no existe**: está diseñada y falta que tu desarrollador la autorice en su herramienta; ver `.ai/RELEVO.md`.
 
 ## 10. Lo que todavía no está (para ser claros)
 - Aprobar **cotizaciones, compras y pagos desde el celular** (hoy desde el celular apruebas viáticos, gastos y solicitudes de la bandeja; en iPhone solo viáticos).

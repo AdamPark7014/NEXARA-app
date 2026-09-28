@@ -16,6 +16,7 @@ import { ClientsModule } from './clients/clients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { FolioModule } from './common/folio/folio.module.js';
 import { UsersModule } from './users/users.module';
+import { AccountAccessModule } from './account-access/account-access.module.js';
 import { AuthModule } from './auth/auth.module';
 import { MeModule } from './me/me.module.js';
 import { ActivitiesModule } from './activities/activities.module';
@@ -116,6 +117,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
     PrismaModule,
     ClientsModule,
     UsersModule,
+    AccountAccessModule,
     AuthModule,
     MeModule,
     ActivitiesModule,

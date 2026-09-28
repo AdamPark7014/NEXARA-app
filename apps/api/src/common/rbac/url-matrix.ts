@@ -279,6 +279,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    // «Acceso a cuentas»: el API solo deja pasar al dueño de la plataforma; aquí solo se permite el camino.
+    { path: '/api/account-access/**', methods: ['GET', 'POST'], scope: 'write' },
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
