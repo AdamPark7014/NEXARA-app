@@ -25,6 +25,7 @@ import EmojiPicker from "./chat/EmojiPicker";
 import { isJumboEmoji } from "@/lib/chat-emoji";
 import { formatApiError } from "@/lib/erp-api";
 import InlineAlert from "@/components/ui/InlineAlert";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import {
   entityMentionToken,
   insertMentionToken,
@@ -71,6 +72,7 @@ type Channel = {
   lastMessagePreview?: string | null;
   unread?: boolean;
   unreadCount?: number;
+  lastReadAt?: string | null;
   muted?: boolean;
   mutedUntil?: string | null;
   /** Vista por jerarquía (dueño / supervisor), no membresía propia */
@@ -123,11 +125,28 @@ type Message = {
   reactions: Reaction[];
   channel?: { id: number; name: string; kind: ChannelKind; slug: string | null };
   receipt?: MessageReceipt | null;
+  /** Cita del mensaje padre cuando ese mensaje ya se eliminó. */
+  replyTo?: { id: number; deleted: true; body: string } | null;
+  /** Marcador local del hilo abierto: el original ya no está en la lista. */
+  deleted?: boolean;
   /** Optimistic client id until server ack */
   clientMsgId?: string;
   pending?: boolean;
   failed?: boolean;
 };
+
+type DeletedPayload = {
+  id: number;
+  channelId: number;
+  parentId?: number | null;
+  authorId?: number;
+  createdAt?: string;
+  lastMessagePreview?: string | null;
+  lastMessageAt?: string | null;
+};
+
+/** Christian (usuario 1). El DELETE del servidor rechaza a cualquier otro. */
+const CHAT_DELETE_USER_ID = 1;
 
 const FAVORITES_KEY = "nexara.chat.favorites";
 const DRAFTS_KEY = "nexara.chat.drafts";
@@ -477,6 +496,7 @@ export default function WorkspaceChat({
   const [readInfo, setReadInfo] = useState<{ seen: ReadPerson[]; pending: ReadPerson[] } | null>(null);
   const [readInfoLoading, setReadInfoLoading] = useState(false);
   const [readInfoError, setReadInfoError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ConfirmState | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [unreadBoundary, setUnreadBoundary] = useState<{ channelId: number; before: string } | null>(null);
   const [notifyOn, setNotifyOn] = useState(() => {
@@ -510,6 +530,8 @@ export default function WorkspaceChat({
   const socketRef = useRef<Socket | null>(null);
   const activeIdRef = useRef<number | null>(null);
   const threadRootRef = useRef<Message | null>(null);
+  const deletedSeenRef = useRef(new Set<number>());
+  const applyDeletedRef = useRef<(payload: DeletedPayload) => void>(() => {});
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nearBottomRef = useRef(true);
   const draftsRef = useRef<Record<number, string>>(loadJson<Record<number, string>>(DRAFTS_KEY, {}));
@@ -546,6 +568,69 @@ export default function WorkspaceChat({
   useEffect(() => {
     threadRootRef.current = threadRoot;
   }, [threadRoot]);
+
+  const canDeleteMessages = currentUserId === CHAT_DELETE_USER_ID;
+  applyDeletedRef.current = (payload) => {
+    const id = Number(payload?.id);
+    if (!Number.isFinite(id) || id <= 0 || deletedSeenRef.current.has(id)) return;
+    deletedSeenRef.current.add(id);
+    const parentId = payload.parentId ?? null;
+    const cite = (m: Message): Message =>
+      m.parentId === id || m.replyTo?.id === id
+        ? { ...m, replyTo: { id, deleted: true, body: "Mensaje eliminado" } }
+        : m;
+    const dropReply = (m: Message): Message =>
+      parentId != null && m.id === parentId
+        ? { ...m, replyCount: Math.max(0, (m.replyCount ?? 0) - 1) }
+        : m;
+
+    setMessages((prev) => prev.filter((m) => m.id !== id).map((m) => dropReply(cite(m))));
+    setThreadReplies((prev) => prev.filter((m) => m.id !== id).map(cite));
+    setPinned((prev) => prev.filter((m) => m.id !== id));
+    setSearchHits((prev) => prev.filter((m) => m.id !== id).map(cite));
+    setThreadRoot((prev) => {
+      if (!prev) return prev;
+      if (prev.id === id) {
+        return {
+          ...prev,
+          body: "Mensaje eliminado",
+          attachmentUrl: null,
+          attachmentName: null,
+          reactions: [],
+          pinnedAt: null,
+          deleted: true,
+        };
+      }
+      return dropReply(cite(prev));
+    });
+    setEditingId((cur) => (cur === id ? null : cur));
+    setReadInfoId((cur) => (cur === id ? null : cur));
+
+    if (parentId != null) return;
+    setChannels((prev) =>
+      prev.map((c) => {
+        if (c.id !== payload.channelId) return c;
+        let unreadCount = c.unreadCount ?? 0;
+        const created = payload.createdAt ? new Date(payload.createdAt).getTime() : 0;
+        const readAt = c.lastReadAt ? new Date(c.lastReadAt).getTime() : 0;
+        const wasUnread =
+          payload.authorId !== currentUserId &&
+          !c.supervised &&
+          created > 0 &&
+          payload.channelId !== activeIdRef.current &&
+          (c.lastReadAt ? created > readAt : true);
+        if (wasUnread) unreadCount = Math.max(0, unreadCount - 1);
+        return {
+          ...c,
+          unreadCount,
+          unread: unreadCount > 0,
+          lastMessagePreview:
+            payload.lastMessagePreview === undefined ? c.lastMessagePreview : payload.lastMessagePreview,
+          lastMessageAt: payload.lastMessageAt === undefined ? c.lastMessageAt : payload.lastMessageAt,
+        };
+      }),
+    );
+  };
 
   useEffect(() => {
     localStorage.setItem("nexara.chat.sound", soundOn ? "1" : "0");
@@ -874,7 +959,11 @@ export default function WorkspaceChat({
         }
         await apiFetch(`chat/channels/${channelId}/read`, token, { method: "PATCH" });
         setChannels((prev) =>
-          prev.map((c) => (c.id === channelId ? { ...c, unread: false, unreadCount: 0 } : c)),
+          prev.map((c) =>
+            c.id === channelId
+              ? { ...c, unread: false, unreadCount: 0, lastReadAt: new Date().toISOString() }
+              : c,
+          ),
         );
       } catch (e) {
         setError(formatApiError(e, "No se pudieron cargar los mensajes"));
@@ -967,6 +1056,11 @@ export default function WorkspaceChat({
       if (msg.channelId === activeIdRef.current && !msg.parentId) {
         setMessages(mergeIncoming);
         void apiFetch(`chat/channels/${msg.channelId}/read`, token, { method: "PATCH" });
+        setChannels((prev) =>
+          prev.map((c) =>
+            c.id === msg.channelId ? { ...c, lastReadAt: msg.createdAt || new Date().toISOString() } : c,
+          ),
+        );
         if (!isMine && !isMuted) {
           playPingRef.current();
           notifyRef.current(msg);
@@ -1013,14 +1107,9 @@ export default function WorkspaceChat({
       });
     });
 
-    socket.on("chat:message-deleted", (payload: { id: number; channelId: number; parentId: number | null }) => {
-      if (payload.parentId) {
-        setThreadReplies((prev) => prev.filter((m) => m.id !== payload.id));
-      } else {
-        setMessages((prev) => prev.filter((m) => m.id !== payload.id));
-      }
-      setPinned((prev) => prev.filter((m) => m.id !== payload.id));
-    });
+    const onDeleted = (payload: DeletedPayload) => applyDeletedRef.current(payload);
+    socket.on("chat:message-deleted", onDeleted);
+    socket.on("chat:message:deleted", onDeleted);
 
     socket.on(
       "chat:channel-activity",
@@ -1399,6 +1488,24 @@ export default function WorkspaceChat({
     }
   };
 
+  const askDelete = (message: Message) => {
+    if (!canDeleteMessages || message.pending || message.id <= 0 || message.deleted) return;
+    setConfirmDelete({
+      title: "Eliminar mensaje",
+      message: "¿Eliminar este mensaje para todos? Desaparece del canal, de los fijados y de la búsqueda.",
+      confirmLabel: "Eliminar",
+      danger: true,
+      fn: async () => {
+        try {
+          const removed = await apiFetch(`chat/messages/${message.id}`, token, { method: "DELETE" });
+          applyDeletedRef.current(removed ?? { id: message.id, channelId: message.channelId, parentId: message.parentId, authorId: message.authorId, createdAt: message.createdAt });
+        } catch (e) {
+          setError(formatApiError(e, "No se pudo eliminar el mensaje"));
+        }
+      },
+    });
+  };
+
   const toggleChannelMute = async () => {
     if (!activeId || detail?.readOnly) return;
     const next = !detail?.muted;
@@ -1768,8 +1875,8 @@ export default function WorkspaceChat({
                       <PushPinIcon aria-hidden="true" sx={{ fontSize: 13 }} />
                     </span>
                   )}
-                  {m.editedAt && <span className={styles.edited}>(editado)</span>}
-                  {mine && (
+                  {m.editedAt && !m.deleted && <span className={styles.edited}>(editado)</span>}
+                  {mine && !m.deleted && (
                     <button
                       type="button"
                       className={styles.receiptBtn}
@@ -1784,7 +1891,13 @@ export default function WorkspaceChat({
                 </div>
               )}
 
-              {editingId === m.id ? (
+              {m.replyTo?.deleted && !m.deleted && (
+                <div className={styles.replyCite}>Mensaje eliminado</div>
+              )}
+
+              {m.deleted ? (
+                <div className={styles.msgDeleted}>Mensaje eliminado</div>
+              ) : editingId === m.id ? (
                 <div className={styles.editBox}>
                   <MentionTextarea
                     value={editDraft}
@@ -1813,7 +1926,7 @@ export default function WorkspaceChat({
                 )
               )}
 
-              {m.attachmentUrl && editingId !== m.id && (
+              {!m.deleted && m.attachmentUrl && editingId !== m.id && (
                 isImageAttachment(m.attachmentName ?? "") ? (
                   <a
                     href={attachmentHref(m.attachmentUrl)}
@@ -1843,7 +1956,7 @@ export default function WorkspaceChat({
                 )
               )}
 
-              {m.reactions?.length > 0 && (
+              {!m.deleted && m.reactions?.length > 0 && (
                 <div className={styles.reactions}>
                   {m.reactions.map((r) => (
                     <div
@@ -1888,9 +2001,9 @@ export default function WorkspaceChat({
                 </div>
               )}
 
-              {!detail?.readOnly && (
+              {!m.deleted && (!detail?.readOnly || canDeleteMessages) && (
               <div className={styles.msgActions} data-emoji-picker>
-                {REACCIONES_RAPIDAS.map((e) => (
+                {!detail?.readOnly && REACCIONES_RAPIDAS.map((e) => (
                   <button
                     key={e}
                     type="button"
@@ -1902,6 +2015,7 @@ export default function WorkspaceChat({
                     <span aria-hidden="true">{e}</span>
                   </button>
                 ))}
+                {!detail?.readOnly && (
                 <button
                   type="button"
                   className={styles.actionBtn}
@@ -1913,7 +2027,8 @@ export default function WorkspaceChat({
                 >
                   <AddReactionOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
                 </button>
-                {emojiPickerFor === m.id && (
+                )}
+                {!detail?.readOnly && emojiPickerFor === m.id && (
                   <div data-emoji-picker>
                     <EmojiPicker
                       title="Reaccionar con un emoji"
@@ -1926,11 +2041,12 @@ export default function WorkspaceChat({
                     />
                   </div>
                 )}
-                {!m.parentId && (
+                {!detail?.readOnly && !m.parentId && (
                   <button type="button" className={styles.actionBtn} onClick={() => void openThread(m)}>
                     Responder
                   </button>
                 )}
+                {!detail?.readOnly && (
                 <button
                   type="button"
                   className={styles.actionBtn}
@@ -1944,7 +2060,8 @@ export default function WorkspaceChat({
                     <PushPinOutlinedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
                   )}
                 </button>
-                {canEdit && (
+                )}
+                {!detail?.readOnly && canEdit && (
                   <button
                     type="button"
                     className={styles.actionBtn}
@@ -1957,7 +2074,7 @@ export default function WorkspaceChat({
                     Editar
                   </button>
                 )}
-                {mine && !m.pending && m.id > 0 && (
+                {!detail?.readOnly && mine && !m.pending && m.id > 0 && (
                   <button
                     type="button"
                     className={styles.actionBtn}
@@ -1967,10 +2084,20 @@ export default function WorkspaceChat({
                     Info
                   </button>
                 )}
+                {canDeleteMessages && !m.pending && m.id > 0 && (
+                  <button
+                    type="button"
+                    className={`${styles.actionBtn} ${styles.actionDanger}`}
+                    title="Eliminar para todos"
+                    onClick={() => askDelete(m)}
+                  >
+                    Eliminar
+                  </button>
+                )}
               </div>
               )}
 
-              {mine && compact && (
+              {mine && compact && !m.deleted && (
                 <div className={styles.receiptLine}>
                   <button
                     type="button"
@@ -2367,6 +2494,7 @@ export default function WorkspaceChat({
                           <div className={styles.searchHitMeta}>
                             {h.author.nombre} · {formatClock(h.createdAt)}
                           </div>
+                          {h.replyTo?.deleted && <div className={styles.replyCite}>Mensaje eliminado</div>}
                           <div className={styles.searchHitBody}>{h.body}</div>
                         </button>
                       ))}
@@ -3333,6 +3461,7 @@ export default function WorkspaceChat({
           </div>
         );
       })()}
+      <ConfirmDialog state={confirmDelete} onClose={() => setConfirmDelete(null)} />
     </>
   );
 }

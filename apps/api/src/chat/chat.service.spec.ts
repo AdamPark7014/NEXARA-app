@@ -1,3 +1,4 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChatChannelKind, ChatMessageKind } from '@prisma/client';
 import { ChatService } from './chat.service.js';
 
@@ -99,6 +100,18 @@ describe('ChatService reaction serialization (serializeMessage)', () => {
   it('devuelve reactions: [] cuando no hay reacciones', () => {
     const result = serialize([]);
     expect(result.reactions).toEqual([]);
+  });
+
+  it('la cita de un padre borrado no devuelve el texto original', () => {
+    const result = (svc as any).serializeMessage({
+      ...baseMessage,
+      parentId: 9,
+      parent: { id: 9, deletedAt: new Date('2026-09-28T12:00:00Z'), body: 'secreto' },
+      reactions: [],
+    });
+    expect(result.replyTo).toEqual({ id: 9, deleted: true, body: 'Mensaje eliminado' });
+    expect(JSON.stringify(result)).not.toContain('secreto');
+    expect(result.body).toBe('hola');
   });
 });
 
@@ -251,5 +264,99 @@ describe('ChatService lecturas por mensaje', () => {
     const created = prisma.chatMessageRead.createMany.mock.calls[0][0];
     expect(created.data[0].readAt).toBeNull();
     expect(prisma.chatChannelMember.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatService.deleteMessage', () => {
+  const mensaje = {
+    id: 44,
+    channelId: 7,
+    authorId: 8,
+    parentId: null as number | null,
+    companyId: 3,
+    createdAt: new Date('2026-09-28T15:00:00Z'),
+    deletedAt: null,
+    body: 'borra esto',
+    pinnedAt: new Date('2026-09-28T15:01:00Z'),
+  };
+
+  function makeSvc(found: typeof mensaje | null = mensaje) {
+    const prisma = {
+      chatMessage: {
+        findFirst: jest.fn().mockResolvedValue(found),
+        update: jest.fn().mockResolvedValue({ ...mensaje, deletedAt: new Date(), deletedById: 1 }),
+      },
+      chatChannel: {
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const realtime = { emitToCompany: jest.fn(), emitToRoom: jest.fn(), emitToUser: jest.fn() };
+    const svc = new ChatService(prisma as any, realtime as any, {} as any);
+    return { prisma, realtime, svc };
+  }
+
+  it('responde 403 a cualquiera que no sea el usuario 1, sin tocar la base', async () => {
+    const { prisma, realtime, svc } = makeSvc();
+    await expect(svc.deleteMessage(44, 2, 3)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.chatMessage.findFirst).not.toHaveBeenCalled();
+    expect(prisma.chatMessage.update).not.toHaveBeenCalled();
+    expect(realtime.emitToCompany).not.toHaveBeenCalled();
+  });
+
+  it('el CEO borra un mensaje ajeno de su empresa, lo desfija y avisa a la empresa', async () => {
+    const { prisma, realtime, svc } = makeSvc();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(mensaje)
+      .mockResolvedValueOnce({ body: 'el anterior', createdAt: new Date('2026-09-28T14:00:00Z') });
+
+    const result = await svc.deleteMessage(44, 1, 3);
+
+    expect(prisma.chatMessage.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 44, deletedAt: null, companyId: 3 }),
+      }),
+    );
+    expect(prisma.chatMessage.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 44 },
+        data: expect.objectContaining({
+          deletedById: 1,
+          pinnedAt: null,
+          pinnedById: null,
+        }),
+      }),
+    );
+    expect(prisma.chatMessage.update.mock.calls[0][0].data.deletedAt).toBeInstanceOf(Date);
+    expect(prisma.chatChannel.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 7 },
+        data: expect.objectContaining({ lastMessagePreview: 'el anterior' }),
+      }),
+    );
+    expect(realtime.emitToCompany).toHaveBeenCalledWith(
+      3,
+      'chat:message-deleted',
+      expect.objectContaining({ id: 44, channelId: 7, authorId: 8, parentId: null }),
+    );
+    expect(realtime.emitToCompany).toHaveBeenCalledWith(
+      3,
+      'chat:message:deleted',
+      expect.objectContaining({ id: 44, lastMessagePreview: 'el anterior' }),
+    );
+    expect(JSON.stringify(result)).not.toContain('borra esto');
+  });
+
+  it('404 si el mensaje es de otra empresa o ya estaba borrado', async () => {
+    const { prisma, svc } = makeSvc(null);
+    await expect(svc.deleteMessage(44, 1, 3)).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.chatMessage.update).not.toHaveBeenCalled();
+  });
+
+  it('una respuesta borrada no reescribe la vista previa del canal', async () => {
+    const reply = { ...mensaje, parentId: 10 };
+    const { prisma, svc } = makeSvc(reply);
+    await svc.deleteMessage(44, 1, 3);
+    expect(prisma.chatChannel.update).not.toHaveBeenCalled();
+    expect(prisma.chatMessage.findFirst).toHaveBeenCalledTimes(1);
   });
 });

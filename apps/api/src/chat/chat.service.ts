@@ -17,6 +17,7 @@ import { resolveUploadsDir } from '../common/uploads-path.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { appUrls } from '../common/app-urls.js';
 import { buildReceipts, type ChatReceipt } from './chat-receipt.js';
+import { citaDeRespuesta, puedeEliminarMensajesDeChat } from './chat-delete-permission.js';
 
 type UploadedChatFile = {
   originalname: string;
@@ -35,6 +36,21 @@ const authorSelect = {
   email: true,
   avatarUrl: true,
 } as const;
+
+/**
+ * Grafo de un mensaje vivo. `replies` no cuenta borrados lógicos.
+ * `parent` se usa solo para saber si la cita debe decir «Mensaje eliminado»;
+ * el cuerpo del padre borrado no sale en la respuesta.
+ */
+const messageGraph = {
+  author: { select: authorSelect },
+  parent: { select: { id: true, deletedAt: true } },
+  reactions: {
+    orderBy: { createdAt: 'asc' as const },
+    include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+  },
+  _count: { select: { replies: { where: { deletedAt: null } } } },
+};
 
 export type PostMessageInput = {
   body: string;
@@ -581,14 +597,7 @@ export class ChatService {
     const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
     const parentId = opts?.parentId === undefined ? null : opts.parentId;
 
-    const include = {
-      author: { select: authorSelect },
-      reactions: {
-        orderBy: { createdAt: 'asc' },
-        include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
-      },
-      _count: { select: { replies: true } },
-    } as const;
+    const include = messageGraph;
 
     if (opts?.aroundId != null && Number.isFinite(opts.aroundId)) {
       const aroundId = opts.aroundId;
@@ -662,6 +671,7 @@ export class ChatService {
       user: { id: number; nombre: string; avatarUrl?: string | null };
     }>;
     _count?: { replies: number };
+    parent?: { id: number; deletedAt: Date | null } | null;
   }) {
     const reactionMap = new Map<
       string,
@@ -701,6 +711,7 @@ export class ChatService {
       author: m.author,
       replyCount: m._count?.replies ?? 0,
       reactions: [...reactionMap.values()],
+      replyTo: citaDeRespuesta(m.parentId, m.parent),
     };
   }
 
@@ -738,12 +749,7 @@ export class ChatService {
         companyId: channel.companyId,
       },
       include: {
-        author: { select: authorSelect },
-        reactions: {
-          orderBy: { createdAt: 'asc' },
-          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
-        },
-        _count: { select: { replies: true } },
+        ...messageGraph,
       },
     });
 
@@ -1059,12 +1065,7 @@ export class ChatService {
     const refreshed = await this.prisma.chatMessage.findUnique({
       where: { id: messageId },
       include: {
-        author: { select: authorSelect },
-        reactions: {
-          orderBy: { createdAt: 'asc' },
-          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
-        },
-        _count: { select: { replies: true } },
+        ...messageGraph,
       },
     });
     if (!refreshed) throw new NotFoundException('Mensaje no encontrado');
@@ -1251,12 +1252,7 @@ export class ChatService {
       where: { id: messageId },
       data: { body: clean, editedAt: new Date() },
       include: {
-        author: { select: authorSelect },
-        reactions: {
-          orderBy: { createdAt: 'asc' },
-          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
-        },
-        _count: { select: { replies: true } },
+        ...messageGraph,
       },
     });
 
@@ -1380,12 +1376,7 @@ export class ChatService {
         pinnedAt: { not: null },
       },
       include: {
-        author: { select: authorSelect },
-        reactions: {
-          orderBy: { createdAt: 'asc' },
-          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
-        },
-        _count: { select: { replies: true } },
+        ...messageGraph,
       },
       orderBy: { pinnedAt: 'desc' },
       take: 50,
@@ -1411,18 +1402,95 @@ export class ChatService {
         ? { pinnedAt: null, pinnedById: null }
         : { pinnedAt: new Date(), pinnedById: userId },
       include: {
-        author: { select: authorSelect },
-        reactions: {
-          orderBy: { createdAt: 'asc' },
-          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
-        },
-        _count: { select: { replies: true } },
+        ...messageGraph,
       },
     });
 
     const payload = this.serializeMessage(updated);
     this.realtime.emitToRoom(this.room(message.channelId), 'chat:message-updated', payload);
     return payload;
+  }
+
+  /**
+   * Borrado lógico de cualquier mensaje de la empresa.
+   *
+   * Solo Christian (usuario 1). Otro id recibe 403 aunque arme el DELETE a mano.
+   * No exige ser el autor ni miembro del canal: vale en canales y en DM de su
+   * empresa. El texto queda en la base (`deletedAt` + `deletedById`); las
+   * lecturas filtran `deletedAt: null`, así que desaparece de la lista, de los
+   * fijados, de la búsqueda y del contador de no leídos. Las respuestas que lo
+   * citaban reciben `replyTo` = «Mensaje eliminado», sin el cuerpo original.
+   * Se quita el pin en la misma escritura. El aviso en vivo es
+   * `chat:message-deleted` (el que ya escuchan web, iOS y Android) y también
+   * `chat:message:deleted`, a la sala de la empresa (una sola vez por socket).
+   */
+  async deleteMessage(messageId: number, userId: number, companyId?: number | null) {
+    if (!puedeEliminarMensajesDeChat(userId)) {
+      throw new ForbiddenException('Solo el CEO puede eliminar mensajes');
+    }
+    const cid = requireCompanyId(companyId);
+    const message = await this.prisma.chatMessage.findFirst({
+      where: {
+        id: messageId,
+        deletedAt: null,
+        companyId: cid,
+      },
+    });
+    if (!message) throw new NotFoundException('Mensaje no encontrado');
+    assertCompanyAccess(message, cid, 'Mensaje');
+
+    const now = new Date();
+    const updated = await this.prisma.chatMessage.update({
+      where: { id: message.id },
+      data: {
+        deletedAt: now,
+        deletedById: userId,
+        pinnedAt: null,
+        pinnedById: null,
+      },
+    });
+    if (!updated) throw new NotFoundException('Mensaje no encontrado');
+
+    let lastMessagePreview: string | null | undefined;
+    let lastMessageAt: string | null | undefined;
+    if (!message.parentId) {
+      const latest = await this.prisma.chatMessage.findFirst({
+        where: {
+          channelId: message.channelId,
+          deletedAt: null,
+          parentId: null,
+          companyId: cid,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { body: true, createdAt: true },
+      });
+      lastMessagePreview = latest ? this.preview(latest.body) : null;
+      lastMessageAt = latest?.createdAt ? latest.createdAt.toISOString() : null;
+      await this.prisma.chatChannel.update({
+        where: { id: message.channelId },
+        data: {
+          lastMessagePreview,
+          lastMessageAt: latest?.createdAt ?? null,
+        },
+      });
+    }
+
+    const payload = {
+      id: message.id,
+      channelId: message.channelId,
+      parentId: message.parentId,
+      authorId: message.authorId,
+      createdAt: message.createdAt.toISOString(),
+      ...(message.parentId
+        ? {}
+        : {
+            lastMessagePreview: lastMessagePreview ?? null,
+            lastMessageAt: lastMessageAt ?? null,
+          }),
+    };
+    this.realtime.emitToCompany(cid, 'chat:message-deleted', payload);
+    this.realtime.emitToCompany(cid, 'chat:message:deleted', payload);
+    return { ok: true, ...payload };
   }
 
   async searchMessages(userId: number, q: string, channelId?: number, companyId?: number | null) {
@@ -1468,13 +1536,8 @@ export class ChatService {
         body: { contains: query, mode: 'insensitive' },
       },
       include: {
-        author: { select: authorSelect },
+        ...messageGraph,
         channel: { select: { id: true, name: true, kind: true, slug: true } },
-        reactions: {
-          orderBy: { createdAt: 'asc' },
-          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
-        },
-        _count: { select: { replies: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 30,
