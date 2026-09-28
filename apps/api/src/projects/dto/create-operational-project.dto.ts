@@ -26,14 +26,17 @@ export class CreateOperationalProjectDto {
   @IsInt()
   salesProjectId?: number;
 
+  /** Si no viene, el proyecto queda a nombre de quien lo crea. */
+  @IsOptional()
   @IsNumber()
-  vendorId!: number;
+  vendorId?: number;
 
   @IsNumber()
   clientId!: number;
 
+  @IsOptional()
   @IsDateString()
-  startDate!: string;
+  startDate?: string;
 
   @IsOptional()
   @IsDateString()

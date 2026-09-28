@@ -51,6 +51,7 @@ describe('OperationalProjectsService: alta rápida desde una actividad', () => {
       }),
     );
     expect(prisma.salesClient.findFirst.mock.calls[0][0].where.companyId).toBe(7);
+    expect(prisma.operationalProject.create.mock.calls[0][0].data.startDate).toBeNull();
   });
 
   it('provisiona el cliente de operación si el padrón todavía no lo tiene', async () => {

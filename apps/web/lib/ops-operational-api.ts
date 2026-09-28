@@ -7,7 +7,7 @@ export type OperationalProject = {
   projectType?: string | null;
   scopeSummary?: string | null;
   status: string;
-  startDate: string;
+  startDate?: string | null;
   endDate?: string | null;
   siteCount?: number | null;
   salesProjectId?: number | null;
@@ -157,7 +157,7 @@ export type CreateOperationalProjectPayload = {
   title: string;
   clientId: number;
   vendorId: number;
-  startDate: string;
+  startDate?: string;
   projectType?: string;
   description?: string;
   scopeSummary?: string;

@@ -276,8 +276,8 @@ model OperationalProject {
   responsableId  Int?
   clientId       Int
   companyId      Int
-  /// Inicio **planeado**.
-  startDate      DateTime
+  /// Inicio **planeado**. Vacío hasta que se capture: al crear basta el nombre y el cliente.
+  startDate      DateTime?
   /// Fin **planeado** (contra el que se mide el retraso).
   endDate        DateTime?
   /// Inicio **real**: el día que de verdad arrancó.

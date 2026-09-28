@@ -320,7 +320,7 @@ export const DIAS_ETAPA_SIN_FECHA = 7;
  */
 export function encadenarEtapas(
   etapas: EtapaParaPeriodo[],
-  inicioProyecto: Date | string,
+  inicioProyecto: Date | string | null | undefined,
   finProyecto?: Date | string | null,
 ): EtapaConPeriodo[] {
   const arranque = claveDia(inicioProyecto);

@@ -3,8 +3,9 @@
  * único POST que crea el proyecto completo.
  *
  * Vive fuera de la página para poder probarlo: las reglas copian lo que la API rechaza
- * (título y renglones de al menos 3 letras, fin después del inicio) para decirlo antes de
- * mandar nada, y el armado descarta los renglones que quedaron vacíos.
+ * (nombre y cliente; renglones de al menos 3 letras; fin después del inicio si ambos vienen)
+ * para decirlo antes de mandar nada, y el armado descarta los renglones que quedaron vacíos.
+ * Fechas, responsable, presupuesto y el resto se pueden dejar vacíos.
  */
 import type {
   CrearProyecto,
@@ -62,7 +63,7 @@ export function borradorVacio(hoy: string, responsableId: string): BorradorProye
     siteCount: "",
     description: "",
     objective: "",
-    startDate: hoy,
+    startDate: "",
     endDate: "",
     budget: "",
     currency: "MXN",
@@ -102,7 +103,7 @@ export function erroresDelPaso(paso: PasoAlta, b: BorradorProyecto): string[] {
     case "fechas": {
       const inicio = diaDe(b.startDate);
       const fin = diaDe(b.endDate);
-      if (inicio === null) errores.push("Pon la fecha de inicio planeada.");
+      if (b.startDate.trim() && inicio === null) errores.push("La fecha de inicio no es válida.");
       if (inicio !== null && fin !== null && fin < inicio) {
         errores.push("El fin planeado no puede ser antes del inicio.");
       }
@@ -110,7 +111,6 @@ export function erroresDelPaso(paso: PasoAlta, b: BorradorProyecto): string[] {
       if (importe !== null && (!Number.isFinite(importe) || importe < 0)) {
         errores.push("El presupuesto debe ser una cantidad (sin letras).");
       }
-      if (!b.responsableId) errores.push("Elige quién es el responsable del proyecto.");
       break;
     }
     case "cronograma": {
@@ -206,7 +206,7 @@ export function cuerpoDeAlta(b: BorradorProyecto, clientId: number): CrearProyec
     ...(b.objective.trim() ? { objective: b.objective.trim() } : {}),
     ...(b.scopeSummary.trim() ? { scopeSummary: b.scopeSummary.trim() } : {}),
     ...(sitios !== undefined && Number.isInteger(sitios) && sitios >= 0 ? { siteCount: sitios } : {}),
-    startDate: b.startDate,
+    ...(b.startDate ? { startDate: b.startDate } : {}),
     ...(b.endDate ? { endDate: b.endDate } : {}),
     ...(importe !== null && Number.isFinite(importe) ? { budgetAmount: importe } : {}),
     currency: (b.currency || "MXN").toUpperCase(),
