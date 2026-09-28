@@ -72,6 +72,9 @@ services:
       HTTP_HEADERS_TIMEOUT_MS: ${HTTP_HEADERS_TIMEOUT_MS:-96000}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      # Llave de la bóveda de contraseñas del dueño (64 hex). Vive SOLO aquí, nunca en la base ni en el repo.
+      # Sin ella la bóveda no guarda ni muestra nada. Respáldala: si se pierde, lo guardado no se puede leer.
+      VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY:-}
       WEB_URL: ${WEB_URL}
       PUBLIC_WEB_URL: ${WEB_URL}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON}

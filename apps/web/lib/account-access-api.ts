@@ -2,7 +2,8 @@
  * «Acceso a cuentas» — solo el dueño (Christian). Consume `apps/api/src/account-access`.
  *
  * Vuelve a escribir su contraseña (`unlock`), recibe una ficha de 5 minutos (que vive solo en memoria de
- * la pantalla) y con ella lista las cuentas y restablece la de cualquiera; la contraseña nueva se ve UNA vez.
+ * la pantalla) y con ella lista las cuentas, ve la contraseña guardada de una cuenta (cifrada en la bóveda
+ * del servidor) y restablece la de cualquiera (la nueva también queda guardada).
  */
 import { buildApiUrl } from "@/lib/api-base";
 
@@ -13,10 +14,14 @@ export type CuentaEmpresa = {
   roleKey: string | null;
   isActive: boolean;
   passwordChangedAt: string | null;
+  /** ¿Hay una contraseña guardada que se pueda mostrar? (la lista nunca trae la contraseña) */
+  guardada: boolean;
+  guardadaEl: string | null;
 };
 
 export type Desbloqueo = { ficha: string; venceEn: string };
 export type ContrasenaNueva = { id: number; nombre: string; email: string; password: string };
+export type EstadoCuentas = { puedeEntrar: boolean; bovedaLista: boolean };
 
 async function pedir<T>(path: string, token: string, init: RequestInit = {}, ficha?: string): Promise<T> {
   const headers: Record<string, string> = {
@@ -39,15 +44,22 @@ async function pedir<T>(path: string, token: string, init: RequestInit = {}, fic
   return (await res.json()) as T;
 }
 
-/** ¿Esta persona puede entrar? Cualquier fallo = no (no se muestra el enlace). */
-export async function puedeEntrarACuentas(token: string): Promise<boolean> {
+/** ¿Esta persona puede entrar y la bóveda tiene llave? Cualquier fallo = no (no se muestra el enlace). */
+export async function estadoCuentas(token: string): Promise<EstadoCuentas> {
   try {
-    const r = await pedir<{ puedeEntrar?: boolean }>("account-access/status", token);
-    return r?.puedeEntrar === true;
+    const r = await pedir<{ puedeEntrar?: boolean; bovedaLista?: boolean }>("account-access/status", token);
+    return { puedeEntrar: r?.puedeEntrar === true, bovedaLista: r?.bovedaLista === true };
   } catch {
-    return false;
+    return { puedeEntrar: false, bovedaLista: false };
   }
 }
+
+export async function puedeEntrarACuentas(token: string): Promise<boolean> {
+  return (await estadoCuentas(token)).puedeEntrar;
+}
+
+export const revelarContrasena = (token: string, ficha: string, userId: number) =>
+  pedir<ContrasenaNueva>(`account-access/users/${userId}/reveal`, token, { method: "POST" }, ficha);
 
 export const desbloquearCuentas = (token: string, password: string) =>
   pedir<Desbloqueo>("account-access/unlock", token, { method: "POST", body: JSON.stringify({ password }) });

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, Optional, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -11,6 +11,7 @@ import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
+import { CredentialVaultService } from '../credential-vault/credential-vault.service.js';
 import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL } from '../common/platform-accounts.js';
 import { asignablesDe, esJefe } from '../me/equipo-alcance.js';
 import { motivoLateralInvalida } from './organigrama-lateral.js';
@@ -333,6 +334,8 @@ export class UsersService {
     @Inject(forwardRef(() => ChatService))
     private readonly chat: ChatService,
     private readonly acsFanout: IntegraAcsFanoutService,
+    /** Bóveda del dueño: guarda cifrada la contraseña que se pone aquí. Opcional (pruebas). */
+    @Optional() private readonly vault?: CredentialVaultService,
   ) {}
 
   /**
@@ -701,6 +704,8 @@ export class UsersService {
         return this.withEmployeeNumber(updatedUser);
       });
       await this.chat.addUserToOrgChannels(created.id);
+      // Contraseña inicial a la bóveda del dueño (cifrada). Si no se puede guardar, el alta sigue igual.
+      await this.vault?.guardar({ userId: created.id, email: created.email, password: createUserDto.password, companyId: tenantId });
       const acsPush = await this.pushAcsFromErp({
         companyId: tenantId,
         userId: created.id,
@@ -1051,7 +1056,9 @@ export class UsersService {
     const nextEmail = data.email !== undefined ? String(data.email || '') : String(currentUser?.email || '');
     const isProtectedUser = this.isProtectedSuperAdminEmail(nextEmail);
 
+    let nuevaContrasena: string | null = null;
     if (data.password) {
+      nuevaContrasena = String(data.password);
       data.passwordHash = await bcrypt.hash(data.password, 10);
       data.passwordChangedAt = new Date();
       delete data.password;
@@ -1094,6 +1101,13 @@ export class UsersService {
         where: { id },
         data,
       });
+
+      // La contraseña cambió: la bóveda del dueño guarda la nueva (cifrada) y, si no puede, olvida la vieja
+      // para no mostrar una contraseña que ya no sirve.
+      if (nuevaContrasena && this.vault) {
+        const guardada = await this.vault.guardar({ userId: id, email: user.email, password: nuevaContrasena, companyId });
+        if (!guardada) await this.vault.olvidar(id);
+      }
 
       if (syncMembershipEmployeeNumber && companyId != null) {
         const tenantId = requireCompanyId(companyId);
