@@ -599,21 +599,23 @@ jobs:
               echo "Keeping bundle with privacy manifest: $bundle (name='$name', CFBundleIdentifier='$id')"
               # Sin Info.plist PlistBuddy lo crea al añadir la primera clave.
               #
-              # OJO: NO se le añaden CFBundleShortVersionString/CFBundleVersion.
-              # Se probaron antes (28-09) y con eso `altool --upload-app` fallaba
-              # con "Cannot determine the Apple ID from Bundle ID
-              # 'firebase-ios-sdk.FirebaseCore.resources' and platform 'IOS'. (12)":
-              # el SDK de Firebase YA trae su propio CFBundleIdentifier de fábrica
-              # (con pinta de bundle id real) en este `.bundle` de solo recursos
-              # (CFBundlePackageType=BNDL, sin ejecutable); al sumarle ademas una
-              # version que coincidia con la de la app, altool lo trataba como si
-              # fuera un producto propio que debe existir en App Store Connect, y
-              # al no encontrarlo abortaba la subida entera. Apple solo exige que
-              # el manifiesto de privacidad EXISTA (ITMS-91061); no exige que el
-              # bundle de recursos tenga version. Si el archivo NO tiene todavia
-              # CFBundleIdentifier (bundle propio nuestro, no de un SDK de
-              # terceros), sí se le pone uno para que `plutil -lint` no truene.
-              add_if_missing "$binfo" CFBundleIdentifier "mx.nexara.mobile.resources.$(printf '%s' "${name%.bundle}" | tr -c 'A-Za-z0-9.-' '-')"
+              # `altool --upload-app` (Xcode 26.3) rechaza la subida ENTERA si
+              # cualquier bundle embebido, aunque sea de solo-recursos (BNDL, sin
+              # ejecutable), trae CFBundleIdentifier: "Cannot determine the Apple
+              # ID from Bundle ID '<id>' and platform 'IOS'. (12)". Confirmado dos
+              # veces (28-09, runs #56 y #57) con el mismo id de fábrica del SDK
+              # de Firebase (firebase-ios-sdk.FirebaseCore.resources): quitarle
+              # la versión (CFBundleShortVersionString/CFBundleVersion) en el
+              # segundo intento NO lo arregló — el problema es la SOLA presencia
+              # del identificador, altool lo trata como una app propia que debe
+              # existir en App Store Connect, y como no existe, aborta. Apple
+              # solo exige que el manifiesto de privacidad EXISTA (ITMS-91061);
+              # un bundle de recursos no necesita CFBundleIdentifier. Por eso se
+              # BORRA si ya trae uno de fábrica y no se le pone ninguno propio.
+              if [ -n "$id" ]; then
+                /usr/libexec/PlistBuddy -c 'Delete :CFBundleIdentifier' "$binfo" || true
+                echo "    - CFBundleIdentifier eliminado (era '$id')"
+              fi
               add_if_missing "$binfo" CFBundleName "${name%.bundle}"
               add_if_missing "$binfo" CFBundlePackageType "BNDL"
               /usr/bin/plutil -lint "$binfo" || { echo "ERROR: Info.plist parcheado de $name no valida"; exit 1; }
