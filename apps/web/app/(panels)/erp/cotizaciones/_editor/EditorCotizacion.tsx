@@ -218,10 +218,16 @@ export default function EditorCotizacion({
         const creada = await crearCotizacion(token, { ...completo, activityId: activityId ?? undefined });
         idRef.current = creada.id;
         setId(creada.id);
+        if (creada.salesClientId) {
+          setDoc((d) => (d.salesClientId ? d : { ...d, salesClientId: creada.salesClientId ?? null }));
+        }
         // Sin recargar: el documento sigue en pantalla con lo que se esté escribiendo.
         window.history.replaceState(null, "", `/erp/cotizaciones/${creada.id}`);
       } else {
-        await actualizarCotizacion(token, idRef.current, cambios);
+        const actualizada = await actualizarCotizacion(token, idRef.current, cambios);
+        if (actualizada.salesClientId) {
+          setDoc((d) => (d.salesClientId ? d : { ...d, salesClientId: actualizada.salesClientId ?? null }));
+        }
       }
       // La vista previa no espera al guardado: ya se arma con lo que está en pantalla.
       await recargar();

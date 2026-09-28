@@ -4,7 +4,10 @@
  * Ver clientes sigue las reglas de sector (`client-sectors.ts`); esto solo decide quién los
  * modifica. Agregar y editar: coordinación y gerencia (y la encargada comercial, rol
  * `administrativo`), más quien tiene gente a su cargo salvo que su rol sea operativo.
- * Un ingeniero o un operativo no da de alta clientes aunque tenga personal reportándole.
+ * Un ingeniero o un operativo no da de alta clientes aunque tenga personal reportándole,
+ * con una excepción: al crear una actividad de servicio puede dar de alta rápido un
+ * cliente CORPORATIVO con solo nombre y contacto (correo y teléfono). No edita el
+ * padrón ni captura RFC ni datos fiscales.
  * Desactivar y eliminar: solo Christian (y su equivalente de pruebas); la cuenta de
  * desarrollo conserva el acceso técnico total.
  */
@@ -61,6 +64,8 @@ export type ClientPermissions = {
   puedeEditar: boolean;
   puedeDesactivar: boolean;
   puedeEliminar: boolean;
+  /** Operativo: alta rápida de cliente corporativo (nombre y contacto) desde una actividad de servicio. */
+  puedeAltaRapidaCorporativa: boolean;
 };
 
 /** Christian, su equivalente de pruebas o la cuenta de desarrollo (acceso técnico total). */
@@ -88,10 +93,25 @@ export function canManageClients(actor: ClientActor | null | undefined, hasDirec
   return hasDirectReports;
 }
 
+/**
+ * Alta rápida desde una actividad de servicio: solo operativos, y solo un cliente
+ * corporativo con nombre y contacto. No abre el padrón ni la edición.
+ */
+export function canQuickCreateCorporateClient(actor?: ClientActor | null): boolean {
+  if (!actor || !isOperationalClientRole(actor.roleKey)) return false;
+  return !canManageClients(actor, false);
+}
+
 export function clientPermissions(actor: ClientActor | null | undefined, hasDirectReports: boolean): ClientPermissions {
   const manage = canManageClients(actor, hasDirectReports);
   const owner = canDeleteOrDeactivateClient(actor);
-  return { puedeAgregar: manage, puedeEditar: manage, puedeDesactivar: owner, puedeEliminar: owner };
+  return {
+    puedeAgregar: manage,
+    puedeEditar: manage,
+    puedeDesactivar: owner,
+    puedeEliminar: owner,
+    puedeAltaRapidaCorporativa: canQuickCreateCorporateClient(actor),
+  };
 }
 
 /** «Inactivo» (o «inactive») sin importar mayúsculas ni espacios. */

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
+import { DatosClienteOpcionales } from "@/components/erp/DatosCliente";
+import { clientSectorsForUser } from "@/lib/client-sectors";
 import { createSalesClient, getClientPermissions, listSalesClients, provisionSalesServiceClient, type SalesClient } from "@/lib/sales-api";
 import { listarCotizaciones, type CotizacionRow } from "@/lib/cotizaciones-api";
 import {
@@ -77,6 +79,7 @@ export default function NuevoProyectoPage() {
   const [cargandoClientes, setCargandoClientes] = useState(true);
   const [errorClientes, setErrorClientes] = useState<string | null>(null);
   const [puedeAgregarCliente, setPuedeAgregarCliente] = useState(false);
+  const [puedeEditarCliente, setPuedeEditarCliente] = useState(false);
   const [altaNombre, setAltaNombre] = useState("");
   const [altaAbierta, setAltaAbierta] = useState(false);
   const [altaGuardando, setAltaGuardando] = useState(false);
@@ -100,7 +103,7 @@ export default function NuevoProyectoPage() {
     if (!token) return;
     let vivo = true;
     setCargandoClientes(true);
-    listSalesClients(token)
+    listSalesClients(token, { sector: "PROYECTO" })
       .then((rows) => {
         if (!vivo) return;
         setClientes([...rows].sort((x, y) => x.name.localeCompare(y.name, "es")));
@@ -109,8 +112,16 @@ export default function NuevoProyectoPage() {
       .catch((e) => vivo && setErrorClientes(formatApiError(e, "No se pudieron cargar los clientes")))
       .finally(() => vivo && setCargandoClientes(false));
     getClientPermissions(token)
-      .then((p) => vivo && setPuedeAgregarCliente(Boolean(p?.puedeAgregar)))
-      .catch(() => vivo && setPuedeAgregarCliente(false));
+      .then((p) => {
+        if (!vivo) return;
+        setPuedeAgregarCliente(Boolean(p?.puedeAgregar));
+        setPuedeEditarCliente(Boolean(p?.puedeEditar));
+      })
+      .catch(() => {
+        if (!vivo) return;
+        setPuedeAgregarCliente(false);
+        setPuedeEditarCliente(false);
+      });
     listarCotizaciones(token)
       .then((rows) => vivo && setCotizaciones(rows))
       .catch(() => vivo && setErrorCotizaciones("No se pudieron cargar las cotizaciones; puedes ligarla después."));
@@ -306,7 +317,7 @@ export default function NuevoProyectoPage() {
           {!cargandoClientes && !clientes.length && !errorClientes ? (
             <p className={styles.hint}>No tienes clientes a la vista. Da de alta uno aquí y sigue con el proyecto.</p>
           ) : null}
-          {puedeAgregarCliente ? (
+          {puedeAgregarCliente && clientSectorsForUser(user).includes("PROYECTO") ? (
             <div className={styles.hint}>
               {altaAbierta ? (
                 <div className={styles.grid2}>
@@ -326,7 +337,12 @@ export default function NuevoProyectoPage() {
                       if (!token) return;
                       setAltaGuardando(true);
                       setErrorAlta(null);
-                      createSalesClient(token, { name: altaNombre.trim(), status: "Activo" })
+                      createSalesClient(token, {
+                        name: altaNombre.trim(),
+                        status: "Activo",
+                        tipo: "PROYECTO",
+                        sectors: ["PROYECTO"],
+                      })
                         .then((creado) => {
                           setClientes((prev) =>
                             [...prev.filter((c) => c.id !== creado.id), creado].sort((x, y) =>
@@ -352,6 +368,11 @@ export default function NuevoProyectoPage() {
               {errorAlta ? <p className={styles.error}>{errorAlta}</p> : null}
             </div>
           ) : null}
+          <DatosClienteOpcionales
+            token={token}
+            clientId={clienteElegido ? clienteElegido.id : null}
+            puedeEditar={puedeEditarCliente && clientSectorsForUser(user).includes("PROYECTO")}
+          />
         </div>
 
         <div className={styles.grid2}>

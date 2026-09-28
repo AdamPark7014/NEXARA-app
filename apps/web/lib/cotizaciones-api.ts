@@ -330,7 +330,7 @@ export type GuardarCotizacion = {
 };
 
 export function crearCotizacion(token: string, payload: GuardarCotizacion) {
-  return cotFetch<{ id: number; quoteNumber: string }>("cotizaciones", token, {
+  return cotFetch<{ id: number; quoteNumber: string; salesClientId?: number | null }>("cotizaciones", token, {
     method: "POST",
     // La API pide la lista de partidas aunque vaya vacía (el borrador nace sin partidas).
     body: JSON.stringify({ ...payload, items: payload.items ?? [] }),
@@ -338,7 +338,7 @@ export function crearCotizacion(token: string, payload: GuardarCotizacion) {
 }
 
 export function actualizarCotizacion(token: string, id: number, payload: Partial<GuardarCotizacion>) {
-  return cotFetch<{ id: number; quoteNumber: string }>(`cotizaciones/${id}`, token, {
+  return cotFetch<{ id: number; quoteNumber: string; salesClientId?: number | null }>(`cotizaciones/${id}`, token, {
     method: "PUT",
     body: JSON.stringify(payload),
   });

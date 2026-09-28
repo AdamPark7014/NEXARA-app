@@ -1,13 +1,16 @@
 import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import {
   canDeleteOrDeactivateClient,
   canManageClients,
+  canQuickCreateCorporateClient,
   CLIENT_DEACTIVATE_FORBIDDEN,
   CLIENT_DELETE_FORBIDDEN,
   CLIENT_MANAGE_FORBIDDEN,
   clientPermissions,
   isInactiveClientStatus,
 } from './client-permissions.js';
+import { tipoPorUso } from './client-tipo.js';
 import { VentasService } from './ventas.service.js';
 
 const CHRISTIAN = { id: 1, email: 'gerencia@nexara.com.mx', roleKey: 'ceo', isSuperAdmin: true };
@@ -68,19 +71,41 @@ describe('permisos de clientes (reglas puras)', () => {
     expect(canManageClients(undefined, true)).toBe(false);
   });
 
-  it('resume los cuatro permisos para web y apps', () => {
+  it('resume los permisos para web y apps', () => {
     expect(clientPermissions(ADMINISTRATIVA, false)).toEqual({
       puedeAgregar: true,
       puedeEditar: true,
       puedeDesactivar: false,
       puedeEliminar: false,
+      puedeAltaRapidaCorporativa: false,
     });
     expect(clientPermissions(CHRISTIAN, false)).toEqual({
       puedeAgregar: true,
       puedeEditar: true,
       puedeDesactivar: true,
       puedeEliminar: true,
+      puedeAltaRapidaCorporativa: false,
     });
+    expect(clientPermissions(TECNICO, true)).toEqual({
+      puedeAgregar: false,
+      puedeEditar: false,
+      puedeDesactivar: false,
+      puedeEliminar: false,
+      puedeAltaRapidaCorporativa: true,
+    });
+    expect(canQuickCreateCorporateClient(TECNICO)).toBe(true);
+    expect(canQuickCreateCorporateClient(LUIS)).toBe(false);
+  });
+
+  it('clasifica por el uso más reciente y, si empatan o no hay uso, queda comercial', () => {
+    const dia = (n: number) => new Date(`2026-09-${String(n).padStart(2, '0')}T12:00:00.000Z`);
+    expect(tipoPorUso({})).toBe('COMERCIAL');
+    expect(tipoPorUso({ comercialAt: dia(1) })).toBe('COMERCIAL');
+    expect(tipoPorUso({ proyectoAt: dia(2) })).toBe('PROYECTO');
+    expect(tipoPorUso({ corporativoAt: dia(3) })).toBe('CORPORATIVO');
+    expect(tipoPorUso({ comercialAt: dia(1), proyectoAt: dia(4), corporativoAt: dia(2) })).toBe('PROYECTO');
+    expect(tipoPorUso({ proyectoAt: dia(5), corporativoAt: dia(5) })).toBe('COMERCIAL');
+    expect(tipoPorUso({ comercialAt: dia(6), proyectoAt: dia(6) })).toBe('COMERCIAL');
   });
 
   it('reconoce «Inactivo» sin importar mayúsculas', () => {
@@ -204,6 +229,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
         data: expect.objectContaining({
           name: 'Cliente de Luis',
           companyId: 7,
+          tipo: 'CORPORATIVO',
           sectors: { create: [expect.objectContaining({ sector: 'CORPORATIVO', companyId: 7 })] },
         }),
       }),
@@ -256,12 +282,60 @@ describe('VentasService · eliminar y desactivar clientes', () => {
       puedeEditar: true,
       puedeDesactivar: false,
       puedeEliminar: false,
+      puedeAltaRapidaCorporativa: false,
     });
     await expect(service.getClientPermissions(DAVID_JEFE)).resolves.toEqual({
       puedeAgregar: false,
       puedeEditar: false,
       puedeDesactivar: false,
       puedeEliminar: false,
+      puedeAltaRapidaCorporativa: true,
     });
+  });
+
+  it('un operativo da de alta rápido un corporativo con nombre y contacto, y no captura el RFC', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: 9, serviceClientId: null, sectors: [], ...data }),
+    );
+    await service.createClient(
+      { name: 'Sucursal Norte', tipo: 'CORPORATIVO', altaRapida: true, billingPhone: '5512345678' } as any,
+      TECNICO,
+      7,
+    );
+    expect(prisma.salesClient.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Sucursal Norte',
+          tipo: 'CORPORATIVO',
+          billingPhone: '5512345678',
+          taxId: null,
+          companyId: 7,
+        }),
+      }),
+    );
+    await expect(
+      service.createClient(
+        { name: 'Con RFC', tipo: 'CORPORATIVO', altaRapida: true, taxId: 'XAXX010101000' } as any,
+        TECNICO,
+        7,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      service.createClient({ name: 'Comercial', tipo: 'COMERCIAL', altaRapida: true } as any, TECNICO, 7),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('un operativo lista clientes corporativos de su empresa y no los comerciales', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.findMany = jest.fn().mockResolvedValue([]);
+    await service.listClients(TECNICO, undefined, { sector: 'CORPORATIVO' } as any, 7);
+    const donde = prisma.salesClient.findMany.mock.calls[0][0].where;
+    expect(donde.companyId).toBe(7);
+    expect(donde.tipo).toBe('CORPORATIVO');
+    expect(donde.ownerId).toBeUndefined();
+    await expect(service.listClients(TECNICO, undefined, { sector: 'COMERCIAL' } as any, 7)).rejects.toThrow(
+      ForbiddenException,
+    );
   });
 });

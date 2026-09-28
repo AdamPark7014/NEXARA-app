@@ -2758,6 +2758,11 @@ model SalesClient {
   ownerId         Int?
   serviceClientId Int?
   companyId       Int
+  /// Un cliente es de un solo tipo. COMERCIAL se elige en la cotización, PROYECTO en
+  /// el módulo de proyectos y CORPORATIVO al crear una actividad de servicio.
+  /// La clasificación de los que ya existían está en la migración
+  /// `20260928220000_sales_client_tipo` (el uso más reciente; empate o sin uso → COMERCIAL).
+  tipo            ClientSector          @default(COMERCIAL)
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   documents       SalesClientDocument[]
@@ -2773,10 +2778,12 @@ model SalesClient {
   invoices Invoice[]
 
   @@index([companyId])
+  @@index([companyId, tipo])
   @@map("sales_clients")
 }
 
-/// Membresía multi-sector Core: un SalesClient puede estar en proyecto, corporativo y/o comercial.
+/// Membresía del tipo del cliente. Desde `tipo` en SalesClient hay una sola fila, la de ese tipo.
+/// Se conserva para no romper lecturas viejas que filtraban por sector.
 model SalesClientSector {
   id            Int          @id @default(autoincrement())
   salesClientId Int

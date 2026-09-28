@@ -425,17 +425,16 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "erp-clients": {
     id: "erp-clients", panel: PANELS.ERP, path: "/clientes",
-    label: "Clientes", description: "Proyecto, corporativo y comercial",
+    label: "Clientes", description: "Fuera del menú: se administran en cotización, proyecto o servicio",
     icon: "🤝",
-    // Coordinación, gerencia y comercial. El menú fino lo decide `canAccessClientPadron`
-    // (correo del encargado o rol); un ingeniero no lo hereda por ANY_INTERNAL.
-    // Crear y editar lo vuelve a validar el API (`client-permissions`).
+    // Ya no sale en el sidebar (`shouldShowModuleInSidebar` lo apaga). La ruta sigue
+    // para quien tenga el enlace. Crear y editar lo valida el API (`client-permissions`).
     allowedRoles: [
       R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
       R.ARQUITECTO, R.COORD_OPERACIONES, R.PROJECT_MANAGER, R.MAINTENANCE_COORDINATOR,
       R.SALES_MANAGER, R.ADMIN_STAFF, R.SALES_REP,
     ],
-    group: "Hoy", visible: true,
+    group: "Hoy", visible: false,
   },
   "erp-cotizaciones": {
     id: "erp-cotizaciones", panel: PANELS.ERP, path: "/cotizaciones",

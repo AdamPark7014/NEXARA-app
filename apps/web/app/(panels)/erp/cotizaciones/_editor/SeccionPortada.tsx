@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { getClientPermissions, listSalesClients, type SalesClient } from "@/lib/sales-api";
+import { DatosClienteOpcionales } from "@/components/erp/DatosCliente";
+import { useUser } from "@/components/UserContext";
+import { clientSectorsForUser } from "@/lib/client-sectors";
+import { formatApiError } from "@/lib/erp-api";
+import { createSalesClient, getClientPermissions, listSalesClients, type SalesClient } from "@/lib/sales-api";
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
 import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
@@ -32,8 +36,12 @@ export function ClienteCombo({
   id: string;
   autoFocus?: boolean;
 }) {
+  const { user } = useUser();
   const [clientes, setClientes] = useState<SalesClient[] | null>(null);
   const [puedeAgregar, setPuedeAgregar] = useState(false);
+  const [puedeEditar, setPuedeEditar] = useState(false);
+  const [creando, setCreando] = useState(false);
+  const [errorAlta, setErrorAlta] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [activo, setActivo] = useState(0);
   const listaId = useId();
@@ -43,7 +51,7 @@ export function ClienteCombo({
   const cargar = () => {
     if (pedido.current || !token) return;
     pedido.current = true;
-    listSalesClients(token)
+    listSalesClients(token, { sector: "COMERCIAL" })
       .then(setClientes)
       .catch(() => setClientes([]));
   };
@@ -57,8 +65,16 @@ export function ClienteCombo({
     if (!token) return;
     let vivo = true;
     getClientPermissions(token)
-      .then((p) => vivo && setPuedeAgregar(Boolean(p?.puedeAgregar)))
-      .catch(() => vivo && setPuedeAgregar(false));
+      .then((p) => {
+        if (!vivo) return;
+        setPuedeAgregar(Boolean(p?.puedeAgregar));
+        setPuedeEditar(Boolean(p?.puedeEditar));
+      })
+      .catch(() => {
+        if (!vivo) return;
+        setPuedeAgregar(false);
+        setPuedeEditar(false);
+      });
     return () => {
       vivo = false;
     };
@@ -115,6 +131,25 @@ export function ClienteCombo({
 
   const mostrar = abierto && editable && coincidencias.length > 0;
   const exacto = clientes?.some((c) => c.id === doc.salesClientId);
+  const puedeCrearComercial = puedeAgregar && clientSectorsForUser(user).includes("COMERCIAL");
+  const puedeEditarComercial = puedeEditar && clientSectorsForUser(user).includes("COMERCIAL");
+
+  const crearAhora = () => {
+    const nombre = doc.clientName.trim();
+    if (!token || nombre.length < 2 || !puedeCrearComercial) return;
+    setCreando(true);
+    setErrorAlta(null);
+    createSalesClient(token, { name: nombre, status: "Activo", tipo: "COMERCIAL", sectors: ["COMERCIAL"] })
+      .then((creado) => {
+        setClientes((prev) => {
+          const lista = (prev ?? []).filter((c) => c.id !== creado.id);
+          return [...lista, creado].sort((a, b) => a.name.localeCompare(b.name, "es"));
+        });
+        elegir(creado);
+      })
+      .catch((e) => setErrorAlta(formatApiError(e, "No se pudo crear el cliente")))
+      .finally(() => setCreando(false));
+  };
 
   return (
     <div className={styles.combo}>
@@ -173,16 +208,28 @@ export function ClienteCombo({
         </ul>
       ) : null}
       {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto ? (
-        puedeAgregar ? (
-          <span className={styles.pastilla} title="Se da de alta en Clientes al guardar y queda listo para el proyecto o la actividad">
-            Cliente nuevo
-          </span>
+        puedeCrearComercial ? (
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            disabled={creando || doc.clientName.trim().length < 2}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={crearAhora}
+          >
+            {creando ? "Creando…" : "Crear cliente comercial"}
+          </button>
         ) : (
-          <span className={styles.pastilla} title="Solo coordinación, gerencia y la encargada comercial pueden dar de alta clientes">
-            Elige un cliente que ya exista
+          <span className={styles.pastilla} title="Solo quien atiende el sector comercial puede dar de alta clientes aquí">
+            Elige un cliente comercial que ya exista
           </span>
         )
       ) : null}
+      {errorAlta ? <span className={styles.pastilla}>{errorAlta}</span> : null}
+      <DatosClienteOpcionales
+        token={token}
+        clientId={doc.salesClientId}
+        puedeEditar={editable && puedeEditarComercial}
+      />
     </div>
   );
 }

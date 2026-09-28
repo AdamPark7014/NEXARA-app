@@ -93,7 +93,7 @@ export default function NuevoClientePage() {
 
   const toggleSector = (s: ClientSector) => {
     sectoresTocados.current = true;
-    setSectors((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+    setSectors([s]);
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -115,7 +115,8 @@ export default function NuevoClientePage() {
       const created = await createSalesClient(token, {
         ...form,
         taxId: form.taxId.toUpperCase(),
-        sectors,
+        tipo: sectors[0],
+        sectors: sectors.slice(0, 1),
         status: "Activo",
       });
       router.push(`/erp/clientes/${created.id}`);
@@ -134,7 +135,7 @@ export default function NuevoClientePage() {
       <PageHead
         back={{ href: "/erp/clientes", label: "Clientes" }}
         title="Nuevo cliente"
-        description="Un solo registro por cliente: con sus datos fiscales queda listo para cotizar y facturar."
+        description="Solo el nombre es obligatorio. RFC, razón social, dirección, régimen y CP se pueden completar después."
       />
 
       <Card as="div">
@@ -142,7 +143,7 @@ export default function NuevoClientePage() {
           <div className={styles.cardPad}>
             <fieldset className={styles.fieldset}>
               <legend className={styles.legend}>Sectores</legend>
-              <p className={styles.fieldHint}>Dónde se podrá elegir a este cliente. Puedes marcar varios.</p>
+              <p className={styles.fieldHint}>Cada cliente es de un solo tipo: comercial, de proyecto o corporativo.</p>
               <div className={styles.sectorPick} role="group" aria-label="Sectores del cliente">
                 {ALL_CLIENT_SECTORS.filter((s) => allowedSectors.includes(s)).map((s) => {
                   const on = sectors.includes(s);
@@ -179,8 +180,8 @@ export default function NuevoClientePage() {
                   <span className={styles.fieldHint}>Como lo conoce tu equipo, por ejemplo «Plaza Norte».</span>
                 </div>
                 <div className={styles.field}>
-                  <label htmlFor="legalName">Razón social *</label>
-                  <input id="legalName" className={styles.input} required value={form.legalName} onChange={set("legalName")} />
+                  <label htmlFor="legalName">Razón social</label>
+                  <input id="legalName" className={styles.input} value={form.legalName} onChange={set("legalName")} />
                   <span className={styles.fieldHint}>Tal como aparece en su constancia fiscal.</span>
                 </div>
                 <div className={styles.field}>
@@ -192,7 +193,6 @@ export default function NuevoClientePage() {
                     onRegimeChange={(fiscalRegime) => setForm((f) => ({ ...f, fiscalRegime }))}
                     inputClassName={styles.input}
                     selectClassName={styles.input}
-                    required
                     disabled={saving}
                     onApply={(data) =>
                       setForm((f) => ({
@@ -205,22 +205,20 @@ export default function NuevoClientePage() {
                   />
                 </div>
                 <div className={`${styles.field} ${styles.fieldFull}`}>
-                  <label htmlFor="fiscalAddress">Dirección fiscal *</label>
+                  <label htmlFor="fiscalAddress">Dirección fiscal</label>
                   <input
                     id="fiscalAddress"
                     className={styles.input}
-                    required
                     autoComplete="street-address"
                     value={form.fiscalAddress}
                     onChange={set("fiscalAddress")}
                   />
                 </div>
                 <div className={styles.field}>
-                  <label htmlFor="fiscalZipCode">Código postal fiscal *</label>
+                  <label htmlFor="fiscalZipCode">Código postal fiscal</label>
                   <input
                     id="fiscalZipCode"
                     className={styles.input}
-                    required
                     inputMode="numeric"
                     autoComplete="postal-code"
                     value={form.fiscalZipCode}
@@ -234,12 +232,11 @@ export default function NuevoClientePage() {
               <legend className={styles.legend}>Contacto</legend>
               <div className={styles.formGrid}>
                 <div className={styles.field}>
-                  <label htmlFor="billingEmail">Correo de facturación *</label>
+                  <label htmlFor="billingEmail">Correo de facturación</label>
                   <input
                     id="billingEmail"
                     type="email"
                     className={styles.input}
-                    required
                     autoComplete="email"
                     value={form.billingEmail}
                     onChange={set("billingEmail")}

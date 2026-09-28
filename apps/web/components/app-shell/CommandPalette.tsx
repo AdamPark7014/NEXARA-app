@@ -292,9 +292,6 @@ export default function CommandPalette({
   }, [user, navigation]);
 
   const globalActions = useMemo<Action[]>(() => {
-    const userJson = user ? JSON.stringify(user) : null;
-    const current = detectCurrentPanelId();
-    const toUrl = (path: string) => resolveCrossPanelHref(path, userJson, current);
     const shared: Action[] = [
       {
         id: "act:dark",
@@ -318,18 +315,7 @@ export default function CommandPalette({
 
     // CRM/OPS/multi-panel viven en CommandPalette.legacy-actions.ts (reciclables).
     if (CORE_SURFACE_ONLY) {
-      return [
-        {
-          id: "act:create-client",
-          label: "Nuevo cliente",
-          description: "Alta en Clientes Core",
-          icon: "client",
-          group: "Crear",
-          url: toUrl("/erp/clientes/nuevo"),
-          keywords: ["nuevo", "cliente", "clientes"],
-        },
-        ...shared,
-      ];
+      return shared;
     }
 
     return [

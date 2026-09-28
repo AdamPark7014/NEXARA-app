@@ -180,6 +180,7 @@ export type SalesClient = {
   sectors?: Array<{ id: number; sector: "PROYECTO" | "CORPORATIVO" | "COMERCIAL" }>;
   serviceClientId?: number | null;
   serviceClient?: ServiceClientLink | null;
+  tipo?: "PROYECTO" | "CORPORATIVO" | "COMERCIAL" | null;
   documents?: SalesClientDocument[];
 };
 
@@ -618,6 +619,8 @@ export type ClientPermissions = {
   puedeEditar: boolean;
   puedeDesactivar: boolean;
   puedeEliminar: boolean;
+  /** Operativo: alta rápida corporativa (nombre y contacto) desde una actividad de servicio. */
+  puedeAltaRapidaCorporativa?: boolean;
 };
 
 export const NO_CLIENT_PERMISSIONS: ClientPermissions = {
@@ -625,6 +628,7 @@ export const NO_CLIENT_PERMISSIONS: ClientPermissions = {
   puedeEditar: false,
   puedeDesactivar: false,
   puedeEliminar: false,
+  puedeAltaRapidaCorporativa: false,
 };
 
 export const getClientPermissions = async (token: string) => {
@@ -997,6 +1001,8 @@ export const createSalesClient = async (
     status?: string;
     notes?: string;
     sectors?: Array<"PROYECTO" | "CORPORATIVO" | "COMERCIAL">;
+    tipo?: "PROYECTO" | "CORPORATIVO" | "COMERCIAL";
+    altaRapida?: boolean;
   },
 ) => {
   return apiRequest<SalesClient>(
