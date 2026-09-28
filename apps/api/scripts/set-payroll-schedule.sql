@@ -2,7 +2,7 @@
 -- Con esto el resumen matutino del CEO («Tu día») avisa el día siguiente al corte que la pre-nómina
 -- está lista, y dos días antes del corte que se acerca. Sin fila no se avisa nada de nómina.
 --
---   psql -v company_id=<id de company_profiles> -f set-payroll-schedule.sql
+--   psql -v company_id=<id de company_profile> -f set-payroll-schedule.sql
 --
 -- Frecuencias:  quincenal (cortes el 15 y el último día) · mensual · semanal (por omisión viernes;
 -- agrega "diaSemanaCorte": 0=domingo … 6=sábado). Para quitarla:

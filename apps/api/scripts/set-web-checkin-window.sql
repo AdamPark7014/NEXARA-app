@@ -1,6 +1,6 @@
 -- Abre, de forma TEMPORAL, la posibilidad de checar entrada y salida desde la web en UNA empresa.
 --
---   psql -v company_id=<id de company_profiles> -v hours=48 -f set-web-checkin-window.sql
+--   psql -v company_id=<id de company_profile> -v hours=48 -f set-web-checkin-window.sql
 --
 -- Por decisión del dueño nadie checa desde el navegador (la ubicación de una pestaña se falsea y de las
 -- checadas sale la nómina). Esta es una excepción con fecha de vencimiento: pasadas `hours` horas se
