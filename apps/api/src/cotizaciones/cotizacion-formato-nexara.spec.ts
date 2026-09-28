@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { formatoDesdeCotizacion, generarCotizacionNexaraPdf } from './cotizacion-formato-nexara.js';
 import { importeConLetra } from './importe-letra.js';
 import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
@@ -152,5 +153,28 @@ describe('formato Nexara', () => {
     expect(texto).toContain('Característica 1:');
     expect(texto).toContain('Característica 80:');
     expect(hojas.length).toBeGreaterThan(1);
+  });
+
+  it('quince viñetas en una sola línea, de más de 1500 caracteres, salen completas y cada una en su renglón', async () => {
+    const cuerpo = (n: number) =>
+      `Viñeta ${String(n).padStart(2, '0')}: especificación técnica que tiene que imprimirse entera, sin recorte de caracteres ni de renglones, incluyendo el cierre UNICO-${String(n).padStart(2, '0')}-FIN`;
+    const inline = `Disco duro Con las siguientes características: ${Array.from({ length: 15 }, (_, i) => `• ${cuerpo(i + 1)}`).join(' ')}`;
+    expect(inline.length).toBeGreaterThan(1500);
+    expect(inline.includes('\n')).toBe(false);
+    const pdf = await generarCotizacionNexaraPdf({
+      ...grupoDice,
+      items: [{ ...grupoDice.items[0], name: inline, description: null }],
+    });
+    fs.writeFileSync('/tmp/cotizacion-vinetas.pdf', pdf);
+    const hojas = textoPorHoja(pdf);
+    const texto = hojas.join('\n');
+    for (let n = 1; n <= 15; n += 1) {
+      expect(texto).toContain(`UNICO-${String(n).padStart(2, '0')}-FIN`);
+    }
+    const intro = texto.split('\n').find((l) => l.includes('siguientes características'));
+    expect(intro).toBeTruthy();
+    expect(intro).not.toContain('Viñeta 01');
+    expect(texto).toContain('Viñeta 01:');
+    expect(texto).toContain('Viñeta 15:');
   });
 });

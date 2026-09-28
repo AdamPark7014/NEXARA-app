@@ -8,6 +8,7 @@ import path from 'path';
 import PDFDocument from 'pdfkit';
 import { importeConLetra } from './importe-letra.js';
 import { normalizarOpciones } from './personalizacion.js';
+import { segmentosLista } from './vinetas-texto.js';
 
 const TEAL = '#1FAF8D';
 const TEAL_OSC = '#15735F';
@@ -420,11 +421,29 @@ function filaPartida(p: Lapiz, partida: PartidaFormato | null, anchos: number[],
   if (marca) bloques.push({ texto: marca, font: p.f, size: 7.5, color: TEAL_OSC });
   if (partida.descripcion) bloques.push({ texto: partida.descripcion, font: p.f, size: 7.5, color: GRIS });
 
-  const lineas: Array<{ t: string; font: string; size: number; color: string; lh: number }> = [];
+  const lineas: Array<{ t: string; font: string; size: number; color: string; lh: number; sangria: number; marca: boolean }> = [];
   for (const bloque of bloques) {
     const lh = altoRenglon(p, bloque.size, bloque.font);
-    for (const t of partirTexto(p, bloque.texto, descAncho, bloque.size, bloque.font)) {
-      lineas.push({ t, font: bloque.font, size: bloque.size, color: bloque.color, lh });
+    p.doc.font(bloque.font).fontSize(bloque.size);
+    const sangriaVineta = Math.ceil(p.doc.widthOfString('•') + 4);
+    const segmentos = segmentosLista(bloque.texto);
+    const lista = segmentos.length ? segmentos : [{ tipo: 'parrafo' as const, texto: bloque.texto }];
+    for (const seg of lista) {
+      if (!seg.texto) {
+        lineas.push({ t: '', font: bloque.font, size: bloque.size, color: bloque.color, lh: Math.max(4, Math.round(lh * 0.4)), sangria: 0, marca: false });
+        continue;
+      }
+      if (seg.tipo === 'vineta') {
+        const ancho = Math.max(8, descAncho - sangriaVineta);
+        const envueltas = partirTexto(p, seg.texto, ancho, bloque.size, bloque.font);
+        envueltas.forEach((t, i) => {
+          lineas.push({ t, font: bloque.font, size: bloque.size, color: bloque.color, lh, sangria: sangriaVineta, marca: i === 0 });
+        });
+      } else {
+        for (const t of partirTexto(p, seg.texto, descAncho, bloque.size, bloque.font)) {
+          lineas.push({ t, font: bloque.font, size: bloque.size, color: bloque.color, lh, sangria: 0, marca: false });
+        }
+      }
     }
   }
   const pad = 4;
@@ -471,7 +490,8 @@ function filaPartida(p: Lapiz, partida: PartidaFormato | null, anchos: number[],
       p.doc.rect(x0, y, AW, linea.lh).fill(TEAL_CLARO);
       p.doc.restore();
     }
-    renglonFijo(p, linea.t, xDesc, y, descAncho, linea.font, linea.size, linea.color);
+    if (linea.marca) renglonFijo(p, '•', xDesc, y, linea.sangria, linea.font, linea.size, linea.color);
+    if (linea.t) renglonFijo(p, linea.t, xDesc + linea.sangria, y, descAncho - linea.sangria, linea.font, linea.size, linea.color);
     y += linea.lh;
   }
   pintarCeldas();
