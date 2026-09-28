@@ -1114,12 +1114,9 @@ export default function OpsActivityForm({
                 tipo="CORPORATIVO"
                 salesClientId={salesServicioId}
                 editable
-                puedeCrear={
-                  (permisosCliente.puedeAgregar && clientSectorsForUser(user).includes("CORPORATIVO")) ||
-                  Boolean(permisosCliente.puedeAltaRapidaCorporativa)
-                }
-                puedeEditar={permisosCliente.puedeEditar && clientSectorsForUser(user).includes("CORPORATIVO")}
-                soloContacto={Boolean(permisosCliente.puedeAltaRapidaCorporativa) && !permisosCliente.puedeAgregar}
+                puedeCrear
+                puedeEditar={permisosCliente.puedeEditar}
+                altaCorporativa
                 clientes={clientesCorporativos}
                 onCreado={(creado) => {
                   setClientesCorporativos((prev) =>

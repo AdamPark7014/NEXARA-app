@@ -68,8 +68,10 @@ export class CreateSalesClientDto {
   tipo?: (typeof SECTORS)[number];
 
   /**
-   * Alta rápida de un operativo al crear una actividad de servicio.
-   * Solo nombre y contacto, y solo tipo CORPORATIVO.
+   * Alta rápida al asignar una actividad de servicio.
+   * La puede quien ya puede crear la actividad (encargado, operativo o el resto del personal).
+   * Solo el nombre es obligatorio; correo, teléfono y RFC son opcionales.
+   * Siempre CORPORATIVO, sin mirar el sector del padrón.
    */
   @IsOptional()
   @IsBoolean()

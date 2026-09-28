@@ -225,7 +225,7 @@ export class VentasClientesController {
 
   @Post(':id/provision-service-client')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
   async provisionServiceClient(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: any,

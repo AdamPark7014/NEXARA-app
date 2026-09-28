@@ -39,7 +39,6 @@ import {
 import {
   canDeleteOrDeactivateClient,
   canManageClients,
-  canQuickCreateCorporateClient,
   CLIENT_DEACTIVATE_FORBIDDEN,
   CLIENT_DELETE_FORBIDDEN,
   CLIENT_MANAGE_FORBIDDEN,
@@ -47,7 +46,6 @@ import {
   CLIENT_STATUS_INACTIVE,
   clientPermissions,
   isInactiveClientStatus,
-  isOperationalClientRole,
   type ClientPermissions,
 } from './client-permissions.js';
 
@@ -147,7 +145,8 @@ export class VentasService {
   }
 
   /**
-   * Un solo tipo. `tipo` gana. Si el operativo pide alta rápida, es CORPORATIVO.
+   * Un solo tipo. `tipo` gana. El alta rápida de servicio es CORPORATIVO
+   * aunque el sector del padrón de quien asigna sea otro.
    * Sin nada explícito: el único sector de su área, o COMERCIAL si tiene varios o ninguno.
    */
   private resolveTipo(dto: CreateSalesClientDto, user: any): ClientSectorCode {
@@ -163,7 +162,7 @@ export class VentasService {
       }
       return 'PROYECTO';
     }
-    if (dto.altaRapida && isOperationalClientRole(user?.roleKey)) {
+    if (dto.altaRapida) {
       if (dto.tipo && dto.tipo !== 'CORPORATIVO') {
         throw new BadRequestException('El alta rápida solo crea clientes corporativos.');
       }
@@ -211,11 +210,13 @@ export class VentasService {
     }
   }
 
-  /** El operativo solo manda nombre y contacto. Lo demás se rechaza, no se guarda en silencio. */
+  /** Nombre obligatorio. Correo, teléfono y RFC opcionales. Lo demás se rechaza. */
   private assertAltaRapida(dto: CreateSalesClientDto) {
+    if (isInactiveClientStatus(dto.status)) {
+      throw new BadRequestException('El alta rápida de un cliente corporativo lo deja activo.');
+    }
     const pesados: Array<keyof CreateSalesClientDto> = [
       'legalName',
-      'taxId',
       'fiscalAddress',
       'fiscalZipCode',
       'fiscalRegime',
@@ -228,7 +229,7 @@ export class VentasService {
     for (const campo of pesados) {
       if (String(dto[campo] ?? '').trim()) {
         throw new BadRequestException(
-          'En el alta rápida de una actividad de servicio solo se guarda el nombre y el contacto (correo y teléfono).',
+          'En el alta rápida de una actividad de servicio solo se guarda el nombre y, si vienen, correo, teléfono y RFC.',
         );
       }
     }
@@ -239,9 +240,8 @@ export class VentasService {
     if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user)) return true;
     if (clientSectorsForActor(user).includes(tipo)) return true;
     if (canManageClients(actor, false)) return true;
-    // El formulario de actividad elige un cliente de proyecto de la empresa, no solo los propios.
-    if (tipo === 'PROYECTO') return true;
-    if (tipo === 'CORPORATIVO' && isOperationalClientRole(user?.roleKey)) return true;
+    // La actividad elige cliente de proyecto o corporativo de toda la empresa, no solo los propios ni los del sector.
+    if (tipo === 'PROYECTO' || tipo === 'CORPORATIVO') return true;
     const reports = await this.hasDirectReports(user?.id);
     return canManageClients(actor, reports);
   }
@@ -511,12 +511,11 @@ export class VentasService {
   async createClient(dto: CreateSalesClientDto, user?: any, companyId?: number | null) {
     const tipo = this.resolveTipo(dto, user);
     const altaProyecto = Boolean(dto.altaProyecto);
-    const rapida = !altaProyecto && Boolean(dto.altaRapida) && tipo === 'CORPORATIVO' && isOperationalClientRole(user?.roleKey);
+    const rapida = !altaProyecto && Boolean(dto.altaRapida) && tipo === 'CORPORATIVO';
     if (altaProyecto) {
       this.assertAltaProyecto(dto);
     } else if (rapida) {
-      const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
-      if (!canQuickCreateCorporateClient(actor)) {
+      if (String(user?.roleKey || '').trim().toLowerCase() === 'cliente') {
         throw new ForbiddenException(CLIENT_MANAGE_FORBIDDEN);
       }
       this.assertAltaRapida(dto);
@@ -534,7 +533,7 @@ export class VentasService {
       data: {
         name: dto.name,
         legalName: minima ? null : dto.legalName || null,
-        taxId: minima ? null : dto.taxId || null,
+        taxId: altaProyecto ? null : dto.taxId?.trim() || null,
         fiscalAddress: minima ? null : dto.fiscalAddress || null,
         fiscalZipCode: minima ? null : dto.fiscalZipCode?.trim() || null,
         fiscalRegime: minima ? null : dto.fiscalRegime?.trim() || null,
@@ -542,7 +541,7 @@ export class VentasService {
         billingPhone: altaProyecto ? null : dto.billingPhone || null,
         industry: minima ? null : dto.industry || null,
         website: minima ? null : dto.website || null,
-        status: altaProyecto ? CLIENT_STATUS_ACTIVE : dto.status || CLIENT_STATUS_ACTIVE,
+        status: rapida || altaProyecto ? CLIENT_STATUS_ACTIVE : dto.status || CLIENT_STATUS_ACTIVE,
         notes: minima ? null : dto.notes || null,
         ownerId,
         serviceClientId: minima ? null : dto.serviceClientId ?? null,
@@ -642,17 +641,21 @@ export class VentasService {
       include: this.clientInclude(),
     });
     assertCompanyAccess(client, tenantId, 'Cliente');
-    this.assertOwnerAccess(client!.ownerId, user, 'cliente');
-    const allowedSectors = clientSectorsForActor(user);
-    if (
-      allowedSectors.length &&
-      !this.isSuperAdminUser(user) &&
-      !this.isSalesTeamManager(user) &&
-      (client!.sectors ?? []).length
-    ) {
-      const clientSectors = (client!.sectors ?? []).map((s) => s.sector as ClientSectorCode);
-      if (!clientSectors.some((s) => allowedSectors.includes(s))) {
-        throw new ForbiddenException('No tienes acceso a este cliente');
+    const tipoCliente = String((client as { tipo?: string }).tipo || '');
+    // Corporativo y proyecto se eligen en la actividad: son de la empresa, no del sector ni del dueño.
+    if (tipoCliente !== 'CORPORATIVO' && tipoCliente !== 'PROYECTO') {
+      this.assertOwnerAccess(client!.ownerId, user, 'cliente');
+      const allowedSectors = clientSectorsForActor(user);
+      if (
+        allowedSectors.length &&
+        !this.isSuperAdminUser(user) &&
+        !this.isSalesTeamManager(user) &&
+        (client!.sectors ?? []).length
+      ) {
+        const clientSectors = (client!.sectors ?? []).map((s) => s.sector as ClientSectorCode);
+        if (!clientSectors.some((s) => allowedSectors.includes(s))) {
+          throw new ForbiddenException('No tienes acceso a este cliente');
+        }
       }
     }
     return client!;

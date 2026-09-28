@@ -23,6 +23,7 @@ const VENDEDOR = { id: 13, email: 'vendedor@nexara.com.mx', roleKey: 'vendedor' 
 const LUIS = { id: 14, email: 'direccion.operaciones@nexara.com.mx', roleKey: 'coord_operaciones' };
 const DANIELA = { id: 15, email: 'daniela.hernandez@nexara.com.mx', roleKey: 'administrativo' };
 const LIDER = { id: 16, email: 'diseno@nexara.com.mx', roleKey: 'lider_diseno' };
+const ANTONIO = { id: 39, email: 'jose.ramirez@nexara.com.mx', roleKey: 'enc_soporte' };
 
 describe('permisos de clientes (reglas puras)', () => {
   it('Christian, su equivalente y la cuenta de desarrollo pueden desactivar y eliminar', () => {
@@ -293,7 +294,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     });
   });
 
-  it('un operativo da de alta rápido un corporativo con nombre y contacto, y no captura el RFC', async () => {
+  it('un operativo da de alta rápido un corporativo con nombre y, si vienen, correo, teléfono y RFC', async () => {
     const { service, prisma } = buildService();
     prisma.salesClient.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: 9, serviceClientId: null, sectors: [], ...data }),
@@ -314,9 +315,31 @@ describe('VentasService · eliminar y desactivar clientes', () => {
         }),
       }),
     );
+    await service.createClient(
+      {
+        name: 'Con RFC',
+        tipo: 'CORPORATIVO',
+        altaRapida: true,
+        billingEmail: 'sucursal@cliente.mx',
+        taxId: 'XAXX010101000',
+      } as any,
+      TECNICO,
+      7,
+    );
+    expect(prisma.salesClient.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Con RFC',
+          tipo: 'CORPORATIVO',
+          billingEmail: 'sucursal@cliente.mx',
+          taxId: 'XAXX010101000',
+          legalName: null,
+        }),
+      }),
+    );
     await expect(
       service.createClient(
-        { name: 'Con RFC', tipo: 'CORPORATIVO', altaRapida: true, taxId: 'XAXX010101000' } as any,
+        { name: 'Con razón social', tipo: 'CORPORATIVO', altaRapida: true, legalName: 'SA de CV' } as any,
         TECNICO,
         7,
       ),
@@ -324,6 +347,38 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     await expect(
       service.createClient({ name: 'Comercial', tipo: 'COMERCIAL', altaRapida: true } as any, TECNICO, 7),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('el encargado de soporte y quien no tiene el sector corporativo también dan de alta rápido', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: 9, serviceClientId: null, sectors: [], ...data }),
+    );
+    await service.createClient({ name: 'Plaza del Sol', altaRapida: true } as any, ANTONIO, 7);
+    expect(prisma.salesClient.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Plaza del Sol',
+          tipo: 'CORPORATIVO',
+          taxId: null,
+          companyId: 7,
+          sectors: { create: [expect.objectContaining({ sector: 'CORPORATIVO', companyId: 7 })] },
+        }),
+      }),
+    );
+    await service.createClient(
+      { name: 'Otro corporativo', tipo: 'CORPORATIVO', altaRapida: true, taxId: 'XAXX010101000' } as any,
+      DANIELA,
+      7,
+    );
+    expect(prisma.salesClient.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: 'Otro corporativo', tipo: 'CORPORATIVO', taxId: 'XAXX010101000' }),
+      }),
+    );
+    await expect(
+      service.createClient({ name: 'Por padrón', tipo: 'CORPORATIVO', sectors: ['CORPORATIVO'] } as any, DANIELA, 7),
+    ).rejects.toThrow(/CORPORATIVO/);
   });
 
   it('el alta de un proyecto crea el cliente PROYECTO solo con el nombre, también si el sector no es el suyo', async () => {
@@ -361,6 +416,24 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     expect(donde.tipo).toBe('CORPORATIVO');
     expect(donde.ownerId).toBeUndefined();
     await expect(service.listClients(TECNICO, undefined, { sector: 'COMERCIAL' } as any, 7)).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('quien asigna una actividad lista todos los corporativos de su empresa, sin filtro de sector', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.findMany = jest.fn().mockResolvedValue([]);
+    await service.listClients(LIDER, undefined, { sector: 'CORPORATIVO' } as any, 7);
+    const donde = prisma.salesClient.findMany.mock.calls[0][0].where;
+    expect(donde.companyId).toBe(7);
+    expect(donde.tipo).toBe('CORPORATIVO');
+    expect(donde.ownerId).toBeUndefined();
+    await service.listClients(DANIELA, undefined, { sector: 'CORPORATIVO' } as any, 7);
+    const deDaniela = prisma.salesClient.findMany.mock.calls[1][0].where;
+    expect(deDaniela.companyId).toBe(7);
+    expect(deDaniela.tipo).toBe('CORPORATIVO');
+    expect(deDaniela.ownerId).toBeUndefined();
+    await expect(service.listClients(LIDER, undefined, { sector: 'COMERCIAL' } as any, 7)).rejects.toThrow(
       ForbiddenException,
     );
   });
