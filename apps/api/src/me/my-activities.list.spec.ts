@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { MyActivitiesService } from './my-activities.service.js';
 
 /**
@@ -249,8 +248,8 @@ describe('autoasignar', () => {
     );
   });
 
-  it('un empleado sin encargo de área no se autoasigna por esta vía', async () => {
-    const activities = { create: jest.fn() };
+  it('un técnico, sin encargo de área, se autoasigna en ejecución', async () => {
+    const activities = { create: jest.fn().mockResolvedValue({ id: 9 }) };
     const service = new MyActivitiesService(
       {} as any,
       activities as any,
@@ -260,9 +259,36 @@ describe('autoasignar', () => {
       {} as any,
     );
 
-    await expect(service.selfCreate(TECNICO, 1, { titulo: 'No' } as any)).rejects.toBeInstanceOf(
-      ForbiddenException,
+    await service.selfCreate(TECNICO, 1, { titulo: 'La mía', coreKind: 'tarea', assignmentCharge: 'despacho' } as any);
+
+    expect(activities.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        titulo: 'La mía',
+        responsableId: TECNICO.id,
+        creadoPorId: TECNICO.id,
+        assignmentCharge: 'ejecucion',
+      }),
+      1,
     );
-    expect(activities.create).not.toHaveBeenCalled();
+  });
+
+  it('administrativo, contabilidad y ventas también se autoasignan', async () => {
+    const activities = { create: jest.fn().mockResolvedValue({ id: 4 }) };
+    const service = new MyActivitiesService(
+      {} as any,
+      activities as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    const monica = { id: 21, email: 'monica.garcia@nexara.com.mx' };
+
+    await service.selfCreate(monica, 1, { titulo: 'Trámite' } as any);
+
+    expect(activities.create).toHaveBeenCalledWith(
+      expect.objectContaining({ responsableId: 21, creadoPorId: 21, assignmentCharge: 'ejecucion' }),
+      1,
+    );
   });
 });

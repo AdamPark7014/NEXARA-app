@@ -569,8 +569,13 @@ export default function OpsActivityForm({
     setHerramientas([]);
     setHerramientasIntentado(false);
     setTareaOtroOpen(false);
-    const next = await fetchNextAnNumber(token);
-    setNextAn(typeof next?.next === "string" ? next.next : "");
+    // El folio siguiente no puede tumbar un alta que ya se guardó.
+    try {
+      const next = await fetchNextAnNumber(token);
+      setNextAn(typeof next?.next === "string" ? next.next : "");
+    } catch {
+      setNextAn("");
+    }
     if (newId > 0) onSuccess?.(newId);
   };
 

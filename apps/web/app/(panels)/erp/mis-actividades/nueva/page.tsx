@@ -1,13 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import {
   ACTIVITY_KINDS,
-  isAreaManagerEmail,
   kindsForAssignment,
   metaForKind,
   type ActivityKind,
@@ -19,7 +17,7 @@ import { IconLabel } from "@/components/ui/IconBadge";
 
 const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), { ssr: false });
 
-/** Encargados de área: auto-asignarse una actividad (solo a sí mismos, ejecución directa). */
+/** Cualquier persona del equipo: auto-asignarse una actividad (solo a sí misma, ejecución directa). */
 export default function AutoAsignarmePage() {
   const router = useRouter();
   const { user } = useUser();
@@ -46,20 +44,6 @@ export default function AutoAsignarmePage() {
 
   if (!user) {
     return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
-  }
-
-  if (!isAreaManagerEmail(user.email)) {
-    return (
-      <div style={{ maxWidth: 560, margin: "40px auto", textAlign: "center", display: "grid", gap: 10 }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>Auto-asignarse</h1>
-        <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-          Solo los encargados de área pueden auto-asignarse actividades. Tu encargado te las asigna.
-        </p>
-        <Link href="/erp/pizarra?vista=mias" style={{ color: "var(--primary)", fontWeight: 700 }}>
-          ← Volver a Mis actividades
-        </Link>
-      </div>
-    );
   }
 
   const kindMeta = kind ? metaForKind(kind) : null;
