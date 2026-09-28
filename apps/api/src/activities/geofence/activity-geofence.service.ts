@@ -60,8 +60,10 @@ export class ActivityGeofenceService {
 
   /** Punto de inicio de esa persona en esa actividad (foto de entrada), si lo hay. */
   async origen(activityId: number, userId: number) {
-    const e = await this.prisma.activityEvidence.findUnique({
-      where: { activityId_userId: { activityId, userId } },
+    // findFirst, no findUnique(activityId_userId): el aislamiento mete companyId y
+    // esa llave compuesta dentro de un AND no es un argumento de Prisma.
+    const e = await this.prisma.activityEvidence.findFirst({
+      where: { activityId, userId },
       select: {
         entryLatitude: true,
         entryLongitude: true,

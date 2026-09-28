@@ -119,13 +119,77 @@ export function whereAlreadyHasCompanyScope(where: unknown): boolean {
 }
 
 /**
+ * Selector de llave única compuesta de Prisma: `activityId_userId: { activityId, userId }`.
+ * Solo existe en `WhereUnique` (findUnique/update/upsert/delete). Dentro de un `AND`,
+ * o en un findFirst, Prisma responde `Unknown argument`.
+ */
+export function readCompoundUniqueSelector(
+  where: unknown,
+): { key: string; value: Record<string, unknown> } | null {
+  if (!where || typeof where !== 'object' || Array.isArray(where)) return null;
+  const keys = Object.keys(where as object);
+  if (keys.length !== 1) return null;
+  const key = keys[0];
+  if (!key.includes('_')) return null;
+  const raw = (where as Record<string, unknown>)[key];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw instanceof Date) return null;
+  const value = raw as Record<string, unknown>;
+  const segments = key.split('_').filter((segment) => segment.length > 0);
+  if (segments.length < 2 || segments.length !== Object.keys(value).length) return null;
+  if (!segments.every((segment) => Object.prototype.hasOwnProperty.call(value, segment))) return null;
+  if (!Object.values(value).every(isCompoundUniqueScalar)) return null;
+  return { key, value };
+}
+
+function isCompoundUniqueScalar(value: unknown): boolean {
+  if (value == null) return true;
+  const kind = typeof value;
+  if (kind === 'string' || kind === 'number' || kind === 'boolean' || kind === 'bigint') return true;
+  if (value instanceof Date) return true;
+  if (kind === 'object') {
+    const name = (value as { constructor?: { name?: string } }).constructor?.name;
+    // Prisma.Decimal (y objetos numéricos equivalentes) viajan en llaves compuestas de fecha/importe.
+    if (name === 'Decimal' || name === 'PrismaDecimal') return true;
+  }
+  return false;
+}
+
+function tenantScopeId(companyId: number | null): number {
+  return companyId != null && Number.isFinite(companyId) && companyId > 0 ? companyId : -1;
+}
+
+/** Quita selectores `campo_campo` que no llevan companyId: en un filtro normal no existen. */
+function expandCompoundUniqueInFilter(where: unknown): unknown {
+  if (!where || typeof where !== 'object') return where;
+  if (Array.isArray(where)) return where.map((part) => expandCompoundUniqueInFilter(part));
+  const compound = readCompoundUniqueSelector(where);
+  if (compound && !Object.prototype.hasOwnProperty.call(compound.value, 'companyId')) {
+    return { ...compound.value };
+  }
+  const record = where as Record<string, unknown>;
+  let changed = false;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if ((key === 'AND' || key === 'OR' || key === 'NOT') && value && typeof value === 'object') {
+      const next = expandCompoundUniqueInFilter(value);
+      out[key] = next;
+      changed = changed || next !== value;
+    } else {
+      out[key] = value;
+    }
+  }
+  return changed ? out : where;
+}
+
+/**
  * Inject tenant filter. Never wrap compound unique wheres in `AND` — that breaks
- * findUnique/update/delete (`Unknown argument companyId_section`).
+ * findUnique/update/delete (`Unknown argument companyId_section` / `activityId_userId`).
  */
 function injectTenantWhere(args: any, companyId: number | null) {
   if (!args) args = {};
   if (!args.where) args.where = {};
-  const scopeId = companyId != null && companyId > 0 ? companyId : -1;
+  args.where = expandCompoundUniqueInFilter(args.where);
+  const scopeId = tenantScopeId(companyId);
   if (whereAlreadyHasCompanyScope(args.where)) {
     return args;
   }
@@ -137,6 +201,200 @@ function injectTenantWhere(args: any, companyId: number | null) {
   }
   args.where = { AND: [args.where, { companyId: scopeId }] };
   return args;
+}
+
+export type TenantQueryPlan =
+  | { type: 'query'; action: string; args: any }
+  | { type: 'updateThenRead'; where: Record<string, unknown>; data: unknown; read: any }
+  | { type: 'deleteMany'; where: Record<string, unknown> }
+  | {
+      type: 'upsert';
+      lookup: Record<string, unknown>;
+      create: Record<string, unknown>;
+      update: Record<string, unknown>;
+      select?: unknown;
+      include?: unknown;
+    };
+
+function readShape(args: any): { select?: unknown; include?: unknown } {
+  const shape: { select?: unknown; include?: unknown } = {};
+  if (args?.select) shape.select = args.select;
+  if (args?.include) shape.include = args.include;
+  return shape;
+}
+
+function stampCompoundCompany(
+  selector: { key: string; value: Record<string, unknown> },
+  companyId: number,
+) {
+  return { [selector.key]: { ...selector.value, companyId } };
+}
+
+/**
+ * Reescribe findUnique/update/upsert/delete de un modelo aislado para que la
+ * llave única compuesta sobreviva al `companyId`.
+ *
+ * `activityId_userId` no admite un `AND` al lado. Si la llave no incluye
+ * `companyId`, se aplana a columnas (`activityId`, `userId`) y la lectura pasa
+ * a findFirst; update/delete/upsert se hacen por esas columnas más la empresa.
+ * Si la llave ya trae `companyId` (`companyId_section`), se deja única y se
+ * fuerza la empresa del request.
+ */
+export function planTenantQuery(action: string, args: any, companyId: number | null): TenantQueryPlan {
+  const scopeId = tenantScopeId(companyId);
+  const safeArgs = args ?? {};
+  const compound = readCompoundUniqueSelector(safeArgs.where);
+  const compoundHasCompany =
+    !!compound && Object.prototype.hasOwnProperty.call(compound.value, 'companyId');
+
+  if (compound && compoundHasCompany) {
+    return {
+      type: 'query',
+      action,
+      args: { ...safeArgs, where: stampCompoundCompany(compound, scopeId) },
+    };
+  }
+
+  if (compound) {
+    const filter = { ...compound.value, companyId: scopeId };
+    if (action === 'findUnique' || action === 'findUniqueOrThrow') {
+      return {
+        type: 'query',
+        action: action === 'findUniqueOrThrow' ? 'findFirstOrThrow' : 'findFirst',
+        args: { ...safeArgs, where: filter },
+      };
+    }
+    if (action === 'update') {
+      return {
+        type: 'updateThenRead',
+        where: filter,
+        data: safeArgs.data,
+        read: { where: filter, ...readShape(safeArgs) },
+      };
+    }
+    if (action === 'delete') {
+      return { type: 'deleteMany', where: filter };
+    }
+    if (action === 'upsert') {
+      const create = { ...(safeArgs.create ?? {}) } as Record<string, unknown>;
+      // La empresa del request gana: un create con companyId ajeno no se cuela.
+      create.companyId = scopeId;
+      return {
+        type: 'upsert',
+        lookup: filter,
+        create,
+        update: { ...(safeArgs.update ?? {}) } as Record<string, unknown>,
+        ...readShape(safeArgs),
+      };
+    }
+    return {
+      type: 'query',
+      action,
+      args: injectTenantWhere({ ...safeArgs, where: { ...compound.value } }, companyId),
+    };
+  }
+
+  const needsWhere =
+    READ_ACTIONS.has(action) ||
+    action === 'update' ||
+    action === 'delete' ||
+    action === 'updateMany' ||
+    action === 'deleteMany';
+  if (!needsWhere) {
+    return { type: 'query', action, args: safeArgs };
+  }
+
+  const already = whereAlreadyHasCompanyScope(safeArgs.where);
+  const idOnly =
+    !!safeArgs.where &&
+    typeof safeArgs.where === 'object' &&
+    !Array.isArray(safeArgs.where) &&
+    Object.keys(safeArgs.where).length === 1 &&
+    Object.prototype.hasOwnProperty.call(safeArgs.where, 'id');
+
+  if (!already && (action === 'findUnique' || action === 'findUniqueOrThrow')) {
+    return {
+      type: 'query',
+      action: action === 'findUniqueOrThrow' ? 'findFirstOrThrow' : 'findFirst',
+      args: injectTenantWhere(safeArgs, companyId),
+    };
+  }
+
+  if (!already && idOnly && (action === 'update' || action === 'delete')) {
+    const scoped = { id: (safeArgs.where as { id: unknown }).id, companyId: scopeId };
+    if (action === 'delete') return { type: 'deleteMany', where: scoped };
+    return {
+      type: 'updateThenRead',
+      where: scoped,
+      data: safeArgs.data,
+      read: { where: scoped, ...readShape(safeArgs) },
+    };
+  }
+
+  if (!already) {
+    return { type: 'query', action, args: injectTenantWhere(safeArgs, companyId) };
+  }
+
+  return { type: 'query', action, args: safeArgs };
+}
+
+/**
+ * Aplica el plan de aislamiento y ejecuta contra `next` (el resto de la cadena
+ * de middleware). Es lo que corre el middleware de tenant: los tests lo usan
+ * igual, sin levantar Prisma.
+ */
+export async function runWithTenantScope(
+  params: { model?: string; action: string; args?: any },
+  companyId: number | null,
+  next: (params: { model?: string; action: string; args?: any }) => Promise<any>,
+): Promise<any> {
+  const plan = planTenantQuery(params.action, params.args, companyId);
+  const scopeId = tenantScopeId(companyId);
+  const forward = (action: string, args: any) => next({ ...params, action, args });
+
+  if (plan.type === 'updateThenRead') {
+    const many = await forward('updateMany', { where: plan.where, data: plan.data });
+    if (!many || many.count === 0) return null;
+    return forward('findFirst', plan.read);
+  }
+
+  if (plan.type === 'deleteMany') {
+    return forward('deleteMany', { where: plan.where });
+  }
+
+  if (plan.type === 'upsert') {
+    const existing = await forward('findFirst', { where: plan.lookup, select: { id: true } });
+    if (existing?.id != null) {
+      const data = plan.update ?? {};
+      if (Object.keys(data).length > 0) {
+        const many = await forward('updateMany', {
+          where: { id: existing.id, companyId: plan.lookup.companyId ?? scopeId },
+          data,
+        });
+        if (!many || many.count === 0) return null;
+      }
+      return forward('findFirst', {
+        where: { id: existing.id, companyId: plan.lookup.companyId ?? scopeId },
+        ...(plan.select ? { select: plan.select } : {}),
+        ...(plan.include ? { include: plan.include } : {}),
+      });
+    }
+    return forward('create', {
+      data: plan.create,
+      ...(plan.select ? { select: plan.select } : {}),
+      ...(plan.include ? { include: plan.include } : {}),
+    });
+  }
+
+  let args = plan.args;
+  if (
+    (plan.action === 'create' || plan.action === 'createMany' || plan.action === 'upsert') &&
+    companyId != null &&
+    companyId > 0
+  ) {
+    args = injectTenantData(args, companyId);
+  }
+  return forward(plan.action, args);
 }
 
 function injectTenantData(args: any, companyId: number) {
@@ -307,75 +565,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           ? Number(store.companyId)
           : null;
 
-      const scopeId =
-        companyId != null && companyId > 0 ? companyId : -1;
-      const mutatingUnique =
-        params.action === 'update' || params.action === 'delete';
-      const needsWhereInject =
-        READ_ACTIONS.has(params.action) ||
-        mutatingUnique ||
-        params.action === 'updateMany' ||
-        params.action === 'deleteMany';
-
-      if (needsWhereInject) {
-        const before = params.args?.where;
-        const alreadyScoped = whereAlreadyHasCompanyScope(before);
-
-        // findUnique + AND/extra fields is invalid — downgrade when we must inject.
-        if (
-          !alreadyScoped &&
-          (params.action === 'findUnique' || params.action === 'findUniqueOrThrow')
-        ) {
-          params.action =
-            params.action === 'findUniqueOrThrow' ? 'findFirstOrThrow' : 'findFirst';
-        }
-
-        // update/delete require WhereUniqueInput — cannot add companyId/AND.
-        // Use *Many with id+companyId, then re-fetch the row for update callers.
-        if (
-          !alreadyScoped &&
-          mutatingUnique &&
-          before &&
-          typeof before === 'object' &&
-          Object.keys(before).length === 1 &&
-          Object.prototype.hasOwnProperty.call(before, 'id')
-        ) {
-          const id = (before as { id: number | string }).id;
-          const data = params.args?.data;
-          if (params.action === 'update') {
-            const many = await next({
-              ...params,
-              action: 'updateMany',
-              args: { where: { id, companyId: scopeId }, data },
-            });
-            if (!many || many.count === 0) return null;
-            return next({
-              ...params,
-              action: 'findFirst',
-              args: { where: { id, companyId: scopeId } },
-            });
-          }
-          return next({
-            ...params,
-            action: 'deleteMany',
-            args: { where: { id, companyId: scopeId } },
-          });
-        }
-
-        params.args = injectTenantWhere(params.args, companyId);
-      }
-
-      if ((params.action === 'create' || params.action === 'createMany' || params.action === 'upsert') && companyId != null && companyId > 0) {
-        params.args = injectTenantData(params.args, companyId);
-      }
-
       if (companyId == null && process.env.NODE_ENV !== 'production') {
         this.tenantLogger.debug(
           `Tenant deny-all applied to ${params.model}.${params.action} (no company context)`,
         );
       }
 
-      return next(params);
+      return runWithTenantScope(params, companyId, (planned) =>
+        next({ ...params, action: planned.action as typeof params.action, args: planned.args }),
+      );
     });
 
     // ── Realtime + Audit middleware ──
