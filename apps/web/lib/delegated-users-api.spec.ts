@@ -55,7 +55,12 @@ describe("crearUsuarioDelegado", () => {
     expect(String(url)).toContain("users/delegated");
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok");
-    expect(JSON.parse(String(init.body))).toEqual(alta);
+    expect(init.headers && (init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+    const cuerpo = init.body as FormData;
+    expect(cuerpo.get("nombre")).toBe(alta.nombre);
+    expect(cuerpo.get("email")).toBe(alta.email);
+    expect(cuerpo.get("password")).toBe(alta.password);
+    expect(cuerpo.get("roleKey")).toBe(alta.roleKey);
   });
 
   it("muestra el mensaje del API cuando rechaza el alta", async () => {

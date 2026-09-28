@@ -2,10 +2,12 @@ import {
   ROLES_DELEGABLES,
   contrasenaAceptable,
   esDireccion,
+  formularioDeAlta,
   parsearConcesiones,
   puedeCrearRol,
   rolesBajoDireccion,
   rolesQuePuedeCrear,
+  telefonoAceptable,
   tiposParaMostrar,
 } from './user-creation-policy.js';
 import { ROLE_TIER } from '../common/rbac/roles.v2.js';
@@ -114,5 +116,17 @@ describe('presentación y contraseña', () => {
     for (const mala of ['corta1', 'sinnumeros', '12345678', '', null, 'a'.repeat(80) + '1']) {
       expect(contrasenaAceptable(mala)).toBe(false);
     }
+  });
+
+  it('teléfono: 10 a 15 dígitos; vacío solo si no es obligatorio', () => {
+    expect(telefonoAceptable('5512345678', true)).toBe(true);
+    expect(telefonoAceptable('+52 55 1234 5678', true)).toBe(true);
+    expect(telefonoAceptable('', false)).toBe(true);
+    expect(telefonoAceptable('', true)).toBe(false);
+    expect(telefonoAceptable('12345', true)).toBe(false);
+    expect(formularioDeAlta(christian, DUENO)).toBe('completo');
+    expect(formularioDeAlta(antonio, DUENO)).toBe('basico');
+    expect(formularioDeAlta(david, DUENO)).toBe('basico');
+    expect(formularioDeAlta(luis, DUENO)).toBe('basico');
   });
 });

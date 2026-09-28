@@ -51,6 +51,13 @@ export type ConcesionesAlta = Record<string, RoleKey[]>;
 
 export type TipoUsuario = { roleKey: RoleKey; etiqueta: string };
 
+/** Dirección elige rol, departamento y jefe. Quien tiene concesión ve solo los datos básicos. */
+export type FormularioAlta = 'basico' | 'completo';
+
+export function formularioDeAlta(actor: ActorAlta | null | undefined, correoDueno = ''): FormularioAlta {
+  return esDireccion(actor, correoDueno) ? 'completo' : 'basico';
+}
+
 const normalizarCorreo = (correo: unknown): string => String(correo ?? '').trim().toLowerCase();
 
 /** Valor guardado → concesiones sanas. Tolera JSON roto, roles desconocidos y roles no delegables. */
@@ -127,4 +134,16 @@ export function tiposParaMostrar(roles: readonly RoleKey[]): TipoUsuario[] {
 export function contrasenaAceptable(valor: unknown): boolean {
   const s = String(valor ?? '');
   return s.length >= 8 && s.length <= 72 && /[A-Za-z]/.test(s) && /\d/.test(s);
+}
+
+/**
+ * Teléfono de contacto. Vacío solo vale si no es obligatorio (el formulario completo de dirección).
+ * Acepta espacios, guiones y +52; lo que cuenta son 10 a 15 dígitos.
+ */
+export function telefonoAceptable(valor: unknown, obligatorio = false): boolean {
+  const raw = String(valor ?? '').trim();
+  if (!raw) return !obligatorio;
+  if (raw.length > 30) return false;
+  const digits = raw.replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 15;
 }

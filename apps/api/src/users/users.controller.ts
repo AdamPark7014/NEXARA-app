@@ -4,7 +4,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { UsersService } from './users.service.js';
 import { UsersDelegationService } from './users-delegation.service.js';
-import { CreateDelegatedUserDto } from './dto/create-delegated-user.dto.js';
+import { CreateDelegatedUserDto, UpdateDelegatedUserDto } from './dto/create-delegated-user.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UpdateUserDto } from './dto/update-user.dto.js';
@@ -25,6 +25,7 @@ const buildAvatarUploadOptions = (dirname: string) => {
   }
 
   return {
+    limits: { fileSize: 8 * 1024 * 1024 },
     storage: diskStorage({
       destination: (_req, _file, cb) => cb(null, destination),
       filename: (_req, file, cb) => {
@@ -60,6 +61,20 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly delegation: UsersDelegationService,
   ) {}
+
+  /** Borra el archivo anterior cuando la foto fija cambia. Un fallo aquí no deshace el alta. */
+  private olvidarAvatar(previous: string | null | undefined, next: string | null | undefined) {
+    const previo = String(previous || '').trim();
+    const siguiente = String(next || '').trim();
+    if (!previo || previo === siguiente || !previo.startsWith('/uploads/users/')) return;
+    const oldFilePath = join(this.usersUploadDir, basename(previo));
+    if (!existsSync(oldFilePath)) return;
+    try {
+      unlinkSync(oldFilePath);
+    } catch {
+      // La foto nueva ya quedó guardada.
+    }
+  }
 
   // CEO (100) puede crear cualquier usuario, Supervisor (50) solo staff (10) de su departamento
   @Post()
@@ -119,16 +134,67 @@ export class UsersController {
     return this.delegation.tiposCreables(user, companyId);
   }
 
+  /**
+   * Formulario de alta: básico o completo, y el equipo cuya foto se puede cambiar.
+   * Sin subordinados directos, `puede` es false y no hay tipos.
+   */
+  @Get('delegated/contexto')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  async delegatedContexto(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    if (companyId == null) {
+      return {
+        formulario: 'basico',
+        tipos: [],
+        rolAutomatico: false,
+        jefeAutomatico: true,
+        telefonoObligatorio: true,
+        puede: false,
+        departamentos: [],
+        jefes: [],
+        equipo: [],
+      };
+    }
+    return this.delegation.contexto(user, companyId);
+  }
+
   /** Alta de un usuario por quien tiene el permiso delegado (Antonio, David, Luis) o por dirección. */
   @Post('delegated')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @UseInterceptors(FileInterceptor('avatar', buildAvatarUploadOptions(__dirname)))
   async createDelegated(
     @CurrentUser() user: any,
     @Body() dto: CreateDelegatedUserDto,
     @CurrentCompanyId() companyId: number | null,
+    @UploadedFile() file?: any,
   ) {
     if (companyId == null) throw new BadRequestException('No se pudo determinar la empresa activa.');
-    return this.delegation.crear(user, dto, companyId);
+    return this.delegation.crear(
+      user,
+      { ...dto, avatarUrl: file ? `/uploads/users/${file.filename}` : undefined },
+      companyId,
+    );
+  }
+
+  /** Foto fija o teléfono de alguien del equipo. No usa la selfie de checada ni la de entrada/salida. */
+  @Patch('delegated/:id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @UseInterceptors(FileInterceptor('avatar', buildAvatarUploadOptions(__dirname)))
+  async updateDelegatedPhoto(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateDelegatedUserDto,
+    @CurrentCompanyId() companyId: number | null,
+    @UploadedFile() file?: any,
+  ) {
+    if (companyId == null) throw new BadRequestException('No se pudo determinar la empresa activa.');
+    const resultado = await this.delegation.actualizarFoto(
+      user,
+      id,
+      { avatarUrl: file ? `/uploads/users/${file.filename}` : undefined, telefono: body.telefono },
+      companyId,
+    );
+    this.olvidarAvatar(resultado.previousAvatar, resultado.avatarUrl);
+    return { id: resultado.id, nombre: resultado.nombre, avatarUrl: resultado.avatarUrl, telefono: resultado.telefono };
   }
 
   @Get()
