@@ -49,13 +49,30 @@ Cuando un viático llega a **tu paso** (el último), ahora te llega un aviso con
 ## 7. Facturación
 Sigue siendo **a mano en el portal del SAT** hasta que se encienda el timbrado electrónico. El sistema ya sabe hacerlo y hay una revisión que dice qué falta, pero encenderlo es un paso fiscal que hacen **tu desarrollador y tú juntos**, con el **CSD de la empresa** (no con tu e.firma). Tu e.firma **no se comparte con nadie ni se guarda en texto**; si alguna vez se pegó en un chat, cámbiala.
 
-## 8. Qué le tienes que pedir a tu desarrollador
+## 8. Quién da de alta a quién
+Hasta ahora solo dirección (tú, Dirección Administrativa y Coordinación Administrativa) podía crear usuarios, así que **Antonio, David y Luis no podían**. Ya se puede, **por persona** (David y Luis tienen el mismo puesto en el sistema pero no dan de alta lo mismo):
+
+| Quién | Puede dar de alta |
+|---|---|
+| **Antonio** (encargado de soporte) | Personal de **soporte** |
+| **Luis** (encargado de servicios) | Personal de **soporte** |
+| **David** (encargado de instalación) | **Instaladores** |
+| **Christian** | **Todos los tipos que están por debajo de ti** (soporte, instalador, coordinadores, directores, RH, contabilidad, ventas, diseño…). Nunca otro CEO ni super administrador |
+
+Cómo lo usan: en **Organigrama** aparece el botón **«Dar de alta a alguien»** solo a quien tiene algún tipo concedido. Escribe nombre y correo, elige el tipo y el sistema propone una contraseña segura (o la escriben). Al terminar la ven **una sola vez** para entregársela a la persona. La persona nueva queda **debajo de quien la dio de alta** en el organigrama y el alta queda registrada en la auditoría.
+Reglas de seguridad: nadie puede dar de alta un tipo que no le concediste, y ningún tipo con permisos de administración (directores, coordinadores, RH, contabilidad) se delega: eso solo lo haces tú.
+*(se activa: tu desarrollador corre un script con los tres correos; si cambian las personas, se edita ese script.)*
+
+## 9. Qué le tienes que pedir a tu desarrollador
 1. **Publicar y activar** lo nuevo (una tarde de trabajo).
 2. Que active tu **calendario de nómina** (quincenal).
 3. Cuando tú decidas los montos, que active los **topes de aprobación**.
-4. **Respaldo diario** de la base de datos (es lo más importante que falta).
+4. Que active **quién da de alta a quién** (Antonio, David, Luis).
+5. **Respaldo diario** de la base de datos (es lo más importante que falta).
 
-## 9. Lo que todavía no está (para ser claros)
+> **Pendiente de tu decisión:** dónde guardar las contraseñas de las cuentas que se creen (una «bóveda» solo para ti). Ver la pregunta que te hizo tu desarrollador.
+
+## 10. Lo que todavía no está (para ser claros)
 - Aprobar **cotizaciones, compras y pagos desde el celular** (hoy desde el celular apruebas viáticos, gastos y solicitudes de la bandeja; en iPhone solo viáticos).
 - **«Facturar esta cotización»** con un clic y el **timbrado real**.
 - **Precios por rango de cantidad** para licitaciones y **agrupar partidas por sede/planta**.
