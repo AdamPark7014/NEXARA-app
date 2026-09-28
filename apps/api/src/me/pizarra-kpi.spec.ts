@@ -68,46 +68,68 @@ describe('tiemposReales', () => {
 });
 
 describe('calculaActividad', () => {
-  it('rojo si venció la fecha máxima', () => {
+  it('rojo si venció la fecha máxima y sigue abierta', () => {
     const r = calculaActividad(
-      { prioridad: 'Baja', fechaMaxima: T('17:00'), inicio: T('09:00') },
+      { prioridad: 'Baja', fechaMaxima: T('17:00'), inicio: T('09:00'), estatus: 'En Proceso' },
       ahora,
     );
     expect(r.vencida).toBe(true);
     expect(r.semaforo).toBe('rojo');
+    expect(r.minutosAtraso).toBe(60);
   });
 
-  it('rojo si es ALTA y no ha iniciado', () => {
-    expect(calculaActividad({ prioridad: 'Alta', estatus: 'Pendiente' }, ahora).semaforo).toBe('rojo');
+  it('la prioridad alta sin hora vencida no la pone roja', () => {
+    expect(calculaActividad({ prioridad: 'Alta', estatus: 'Pendiente' }, ahora).semaforo).toBe('verde');
   });
 
-  it('rojo si excedió el tiempo planeado', () => {
+  it('rojo si pasó la hora de inicio programada y no ha empezado', () => {
     const r = calculaActividad(
-      { prioridad: 'Baja', minutosPlan: 60, inicio: T('16:00'), estatus: 'En Proceso' },
+      { prioridad: 'Baja', fechaInicio: T('16:00'), estatus: 'Pendiente' },
+      ahora,
+    );
+    expect(r.semaforo).toBe('rojo');
+    expect(r.minutosAtraso).toBe(120);
+  });
+
+  it('exceder el plan no pinta rojo si el tope sigue adelante', () => {
+    const r = calculaActividad(
+      {
+        prioridad: 'Baja',
+        minutosPlan: 60,
+        inicio: T('16:00'),
+        estatus: 'En Proceso',
+        fechaMaxima: new Date('2026-09-17T20:00:00.000Z'),
+      },
       ahora,
     );
     expect(r.minutosReales).toBe(120);
     expect(r.excedida).toBe(true);
-    expect(r.semaforo).toBe('rojo');
+    expect(r.semaforo).toBe('verde');
   });
 
-  it('amarillo si es MEDIA sin iniciar, o en curso con más del 80 % del plan', () => {
-    expect(calculaActividad({ prioridad: 'Media', estatus: 'Pendiente' }, ahora).semaforo).toBe(
-      'amarillo',
-    );
+  it('naranja si faltan pocos minutos para el inicio o el tope', () => {
+    expect(
+      calculaActividad({ prioridad: 'Media', estatus: 'Pendiente', fechaInicio: T('18:20') }, ahora).semaforo,
+    ).toBe('amarillo');
     const enCurso = calculaActividad(
-      { prioridad: 'Baja', minutosPlan: 120, inicio: T('16:15'), estatus: 'En Proceso' },
+      { prioridad: 'Baja', minutosPlan: 120, inicio: T('16:15'), estatus: 'En Proceso', fechaMaxima: T('18:15') },
       ahora,
     );
     expect(enCurso.minutosReales).toBe(105);
     expect(enCurso.semaforo).toBe('amarillo');
   });
 
-  it('verde: BAJA sin iniciar y en curso con plan de sobra', () => {
+  it('verde: sin fechas, o en curso con el tope holgado', () => {
     expect(calculaActividad({ prioridad: 'Baja', estatus: 'Pendiente' }, ahora).semaforo).toBe('verde');
     expect(
       calculaActividad(
-        { prioridad: 'Alta', minutosPlan: 480, inicio: T('17:00'), estatus: 'En Proceso' },
+        {
+          prioridad: 'Alta',
+          minutosPlan: 480,
+          inicio: T('17:00'),
+          estatus: 'En Proceso',
+          fechaMaxima: new Date('2026-09-17T22:00:00.000Z'),
+        },
         ahora,
       ).semaforo,
     ).toBe('verde');
@@ -130,13 +152,13 @@ describe('calculaActividad', () => {
     expect(r.minutosReales).toBe(120);
   });
 
-  it('terminada tarde queda roja y fuera de «a tiempo»', () => {
+  it('terminada tarde queda fuera de «a tiempo» y el recuadro ya no se queda rojo', () => {
     const r = calculaActividad(
       { estatus: 'Finalizada', terminada: true, fechaMaxima: T('10:00'), inicio: T('09:00'), fin: T('11:00') },
       ahora,
     );
     expect(r.aTiempo).toBe(false);
-    expect(r.semaforo).toBe('rojo');
+    expect(r.semaforo).toBe('verde');
   });
 
   it('una cancelada no pinta semáforo', () => {
@@ -290,14 +312,24 @@ describe('actividad con periodo de varios días', () => {
     expect(c.semaforo).toBe('verde');
   });
 
-  it('antes de su primer día está programada, no «ALTA sin iniciar»', () => {
+  it('antes de su primer día está programada; la prioridad no la pone roja al empezar el periodo', () => {
     const c = calculaActividad({ prioridad: 'ALTA', periodo: { inicio: '2026-09-21', fin: '2026-09-30' } }, ahora);
     expect(c.semaforo).toBe('verde');
     const yaEmpezo = calculaActividad(
       { prioridad: 'ALTA', periodo: { inicio: '2026-09-17', fin: '2026-09-30' } },
       ahora,
     );
-    expect(yaEmpezo.semaforo).toBe('rojo');
+    expect(yaEmpezo.semaforo).toBe('verde');
+    const sinArrancar = calculaActividad(
+      {
+        prioridad: 'BAJA',
+        periodo: { inicio: '2026-09-17', fin: '2026-09-30' },
+        fechaInicio: T('16:00'),
+        estatus: 'Pendiente',
+      },
+      ahora,
+    );
+    expect(sinArrancar.semaforo).toBe('rojo');
   });
 
   it('cerrada antes de su fin cuenta a tiempo', () => {

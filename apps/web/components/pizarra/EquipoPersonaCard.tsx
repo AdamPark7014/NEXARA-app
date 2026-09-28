@@ -37,6 +37,7 @@ export function AvatarAro({
   nombre,
   avatarUrl,
   estado,
+  atrasada = false,
   size = 74,
   className,
 }: {
@@ -44,14 +45,16 @@ export function AvatarAro({
   avatarUrl?: string | null;
   /** Sin estado el aro queda neutro: la foto identifica, no informa. */
   estado?: EstadoAro | null;
+  /** La persona va tarde: el aro es rojo, no ámbar. */
+  atrasada?: boolean;
   size?: number;
   className?: string;
 }) {
   const src = avatarUrl ? resolveAssetUrl(avatarUrl) : "";
-  const etiqueta = estado ? TITULO_ARO[estado] : undefined;
+  const etiqueta = atrasada ? "Atrasada" : estado ? TITULO_ARO[estado] : undefined;
   return (
     <span
-      className={[s.aro, estado ? CLASE_ARO[estado] : "", className].filter(Boolean).join(" ")}
+      className={[s.aro, atrasada ? s.aroAtrasada : estado ? CLASE_ARO[estado] : "", className].filter(Boolean).join(" ")}
       style={{ "--foto": `${size}px` } as CSSProperties}
       title={etiqueta}
       aria-label={etiqueta}
@@ -90,7 +93,9 @@ const CLASE_ESTADO: Record<EstadoAro, string> = {
 
 function claseDeEstadoActividad(estado: string): string {
   if (estado === "En curso") return s.estadoTrabajando;
-  if (estado === "Atrasado") return s.estadoRetraso;
+  if (estado.startsWith("Atrasada")) return s.estadoAtrasada;
+  if (estado === "Por vencer") return s.estadoRetraso;
+  if (estado === "Sin iniciar") return s.estadoEnTiempo;
   return "";
 }
 
@@ -116,7 +121,7 @@ export default function EquipoPersonaCard({
       href={`/erp/pizarra/${user.id}`}
       className={[s.tarjeta, isSelf ? s.tarjetaYo : ""].filter(Boolean).join(" ")}
     >
-      <AvatarAro nombre={user.nombre} avatarUrl={user.avatarUrl} estado={estado} />
+      <AvatarAro nombre={user.nombre} avatarUrl={user.avatarUrl} estado={estado} atrasada={user.status === "atrasado"} />
       <span className={s.nombre}>{user.nombre}</span>
       {user.puesto ? <span className={s.puesto}>{user.puesto}</span> : null}
       {lineas.length > 0 ? (

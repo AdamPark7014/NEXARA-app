@@ -5,14 +5,17 @@
  * las mismas definiciones (contrato del 18-09, sección B) y para poder probarlas
  * sin base de datos.
  */
-import { workDateKey } from '../common/time/workday.js';
-import { esMultiDia, finDelPeriodo, periodoDeActividad, periodoFuturo } from './actividad-periodo.js';
+import { esMultiDia, periodoDeActividad } from './actividad-periodo.js';
+import { evaluarSemaforo, type Semaforo as SemaforoReloj } from './semaforo-actividad.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Aceptacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
-export type Semaforo = 'rojo' | 'amarillo' | 'verde';
+export type Semaforo = SemaforoReloj;
 
-/** Umbral de «ya casi se acaba el tiempo» (amarillo mientras sigue en curso). */
+/**
+ * Ya no pinta el color: el semáforo lo decide el reloj (`semaforo-actividad.ts`).
+ * Se deja exportado para no romper a quien lo importaba del contrato del 18-09.
+ */
 export const UMBRAL_AMARILLO = 0.8;
 
 /** Radio a partir del cual iniciar lejos del sitio del cliente genera aviso. */
@@ -139,53 +142,30 @@ export function cambiosAlIniciar(
 }
 
 /**
- * Semáforo del contrato:
- * - rojo: vencida (pasó `fechaMaxima`), excedida, o prioridad ALTA sin iniciar.
- * - amarillo: prioridad MEDIA sin iniciar, o en curso con más del 80 % del plan consumido.
- * - verde: lo demás (incluida la que ya terminó a tiempo).
+ * Semáforo por el reloj (ver `semaforo-actividad.ts`). La prioridad y el plan
+ * no cambian el color: rojo es llegar tarde, naranja es que faltan pocos minutos.
  */
 export function semaforoDe(params: {
   prioridad?: string | null;
+  fechaInicio?: Date | string | null;
   fechaMaxima?: Date | string | null;
+  fechaEntregaEsperada?: Date | string | null;
   inicioRealAt?: Date | string | null;
   finRealAt?: Date | string | null;
   minutosPlan?: number | null;
   minutosReales?: number | null;
   /** Cerrada (finalizada, aprobada o cancelada): ya no se le exige fecha. */
   cerrada?: boolean;
+  estatus?: string | null;
   ahora?: Date;
   /**
-   * Periodo de la actividad (`actividad-periodo.ts`). Con él, «vencida» es pasar el fin
-   * de su último día; antes de su primer día está programada (verde); y si dura varios
-   * días, el tiempo estimado de una jornada no la pone roja ni amarilla mientras corre.
+   * Periodo de la actividad (`actividad-periodo.ts`). Con él, el tope es el fin
+   * de su último día; antes de su primer día está programada (verde).
    */
   periodoInicio?: Date | string | null;
   periodoFin?: Date | string | null;
 }): Semaforo {
-  const ahora = params.ahora ?? new Date();
-  const periodo = periodoDeActividad(params);
-  const variosDias = esMultiDia(periodo);
-  const plan = variosDias ? null : (params.minutosPlan ?? null);
-  const reales = params.minutosReales ?? null;
-  if (estaExcedida(plan, reales)) return 'rojo';
-
-  const terminada = Boolean(aFecha(params.finRealAt)) || Boolean(params.cerrada);
-  if (terminada) return 'verde';
-
-  const maxima = periodo ? finDelPeriodo(periodo.fin) : aFecha(params.fechaMaxima);
-  if (maxima && maxima.getTime() < ahora.getTime()) return 'rojo';
-
-  const iniciada = Boolean(aFecha(params.inicioRealAt));
-  if (!iniciada) {
-    if (periodoFuturo(periodo, workDateKey(ahora))) return 'verde';
-    const prioridad = normalizarPrioridad(params.prioridad);
-    if (prioridad === 'ALTA') return 'rojo';
-    if (prioridad === 'MEDIA') return 'amarillo';
-    return 'verde';
-  }
-
-  if (plan != null && plan > 0 && reales != null && reales >= plan * UMBRAL_AMARILLO) return 'amarillo';
-  return 'verde';
+  return evaluarSemaforo(params).semaforo;
 }
 
 /** Vista de tiempos y semáforo que consumen `me/activities`, el detalle y las apps. */
@@ -201,7 +181,9 @@ export function tiemposDto(
   },
   actividad: {
     prioridad?: string | null;
+    fechaInicio?: Date | null;
     fechaMaxima?: Date | null;
+    fechaEntregaEsperada?: Date | null;
     estatus?: string | null;
     periodoInicio?: Date | string | null;
     periodoFin?: Date | string | null;
@@ -213,22 +195,26 @@ export function tiemposDto(
   const cerrada = esCerrada(actividad.estatus);
   // Varios días: el plan es de una jornada y el reloj corre de corrido; no se compara.
   const variosDias = esMultiDia(periodoDeActividad(actividad));
+  const luz = evaluarSemaforo({
+    fechaInicio: actividad.fechaInicio ?? null,
+    fechaMaxima: actividad.fechaMaxima ?? null,
+    fechaEntregaEsperada: actividad.fechaEntregaEsperada ?? null,
+    inicioRealAt: fila.inicioRealAt ?? null,
+    finRealAt: fila.finRealAt ?? null,
+    estatus: actividad.estatus,
+    cerrada,
+    ahora,
+    periodoInicio: actividad.periodoInicio ?? null,
+    periodoFin: actividad.periodoFin ?? null,
+  });
   return {
     aceptacion: aceptacionDe(fila),
     motivoRechazo: fila.motivoRechazo ?? null,
     prioridad: normalizarPrioridad(actividad.prioridad),
-    semaforo: semaforoDe({
-      prioridad: actividad.prioridad,
-      fechaMaxima: actividad.fechaMaxima ?? null,
-      inicioRealAt: fila.inicioRealAt ?? null,
-      finRealAt: fila.finRealAt ?? null,
-      minutosPlan: plan,
-      minutosReales: reales,
-      cerrada,
-      ahora,
-      periodoInicio: actividad.periodoInicio ?? null,
-      periodoFin: actividad.periodoFin ?? null,
-    }),
+    semaforo: luz.semaforo,
+    minutosAtraso: luz.minutosAtraso,
+    minutosParaVencer: luz.minutosParaVencer,
+    motivoSemaforo: luz.motivo,
     minutosPlan: plan,
     minutosReales: reales,
     excedida: variosDias ? false : estaExcedida(plan, reales),

@@ -23,7 +23,7 @@ import { isCeoEmail } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
 import IniciarActividad from "@/components/pizarra/IniciarActividad";
-import { puedeIniciar, SEMAFORO_UI, textoPlanVsReal } from "@/lib/actividad-tiempos";
+import { colorBordeActividad, puedeIniciar, SEMAFORO_UI, textoChipSemaforo, textoPlanVsReal } from "@/lib/actividad-tiempos";
 import {
   estatusUi,
   formatMinutes,
@@ -363,7 +363,7 @@ export default function MisActividadesPage() {
                     ? "1.5px solid color-mix(in srgb, var(--primary) 40%, var(--border))"
                     : "1px solid var(--border)",
                 background: first ? "color-mix(in srgb, var(--primary) 5%, var(--surface))" : "var(--surface)",
-                boxShadow: `inset 5px 0 0 ${pr.color}`,
+                boxShadow: `inset 5px 0 0 ${colorBordeActividad(a.semaforo, Boolean(a.inicioRealAt))}`,
               }}
             >
               <div
@@ -436,10 +436,10 @@ export default function MisActividadesPage() {
                   {a.semaforo ? (
                     <Chip color={SEMAFORO_UI[a.semaforo].color}>
                       <FiberManualRecordIcon aria-hidden="true" sx={{ fontSize: 9 }} />
-                      {SEMAFORO_UI[a.semaforo].label}
+                      {textoChipSemaforo(a.semaforo, a.minutosAtraso, a.minutosParaVencer, a.motivoSemaforo)}
                     </Chip>
                   ) : null}
-                  {puedeIniciar(a) ? <Chip color="#d97706">Sin iniciar</Chip> : null}
+                  {puedeIniciar(a) && a.semaforo === "verde" ? <Chip color="#2563eb">Sin iniciar</Chip> : null}
                   <Chip>
                     <ActivityKindIcon kind={kindIcon(a)} size={15} />
                     {kindLabel(a)}

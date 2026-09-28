@@ -102,7 +102,7 @@ export function filtrarCentroOperativo<T extends { email?: string | null }>(
 
 export type LineaActividadTarjeta = {
   id: number;
-  /** Sin iniciar, En curso, Atrasado… */
+  /** Sin iniciar, En curso, Atrasada… */
   estado: string;
   folio: string;
   titulo: string;
@@ -113,12 +113,18 @@ export function estadoDeActividad(a: {
   estatus?: string | null;
   inicioRealAt?: string | null;
   atrasada?: boolean | null;
+  minutosAtraso?: number | null;
+  semaforo?: "rojo" | "amarillo" | "verde" | null;
   periodo?: { etiqueta?: string | null } | null;
 }): string {
   const est = (a.estatus || "").toLowerCase();
   if (/cancel/.test(est)) return "Cancelada";
   if (/finaliz|complet|aprob/.test(est)) return "Terminada";
-  if (a.atrasada || /atraso/i.test(a.periodo?.etiqueta || "")) return "Atrasado";
+  if (a.atrasada || a.semaforo === "rojo" || /atraso/i.test(a.periodo?.etiqueta || "")) {
+    const t = formatMinutes(a.minutosAtraso);
+    return t && t !== "—" ? `Atrasada · ${t}` : "Atrasada";
+  }
+  if (a.semaforo === "amarillo") return "Por vencer";
   if (a.inicioRealAt || /proceso|validar/.test(est)) return "En curso";
   return "Sin iniciar";
 }
@@ -142,7 +148,7 @@ export function actividadesDeTarjeta(u: TeamBoardUser): LineaActividadTarjeta[] 
     return [
       {
         id: u.currentActivity.id,
-        estado: u.status === "atrasado" ? "Atrasado" : estadoDeActividad(u.currentActivity),
+        estado: u.status === "atrasado" ? "Atrasada" : estadoDeActividad(u.currentActivity),
         folio: u.currentActivity.anNumber,
         titulo: u.currentActivity.titulo,
       },
@@ -185,7 +191,7 @@ export function contextoActividad(u: TeamBoardUser, ahora: number = Date.now()):
   }
 
   if (u.status === "atrasado" && u.currentLateMinutes) {
-    partes.push(`Atrasado ${formatMinutes(u.currentLateMinutes)}`);
+    partes.push(`Atrasada · ${formatMinutes(u.currentLateMinutes)}`);
   } else if (u.status === "libre" && u.lastFinished) {
     const h = hora(u.lastFinished.finishedAt);
     const tarde = u.lastFinished.lateMinutes;

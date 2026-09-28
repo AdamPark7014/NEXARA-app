@@ -1154,6 +1154,9 @@ model Activity {
   branchState             String?                  @db.VarChar(120)
   branchAddress           String?                  @db.VarChar(220)
   slaAlertedAt            DateTime?
+  /// Cuándo se avisó que la actividad entró en rojo. Se limpia al salir de rojo.
+  /// El recordatorio (system setting activities.overdue_reminder_hours) vuelve a avisar pasado ese plazo.
+  overdueAlertedAt        DateTime?
   tiempoEstimadoMin       Int?
   tiempoMaximoMin         Int?
   creadoPorId             Int
@@ -3199,6 +3202,8 @@ enum NotificationType {
   ACTIVITY_REJECTED_BY_ASSIGNEE
   /// Pasó del tiempo estimado (aviso a la persona y a sus superiores).
   ACTIVITY_OVERTIME
+  /// Entró en rojo: pasó la hora de inicio sin arrancar, o el tope sin terminarse.
+  ACTIVITY_OVERDUE
   /// Inició lejos del sitio del cliente o se saltó el orden de prioridad.
   ACTIVITY_START_FLAGGED
   // Celebraciones del equipo (tarea diaria de las 8:00)

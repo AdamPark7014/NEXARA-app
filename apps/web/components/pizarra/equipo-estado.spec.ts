@@ -144,7 +144,7 @@ describe("queHace y contextoActividad", () => {
       ],
     });
     expect(actividadesDeTarjeta(u)).toEqual([
-      { id: 1, estado: "Atrasado", folio: "AN-0001", titulo: "Actualizar archivo SLA" },
+      { id: 1, estado: "Atrasada", folio: "AN-0001", titulo: "Actualizar archivo SLA" },
       { id: 2, estado: "En curso", folio: "AN-0002", titulo: "Visita de otro departamento" },
     ]);
     expect(queHace(u)).not.toBe("Sin actividad asignada");
@@ -164,7 +164,7 @@ describe("queHace y contextoActividad", () => {
       },
     });
     expect(actividadesDeTarjeta(u)).toEqual([
-      { id: 1, estado: "Atrasado", folio: "AN-0001", titulo: "Actualizar archivo SLA" },
+      { id: 1, estado: "Atrasada", folio: "AN-0001", titulo: "Actualizar archivo SLA" },
     ]);
   });
 
@@ -175,7 +175,7 @@ describe("queHace y contextoActividad", () => {
       currentLateMinutes: 135,
       openActivities: [{ ...abierta, assignmentCharge: "Despacho a equipo" }],
     });
-    expect(contextoActividad(u)).toBe("AN-1042 · Despacho a equipo · Atrasado 2 h 15 min");
+    expect(contextoActividad(u)).toBe("AN-1042 · Despacho a equipo · Atrasada · 2 h 15 min");
   });
 });
 

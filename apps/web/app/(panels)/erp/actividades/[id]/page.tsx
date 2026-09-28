@@ -33,7 +33,7 @@ import {
   normalizarPrioridad,
   PRIORIDAD_UI,
   puedeIniciar,
-  SEMAFORO_UI,
+  textoChipSemaforo,
   textoPlanVsReal,
 } from "@/lib/actividad-tiempos";
 import type { SvgIconComponent } from "@mui/icons-material";
@@ -224,6 +224,14 @@ export default function ActivityDetailPage() {
     (m) => (m.userId ?? m.user?.id) === user?.id && !m.retiradoAt,
   );
   const semaforo = miFila?.semaforo ?? activity.semaforo ?? null;
+  const chipSemaforo = semaforo
+    ? textoChipSemaforo(
+        semaforo,
+        miFila?.minutosAtraso ?? activity.minutosAtraso,
+        miFila?.minutosParaVencer ?? activity.minutosParaVencer,
+        miFila?.motivoSemaforo ?? activity.motivoSemaforo,
+      )
+    : null;
   const planVsReal = textoPlanVsReal(
     miFila?.minutosPlan ?? activity.minutosPlan,
     miFila?.minutosReales ?? activity.minutosReales,
@@ -325,9 +333,7 @@ export default function ActivityDetailPage() {
             hint={
               excedida
                 ? "Excedió el tiempo estimado"
-                : semaforo
-                  ? SEMAFORO_UI[semaforo].label
-                  : "Estimado vs real"
+                : chipSemaforo ?? "Estimado vs real"
             }
           />
         ) : null}

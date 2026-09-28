@@ -118,6 +118,7 @@ const ICON_BY_TYPE: Record<string, NotificationIcon> = {
   ACTIVITY_ACCEPTED_BY_ASSIGNEE: 'aceptada',
   ACTIVITY_REJECTED_BY_ASSIGNEE: 'rechazada',
   ACTIVITY_OVERTIME: 'tiempo_excedido',
+  ACTIVITY_OVERDUE: 'vencida',
   ACTIVITY_START_FLAGGED: 'inicio_marcado',
   SALES_CLIENT_CREATED: 'cliente',
   BIRTHDAY: 'cumpleanos',
