@@ -24,6 +24,11 @@
   cambia el hash si la contraseña de la hoja no coincide, guarda en la bóveda, y NO toca a Christian ni a la cuenta de desarrollo
   (las de la hoja para esas dos cuentas siguen un patrón adivinable; una hoja no debe pisar la contraseña del dueño).
 - Pruebas: API 227 suites / 2,745; web 73 archivos / 638; `tsc` limpio en ambos.
+- **Subido** (`6647aeb9`) y **desplegado** (2.º despliegue del día, sin migraciones nuevas).
+- **Activaciones en producción: NO hechas por Claude.** El clasificador negó leer la base de producción (`Production Reads`) y no se
+  rodeó. Quedó `apps/api/scripts/activar-perfil-ceo.sh` para que Adam lo corra EN el servidor
+  (`cd /var/www/nexara-app && git pull --ff-only && bash apps/api/scripts/activar-perfil-ceo.sh` lista las empresas;
+  con `COMPANY_ID=<id> APLICAR=1` aplica módulos/nómina/alta delegada/checar en web (`HORAS`, 48 por omisión)/plantillas).
 
 ## Hecho (Claude, 28-09 10:00-11:00): alta de usuarios delegada, checar desde la web (temporal), subida y despliegue
 - **Subido a GitHub** (`a9a1aa72..4d706ed8`, 21 commits incluidos los de la sesión anterior y `f006fe0e` de otra sesión) y **desplegado**
