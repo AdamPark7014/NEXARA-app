@@ -10,6 +10,7 @@ import { matchesAutoApproveCondition } from './workflow-auto-approve-condition.j
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { appUrls } from '../common/app-urls.js';
 import { resumenDe, resumirEntidades } from './entity-summary.js';
+import { tipoBase } from './approval-thresholds.js';
 
 /**
  * Quien puede decidir cualquier paso aunque no sea su aprobador: el equipo de desarrollo y los roles
@@ -407,7 +408,7 @@ export class WorkflowService {
     entityId: number,
     companyId: number,
   ): Promise<Record<string, unknown>> {
-    const type = entityType.toUpperCase();
+    const type = tipoBase(entityType);
     if (type === 'COTIZACION') {
       const quote = await this.prisma.cotizacion.findFirst({
         where: { id: entityId, ...companyWhere(companyId) },

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -9,6 +9,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
+import { ApprovalThresholdService } from '../workflow/approval-thresholds.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from '../warehouse/empaque.js';
 import { generatePurchaseOrderPdf, type PurchaseOrderPdfPayload } from './purchase-order-pdf.js';
@@ -24,6 +25,8 @@ export class ProcurementService {
     private readonly accounting: AccountingService,
     private readonly audit: AuditService,
     private readonly folio: FolioService,
+    // Topes de aprobación por monto (política de empresa). Opcional: sin tope configurado no se exige nada.
+    @Optional() private readonly aprobacionPorMonto?: ApprovalThresholdService,
   ) {}
 
   /**
@@ -477,6 +480,13 @@ export class ProcurementService {
 
   async approvePurchaseOrder(id: number, userId: number, companyId?: number | null) {
     const po = await this.getPurchaseOrder(id, companyId);
+    await this.aprobacionPorMonto?.exigir({
+      tipo: 'PURCHASE_ORDER',
+      entityId: id,
+      monto: Number(po.totalAmount),
+      actorId: userId,
+      companyId: po.companyId,
+    });
     const updated = await this.prisma.purchaseOrder.update({
       where: { id },
       data: { status: 'CONFIRMED', approvedById: userId, approvedAt: new Date() },

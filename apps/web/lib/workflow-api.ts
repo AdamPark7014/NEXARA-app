@@ -142,6 +142,7 @@ const ENTITY_TYPE_LABEL: Record<string, string> = {
   VIATICS: "Viáticos",
   QUOTE: "Cotización",
   COTIZACION: "Cotización",
+  COTIZACION_MONTO: "Cotización (por monto)",
   DISCOUNT: "Descuento",
   HIRING: "Contratación",
   VACATION: "Vacaciones",
@@ -239,7 +240,9 @@ export function entityApprovalHref(entityType: string, entityId: number): string
       return `/erp/finance/viatics?highlight=${entityId}`;
     case "QUOTE":
     case "COTIZACION":
-      return `/crm/quotes/${entityId}`;
+    case "COTIZACION_MONTO":
+      // Core ya tiene la cotización en /erp: el CEO la abre desde su bandeja para revisar costo y margen.
+      return `/erp/cotizaciones/${entityId}`;
     case "PROJECT":
     case "SALES_PROJECT":
       return `/crm/projects/${entityId}`;
