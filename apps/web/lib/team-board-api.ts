@@ -44,6 +44,8 @@ export type TeamBoardOpenActivity = {
   minutosPlan?: number | null;
   minutosReales?: number | null;
   excedida?: boolean;
+  /** Pasó su fecha límite y sigue abierta. */
+  atrasada?: boolean;
   /** Hora real de arranque, no la programada. */
   inicioRealAt?: string | null;
   finRealAt?: string | null;
