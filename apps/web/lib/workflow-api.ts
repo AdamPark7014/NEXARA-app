@@ -53,6 +53,17 @@ export type WorkflowInstanceRow = {
  */
 export type PendingApproval = WorkflowApprovalRow & {
   instance: WorkflowInstanceRow;
+  /** De qué es y de cuánto (el API lo arma por tipo de entidad). Ausente en API antiguos. */
+  resumen?: ApprovalSummary | null;
+};
+
+/** Resumen legible de lo que se aprueba: título, segunda línea e importe. */
+export type ApprovalSummary = {
+  titulo: string;
+  detalle: string | null;
+  /** `null` cuando el tipo no tiene importe (p. ej. cierre de actividad). */
+  monto: number | null;
+  moneda: string;
 };
 
 const apiFetch = async (path: string, token: string, init: RequestInit = {}) => {

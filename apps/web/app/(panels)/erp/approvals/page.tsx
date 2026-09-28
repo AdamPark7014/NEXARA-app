@@ -41,6 +41,9 @@ type ApprovalRow = {
   titulo: string;
   detalle: string;
   folio: string;
+  /** Importe de lo que se aprueba; `null` si el tipo no lo tiene o el API no lo trae. */
+  monto: number | null;
+  moneda: string;
   href: string | null;
   solicita: string;
   solicitaRol: string;
@@ -66,9 +69,14 @@ const toApprovalRow = (approval: PendingApproval): ApprovalRow => {
     approvalId: approval.id,
     instanceId: inst.id,
     type: tipo,
-    titulo: inst.workflow?.name ?? tipo,
-    detalle: `${tipo} con folio ${inst.entityId}, en espera de tu decisión.`,
+    // Con resumen: «Orden de compra OC-0012», «CT», $48,250. Sin él (API antiguo, entidad borrada): como siempre.
+    titulo: approval.resumen?.titulo ?? inst.workflow?.name ?? tipo,
+    detalle: approval.resumen
+      ? [tipo, approval.resumen.detalle].filter(Boolean).join(" · ")
+      : `${tipo} con folio ${inst.entityId}, en espera de tu decisión.`,
     folio: String(inst.entityId),
+    monto: approval.resumen?.monto ?? null,
+    moneda: approval.resumen?.moneda ?? "MXN",
     href: href && href.startsWith("/erp/") ? href : null,
     solicita: inst.startedBy?.nombre ?? "Sin nombre",
     solicitaRol: inst.startedBy?.role?.nombre ?? "",
@@ -78,6 +86,9 @@ const toApprovalRow = (approval: PendingApproval): ApprovalRow => {
     createdAt: approval.createdAt,
   };
 };
+
+const formatMonto = (monto: number, moneda: string) =>
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: moneda === "USD" ? "USD" : "MXN", maximumFractionDigits: 2 }).format(monto);
 
 const daysWaiting = (iso: string) => {
   const t = new Date(iso).getTime();
@@ -213,9 +224,11 @@ export default function ApprovalsPage() {
   }, [highlightId, list]);
 
   const counts = useMemo(() => {
-    const c = { all: rows.length, Alta: 0, Media: 0, Baja: 0, late: 0, oldest: 0 };
+    const c = { all: rows.length, Alta: 0, Media: 0, Baja: 0, late: 0, oldest: 0, monto: 0, sinImporte: 0 };
     for (const a of rows) {
       c[a.prioridad]++;
+      if (a.monto == null) c.sinImporte++;
+      else if (a.moneda !== "USD") c.monto += a.monto;
       const d = daysWaiting(a.createdAt);
       if (d >= 3) c.late++;
       if (d > c.oldest) c.oldest = d;
@@ -307,6 +320,8 @@ export default function ApprovalsPage() {
                     { key: "type", label: "Tipo" },
                     { key: "titulo", label: "Solicitud" },
                     { key: "folio", label: "Folio" },
+                    { key: "monto", label: "Importe" },
+                    { key: "moneda", label: "Moneda" },
                     { key: "solicita", label: "Solicita" },
                     { key: "prioridad", label: "Prioridad" },
                     { key: "fechaSolicitud", label: "Fecha" },
@@ -338,6 +353,7 @@ export default function ApprovalsPage() {
             ariaLabel="Resumen de la bandeja"
             metrics={[
               { label: "pendientes", value: counts.all, hint: counts.all === 0 ? "bandeja al día" : "esperan tu decisión", tone: counts.all > 0 ? "warning" : "success" },
+              { label: "importe por aprobar", value: counts.monto > 0 ? formatMonto(counts.monto, "MXN") : "—", hint: counts.sinImporte > 0 ? `${counts.sinImporte} sin importe` : "en pesos" },
               { label: "prioridad alta", value: counts.Alta, hint: counts.Alta > 0 ? "atiéndelas primero" : "sin urgentes", tone: counts.Alta > 0 ? "danger" : "default", onClick: counts.Alta > 0 ? () => setFilter("Alta") : undefined },
               { label: "esperando 3 días o más", value: counts.late, tone: counts.late > 0 ? "warning" : "default" },
               { label: "la más antigua", value: counts.all > 0 ? (counts.oldest === 0 ? "hoy" : `${counts.oldest} ${counts.oldest === 1 ? "día" : "días"}`) : "—" },
@@ -417,6 +433,7 @@ export default function ApprovalsPage() {
                   </div>
 
                   <h3 id={`${a.key}-title`} className={s.cardTitle}>{a.titulo}</h3>
+                  {a.monto != null && <div className={s.cardAmount}>{formatMonto(a.monto, a.moneda)}</div>}
                   <p className={s.cardDetail}>{a.detalle}</p>
 
                   <div>
