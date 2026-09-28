@@ -23,12 +23,23 @@ const ROLES: Record<string, any> = {
   dir_admin: { id: 103, accesoConsoleAdmin: true },
 };
 
-function crear(opts: { grants?: string | null; sinRol?: string } = {}) {
-  const create = jest.fn(async (dto: any) => ({ id: 500, nombre: dto.nombre, email: dto.email, departmentId: dto.departmentId, employeeNumber: 'NX-500', passwordHash: 'x' }));
+function crear(opts: { grants?: string | null; sinRol?: string; sinSubordinados?: boolean; departamentos?: { id: number; nombre: string }[] } = {}) {
+  const create = jest.fn(async (dto: any) => ({ id: 500, nombre: dto.nombre, email: dto.email, departmentId: dto.departmentId, employeeNumber: 'NX-500', avatarUrl: dto.avatarUrl ?? null, passwordHash: 'x' }));
   const log = jest.fn(async () => ({}));
   const prisma: any = {
     systemSetting: { findMany: jest.fn(async () => (opts.grants === null ? [] : [{ companyId: 7, value: opts.grants ?? GRANTS }])) },
-    user: { findUnique: jest.fn(async ({ where }: any) => PERSONAS[where.id] ?? null) },
+    user: {
+      findUnique: jest.fn(async ({ where }: any) => PERSONAS[where.id] ?? null),
+      count: jest.fn(async ({ where }: any) => (opts.sinSubordinados ? 0 : [1, 2, 3, 4].includes(where.managerId) ? 2 : 0)),
+      findMany: jest.fn(async () => []),
+      findFirst: jest.fn(async () => null),
+      update: jest.fn(async ({ data }: any) => data),
+    },
+    department: {
+      findMany: jest.fn(async () => opts.departamentos ?? []),
+      findFirst: jest.fn(async ({ where }: any) => (where?.id ? { id: where.id } : null)),
+    },
+    userProfile: { upsert: jest.fn(async (args: any) => args) },
     role: { findFirst: jest.fn(async ({ where }: any) => (where.orgRoleKey === opts.sinRol ? null : ROLES[where.orgRoleKey] ?? null)) },
   };
   return { servicio: new UsersDelegationService(prisma, { create } as any, { log } as any), create, log, prisma };
@@ -38,6 +49,7 @@ const alta = (roleKey: string, extra: Record<string, unknown> = {}) => ({
   nombre: 'Persona Nueva Prueba',
   email: 'Nueva.Persona@Nexara.com.mx',
   password: 'Nexara2026x',
+  telefono: '5512345678',
   roleKey,
   ...extra,
 });
@@ -157,5 +169,65 @@ describe('UsersDelegationService.crear', () => {
     prisma.systemSetting.findMany.mockImplementation(async (a: any) => (a.where.OR.some((o: any) => o.companyId === 7) ? [{ companyId: 7, value: GRANTS }] : []));
     await expect(servicio.crear({ id: 2 }, alta('ing_soporte'), 9)).rejects.toBeInstanceOf(ForbiddenException);
     await expect(servicio.crear({ id: 2 }, alta('ing_soporte'), 7)).resolves.toBeTruthy();
+  });
+
+  it('sin subordinados no ve tipos y el alta responde prohibido, aunque tenga concesión', async () => {
+    const { servicio, create } = crear({ sinSubordinados: true });
+    expect(await servicio.tiposCreables({ id: 2 }, 7)).toEqual([]);
+    const ctx = await servicio.contexto({ id: 2 }, 7);
+    expect(ctx.puede).toBe(false);
+    await expect(servicio.crear({ id: 2 }, alta('ing_soporte'), 7)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('el básico exige teléfono; dirección puede omitirlo; la foto fija viaja al alta', async () => {
+    const { servicio, create, prisma } = crear();
+    await expect(servicio.crear({ id: 2 }, alta('ing_soporte', { telefono: '' }), 7)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(servicio.crear({ id: 2 }, alta('ing_soporte', { telefono: '123' }), 7)).rejects.toBeInstanceOf(BadRequestException);
+    await servicio.crear({ id: 1 }, alta('ing_campo', { telefono: '', avatarUrl: '/uploads/users/cara.jpg' }), 7);
+    expect((create.mock.calls[0] as any[])[0]).toMatchObject({ avatarUrl: '/uploads/users/cara.jpg', roleId: 102 });
+    expect(prisma.userProfile.upsert).not.toHaveBeenCalled();
+
+    await servicio.crear({ id: 2 }, alta('ing_soporte', { avatarUrl: '/uploads/users/soporte.jpg' }), 7);
+    expect(prisma.userProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: { userId: 500, telefono: '5512345678' } }),
+    );
+    expect((create.mock.calls[1] as any[])[0].avatarUrl).toBe('/uploads/users/soporte.jpg');
+    expect((create.mock.calls[1] as any[])[0].managerId).toBe(2);
+  });
+
+  it('si el área del rol existe, el instalador o el de soporte caen ahí y no en el departamento del jefe', async () => {
+    const { servicio, create } = crear({ departamentos: [{ id: 20, nombre: 'Soporte' }] });
+    await servicio.crear({ id: 4 }, alta('ing_soporte'), 7);
+    expect((create.mock.calls[0] as any[])[0].departmentId).toBe(20);
+  });
+
+  it('Antonio cambia la foto de quien le reporta; no la de otro. Christian sí puede con cualquiera', async () => {
+    const { servicio, prisma } = crear();
+    prisma.user.findFirst.mockImplementation(async ({ where }: any) => {
+      if (where.id === 57) return { id: 57, nombre: 'Instalador', managerId: 2, avatarUrl: '/uploads/users/vieja.jpg', isActive: true };
+      if (where.id === 8) return { id: 8, nombre: 'David', managerId: 1, avatarUrl: null, isActive: true };
+      return null;
+    });
+    const propia = await servicio.actualizarFoto({ id: 2 }, 57, { avatarUrl: '/uploads/users/nueva.jpg' }, 7);
+    expect(propia).toMatchObject({ id: 57, avatarUrl: '/uploads/users/nueva.jpg', previousAvatar: '/uploads/users/vieja.jpg' });
+    await expect(servicio.actualizarFoto({ id: 2 }, 8, { avatarUrl: '/uploads/users/no.jpg' }, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(servicio.actualizarFoto({ id: 1 }, 8, { avatarUrl: '/uploads/users/ceo.jpg' }, 7)).resolves.toMatchObject({ id: 8 });
+  });
+
+  it('David ve el formulario básico con el rol automático; Christian el completo', async () => {
+    const { servicio } = crear();
+    const david = await servicio.contexto({ id: 3 }, 7);
+    expect(david).toMatchObject({ formulario: 'basico', rolAutomatico: true, jefeAutomatico: true, telefonoObligatorio: true, puede: true });
+    expect(david.tipos.map((t) => t.roleKey)).toEqual(['ing_campo']);
+    expect(david.departamentos).toEqual([]);
+
+    const christian = await servicio.contexto({ id: 1 }, 7);
+    expect(christian.formulario).toBe('completo');
+    expect(christian.rolAutomatico).toBe(false);
+    expect(christian.jefeAutomatico).toBe(false);
+    expect(christian.telefonoObligatorio).toBe(false);
+    expect(christian.tipos.map((t) => t.roleKey)).toEqual(expect.arrayContaining(['ing_soporte', 'ing_campo', 'dir_admin']));
+    expect(christian.tipos.map((t) => t.roleKey)).not.toContain('ceo');
   });
 });

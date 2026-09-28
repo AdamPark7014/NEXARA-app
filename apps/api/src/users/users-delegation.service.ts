@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
 import { UsersService } from './users.service.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
+import { ROLE_LABELS, type RoleKey } from '../common/rbac/roles.v2.js';
 import {
   USER_CREATION_GRANTS_SETTING_KEY,
   contrasenaAceptable,
@@ -11,8 +12,10 @@ import {
   parsearConcesiones,
   puedeCrearRol,
   rolesQuePuedeCrear,
+  telefonoAceptable,
   tiposParaMostrar,
   type ConcesionesAlta,
+  type FormularioAlta,
   type TipoUsuario,
 } from './user-creation-policy.js';
 
@@ -22,12 +25,45 @@ export type AltaDelegada = {
   nombre: string;
   email: string;
   password: string;
-  roleKey: string;
+  roleKey?: string;
   departmentId?: number | string | null;
   employeeNumber?: string | null;
   /** Solo dirección puede elegir a quién le reporta; para los demás siempre es quien da de alta. */
   managerId?: number | null;
+  /** Contacto. Obligatorio en el formulario básico. */
+  telefono?: string | null;
+  /** La pone el controlador a partir del archivo ya recortado. No llega del JSON. */
+  avatarUrl?: string | null;
 };
+
+export type ContextoAlta = {
+  formulario: FormularioAlta;
+  tipos: TipoUsuario[];
+  /** Un solo tipo: el formulario no pregunta el rol. */
+  rolAutomatico: boolean;
+  /** El jefe es quien da de alta. En el completo se puede elegir otro. */
+  jefeAutomatico: boolean;
+  telefonoObligatorio: boolean;
+  /** Sin subordinados directos, o sin tipos concedidos, el módulo no se ofrece. */
+  puede: boolean;
+  departamentos: { id: number; nombre: string }[];
+  jefes: { id: number; nombre: string }[];
+  equipo: { id: number; nombre: string; avatarUrl: string | null; telefono: string | null }[];
+};
+
+const CONTEXTO_VACIO: ContextoAlta = {
+  formulario: 'basico',
+  tipos: [],
+  rolAutomatico: false,
+  jefeAutomatico: true,
+  telefonoObligatorio: true,
+  puede: false,
+  departamentos: [],
+  jefes: [],
+  equipo: [],
+};
+
+const sinAcentos = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
 type UsuarioSesion = { id?: number | string | null; isClient?: boolean; isBranchUser?: boolean };
 
@@ -80,21 +116,150 @@ export class UsersDelegationService {
     return actor;
   }
 
+  /** Personas activas que le reportan en esta empresa. El lateral del organigrama no cuenta. */
+  private async tieneSubordinados(actorId: number, companyId: number): Promise<boolean> {
+    const n = await this.prisma.user.count({
+      where: {
+        managerId: actorId,
+        isActive: true,
+        companyMemberships: { some: { companyId } },
+      },
+    });
+    return n > 0;
+  }
+
+  private async equipoDirecto(actorId: number, companyId: number) {
+    const filas = await this.prisma.user.findMany({
+      where: {
+        managerId: actorId,
+        isActive: true,
+        companyMemberships: { some: { companyId } },
+      },
+      select: { id: true, nombre: true, avatarUrl: true, perfil: { select: { telefono: true } } },
+      orderBy: { nombre: 'asc' },
+    });
+    return filas.map((f: { id: number; nombre: string; avatarUrl: string | null; perfil?: { telefono: string | null } | null }) => ({
+      id: f.id,
+      nombre: f.nombre,
+      avatarUrl: f.avatarUrl ?? null,
+      telefono: f.perfil?.telefono ?? null,
+    }));
+  }
+
+  /**
+   * Departamento del alta. Dirección puede elegirlo. Si no, el que se llama como el área del rol
+   * («Soporte», «Operaciones»); si no existe, el de quien da de alta.
+   */
+  private async departmentIdDe(
+    roleKey: string,
+    actorDepartmentId: number | null,
+    companyId: number,
+    pedido: number | string | null | undefined,
+    direccion: boolean,
+  ): Promise<number | null> {
+    if (direccion && pedido != null && pedido !== '') {
+      const id = Number(pedido);
+      if (Number.isFinite(id) && id > 0) {
+        const ok = await this.prisma.department.findFirst({
+          where: { id, companyId },
+          select: { id: true },
+        });
+        if (ok) return ok.id;
+      }
+    }
+    const etiqueta = ROLE_LABELS[roleKey as RoleKey]?.departamento;
+    if (etiqueta) {
+      const deps = await this.prisma.department.findMany({
+        where: { companyId },
+        select: { id: true, nombre: true },
+        orderBy: { id: 'asc' },
+      });
+      const buscado = sinAcentos(etiqueta);
+      const hit = deps.find((d: { id: number; nombre: string }) => sinAcentos(d.nombre) === buscado);
+      if (hit) return hit.id;
+    }
+    return actorDepartmentId;
+  }
+
+  /**
+   * Lo que ve el formulario. Vacío si no tiene subordinados o si dirección no le concedió ningún tipo:
+   * la pantalla no muestra el módulo y el alta responde 403.
+   */
+  async contexto(sesion: UsuarioSesion, companyId: number): Promise<ContextoAlta> {
+    const actor = await this.actor(sesion);
+    const concesiones = await this.concesiones(companyId);
+    const direccion = esDireccion(actor, PLATFORM_OWNER_EMAIL);
+    const roles = rolesQuePuedeCrear(actor, concesiones, PLATFORM_OWNER_EMAIL);
+    const conGente = await this.tieneSubordinados(actor.id, companyId);
+    if (!conGente || roles.length === 0) {
+      return { ...CONTEXTO_VACIO, formulario: direccion ? 'completo' : 'basico' };
+    }
+    const tipos = tiposParaMostrar(roles);
+    const equipo = await this.equipoDirecto(actor.id, companyId);
+    if (!direccion) {
+      return {
+        formulario: 'basico',
+        tipos,
+        rolAutomatico: tipos.length === 1,
+        jefeAutomatico: true,
+        telefonoObligatorio: true,
+        puede: true,
+        departamentos: [],
+        jefes: [],
+        equipo,
+      };
+    }
+    const [departamentos, jefes] = await Promise.all([
+      this.prisma.department.findMany({
+        where: { companyId },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+      this.prisma.user.findMany({
+        where: { isActive: true, companyMemberships: { some: { companyId } } },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      }),
+    ]);
+    return {
+      formulario: 'completo',
+      tipos,
+      rolAutomatico: false,
+      jefeAutomatico: false,
+      telefonoObligatorio: false,
+      puede: true,
+      departamentos,
+      jefes,
+      equipo,
+    };
+  }
+
   /** Los tipos que esta persona puede dar de alta (para armar el formulario). */
   async tiposCreables(sesion: UsuarioSesion, companyId: number): Promise<TipoUsuario[]> {
-    const actor = await this.actor(sesion);
-    return tiposParaMostrar(rolesQuePuedeCrear(actor, await this.concesiones(companyId), PLATFORM_OWNER_EMAIL));
+    return (await this.contexto(sesion, companyId)).tipos;
   }
 
   async crear(sesion: UsuarioSesion, dto: AltaDelegada, companyId: number) {
     const actor = await this.actor(sesion);
+    if (!(await this.tieneSubordinados(actor.id, companyId))) {
+      throw new ForbiddenException('Solo quien tiene personal a su cargo puede dar de alta usuarios.');
+    }
     const concesiones = await this.concesiones(companyId);
+    const direccion = esDireccion(actor, PLATFORM_OWNER_EMAIL);
+    const permitidos = rolesQuePuedeCrear(actor, concesiones, PLATFORM_OWNER_EMAIL);
+    let roleKey = String(dto.roleKey ?? '').trim();
+    if (!roleKey && permitidos.length === 1) roleKey = permitidos[0];
+    if (!roleKey) throw new BadRequestException('Elige el tipo de usuario.');
 
-    if (!puedeCrearRol(actor, dto.roleKey, concesiones, PLATFORM_OWNER_EMAIL)) {
+    if (!puedeCrearRol(actor, roleKey, concesiones, PLATFORM_OWNER_EMAIL)) {
       throw new ForbiddenException('No tienes permiso para dar de alta usuarios de ese tipo.');
     }
     if (!contrasenaAceptable(dto.password)) {
       throw new BadRequestException('La contraseña debe tener al menos 8 caracteres, con letras y números.');
+    }
+    const telefono = String(dto.telefono ?? '').trim();
+    if (!telefonoAceptable(telefono, !direccion)) {
+      throw new BadRequestException('Escribe un teléfono de 10 dígitos.');
     }
     const nombre = String(dto.nombre ?? '').trim();
     const email = String(dto.email ?? '').trim().toLowerCase();
@@ -104,7 +269,7 @@ export class UsersDelegationService {
     // El tipo de usuario es el rol del sistema con esa clave. Quien no es dirección jamás da de alta un
     // rol con permisos de administración, aunque la clave figure en su concesión.
     const rol = await this.prisma.role.findFirst({
-      where: { orgRoleKey: dto.roleKey },
+      where: { orgRoleKey: roleKey },
       select: {
         id: true,
         accesoConsoleAdmin: true,
@@ -115,7 +280,6 @@ export class UsersDelegationService {
       },
     });
     if (!rol) throw new BadRequestException('Ese tipo de usuario no está configurado. Avisa a dirección.');
-    const direccion = esDireccion(actor, PLATFORM_OWNER_EMAIL);
     const conPoderes = Boolean(
       rol.accesoConsoleAdmin || rol.accesoGestionUsuarios || rol.accesoGestionTienda || rol.accesoGestionWeb || rol.accesoContabilidad,
     );
@@ -123,11 +287,12 @@ export class UsersDelegationService {
       throw new ForbiddenException('Ese tipo de usuario solo lo da de alta dirección.');
     }
 
-    const departmentId = dto.departmentId ?? actor.departmentId;
+    const departmentId = await this.departmentIdDe(roleKey, actor.departmentId, companyId, dto.departmentId, direccion);
     if (departmentId == null) throw new BadRequestException('Elige el departamento.');
 
     // La persona nueva queda «debajo» de quien la da de alta (organigrama). Dirección puede elegir otro jefe.
     const managerId = direccion && dto.managerId ? Number(dto.managerId) : actor.id;
+    const avatarUrl = String(dto.avatarUrl ?? '').trim() || undefined;
 
     const creado: any = await this.users.create(
       {
@@ -138,9 +303,18 @@ export class UsersDelegationService {
         departmentId,
         employeeNumber: dto.employeeNumber?.trim() || undefined,
         managerId,
+        avatarUrl,
       } as CreateUserDto,
       companyId,
     );
+
+    if (telefono) {
+      await this.prisma.userProfile.upsert({
+        where: { userId: creado.id },
+        update: { telefono },
+        create: { userId: creado.id, telefono },
+      });
+    }
 
     await this.audit
       .log(
@@ -149,7 +323,7 @@ export class UsersDelegationService {
           entityId: creado.id,
           action: 'CREATE_DELEGATED',
           // Sin la contraseña, jamás.
-          changes: { roleKey: dto.roleKey, email, managerId, creadoPor: actor.id },
+          changes: { roleKey, email, managerId, creadoPor: actor.id, conFoto: Boolean(avatarUrl) },
           companyId,
         },
         actor.id,
@@ -160,10 +334,80 @@ export class UsersDelegationService {
       id: creado.id as number,
       nombre: creado.nombre as string,
       email: creado.email as string,
-      roleKey: dto.roleKey,
+      roleKey,
       departmentId: creado.departmentId ?? null,
       employeeNumber: creado.employeeNumber ?? null,
       managerId,
+      avatarUrl: (creado.avatarUrl as string | null | undefined) ?? avatarUrl ?? null,
+      telefono: telefono || null,
+    };
+  }
+
+  /**
+   * Cambia la foto fija (o el teléfono) de alguien que ya existe.
+   * Dirección puede con cualquiera de la empresa. Un jefe, solo con quien le reporta.
+   * La foto de checada no entra por aquí: esto escribe `User.avatarUrl`.
+   */
+  async actualizarFoto(
+    sesion: UsuarioSesion,
+    userId: number,
+    cambio: { avatarUrl?: string | null; telefono?: string },
+    companyId: number,
+  ) {
+    const actor = await this.actor(sesion);
+    if (!(await this.tieneSubordinados(actor.id, companyId))) {
+      throw new ForbiddenException('Solo quien tiene personal a su cargo puede cambiar estas fotos.');
+    }
+    const concesiones = await this.concesiones(companyId);
+    const direccion = esDireccion(actor, PLATFORM_OWNER_EMAIL);
+    if (!direccion && rolesQuePuedeCrear(actor, concesiones, PLATFORM_OWNER_EMAIL).length === 0) {
+      throw new ForbiddenException('No tienes permiso para dar de alta usuarios.');
+    }
+    const destino = await this.prisma.user.findFirst({
+      where: { id: userId, companyMemberships: { some: { companyId } } },
+      select: { id: true, nombre: true, managerId: true, avatarUrl: true, isActive: true },
+    });
+    if (!destino || destino.isActive === false) throw new BadRequestException('No encontramos a esa persona.');
+    if (!direccion && destino.managerId !== actor.id) {
+      throw new ForbiddenException('Solo puedes cambiar la foto de quien te reporta.');
+    }
+    const telefono = cambio.telefono !== undefined ? String(cambio.telefono).trim() : undefined;
+    if (telefono !== undefined && !telefonoAceptable(telefono, true)) {
+      throw new BadRequestException('Escribe un teléfono de 10 dígitos.');
+    }
+    const avatarUrl = String(cambio.avatarUrl ?? '').trim();
+    if (!avatarUrl && telefono === undefined) throw new BadRequestException('No hay nada que cambiar.');
+
+    if (avatarUrl) {
+      await this.prisma.user.update({ where: { id: destino.id }, data: { avatarUrl } });
+    }
+    if (telefono !== undefined) {
+      await this.prisma.userProfile.upsert({
+        where: { userId: destino.id },
+        update: { telefono },
+        create: { userId: destino.id, telefono },
+      });
+    }
+
+    await this.audit
+      .log(
+        {
+          entityType: 'User',
+          entityId: destino.id,
+          action: 'AVATAR_DELEGATED',
+          changes: { creadoPor: actor.id, conFoto: Boolean(avatarUrl) },
+          companyId,
+        },
+        actor.id,
+      )
+      .catch(() => undefined);
+
+    return {
+      id: destino.id as number,
+      nombre: destino.nombre as string,
+      avatarUrl: avatarUrl || destino.avatarUrl || null,
+      previousAvatar: (destino.avatarUrl as string | null) ?? null,
+      telefono: telefono ?? null,
     };
   }
 }

@@ -290,10 +290,12 @@ export const SHARED_SESSION_URL_RULES: UrlRule[] = [
   { path: '/api/user-preferences/**', scope: 'write' },
   { path: '/api/users/me', methods: ['GET', 'PATCH'], scope: 'write' },
   { path: '/api/users/profile/**', scope: 'write' },
-  // Alta delegada: la ve todo el personal interno, pero el API solo deja pasar a quien dirección le concedió
-  // algún tipo (`users.creation_grants`); el resto recibe una lista vacía / 403.
+  // Alta delegada: la ve todo el personal interno, pero el API solo deja pasar a quien tiene
+  // subordinados y dirección le concedió algún tipo (`users.creation_grants`).
   { path: '/api/users/delegated', methods: ['POST'], scope: 'write' },
   { path: '/api/users/delegated/roles', methods: ['GET'], scope: 'read' },
+  { path: '/api/users/delegated/contexto', methods: ['GET'], scope: 'read' },
+  { path: '/api/users/delegated/*', methods: ['PATCH'], scope: 'write' },
   { path: '/api/me/**', methods: ['GET'], scope: 'read' },
   { path: '/api/devices/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
   { path: '/api/company/mine', methods: ['GET'], scope: 'read' },

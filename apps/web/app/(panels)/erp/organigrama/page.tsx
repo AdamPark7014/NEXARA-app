@@ -15,7 +15,7 @@ export default function OrganigramaPage() {
   const canEditOrg = useMemo(() => getHrSectionConfig(user).canAssign, [user]);
   return (
     <>
-      {/* Solo aparece para quien dirección le concedió dar de alta algún tipo de usuario. */}
+      {/* Solo aparece para quien tiene subordinados y dirección le concedió algún tipo. */}
       <AltaUsuarioPanel />
       <OrgChartView canEditOrg={canEditOrg} eyebrow="Core · Recursos" />
     </>

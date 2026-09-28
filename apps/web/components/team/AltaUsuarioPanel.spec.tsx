@@ -12,7 +12,7 @@ const INSTALADOR = { roleKey: "ing_campo", etiqueta: "Instalador" };
 
 function respuestas(tipos: unknown, alta?: () => unknown) {
   return vi.fn(async (url: string, init?: RequestInit) => {
-    if (String(url).includes("users/delegated/roles")) return { ok: true, json: async () => tipos };
+    if (String(url).includes("users/delegated/contexto")) return { ok: true, json: async () => tipos };
     if (init?.method === "POST") {
       const r = alta ? alta() : { ok: true, cuerpo: { id: 9, nombre: "Persona Nueva", email: "nueva@nexara.com.mx", roleKey: "ing_soporte", departmentId: 1, employeeNumber: null, managerId: 2 } };
       return { ok: (r as any).ok, json: async () => (r as any).cuerpo };
@@ -50,6 +50,9 @@ describe("AltaUsuarioPanel", () => {
     const dialogo = await screen.findByRole("dialog");
     await userEvent.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
     await userEvent.type(within(dialogo).getByLabelText("Correo"), "nueva@nexara.com.mx");
+    await userEvent.type(within(dialogo).getByLabelText("Teléfono"), "5512345678");
+    expect(within(dialogo).queryByLabelText("Tipo de usuario")).toBeNull();
+    expect(within(dialogo).getByText(/Rol y jefe quedan fijos/)).toBeTruthy();
     const clave = (within(dialogo).getByLabelText(/^Contraseña/) as HTMLInputElement).value;
     expect(clave.length).toBeGreaterThanOrEqual(10); // ya viene generada
     await userEvent.click(within(dialogo).getByRole("button", { name: "Crear usuario" }));
@@ -60,7 +63,12 @@ describe("AltaUsuarioPanel", () => {
     expect(screen.getByText(/única vez que se muestra/)).toBeTruthy();
 
     const post = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([, i]) => i?.method === "POST")!;
-    expect(JSON.parse(String(post[1].body))).toEqual({ nombre: "Persona Nueva", email: "nueva@nexara.com.mx", password: clave, roleKey: "ing_soporte" });
+    const cuerpo = post[1].body as FormData;
+    expect(cuerpo.get("nombre")).toBe("Persona Nueva");
+    expect(cuerpo.get("email")).toBe("nueva@nexara.com.mx");
+    expect(cuerpo.get("password")).toBe(clave);
+    expect(cuerpo.get("roleKey")).toBe("ing_soporte");
+    expect(cuerpo.get("telefono")).toBe("5512345678");
   });
 
   it("con varios tipos obliga a elegir uno antes de poder crear", async () => {
@@ -82,6 +90,7 @@ describe("AltaUsuarioPanel", () => {
     const dialogo = await screen.findByRole("dialog");
     await userEvent.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
     await userEvent.type(within(dialogo).getByLabelText("Correo"), "repetido@nexara.com.mx");
+    await userEvent.type(within(dialogo).getByLabelText("Teléfono"), "5512345678");
     await userEvent.click(within(dialogo).getByRole("button", { name: "Crear usuario" }));
     expect(await screen.findByText("El correo ya está registrado (Otra Persona).")).toBeTruthy();
     expect(within(dialogo).getByRole("button", { name: "Crear usuario" })).toBeTruthy();
