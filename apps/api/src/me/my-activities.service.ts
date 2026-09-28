@@ -8,7 +8,6 @@ import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helper
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
-import { tiposVisibles } from './equipo-alcance.js';
 import {
   cambiosAlIniciar,
   horasPlanValidas,
@@ -793,14 +792,17 @@ export class MyActivitiesService {
 
   async list(viewer: MyActivitiesViewer, companyId: number | null): Promise<MyActivitiesResponse> {
     this.assertNotCeo(viewer);
-    // Luis coordina servicios: en su lista solo entran actividades de ese tipo.
-    const tipos = tiposVisibles({ id: viewer.id, email: viewer.email ?? null });
+    // Cola personal: todo lo que esta persona tiene asignado. No se recorta por
+    // tipo (Luis coordina servicios ajenos, pero una tarea a su nombre también es
+    // suya) ni por el departamento de quien se la dejó. Sí se recorta por persona,
+    // empresa y por haber salido del equipo.
+    const tenant = companyId != null ? { companyId } : {};
     const rows = await this.prisma.activityAssignee.findMany({
       where: {
         userId: viewer.id,
         retiradoAt: null,
-        ...(companyId != null ? { companyId } : {}),
-        activity: { deletedAt: null, ...(tipos ? { coreKind: { in: tipos } } : {}) },
+        ...tenant,
+        activity: { deletedAt: null },
       },
       select: {
         rol: true,
@@ -868,6 +870,86 @@ export class MyActivitiesService {
       },
       take: 300,
     });
+
+    // Responsable sin fila de equipo (alta de un contrato, un import o un cambio
+    // de responsable que no dejó `activity_assignees`). Si lo sacaron del equipo,
+    // la fila retirada existe y esta consulta no lo revive.
+    const cubiertas = new Set(rows.map((row) => row.activity.id));
+    const huerfanas = await this.prisma.activity.findMany({
+      where: {
+        responsableId: viewer.id,
+        deletedAt: null,
+        ...tenant,
+        ...(cubiertas.size > 0 ? { id: { notIn: [...cubiertas] } } : {}),
+        assignees: { none: { userId: viewer.id } },
+      },
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        descripcion: true,
+        estatus: true,
+        prioridad: true,
+        coreKind: true,
+        ticketTypeCustom: true,
+        assignmentCharge: true,
+        fechaInicio: true,
+        fechaMaxima: true,
+        fechaAsignacion: true,
+        fechaFinalizacion: true,
+        periodoInicio: true,
+        periodoFin: true,
+        tiempoEstimadoMin: true,
+        tiempoMaximoMin: true,
+        creadoPorId: true,
+        creador: { select: { id: true, nombre: true } },
+        project: { select: { title: true } },
+        client: { select: { name: true } },
+        activityEvidences: { select: { userId: true, status: true } },
+        scheduleChanges: {
+          orderBy: { createdAt: 'desc' as const },
+          take: 1,
+          select: {
+            createdAt: true,
+            fechaAnterior: true,
+            fechaNueva: true,
+            motivo: true,
+            cambiadoPor: { select: { nombre: true } },
+          },
+        },
+        assignees: {
+          where: { retiradoAt: null },
+          select: {
+            userId: true,
+            rol: true,
+            asignadoAt: true,
+            user: { select: { nombre: true } },
+            asignadoPor: { select: { nombre: true } },
+          },
+          orderBy: { asignadoAt: 'asc' as const },
+        },
+      },
+      take: 100,
+    });
+    for (const activity of huerfanas) {
+      rows.push({
+        rol: 'LEAD',
+        asignadoAt: activity.fechaAsignacion,
+        indicaciones: null,
+        ordenEjecucion: null,
+        ordenJustificacion: null,
+        ordenActualizadoAt: null,
+        aceptadaAt: null,
+        rechazadaAt: null,
+        motivoRechazo: null,
+        inicioRealAt: null,
+        finRealAt: null,
+        horasPlan: null,
+        saltoPrioridad: false,
+        asignadoPor: activity.creador,
+        activity,
+      } as (typeof rows)[number]);
+    }
 
     const ahora = new Date();
     const dayStart = new Date(`${ahora.toLocaleDateString('sv-SE')}T00:00:00`);

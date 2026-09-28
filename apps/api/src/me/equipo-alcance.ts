@@ -99,8 +99,13 @@ export function alcanzaA(
 }
 
 /**
- * Tipos de actividad (`coreKind`) que ve cada coordinador; `null` = todos. Luis coordina servicios:
- * ni proyectos, obras ni tareas de instalación le corresponden.
+ * Tipos de actividad (`coreKind`) que un coordinador ve del trabajo de *otras*
+ * personas en la pizarra; `null` = todos. Luis coordina servicios ajenos: en el
+ * tablero no le salen proyectos, obras ni tareas de instalación de su gente.
+ *
+ * No recorta la cola personal (`GET /me/activities`). Lo que le asignaron a él
+ * —tarea, proyecto, comercial o servicio, y aunque venga de otro departamento—
+ * es suyo y tiene que aparecer en su lista y en sus contadores.
  */
 const TIPOS_POR_CORREO: Record<string, string[]> = {
   'direccion.operaciones@nexara.com.mx': ['servicio'],
