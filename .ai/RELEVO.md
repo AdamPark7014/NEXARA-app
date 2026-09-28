@@ -12,7 +12,9 @@
   `chat_message_reads`, y un cambio de `TextoAuto` en la misma `TablaPartidas.tsx` que dio un conflicto de rebase, resuelto quedándose con
   `TextoAuto`/`onValor` de Cursor + el `tabIndex={-1}` del fix). Cada rebase se volvió a probar entero (con `prisma generate` de por medio)
   antes de empujar: terminó en API 238/2 860, web 74/649, ambos `tsc` limpios. Push final `02b6856e`. Deploy con `--with-migrate` lanzado
-  en el servidor (aplica ambas migraciones de Cursor); confirmar con `docker compose ps` o los logs si sigue en pie al retomar.
+  en el servidor y **terminado y verificado** (14:01): las tres migraciones del día (`credential_vault`, `sales_client_tipo`,
+  `chat_message_reads`) están aplicadas, los 5 contenedores healthy/up, y `/`, `/login`, `/erp/acceso-cuentas` (200) y
+  `/api/account-access/status`, `/api/chat/channels` (401 sin sesión, como toca) responden bien.
 - **Bóveda de contraseñas (turno anterior de Claude, mismo día):** construida, desplegada y con la hoja del 21-09 cargada (16 cuentas en
   la empresa 1, verificadas). Ver más abajo la entrada «BÓVEDA DE CONTRASEÑAS construida». `VAULT_ENCRYPTION_KEY` vive en
   `/var/www/nexara-app/deploy/.env.nexara` (600) — Adam debe respaldarla.
