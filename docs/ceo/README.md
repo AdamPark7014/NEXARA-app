@@ -6,6 +6,7 @@ viven en el paquete que se le entrega; aquí quedan los que tocan al ERP.
 
 | Documento | Para qué |
 |---|---|
+| `PERFIL-CEO-EN-EL-ERP.md` | Guía para Christian: cómo trabaja ahora («Tu día», bandeja con importe, topes, modo resumen, nómina) |
 | `PENDIENTES-PARA-HIJO-2026-09-27.md` | Estado real, comandos de despliegue, riesgos de facturación y decisiones |
 | `AUTOMATIZACION-PROCESOS-2026-09-27.md` | Qué corre solo (horarios en hora de México) y qué falta |
 | `MODELO-AUTOMATIZACION-PARAMETRIZADO-2026-09-27.md` | Los 5 casos de uso, paso por paso (✅ / 🟡 / ❌) y dónde aprueba el CEO |

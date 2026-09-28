@@ -16,7 +16,7 @@ Equipo y licencias (Fortinet, ESET, Office, cámaras, switches, workstations).
 |---|---|---|
 | Cotización con plantilla, marca, costo y margen | 9 plantillas base, catálogo de partidas; margen sobre precio de venta (30 % por omisión con CT) | ✅ *(por cargar en tu cuenta)* |
 | Revisión interna antes de enviar | Se puede pasar a otra persona con nota | ✅ |
-| **Aprobación del CEO** | `aprobar` y `enviar` no tienen tope de monto ni de rol; solo un descuento > 15 % dispara aprobación | ❌ → **conectar topes** |
+| **Aprobación del CEO** | Sin configurar, `aprobar` y `enviar` no tienen tope (solo un descuento > 15 % dispara aprobación). **Con un tope por empresa** (hecho, opcional) una cotización que lo supera espera la autorización de dirección, que ve el importe en su bandeja | 🟡 → **falta que Christian fije el monto** |
 | Envío y firma del cliente | Enlace público con firma o rechazo; vencimientos avisados | ✅ |
 | Al firmar: oportunidad ganada, proyecto comercial y **pedido borrador al distribuidor (CT)** | Sí, si la cotización está ligada a una oportunidad | ✅ |
 | Pedido a CT y compra | Manual; exige cotización aprobada y API de CT | 🟡 |
@@ -64,7 +64,7 @@ Preventivo/correctivo recurrente.
 |---|---|---|
 | Asistencias, retardos, extras aprobados | Checador, cierre automático, indicadores | ✅ |
 | Pre-nómina del periodo | Pantalla en vivo (horas netas, extras aprobados, avisos) | ✅ |
-| **Calendario quincenal (15 y último día) y aviso «lista para revisar»** | No existe: los periodos son fechas libres | ❌ |
+| **Calendario quincenal (15 y último día) y aviso «lista para revisar»** | Hecho: política `payroll.schedule` y aviso dentro de «Tu día» para quien ve Pagos | ✅ *(por activar)* |
 | Borradores de pago | Manual (un clic) y con **otro cálculo** de horas (brutas, con comida) | 🟡 |
 | **Pagos a personal — solo CEO** | ✅ hecho hoy (por empresa); la contadora conserva Facturación | ✅ |
 | Marcar pagado → póliza contable | Automático (cuenta de sueldos contra bancos), **sin paso del CEO** | 🟡 |
@@ -80,9 +80,9 @@ Preventivo/correctivo recurrente.
 ## Dónde apruebas tú (propuesta para confirmar)
 | Qué | Hoy | Propuesta |
 |---|---|---|
-| Cotización | Cualquiera con permiso | Coord. de ventas hasta $50 k · Dir. de Operaciones hasta $250 k · **tú** hasta $1 M o más (montos de ejemplo, a confirmar) |
-| Compra / OC | Cualquiera con permiso (o paso sin aprobador) | Dir. Administrativa hasta $25 k · **tú** desde $200 k |
-| Viático | Cadena por jerarquía; Dir. Admin desde $10 k; el CEO es paso final | Igual; avisarte cuando llegue a tu paso (hoy no avisa) |
+| Cotización | Cualquiera con permiso (**mecanismo de tope ya hecho**, sin activar) | Que solo lleguen a ti las de más de **$X** (montos de ejemplo: coord. de ventas hasta $50 k · Dir. de Operaciones hasta $250 k · tú desde $1 M — a confirmar) |
+| Compra / OC | Cualquiera con permiso (o paso sin aprobador) | Que solo lleguen a ti las de más de **$X** (ejemplo: Dir. Administrativa hasta $25 k · tú desde $200 k) |
+| Viático | Cadena por jerarquía; Dir. Admin desde $10 k; el CEO es paso final | Igual; **ya te avisan cuando llega a tu paso** |
 | Gasto > $5 k | Workflow sembrado | Igual, con importe visible |
 | Proyecto > $500 k | Regla sin freno real | Que el proyecto espere tu firma |
 | **Pagos a personal** | ✅ solo tú | Además, que «marcar pagado» sea tuyo |
