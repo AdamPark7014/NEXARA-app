@@ -3,6 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { UsersService } from './users.service.js';
+import { UsersDelegationService } from './users-delegation.service.js';
+import { CreateDelegatedUserDto } from './dto/create-delegated-user.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UpdateUserDto } from './dto/update-user.dto.js';
@@ -54,7 +56,10 @@ export class UsersController {
   private readonly usersUploadDir = getUsersUploadDir(__dirname);
   private readonly userDocsUploadDir = getUserDocsUploadDir(__dirname);
 
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly delegation: UsersDelegationService,
+  ) {}
 
   // CEO (100) puede crear cualquier usuario, Supervisor (50) solo staff (10) de su departamento
   @Post()
@@ -101,6 +106,29 @@ export class UsersController {
       createUserDto.avatarUrl = `/uploads/users/${file.filename}`;
     }
     return this.usersService.create(createUserDto, companyId);
+  }
+
+  /**
+   * Tipos de usuario que quien consulta puede dar de alta. Vacío = no tiene el permiso (la pantalla
+   * no ofrece el botón). No pide `users.manage`: el permiso es por persona y lo decide dirección.
+   */
+  @Get('delegated/roles')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  async delegatedRoles(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    if (companyId == null) return [];
+    return this.delegation.tiposCreables(user, companyId);
+  }
+
+  /** Alta de un usuario por quien tiene el permiso delegado (Antonio, David, Luis) o por dirección. */
+  @Post('delegated')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  async createDelegated(
+    @CurrentUser() user: any,
+    @Body() dto: CreateDelegatedUserDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    if (companyId == null) throw new BadRequestException('No se pudo determinar la empresa activa.');
+    return this.delegation.crear(user, dto, companyId);
   }
 
   @Get()
