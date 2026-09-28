@@ -19,6 +19,7 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { toast } from "@/components/Toast";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import { evaluarSemaforoActividad, textoChipSemaforo } from "@/lib/actividad-tiempos";
 
 type ActivityRow = {
   id: number;
@@ -38,7 +39,9 @@ type ActivityRow = {
     reviewedBy?: { nombre?: string };
   } | null;
   fechaInicio?: string | null;
+  fechaMaxima?: string | null;
   fechaEntregaEsperada?: string | null;
+  activityEvidences?: ActivityRow["activityEvidence"][];
 };
 
 function evidenceLabel(row: ActivityRow): string {
@@ -57,10 +60,21 @@ function evidenceLabel(row: ActivityRow): string {
 
 function statusVariant(estatus: string): "positive" | "warning" | "danger" | "accent" | "neutral" {
   if (estatus === "Finalizada" || estatus === "Aprobada") return "positive";
-  if (estatus === "Pendiente") return "warning";
   if (/rechaz|cancel/i.test(estatus)) return "danger";
   if (estatus === "En Proceso") return "accent";
+  if (estatus === "Pendiente" || estatus === "Asignada") return "neutral";
   return "neutral";
+}
+
+function plazoDe(row: ActivityRow) {
+  const ev = row.activityEvidence ?? row.activityEvidences?.[0] ?? null;
+  const iniciada = Boolean(ev?.status);
+  return evaluarSemaforoActividad({
+    fechaInicio: row.fechaInicio,
+    fechaMaxima: row.fechaMaxima,
+    fechaEntregaEsperada: row.fechaEntregaEsperada,
+    estatus: iniciada && !/proceso|validar/i.test(row.estatus) ? "En Proceso" : row.estatus,
+  });
 }
 
 export type ActivityBucket = "daily" | "projects" | "services";
@@ -273,6 +287,16 @@ export default function OpsActivitiesBoard({
     },
     { key: "responsable", label: "Responsable", render: (r) => r.responsable?.nombre ?? "—", width: 130 },
     { key: "prioridad", label: "Prioridad", width: 90 },
+    {
+      key: "plazo",
+      label: "Plazo",
+      width: 150,
+      render: (r) => {
+        const luz = plazoDe(r);
+        const variant = luz.semaforo === "rojo" ? "danger" : luz.semaforo === "amarillo" ? "warning" : "neutral";
+        return <Tag variant={variant}>{textoChipSemaforo(luz.semaforo, luz.minutosAtraso, luz.minutosParaVencer, luz.motivo)}</Tag>;
+      },
+    },
     {
       key: "evidence",
       label: "Evidencias",

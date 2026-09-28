@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
+import { colorBordeActividad, evaluarSemaforoActividad, textoChipSemaforo } from "@/lib/actividad-tiempos";
 import { formatoFecha, type Tono } from "@/lib/proyectos-api";
-import { diasEntre } from "@/lib/proyecto-plan";
 import ProgramarActividades from "./ProgramarActividades";
 import { claseTono } from "./tono";
 import type { SeccionProps } from "./tipos";
@@ -48,13 +48,17 @@ export default function SeccionActividades(props: SeccionProps) {
           <ul className={styles.items}>
             {p.activities.map((a) => {
               const abierta = !isActivityCompleted(a.estatus) && !/cancel/i.test(a.estatus ?? "");
-              // Con periodo manda su último día; sin él, la entrega esperada de siempre.
-              const atrasada = a.periodo
-                ? a.periodo.estado === "vencida"
-                : abierta && (diasEntre(a.fechaEntregaEsperada, hoy) ?? 0) > 0;
+              const luz = evaluarSemaforoActividad({
+                fechaInicio: a.fechaInicio,
+                fechaEntregaEsperada: a.fechaEntregaEsperada,
+                estatus: a.estatus,
+                periodoEstado: a.periodo?.estado,
+                ahora: new Date(`${hoy}T12:00:00`),
+              });
+              const atrasada = abierta && luz.semaforo === "rojo";
               const etapa = etapaDe(a.projectMilestoneId);
               return (
-                <li key={a.id} className={styles.item}>
+                <li key={a.id} className={styles.item} style={{ boxShadow: `inset 4px 0 0 ${colorBordeActividad(luz.semaforo, isActivityInProgress(a.estatus))}` }}>
                   <div className={styles.itemMain}>
                     <Link href={`/erp/actividades/${a.id}`} className={styles.itemTitle} style={{ color: "inherit" }}>
                       {a.anNumber ? `${a.anNumber} · ` : ""}
@@ -75,9 +79,9 @@ export default function SeccionActividades(props: SeccionProps) {
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
-                    {atrasada ? (
-                      <span className={`${styles.rowWrap} ${styles.vencido}`}>
-                        {a.periodo ? "Pasó su último día sin cerrarse" : "Pasó su fecha de entrega"}
+                    {atrasada || luz.semaforo === "amarillo" ? (
+                      <span className={`${styles.rowWrap} ${atrasada ? styles.vencido : ""}`}>
+                        {textoChipSemaforo(luz.semaforo, luz.minutosAtraso, luz.minutosParaVencer, luz.motivo)}
                       </span>
                     ) : null}
                   </div>

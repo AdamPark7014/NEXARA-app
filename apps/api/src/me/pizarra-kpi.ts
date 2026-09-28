@@ -7,8 +7,8 @@
  *
  * Contrato del viernes, sección C (y la prioridad/semáforo de la B).
  */
-import { workDateKey } from '../common/time/workday.js';
-import { esMultiDia, finDelPeriodo, periodoFuturo, type Periodo } from '../activities/actividad-periodo.js';
+import { esMultiDia, finDelPeriodo, type Periodo } from '../activities/actividad-periodo.js';
+import { evaluarSemaforo } from '../activities/semaforo-actividad.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Semaforo = 'rojo' | 'amarillo' | 'verde';
@@ -23,7 +23,10 @@ export const PRIORIDAD_ETIQUETA: Record<Prioridad, string> = {
 export const MINUTOS_MAX_JORNADA = 9 * 60;
 /** Comida sin regreso registrado: se descuenta una hora. */
 export const MINUTOS_COMIDA_POR_OMISION = 60;
-/** En curso con más de este porcentaje del plan consumido: amarillo. */
+/**
+ * Ya no pinta el semáforo (eso lo decide el reloj). Sigue exportado por el
+ * contrato anterior: el aviso de tiempo excedido no usa este porcentaje.
+ */
 export const PCT_ALERTA_PLAN = 80;
 
 function sinAcentos(texto: string): string {
@@ -126,6 +129,9 @@ export type ActividadPizarra = {
   minutosPlan?: number | null;
   inicio?: Date | null;
   fin?: Date | null;
+  /** Hora a la que la citaron. No es el inicio real. */
+  fechaInicio?: Date | null;
+  fechaEntregaEsperada?: Date | null;
   /**
    * Periodo de varios días (`actividad-periodo.ts`): vence al terminar su último día,
    * no a la hora citada; antes de empezar no se le exige nada, y el tiempo estimado
@@ -141,6 +147,9 @@ export type ActividadCalculada = {
   minutosReales: number | null;
   excedida: boolean;
   vencida: boolean;
+  /** Minutos de atraso cuando el semáforo es rojo. */
+  minutosAtraso: number | null;
+  minutosParaVencer: number | null;
   iniciada: boolean;
   terminada: boolean;
   cancelada: boolean;
@@ -151,11 +160,9 @@ export type ActividadCalculada = {
 };
 
 /**
- * Semáforo del contrato: rojo = vencida, excedida o ALTA sin iniciar;
- * amarillo = MEDIA sin iniciar o en curso con más del 80 % del plan; verde = lo demás.
- *
- * Para una actividad terminada, «vencida» se mide contra su fin real, no contra
- * ahora: lo que cerró a tiempo no se pone rojo por el paso del tiempo.
+ * Semáforo por el reloj (`semaforo-actividad.ts`): rojo solo si ya se atrasó,
+ * naranja si faltan pocos minutos, verde si va en tiempo. «Vencida» (para el
+ * KPI de a tiempo) se mide contra el fin real cuando ya terminó, no contra ahora.
  */
 export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadCalculada {
   const prioridad = normalizaPrioridad(act.prioridad);
@@ -168,34 +175,29 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
   const iniciada = inicio != null || estatusArrancado(act.estatus) || terminada;
   const referencia = terminada ? (fin ?? ahora) : ahora;
   const periodo = act.periodo ?? null;
-  const limite = periodo ? finDelPeriodo(periodo.fin) : (act.fechaMaxima ?? null);
+  const limite = periodo ? finDelPeriodo(periodo.fin) : masTemprana(act.fechaMaxima, act.fechaEntregaEsperada);
   const vencida = limite != null && referencia.getTime() > limite.getTime();
   const variosDias = esMultiDia(periodo);
   const excedida =
     !variosDias && minutosPlan != null && minutosReales != null && minutosReales > minutosPlan;
-  // Todavía no llega su primer día: no está «sin iniciar», está programada.
-  const programada = !terminada && periodoFuturo(periodo, workDateKey(ahora));
-
-  let semaforo: Semaforo = 'verde';
-  if (!cancelada && !programada) {
-    if (vencida || excedida || (prioridad === 'ALTA' && !iniciada)) {
-      semaforo = 'rojo';
-    } else if (
-      (prioridad === 'MEDIA' && !iniciada) ||
-      (iniciada &&
-        !terminada &&
-        !variosDias &&
-        minutosPlan != null &&
-        minutosReales != null &&
-        minutosReales >= (minutosPlan * PCT_ALERTA_PLAN) / 100)
-    ) {
-      semaforo = 'amarillo';
-    }
-  }
+  const luz = evaluarSemaforo({
+    fechaInicio: act.fechaInicio ?? null,
+    fechaMaxima: act.fechaMaxima ?? null,
+    fechaEntregaEsperada: act.fechaEntregaEsperada ?? null,
+    inicioRealAt: inicio,
+    finRealAt: fin,
+    estatus: act.estatus,
+    cerrada: terminada,
+    cancelada,
+    periodo,
+    ahora,
+  });
 
   return {
     prioridad,
-    semaforo,
+    semaforo: luz.semaforo,
+    minutosAtraso: luz.minutosAtraso,
+    minutosParaVencer: luz.minutosParaVencer,
     minutosPlan,
     minutosReales,
     excedida,
@@ -259,6 +261,11 @@ export type KpisPersona = {
   productividadPct: number | null;
   rechazadas: number;
 };
+
+function masTemprana(a?: Date | null, b?: Date | null): Date | null {
+  if (a && b) return a.getTime() <= b.getTime() ? a : b;
+  return a ?? b ?? null;
+}
 
 function pct(numerador: number, denominador: number): number | null {
   if (!denominador) return null;

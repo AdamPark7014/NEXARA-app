@@ -33,8 +33,8 @@ object ActivitySemaforo {
 
     /** `null` cuando el API no manda semáforo (app vieja contra API vieja). */
     fun luz(semaforo: String?): Luz? = when (semaforo?.trim()?.lowercase()) {
-        ROJO -> Luz(ROJO, "Urge", CoreActivityRules.ROJO)
-        AMARILLO -> Luz(AMARILLO, "Atención", CoreActivityRules.NARANJA)
+        ROJO -> Luz(ROJO, "Atrasada", CoreActivityRules.ROJO)
+        AMARILLO -> Luz(AMARILLO, "Por vencer", CoreActivityRules.NARANJA)
         VERDE -> Luz(VERDE, "En tiempo", CoreActivityRules.VERDE)
         else -> null
     }

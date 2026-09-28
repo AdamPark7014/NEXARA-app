@@ -139,6 +139,9 @@ export type MyActivityItem = {
   aceptacion: Aceptacion;
   motivoRechazo: string | null;
   semaforo: Semaforo;
+  minutosAtraso: number | null;
+  minutosParaVencer: number | null;
+  motivoSemaforo: 'inicio' | 'tope' | null;
   /** Tiempo estimado en minutos (horasPlan × 60) y tiempo realmente dedicado. */
   minutosPlan: number | null;
   minutosReales: number | null;
@@ -833,6 +836,7 @@ export class MyActivitiesService {
             assignmentCharge: true,
             fechaInicio: true,
             fechaMaxima: true,
+            fechaEntregaEsperada: true,
             fechaAsignacion: true,
             fechaFinalizacion: true,
             periodoInicio: true,
@@ -896,6 +900,7 @@ export class MyActivitiesService {
         assignmentCharge: true,
         fechaInicio: true,
         fechaMaxima: true,
+        fechaEntregaEsperada: true,
         fechaAsignacion: true,
         fechaFinalizacion: true,
         periodoInicio: true,
@@ -1009,6 +1014,9 @@ export class MyActivitiesService {
         aceptacion: tiempos.aceptacion,
         motivoRechazo: tiempos.motivoRechazo,
         semaforo: tiempos.semaforo,
+        minutosAtraso: tiempos.minutosAtraso,
+        minutosParaVencer: tiempos.minutosParaVencer,
+        motivoSemaforo: tiempos.motivoSemaforo,
         minutosPlan: tiempos.minutosPlan,
         minutosReales: tiempos.minutosReales,
         excedida: tiempos.excedida,

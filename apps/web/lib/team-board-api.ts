@@ -44,8 +44,10 @@ export type TeamBoardOpenActivity = {
   minutosPlan?: number | null;
   minutosReales?: number | null;
   excedida?: boolean;
-  /** Pasó su fecha límite y sigue abierta. */
+  /** Pasó la hora de inicio sin arrancar, o el tope sin terminarse. */
   atrasada?: boolean;
+  /** Minutos de ese atraso, para «Atrasada · 2 h». */
+  minutosAtraso?: number | null;
   /** Hora real de arranque, no la programada. */
   inicioRealAt?: string | null;
   finRealAt?: string | null;
@@ -211,9 +213,9 @@ export const SEMAFORO_COLORS: Record<Semaforo, string> = {
 };
 
 export const SEMAFORO_LABELS: Record<Semaforo, string> = {
-  rojo: "Atención",
-  amarillo: "Va justa",
-  verde: "En orden",
+  rojo: "Atrasada",
+  amarillo: "Por vencer",
+  verde: "En tiempo",
 };
 
 export const PRIORIDAD_LABELS: Record<Prioridad, string> = {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   ACCION_INICIAR,
+  evaluarSemaforoActividad,
   formatoMinutos,
   normalizarPrioridad,
   puedeIniciar,
+  textoChipSemaforo,
   textoPlanVsReal,
 } from "./actividad-tiempos";
 
@@ -29,6 +31,38 @@ describe("tiempos en la tarjeta", () => {
     expect(textoPlanVsReal(120, null)).toBe("Plan 2 h");
     expect(textoPlanVsReal(null, 30)).toBe("Real 30 min");
     expect(textoPlanVsReal(null, null)).toBeNull();
+  });
+});
+
+describe("semáforo por el reloj", () => {
+  const ahora = new Date("2026-09-18T18:00:00.000Z");
+  const hace = (min: number) => new Date(ahora.getTime() - min * 60_000).toISOString();
+  const en = (min: number) => new Date(ahora.getTime() + min * 60_000).toISOString();
+
+  it("roja con el tiempo de atraso si pasó el inicio o el tope", () => {
+    const luz = evaluarSemaforoActividad({ fechaInicio: hace(75), estatus: "Pendiente", ahora });
+    expect(luz.semaforo).toBe("rojo");
+    expect(textoChipSemaforo(luz.semaforo, luz.minutosAtraso, luz.minutosParaVencer, luz.motivo)).toBe(
+      "Atrasada · 1 h 15 min",
+    );
+    expect(
+      evaluarSemaforoActividad({
+        inicioRealAt: hace(30),
+        fechaMaxima: hace(15),
+        estatus: "En Proceso",
+        ahora,
+      }).motivo,
+    ).toBe("tope");
+  });
+
+  it("naranja solo si faltan 30 min o menos, y verde si va holgada o no tiene hora", () => {
+    const pronto = evaluarSemaforoActividad({ fechaInicio: en(12), estatus: "Pendiente", ahora });
+    expect(pronto.semaforo).toBe("amarillo");
+    expect(textoChipSemaforo(pronto.semaforo, pronto.minutosAtraso, pronto.minutosParaVencer, pronto.motivo)).toBe(
+      "Atención · 12 min",
+    );
+    expect(evaluarSemaforoActividad({ estatus: "Pendiente", ahora }).semaforo).toBe("verde");
+    expect(evaluarSemaforoActividad({ fechaInicio: en(90), estatus: "Pendiente", ahora }).semaforo).toBe("verde");
   });
 });
 

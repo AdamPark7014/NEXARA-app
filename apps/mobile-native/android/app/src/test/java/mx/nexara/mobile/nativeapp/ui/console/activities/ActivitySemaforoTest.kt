@@ -11,9 +11,9 @@ class ActivitySemaforoTest {
 
     @Test
     fun `cada luz tiene nombre y color`() {
-        assertEquals("Urge", ActivitySemaforo.luz("rojo")?.etiqueta)
+        assertEquals("Atrasada", ActivitySemaforo.luz("rojo")?.etiqueta)
         assertEquals(CoreActivityRules.ROJO, ActivitySemaforo.luz("rojo")?.color)
-        assertEquals("Atención", ActivitySemaforo.luz("AMARILLO")?.etiqueta)
+        assertEquals("Por vencer", ActivitySemaforo.luz("AMARILLO")?.etiqueta)
         assertEquals("En tiempo", ActivitySemaforo.luz(" verde ")?.etiqueta)
     }
 

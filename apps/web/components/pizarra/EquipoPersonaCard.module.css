@@ -73,6 +73,7 @@
 
 .aroTrabajando { --aro: var(--ui-success); }
 .aroRetraso { --aro: var(--ui-warning); }
+.aroAtrasada { --aro: var(--ui-danger); }
 .aroLibre { --aro: var(--ui-info); }
 
 .foto {
@@ -171,7 +172,9 @@
 }
 
 .estadoTrabajando { --estado-fg: var(--ui-success-text); --estado-dot: var(--ui-success); }
+.estadoAtrasada { --estado-fg: var(--ui-danger-text); --estado-dot: var(--ui-danger); }
 .estadoRetraso { --estado-fg: var(--ui-warning-text); --estado-dot: var(--ui-warning); }
+.estadoEnTiempo { --estado-fg: var(--ui-info-text); --estado-dot: var(--ui-info); }
 .estadoLibre { --estado-fg: var(--ui-info-text); --estado-dot: var(--ui-info); }
 
 /* Tarjeta + «＋ Asignar»: el botón va fuera del enlace de la tarjeta (no se anidan enlaces). */

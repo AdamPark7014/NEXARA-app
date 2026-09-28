@@ -26,7 +26,7 @@ export default function ResumenEquipo({
 }) {
   if (users.length === 0) return null;
   const r = resumenEquipo(users);
-  const desgloseRetraso = `${r.atrasados} pasados de su fecha máxima · ${r.sinActividad} sin nada abierto`;
+  const desgloseRetraso = `${r.atrasados} atrasadas · ${r.sinActividad} sin nada abierto`;
 
   const celda = (id: FiltroEquipo, clase: string, title: string, children: ReactNode) => {
     const className = [s.celda, clase, onFiltro ? s.boton : "", onFiltro && filtro === id ? s.activa : ""]

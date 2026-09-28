@@ -115,34 +115,59 @@ describe('iniciar actividad (el asignado no acepta ni rechaza, solo inicia)', ()
 });
 
 describe('semáforo', () => {
-  it('rojo: prioridad ALTA sin iniciar', () => {
-    expect(semaforoDe({ prioridad: 'Alta', ahora: AHORA })).toBe('rojo');
+  it('rojo: pasó la hora de inicio y no ha empezado (la prioridad sola no pinta)', () => {
+    expect(semaforoDe({ prioridad: 'Alta', ahora: AHORA })).toBe('verde');
+    expect(semaforoDe({ prioridad: 'Alta', fechaInicio: hace(20), estatus: 'Pendiente', ahora: AHORA })).toBe('rojo');
   });
 
-  it('rojo: pasó su fecha máxima', () => {
-    expect(semaforoDe({ prioridad: 'Baja', fechaMaxima: hace(60), ahora: AHORA })).toBe('rojo');
-  });
-
-  it('rojo: excedió el plan aunque siga en curso', () => {
+  it('rojo: pasó su fecha máxima y sigue abierta', () => {
     expect(
-      semaforoDe({ prioridad: 'Baja', inicioRealAt: hace(155), minutosPlan: 120, minutosReales: 155, ahora: AHORA }),
+      semaforoDe({ prioridad: 'Baja', fechaMaxima: hace(60), inicioRealAt: hace(120), estatus: 'En Proceso', ahora: AHORA }),
     ).toBe('rojo');
   });
 
-  it('amarillo: prioridad MEDIA sin iniciar', () => {
-    expect(semaforoDe({ prioridad: null, ahora: AHORA })).toBe('amarillo');
+  it('exceder el plan no la pone roja si el tope sigue adelante', () => {
+    expect(
+      semaforoDe({
+        prioridad: 'Baja',
+        inicioRealAt: hace(155),
+        fechaMaxima: new Date(AHORA.getTime() + 60 * 60_000),
+        minutosPlan: 120,
+        minutosReales: 155,
+        estatus: 'En Proceso',
+        ahora: AHORA,
+      }),
+    ).toBe('verde');
   });
 
-  it('amarillo: en curso con más del 80 % del plan consumido', () => {
+  it('prioridad MEDIA sin hora vencida no es naranja', () => {
+    expect(semaforoDe({ prioridad: null, ahora: AHORA })).toBe('verde');
+  });
+
+  it('naranja: faltan pocos minutos para el tope', () => {
     expect(
-      semaforoDe({ prioridad: 'Baja', inicioRealAt: hace(100), minutosPlan: 120, minutosReales: 100, ahora: AHORA }),
+      semaforoDe({
+        prioridad: 'Baja',
+        inicioRealAt: hace(100),
+        fechaMaxima: new Date(AHORA.getTime() + 10 * 60_000),
+        estatus: 'En Proceso',
+        ahora: AHORA,
+      }),
     ).toBe('amarillo');
   });
 
-  it('verde: BAJA sin iniciar, o en curso con tiempo de sobra', () => {
+  it('verde: en curso con tiempo de sobra, aunque la prioridad sea alta', () => {
     expect(semaforoDe({ prioridad: 'Baja', ahora: AHORA })).toBe('verde');
     expect(
-      semaforoDe({ prioridad: 'Alta', inicioRealAt: hace(30), minutosPlan: 120, minutosReales: 30, ahora: AHORA }),
+      semaforoDe({
+        prioridad: 'Alta',
+        inicioRealAt: hace(30),
+        fechaMaxima: new Date(AHORA.getTime() + 3 * 60 * 60_000),
+        minutosPlan: 120,
+        minutosReales: 30,
+        estatus: 'En Proceso',
+        ahora: AHORA,
+      }),
     ).toBe('verde');
   });
 
@@ -174,7 +199,7 @@ describe('tiemposDto', () => {
       minutosPlan: 120,
       minutosReales: 155,
       excedida: true,
-      semaforo: 'rojo',
+      semaforo: 'verde',
       saltoPrioridad: true,
     });
   });
@@ -188,7 +213,7 @@ describe('tiemposDto', () => {
     expect(dto.aceptacion).toBe('RECHAZADA');
     expect(dto.motivoRechazo).toContain('emergencia');
     expect(dto.minutosReales).toBeNull();
-    expect(dto.semaforo).toBe('amarillo');
+    expect(dto.semaforo).toBe('verde');
   });
 });
 

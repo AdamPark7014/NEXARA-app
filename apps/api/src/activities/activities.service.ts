@@ -10,6 +10,7 @@ import { generateActivitiesReportPdf } from './activities-report-pdf.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, isFinishedStatus } from './activity-status.js';
 import { esCerrada, normalizarPrioridad, tiemposDto } from './actividad-tiempos.js';
+import { evaluarSemaforo } from './semaforo-actividad.js';
 import {
   camposDePeriodo,
   periodoDeActividad,
@@ -469,6 +470,9 @@ export class ActivitiesService {
       assignees: equipo,
       /** Resumen de la actividad: el del responsable, o el del primero del equipo. */
       semaforo: propia?.semaforo ?? null,
+      minutosAtraso: propia?.minutosAtraso ?? null,
+      minutosParaVencer: propia?.minutosParaVencer ?? null,
+      motivoSemaforo: propia?.motivoSemaforo ?? null,
       minutosPlan: propia?.minutosPlan ?? null,
       minutosReales: propia?.minutosReales ?? null,
       excedida: Boolean(propia?.excedida),
@@ -483,7 +487,14 @@ export class ActivitiesService {
     const now = new Date();
     const rows = await this.prisma.activity.findMany({
       where: { ...scope, deletedAt: null },
-      select: { estatus: true, fechaMaxima: true, fechaEntregaEsperada: true },
+      select: {
+        estatus: true,
+        fechaInicio: true,
+        fechaMaxima: true,
+        fechaEntregaEsperada: true,
+        periodoInicio: true,
+        periodoFin: true,
+      },
     });
 
     const closed = new Set(['Finalizada', 'Finalizado', 'COMPLETADA', 'Cancelada', 'CANCELADA', 'Rechazada']);
@@ -496,7 +507,6 @@ export class ActivitiesService {
 
     for (const row of rows) {
       const status = String(row.estatus ?? '');
-      const due = row.fechaMaxima ?? row.fechaEntregaEsperada;
       const isClosed = closed.has(status);
       const isProgress = inProgress.has(status);
 
@@ -508,7 +518,7 @@ export class ActivitiesService {
         abiertas += 1;
       }
 
-      if (!isClosed && due && new Date(due).getTime() < now.getTime()) {
+      if (evaluarSemaforo({ ...row, ahora: now }).semaforo === 'rojo') {
         vencidas += 1;
       }
     }
@@ -547,8 +557,11 @@ export class ActivitiesService {
         estatus: true,
         prioridad: true,
         fechaAsignacion: true,
+        fechaInicio: true,
         fechaEntregaEsperada: true,
         fechaMaxima: true,
+        periodoInicio: true,
+        periodoFin: true,
         fechaFinalizacion: true,
         branchName: true,
         branchCity: true,
@@ -587,9 +600,8 @@ export class ActivitiesService {
 
     for (const row of rows) {
       const status = String(row.estatus ?? '');
-      const due = row.fechaMaxima ?? row.fechaEntregaEsperada;
       const isClosed = closed.has(status);
-      const overdue = Boolean(!isClosed && due && new Date(due).getTime() < now.getTime());
+      const overdue = evaluarSemaforo({ ...row, estatus: status, ahora: now }).semaforo === 'rojo';
 
       const card: DispatchCard = {
         id: row.id,

@@ -259,6 +259,7 @@ export default function CentroOperativo({
                   nombre={u.nombre}
                   avatarUrl={u.avatarUrl}
                   estado={ARO_DE_ESTADO[u.status] ?? "retraso"}
+                  atrasada={u.status === "atrasado"}
                   size={reparto.avatar}
                 />
                 <span className={s.nombre}>{u.nombre}</span>

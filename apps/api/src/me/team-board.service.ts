@@ -85,8 +85,10 @@ export type TeamBoardOpenActivity = {
   minutosPlan: number | null;
   minutosReales: number | null;
   excedida: boolean;
-  /** Pasó su fecha límite (o el fin de su periodo) y sigue abierta. */
+  /** Roja: pasó la hora de inicio sin arrancar, o el tope sin terminarse. */
   atrasada: boolean;
+  /** Minutos de ese atraso, para el chip «Atrasada · 2 h». */
+  minutosAtraso: number | null;
   /** Hora real de arranque (foto de entrada o `inicioRealAt`), no la programada. */
   inicioRealAt: Date | null;
   finRealAt: Date | null;
@@ -473,7 +475,9 @@ export class TeamBoardService {
         ticketTypeCustom: true,
         assignmentCharge: true,
         fechaAsignacion: true,
+        fechaInicio: true,
         fechaMaxima: true,
+        fechaEntregaEsperada: true,
         fechaFinalizacion: true,
         periodoInicio: true,
         periodoFin: true,
@@ -514,7 +518,9 @@ export class TeamBoardService {
         {
           prioridad: a.prioridad,
           estatus: a.estatus,
+          fechaInicio: a.fechaInicio,
           fechaMaxima: a.fechaMaxima,
+          fechaEntregaEsperada: a.fechaEntregaEsperada,
           terminada: cerrada || ev?.status === 'COMPLETED',
           cancelada: /cancel/i.test(a.estatus || ''),
           rechazadaAt: fechaOpcional(fila, 'rechazadaAt'),
@@ -595,6 +601,7 @@ export class TeamBoardService {
             fechaAsignacion: true,
             fechaInicio: true,
             fechaMaxima: true,
+            fechaEntregaEsperada: true,
             fechaFinalizacion: true,
             periodoInicio: true,
             periodoFin: true,
@@ -641,7 +648,9 @@ export class TeamBoardService {
         {
           prioridad: act.prioridad,
           estatus: act.estatus,
+          fechaInicio: act.fechaInicio,
           fechaMaxima: act.fechaMaxima,
+          fechaEntregaEsperada: act.fechaEntregaEsperada,
           terminada,
           cancelada: /cancel/i.test(act.estatus || ''),
           rechazadaAt: fechaOpcional(fila, 'rechazadaAt'),
@@ -809,6 +818,7 @@ export class TeamBoardService {
               estatus: true,
               prioridad: true,
               fechaMaxima: true,
+              fechaEntregaEsperada: true,
               projectId: true,
               clientId: true,
               responsableId: true,
@@ -854,6 +864,7 @@ export class TeamBoardService {
           estatus: true,
           prioridad: true,
           fechaMaxima: true,
+          fechaEntregaEsperada: true,
           projectId: true,
           clientId: true,
           responsableId: true,
@@ -999,7 +1010,9 @@ export class TeamBoardService {
         {
           prioridad: act.prioridad,
           estatus: act.estatus,
+          fechaInicio: act.fechaInicio,
           fechaMaxima: act.fechaMaxima,
+          fechaEntregaEsperada: act.fechaEntregaEsperada,
           terminada,
           cancelada: /cancel/i.test(act.estatus || ''),
           rechazadaAt: fechaOpcional(row, 'rechazadaAt'),
@@ -1023,8 +1036,7 @@ export class TeamBoardService {
           dayEnd,
         ) ||
           (!terminada && act.fechaAsignacion.getTime() <= dayEnd.getTime()));
-      const limite = limiteDeActividad(act);
-      const atrasada = !isClosed && limite != null && limite.getTime() < now.getTime();
+      const atrasada = !isClosed && calc.semaforo === 'rojo';
       calculoPorFila.set(clave(row.userId, act.id), {
         calc,
         inicio: tiempos.inicio,
@@ -1058,6 +1070,7 @@ export class TeamBoardService {
         minutosReales: calc.minutosReales,
         excedida: calc.excedida,
         atrasada,
+        minutosAtraso: calc.minutosAtraso,
         inicioRealAt: tiempos.inicio,
         finRealAt: tiempos.fin,
         asignadoPor: row.asignadoPor
@@ -1134,10 +1147,9 @@ export class TeamBoardService {
 
       if (act) {
         // Con periodo, «atrasado» es pasar el fin de su último día, no la hora citada del primero.
-        const limite = limiteDeActividad(act);
-        const overdue = limite != null && limite.getTime() < now.getTime();
+        const overdue = enCurso?.calculo?.calc.semaforo === 'rojo';
         status = overdue ? 'atrasado' : 'activo';
-        currentLateMinutes = overdue && limite ? minutos(now.getTime() - limite.getTime()) : null;
+        currentLateMinutes = overdue ? (enCurso?.calculo?.calc.minutosAtraso ?? null) : null;
         currentActivity = {
           id: act.id,
           anNumber: act.anNumber,

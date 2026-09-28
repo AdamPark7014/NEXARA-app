@@ -61,6 +61,9 @@ export type ActivityDetail = {
     aceptacion?: Aceptacion;
     motivoRechazo?: string | null;
     semaforo?: Semaforo;
+    minutosAtraso?: number | null;
+    minutosParaVencer?: number | null;
+    motivoSemaforo?: "inicio" | "tope" | null;
     minutosPlan?: number | null;
     minutosReales?: number | null;
     excedida?: boolean;
@@ -70,6 +73,9 @@ export type ActivityDetail = {
   }>;
   /** Resumen de tiempos de la actividad (responsable o primero del equipo). */
   semaforo?: Semaforo | null;
+  minutosAtraso?: number | null;
+  minutosParaVencer?: number | null;
+  motivoSemaforo?: "inicio" | "tope" | null;
   minutosPlan?: number | null;
   minutosReales?: number | null;
   excedida?: boolean;

@@ -5,6 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { AvatarAro } from "@/components/pizarra/EquipoPersonaCard";
 import { PrioridadChip, SemaforoDot } from "@/components/pizarra/PizarraKpi";
 import type { Prioridad, Semaforo } from "@/lib/team-board-api";
+import { colorBordeActividad } from "@/lib/actividad-tiempos";
 
 export type PersonaPhotoCardProps = {
   href?: string;
@@ -61,6 +62,7 @@ export default function PersonaPhotoCard({
     padding: "var(--ui-s3)",
     borderRadius: "var(--ui-radius-lg)",
     border: "1px solid var(--ui-border)",
+    boxShadow: semaforo ? `inset 4px 0 0 ${colorBordeActividad(semaforo)}` : undefined,
     background: "var(--ui-surface)",
     color: "inherit",
     textDecoration: "none",

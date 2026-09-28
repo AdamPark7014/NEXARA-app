@@ -58,6 +58,9 @@ export type MyActivityItem = {
   aceptacion?: Aceptacion;
   motivoRechazo?: string | null;
   semaforo?: Semaforo;
+  minutosAtraso?: number | null;
+  minutosParaVencer?: number | null;
+  motivoSemaforo?: "inicio" | "tope" | null;
   minutosPlan?: number | null;
   minutosReales?: number | null;
   excedida?: boolean;
