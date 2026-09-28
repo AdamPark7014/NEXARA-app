@@ -2489,7 +2489,8 @@ model CotizacionItem {
   /// Cuántos paquetes generaron esta partida.
   paqueteCantidad       Int?
   category              String?    @db.VarChar(120)
-  name                  String     @db.VarChar(200)
+  /// Título impreso en la columna Descripción. Texto largo (características, viñetas): no se recorta.
+  name                  String     @db.Text
   /// Número de partida tal como se imprime («1», «1.1»). Vacío = el orden de captura.
   partida               String?    @db.VarChar(16)
   description           String?

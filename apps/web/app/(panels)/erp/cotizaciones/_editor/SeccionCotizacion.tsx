@@ -8,6 +8,12 @@ import {
   type PaqueteCotizacion,
 } from "@/lib/cotizaciones-api";
 import { sumarDias, totalesDePartidas, type DocumentoCotizacion, type PartidaEditor } from "@/lib/cotizacion-documento";
+import {
+  ENTREGA_POR_OMISION,
+  GARANTIA_POR_OMISION,
+  fechaCortaMx,
+  textoVigenciaPorOmision,
+} from "@/lib/cotizacion-personalizacion";
 import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
 import TablaPartidas from "./TablaPartidas";
 import styles from "./editor.module.css";
@@ -57,7 +63,16 @@ export default function SeccionCotizacion({
   const [aplicando, setAplicando] = useState<string | null>(null);
 
   const totales = useMemo(() => totalesDePartidas(doc.partidas), [doc.partidas]);
-  const vigencia = diasEntre(doc.issueDate, doc.validUntil);
+  const vigenciaDias = diasEntre(doc.issueDate, doc.validUntil);
+  const entregaTexto = doc.opciones.condiciones.tiempoEntrega.trim() || doc.deliveryTime.trim() || ENTREGA_POR_OMISION;
+  const garantiaTexto = doc.opciones.condiciones.garantia.trim() || GARANTIA_POR_OMISION;
+  const vigenciaTexto =
+    doc.opciones.condiciones.vigencia.trim() || textoVigenciaPorOmision(vigenciaDias, fechaCortaMx(doc.validUntil));
+  const setCondicion = (clave: "tiempoEntrega" | "garantia" | "vigencia", valor: string) =>
+    cambiar((d) => ({
+      ...d,
+      opciones: { ...d.opciones, condiciones: { ...d.opciones.condiciones, [clave]: valor } },
+    }));
   const moneda = doc.moneda;
   const terminosIncluidos = doc.opciones.secciones.terminos;
 
@@ -66,7 +81,7 @@ export default function SeccionCotizacion({
   const base = (clave: ClaveTermino) => detalle?.terminosBase?.partes?.find((p) => p.clave === clave)?.texto ?? "";
   const esLicitacion = (detalle?.terminos.modalidad ?? "") === "LICITACION" || doc.segmento === "LICITACION";
   // Títulos y orden como los imprime el PDF (en licitación se llaman como en las bases).
-  // Vigencia, tiempo de entrega y garantía no se reescriben aquí: salen de las fechas y de «Personalizar».
+  // Tiempo de entrega, garantía y vigencia se editan abajo: ese texto es el del PDF.
   const partesBase = (detalle?.terminosBase?.partes ?? []).filter(
     (p) => p.clave !== "vigencia" && p.clave !== "entrega" && p.clave !== "garantia",
   );
@@ -295,9 +310,10 @@ export default function SeccionCotizacion({
             <span className={styles.etiqueta}>Partidas</span>
             {editable ? (
               <Ayuda titulo="la tabla de partidas">
-                Enter agrega una fila · Tab cambia de celda · ↑↓ cambian de fila · Retroceso en una descripción vacía
-                quita la fila. La última fila busca en el catálogo mientras escribes; el menú ⋯ de cada renglón tiene
-                el grupo (equipos, materiales o mano de obra), subir, bajar y quitar.
+                Enter agrega una fila (Mayús+Enter, un salto en el título) · Tab cambia de celda · ↑↓ cambian de fila ·
+                Retroceso en un título vacío quita la fila. La descripción del PDF es el recuadro de abajo: crece con
+                el texto y conserva saltos de línea y viñetas. La última fila busca en el catálogo mientras escribes;
+                el menú ⋯ de cada renglón tiene el grupo (equipos, materiales o mano de obra), subir, bajar y quitar.
               </Ayuda>
             ) : null}
           </span>
@@ -322,11 +338,13 @@ export default function SeccionCotizacion({
             <span className={styles.etiqueta}>Términos y condiciones</span>
             <Ayuda titulo="los términos">
               {detalle
-                ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Cada término viene del segmento y de lo que cobras; si lo reescribes, se queda como lo escribiste («Restablecer» lo devuelve). El anticipo, la vigencia, el tiempo de entrega y la garantía se cambian en Personalizar.`
+                ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Cada término viene del segmento y de lo que cobras; si lo reescribes, se queda como lo escribiste («Restablecer» lo devuelve). El tiempo de entrega, la garantía y la vigencia de abajo son el texto que sale en el PDF.`
                 : "Se arman al guardar, según el segmento y lo que cobres."}
             </Ayuda>
           </span>
-          {!terminosIncluidos ? <span className={styles.pista}>No van en el PDF (Personalizar)</span> : null}
+          {!terminosIncluidos ? (
+            <span className={styles.pista}>Los términos no van en el PDF. Entrega, garantía y vigencia sí.</span>
+          ) : null}
           {!terminosIncluidos && editable && onIncluirTerminos ? (
             <button type="button" className={styles.secondaryBtn} onClick={onIncluirTerminos}>
               Incluir
@@ -334,9 +352,9 @@ export default function SeccionCotizacion({
           ) : null}
         </div>
 
-        {detalle && terminosIncluidos ? (
-          <ul className={styles.terminos}>
-            {orden.map((clave) => {
+        <ul className={styles.terminos}>
+          {detalle && terminosIncluidos
+            ? orden.map((clave) => {
               const textoBase = base(clave);
               const propio = doc.terminos[clave];
               const editado = propio != null && propio.trim() !== textoBase.trim();
@@ -394,29 +412,45 @@ export default function SeccionCotizacion({
                   />
                 </li>
               );
-            })}
-            {doc.opciones.condiciones.tiempoEntrega.trim() ? (
-              <li className={styles.termino}>
-                <span className={styles.terminoTitulo}>Tiempo de entrega</span>
-                <p className={styles.pista}>{doc.opciones.condiciones.tiempoEntrega}</p>
-              </li>
-            ) : null}
-            {doc.opciones.condiciones.garantia.trim() ? (
-              <li className={styles.termino}>
-                <span className={styles.terminoTitulo}>Garantía</span>
-                <p className={styles.pista}>{doc.opciones.condiciones.garantia}</p>
-              </li>
-            ) : null}
+            })
+            : null}
             <li className={styles.termino}>
-              <span className={styles.terminoTitulo}>Vigencia</span>
-              <p className={styles.pista}>
-                {vigencia
-                  ? `${vigencia} días naturales a partir de la fecha de emisión de esta propuesta.`
-                  : "Pon la fecha de validez arriba y se escribe sola."}
-              </p>
+              <div className={styles.terminoCabeza}>
+                <span className={styles.terminoTitulo}>Tiempo de entrega</span>
+                {doc.opciones.condiciones.tiempoEntrega.trim() ? <span className={styles.editado}>Editado</span> : null}
+              </div>
+              <TextoAuto
+                value={entregaTexto}
+                disabled={!editable}
+                aria-label="Tiempo de entrega"
+                onValor={(v) => setCondicion("tiempoEntrega", v)}
+              />
+            </li>
+            <li className={styles.termino}>
+              <div className={styles.terminoCabeza}>
+                <span className={styles.terminoTitulo}>Garantía</span>
+                {doc.opciones.condiciones.garantia.trim() ? <span className={styles.editado}>Editado</span> : null}
+              </div>
+              <TextoAuto
+                value={garantiaTexto}
+                disabled={!editable}
+                aria-label="Garantía"
+                onValor={(v) => setCondicion("garantia", v)}
+              />
+            </li>
+            <li className={styles.termino}>
+              <div className={styles.terminoCabeza}>
+                <span className={styles.terminoTitulo}>Vigencia</span>
+                {doc.opciones.condiciones.vigencia.trim() ? <span className={styles.editado}>Editado</span> : null}
+              </div>
+              <TextoAuto
+                value={vigenciaTexto}
+                disabled={!editable}
+                aria-label="Vigencia"
+                onValor={(v) => setCondicion("vigencia", v)}
+              />
             </li>
           </ul>
-        ) : null}
       </div>
     </Hoja>
   );

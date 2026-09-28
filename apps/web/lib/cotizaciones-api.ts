@@ -230,6 +230,8 @@ export type CotizacionDetalle = {
   clientAddress?: string | null;
   atencion?: string | null;
   trabajo?: string | null;
+  /** Tiempo de entrega legado. Las condiciones comerciales lo pisan si traen el suyo. */
+  deliveryTime?: string | null;
   salesClientId?: number | null;
   projectName?: string | null;
   /** Párrafo de entrada de 02 Alcance (debajo del título del proyecto). */
