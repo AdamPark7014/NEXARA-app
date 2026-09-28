@@ -25,8 +25,8 @@ HORAS="${HORAS:-48}"
 psql_db() { docker exec -i "$DB_CONTAINER" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 "$@"' sh "$@"; }
 
 if [ -z "${COMPANY_ID:-}" ]; then
-  echo "Empresas (id | nombre | slug):"
-  psql_db -At -F ' | ' -c 'select id, name, slug from company_profiles order by id'
+  echo "Empresas (id | nombre | slug | activa):"
+  psql_db -At -F ' | ' -c 'select id, coalesce("tradeName", "legalName"), slug, "isActive" from company_profile order by id'
   echo
   echo "Vuelve a correrlo con COMPANY_ID=<id>."
   exit 0
@@ -34,7 +34,7 @@ fi
 case "$COMPANY_ID" in ''|*[!0-9]*) echo "COMPANY_ID debe ser un número." >&2; exit 2;; esac
 case "$HORAS" in ''|*[!0-9]*) echo "HORAS debe ser un número entero." >&2; exit 2;; esac
 
-echo "Empresa $COMPANY_ID: $(psql_db -At -c "select name from company_profiles where id = $COMPANY_ID")"
+echo "Empresa $COMPANY_ID: $(psql_db -At -c "select coalesce(\"tradeName\", \"legalName\") from company_profile where id = $COMPANY_ID")"
 if [ "${APLICAR:-0}" != "1" ]; then
   echo "SIMULACIÓN (no se escribe nada). Con APLICAR=1 se harían:"
   echo "  · política de módulos (Pagos solo CEO) · nómina quincenal · quién da de alta a quién"
@@ -53,4 +53,5 @@ echo "→ plantillas de cotización"
 docker exec "$API_CONTAINER" sh -c "cd /app/apps/api && npm run seed:plantillas -- --company-id=$COMPANY_ID --apply"
 
 echo
-echo "Listo. Verifica con: psql -c \"select key, \\\"companyId\\\" from system_settings where \\\"companyId\\\" = $COMPANY_ID\""
+echo "Listo. Lo que quedó activo en la empresa $COMPANY_ID:"
+psql_db -At -F ' | ' -c "select key, value from system_settings where \"companyId\" = $COMPANY_ID and key in ('rbac.module_roles','payroll.schedule','users.creation_grants','attendance.web_checkin_until') order by key"

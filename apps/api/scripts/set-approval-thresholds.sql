@@ -1,7 +1,7 @@
 -- Fija desde qué monto hace falta la autorización de dirección en UNA empresa (política
 -- `approvals.thresholds`). Sin fila no cambia nada.
 --
---   psql -v company_id=<id de company_profiles> -f set-approval-thresholds.sql
+--   psql -v company_id=<id de company_profile> -f set-approval-thresholds.sql
 --
 -- Efecto: una cotización con total >= COTIZACION.desde no se puede enviar ni aprobar por quien no sea de
 -- dirección: se le pide la autorización a dirección (aparece en su bandeja de Aprobaciones con el

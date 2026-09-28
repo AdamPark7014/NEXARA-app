@@ -1,7 +1,7 @@
 -- Reserva módulos de una empresa a ciertos roles (política `rbac.module_roles`).
 -- Solo esa empresa: las demás siguen con la matriz global.
 --
---   psql -v company_id=<id de company_profiles> -f set-module-policy.sql
+--   psql -v company_id=<id de company_profile> -f set-module-policy.sql
 --
 -- Cambia la lista de roles en el JSON para ajustar quién lo ve. Para quitar la restricción:
 --   DELETE FROM system_settings WHERE key = 'rbac.module_roles' AND "companyId" = <id>;

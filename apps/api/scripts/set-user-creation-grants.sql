@@ -1,6 +1,6 @@
 -- Quién puede dar de alta usuarios de qué tipo en UNA empresa (política `users.creation_grants`).
 --
---   psql -v company_id=<id de company_profiles> -f set-user-creation-grants.sql
+--   psql -v company_id=<id de company_profile> -f set-user-creation-grants.sql
 --
 -- Concede por PERSONA (por correo), no por rol: David y Luis comparten rol y no dan de alta lo mismo.
 --   Antonio (José Antonio Ramírez)  → soporte           (ing_soporte)
