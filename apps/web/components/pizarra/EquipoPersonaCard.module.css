@@ -4,7 +4,7 @@
 
 .rejilla {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--ui-s3);
 }
 
@@ -179,6 +179,34 @@
 .asignar:focus-visible {
   outline: none;
   box-shadow: var(--ui-ring);
+}
+
+/* Cada actividad: estado, y debajo folio (AN-0001) y título. Sin recorte
+   que se coma el número. */
+.lista {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: var(--ui-s2);
+  text-align: center;
+}
+
+.item {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.folio {
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.an {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Lo que importa — qué está haciendo — cabe entero en dos renglones. */

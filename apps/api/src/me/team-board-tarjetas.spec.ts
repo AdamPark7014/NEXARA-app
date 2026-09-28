@@ -1,0 +1,144 @@
+import { TeamBoardService } from './team-board.service';
+
+/**
+ * Mi equipo: la tarjeta lista lo asignado a esa persona (responsable, equipo,
+ * autoasignada o de otro departamento), con folio. Una cerrada no ocupa el lugar
+ * de las pendientes.
+ */
+const AHORA = new Date('2026-09-28T18:00:00.000Z');
+
+const LUIS = {
+  id: 7,
+  nombre: 'Luis Joel Aguilar Castillo',
+  email: 'direccion.operaciones@nexara.com.mx',
+  avatarUrl: null,
+  puesto: 'Coordinador de servicios',
+  managerId: 1,
+};
+const CAROLINA = {
+  id: 13,
+  nombre: 'Carolina',
+  email: 'soporte@nexara.com.mx',
+  avatarUrl: null,
+  puesto: 'Ingeniero de soporte',
+  managerId: 7,
+};
+
+function actividad(over: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    anNumber: 'AN-0001',
+    titulo: 'Actualizar archivo SLA',
+    estatus: 'Pendiente',
+    prioridad: 'MEDIA',
+    fechaMaxima: new Date('2026-09-27T18:00:00.000Z'),
+    projectId: null,
+    clientId: null,
+    responsableId: 7,
+    fechaAsignacion: new Date('2026-09-20T15:00:00.000Z'),
+    fechaInicio: new Date('2026-09-20T15:00:00.000Z'),
+    fechaFinalizacion: null,
+    periodoInicio: null,
+    periodoFin: null,
+    coreKind: 'tarea',
+    assignmentCharge: 'ejecucion',
+    deletedAt: null,
+    assignees: [],
+    activityEvidences: [],
+    ...over,
+  };
+}
+
+function fila(act: ReturnType<typeof actividad>, over: Record<string, unknown> = {}) {
+  return {
+    userId: act.responsableId,
+    rol: 'LEAD',
+    retiradoAt: null,
+    horasPlan: null,
+    indicaciones: null,
+    asignadoPor: { id: 7, nombre: 'Luis' },
+    activity: act,
+    ...over,
+  };
+}
+
+function build(filas: unknown[], huerfanas: unknown[] = []) {
+  const prisma = {
+    user: { findMany: jest.fn().mockResolvedValue([LUIS, CAROLINA]) },
+    activityAssignee: { findMany: jest.fn().mockResolvedValue(filas) },
+    activity: { findMany: jest.fn().mockResolvedValue(huerfanas) },
+    attendance: { findMany: jest.fn().mockResolvedValue([]) },
+    lunchBreak: { findMany: jest.fn().mockResolvedValue([]) },
+    locationTracking: { findMany: jest.fn().mockResolvedValue([]) },
+    activityPeerRequest: { count: jest.fn().mockResolvedValue(0) },
+  };
+  return new TeamBoardService(prisma as never);
+}
+
+describe('tarjetas de Mi equipo', () => {
+  beforeEach(() => jest.useFakeTimers({ now: AHORA }));
+  afterEach(() => jest.useRealTimers());
+
+  it('lista folio y título de lo asignado, también si no es un servicio, y omite la cerrada', async () => {
+    const sla = actividad({ id: 1, anNumber: 'AN-0001', titulo: 'Actualizar archivo SLA' });
+    const visita = actividad({
+      id: 2,
+      anNumber: 'AN-0002',
+      titulo: 'Visita de otro departamento',
+      estatus: 'En Proceso',
+      coreKind: 'servicio',
+      fechaMaxima: new Date('2026-10-02T18:00:00.000Z'),
+    });
+    const cerrada = actividad({
+      id: 3,
+      anNumber: 'AN-0003',
+      titulo: 'Ya se cerró',
+      estatus: 'Finalizada',
+      fechaFinalizacion: new Date('2026-09-28T16:00:00.000Z'),
+    });
+    const service = build([
+      fila(sla),
+      fila(visita, { inicioRealAt: new Date('2026-09-28T15:00:00.000Z') }),
+      fila(cerrada),
+      fila(visita, { userId: 13, rol: 'TECNICO' }),
+    ]);
+
+    const board = await service.getBoard(
+      { id: 7, email: LUIS.email, roleKey: 'coord_operaciones' },
+      1,
+    );
+    const luis = board.users.find((u) => u.id === 7)!;
+    expect(luis.openActivities.map((a) => a.anNumber)).toEqual(['AN-0001', 'AN-0002']);
+    expect(luis.openActivities[0]).toEqual(
+      expect.objectContaining({ titulo: 'Actualizar archivo SLA', atrasada: true, estatus: 'Pendiente' }),
+    );
+    expect(luis.openActivities[1]).toEqual(
+      expect.objectContaining({ titulo: 'Visita de otro departamento', atrasada: false }),
+    );
+    expect(luis.openActivities.map((a) => a.anNumber)).not.toContain('AN-0003');
+
+    const carolina = board.users.find((u) => u.id === 13)!;
+    expect(carolina.openActivities.map((a) => a.anNumber)).toEqual(['AN-0002']);
+  });
+
+  it('el responsable sin fila de equipo igual sale en su tarjeta', async () => {
+    const suelta = actividad({
+      id: 4,
+      anNumber: 'AN-0004',
+      titulo: 'Preventivo sin fila',
+      responsableId: 13,
+      coreKind: 'tarea',
+      creador: { id: 8, nombre: 'David' },
+      assignees: [],
+    });
+    const service = build([], [suelta]);
+    const board = await service.getBoard(
+      { id: 7, email: LUIS.email, roleKey: 'coord_operaciones' },
+      1,
+    );
+    const carolina = board.users.find((u) => u.id === 13)!;
+    expect(carolina.openActivities.map((a) => ({ folio: a.anNumber, titulo: a.titulo }))).toEqual([
+      { folio: 'AN-0004', titulo: 'Preventivo sin fila' },
+    ]);
+  });
+});

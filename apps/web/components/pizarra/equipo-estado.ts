@@ -100,6 +100,57 @@ export function filtrarCentroOperativo<T extends { email?: string | null }>(
   return users.filter((u) => !esExcluidoDelCentroOperativo(u.email));
 }
 
+export type LineaActividadTarjeta = {
+  id: number;
+  /** Sin iniciar, En curso, Atrasado… */
+  estado: string;
+  folio: string;
+  titulo: string;
+};
+
+/** Estado de UNA actividad en la tarjeta, no el aro de la persona. */
+export function estadoDeActividad(a: {
+  estatus?: string | null;
+  inicioRealAt?: string | null;
+  atrasada?: boolean | null;
+  periodo?: { etiqueta?: string | null } | null;
+}): string {
+  const est = (a.estatus || "").toLowerCase();
+  if (/cancel/.test(est)) return "Cancelada";
+  if (/finaliz|complet|aprob/.test(est)) return "Terminada";
+  if (a.atrasada || /atraso/i.test(a.periodo?.etiqueta || "")) return "Atrasado";
+  if (a.inicioRealAt || /proceso|validar/.test(est)) return "En curso";
+  return "Sin iniciar";
+}
+
+/**
+ * Lo que se lee en la tarjeta de Mi equipo: cada actividad asignada, con folio.
+ * Vacío solo cuando de verdad no hay nada abierto (ahí la tarjeta puede decir
+ * «Sin actividad asignada»).
+ */
+export function actividadesDeTarjeta(u: TeamBoardUser): LineaActividadTarjeta[] {
+  const abiertas = u.openActivities ?? [];
+  if (abiertas.length > 0) {
+    return abiertas.map((a) => ({
+      id: a.id,
+      estado: estadoDeActividad(a),
+      folio: a.anNumber,
+      titulo: a.titulo,
+    }));
+  }
+  if (u.currentActivity) {
+    return [
+      {
+        id: u.currentActivity.id,
+        estado: u.status === "atrasado" ? "Atrasado" : estadoDeActividad(u.currentActivity),
+        folio: u.currentActivity.anNumber,
+        titulo: u.currentActivity.titulo,
+      },
+    ];
+  }
+  return [];
+}
+
 /** Renglón 1: qué está haciendo, completo (la tarjeta lo parte en dos líneas). */
 export function queHace(u: TeamBoardUser): string {
   const abierta = u.openActivities?.[0];
@@ -125,8 +176,9 @@ function hora(iso: string): string {
 export function contextoActividad(u: TeamBoardUser, ahora: number = Date.now()): string {
   const partes: string[] = [];
   const abierta = u.openActivities?.[0];
+  const folio = abierta?.anNumber || u.currentActivity?.anNumber;
+  if (folio) partes.push(folio);
   if (abierta) {
-    partes.push(abierta.anNumber);
     const encargo = chargeLabel(abierta.assignmentCharge);
     if (encargo) partes.push(encargo);
     if (abierta.periodo?.multiDia && abierta.periodo.etiqueta) partes.push(abierta.periodo.etiqueta);

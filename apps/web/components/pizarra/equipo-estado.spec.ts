@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ARO_DE_ESTADO,
   CENTRO_OPERATIVO_EMAILS_EXCLUIDOS,
+  actividadesDeTarjeta,
   contextoActividad,
   filtrarCentroOperativo,
   hayFlujo,
@@ -111,7 +112,60 @@ describe("queHace y contextoActividad", () => {
   });
 
   it("sin nada abierto lo dice con todas sus letras", () => {
-    expect(queHace(persona({ id: 1, status: "sin_actividad" }))).toBe("Sin actividad asignada");
+    const u = persona({ id: 1, status: "sin_actividad" });
+    expect(queHace(u)).toBe("Sin actividad asignada");
+    expect(actividadesDeTarjeta(u)).toEqual([]);
+  });
+
+  it("lista cada actividad con su estado, folio y título, y no dice que no hay", () => {
+    const u = persona({
+      id: 7,
+      nombre: "Luis Joel Aguilar Castillo",
+      status: "atrasado",
+      openActivities: [
+        {
+          ...abierta,
+          id: 1,
+          anNumber: "AN-0001",
+          titulo: "Actualizar archivo SLA",
+          estatus: "Pendiente",
+          atrasada: true,
+          inicioRealAt: null,
+        },
+        {
+          ...abierta,
+          id: 2,
+          anNumber: "AN-0002",
+          titulo: "Visita de otro departamento",
+          estatus: "En Proceso",
+          atrasada: false,
+          inicioRealAt: "2026-09-28T15:00:00.000Z",
+        },
+      ],
+    });
+    expect(actividadesDeTarjeta(u)).toEqual([
+      { id: 1, estado: "Atrasado", folio: "AN-0001", titulo: "Actualizar archivo SLA" },
+      { id: 2, estado: "En curso", folio: "AN-0002", titulo: "Visita de otro departamento" },
+    ]);
+    expect(queHace(u)).not.toBe("Sin actividad asignada");
+  });
+
+  it("si solo viene la actividad actual, el folio igual aparece", () => {
+    const u = persona({
+      id: 7,
+      status: "atrasado",
+      currentActivity: {
+        id: 1,
+        anNumber: "AN-0001",
+        titulo: "Actualizar archivo SLA",
+        estatus: "Pendiente",
+        fechaMaxima: null,
+        bucket: "daily",
+      },
+    });
+    expect(actividadesDeTarjeta(u)).toEqual([
+      { id: 1, estado: "Atrasado", folio: "AN-0001", titulo: "Actualizar archivo SLA" },
+    ]);
   });
 
   it("el segundo renglón lleva folio, encargo y el atraso", () => {

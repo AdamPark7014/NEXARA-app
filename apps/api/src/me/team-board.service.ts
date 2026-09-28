@@ -85,6 +85,8 @@ export type TeamBoardOpenActivity = {
   minutosPlan: number | null;
   minutosReales: number | null;
   excedida: boolean;
+  /** Pasó su fecha límite (o el fin de su periodo) y sigue abierta. */
+  atrasada: boolean;
   /** Hora real de arranque (foto de entrada o `inicioRealAt`), no la programada. */
   inicioRealAt: Date | null;
   finRealAt: Date | null;
@@ -289,7 +291,9 @@ export class TeamBoardService {
       userIds,
       companyId,
       now,
-      tiposVisibles(viewer),
+      // La tarjeta de cada persona es SU trabajo: responsable, equipo,
+      // autoasignada o de otro departamento. El filtro de tipo no aplica aquí.
+      null,
       rangoFinal,
       viewer.id,
     );
@@ -414,7 +418,7 @@ export class TeamBoardService {
       [userId],
       companyId,
       now,
-      tiposVisibles(viewer),
+      null,
       rango ?? this.resolveRange(null, null, now),
       viewer.id,
     );
@@ -754,8 +758,9 @@ export class TeamBoardService {
     companyId: number | null,
     now: Date,
     /**
-     * Solo estos tipos de actividad (`coreKind`) en las tarjetas de *otros*;
-     * `null` = todos. Las de `propietarioId` no se recortan: son su trabajo.
+     * `null` = todas las actividades asignadas a la persona (la tarjeta de
+     * Mi equipo). Un filtro solo recortaría el trabajo ajeno de un coordinador
+     * y la tarjeta diría «Sin actividad asignada» con tareas reales encima.
      */
     tipos: string[] | null = null,
     rango?: BoardRange,
@@ -775,7 +780,7 @@ export class TeamBoardService {
       );
     };
 
-    const [assigneeRows, attendances, lunchBreaks, locationTrackings] = await Promise.all([
+    const [assigneeRows, huerfanas, attendances, lunchBreaks, locationTrackings] = await Promise.all([
       // `include` en vez de `select`: así llegan también las columnas de la sección B
       // (`inicioRealAt`, `aceptadaAt`…) en cuanto exista su migración, sin tocar esto.
       this.prisma.activityAssignee.findMany({
@@ -830,6 +835,49 @@ export class TeamBoardService {
                   exitPhotoUploadedAt: true,
                 },
               },
+            },
+          },
+        },
+      }),
+      // Responsable sin fila de equipo (contrato, import o alta que no dejó
+      // `activity_assignees`). Si lo sacaron del equipo, la fila existe y no se revive.
+      this.prisma.activity.findMany({
+        where: {
+          responsableId: { in: userIds },
+          deletedAt: null,
+          ...(companyId != null ? { companyId } : {}),
+        },
+        select: {
+          id: true,
+          anNumber: true,
+          titulo: true,
+          estatus: true,
+          prioridad: true,
+          fechaMaxima: true,
+          projectId: true,
+          clientId: true,
+          responsableId: true,
+          fechaAsignacion: true,
+          fechaInicio: true,
+          fechaFinalizacion: true,
+          periodoInicio: true,
+          periodoFin: true,
+          coreKind: true,
+          assignmentCharge: true,
+          deletedAt: true,
+          creador: { select: { id: true, nombre: true } },
+          assignees: {
+            select: { userId: true, retiradoAt: true, user: { select: { email: true } } },
+          },
+          activityEvidences: {
+            where: { userId: { in: userIds } },
+            select: {
+              userId: true,
+              status: true,
+              completedAt: true,
+              reviewStatus: true,
+              entryPhotoUploadedAt: true,
+              exitPhotoUploadedAt: true,
             },
           },
         },
@@ -903,8 +951,34 @@ export class TeamBoardService {
     const calculoPorFila = new Map<string, Calculo>();
     const clave = (userId: number, activityId: number) => `${userId}:${activityId}`;
 
+    const filas = [...assigneeRows];
+    const yaEnEquipo = new Set(
+      assigneeRows
+        .filter((r) => r.activity && !r.activity.deletedAt)
+        .map((r) => `${r.userId}:${r.activity.id}`),
+    );
+    for (const act of huerfanas) {
+      const responsableId = act.responsableId;
+      if (responsableId == null || !userIds.includes(responsableId)) continue;
+      if (yaEnEquipo.has(`${responsableId}:${act.id}`)) continue;
+      // Cualquier fila, aunque esté retirada, significa que ya no es el responsable suelto.
+      if ((act.assignees ?? []).some((a) => a.userId === responsableId)) continue;
+      filas.push({
+        userId: responsableId,
+        rol: 'LEAD',
+        retiradoAt: null,
+        horasPlan: null,
+        indicaciones: null,
+        asignadoPor: act.creador ?? null,
+        activity: {
+          ...act,
+          assignees: (act.assignees ?? []).filter((a) => a.retiradoAt == null),
+        },
+      } as unknown as (typeof assigneeRows)[number]);
+    }
+
     const openByUser = new Map<number, TeamBoardOpenActivity[]>();
-    for (const row of assigneeRows) {
+    for (const row of filas) {
       const act = row.activity;
       if (!act || act.deletedAt) continue;
       const myEv =
@@ -949,6 +1023,8 @@ export class TeamBoardService {
           dayEnd,
         ) ||
           (!terminada && act.fechaAsignacion.getTime() <= dayEnd.getTime()));
+      const limite = limiteDeActividad(act);
+      const atrasada = !isClosed && limite != null && limite.getTime() < now.getTime();
       calculoPorFila.set(clave(row.userId, act.id), {
         calc,
         inicio: tiempos.inicio,
@@ -981,6 +1057,7 @@ export class TeamBoardService {
         minutosPlan: calc.minutosPlan,
         minutosReales: calc.minutosReales,
         excedida: calc.excedida,
+        atrasada,
         inicioRealAt: tiempos.inicio,
         finRealAt: tiempos.fin,
         asignadoPor: row.asignadoPor
@@ -989,6 +1066,9 @@ export class TeamBoardService {
         aceptacion: aceptacionDe(row),
         periodo: periodoDto(act, now, terminada),
       };
+      // Cerrada no es «asignada» en la tarjeta: si no, el cupo de la lista se llena
+      // de historial y las pendientes (AN-0001, AN-0002) no salen.
+      if (isClosed) continue;
       const list = openByUser.get(row.userId) ?? [];
       if (!list.some((x) => x.id === item.id)) list.push(item);
       openByUser.set(row.userId, list);
@@ -996,12 +1076,18 @@ export class TeamBoardService {
 
     return scoped.map((u) => {
       const allOpen = openByUser.get(u.id) ?? [];
-      const openActivities = allOpen.slice(0, 5);
+      const openActivities = [...allOpen].sort((a, b) => {
+        if (a.atrasada !== b.atrasada) return a.atrasada ? -1 : 1;
+        const arrancoA = a.inicioRealAt ? 0 : 1;
+        const arrancoB = b.inicioRealAt ? 0 : 1;
+        if (arrancoA !== arrancoB) return arrancoA - arrancoB;
+        return a.anNumber.localeCompare(b.anNumber);
+      });
       const minutos = (ms: number) => Math.max(0, Math.floor(ms / 60_000));
       // Trabajo propio (un despacho que solo reparte no cuenta) y si esta persona ya lo terminó:
       // envió su evidencia o la actividad se cerró. Antes lo terminado seguía contando como «en curso»
       // y salía «Atrasado» aunque ya lo hubiera entregado.
-      const propias = assigneeRows
+      const propias = filas
         .filter((r) => r.userId === u.id && r.activity && !r.activity.deletedAt)
         .filter((r) => !(r.activity.assignmentCharge === 'despacho' && String(r.rol) === 'LEAD'))
         .map((r) => {

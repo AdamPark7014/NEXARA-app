@@ -6,6 +6,7 @@ import { resolveAssetUrl } from "@/lib/evidence-display";
 import { STATUS_LABELS, type TeamBoardUser } from "@/lib/team-board-api";
 import {
   ARO_DE_ESTADO,
+  actividadesDeTarjeta,
   contextoActividad,
   iniciales,
   queHace,
@@ -85,6 +86,12 @@ const CLASE_ESTADO: Record<EstadoAro, string> = {
   libre: s.estadoLibre,
 };
 
+function claseDeEstadoActividad(estado: string): string {
+  if (estado === "En curso") return s.estadoTrabajando;
+  if (estado === "Atrasado") return s.estadoRetraso;
+  return "";
+}
+
 export default function EquipoPersonaCard({
   user,
   isSelf = false,
@@ -98,6 +105,7 @@ export default function EquipoPersonaCard({
   asignarHref?: string;
 }) {
   const estado = ARO_DE_ESTADO[user.status] ?? "retraso";
+  const lineas = actividadesDeTarjeta(user);
   const actividad = queHace(user);
   const contexto = contextoActividad(user, ahora);
   const espera = user.enEsperaAprobacion ?? 0;
@@ -109,11 +117,28 @@ export default function EquipoPersonaCard({
       <AvatarAro nombre={user.nombre} avatarUrl={user.avatarUrl} estado={estado} />
       <span className={s.nombre}>{user.nombre}</span>
       {user.puesto ? <span className={s.puesto}>{user.puesto}</span> : null}
-      <span className={[s.estado, CLASE_ESTADO[estado]].join(" ")}>{STATUS_LABELS[user.status]}</span>
-      <span className={s.actividad} title={actividad}>
-        {actividad}
-      </span>
-      {contexto ? <span className={s.contexto}>{contexto}</span> : null}
+      {lineas.length > 0 ? (
+        <span className={s.lista}>
+          {lineas.map((linea) => (
+            <span key={linea.id} className={s.item}>
+              <span className={[s.estado, claseDeEstadoActividad(linea.estado)].filter(Boolean).join(" ")}>
+                {linea.estado}
+              </span>
+              <span className={s.folio}>
+                <span className={s.an}>{linea.folio}</span> {linea.titulo}
+              </span>
+            </span>
+          ))}
+        </span>
+      ) : (
+        <>
+          <span className={[s.estado, CLASE_ESTADO[estado]].join(" ")}>{STATUS_LABELS[user.status]}</span>
+          <span className={s.actividad} title={actividad}>
+            {actividad}
+          </span>
+          {contexto ? <span className={s.contexto}>{contexto}</span> : null}
+        </>
+      )}
       {isSelf || user.enCorreccion || espera > 0 ? (
         <span className={s.marcas}>
           {isSelf ? <span className={[s.marca, s.marcaYo].join(" ")}>Tú</span> : null}

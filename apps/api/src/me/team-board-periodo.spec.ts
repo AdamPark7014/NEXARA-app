@@ -65,6 +65,7 @@ function build(filas: unknown[]) {
       ]),
     },
     activityAssignee: { findMany: jest.fn().mockResolvedValue(filas) },
+    activity: { findMany: jest.fn().mockResolvedValue([]) },
     attendance: { findMany: jest.fn().mockResolvedValue([]) },
     lunchBreak: { findMany: jest.fn().mockResolvedValue([]) },
     locationTracking: { findMany: jest.fn().mockResolvedValue([]) },
