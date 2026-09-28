@@ -918,6 +918,7 @@ model User {
   chatMessagesAuthored      ChatMessage[]              @relation("ChatMessageAuthor")
   chatMessagesPinned        ChatMessage[]              @relation("ChatMessagePinner")
   chatReactions             ChatMessageReaction[]      @relation("ChatReactionUser")
+  chatMessageReads          ChatMessageRead[]          @relation("ChatMessageReadUser")
   workflowStepsApprover     WorkflowStep[]             @relation("WorkflowStepApprover")
   workflowsStarted          WorkflowInstance[]         @relation("WorkflowStarter")
   workflowApprovals         WorkflowApproval[]         @relation("ApprovalDecider")
@@ -5963,6 +5964,7 @@ model CompanyProfile {
   bankTransactions           BankTransaction[]
   bankReconciliations        BankReconciliation[]
   chatMessages               ChatMessage[]
+  chatMessageReads           ChatMessageRead[]
   serviceSheets              ServiceSheet[]
   activityEvidences          ActivityEvidence[]
   locationTrackings          LocationTracking[]
@@ -6328,6 +6330,7 @@ model ChatMessage {
   parent         ChatMessage?          @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
   replies        ChatMessage[]         @relation("ChatThread")
   reactions      ChatMessageReaction[]
+  reads          ChatMessageRead[]
   companyId      Int
   company        CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -6349,6 +6352,27 @@ model ChatMessageReaction {
 
   @@unique([messageId, userId, emoji])
   @@map("chat_message_reactions")
+}
+
+/// Quién ya tiene un mensaje y cuándo lo vio.
+/// La fila existe cuando el destinatario lo recibió (entregado).
+/// `readAt` se llena al verlo. Única por mensaje+usuario; el aislamiento
+/// aplana esa llave, así que las lecturas van por findFirst/createMany.
+model ChatMessageRead {
+  id        Int         @id @default(autoincrement())
+  messageId Int
+  userId    Int
+  readAt    DateTime?
+  companyId Int
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation("ChatMessageReadUser", fields: [userId], references: [id], onDelete: Cascade)
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@index([companyId])
+  @@map("chat_message_reads")
 }
 
 /// Webhooks outbound — integración enterprise (Stripe/Atlassian-style)

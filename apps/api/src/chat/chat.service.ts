@@ -16,6 +16,7 @@ import { isSuperAdminEmail } from '../common/platform-accounts.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { appUrls } from '../common/app-urls.js';
+import { buildReceipts, type ChatReceipt } from './chat-receipt.js';
 
 type UploadedChatFile = {
   originalname: string;
@@ -576,7 +577,7 @@ export class ChatService {
     opts?: { beforeId?: number; aroundId?: number; limit?: number; parentId?: number | null },
     companyId?: number | null,
   ) {
-    await this.assertChannelAccess(channelId, userId, undefined, companyId);
+    const access = await this.assertChannelAccess(channelId, userId, undefined, companyId);
     const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
     const parentId = opts?.parentId === undefined ? null : opts.parentId;
 
@@ -613,7 +614,7 @@ export class ChatService {
       ]);
       const rows = [...olderOrEq.reverse(), ...newer];
       return {
-        messages: rows.map((m) => this.serializeMessage(m)),
+        messages: await this.presentMessages(rows, userId, channelId, access.channel.companyId),
         hasMore: olderOrEq.length === half + 1,
       };
     }
@@ -632,7 +633,12 @@ export class ChatService {
       take: limit,
     });
 
-    const messages = rows.reverse().map((m) => this.serializeMessage(m));
+    const messages = await this.presentMessages(
+      rows.reverse(),
+      userId,
+      channelId,
+      access.channel.companyId,
+    );
     return { messages, hasMore: rows.length === limit };
   }
 
@@ -756,16 +762,27 @@ export class ChatService {
       data: { lastReadAt: new Date() },
     });
 
-    const payload = this.serializeMessage(message);
-    this.realtime.emitToRoom(this.room(channelId), 'chat:message', payload);
-    // Also nudge members who aren't in the room yet
     const members = await this.prisma.chatChannelMember.findMany({
-      where: { channelId },
+      where: { channelId, user: { isActive: true } },
       select: { userId: true },
     });
+    const recipientCount = members.filter((m) => m.userId !== userId).length;
+    const payload = {
+      ...this.serializeMessage(message),
+      receipt: {
+        messageId: message.id,
+        state: 'sent' as const,
+        readCount: 0,
+        recipientCount,
+      },
+    };
+    this.realtime.emitToRoom(this.room(channelId), 'chat:message', payload);
+    // Also nudge members who aren't in the room yet
     for (const m of members) {
       this.realtime.emitToUser(m.userId, 'chat:channel-activity', {
         channelId,
+        messageId: message.id,
+        authorId: userId,
         preview: this.preview(message.body),
         at: message.createdAt,
         kind: channel.kind,
@@ -930,6 +947,79 @@ export class ChatService {
       update: { lastReadAt: new Date() },
     });
     return { ok: true };
+  }
+
+  /** El cliente ya tiene estos mensajes (socket o la lista). No los marca como vistos. */
+  async markMessagesDelivered(
+    channelId: number,
+    userId: number,
+    messageIds: number[],
+    companyId?: number | null,
+  ) {
+    return this.recordReceipts(channelId, userId, messageIds, companyId, false);
+  }
+
+  /** El usuario abrió la conversación y el mensaje está a la vista. */
+  async markMessagesSeen(
+    channelId: number,
+    userId: number,
+    messageIds: number[],
+    companyId?: number | null,
+  ) {
+    return this.recordReceipts(channelId, userId, messageIds, companyId, true);
+  }
+
+  /** Autor del mensaje: quién lo vio y quién sigue pendiente. */
+  async getMessageReads(messageId: number, userId: number, companyId?: number | null) {
+    const message = await this.prisma.chatMessage.findFirst({
+      where: {
+        id: messageId,
+        deletedAt: null,
+        ...(companyId != null ? companyWhere(companyId) : {}),
+      },
+    });
+    if (!message) throw new NotFoundException('Mensaje no encontrado');
+    if (companyId != null) assertCompanyAccess(message, companyId, 'Mensaje');
+    if (message.authorId !== userId) {
+      throw new ForbiddenException('Solo quien envió el mensaje puede ver quién lo leyó');
+    }
+    await this.assertChannelAccess(message.channelId, userId, undefined, companyId);
+
+    const members = await this.prisma.chatChannelMember.findMany({
+      where: {
+        channelId: message.channelId,
+        userId: { not: userId },
+        user: { isActive: true },
+      },
+      include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+    });
+    const recipientIds = members.map((m) => m.userId);
+    const rows = recipientIds.length
+      ? await this.prisma.chatMessageRead.findMany({
+          where: {
+            messageId,
+            companyId: message.companyId,
+            userId: { in: recipientIds },
+          },
+          select: { userId: true, readAt: true },
+        })
+      : [];
+    const byUser = new Map(rows.map((row) => [row.userId, row]));
+    const seen: Array<{ id: number; nombre: string; avatarUrl: string | null; readAt: Date }> = [];
+    const pending: Array<{ id: number; nombre: string; avatarUrl: string | null; delivered: boolean }> = [];
+    for (const member of members) {
+      const person = {
+        id: member.user.id,
+        nombre: member.user.nombre,
+        avatarUrl: member.user.avatarUrl ?? null,
+      };
+      const row = byUser.get(member.userId);
+      if (row?.readAt) seen.push({ ...person, readAt: row.readAt });
+      else pending.push({ ...person, delivered: Boolean(row) });
+    }
+    seen.sort((a, b) => b.readAt.getTime() - a.readAt.getTime());
+    pending.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    return { messageId, seen, pending };
   }
 
   async toggleReaction(
@@ -1396,6 +1486,144 @@ export class ChatService {
         channel: m.channel,
       })),
     };
+  }
+
+  /**
+   * Registra entrega o lectura sin `upsert({ messageId_userId })`.
+   * Esa llave no lleva companyId y el middleware la aplana; findMany + createMany
+   * con companyId explícito sí pasan el aislamiento.
+   */
+  private async recordReceipts(
+    channelId: number,
+    userId: number,
+    messageIds: number[],
+    companyId: number | null | undefined,
+    seen: boolean,
+  ) {
+    const access = await this.assertChannelAccess(channelId, userId, undefined, companyId);
+    if (access.readOnly) return { ok: true, updated: 0 };
+    const cid = access.channel.companyId;
+    if (companyId != null) assertCompanyAccess(access.channel, companyId, 'Canal');
+    if (!Array.isArray(messageIds)) {
+      throw new BadRequestException('messageIds debe ser una lista');
+    }
+
+    const ids = [...new Set(messageIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))].slice(
+      0,
+      100,
+    );
+    if (!ids.length) return { ok: true, updated: 0 };
+
+    const messages = await this.prisma.chatMessage.findMany({
+      where: {
+        id: { in: ids },
+        channelId,
+        deletedAt: null,
+        authorId: { not: userId },
+        companyId: cid,
+      },
+      select: { id: true, authorId: true },
+    });
+    const validIds = messages.map((m) => m.id);
+    if (!validIds.length) return { ok: true, updated: 0 };
+
+    const now = new Date();
+    const existing = await this.prisma.chatMessageRead.findMany({
+      where: { userId, companyId: cid, messageId: { in: validIds } },
+      select: { messageId: true },
+    });
+    const have = new Set(existing.map((row) => row.messageId));
+    const missing = validIds.filter((id) => !have.has(id));
+    let changed = 0;
+    if (missing.length) {
+      const created = await this.prisma.chatMessageRead.createMany({
+        data: missing.map((messageId) => ({
+          messageId,
+          userId,
+          readAt: seen ? now : null,
+          companyId: cid,
+        })),
+        skipDuplicates: true,
+      });
+      changed += created.count ?? 0;
+    }
+    if (seen) {
+      const updated = await this.prisma.chatMessageRead.updateMany({
+        where: { userId, companyId: cid, messageId: { in: validIds }, readAt: null },
+        data: { readAt: now },
+      });
+      changed += updated.count ?? 0;
+      await this.prisma.chatChannelMember.updateMany({
+        where: { channelId, userId },
+        data: { lastReadAt: now },
+      });
+    }
+    if (changed > 0) {
+      await this.emitReceipts(channelId, cid, messages);
+    }
+    return { ok: true, updated: changed };
+  }
+
+  private async presentMessages<T extends { id: number; authorId: number }>(
+    rows: T[],
+    viewerId: number,
+    channelId: number,
+    companyId: number,
+  ) {
+    const serialized = rows.map((row) => this.serializeMessage(row as never));
+    const mineIds = serialized.filter((m) => m.authorId === viewerId).map((m) => m.id);
+    if (!mineIds.length) {
+      return serialized.map((m) => ({ ...m, receipt: null as ChatReceipt | null }));
+    }
+    const members = await this.prisma.chatChannelMember.findMany({
+      where: { channelId, user: { isActive: true } },
+      select: { userId: true },
+    });
+    const recipients = members.map((m) => m.userId).filter((id) => id !== viewerId);
+    const receipts = await this.loadReceipts(mineIds, recipients, companyId);
+    const byId = new Map(receipts.map((receipt) => [receipt.messageId, receipt]));
+    return serialized.map((m) => ({
+      ...m,
+      receipt: m.authorId === viewerId ? (byId.get(m.id) ?? null) : null,
+    }));
+  }
+
+  private async loadReceipts(messageIds: number[], recipientIds: number[], companyId: number) {
+    if (!messageIds.length) return [];
+    const rows = recipientIds.length
+      ? await this.prisma.chatMessageRead.findMany({
+          where: {
+            companyId,
+            messageId: { in: messageIds },
+            userId: { in: recipientIds },
+          },
+          select: { messageId: true, userId: true, readAt: true },
+        })
+      : [];
+    return buildReceipts(messageIds, recipientIds, rows);
+  }
+
+  private async emitReceipts(
+    channelId: number,
+    companyId: number,
+    messages: Array<{ id: number; authorId: number }>,
+  ) {
+    const byAuthor = new Map<number, number[]>();
+    for (const message of messages) {
+      const list = byAuthor.get(message.authorId) ?? [];
+      list.push(message.id);
+      byAuthor.set(message.authorId, list);
+    }
+    const members = await this.prisma.chatChannelMember.findMany({
+      where: { channelId, user: { isActive: true } },
+      select: { userId: true },
+    });
+    const memberIds = members.map((m) => m.userId);
+    for (const [authorId, messageIds] of byAuthor) {
+      const recipients = memberIds.filter((id) => id !== authorId);
+      const receipts = await this.loadReceipts(messageIds, recipients, companyId);
+      this.realtime.emitToUser(authorId, 'chat:receipt', { channelId, receipts });
+    }
   }
 
   async saveAttachment(file: UploadedChatFile) {

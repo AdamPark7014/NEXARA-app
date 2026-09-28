@@ -19,6 +19,8 @@ const SOFT_DELETE_MODELS = new Set<string>([
 const AUDIT_EXCLUDED = new Set<string>([
   'AuditLog', 'KpiSnapshot', 'LocationTracking', 'Notification',
   'NewsletterSubscriber', 'SystemSetting', 'UserPreference',
+  // Una fila por mensaje visible: no vale la pena auditar cada palomita.
+  'ChatMessageRead',
 ]);
 
 /**

@@ -173,3 +173,83 @@ describe('ChatService.toggleReaction — forma de la query y del payload realtim
     expect(payload.reactions[0].users[0]).toMatchObject({ id: 1, nombre: 'Yo', avatarUrl: null });
   });
 });
+
+describe('ChatService lecturas por mensaje', () => {
+  function makeSvc() {
+    const prisma = {
+      chatChannel: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 3,
+          companyId: 9,
+          isArchived: false,
+          kind: ChatChannelKind.PUBLIC,
+          members: [{ userId: 1 }],
+        }),
+      },
+      chatChannelMember: {
+        findMany: jest.fn().mockResolvedValue([{ userId: 1 }, { userId: 2 }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      chatMessage: {
+        findMany: jest.fn().mockResolvedValue([{ id: 10, authorId: 2 }]),
+        findFirst: jest.fn(),
+      },
+      chatMessageRead: {
+        findMany: jest.fn().mockResolvedValue([]),
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const realtime = { emitToUser: jest.fn(), emitToRoom: jest.fn() };
+    const svc = new ChatService(prisma as any, realtime as any, {} as any);
+    return { prisma, realtime, svc };
+  }
+
+  it('marca visto con createMany y companyId, sin la llave messageId_userId', async () => {
+    const { prisma, realtime, svc } = makeSvc();
+    prisma.chatMessageRead.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ messageId: 10, userId: 1, readAt: new Date('2026-09-28T18:00:00Z') }]);
+
+    const result = await svc.markMessagesSeen(3, 1, [10, 10, -3, 10], 9);
+
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    expect(prisma.chatMessage.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          channelId: 3,
+          companyId: 9,
+          authorId: { not: 1 },
+        }),
+      }),
+    );
+    const created = prisma.chatMessageRead.createMany.mock.calls[0][0];
+    expect(created.skipDuplicates).toBe(true);
+    expect(created.data).toEqual([
+      expect.objectContaining({ messageId: 10, userId: 1, companyId: 9 }),
+    ]);
+    expect(created.data[0].readAt).toBeInstanceOf(Date);
+    expect(prisma.chatMessageRead.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 1, companyId: 9, readAt: null }),
+      }),
+    );
+    expect(JSON.stringify(prisma.chatMessageRead.createMany.mock.calls)).not.toContain('messageId_userId');
+    expect(realtime.emitToUser).toHaveBeenCalledWith(
+      2,
+      'chat:receipt',
+      expect.objectContaining({
+        channelId: 3,
+        receipts: [expect.objectContaining({ messageId: 10, state: 'read', recipientCount: 1 })],
+      }),
+    );
+  });
+
+  it('la entrega deja readAt en null y no mueve el último leído del canal', async () => {
+    const { prisma, svc } = makeSvc();
+    await svc.markMessagesDelivered(3, 1, [10], 9);
+    const created = prisma.chatMessageRead.createMany.mock.calls[0][0];
+    expect(created.data[0].readAt).toBeNull();
+    expect(prisma.chatChannelMember.updateMany).not.toHaveBeenCalled();
+  });
+});

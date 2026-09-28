@@ -103,6 +103,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'BankTransaction',
   'BankReconciliation',
   'ChatMessage',
+  'ChatMessageRead',
   'ServiceSheet',
   'WarehouseLocation',
   'StockLevel',
