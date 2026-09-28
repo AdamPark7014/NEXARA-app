@@ -320,6 +320,8 @@ export class MyActivitiesService {
     });
     if (!lead) throw new ForbiddenException('Solo quien reparte este despacho puede asignarlo');
 
+    // El departamento de quien creó la actividad no importa: Antonio reparte un
+    // servicio que dejó Luis. El candado es el equipo de quien despacha.
     const pool = await equipoDeDespacho(this.prisma, viewer);
     const targets = await this.prisma.user.findMany({
       where: { id: { in: ids }, isActive: true },
@@ -792,8 +794,9 @@ export class MyActivitiesService {
 
   async list(viewer: MyActivitiesViewer, companyId: number | null): Promise<MyActivitiesResponse> {
     this.assertNotCeo(viewer);
-    // Cola personal: todo lo que esta persona tiene asignado. No se recorta por
-    // tipo (Luis coordina servicios ajenos, pero una tarea a su nombre también es
+    // Cola personal: todo lo que esta persona tiene asignado, también si se la
+    // asignó ella misma (`creadoPorId` es el viewer). No se recorta por tipo
+    // (Luis coordina servicios ajenos, pero una tarea a su nombre también es
     // suya) ni por el departamento de quien se la dejó. Sí se recorta por persona,
     // empresa y por haber salido del equipo.
     const tenant = companyId != null ? { companyId } : {};

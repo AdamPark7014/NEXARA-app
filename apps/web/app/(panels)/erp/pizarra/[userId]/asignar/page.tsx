@@ -253,8 +253,9 @@ export default function AsignarActividadPage() {
   );
 
   const kindMeta = kind ? metaForKind(kind) : null;
-  // Solo Luis: servicio → despacho+cupo; tarea/proyecto/comercial → ejecución directa.
-  // David/Antonio/Josué: eligen ejecución vs despacho.
+  // Luis o Antonio + servicio: despacho, sin elegir al ingeniero.
+  // Luis en tarea/proyecto/comercial: ejecución directa.
+  // David/Josué: eligen ejecución vs despacho; si es despacho, ellos eligen al ejecutor después.
   const despachoOnly = forcesDespachoOnly(person?.email, kind);
   const ejecucionOnly = forcesEjecucionOnly(person?.email, kind);
   const offerCharge =
@@ -384,7 +385,7 @@ export default function AsignarActividadPage() {
     }
     setTeamError(null);
     try {
-      // Luis + servicio: despacho + cupo; él reparte después (a Antonio).
+      // Servicio a Luis o a Antonio: solo el LEAD. El ingeniero lo elige quien reparte.
       if (despachoOnly) {
         await addTeamMember(
           token,
@@ -394,6 +395,13 @@ export default function AsignarActividadPage() {
           "LEAD",
           horasPlan,
         );
+        router.push(fichaAsignada);
+        return;
+      }
+
+      // Despacho a otro mando: no se elige aquí a quien la ejecuta.
+      if (effectiveCharge === "despacho" && canOfferAssignmentCharge(person?.email)) {
+        await addTeamMember(token, activityId, userId, leadNotes.trim(), "LEAD", horasPlan);
         router.push(fichaAsignada);
         return;
       }
@@ -456,7 +464,9 @@ export default function AsignarActividadPage() {
   // Pasos en el orden en que aparecen: se numeran seguidos, sin saltos.
   const verEncargo = Boolean(kind) && !bridgeNeeded && (despachoOnly || ejecucionOnly || offerCharge);
   const verTiempo = Boolean(kindMeta) && !bridgeNeeded && chargeReady;
-  const verEquipo = verTiempo && planValido && !despachoOnly && !ejecucionOnly;
+  const despachoAMando =
+    effectiveCharge === "despacho" && canOfferAssignmentCharge(person?.email);
+  const verEquipo = verTiempo && planValido && !despachoOnly && !ejecucionOnly && !despachoAMando;
   const pasos: PasoId[] = [
     "tipo",
     ...(verEncargo ? (["encargo"] as const) : []),
@@ -639,8 +649,9 @@ export default function AsignarActividadPage() {
             </h2>
             <p style={{ margin: "8px 0 0", fontSize: 15, fontWeight: 800 }}>Despacho a equipo</p>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              La reparte a su gente. En servicios le dejas la actividad y cuántas personas ocupas; él se la
-              manda a Antonio y Antonio elige al soporte.
+              {isServicioBridgeEmail(person?.email)
+                ? `Se la dejas a ${nombreCorto}. Él elige al ingeniero de su equipo. Tú no eliges quién la ejecuta.`
+                : "La reparte a su gente. En servicios le dejas la actividad y cuántas personas ocupas; él se la manda a Antonio y Antonio elige al soporte."}
             </p>
           </div>
           <label style={{ display: "grid", gap: 4, maxWidth: 220 }}>

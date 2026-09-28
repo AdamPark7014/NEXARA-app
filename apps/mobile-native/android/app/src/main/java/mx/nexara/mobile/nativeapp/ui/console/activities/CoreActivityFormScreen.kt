@@ -218,7 +218,7 @@ private fun AssignFlow(
         }
     }
 
-    // Solo Luis: servicio → despacho + cupo; tarea/proyecto/comercial → ejecución directa.
+    // Luis o Antonio + servicio: despacho, sin elegir al ingeniero.
     val despachoOnly = !selfAssign && k.forcesDespachoOnly(targetEmail, kind)
     val ejecucionOnly = !selfAssign && k.forcesEjecucionOnly(targetEmail, kind)
     val offerCharge = !selfAssign && k.canOfferAssignmentCharge(targetEmail) && !despachoOnly && !ejecucionOnly
@@ -336,8 +336,12 @@ private fun AssignFlow(
             Spacer(Modifier.height(6.dp))
             Text("Despacho a equipo", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
             Text(
-                "Solo en servicios: le dejas la actividad y cuántas personas ocupas; él manda a Antonio y " +
-                    "Antonio elige al soporte.",
+                if (k.isServicioBridgeEmail(targetEmail)) {
+                    "Se la dejas a $short. Él elige al ingeniero de su equipo. Tú no eliges quién la ejecuta."
+                } else {
+                    "Solo en servicios: le dejas la actividad y cuántas personas ocupas; él manda a Antonio y " +
+                        "Antonio elige al soporte."
+                },
                 fontSize = 12.sp,
                 color = NxColors.Muted,
             )
@@ -407,7 +411,8 @@ private fun AssignFlow(
     val meta = k.meta(kind)
     if (meta != null && !bridgeNeeded && chargeReady) {
         // ── 3 · Equipo extra ────────────────────────────────────────────────
-        if (!selfAssign && !despachoOnly && !ejecucionOnly) {
+        val despachoAMando = effectiveCharge == k.DESPACHO && k.canOfferAssignmentCharge(targetEmail)
+        if (!selfAssign && !despachoOnly && !ejecucionOnly && !despachoAMando) {
             NxPanelShell {
                 StepLabel(
                     "${if (offerCharge) "3" else "2"} · Equipo " +
@@ -506,9 +511,9 @@ private fun AssignFlow(
                     effectiveCharge = effectiveCharge,
                     headcount = headcount,
                     leadNotes = leadNotes,
-                    extraIds = selectedExtras,
+                    extraIds = if (despachoAMando) emptyList() else selectedExtras,
                     extraNotes = extraNotes,
-                    peerCoordinatorIds = autoPeers.map { it.id },
+                    peerCoordinatorIds = if (despachoAMando) emptyList() else autoPeers.map { it.id },
                 )
                 if (id == null) {
                     if (plan.isEmpty()) {
