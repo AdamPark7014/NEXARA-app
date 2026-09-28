@@ -80,8 +80,15 @@ describe('AccountAccessService', () => {
     };
     const log = jest.fn(async () => ({}));
     const revokeAllUserSessions = jest.fn(async () => ({ revoked: 2 }));
-    const servicio = new AccountAccessService(prisma, { log } as any, { revokeAllUserSessions } as any);
-    return { servicio, prisma, update, log, revokeAllUserSessions };
+    const vault = {
+      disponible: jest.fn(() => true),
+      guardar: jest.fn(async () => true),
+      olvidar: jest.fn(async () => undefined),
+      revelar: jest.fn(async (id: number) => (id === 2 ? 'Guardada-Prueba-3333' : null)),
+      guardadas: jest.fn(async () => new Map<number, Date>([[2, new Date('2026-09-28T12:00:00Z')]])),
+    };
+    const servicio = new AccountAccessService(prisma, { log } as any, { revokeAllUserSessions } as any, vault as any);
+    return { servicio, prisma, update, log, revokeAllUserSessions, vault };
   }
 
   it('solo el dueño puede entrar: cualquier otra persona, cliente o sesión sin usuario recibe 403', async () => {
@@ -152,6 +159,49 @@ describe('AccountAccessService', () => {
     const auditoria = JSON.stringify(log.mock.calls);
     expect(auditoria).toContain('ACCOUNT_PASSWORD_RESET');
     expect(auditoria).not.toContain(r.password);
+  });
+
+  it('la lista dice quién tiene contraseña guardada, sin traerla', async () => {
+    const { servicio } = crear();
+    const { ficha } = emitirFicha(1, SECRETO);
+    const lista = await servicio.listar({ id: 1 }, ficha, 7);
+    expect(lista[0]).toMatchObject({ email: 'jose.ramirez@nexara.com.mx', guardada: true, guardadaEl: '2026-09-28T12:00:00.000Z' });
+    expect(JSON.stringify(lista)).not.toContain('Guardada-Prueba');
+  });
+
+  it('revelar: con ficha muestra la contraseña guardada de UNA cuenta y audita la vista sin ella', async () => {
+    const { servicio, log } = crear();
+    const { ficha } = emitirFicha(1, SECRETO);
+    const r = await servicio.revelar({ id: 1 }, ficha, 2, 7);
+    expect(r).toMatchObject({ id: 2, email: 'jose.ramirez@nexara.com.mx', password: 'Guardada-Prueba-3333' });
+    const auditoria = JSON.stringify(log.mock.calls);
+    expect(auditoria).toContain('ACCOUNT_PASSWORD_REVEAL');
+    expect(auditoria).not.toContain('Guardada-Prueba-3333');
+  });
+
+  it('revelar: sin ficha, con ficha ajena, para el dueño/desarrollo o sin nada guardado no entrega nada', async () => {
+    const { servicio, vault, prisma } = crear();
+    const { ficha } = emitirFicha(1, SECRETO);
+    await expect(servicio.revelar({ id: 1 }, undefined, 2, 7)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(servicio.revelar({ id: 1 }, emitirFicha(2, SECRETO).ficha, 2, 7)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(servicio.revelar({ id: 2 }, ficha, 2, 7)).rejects.toBeInstanceOf(ForbiddenException); // no es el dueño
+    await expect(servicio.revelar({ id: 1 }, ficha, 1, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(servicio.revelar({ id: 1 }, ficha, 9, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(vault.revelar).not.toHaveBeenCalled();
+    prisma.user.findFirst.mockImplementationOnce(async () => ({ id: 3, nombre: 'Sin bóveda', email: 'otro@nexara.com.mx' }));
+    await expect(servicio.revelar({ id: 1 }, ficha, 3, 7)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('restablecer también guarda la contraseña nueva en la bóveda (y olvida la vieja si no puede)', async () => {
+    const { servicio, vault } = crear();
+    const { ficha } = emitirFicha(1, SECRETO);
+    const r = await servicio.restablecer({ id: 1 }, ficha, 2, 7);
+    expect(vault.guardar).toHaveBeenCalledWith(expect.objectContaining({ userId: 2, password: r.password, companyId: 7, porUserId: 1 }));
+    expect(vault.olvidar).not.toHaveBeenCalled();
+
+    vault.guardar.mockResolvedValueOnce(false as any);
+    await servicio.restablecer({ id: 1 }, ficha, 2, 7);
+    expect(vault.olvidar).toHaveBeenCalledWith(2);
   });
 
   it('no restablece al dueño ni a la cuenta de desarrollo, ni a quien no es de la empresa', async () => {

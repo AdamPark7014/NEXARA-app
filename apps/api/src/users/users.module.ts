@@ -9,9 +9,10 @@ import { ChatModule } from '../chat/chat.module.js';
 import { IntegraModule } from '../integra/integra.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { UsersDelegationService } from './users-delegation.service.js';
+import { CredentialVaultModule } from '../credential-vault/credential-vault.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule, forwardRef(() => ChatModule), IntegraModule],
+  imports: [PrismaModule, AuthModule, AuditModule, CredentialVaultModule, forwardRef(() => ChatModule), IntegraModule],
   controllers: [UsersController, RolesController],
   providers: [UsersService, UsersDelegationService, RbacGuard],
   exports: [UsersService, UsersDelegationService],

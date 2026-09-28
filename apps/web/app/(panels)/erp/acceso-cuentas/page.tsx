@@ -3,9 +3,9 @@
 /**
  * Acceso a cuentas — solo el dueño (Christian).
  *
- * Vuelve a escribir su contraseña y, durante 5 minutos, puede restablecer la contraseña de cualquier
- * cuenta de la empresa; la nueva se muestra una sola vez para entregarla. La ficha vive solo en la
- * memoria de esta pantalla: al recargar o pasar los 5 minutos se vuelve a pedir la contraseña.
+ * Vuelve a escribir su contraseña y, durante 5 minutos, puede ver la contraseña guardada de una cuenta
+ * (cifrada en la bóveda del servidor; se oculta sola a los 30 s) o ponerle una nueva a cualquiera. La ficha
+ * vive solo en la memoria de esta pantalla: al recargar o pasar los 5 minutos se vuelve a pedir la contraseña.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
@@ -15,9 +15,10 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import {
   desbloquearCuentas,
+  estadoCuentas,
   listarCuentas,
-  puedeEntrarACuentas,
   restablecerContrasena,
+  revelarContrasena,
   type ContrasenaNueva,
   type CuentaEmpresa,
 } from "@/lib/account-access-api";
@@ -32,15 +33,21 @@ const entrada = {
   minHeight: 44,
 } as const;
 
+/** Cuánto se queda visible una contraseña en pantalla. */
+const VISIBLE_MS = 30_000;
+
 const dias = (iso: string | null) => {
   if (!iso) return "sin cambios registrados";
   const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
   return d === 0 ? "cambiada hoy" : `cambiada hace ${d} ${d === 1 ? "día" : "días"}`;
 };
 
+type Mostrada = ContrasenaNueva & { esNueva: boolean };
+
 export default function AccesoCuentasPage() {
   const { token } = useUser();
   const [permitido, setPermitido] = useState<boolean | null>(null);
+  const [bovedaLista, setBovedaLista] = useState(true);
   const [password, setPassword] = useState("");
   const [ficha, setFicha] = useState<{ valor: string; venceEn: number } | null>(null);
   const [cuentas, setCuentas] = useState<CuentaEmpresa[] | null>(null);
@@ -48,15 +55,17 @@ export default function AccesoCuentasPage() {
   const [error, setError] = useState<string | null>(null);
   const [trabajando, setTrabajando] = useState(false);
   const [confirmar, setConfirmar] = useState<number | null>(null);
-  const [nueva, setNueva] = useState<ContrasenaNueva | null>(null);
+  const [mostrada, setMostrada] = useState<Mostrada | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [ahora, setAhora] = useState(() => Date.now());
 
   useEffect(() => {
     if (!token) return;
     let cancelado = false;
-    void puedeEntrarACuentas(token).then((v) => {
-      if (!cancelado) setPermitido(v);
+    void estadoCuentas(token).then((e) => {
+      if (cancelado) return;
+      setPermitido(e.puedeEntrar);
+      setBovedaLista(e.bovedaLista);
     });
     return () => {
       cancelado = true;
@@ -73,7 +82,7 @@ export default function AccesoCuentasPage() {
   const bloquear = useCallback(() => {
     setFicha(null);
     setCuentas(null);
-    setNueva(null);
+    setMostrada(null);
     setConfirmar(null);
     setPassword("");
   }, []);
@@ -84,6 +93,13 @@ export default function AccesoCuentasPage() {
       setError("Pasaron 5 minutos: vuelve a escribir tu contraseña.");
     }
   }, [ahora, ficha, bloquear]);
+
+  // Una contraseña a la vista se oculta sola.
+  useEffect(() => {
+    if (!mostrada) return;
+    const id = window.setTimeout(() => setMostrada(null), VISIBLE_MS);
+    return () => window.clearTimeout(id);
+  }, [mostrada]);
 
   const desbloquear = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,15 +120,29 @@ export default function AccesoCuentasPage() {
     }
   };
 
+  const ver = async (id: number) => {
+    if (!token || !ficha || trabajando) return;
+    setTrabajando(true);
+    setError(null);
+    try {
+      setMostrada({ ...(await revelarContrasena(token, ficha.valor, id)), esNueva: false });
+      setCopiado(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo mostrar la contraseña.");
+    } finally {
+      setTrabajando(false);
+    }
+  };
+
   const restablecer = async (id: number) => {
     if (!token || !ficha || trabajando) return;
     setTrabajando(true);
     setError(null);
     try {
-      setNueva(await restablecerContrasena(token, ficha.valor, id));
+      setMostrada({ ...(await restablecerContrasena(token, ficha.valor, id)), esNueva: true });
       setCopiado(false);
       setConfirmar(null);
-      // La fecha de cambio de esa cuenta se actualiza en la lista.
+      // La fecha de cambio y el estado «guardada» de esa cuenta se actualizan en la lista.
       setCuentas(await listarCuentas(token, ficha.valor));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo restablecer la contraseña.");
@@ -139,7 +169,7 @@ export default function AccesoCuentasPage() {
       <PageHeader
         eyebrow="Gobierno · Seguridad"
         title="Acceso a cuentas"
-        subtitle="Vuelve a escribir tu contraseña para poner una contraseña nueva a cualquier cuenta de la empresa."
+        subtitle="Vuelve a escribir tu contraseña para ver la contraseña de una cuenta o ponerle una nueva."
         actions={
           ficha ? (
             <Button variant="ghost" onClick={bloquear}>
@@ -150,6 +180,12 @@ export default function AccesoCuentasPage() {
       />
 
       {error && <InlineAlert variant="danger" message={error} onDismiss={() => setError(null)} />}
+      {permitido && !bovedaLista && (
+        <InlineAlert
+          variant="warning"
+          message="La bóveda no tiene llave de cifrado configurada en el servidor: por ahora no se guardan ni se muestran contraseñas. Puedes restablecerlas y entregarlas al momento."
+        />
+      )}
 
       {!ficha ? (
         <form onSubmit={desbloquear} style={{ display: "grid", gap: 12, maxWidth: 420, marginTop: 16 }}>
@@ -169,25 +205,28 @@ export default function AccesoCuentasPage() {
             Entrar
           </Button>
           <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-            El acceso dura 5 minutos. Cada entrada y cada restablecimiento quedan en la auditoría. El sistema no guarda las
-            contraseñas de nadie: lo que haces aquí es poner una nueva y verla una sola vez.
+            El acceso dura 5 minutos. Cada entrada, cada vez que ves una contraseña y cada restablecimiento quedan en la
+            auditoría. Las contraseñas se guardan cifradas; solo se pueden ver las que se pusieron desde el sistema. De las
+            anteriores no hay nada que mostrar: para esas, ponle una nueva.
           </p>
         </form>
       ) : (
         <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-          {nueva && (
+          {mostrada && (
             <div role="status" style={{ display: "grid", gap: 8, padding: 14, borderRadius: 14, border: "1px solid var(--state-success-border, var(--border))", background: "var(--state-success-bg, var(--surface-2))" }}>
-              <strong>Contraseña nueva de {nueva.nombre}</strong>
-              <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 18, letterSpacing: 0.5 }}>{nueva.password}</div>
+              <strong>{mostrada.esNueva ? "Contraseña nueva de" : "Contraseña de"} {mostrada.nombre}</strong>
+              <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 18, letterSpacing: 0.5, overflowWrap: "anywhere" }}>{mostrada.password}</div>
               <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                Usuario: {nueva.email}. Se cerraron sus sesiones abiertas. <strong>Esta es la única vez que se muestra.</strong>
+                Usuario: {mostrada.email}.{" "}
+                {mostrada.esNueva ? "Se cerraron sus sesiones abiertas. " : ""}
+                Se oculta sola en 30 segundos.
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <Button
                   variant="secondary"
                   onClick={async () => {
                     try {
-                      await navigator.clipboard.writeText(`Usuario: ${nueva.email}\nContraseña: ${nueva.password}`);
+                      await navigator.clipboard.writeText(`Usuario: ${mostrada.email}\nContraseña: ${mostrada.password}`);
                       setCopiado(true);
                     } catch {
                       setCopiado(false);
@@ -196,7 +235,7 @@ export default function AccesoCuentasPage() {
                 >
                   {copiado ? "Copiado ✓" : "Copiar usuario y contraseña"}
                 </Button>
-                <Button variant="ghost" onClick={() => setNueva(null)}>
+                <Button variant="ghost" onClick={() => setMostrada(null)}>
                   Ocultar
                 </Button>
               </div>
@@ -227,7 +266,8 @@ export default function AccesoCuentasPage() {
                       {c.nombre} {!c.isActive && <span style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>(inactiva)</span>}
                     </div>
                     <div style={{ fontSize: 12.5, color: "var(--text-secondary)", overflowWrap: "anywhere" }}>
-                      {c.email} · {c.roleKey ?? "sin tipo"} · contraseña {dias(c.passwordChangedAt)}
+                      {c.email} · {c.roleKey ?? "sin tipo"} · contraseña {dias(c.passwordChangedAt)} ·{" "}
+                      {c.guardada ? "guardada" : "sin contraseña guardada"}
                     </div>
                   </div>
                   {confirmar === c.id ? (
@@ -241,9 +281,16 @@ export default function AccesoCuentasPage() {
                       </Button>
                     </div>
                   ) : (
-                    <Button variant="secondary" onClick={() => setConfirmar(c.id)}>
-                      Restablecer contraseña
-                    </Button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {c.guardada && (
+                        <Button variant="primary" loading={trabajando} onClick={() => void ver(c.id)}>
+                          Ver contraseña
+                        </Button>
+                      )}
+                      <Button variant="secondary" onClick={() => setConfirmar(c.id)}>
+                        Restablecer contraseña
+                      </Button>
+                    </div>
                   )}
                 </li>
               ))}

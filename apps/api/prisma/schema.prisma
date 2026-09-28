@@ -925,6 +925,7 @@ model User {
   preferences               UserPreference[]           @relation("UserPreferences")
   pushEndpoints             UserPushEndpoint[]
   sessions                  UserSession[]              @relation("UserSessions")
+  vaultEntry                CredentialVaultEntry?      @relation("UserVaultEntry")
   webhooksCreated           OutboundWebhook[]          @relation("WebhookCreator")
   companyApiKeysCreated     CompanyApiKey[]            @relation("CompanyApiKeyCreator")
 
@@ -999,6 +1000,24 @@ model UserSession {
   @@index([userId, revokedAt])
   @@index([expiresAt])
   @@map("user_sessions")
+}
+
+/// Contraseña vigente de una cuenta, CIFRADA (AES-256-GCM, llave `VAULT_ENCRYPTION_KEY` fuera de la base).
+/// Solo la lee el dueño de la plataforma tras volver a escribir su contraseña (módulo account-access).
+/// Guarda únicamente las contraseñas que pasaron por el sistema (alta, cambio, restablecimiento, carga inicial).
+model CredentialVaultEntry {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  userId      Int      @unique
+  /// `v1.<iv>.<tag>.<texto cifrado>` en base64url; el AAD es `companyId:userId`.
+  ciphertext  String
+  updatedById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation("UserVaultEntry", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("credential_vault_entries")
 }
 
 enum CvEmploymentStatus {
