@@ -8,6 +8,7 @@ import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { buildCollapseKey, channelForCategory, iconForNotification } from './notification-push-meta.js';
 import { appUrls } from '../common/app-urls.js';
+import { PREF_SOLO_RESUMEN, modoResumenActivo, omitirEnModoResumen } from './notification-noise.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -316,6 +317,26 @@ export class NotificationsService {
    * Crear notificación individual con opciones completas.
    * Push eficiente: canal + collapseKey; dedupe corto; no auto-notif al actor.
    */
+  /** Modo «solo el resumen y lo urgente» por persona, guardado 60 s para no consultar en cada aviso. */
+  private readonly soloResumenCache = new Map<number, { at: number; activo: boolean }>();
+
+  private async soloResumen(userId: number): Promise<boolean> {
+    const previo = this.soloResumenCache.get(userId);
+    if (previo && Date.now() - previo.at < 60_000) return previo.activo;
+    let activo = false;
+    try {
+      const pref = await this.prisma.userPreference.findUnique({
+        where: { userId_key: { userId, key: PREF_SOLO_RESUMEN } },
+        select: { value: true },
+      });
+      activo = modoResumenActivo(pref?.value);
+    } catch {
+      activo = false;
+    }
+    this.soloResumenCache.set(userId, { at: Date.now(), activo });
+    return activo;
+  }
+
   async createNotification(payload: INotificationPayload) {
     try {
       if (
@@ -323,6 +344,12 @@ export class NotificationsService {
         payload.triggerUserId != null &&
         payload.triggerUserId === payload.userId
       ) {
+        return null;
+      }
+
+      // Quien eligió «solo el resumen y lo urgente» no recibe los avisos meramente informativos.
+      // Solo se consulta la preferencia cuando el aviso es de los informativos.
+      if (omitirEnModoResumen(payload) && (await this.soloResumen(payload.userId))) {
         return null;
       }
 

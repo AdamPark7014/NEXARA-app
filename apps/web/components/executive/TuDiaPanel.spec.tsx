@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TuDiaPanel, { type TuDia } from "./TuDiaPanel";
 
@@ -21,7 +22,14 @@ const RESUMEN: TuDia = {
 };
 
 function respuesta(cuerpo: unknown, ok = true, status = 200) {
-  return vi.fn(async () => ({ ok, status, json: async () => cuerpo }) as unknown as Response);
+  return vi.fn(async (url: string) =>
+    ({
+      ok: String(url).includes("user-preferences") ? true : ok,
+      status,
+      json: async () => cuerpo,
+      text: async () => (String(url).includes("user-preferences") ? "0" : JSON.stringify(cuerpo)),
+    }) as unknown as Response,
+  );
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -45,9 +53,8 @@ describe("TuDiaPanel", () => {
     vi.stubGlobal("fetch", f);
     render(<TuDiaPanel token="tok-123" />);
     await screen.findByText(/3 solicitudes/);
-    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
-    expect(String(url)).toContain("executive/brief");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok-123");
+    const llamada = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([u]) => String(u).includes("executive/brief"))!;
+    expect((llamada[1].headers as Record<string, string>).Authorization).toBe("Bearer tok-123");
   });
 
   it("sin pendientes dice «Todo al día»", async () => {
@@ -70,5 +77,21 @@ describe("TuDiaPanel", () => {
     const { container } = render(<TuDiaPanel token={null} />);
     expect(f).not.toHaveBeenCalled();
     expect(container.querySelector("section")).toBeNull();
+  });
+
+  it("permite elegir «solo el resumen y lo urgente» y lo guarda", async () => {
+    const f = respuesta(RESUMEN);
+    vi.stubGlobal("fetch", f);
+    render(<TuDiaPanel token="tok" />);
+    const casilla = (await screen.findByRole("checkbox")) as HTMLInputElement;
+    expect(casilla.checked).toBe(false);
+
+    await userEvent.click(casilla);
+    expect(casilla.checked).toBe(true);
+    await waitFor(() => {
+      const put = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([, i]) => i?.method === "PUT");
+      expect(put).toBeTruthy();
+      expect(JSON.parse(String(put![1].body))).toEqual({ key: "notificaciones.solo_resumen", value: "1" });
+    });
   });
 });
