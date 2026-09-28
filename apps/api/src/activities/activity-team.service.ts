@@ -18,6 +18,7 @@ import {
   type ChainActor,
 } from './activity-superiors.js';
 import { esDeTodaLaEmpresa, puedeAsignarA, tiposVisibles, type Alcanzador } from '../me/equipo-alcance.js';
+import { puedePedirApoyoEntreAreas } from './asignacion-departamento.js';
 
 /**
  * Equipo de una actividad y su historial de reasignaciones.
@@ -166,11 +167,13 @@ export class ActivityTeamService {
     }
     const users = await this.prisma.user.findMany({
       where: { isActive: true },
-      select: { id: true, email: true, managerId: true },
+      select: { id: true, email: true, managerId: true, roleKey: true, departmentId: true },
     });
-    if (!puedeAsignarA(actor, users, userId)) {
-      throw new ForbiddenException('Solo puedes asignar a gente de tu equipo');
-    }
+    if (puedeAsignarA(actor, users, userId)) return;
+    const target = users.find((u) => u.id === userId);
+    // Apoyo entre mandos (otro coordinador, o quien tiene gente a su cargo). No abre al ingeniero ajeno.
+    if (target && puedePedirApoyoEntreAreas(actor, target, users)) return;
+    throw new ForbiddenException('Solo puedes asignar a gente de tu equipo');
   }
 
   async addMember(

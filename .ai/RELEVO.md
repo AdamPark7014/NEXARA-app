@@ -1,6 +1,10 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Último turno:** cursor
+- **Fecha:** 2026-09-28
+- **Hecho:** Luis (coordinador) ya puede asignar o pedir apoyo fuera de su departamento. El alta de actividades ya no exige el mismo `departmentId` si quien asigna es coordinación/gerencia y el destino es otro mando o alguien de su equipo. Un empleado sin mando sigue limitado a su departamento. Validación en `POST/PATCH /activities` y al sumar gente al equipo. Sin migración. Despliegue: `cd /var/www/nexara-app && git pull --ff-only origin main && bash deploy/update.sh` (reconstruye `nexara-api`).
+
+- **Último turno anterior:** claude-code
 - **Fecha:** 2026-09-28
 - **Regla:** se trabaja **siempre directo en `main`**: sin ramas, worktrees ni PRs (Adam es el único programador).
   Está en las reglas de Cursor, `~/.claude/CLAUDE.md`, `C:\dev\CLAUDE.md`, `FUSION-PROTOCOL.md` y la plantilla EXEC-PACKET.

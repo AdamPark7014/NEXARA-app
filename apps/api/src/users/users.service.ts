@@ -761,6 +761,21 @@ export class UsersService {
    * campo, así que David podía asignarle a José Antonio y a soporte, que no son suyos.
    * Los jefes salen primero: Christian normalmente reparte a encargados y ellos delegan.
    */
+  /** Personas activas de la empresa, para decidir si una asignación cruza de departamento. */
+  async listAssignmentRoster(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    return this.prisma.user.findMany({
+      where: { AND: [this.companyMembershipFilter(tenantId), { isActive: true }] },
+      select: {
+        id: true,
+        email: true,
+        managerId: true,
+        departmentId: true,
+        roleKey: true,
+      },
+    });
+  }
+
   async findAssignableUsers(
     currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any; email?: string | null; roleKey?: string | null },
     companyId?: number | null,
