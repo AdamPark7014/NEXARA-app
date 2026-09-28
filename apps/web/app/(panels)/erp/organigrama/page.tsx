@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import OrgChartView from "@/components/organigrama/OrgChartView";
 import { useUser } from "@/components/UserContext";
 import { getHrSectionConfig } from "@/lib/section-views";
+import AltaUsuarioPanel from "@/components/team/AltaUsuarioPanel";
 
 /**
  * Organigrama de Core: lectura para todo el personal interno, sin el guard de RH.
@@ -12,5 +13,11 @@ import { getHrSectionConfig } from "@/lib/section-views";
 export default function OrganigramaPage() {
   const { user } = useUser();
   const canEditOrg = useMemo(() => getHrSectionConfig(user).canAssign, [user]);
-  return <OrgChartView canEditOrg={canEditOrg} eyebrow="Core · Recursos" />;
+  return (
+    <>
+      {/* Solo aparece para quien dirección le concedió dar de alta algún tipo de usuario. */}
+      <AltaUsuarioPanel />
+      <OrgChartView canEditOrg={canEditOrg} eyebrow="Core · Recursos" />
+    </>
+  );
 }

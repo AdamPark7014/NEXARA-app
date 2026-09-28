@@ -7,11 +7,13 @@ import { RbacGuard } from '../common/rbac.guard.js';
 import { RolesController } from './roles.controller.js';
 import { ChatModule } from '../chat/chat.module.js';
 import { IntegraModule } from '../integra/integra.module.js';
+import { AuditModule } from '../audit/audit.module.js';
+import { UsersDelegationService } from './users-delegation.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, forwardRef(() => ChatModule), IntegraModule],
+  imports: [PrismaModule, AuthModule, AuditModule, forwardRef(() => ChatModule), IntegraModule],
   controllers: [UsersController, RolesController],
-  providers: [UsersService, RbacGuard],
-  exports: [UsersService],
+  providers: [UsersService, UsersDelegationService, RbacGuard],
+  exports: [UsersService, UsersDelegationService],
 })
 export class UsersModule {}
