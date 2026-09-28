@@ -30,6 +30,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import {
   canSeeClientesModule,
+  clientSectorsForActor,
   clientSectorsForEmail,
   isClientSector,
   needsOpsProvision,
@@ -109,8 +110,18 @@ export class VentasService {
   }
 
   private assertCanUseSectors(user: any, sectors: ClientSectorCode[]) {
-    if (this.isSuperAdminUser(user) || this.isSalesTeamManager(user)) return;
-    const allowed = clientSectorsForEmail(user?.email);
+    if (this.isSuperAdminUser(user)) return;
+    const byEmail = clientSectorsForEmail(user?.email);
+    if (byEmail.length) {
+      for (const s of sectors) {
+        if (!byEmail.includes(s)) {
+          throw new ForbiddenException(`No puedes usar el sector ${s}`);
+        }
+      }
+      return;
+    }
+    if (this.isSalesTeamManager(user)) return;
+    const allowed = clientSectorsForActor(user);
     if (!allowed.length) {
       throw new ForbiddenException('No tienes acceso al módulo de clientes');
     }
@@ -119,6 +130,18 @@ export class VentasService {
         throw new ForbiddenException(`No puedes usar el sector ${s}`);
       }
     }
+  }
+
+  /** Sin sector en el body: el del área de quien da de alta (correo, si no el rol). */
+  private defaultSectorsFor(user: any): ClientSectorCode[] {
+    const allowed = clientSectorsForActor(user);
+    return allowed.length ? allowed : ['COMERCIAL'];
+  }
+
+  /** Coordinación y gerencia ven el padrón de su empresa, no solo los clientes que ellos crearon. */
+  private vePadronDeLaEmpresa(user?: any): boolean {
+    if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user) || this.isSalesTeamManager(user)) return true;
+    return canManageClients({ id: user?.id, email: user?.email, roleKey: user?.roleKey }, false);
   }
 
   private requireFiscalForSectors(dto: CreateSalesClientDto) {
@@ -384,7 +407,8 @@ export class VentasService {
   private async assertCanManageClients(user?: any) {
     const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
     if (canManageClients(actor, false)) return;
-    if (!(await this.hasDirectReports(user?.id))) {
+    const reports = await this.hasDirectReports(user?.id);
+    if (!canManageClients(actor, reports)) {
       throw new ForbiddenException(CLIENT_MANAGE_FORBIDDEN);
     }
   }
@@ -401,11 +425,13 @@ export class VentasService {
     if (isInactiveClientStatus(dto.status)) this.assertCanDeactivateClient(user);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
-    const sectors = this.normalizeIncomingSectors(dto.sectors);
-    if (dto.sectors?.length) {
+    const explicitSectors = Boolean(dto.sectors?.length);
+    const sectors = explicitSectors ? this.normalizeIncomingSectors(dto.sectors) : this.defaultSectorsFor(user);
+    if (explicitSectors) {
       this.assertCanUseSectors(user, sectors);
       this.requireFiscalForSectors(dto);
-    } else if (canSeeClientesModule(user?.email) && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user)) {
+    } else if (clientSectorsForActor(user).length) {
+      // Alta rápida (cotización o proyecto): cae en el sector del área, sin exigir datos fiscales.
       this.assertCanUseSectors(user, sectors);
     }
 
@@ -479,14 +505,13 @@ export class VentasService {
     let where: Record<string, unknown> = { ...companyWhere(companyId ?? null) };
 
     if (sector) {
-      if (!canSeeClientesModule(user?.email) && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user)) {
-        throw new ForbiddenException('No tienes acceso al módulo de clientes');
-      }
       this.assertCanUseSectors(user, [sector as ClientSectorCode]);
       where = {
         ...where,
         sectors: { some: { sector } },
       };
+    } else if (this.vePadronDeLaEmpresa(user)) {
+      if (ownerId) where = { ...where, ...this.buildScopedOwnerWhere(user, ownerId) };
     } else {
       where = { ...where, ...this.buildScopedOwnerWhere(user, ownerId) };
     }
@@ -519,10 +544,15 @@ export class VentasService {
     });
     assertCompanyAccess(client, tenantId, 'Cliente');
     this.assertOwnerAccess(client!.ownerId, user, 'cliente');
-    if (canSeeClientesModule(user?.email) && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user)) {
-      const allowed = clientSectorsForEmail(user?.email);
+    const allowedSectors = clientSectorsForActor(user);
+    if (
+      allowedSectors.length &&
+      !this.isSuperAdminUser(user) &&
+      !this.isSalesTeamManager(user) &&
+      (client!.sectors ?? []).length
+    ) {
       const clientSectors = (client!.sectors ?? []).map((s) => s.sector as ClientSectorCode);
-      if (!clientSectors.some((s) => allowed.includes(s))) {
+      if (!clientSectors.some((s) => allowedSectors.includes(s))) {
         throw new ForbiddenException('No tienes acceso a este cliente');
       }
     }

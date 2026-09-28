@@ -211,7 +211,10 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/api/proyectos/**', methods: ['GET'], scope: 'read' },
 ];
 
-/** Clientes Core — restringido a dirección/ventas (no todo el personal). */
+/**
+ * Clientes Core — coordinación, gerencia y comercial.
+ * Ingenieros y operativos no entran: el alta la vuelve a comprobar `client-permissions.ts`.
+ */
 export const CLIENTES_CORE_URL_RULES: UrlRule[] = [
   { path: '/erp/clientes', scope: 'write' },
   { path: '/erp/clientes/**', scope: 'write' },
@@ -358,6 +361,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/users',   methods: ['GET'], scope: 'read' },
     { path: '/api/clients', methods: ['GET'], scope: 'read' },
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
+    ...CLIENTES_CORE_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
     ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
@@ -412,6 +416,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/integra/**', scope: 'write' },
     { path: '/api/access-control/**', scope: 'write' },
     { path: '/api/integra/**', scope: 'write' },
+    ...CLIENTES_CORE_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
   ],
 
@@ -453,6 +458,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/users/**', scope: 'admin' },
     { path: '/api/workflow/**', scope: 'approve' },
     { path: '/api/access-control/**', scope: 'write' },
+    ...CLIENTES_CORE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -528,6 +534,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/cotizaciones/**', methods: ['GET', 'POST', 'PATCH', 'PUT'], scope: 'write' },
     { path: '/api/smart-quote/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
     { path: '/api/accounting/invoices/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    ...CLIENTES_CORE_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
     ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
@@ -589,6 +596,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/company/**', methods: ['GET'], scope: 'read' },
     { path: '/api/users', methods: ['GET'], scope: 'read' },
     { path: '/api/users/profile/**', scope: 'write' },
+    ...CLIENTES_CORE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -644,6 +652,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/viatics/**', scope: 'approve' },
     { path: '/integra/**', scope: 'write' },
     { path: '/api/integra/**', scope: 'write' },
+    ...CLIENTES_CORE_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
     ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
@@ -806,6 +815,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/vehicles/**', methods: ['GET'], scope: 'read' },
     { path: '/integra/**', scope: 'write' },
     { path: '/api/integra/**', scope: 'write' },
+    ...CLIENTES_CORE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────

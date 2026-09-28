@@ -40,8 +40,42 @@ export function clientSectorsForEmail(email?: string | null): ClientSectorCode[]
   return SECTOR_MATRIX[e] ? [...SECTOR_MATRIX[e]] : [];
 }
 
+/**
+ * Sectores por rol cuando la persona no está en la matriz de correos.
+ * El correo del encargado gana (`clientSectorsForActor`): Luis sigue en corporativo
+ * y Daniela en comercial aunque el rol, por sí solo, abra más.
+ */
+const ROLE_SECTORS: Record<string, ClientSectorCode[]> = {
+  ceo: ALL_CLIENT_SECTORS,
+  dir_admin: ALL_CLIENT_SECTORS,
+  dir_operaciones: ALL_CLIENT_SECTORS,
+  coord_admin: ALL_CLIENT_SECTORS,
+  coord_operaciones: ALL_CLIENT_SECTORS,
+  coord_ventas: ALL_CLIENT_SECTORS,
+  arquitecto: ALL_CLIENT_SECTORS,
+  enc_soporte: ALL_CLIENT_SECTORS,
+  administrativo: ['COMERCIAL'],
+  contabilidad: ['COMERCIAL'],
+  rh: ['COMERCIAL'],
+};
+
+export function clientSectorsForRole(roleKey?: string | null): ClientSectorCode[] {
+  const role = String(roleKey || '').trim().toLowerCase();
+  return ROLE_SECTORS[role] ? [...ROLE_SECTORS[role]] : [];
+}
+
+export function clientSectorsForActor(actor?: { email?: string | null; roleKey?: string | null } | null): ClientSectorCode[] {
+  const byEmail = clientSectorsForEmail(actor?.email);
+  if (byEmail.length) return byEmail;
+  return clientSectorsForRole(actor?.roleKey);
+}
+
 export function canSeeClientesModule(email?: string | null): boolean {
   return clientSectorsForEmail(email).length > 0;
+}
+
+export function canAccessClientPadron(actor?: { email?: string | null; roleKey?: string | null } | null): boolean {
+  return clientSectorsForActor(actor).length > 0;
 }
 
 export function isClientSector(value: unknown): value is ClientSectorCode {

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
-import { listSalesClients, provisionSalesServiceClient, type SalesClient } from "@/lib/sales-api";
+import { createSalesClient, getClientPermissions, listSalesClients, provisionSalesServiceClient, type SalesClient } from "@/lib/sales-api";
 import { listarCotizaciones, type CotizacionRow } from "@/lib/cotizaciones-api";
 import {
   ROLES_EQUIPO,
@@ -76,6 +76,11 @@ export default function NuevoProyectoPage() {
   const [clientes, setClientes] = useState<SalesClient[]>([]);
   const [cargandoClientes, setCargandoClientes] = useState(true);
   const [errorClientes, setErrorClientes] = useState<string | null>(null);
+  const [puedeAgregarCliente, setPuedeAgregarCliente] = useState(false);
+  const [altaNombre, setAltaNombre] = useState("");
+  const [altaAbierta, setAltaAbierta] = useState(false);
+  const [altaGuardando, setAltaGuardando] = useState(false);
+  const [errorAlta, setErrorAlta] = useState<string | null>(null);
   const [buscarCliente, setBuscarCliente] = useState("");
   const [cotizaciones, setCotizaciones] = useState<CotizacionRow[]>([]);
   const [errorCotizaciones, setErrorCotizaciones] = useState<string | null>(null);
@@ -103,6 +108,9 @@ export default function NuevoProyectoPage() {
       })
       .catch((e) => vivo && setErrorClientes(formatApiError(e, "No se pudieron cargar los clientes")))
       .finally(() => vivo && setCargandoClientes(false));
+    getClientPermissions(token)
+      .then((p) => vivo && setPuedeAgregarCliente(Boolean(p?.puedeAgregar)))
+      .catch(() => vivo && setPuedeAgregarCliente(false));
     listarCotizaciones(token)
       .then((rows) => vivo && setCotizaciones(rows))
       .catch(() => vivo && setErrorCotizaciones("No se pudieron cargar las cotizaciones; puedes ligarla después."));
@@ -296,10 +304,53 @@ export default function NuevoProyectoPage() {
             </p>
           ) : null}
           {!cargandoClientes && !clientes.length && !errorClientes ? (
-            <p className={styles.hint}>
-              No tienes clientes a la vista. <Link href="/erp/clientes/nuevo?sector=proyecto">Da de alta uno</Link> y
-              vuelve aquí.
-            </p>
+            <p className={styles.hint}>No tienes clientes a la vista. Da de alta uno aquí y sigue con el proyecto.</p>
+          ) : null}
+          {puedeAgregarCliente ? (
+            <div className={styles.hint}>
+              {altaAbierta ? (
+                <div className={styles.grid2}>
+                  <input
+                    className={styles.input}
+                    value={altaNombre}
+                    onChange={(e) => setAltaNombre(e.target.value)}
+                    placeholder="Nombre del cliente nuevo"
+                    aria-label="Nombre del cliente nuevo"
+                    maxLength={160}
+                  />
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    disabled={altaGuardando || altaNombre.trim().length < 2}
+                    onClick={() => {
+                      if (!token) return;
+                      setAltaGuardando(true);
+                      setErrorAlta(null);
+                      createSalesClient(token, { name: altaNombre.trim(), status: "Activo" })
+                        .then((creado) => {
+                          setClientes((prev) =>
+                            [...prev.filter((c) => c.id !== creado.id), creado].sort((x, y) =>
+                              x.name.localeCompare(y.name, "es"),
+                            ),
+                          );
+                          cambiar("clienteId", String(creado.id));
+                          setAltaNombre("");
+                          setAltaAbierta(false);
+                        })
+                        .catch((e) => setErrorAlta(formatApiError(e, "No se pudo dar de alta el cliente")))
+                        .finally(() => setAltaGuardando(false));
+                    }}
+                  >
+                    {altaGuardando ? "Guardando…" : "Crear y usar"}
+                  </button>
+                </div>
+              ) : (
+                <button type="button" className={styles.secondaryBtn} onClick={() => setAltaAbierta(true)}>
+                  Dar de alta un cliente
+                </button>
+              )}
+              {errorAlta ? <p className={styles.error}>{errorAlta}</p> : null}
+            </div>
           ) : null}
         </div>
 

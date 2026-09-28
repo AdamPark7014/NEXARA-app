@@ -2,28 +2,50 @@
  * Quién puede agregar, editar, desactivar y eliminar clientes del padrón (Core y CRM).
  *
  * Ver clientes sigue las reglas de sector (`client-sectors.ts`); esto solo decide quién los
- * modifica. Agregar y editar: quien tiene gente a su cargo (alguien con `managerId` = él),
- * los roles administrativos y dirección general. Desactivar y eliminar: solo Christian
- * (y su equivalente de pruebas); la cuenta de desarrollo conserva el acceso técnico total.
+ * modifica. Agregar y editar: coordinación y gerencia (y la encargada comercial, rol
+ * `administrativo`), más quien tiene gente a su cargo salvo que su rol sea operativo.
+ * Un ingeniero o un operativo no da de alta clientes aunque tenga personal reportándole.
+ * Desactivar y eliminar: solo Christian (y su equivalente de pruebas); la cuenta de
+ * desarrollo conserva el acceso técnico total.
  */
 import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail } from '../common/platform-accounts.js';
 
-/** Roles v2 administrativos que dan de alta y corrigen clientes. */
+/**
+ * Roles que agregan y corrigen clientes aunque no tengan gente a su cargo.
+ * Incluye coordinación, gerencia y el rol de la encargada comercial (`administrativo`).
+ */
 export const CLIENT_ADMIN_ROLE_KEYS: readonly string[] = [
-  'coord_admin',
+  'ceo',
   'dir_admin',
+  'dir_operaciones',
+  'coord_admin',
+  'coord_operaciones',
+  'coord_ventas',
+  'arquitecto',
+  'enc_soporte',
   'administrativo',
   'contabilidad',
   'rh',
-  'coord_operaciones',
-  'dir_operaciones',
+];
+
+/**
+ * Ingenieros y operativos: nunca agregan ni editan clientes, ni con gente a su cargo.
+ * `ing_soporte` es el rol de los ingenieros de soporte (y del encargado de soporte que
+ * comparte esa clave); el alta de ese puesto vive en `enc_soporte`.
+ */
+export const CLIENT_OPERATIONAL_ROLE_KEYS: readonly string[] = [
+  'ing_campo',
+  'ing_soporte',
+  'disenador',
+  'vendedor',
+  'cliente',
 ];
 
 export const CLIENT_STATUS_ACTIVE = 'Activo';
 export const CLIENT_STATUS_INACTIVE = 'Inactivo';
 
 export const CLIENT_MANAGE_FORBIDDEN =
-  'Solo quien tiene personal a su cargo, Administración o Dirección puede agregar o editar clientes';
+  'Solo coordinación, gerencia y la encargada comercial pueden agregar o editar clientes';
 export const CLIENT_DELETE_FORBIDDEN = 'Solo Christian (Dirección General) puede eliminar clientes';
 export const CLIENT_DEACTIVATE_FORBIDDEN =
   'Solo Christian (Dirección General) puede desactivar o reactivar clientes';
@@ -51,11 +73,17 @@ export function canDeleteOrDeactivateClient(actor?: ClientActor | null): boolean
   return isClientOwnerAuthority(actor);
 }
 
-/** Agregar y editar: jefes (con personal a cargo), roles administrativos y dirección general. */
+export function isOperationalClientRole(roleKey?: string | null): boolean {
+  const key = String(roleKey || '').trim().toLowerCase();
+  return Boolean(key) && CLIENT_OPERATIONAL_ROLE_KEYS.includes(key);
+}
+
+/** Agregar y editar: coordinación, gerencia y encargada comercial. Un operativo no, ni siendo jefe. */
 export function canManageClients(actor: ClientActor | null | undefined, hasDirectReports: boolean): boolean {
   if (!actor) return false;
   if (isClientOwnerAuthority(actor)) return true;
   const roleKey = String(actor.roleKey || '').trim().toLowerCase();
+  if (isOperationalClientRole(roleKey)) return false;
   if (roleKey && CLIENT_ADMIN_ROLE_KEYS.includes(roleKey)) return true;
   return hasDirectReports;
 }

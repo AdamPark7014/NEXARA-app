@@ -45,7 +45,7 @@ export class CotizacionesController {
     @Body() dto: CreateCotizacionDto,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.cotizacionesService.create(dto, user?.id, companyId);
+    return this.cotizacionesService.create(dto, user?.id, companyId, user);
   }
 
   @UseGuards(RbacGuard)
@@ -166,7 +166,7 @@ export class CotizacionesController {
     @Body() dto: UpdateCotizacionDto,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.cotizacionesService.update(id, dto, user?.id, companyId);
+    return this.cotizacionesService.update(id, dto, user?.id, companyId, user);
   }
 
   @UseGuards(RbacGuard)

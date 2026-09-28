@@ -201,7 +201,58 @@ export class CotizacionesService {
     return candidate;
   }
 
-  async create(dto: CreateCotizacionDto, createdById?: number, companyId?: number | null) {
+  /**
+   * Si el nombre no está en el padrón de esta empresa, lo da de alta con las
+   * mismas reglas que Clientes (coordinación y gerencia sí; un ingeniero no).
+   * El cliente queda en la empresa de la cotización y en el sector de quien lo crea,
+   * para poder usarlo enseguida en un proyecto o una actividad.
+   */
+  private async clientePorNombreOAlta(
+    nombre: string,
+    datos: {
+      legalName?: string | null;
+      billingEmail?: string | null;
+      billingPhone?: string | null;
+      fiscalAddress?: string | null;
+    },
+    companyId: number,
+    actor?: { id?: number; email?: string | null; roleKey?: string | null; nombre?: string | null } | null,
+    actorId?: number,
+  ) {
+    const existente = await this.db.salesClient.findFirst({
+      where: { companyId, name: nombre },
+    });
+    if (existente) return existente;
+    const id = actor?.id ?? actorId;
+    const quien =
+      actor?.roleKey || actor?.email
+        ? actor
+        : id
+          ? await this.db.user.findUnique({
+              where: { id },
+              select: { id: true, email: true, roleKey: true, nombre: true },
+            })
+          : null;
+    return this.ventasService.createClient(
+      {
+        name: nombre,
+        legalName: (datos.legalName || nombre) ?? undefined,
+        billingEmail: datos.billingEmail || undefined,
+        billingPhone: datos.billingPhone || undefined,
+        fiscalAddress: datos.fiscalAddress || undefined,
+        status: 'Activo',
+      },
+      quien ?? undefined,
+      companyId,
+    );
+  }
+
+  async create(
+    dto: CreateCotizacionDto,
+    createdById?: number,
+    companyId?: number | null,
+    actor?: { id?: number; email?: string | null; roleKey?: string | null; nombre?: string | null } | null,
+  ) {
     // El editor de Core guarda el borrador en cuanto hay cliente, antes de la primera partida: una
     // cotización sin partidas es un borrador válido (lo que no puede es enviarse así).
     const items = dto.items?.length ? this.normalizeItems(dto.items) : [];
@@ -272,21 +323,18 @@ export class CotizacionesService {
       if (!clientName) {
         throw new BadRequestException('La cotización requiere un cliente: selecciona uno existente o captura al menos el nombre.');
       }
-      const existingByName = await this.db.salesClient.findFirst({
-        where: { companyId: resolvedCompanyId, name: clientName },
-      });
-      const salesClient =
-        existingByName ??
-        (await this.db.salesClient.create({
-          data: {
-            name: clientName,
-            legalName: clientCompany || clientName,
-            billingEmail: clientEmail,
-            billingPhone: clientPhone,
-            fiscalAddress: clientAddress,
-            companyId: resolvedCompanyId,
-          },
-        }));
+      const salesClient = await this.clientePorNombreOAlta(
+        clientName,
+        {
+          legalName: clientCompany,
+          billingEmail: clientEmail,
+          billingPhone: clientPhone,
+          fiscalAddress: clientAddress,
+        },
+        resolvedCompanyId,
+        actor,
+        createdById,
+      );
       salesClientId = salesClient.id;
     }
 
@@ -673,7 +721,13 @@ export class CotizacionesService {
     });
   }
 
-  async update(id: number, dto: UpdateCotizacionDto, updatedById?: number, companyId?: number | null) {
+  async update(
+    id: number,
+    dto: UpdateCotizacionDto,
+    updatedById?: number,
+    companyId?: number | null,
+    actor?: { id?: number; email?: string | null; roleKey?: string | null; nombre?: string | null } | null,
+  ) {
     const existing = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
       include: { items: true },
@@ -722,21 +776,21 @@ export class CotizacionesService {
       (salesClientIdResuelto === undefined && existing.salesClientId == null);
 
     if (quedaSinCliente && nombreNuevo) {
-      const existentePorNombre = await this.db.salesClient.findFirst({
-        where: { companyId: tenantId, name: nombreNuevo },
-      });
-      const cliente =
-        existentePorNombre ??
-        (await this.db.salesClient.create({
-          data: {
-            name: nombreNuevo,
-            legalName: dto.clientCompany?.trim() || nombreNuevo,
-            billingEmail: dto.clientEmail?.trim(),
-            billingPhone: dto.clientPhone?.trim(),
-            fiscalAddress: dto.clientAddress?.trim(),
-            companyId: tenantId,
-          },
-        }));
+      if (tenantId == null) {
+        throw new BadRequestException('La cotización no tiene empresa; no se puede dar de alta el cliente.');
+      }
+      const cliente = await this.clientePorNombreOAlta(
+        nombreNuevo,
+        {
+          legalName: dto.clientCompany?.trim(),
+          billingEmail: dto.clientEmail?.trim(),
+          billingPhone: dto.clientPhone?.trim(),
+          fiscalAddress: dto.clientAddress?.trim(),
+        },
+        tenantId,
+        actor,
+        updatedById,
+      );
       salesClientIdResuelto = cliente.id;
     }
 
