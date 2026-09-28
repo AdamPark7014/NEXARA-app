@@ -22,6 +22,12 @@ import {
   type CampoEvidencia,
   type Momento,
 } from '@/lib/evidencia-campos';
+import {
+  dataUrlDeImagen,
+  mensajeAdjuntoInvalido,
+  primerArchivo,
+  puntoDeFoto,
+} from '@/lib/evidencia-adjunto';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useUser } from './UserContext';
@@ -652,8 +658,9 @@ const ActivityEvidenceFlow = () => {
   type PendingPhoto = {
     kind: 'entry' | 'evidence' | 'exit';
     dataUrl: string;
-    latitude: number;
-    longitude: number;
+    /** La entrada y la salida siempre traen GPS. Una evidencia adjunta puede ir sin él. */
+    latitude: number | null;
+    longitude: number | null;
     capturedAt: string;
   };
   const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
@@ -669,6 +676,10 @@ const ActivityEvidenceFlow = () => {
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
   const liveStreamRef = useRef<MediaStream | null>(null);
   const liveGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  /** Input de archivo de evidencia (fotos libres y de campo). Sin `capture`: abre galería o explorador. */
+  const adjuntoRef = useRef<HTMLInputElement | null>(null);
+  /** Hueco de campo al que va el archivo que se está eligiendo. `null` = foto libre. */
+  const adjuntoCampoRef = useRef<{ fieldId: number; momento: Momento } | null>(null);
 
   const stopLiveStream = useCallback(() => {
     liveStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -779,8 +790,15 @@ const ActivityEvidenceFlow = () => {
     setError(null);
 
     try {
-      // Misma ubicación que se mostró en la vista previa.
-      const { dataUrl: photoUrl, latitude, longitude } = photo;
+      // Misma ubicación que se mostró en la vista previa. La entrada sigue exigiendo GPS.
+      const { dataUrl: photoUrl } = photo;
+      const punto = puntoDeFoto(photo.latitude, photo.longitude);
+      if (!punto) {
+        setError('La foto de entrada necesita tu ubicación GPS.');
+        setLoading(false);
+        return false;
+      }
+      const { latitude, longitude } = punto;
 
       const endpoint = isCorrection
         ? `activity-evidence/${flowData.activityId}/resubmit`
@@ -838,17 +856,98 @@ const ActivityEvidenceFlow = () => {
     openCamera('evidence');
   };
 
+  /** Ubicación si el navegador la da pronto. Si no, la evidencia adjunta sigue. */
+  const ubicacionOpcional = (): Promise<{ latitude: number; longitude: number } | null> =>
+    new Promise((resolve) => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      let settled = false;
+      const finish = (punto: { latitude: number; longitude: number } | null) => {
+        if (settled) return;
+        settled = true;
+        resolve(puntoDeFoto(punto?.latitude, punto?.longitude));
+      };
+      const timer = setTimeout(() => finish(null), 2500);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          clearTimeout(timer);
+          finish({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        },
+        () => {
+          clearTimeout(timer);
+          finish(null);
+        },
+        { enableHighAccuracy: false, timeout: 2000, maximumAge: 60_000 },
+      );
+    });
+
+  const abrirAdjuntoLibre = () => {
+    if (!flowData) return;
+    adjuntoCampoRef.current = null;
+    setCampoTarget(null);
+    setError(null);
+    adjuntoRef.current?.click();
+  };
+
+  const abrirAdjuntoCampo = (fieldId: number, momento: Momento) => {
+    if (!flowData) return;
+    adjuntoCampoRef.current = { fieldId, momento };
+    setCampoTarget({ fieldId, momento });
+    setError(null);
+    adjuntoRef.current?.click();
+  };
+
+  /**
+   * Archivo de evidencia (galería, explorador, captura, pegar, arrastrar).
+   * Pasa por la misma vista previa que la cámara. No toca entrada ni salida.
+   */
+  const adjuntarEvidencia = async (file: File) => {
+    if (!flowData) return;
+    if (flowData.step !== 'EVIDENCE_PHOTOS') return;
+    const aviso = mensajeAdjuntoInvalido(file);
+    if (aviso) {
+      setError(aviso);
+      return;
+    }
+    if (!porCampos && !isInventoryFlow && flowData.evidencePhotos.length >= photoRequired) {
+      setError(`Ya tienes las ${photoRequired} fotos de evidencia.`);
+      return;
+    }
+    const destino = adjuntoCampoRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const dataUrl = await dataUrlDeImagen(file);
+      const geo = await ubicacionOpcional();
+      if (destino) setCampoTarget(destino);
+      setPendingPhoto({
+        kind: 'evidence',
+        dataUrl,
+        latitude: geo?.latitude ?? null,
+        longitude: geo?.longitude ?? null,
+        capturedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      setError(photoErrorText(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addEvidencePhoto = (photo: PendingPhoto) => {
     if (!flowData) return;
     const previas = flowData.evidencePhotos.length;
     const updatedPhotos = [...flowData.evidencePhotos, photo.dataUrl];
+    const punto = puntoDeFoto(photo.latitude, photo.longitude);
     setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
     setEvidenceGeo((prev) => {
       const alineadas = prev.slice(0, previas);
       while (alineadas.length < previas) alineadas.push(null);
       return [
         ...alineadas,
-        { latitude: photo.latitude, longitude: photo.longitude, capturedAt: photo.capturedAt },
+        punto ? { ...punto, capturedAt: photo.capturedAt } : null,
       ];
     });
     setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
@@ -859,11 +958,12 @@ const ActivityEvidenceFlow = () => {
     setLoading(true);
     setError(null);
     try {
+      const punto = puntoDeFoto(photo.latitude, photo.longitude);
       const lista = await guardarFotoDeCampo(user.token, flowData.activityId, campoTarget.fieldId, {
         momento: campoTarget.momento,
         photoUrl: photo.dataUrl,
-        latitude: photo.latitude,
-        longitude: photo.longitude,
+        latitude: punto?.latitude,
+        longitude: punto?.longitude,
         capturedAt: photo.capturedAt,
       });
       setCamposEvidencia(lista);
@@ -1224,11 +1324,18 @@ const ActivityEvidenceFlow = () => {
     setError(null);
 
     try {
-      // Misma ubicación que se mostró en la vista previa.
-      const { dataUrl: photoUrl, latitude, longitude } = photo;
+      // Misma ubicación que se mostró en la vista previa. La salida sigue exigiendo GPS.
+      const { dataUrl: photoUrl } = photo;
+      const punto = puntoDeFoto(photo.latitude, photo.longitude);
+      if (!punto) {
+        setError('La foto de salida necesita tu ubicación GPS.');
+        setLoading(false);
+        return false;
+      }
+      const { latitude, longitude } = punto;
 
       // Misma regla que la API: fuera del radio del punto de inicio no se envía.
-      const bloqueo = bloqueoPorZona({ latitude, longitude });
+      const bloqueo = bloqueoPorZona(punto);
       if (bloqueo) {
         setZonaSalidaError(bloqueo);
         void geocerca.recargar();
@@ -1294,6 +1401,38 @@ const ActivityEvidenceFlow = () => {
       setLoading(false);
     }
   };
+
+  // Pegar (Ctrl+V) una captura en el paso de evidencias. No corre en un campo de texto.
+  useEffect(() => {
+    if (flowData?.step !== 'EVIDENCE_PHOTOS' || isFlowLocked) return;
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      const file = primerArchivo(event.clipboardData?.files);
+      if (!file) return;
+      event.preventDefault();
+      if (!porCampos) {
+        adjuntoCampoRef.current = null;
+      } else if (!adjuntoCampoRef.current) {
+        const vacios: Array<{ fieldId: number; momento: Momento }> = [];
+        for (const campo of camposEvidencia) {
+          for (const momento of MOMENTOS) {
+            if (!campo.momentos.includes(momento) || campo.fotos?.[momento]) continue;
+            vacios.push({ fieldId: campo.id, momento });
+          }
+        }
+        if (vacios.length !== 1) {
+          setError('Pega la imagen sobre el campo, o usa Adjuntar en ese hueco.');
+          return;
+        }
+        adjuntoCampoRef.current = vacios[0];
+      }
+      void adjuntarEvidencia(file);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [flowData?.step, isFlowLocked, porCampos, camposEvidencia, adjuntarEvidencia]);
 
   if (!user) return <div>Cargando...</div>;
 
@@ -1382,15 +1521,23 @@ const ActivityEvidenceFlow = () => {
               }}
             />
             <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-              📍 Ubicación capturada: {pendingPhoto.latitude.toFixed(5)}, {pendingPhoto.longitude.toFixed(5)} ·{' '}
-              <a
-                href={`https://www.google.com/maps?q=${pendingPhoto.latitude},${pendingPhoto.longitude}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: 'var(--primary)', fontWeight: 650 }}
-              >
-                Ver en mapa
-              </a>
+              {(() => {
+                const punto = puntoDeFoto(pendingPhoto.latitude, pendingPhoto.longitude);
+                if (!punto) return <>Sin ubicación GPS. La evidencia se guarda igual.</>;
+                return (
+                  <>
+                    📍 Ubicación capturada: {punto.latitude.toFixed(5)}, {punto.longitude.toFixed(5)} ·{' '}
+                    <a
+                      href={`https://www.google.com/maps?q=${punto.latitude},${punto.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: 'var(--primary)', fontWeight: 650 }}
+                    >
+                      Ver en mapa
+                    </a>
+                  </>
+                );
+              })()}
             </div>
             {pendingPhoto.kind === 'exit' && zonaSalidaError ? (
               <AvisoFueraDeZona mensaje={zonaSalidaError} />
@@ -1816,7 +1963,32 @@ const ActivityEvidenceFlow = () => {
 
       {/* PASO 2: Fotos de Evidencia */}
       {flowData.step === 'EVIDENCE_PHOTOS' && !isFlowLocked && (
-        <div className={`${styles.stepCard} ${styles.stepEvidence}`}>
+        <div
+          className={`${styles.stepCard} ${styles.stepEvidence}`}
+          onDragOver={(event) => {
+            if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            const destino = (event.target as HTMLElement).closest?.('[data-inventory-drop]');
+            if (destino) return;
+            event.preventDefault();
+            const file = primerArchivo(event.dataTransfer?.files);
+            if (!file) return;
+            const slot = (event.target as HTMLElement).closest?.('[data-campo-slot]');
+            if (slot) {
+              const fieldId = Number(slot.getAttribute('data-field-id'));
+              const momento = slot.getAttribute('data-momento') as Momento | null;
+              if (!fieldId || !momento) return;
+              adjuntoCampoRef.current = { fieldId, momento };
+            } else if (!porCampos) {
+              adjuntoCampoRef.current = null;
+            } else {
+              setError('Suelta la imagen sobre el campo, o usa Adjuntar en ese hueco.');
+              return;
+            }
+            void adjuntarEvidencia(file);
+          }}
+        >
           <h3 className={styles.stepTitle}>
             {isInventoryFlow
               ? `🗂️ Paso 2: Inventario comparativo + evidencias (${flowData.evidencePhotos.length} foto${flowData.evidencePhotos.length === 1 ? '' : 's'})`
@@ -1830,8 +2002,8 @@ const ActivityEvidenceFlow = () => {
               : porCampos
                 ? camposFaltan === 0
                   ? 'Ya documentaste todos los campos. Continúa al siguiente paso.'
-                  : 'Toca cada hueco para tomar la foto de ese momento (antes / en progreso / después).'
-                : `Toma ${photoRequired} fotos de evidencia.`}
+                  : 'Toma la foto con la cámara o adjunta una imagen que ya tengas (galería, archivo, captura). En el escritorio también puedes arrastrarla o pegarla con Ctrl+V.'
+                : `Toma o adjunta ${photoRequired} fotos de evidencia. En el escritorio puedes arrastrarlas o pegarlas con Ctrl+V.`}
           </p>
 
           {porCampos ? (
@@ -1873,9 +2045,16 @@ const ActivityEvidenceFlow = () => {
                       {momentos.map((m) => {
                         const foto = campo.fotos?.[m] ?? null;
                         return (
-                          <div key={m} style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+                          <div
+                            key={m}
+                            data-campo-slot=""
+                            data-field-id={campo.id}
+                            data-momento={m}
+                            style={{ display: 'grid', gap: 4, minWidth: 0 }}
+                          >
                             <span style={{ fontSize: 12, fontWeight: 700 }}>{MOMENTO_LABEL[m]}</span>
                             {foto ? (
+                              <div style={{ display: 'grid', gap: 4 }}>
                               <div style={{ position: 'relative' }}>
                                 <button
                                   type="button"
@@ -1914,25 +2093,64 @@ const ActivityEvidenceFlow = () => {
                                   ✕
                                 </button>
                               </div>
-                            ) : (
                               <button
                                 type="button"
-                                onClick={() => handleCaptureCampoPhoto(campo.id, m)}
+                                onClick={() => abrirAdjuntoCampo(campo.id, m)}
                                 disabled={loading}
                                 style={{
-                                  height: 96,
-                                  borderRadius: 12,
-                                  border: '1px dashed color-mix(in srgb, #d97706 45%, var(--border))',
-                                  background: 'color-mix(in srgb, #d97706 6%, var(--surface))',
-                                  color: '#d97706',
-                                  fontWeight: 700,
-                                  fontSize: 13,
+                                  height: 28,
+                                  borderRadius: 8,
+                                  border: '1px solid var(--border)',
+                                  background: 'var(--surface)',
+                                  color: 'inherit',
+                                  fontWeight: 650,
+                                  fontSize: 12,
                                   cursor: 'pointer',
                                   fontFamily: 'inherit',
                                 }}
                               >
-                                📷 Tomar
+                                Adjuntar
                               </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'grid', gap: 4 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCaptureCampoPhoto(campo.id, m)}
+                                  disabled={loading}
+                                  style={{
+                                    height: 72,
+                                    borderRadius: 12,
+                                    border: '1px dashed color-mix(in srgb, #d97706 45%, var(--border))',
+                                    background: 'color-mix(in srgb, #d97706 6%, var(--surface))',
+                                    color: '#d97706',
+                                    fontWeight: 700,
+                                    fontSize: 13,
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                  }}
+                                >
+                                  📷 Tomar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => abrirAdjuntoCampo(campo.id, m)}
+                                  disabled={loading}
+                                  style={{
+                                    height: 28,
+                                    borderRadius: 8,
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--surface)',
+                                    color: 'inherit',
+                                    fontWeight: 650,
+                                    fontSize: 12,
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                  }}
+                                >
+                                  Adjuntar
+                                </button>
+                              </div>
                             )}
                           </div>
                         );
@@ -2148,9 +2366,14 @@ const ActivityEvidenceFlow = () => {
                         <div
                           key={fileKey}
                           className={styles.inventoryDropzone}
-                          onDragOver={(event) => event.preventDefault()}
+                          data-inventory-drop=""
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
                           onDrop={(event) => {
                             event.preventDefault();
+                            event.stopPropagation();
                             setInventoryImageField(index, field, event.dataTransfer.files?.[0]);
                           }}
                         >
@@ -2282,7 +2505,15 @@ const ActivityEvidenceFlow = () => {
                 onClick={handleAddEvidencePhoto}
                 disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= photoRequired)}
               >
-                {loading ? '⏳ Capturando...' : '📷 Agregar'}
+                {loading ? '⏳ Capturando...' : '📷 Tomar foto'}
+              </button>
+              <button
+                type="button"
+                className={`${styles.actionButton} ${styles.actionSecondary}`}
+                onClick={abrirAdjuntoLibre}
+                disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= photoRequired)}
+              >
+                Adjuntar
               </button>
               <button
                 className={`${styles.actionButton} ${styles.actionSecondary}`}
@@ -2312,6 +2543,18 @@ const ActivityEvidenceFlow = () => {
               ❌ {error}
             </div>
           ) : null}
+          <input
+            ref={adjuntoRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
+            style={{ display: 'none' }}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (!file) return;
+              void adjuntarEvidencia(file);
+            }}
+          />
         </div>
       )}
 
