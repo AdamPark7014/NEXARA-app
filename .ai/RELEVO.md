@@ -29,10 +29,15 @@
   (las de la hoja para esas dos cuentas siguen un patrón adivinable; una hoja no debe pisar la contraseña del dueño).
 - Pruebas: API 227 suites / 2,745; web 73 archivos / 638; `tsc` limpio en ambos.
 - **Subido** (`6647aeb9`) y **desplegado** (2.º despliegue del día, sin migraciones nuevas).
-- **Activaciones en producción: NO hechas por Claude.** El clasificador negó leer la base de producción (`Production Reads`) y no se
-  rodeó. Quedó `apps/api/scripts/activar-perfil-ceo.sh` para que Adam lo corra EN el servidor
-  (`cd /var/www/nexara-app && git pull --ff-only && bash apps/api/scripts/activar-perfil-ceo.sh` lista las empresas;
-  con `COMPANY_ID=<id> APLICAR=1` aplica módulos/nómina/alta delegada/checar en web (`HORAS`, 48 por omisión)/plantillas).
+- **Activaciones en producción: HECHAS por Adam (28-09 ~11:17 MX), no por Claude.** El clasificador negó a Claude leer y escribir en la
+  base de producción (`Production Reads`, `Production Deploy`) y no se rodeó; Adam corrió `apps/api/scripts/activar-perfil-ceo.sh`
+  en el servidor: `COMPANY_ID=1 APLICAR=1` (empresa 1 = NEXARA; la 2 = NEXARA Demo NO lleva estas políticas). Quedó activo en la empresa 1:
+  `rbac.module_roles` = `{"employee-payments":["ceo"]}` (Pagos solo CEO), `payroll.schedule` = quincenal,
+  `users.creation_grants` (Antonio y Luis → `ing_soporte`, David → `ing_campo`), `attendance.web_checkin_until` = 2026-09-30T17:16:49Z
+  (checar en web abierto 48 h y se cierra solo) y las **9 plantillas de cotización** (`seed:plantillas`, 9 creadas). Las políticas se releen en ≤30 s.
+  Sin activar a propósito: topes de aprobación (faltan montos de Christian) y CFDI (mock). Sin verificar por Claude con un usuario real;
+  la primera prueba útil es entrar como Antonio y ver «Dar de alta a alguien» en `/erp/organigrama`, y como Christian ver «Acceso a cuentas».
+- Bug del script (tabla `company_profiles` → es `company_profile`) corregido en `e4a949ef`.
 
 ## Hecho (Claude, 28-09 10:00-11:00): alta de usuarios delegada, checar desde la web (temporal), subida y despliegue
 - **Subido a GitHub** (`a9a1aa72..4d706ed8`, 21 commits incluidos los de la sesión anterior y `f006fe0e` de otra sesión) y **desplegado**
@@ -183,7 +188,9 @@ Nueve carriles en paralelo, integrados y fusionados en `main`:
 - Deploy 1 (`8a1e95a4`) y deploy 2 (`a393c6cb`, rama `main`) en producción.
 
 ## A medias / siguiente
-- Actualizar los 2 specs RBAC de `enc_soporte` y `HerramientasChecklist.spec.tsx`.
+- **Bóveda de contraseñas** (guardar y mostrar a Christian las de las cuentas, y cargar la hoja del 21-09): bloqueada por el clasificador; ver arriba.
+- El **1-oct** (o cuando venza `attendance.web_checkin_until`) confirmar que checar en web ya se cerró; para cerrarla antes:
+  `DELETE FROM system_settings WHERE key='attendance.web_checkin_until' AND "companyId"=1;`
 - iOS: compilar en Mac/TestFlight (riesgos: `if` dentro del toolbar del chat; chat compacto en iPhone).
 - Android: tema oscuro definido pero apagado (pantallas con colores claros fijos); `ClickableText` del chat.
 - `/erp/mis-actividades` redirige con `redirect()` de servidor y en navegación cliente deja un error de
