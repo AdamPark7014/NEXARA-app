@@ -31,6 +31,11 @@ Core hace solo **mucho más** de lo que hace cualquier hoja de Excel: avisos, al
 | Cierre automático de jornadas abiertas | 23:30 diario | Sale = menor entre entrada + 9 h y 23:30; avisa a jefes y dirección |
 | Avisos de comida | 14:50 y 16:05, L–V | Personal |
 
+**Dirección**
+| Qué | Cuándo | A quién / cómo |
+|---|---|---|
+| **«Tu día» (nuevo)** | 08:00 L–V | CEO de cada empresa, app y push; nada si no hay pendientes; una vez al día |
+
 **Ventas y cotizaciones**
 | Qué | Cuándo | A quién / cómo |
 |---|---|---|
@@ -66,22 +71,27 @@ Core hace solo **mucho más** de lo que hace cualquier hoja de Excel: avisos, al
 
 ## 3. Arreglado hoy en el código (por desplegar)
 - **Tu pantalla «Hoy»** mostraba **cero facturas vencidas y cero stock bajo aunque las hubiera**: contaba un estado que nadie escribe y consultaba una tabla que no existe. Ahora las vencidas salen por fecha de vencimiento y solo de cobranza; el stock bajo, de las existencias reales; **por cobrar y por pagar ya restan lo cobrado/pagado**; las actividades «Asignada» ya cuentan como abiertas.
-- **Bandeja de Aprobaciones:** los pasos sin aprobador aparecen en la bandeja de la dirección y avisan con el importe («… OC #99 por $48,250.00»).
+- **Bandeja de Aprobaciones:** los pasos sin aprobador aparecen en la bandeja de la dirección y avisan con el importe («… OC #99 por $48,250.00»). Cada solicitud muestra ahora **de qué es y de cuánto** (título, cliente/proveedor, importe) y abre la cotización en Core.
+- **«Tu día» (nuevo):** cada mañana hábil a las 08:00 un solo aviso al CEO con lo que espera algo de él — aprobaciones con importe, facturas vencidas por cobrar, OC atrasadas, cotizaciones que vencen en 3 días, actividades atrasadas/por validar y, cuando cierra la quincena, «tu pre-nómina está lista»— y el mismo resumen en un panel en «Hoy». Si no hay nada, no manda nada.
+- **Nómina quincenal:** el sistema ya conoce el calendario (cortes el 15 y el último día) y avisa a quien ve «Pagos a personal».
+- **Topes de aprobación por monto (opcional):** cada empresa puede fijar desde qué monto una cotización o una OC necesita la autorización de dirección; sin configurar no cambia nada.
+- **Menos ruido:** cada persona puede elegir «solo el resumen y lo urgente» (sin avisos de asistencias, evidencias enviadas, «se creó…»).
+- **Viáticos:** el aviso llega a quien le toca el siguiente paso (el CEO al final).
 - **Avisos de la mañana** (cobranza, OC, mantenimientos, margen, vehículos, herramientas, reabastecimiento) ya corren en hora de México.
 - **«Pagos a personal» solo CEO** (por empresa); **aviso de OC atrasadas**; **revisión previa de facturación** y arreglos previos (dígito verificador del RFC, CP del emisor, IVA 0 %, respuesta sin UUID).
 
 ## 4. Lo que falta para «el CEO solo revisa y aprueba» (prioridad)
 | # | Falta | Qué ya existe | Quién |
 |---|---|---|---|
-| 1 | **Definir quién aprueba qué y hasta qué monto** y conectarlo a cotizaciones y compras | Motor de aprobaciones + reglas de tope sin conectar (viáticos ≥ $10 k Dir. Admin; cotizaciones $50 k / $250 k / $1 M; compras $25 k / $200 k) | **Christian decide montos** · desarrollador conecta |
-| 2 | **Mostrar el importe en la bandeja web** (dice «folio N») y aprobar cotizaciones, OC y pagos desde el celular | Android aprueba viáticos/gastos y flujos; iOS solo viáticos | Desarrollador |
-| 3 | **Cobranza para el CEO:** resumen diario de facturas vencidas y «trabajo cerrado sin facturar» | Cálculo de vencidas y `activityId` en factura | Desarrollador |
+| 1 | **Definir hasta qué monto se aprueba solo** (topes de cotizaciones y compras) | **Mecanismo ya hecho** (opt-in por empresa); falta el monto. Referencia de las reglas antiguas: viáticos ≥ $10 k Dir. Admin; cotizaciones $50 k / $250 k / $1 M; compras $25 k / $200 k | **Christian decide montos** · desarrollador corre un script |
+| 2 | ~~Importe en la bandeja web~~ hecho. **Aprobar cotizaciones, OC y pagos desde el celular** | Android aprueba viáticos/gastos y flujos; iOS solo viáticos | Desarrollador |
+| 3 | ~~Resumen de cobranza para el CEO~~ hecho en «Tu día». Falta «trabajo cerrado sin facturar» | `activityId` en la factura | Desarrollador |
 | 4 | **Botón «facturar esta cotización/proyecto»** y **timbrado real** | Módulo de timbrado completo, apagado | Desarrollador + Christian |
 | 5 | **Cotización aprobada por dentro → proyecto** | Al firmar el cliente sí se crea; al aprobar internamente no | Desarrollador |
 | 6 | **Nómina quincenal:** calendario de cortes, aviso «tu pre-nómina está lista», un solo cálculo de horas, CLABE/banco por empleado y layout de dispersión | Pre-nómina neta, póliza al pagar | Desarrollador + Christian (datos) |
 | 7 | **Facturación recurrente de pólizas** | Contrato con cuota mensual y visitas | Desarrollador |
 | 8 | **Licitaciones:** recordatorio de fechas críticas, enlazar a cotización, precios por rango | Módulo de licitaciones con fechas y documentos | Desarrollador |
-| 9 | **Menos ruido:** hoy el CEO recibe cada evidencia y muchos avisos de «creado». Un resumen diario consolidado | Notificaciones por jerarquía | Desarrollador |
+| 9 | ~~Menos ruido~~ hecho como opción («solo el resumen y lo urgente»). Falta activarla para Christian si la quiere por omisión | Preferencia por persona | Christian decide |
 
 ## 5. Otras mejoras del propio sistema (`docs/erp-automation-map.md`)
 **Media (P1):** resúmenes semanales de CxC/CxP · salud de webhooks · borrador automático de requisición por faltantes · recordatorio de cierre contable si hay bloqueos +3 días.
