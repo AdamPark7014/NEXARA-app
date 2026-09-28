@@ -20,6 +20,7 @@ import { FormField, FormGrid } from "@/components/ui/FormField";
 import { SkeletonList } from "@/components/PageState";
 import { Avatar } from "@/components/base";
 import { useUser } from "@/components/UserContext";
+import AccesoCuentasEnlace from "@/components/team/AccesoCuentasEnlace";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { getOrgRoleLabel } from "@/lib/org-roles";
@@ -1059,6 +1060,8 @@ export default function UsersPage() {
         subtitle="Cuentas, roles, sesiones abiertas y señales de riesgo de acceso."
         actions={cfg.canAssign ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {/* Solo el dueño lo ve: restablecer la contraseña de cualquier cuenta volviendo a escribir la suya. */}
+            <AccesoCuentasEnlace />
             <Button variant="ghost" onClick={() => { window.location.href = "/integra/people"; }}>
               Personas de acceso físico
             </Button>
