@@ -2392,6 +2392,11 @@ model Cotizacion {
   clientEmail     String?                  @db.VarChar(200)
   clientPhone     String?                  @db.VarChar(60)
   clientAddress   String?
+  /// Persona de atención en el membrete («Eva Benavides»). El cliente impreso es la empresa
+  /// o, si no hay empresa, `clientName`.
+  atencion        String?                  @db.VarChar(180)
+  /// Franja «Trabajo» del membrete («Ventas»). Vacío: el PDF imprime Ventas.
+  trabajo         String?                  @db.VarChar(80)
   projectName     String?                  @db.VarChar(200)
   scope           String?                  @db.Text
   paymentTerms    String?                  @db.VarChar(200)
@@ -2466,6 +2471,8 @@ model CotizacionItem {
   paqueteCantidad       Int?
   category              String?    @db.VarChar(120)
   name                  String     @db.VarChar(200)
+  /// Número de partida tal como se imprime («1», «1.1»). Vacío = el orden de captura.
+  partida               String?    @db.VarChar(16)
   description           String?
   scope                 String?
   brand                 String?    @db.VarChar(120)

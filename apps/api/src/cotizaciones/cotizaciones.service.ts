@@ -18,6 +18,7 @@ import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
+import { formatoDesdeCotizacion, generarCotizacionNexaraPdf } from './cotizacion-formato-nexara.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -309,6 +310,8 @@ export class CotizacionesService {
       clientEmail,
       clientPhone,
       clientAddress,
+      atencion: dto.atencion?.trim() || null,
+      trabajo: dto.trabajo?.trim() || null,
       projectName: dto.projectName?.trim() || null,
       scope: dto.scope?.trim() || null,
       paymentTerms: dto.paymentTerms?.trim() || null,
@@ -758,6 +761,8 @@ export class CotizacionesService {
       clientEmail: dto.clientEmail?.trim(),
       clientPhone: dto.clientPhone?.trim(),
       clientAddress: dto.clientAddress?.trim(),
+      atencion: dto.atencion?.trim(),
+      trabajo: dto.trabajo?.trim(),
       projectName: dto.projectName?.trim(),
       scope: dto.scope?.trim(),
       paymentTerms: dto.paymentTerms?.trim(),
@@ -797,15 +802,23 @@ export class CotizacionesService {
       updateData['retentionTotal'] = round2(totals.retentionTotal);
       updateData['total'] = round2(totals.total);
 
+      // El middleware de tenant convierte `cotizacion.update({ where: { id } })` en
+      // `updateMany` (WhereUnique no admite companyId). `updateMany` no acepta
+      // escrituras anidadas: `items: { create }` lanzaba PrismaClientValidationError
+      // y el filtro lo devolvía como HTTP 400 INVALID_REQUEST. Las partidas se
+      // escriben en su propia tabla; el padre solo recibe columnas.
+      const scalars = Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined));
       result = await this.db.$transaction(async (tx) => {
         await tx.cotizacionItem.deleteMany({ where: { cotizacionId: id } });
-        return tx.cotizacion.update({
+        if (itemData.length) {
+          await tx.cotizacionItem.createMany({
+            data: itemData.map((item) => ({ ...item, cotizacionId: id })),
+          });
+        }
+        await tx.cotizacion.update({ where: { id }, data: scalars });
+        return tx.cotizacion.findFirstOrThrow({
           where: { id },
-          data: {
-            ...Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined)),
-            items: { create: itemData },
-          },
-          include: { items: true, createdBy: true },
+          include: { items: { orderBy: { id: 'asc' } }, createdBy: true },
         });
       });
       finalItems = items;
@@ -887,8 +900,9 @@ export class CotizacionesService {
     try {
       const guardada = await this.findOne(id, companyId);
       const quote = borradorSobreGuardada(guardada, borrador);
-      const secciones: SeccionesPropuesta = {};
-      const pdf = await this.buildPropuesta(quote, secciones);
+      // Lo que ve quien cotiza es el mismo PDF que se descarga: el formato de Christian.
+      const pdf = await generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote));
+      const secciones: SeccionesPropuesta = { cotizacion: 1 };
       return { pdf, secciones };
     } finally {
       const quedan = (this.vistasEnCurso.get(clave) ?? 1) - 1;
@@ -1946,14 +1960,10 @@ export class CotizacionesService {
   }
 
   private async buildPdf(quote: any, internal = false) {
-    // Lo que sale al cliente es la propuesta técnica; la vista interna conserva el formato viejo,
-    // que es el único con costo de proveedor y margen.
+    // Lo que sale al cliente (y lo que se adjunta al enviarla) es el formato de Christian.
+    // La vista interna conserva el formato anterior, que es el único con costo y margen.
     if (!internal) {
-      try {
-        return await this.buildPropuesta(quote);
-      } catch (error) {
-        console.error('No se pudo armar la propuesta técnica; se usa el formato anterior:', error);
-      }
+      return generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote));
     }
 
     const items = quote.items.map((item: any) => ({

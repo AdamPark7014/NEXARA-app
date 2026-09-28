@@ -4,10 +4,13 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { smartQuoteSearch, type SmartOffer } from "@/lib/smart-quote-api";
 import { GRUPOS_PARTIDA, GRUPO_LABEL, formatoMoneda, type GrupoPartida } from "@/lib/cotizaciones-api";
 import {
+  MARGEN_SOBRE_COSTO,
   UNIDADES,
   importeDeLinea,
+  margenDesdePrecio,
   mover,
   partidaNueva,
+  precioConMargenSobreCosto,
   type PartidaEditor,
   type Totales,
 } from "@/lib/cotizacion-documento";
@@ -266,6 +269,34 @@ export default function TablaPartidas({
   const cambiar = (key: string, cambio: Partial<PartidaEditor>) =>
     setPartidas((lista) => lista.map((p) => (p.key === key ? { ...p, ...cambio } : p)));
 
+  /** Costo interno: el precio de venta sale del margen sobre el costo (20% si aún no hay). */
+  const ponerCosto = (p: PartidaEditor, costo: number) => {
+    if (!Number.isFinite(costo) || costo <= 0) {
+      cambiar(p.key, { unitCost: null });
+      return;
+    }
+    const margen = p.marginPercent == null || !Number.isFinite(Number(p.marginPercent)) ? MARGEN_SOBRE_COSTO : Number(p.marginPercent);
+    cambiar(p.key, { unitCost: costo, marginPercent: margen, unitPrice: precioConMargenSobreCosto(costo, margen) });
+  };
+
+  const ponerMargen = (p: PartidaEditor, margen: number) => {
+    const m = Number.isFinite(margen) ? margen : MARGEN_SOBRE_COSTO;
+    if (p.unitCost != null && Number(p.unitCost) > 0) {
+      cambiar(p.key, { marginPercent: m, unitPrice: precioConMargenSobreCosto(Number(p.unitCost), m) });
+      return;
+    }
+    cambiar(p.key, { marginPercent: m });
+  };
+
+  const ponerPrecio = (p: PartidaEditor, precio: number) => {
+    const unitPrice = Number.isFinite(precio) ? Math.max(0, precio) : 0;
+    if (p.unitCost != null && Number(p.unitCost) > 0) {
+      cambiar(p.key, { unitPrice, marginPercent: margenDesdePrecio(Number(p.unitCost), unitPrice) });
+      return;
+    }
+    cambiar(p.key, { unitPrice });
+  };
+
   const insertarDespues = (key: string) => {
     const nueva = partidaNueva();
     enfocar.current = { key: nueva.key, col: "desc" };
@@ -355,25 +386,77 @@ export default function TablaPartidas({
       {partidas.map((p, i) => (
         <div className={styles.fila} role="row" key={p.key}>
           <span role="cell" className={styles.celdaIndice} data-area="idx">
-            {i + 1}
+            <input
+              className={`${styles.celda} ${styles.celdaPartida}`}
+              value={p.partida ?? ""}
+              placeholder={String(i + 1)}
+              disabled={!editable}
+              aria-label={`Partida ${i + 1}`}
+              title="Número de partida (1, 1.1…)"
+              onChange={(e) => cambiar(p.key, { partida: e.target.value.slice(0, 16) })}
+            />
           </span>
           <span role="cell" className={styles.celdaDesc} data-area="desc">
-            <input
-              ref={refDe(p.key, "desc")}
-              className={styles.celda}
-              value={p.name}
-              title={p.name}
-              placeholder="Descripción de la partida"
-              disabled={!editable}
-              aria-label={`Descripción de la partida ${i + 1}`}
-              onChange={(e) => cambiar(p.key, { name: e.target.value })}
-              onKeyDown={teclado(p.key, "desc")}
-            />
-            {p.paqueteClave ? (
-              <span className={styles.pastilla} title="Viene de un paquete: se reescribe si vuelves a aplicarlo">
-                ×{p.paqueteCantidad ?? "?"}
-              </span>
-            ) : null}
+            <span className={styles.celdaDescCabeza}>
+              <input
+                ref={refDe(p.key, "desc")}
+                className={styles.celda}
+                value={p.name}
+                title={p.name}
+                placeholder="Título de la partida"
+                disabled={!editable}
+                aria-label={`Descripción de la partida ${i + 1}`}
+                onChange={(e) => cambiar(p.key, { name: e.target.value })}
+                onKeyDown={teclado(p.key, "desc")}
+              />
+              {p.paqueteClave ? (
+                <span className={styles.pastilla} title="Viene de un paquete: se reescribe si vuelves a aplicarlo">
+                  ×{p.paqueteCantidad ?? "?"}
+                </span>
+              ) : null}
+            </span>
+            <span className={styles.detallePartida}>
+              <input
+                className={styles.celda}
+                value={p.brand ?? ""}
+                placeholder="Marca"
+                disabled={!editable}
+                aria-label={`Marca de la partida ${i + 1}`}
+                onChange={(e) => cambiar(p.key, { brand: e.target.value || null })}
+              />
+              <input
+                className={styles.celda}
+                value={p.model ?? ""}
+                placeholder="Modelo"
+                disabled={!editable}
+                aria-label={`Modelo de la partida ${i + 1}`}
+                onChange={(e) => cambiar(p.key, { model: e.target.value || null })}
+              />
+              <CeldaNumero
+                valor={p.unitCost == null ? Number.NaN : Number(p.unitCost)}
+                editable={editable}
+                etiqueta={`Costo interno de la partida ${i + 1}`}
+                placeholder="Costo"
+                decimales={2}
+                onValor={(n) => ponerCosto(p, n)}
+              />
+              <CeldaNumero
+                valor={p.marginPercent == null ? Number.NaN : Number(p.marginPercent)}
+                editable={editable}
+                etiqueta={`Margen sobre costo de la partida ${i + 1} (%)`}
+                placeholder={`${MARGEN_SOBRE_COSTO}%`}
+                decimales={2}
+                onValor={(n) => ponerMargen(p, n)}
+              />
+              <input
+                className={`${styles.celda} ${styles.detalleAmplio}`}
+                value={p.description ?? ""}
+                placeholder="Descripción para el PDF. El costo y el margen no se imprimen."
+                disabled={!editable}
+                aria-label={`Detalle de la partida ${i + 1}`}
+                onChange={(e) => cambiar(p.key, { description: e.target.value || null })}
+              />
+            </span>
           </span>
           <span role="cell" data-area="unidad">
             <select
@@ -408,7 +491,7 @@ export default function TablaPartidas({
               etiqueta={`Precio unitario de la partida ${i + 1}`}
               placeholder="0.00"
               decimales={2}
-              onValor={(n) => cambiar(p.key, { unitPrice: n })}
+              onValor={(n) => ponerPrecio(p, n)}
               onKeyDown={teclado(p.key, "precio")}
             />
           </span>
@@ -606,7 +689,12 @@ function FilaNueva({
         description: o.descripcion ?? null,
         unit: "Pieza",
         qty: cantidadSana,
-        unitPrice: Number(o.sellPriceSuggested || o.precio || 0),
+        unitCost: Number(o.costMxn) > 0 ? Number(o.costMxn) : null,
+        marginPercent: Number(o.costMxn) > 0 ? MARGEN_SOBRE_COSTO : null,
+        unitPrice:
+          Number(o.costMxn) > 0
+            ? precioConMargenSobreCosto(Number(o.costMxn), MARGEN_SOBRE_COSTO)
+            : Number(o.sellPriceSuggested || o.precio || 0),
         grupo: "EQUIPOS",
         brand: o.marca ?? null,
         model: o.modelo ?? null,

@@ -207,7 +207,22 @@ export const esBloqueDePaquete = (b: Pick<BloqueEditor, "clave">) => b.clave.sta
 // ─── 04 Cotización: partidas ─────────────────────────────────────────────────
 
 /** Unidades de la propuesta modelo, más las que se usan en obra. */
-export const UNIDADES = ["Pieza", "Servicio", "Insumo", "Metro", "Rollo", "Caja", "Kit", "Juego", "Lote", "Hora"] as const;
+export const UNIDADES = ["Pieza", "Servicio", "Licencia", "Insumo", "Metro", "Rollo", "Caja", "Kit", "Juego", "Lote", "Hora"] as const;
+
+/** Margen con el que cotiza Christian: porcentaje sobre el costo, no sobre el precio. 20% → precio = costo × 1.20. */
+export const MARGEN_SOBRE_COSTO = 20;
+
+export function precioConMargenSobreCosto(costo: number, margen = MARGEN_SOBRE_COSTO): number {
+  const c = Math.max(0, Number(costo) || 0);
+  const m = Number.isFinite(Number(margen)) ? Number(margen) : MARGEN_SOBRE_COSTO;
+  return Math.round(c * (1 + m / 100) * 100) / 100;
+}
+
+/** El margen que produce `precio` a partir del costo (sobre costo, no sobre venta). */
+export function margenDesdePrecio(costo: number, precio: number): number {
+  if (!(Number(costo) > 0)) return MARGEN_SOBRE_COSTO;
+  return Math.round((Number(precio) / Number(costo) - 1) * 10000) / 100;
+}
 
 export type PartidaEditor = PartidaCotizacion & { key: string };
 
@@ -244,6 +259,9 @@ export function partidasDesdeApi(items: PartidaCotizacion[] | null | undefined):
     brand: p.brand ?? null,
     model: p.model ?? null,
     imagenUrl: p.imagenUrl ?? null,
+    partida: p.partida ?? null,
+    unitCost: p.unitCost == null || p.unitCost === ("" as unknown) ? null : Number(p.unitCost),
+    marginPercent: p.marginPercent == null || p.marginPercent === ("" as unknown) ? null : Number(p.marginPercent),
   }));
 }
 
@@ -331,6 +349,11 @@ export type DocumentoCotizacion = {
   clientCompany: string;
   clientEmail: string;
   clientPhone: string;
+  clientAddress: string;
+  /** Persona de atención en el membrete. */
+  atencion: string;
+  /** Franja «Trabajo». Vacío se imprime como Ventas. */
+  trabajo: string;
   projectName: string;
   /** Párrafo de entrada de 02 Alcance. */
   alcanceIntro: string;
@@ -370,6 +393,9 @@ export function documentoVacio(segmento: Segmento = "COMERCIAL", hoy = new Date(
     clientCompany: "",
     clientEmail: "",
     clientPhone: "",
+    clientAddress: "",
+    atencion: "",
+    trabajo: "Ventas",
     projectName: "",
     alcanceIntro: "",
     objetivo: { intro: "", beneficios: [], cierre: "" },
@@ -393,6 +419,9 @@ export function documentoDesdeDetalle(d: CotizacionDetalle): DocumentoCotizacion
     clientCompany: d.clientCompany ?? "",
     clientEmail: d.clientEmail ?? "",
     clientPhone: d.clientPhone ?? "",
+    clientAddress: d.clientAddress ?? "",
+    atencion: d.atencion ?? "",
+    trabajo: d.trabajo?.trim() || "Ventas",
     projectName: d.projectName ?? "",
     alcanceIntro: d.scope ?? "",
     objetivo: {
@@ -472,6 +501,9 @@ export function payloadDeDocumento(doc: DocumentoCotizacion): GuardarCotizacion 
     clientName: doc.clientName.trim(),
     clientCompany: doc.clientCompany.trim(),
     clientPhone: doc.clientPhone.trim(),
+    clientAddress: doc.clientAddress.trim(),
+    atencion: doc.atencion.trim(),
+    trabajo: doc.trabajo.trim(),
     projectName: doc.projectName.trim(),
     scope: doc.alcanceIntro.trim(),
     objetivo: escribirObjetivo({

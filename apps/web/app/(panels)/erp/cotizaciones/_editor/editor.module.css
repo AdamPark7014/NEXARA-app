@@ -1247,9 +1247,41 @@ select.celda {
 
 .celdaDesc {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.celdaDescCabeza {
+  display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
+}
+
+.celdaPartida {
+  height: 28px;
+  padding: 0 2px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.detallePartida {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5.5rem 4.25rem;
+  gap: 2px 4px;
+  padding: 0 4px 2px;
+}
+
+.detallePartida .celda {
+  height: 28px;
+  font-size: 12px;
+}
+
+.detalleAmplio {
+  grid-column: 1 / -1;
 }
 
 .celdaTotal {

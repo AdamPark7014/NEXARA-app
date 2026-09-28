@@ -18,6 +18,8 @@ export type RawCotizacionItem = {
   paqueteCantidad?: number | string | null;
   category?: string | null;
   name?: string | null;
+  /** Etiqueta impresa («1», «1.1»). */
+  partida?: string | null;
   description?: string | null;
   scope?: string | null;
   brand?: string | null;
@@ -60,6 +62,7 @@ export type NormalizedCotizacionItem = {
   paqueteCantidad: number | null;
   category: string;
   name: string;
+  partida: string | null;
   description: string | null;
   scope: string | null;
   brand: string | null;
@@ -176,6 +179,22 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
   }
 
   const percent = (value: unknown) => Math.max(0, Math.min(100, Number(value) || 0));
+  /**
+   * Prisma declara cantidad, descuento e impuestos como enteros. Un 10.5 o un
+   * 2.0 que dejó de ser entero revienta el guardado con PrismaClientValidationError
+   * y el cliente solo ve HTTP 400 INVALID_REQUEST.
+   */
+  const entero = (value: unknown, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.round(n);
+  };
+  const enteroONulo = (value: unknown) => {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Math.round(n);
+  };
 
   return items.map((item) => {
     const supplierCode = inferSupplierCode({
@@ -194,12 +213,13 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
     });
 
     return {
-      productId: item.productId ? Number(item.productId) : null,
+      productId: item.productId ? entero(item.productId) || null : null,
       grupo: item.grupo?.trim().toUpperCase().replace(/[\s-]+/g, '_') || null,
       paqueteClave: item.paqueteClave?.trim() || null,
-      paqueteCantidad: item.paqueteCantidad != null ? Number(item.paqueteCantidad) : null,
+      paqueteCantidad: enteroONulo(item.paqueteCantidad),
       category: item.category?.trim() || 'Otros',
-      name: item.name?.trim() || 'Concepto',
+      name: (item.name?.trim() || 'Concepto').slice(0, 200),
+      partida: item.partida?.trim().slice(0, 16) || null,
       description: item.description?.trim() || null,
       scope: item.scope?.trim() || null,
       brand: item.brand?.trim() || null,
@@ -209,26 +229,26 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
       partNumber: item.partNumber?.trim() || null,
       batchReference: item.batchReference?.trim() || null,
       unit: item.unit?.trim() || 'pieza',
-      qty: Math.max(1, Number(item.qty) || 1),
+      qty: Math.max(1, entero(item.qty, 1)),
       unitPrice: pricing.unitPrice,
       unitCost: pricing.unitCost,
-      supplierId: item.supplierId ? Number(item.supplierId) : null,
+      supplierId: item.supplierId ? entero(item.supplierId) || null : null,
       supplierSku: item.supplierSku?.trim() || null,
-      productCtId: item.productCtId ? Number(item.productCtId) : null,
+      productCtId: item.productCtId ? entero(item.productCtId) || null : null,
       supplierCode: pricing.supplierCode,
       supplierWarehouseCode: item.supplierWarehouseCode?.trim()?.slice(0, 10) || null,
       marginPercent: pricing.marginPercent,
-      stockSnapshot: item.stockSnapshot != null ? Number(item.stockSnapshot) : null,
-      leadTimeDays: item.leadTimeDays != null ? Number(item.leadTimeDays) : null,
+      stockSnapshot: enteroONulo(item.stockSnapshot),
+      leadTimeDays: enteroONulo(item.leadTimeDays),
       scoreReason: item.scoreReason?.trim() || null,
       optimizationMode: item.optimizationMode?.trim() || null,
-      discount: percent(item.discount),
-      tax: taxProvided ? taxPercent! : pricing.taxPercent,
-      ieps: percent(item.ieps),
-      retention: percent(item.retention),
+      discount: entero(percent(item.discount)),
+      tax: entero(taxProvided ? taxPercent! : pricing.taxPercent),
+      ieps: entero(percent(item.ieps)),
+      retention: entero(percent(item.retention)),
       laborHours: Math.max(0, Number(item.laborHours) || 0),
       laborRate: Math.max(0, Number(item.laborRate) || 0),
-      warrantyMonths: Math.max(0, Number(item.warrantyMonths) || 0),
+      warrantyMonths: Math.max(0, entero(item.warrantyMonths, 0)),
       deliveryTime: item.deliveryTime?.trim() || null,
       countryOrigin: item.countryOrigin?.trim() || null,
       notes: item.notes?.trim() || null,
