@@ -28,6 +28,11 @@ export class CotizacionItemDto {
   @IsString()
   name!: string;
 
+  /** Etiqueta impresa («1», «1.1»). Vacío = el orden de captura. */
+  @IsOptional()
+  @IsString()
+  partida?: string;
+
   @IsOptional()
   @IsString()
   description?: string;

@@ -58,6 +58,14 @@ export class UpdateCotizacionDto {
   clientAddress?: string;
 
   @IsOptional()
+  @IsString()
+  atencion?: string;
+
+  @IsOptional()
+  @IsString()
+  trabajo?: string;
+
+  @IsOptional()
   @IsInt()
   salesClientId?: number;
 

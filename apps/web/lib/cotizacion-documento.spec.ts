@@ -13,8 +13,10 @@ import {
   leerObjetivo,
   mover,
   nuevoBloque,
+  margenDesdePrecio,
   partidaNueva,
   partidasParaApi,
+  precioConMargenSobreCosto,
   payloadDeDocumento,
   sumarDias,
   totalesDePartidas,
@@ -117,6 +119,11 @@ describe("partidas y totales", () => {
     expect(resto).toHaveLength(0);
     expect(p).toMatchObject({ name: "Poste 3 m", qty: 1, unitPrice: 2661.58, unit: "Pieza", tax: 16 });
     expect(p).not.toHaveProperty("key");
+  });
+
+  it("el margen es sobre el costo: 20% de 100 son 120, no 125", () => {
+    expect(precioConMargenSobreCosto(100, 20)).toBe(120);
+    expect(margenDesdePrecio(100, 120)).toBe(20);
   });
 });
 

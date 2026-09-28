@@ -126,6 +126,58 @@ export default function SeccionCotizacion({
           />
         </div>
         <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="cot-empresa">
+            Empresa
+          </label>
+          <input
+            id="cot-empresa"
+            className={styles.input}
+            value={doc.clientCompany}
+            disabled={!editable}
+            placeholder="Grupo Dice Puebla"
+            onChange={(e) => cambiar((d) => ({ ...d, clientCompany: e.target.value }))}
+          />
+        </div>
+        <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="cot-atencion">
+            Atención
+          </label>
+          <input
+            id="cot-atencion"
+            className={styles.input}
+            value={doc.atencion}
+            disabled={!editable}
+            placeholder="Eva Benavides"
+            onChange={(e) => cambiar((d) => ({ ...d, atencion: e.target.value }))}
+          />
+        </div>
+        <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="cot-ubicacion">
+            Ubicación
+          </label>
+          <input
+            id="cot-ubicacion"
+            className={styles.input}
+            value={doc.clientAddress}
+            disabled={!editable}
+            placeholder="Puebla, Pue."
+            onChange={(e) => cambiar((d) => ({ ...d, clientAddress: e.target.value }))}
+          />
+        </div>
+        <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="cot-trabajo">
+            Trabajo
+          </label>
+          <input
+            id="cot-trabajo"
+            className={styles.input}
+            value={doc.trabajo}
+            disabled={!editable}
+            placeholder="Ventas"
+            onChange={(e) => cambiar((d) => ({ ...d, trabajo: e.target.value }))}
+          />
+        </div>
+        <div className={styles.campo}>
           <label className={styles.etiqueta} htmlFor="cot-correo">
             Correo
           </label>

@@ -87,6 +87,12 @@ export type PartidaCotizacion = {
   brand?: string | null;
   model?: string | null;
   imagenUrl?: string | null;
+  /** Número impreso («1», «1.1»). Vacío = el orden de captura. */
+  partida?: string | null;
+  /** Costo mayorista. Interno: no sale en el PDF. */
+  unitCost?: number | null;
+  /** Margen % sobre el costo. Interno: no sale en el PDF. */
+  marginPercent?: number | null;
 };
 
 /** 02 Alcance: una subsección numerada (título, párrafo y viñetas). */
@@ -222,6 +228,8 @@ export type CotizacionDetalle = {
   clientEmail?: string | null;
   clientPhone?: string | null;
   clientAddress?: string | null;
+  atencion?: string | null;
+  trabajo?: string | null;
   salesClientId?: number | null;
   projectName?: string | null;
   /** Párrafo de entrada de 02 Alcance (debajo del título del proyecto). */
@@ -298,6 +306,8 @@ export type GuardarCotizacion = {
   clientEmail?: string | null;
   clientPhone?: string | null;
   clientAddress?: string | null;
+  atencion?: string | null;
+  trabajo?: string | null;
   clientCompany?: string | null;
   projectName?: string | null;
   scope?: string | null;
