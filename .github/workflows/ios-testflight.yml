@@ -11,6 +11,14 @@ on:
         description: "App Store version (CFBundleShortVersionString), e.g. 1.0.0"
         required: false
         default: ""
+      # OJO al reenviar a Apple una versión ya subida/rechazada (p. ej. 1.0.0):
+      # App Store Connect exige un CFBundleVersion MAYOR que el de TODA build
+      # anterior de esa versión, o la subida falla con "The bundle version must
+      # be higher than the previously uploaded version". Hay que pasar aquí un
+      # número mayor que el último subido. Con la entrada vacía se usa el del
+      # Info.plist (1) y el paso "Patch embedded Info.plist" lo sube a 2 solo
+      # si sigue en 1: comprueba en App Store Connect (TestFlight > Builds) qué
+      # número tiene la build ya subida antes de dejarla vacía.
       build:
         description: "Build number (CFBundleVersion). Empty = unchanged."
         required: false
@@ -410,6 +418,31 @@ jobs:
           grep -E "ProcessInfoPlistFile|Info\\.plist|INFOPLIST" "$ARCH_LOG" || true
           echo "::endgroup::"
 
+      # Apple exige el manifiesto de privacidad de la app (PrivacyInfo.xcprivacy)
+      # y, desde mayo de 2024, el de los SDK de terceros (ITMS-91061). El de la
+      # app viaja como recurso en la raíz del .app (declarado en project.yml);
+      # los de los SDK (Firebase, GoogleUtilities, Promises, nanopb, Starscream…)
+      # viajan dentro de sus .bundle de SPM. Si el de la app no está, se corta
+      # aquí en vez de descubrirlo tras la subida.
+      - name: Verify PrivacyInfo.xcprivacy in archive
+        run: |
+          set -euo pipefail
+          APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
+          fi
+          echo "::group::PrivacyInfo.xcprivacy files in archive"
+          /usr/bin/find "$ARCHIVE_PATH" -name PrivacyInfo.xcprivacy -print
+          echo "::endgroup::"
+          APP_MANIFEST="$APP_DIR/PrivacyInfo.xcprivacy"
+          if [ ! -f "$APP_MANIFEST" ]; then
+            echo "ERROR: la app no lleva su PrivacyInfo.xcprivacy en $APP_MANIFEST (revisa Resources/PrivacyInfo.xcprivacy en project.yml)"; exit 1
+          fi
+          /usr/bin/plutil -lint "$APP_MANIFEST"
+          /usr/libexec/PlistBuddy -c 'Print :NSPrivacyAccessedAPITypes' "$APP_MANIFEST" >/dev/null || { echo "ERROR: NSPrivacyAccessedAPITypes ausente en el manifiesto de la app"; exit 1; }
+          echo "NSPrivacyTracking: $(/usr/libexec/PlistBuddy -c 'Print :NSPrivacyTracking' "$APP_MANIFEST" || true)"
+          echo "OK: manifiesto de privacidad de la app presente en $APP_MANIFEST"
+
       - name: Patch embedded Info.plist (launch/orientations/icons)
         run: |
           set -euo pipefail
@@ -441,14 +474,23 @@ jobs:
             /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:1 string UIInterfaceOrientationLandscapeLeft' "$PLIST"
             /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:2 string UIInterfaceOrientationLandscapeRight' "$PLIST"
           }
-          # iPad orientations (tilde key)
-          /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations~ipad' "$PLIST" 2>/dev/null || {
-            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad array' "$PLIST"
-            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:0 string UIInterfaceOrientationPortrait' "$PLIST"
-            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:1 string UIInterfaceOrientationPortraitUpsideDown' "$PLIST"
-            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:2 string UIInterfaceOrientationLandscapeLeft' "$PLIST"
-            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:3 string UIInterfaceOrientationLandscapeRight' "$PLIST"
-          }
+          # iPad orientations (tilde key). Solo aplica si el binario declara iPad
+          # (UIDeviceFamily con 2). La app es iPhone-only desde 1.0
+          # (TARGETED_DEVICE_FAMILY "1" en project.yml): ahí NO se añade la clave
+          # y el paso no falla. Si algún día vuelve a "1,2", se añade sola.
+          DEVICE_FAMILY="$(/usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily' "$PLIST" 2>/dev/null || true)"
+          echo "UIDeviceFamily: $(printf '%s' "$DEVICE_FAMILY" | tr -s '[:space:]' ' ')"
+          if printf '%s\n' "$DEVICE_FAMILY" | grep -qE '^[[:space:]]*2[[:space:]]*$'; then
+            /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations~ipad' "$PLIST" 2>/dev/null || {
+              /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad array' "$PLIST"
+              /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:0 string UIInterfaceOrientationPortrait' "$PLIST"
+              /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:1 string UIInterfaceOrientationPortraitUpsideDown' "$PLIST"
+              /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:2 string UIInterfaceOrientationLandscapeLeft' "$PLIST"
+              /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:3 string UIInterfaceOrientationLandscapeRight' "$PLIST"
+            }
+          else
+            echo "App solo iPhone: se omite UISupportedInterfaceOrientations~ipad"
+          fi
           # CFBundleIconName
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c 'Add :CFBundleIconName string AppIcon' "$PLIST"
@@ -462,7 +504,7 @@ jobs:
               NSPhotoLibraryUsageDescription
               NSPhotoLibraryAddUsageDescription
               NSMicrophoneUsageDescription
-              NSUserTrackingUsageDescription
+              NSFaceIDUsageDescription
             )
             for K in "${KEYS[@]}"; do
               SRC_VAL="$(/usr/libexec/PlistBuddy -c "Print :$K" "$SRC_PLIST" 2>/dev/null || true)"
@@ -477,7 +519,10 @@ jobs:
           else
             echo "WARN: Source Info.plist not found at $SRC_PLIST; skipping usage descriptions propagation."
           fi
-          # Bump CFBundleVersion to 2 if still 1 (avoid duplicate build number)
+          # Bump CFBundleVersion to 2 if still 1 (avoid duplicate build number).
+          # OJO: para reenviar una versión ya subida, pasa `build` explícito y
+          # MAYOR que la última subida (ver la entrada `build` arriba); esto solo
+          # cubre el caso de dejarla vacía con el Info.plist en 1.
           CUR_VER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$PLIST" 2>/dev/null || echo '')"
           if [ "$CUR_VER" = "1" ]; then
             /usr/libexec/PlistBuddy -c 'Set CFBundleVersion 2' "$PLIST"
@@ -488,7 +533,18 @@ jobs:
           /usr/bin/plutil -p "$PLIST" | head -n 100 || true
           echo "::endgroup::"
 
-      - name: Neutralize third-party resource bundles (Starscream/Firebase/Google/Promises)
+      # Antes este paso BORRABA todo .bundle de Starscream/Firebase/Google/
+      # Promises/nanopb (y cualquier `.resources`) para evitar errores de
+      # validación por bundles de SPM sin las claves de versión en su Info.plist.
+      # Pero en SPM esos bundles son justo los que llevan el PrivacyInfo.xcprivacy
+      # de cada SDK, y Apple lo exige (ITMS-91061: "Missing privacy manifest").
+      # Ahora:
+      #  - bundle CON PrivacyInfo.xcprivacy  -> se CONSERVA y se parchea su
+      #    Info.plist (identificador, tipo, versión y build) para que valide.
+      #  - bundle SIN manifiesto que case con las heurísticas de siempre -> se
+      #    borra como antes.
+      #  - cualquier otro bundle -> no se toca.
+      - name: Keep SDK privacy manifests, strip other third-party resource bundles
         run: |
           set -euo pipefail
           APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
@@ -499,40 +555,74 @@ jobs:
           echo "::group::All .bundle paths"
           /usr/bin/find "$APP_DIR" -type d -name '*.bundle' -print || true
           echo "::endgroup::"
-          removed=0
-          while IFS= read -r -d '' bundle; do
-            id=""
-            if [ -f "$bundle/Info.plist" ]; then
-              id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$bundle/Info.plist" 2>/dev/null || echo "")
+
+          # Versión y build de la app (ya parcheados en el paso anterior): los
+          # bundles conservados heredan estos valores si les faltan.
+          APP_VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Info.plist" 2>/dev/null || echo '1.0.0')"
+          APP_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_DIR/Info.plist" 2>/dev/null || echo '1')"
+
+          add_if_missing() {
+            local pl="$1" key="$2" val="$3"
+            if ! /usr/libexec/PlistBuddy -c "Print :$key" "$pl" >/dev/null 2>&1; then
+              /usr/libexec/PlistBuddy -c "Add :$key string $val" "$pl"
+              echo "    + $key = $val"
             fi
+          }
+
+          # Heurísticas de siempre para decidir qué es "resource bundle de
+          # terceros" (solo se usan con los bundles SIN manifiesto de privacidad).
+          is_third_party_bundle() {
+            local name="$1" id="$2"
+            echo "$name" | grep -qiE 'Starscream|Firebase|Google|GoogleUtilities|GoogleDataTransport|Promises|FBLPromises|nanopb' && return 0
+            echo "$name" | grep -qiE '[.]resources' && return 0
+            echo "$id"   | grep -qiE '^starscream[.]' && return 0
+            echo "$id"   | grep -qiE '[.]resources$' && return 0
+            echo "$id"   | grep -qi '^firebase' && return 0
+            echo "$id"   | grep -qi '^firebase-ios-sdk' && return 0
+            echo "$id"   | grep -qiE '^com[.]google[.]' && return 0
+            echo "$id"   | grep -qiE '^google[.]' && return 0
+            echo "$id"   | grep -qi 'googleutilities' && return 0
+            echo "$id"   | grep -qi 'googledatatransport' && return 0
+            echo "$id"   | grep -qi 'promises' && return 0
+            echo "$id"   | grep -qi 'nanopb' && return 0
+            return 1
+          }
+
+          removed=0
+          kept=0
+          while IFS= read -r -d '' bundle; do
+            # Un bundle padre ya borrado arrastra a los anidados.
+            [ -d "$bundle" ] || continue
             name="$(basename "$bundle")"
-            # Heuristics:
-            #  - Explicit Starscream match (existing behavior)
-            #  - Any CFBundleIdentifier that ends with ".resources" (e.g., firebase-ios-sdk.FirebaseCore.resources)
-            #  - Well-known third-party prefixes: firebase, google, com.google, googleutilities, googledatatransport, promises
-            #  - Only applies to .bundle directories (never touches frameworks)
-            if \
-              echo "$name" | grep -qiE 'Starscream|Firebase|Google|GoogleUtilities|GoogleDataTransport|Promises|FBLPromises|nanopb' || \
-              echo "$name" | grep -qiE '[.]resources' || \
-              \
-              # CFBundleIdentifier-based patterns
-              echo "$id"   | grep -qiE '^starscream[.]' || \
-              echo "$id"   | grep -qiE '[.]resources$' || \
-              echo "$id"   | grep -qi '^firebase' || \
-              echo "$id"   | grep -qi '^firebase-ios-sdk' || \
-              echo "$id"   | grep -qiE '^com[.]google[.]' || \
-              echo "$id"   | grep -qiE '^google[.]' || \
-              echo "$id"   | grep -qi 'googleutilities' || \
-              echo "$id"   | grep -qi 'googledatatransport' || \
-              echo "$id"   | grep -qi 'promises' || \
-              echo "$id"   | grep -qi 'nanopb' \
-            ; then
-              echo "Removing third-party resource bundle: $bundle (name='$name', CFBundleIdentifier='$id')"
+            binfo="$bundle/Info.plist"
+            id=""
+            if [ -f "$binfo" ]; then
+              id="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$binfo" 2>/dev/null || echo "")"
+            fi
+            manifest="$(/usr/bin/find "$bundle" -maxdepth 3 -type f -name PrivacyInfo.xcprivacy -print 2>/dev/null || true)"
+            if [ -n "$manifest" ]; then
+              echo "Keeping bundle with privacy manifest: $bundle (name='$name', CFBundleIdentifier='$id')"
+              # Sin Info.plist PlistBuddy lo crea al añadir la primera clave.
+              add_if_missing "$binfo" CFBundleIdentifier "mx.nexara.mobile.resources.$(printf '%s' "${name%.bundle}" | tr -c 'A-Za-z0-9.-' '-')"
+              add_if_missing "$binfo" CFBundleName "${name%.bundle}"
+              add_if_missing "$binfo" CFBundlePackageType "BNDL"
+              add_if_missing "$binfo" CFBundleShortVersionString "$APP_VER"
+              add_if_missing "$binfo" CFBundleVersion "$APP_BUILD"
+              /usr/bin/plutil -lint "$binfo" || { echo "ERROR: Info.plist parcheado de $name no valida"; exit 1; }
+              kept=$((kept+1))
+            elif is_third_party_bundle "$name" "$id"; then
+              echo "Removing third-party resource bundle without privacy manifest: $bundle (name='$name', CFBundleIdentifier='$id')"
               rm -rf "$bundle"
               removed=$((removed+1))
             fi
           done < <(/usr/bin/find "$APP_DIR" -type d -name '*.bundle' -print0)
           echo "REMOVED_COUNT=$removed"
+          echo "KEPT_WITH_MANIFEST_COUNT=$kept"
+          echo "::group::PrivacyInfo.xcprivacy remaining in archive"
+          /usr/bin/find "$ARCHIVE_PATH" -name PrivacyInfo.xcprivacy -print
+          echo "::endgroup::"
+          # El manifiesto de la propia app jamás debe perderse en este paso.
+          test -f "$APP_DIR/PrivacyInfo.xcprivacy" || { echo "ERROR: PrivacyInfo.xcprivacy de la app desapareció del .app"; exit 1; }
       - name: Inspect built Info.plist in archive (launch/orientations)
         run: |
           set -euo pipefail
@@ -572,8 +662,16 @@ jobs:
           fi
           echo "::endgroup::"
           echo "::endgroup::"
-          if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
-            echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
+          # La clave de iPad solo se exige si el binario declara iPad (UIDeviceFamily
+          # con 2). La app es iPhone-only: ahí no debe fallar.
+          FAMILY_DUMP="$(/usr/libexec/PlistBuddy -c 'Print :UIDeviceFamily' "$APP_INFO_PLIST" 2>/dev/null || true)"
+          echo "UIDeviceFamily: $(printf '%s' "$FAMILY_DUMP" | tr -s '[:space:]' ' ')"
+          if printf '%s\n' "$FAMILY_DUMP" | grep -qE '^[[:space:]]*2[[:space:]]*$'; then
+            if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+              echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
+            fi
+          else
+            echo "App solo iPhone: no se exige UISupportedInterfaceOrientations~ipad"
           fi
           if ! /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" >/dev/null 2>&1; then
             echo "ERROR: UILaunchScreen missing in embedded Info.plist"; exit 1

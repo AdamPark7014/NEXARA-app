@@ -48,10 +48,24 @@ struct CoreShellView: View {
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
 
     var body: some View {
+        VStack(spacing: 0) {
+            // Modo demostración: aviso discreto arriba, con salida a un toque.
+            if DemoMode.isActive {
+                DemoBanner()
+            }
+            shell
+        }
+    }
+
+    private var shell: some View {
         TabView(selection: $selected) {
             ForEach(modules) { module in
                 tabRoot(module)
-                    .tabItem { Label(module.title, systemImage: module.systemImage) }
+                    .tabItem {
+                        Label(module.title, systemImage: module.systemImage)
+                            .accessibilityIdentifier("tab-\(module.rawValue)")
+                    }
+                    .accessibilityIdentifier("tab-\(module.rawValue)")
                     .tag(module)
             }
         }
@@ -121,6 +135,7 @@ struct CoreShellView: View {
                     Label("Más", systemImage: "square.grid.2x2")
                 }
                 .accessibilityLabel("Más módulos")
+                .accessibilityIdentifier("more-button")
             }
         }
     }
@@ -142,6 +157,7 @@ struct CoreShellView: View {
                 }
             }
             .accessibilityLabel(badge.unreadCount > 0 ? "Notificaciones, \(badge.unreadCount) sin leer" : "Notificaciones")
+            .accessibilityIdentifier("bell-button")
         }
     }
 

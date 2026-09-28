@@ -29,6 +29,8 @@ enum RememberMe {
     /// Se llama una vez al arrancar el proceso, antes de decidir la primera pantalla.
     static func endSessionOnLaunchIfNeeded() {
         guard !isEnabled, SessionStore.shared.currentUser != nil else { return }
+        // La sesión demo (`-NEXARA_DEMO 1`) no es una sesión «recordada»: no se cierra.
+        guard !DemoMode.isActive else { return }
         AuthRepository.shared.logout()
     }
 }

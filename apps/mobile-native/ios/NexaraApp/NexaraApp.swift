@@ -55,7 +55,11 @@ final class AppState: ObservableObject {
         // tres láminas hablan de checar jornada, subir evidencias y del chat del
         // equipo, y un cliente o una sucursal no hacen nada de eso. Es la única
         // diferencia deliberada con Android en este flujo.
-        if !CoreNavigation.isExternal(user), !OnboardingStore.isCompleted { return .onboarding }
+        //
+        // En el modo demostración tampoco: quien pulsó «Explorar con datos de muestra»
+        // quiere ver la app, no tres láminas (y la demo no debe dejar la bienvenida
+        // «vista» para quien luego entre con su cuenta).
+        if !CoreNavigation.isExternal(user), !OnboardingStore.isCompleted, !DemoMode.isActive { return .onboarding }
         return home(for: user)
     }
 

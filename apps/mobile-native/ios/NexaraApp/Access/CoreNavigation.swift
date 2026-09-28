@@ -196,6 +196,11 @@ enum CoreNavigation {
     ///   Vehículos y Organigrama, los tres que tiene todo el personal.
     static func extraModules(for user: SessionUser?) -> [CoreExtraModule] {
         guard let user, !isExternal(user) else { return [] }
+        // Modo demostración: solo los módulos con pantalla propia y datos de muestra.
+        // Los otros siete son un «Abrir en la web» y harían parecer la app incompleta.
+        if DemoMode.isActive {
+            return CoreExtraModule.allCases.filter { CoreExtraDestination.tienePantallaNativa($0) }
+        }
         if user.isSuperAdmin { return CoreExtraModule.allCases }
         let nav = Set((user.navModules ?? []).map { $0.lowercased() })
         guard !nav.isEmpty else { return [.herramientas, .vehiculos, .organigrama, .viaticos] }

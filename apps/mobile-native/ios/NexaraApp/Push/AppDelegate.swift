@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             NetworkMonitor.shared.start()
             // Con sesión se pide el permiso si aún no se decidió; sin sesión solo
             // se registra el dispositivo y el permiso se pide al iniciar sesión.
+            // Modo demostración (`-NEXARA_DEMO 1`): ni permiso de avisos ni registro de push.
+            guard !DemoMode.isActive else { return }
             let signedIn = SessionStore.shared.currentUser != nil
             await PushManager.shared.requestPermissionAndRegister(prompt: signedIn)
         }

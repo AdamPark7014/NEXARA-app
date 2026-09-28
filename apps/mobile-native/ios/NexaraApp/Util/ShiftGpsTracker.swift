@@ -52,11 +52,12 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         isTracking = UserDefaults.standard.bool(forKey: ShiftGpsTracker.activeKey)
     }
 
-    var isAlways: Bool { authorization == .authorizedAlways }
-    var isDenied: Bool { authorization == .denied || authorization == .restricted }
+    var isAlways: Bool { DemoMode.isActive || authorization == .authorizedAlways }
+    var isDenied: Bool { !DemoMode.isActive && (authorization == .denied || authorization == .restricted) }
 
     /// Texto para explicar el permiso antes de pedirlo (lo pinta la pantalla).
     var authorizationLabel: String {
+        if DemoMode.isActive { return "Permitido siempre" }
         switch authorization {
         case .authorizedAlways: return "Permitido siempre"
         case .authorizedWhenInUse: return "Solo con la app abierta"
@@ -69,6 +70,8 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
     /// «mientras la app esté abierta» y después la ampliación; pedirlo así es lo
     /// que hace que el sistema enseñe el segundo aviso.
     func requestAlwaysAuthorization() {
+        // Modo demostración: no se pide ningún permiso de ubicación.
+        if DemoMode.isActive { return }
         switch authorization {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
@@ -81,6 +84,13 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
 
     /// Arranca el seguimiento de la jornada.
     func start() {
+        // Modo demostración: se «comparte» ubicación de mentira, sin tocar CoreLocation.
+        if DemoMode.isActive {
+            isTracking = true
+            lastError = nil
+            lastSentAt = Date()
+            return
+        }
         UserDefaults.standard.set(true, forKey: ShiftGpsTracker.activeKey)
         isTracking = true
         lastError = nil
@@ -97,6 +107,10 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
 
     /// Detiene el seguimiento (salida marcada, permiso retirado o sesión cerrada).
     func stop() {
+        if DemoMode.isActive {
+            isTracking = false
+            return
+        }
         UserDefaults.standard.set(false, forKey: ShiftGpsTracker.activeKey)
         isTracking = false
         manager.stopUpdatingLocation()
@@ -110,6 +124,8 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
     /// (`GET gps/me` ya cruza consentimiento con jornada abierta), no la
     /// bandera local, que podría haber quedado encendida de ayer.
     func resumeIfNeeded() async {
+        // Modo demostración: nada que reanudar.
+        if DemoMode.isActive { return }
         guard SessionStore.shared.currentUser != nil else {
             if isTracking { stop() }
             return

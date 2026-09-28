@@ -388,7 +388,10 @@ enum CoreOrg {
     }
 
     static func isCeo(_ email: String?) -> Bool {
-        ceoEquivalentEmails.contains(normalized(email))
+        // Modo demostración: la persona ficticia tiene la vista completa de dirección
+        // (pizarra del equipo, Clientes, justificar faltas…) sin exponer ninguna cuenta real.
+        if DemoMode.isActive { return true }
+        return ceoEquivalentEmails.contains(normalized(email))
     }
 
     /// Cuentas que nunca deben listarse como empleado (equipo/asignar/asistencia).

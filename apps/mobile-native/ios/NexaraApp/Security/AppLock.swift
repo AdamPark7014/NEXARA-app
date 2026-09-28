@@ -20,7 +20,9 @@ enum AppLock {
         return ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err)
     }
 
-    static var shouldLock: Bool { isEnabled && isAvailable }
+    /// Nunca en el modo demostración: no hay nada que proteger y el revisor no debe toparse
+    /// con una pantalla de biometría.
+    static var shouldLock: Bool { !DemoMode.isActive && isEnabled && isAvailable }
 
     @MainActor
     static func authenticate(

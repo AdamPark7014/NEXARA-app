@@ -59,6 +59,27 @@ final class OfflineMutationQueue {
         let dir = base.appendingPathComponent("nexara-offline", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         file = dir.appendingPathComponent("mutations.json")
+        // Versiones anteriores encolaban `auth/login` con el correo y la contraseña en
+        // claro. Si quedó alguno en el archivo, se borra en cuanto arranca la cola.
+        purgeSensitive()
+    }
+
+    /// ¿Esta petición encolada es de acceso (`auth/*`, `portal/login`) o de registro del
+    /// teléfono? Nunca debe persistirse ni reenviarse: lleva la contraseña.
+    static func isSensitive(url: String) -> Bool {
+        let path = (URL(string: url)?.path ?? url).lowercased()
+        return path.contains("/auth/")
+            || path.hasSuffix("/auth")
+            || path.contains("/portal/login")
+            || path.contains("/devices/push-token")
+    }
+
+    private func purgeSensitive() {
+        queue.sync {
+            let all = loadUnlocked()
+            let kept = all.filter { !Self.isSensitive(url: $0.url) }
+            if kept.count != all.count { saveUnlocked(kept) }
+        }
     }
 
     func load() -> [QueuedMutation] {
@@ -69,6 +90,8 @@ final class OfflineMutationQueue {
     }
 
     func enqueue(_ item: QueuedMutation) {
+        // Jamás se guarda un cuerpo de acceso (contraseña en claro).
+        guard !Self.isSensitive(url: item.url) else { return }
         queue.sync {
             var all = loadUnlocked()
             all.append(item)

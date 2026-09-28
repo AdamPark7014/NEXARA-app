@@ -110,6 +110,8 @@ final class CoreRepository {
     /// Acciones con permiso de superior (cancelar, pasar, justificar, desactivar…) no van a
     /// la cola sin conexión: si el API las rechaza al reenviarlas, nadie se entera.
     static func requireOnline() async throws {
+        // Modo demostración: todo es local, siempre «hay señal».
+        if DemoMode.isActive { return }
         guard await NetworkMonitor.shared.isOnline else {
             throw CoreError.message("Sin conexión: esta acción necesita señal. Intenta de nuevo cuando regrese.")
         }

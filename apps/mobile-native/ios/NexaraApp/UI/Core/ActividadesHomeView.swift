@@ -16,7 +16,8 @@ struct ActividadesHomeView: View {
     @State private var loaded = false
 
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
-    private var isCeo: Bool { CoreOrg.isCeo(session.currentUser?.email) }
+    /// En demo la persona ve «Mis actividades» y «Mi equipo» (no solo el tablero de dirección).
+    private var isCeo: Bool { !DemoMode.isActive && CoreOrg.isCeo(session.currentUser?.email) }
     private var teamMates: [TeamBoardUser] { (board?.users ?? []).filter { $0.id != myId } }
 
     var body: some View {

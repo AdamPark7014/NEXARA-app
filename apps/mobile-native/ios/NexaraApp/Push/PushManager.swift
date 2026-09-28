@@ -58,6 +58,8 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
     /// decidido y registra el dispositivo en APNs. `prompt: false` no muestra el
     /// diálogo (arranque sin sesión): el permiso se pide al iniciar sesión.
     func requestPermissionAndRegister(prompt: Bool = true) async {
+        // Modo demostración: no se pide permiso de avisos ni se registra el teléfono.
+        guard !DemoMode.isActive else { return }
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         if settings.authorizationStatus == .notDetermined {
@@ -75,6 +77,7 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
 
     /// Llamar tras login: pide permiso y registra el token vigente.
     func ensureRegisteredAfterLogin() async {
+        guard !DemoMode.isActive else { return }
         await requestPermissionAndRegister()
         #if canImport(FirebaseCore) && canImport(FirebaseMessaging)
         if firebaseEnabled {
@@ -118,6 +121,8 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
     fileprivate func sendTokenToBackend(_ token: String) async {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        // La sesión demo no es una sesión real: su token no se manda a ningún servidor.
+        guard !DemoMode.isActive else { return }
         guard let session = SessionStore.shared.currentUser, !session.token.isEmpty else {
             pendingToken = trimmed
             return

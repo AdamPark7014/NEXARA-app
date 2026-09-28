@@ -240,7 +240,15 @@ struct GeoPhotoCaptureView: View {
                 live
             }
         }
-        .onAppear { camera.start() }
+        .onAppear {
+            if DemoMode.isActive {
+                // Modo demostración: el simulador no tiene cámara. Se da por tomada una foto de
+                // muestra (dibujada en código) y se salta directo a «Enviar esta foto».
+                if captured == nil { captured = DemoImages.capturedPhoto(title: title) }
+            } else {
+                camera.start()
+            }
+        }
         .onDisappear { camera.stop() }
     }
 
@@ -401,7 +409,8 @@ struct GeoPhotoCaptureView: View {
 
                 HStack(spacing: 10) {
                     Button {
-                        captured = nil
+                        // En demo no hay cámara a la que volver: se «toma» otra foto de muestra.
+                        captured = DemoMode.isActive ? DemoImages.capturedPhoto(title: title) : nil
                         message = nil
                     } label: {
                         Label("Tomar otra", systemImage: "camera").frame(maxWidth: .infinity)

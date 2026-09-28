@@ -43,6 +43,8 @@ final class RealtimeBus: ObservableObject {
 
     func start(token: String) {
         guard !token.isEmpty else { return }
+        // Modo demostración: no se conecta a ningún servidor.
+        guard !DemoMode.isActive else { return }
         if activeToken == token, socket?.status == .connected { return }
         stop()
 

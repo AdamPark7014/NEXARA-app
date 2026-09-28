@@ -81,6 +81,8 @@ final class DeviceLocation: NSObject, ObservableObject, CLLocationManagerDelegat
     }
 
     func current() async -> DeviceCoords? {
+        // Modo demostración: coordenadas fijas (Puebla), sin permiso, sin GPS real y sin «mock».
+        if DemoMode.isActive { return DemoImages.coords }
         if !hasPermission {
             manager.requestWhenInUseAuthorization()
         }

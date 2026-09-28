@@ -178,6 +178,37 @@ final class ApiClient {
     private static let mutatingMethods: Set<String> = ["POST", "PUT", "PATCH", "DELETE"]
     private static let queuedBody = Data("{\"queued\":true,\"offline\":true}".utf8)
 
+    /// Rutas que NUNCA van a la cola sin conexión (paridad con `NOT_QUEUEABLE` de
+    /// `OfflineHttpInterceptor.kt`): el acceso y el registro del teléfono se repiten
+    /// solos, y encolar un login guardaba el correo y la CONTRASEÑA en claro en
+    /// `nexara-offline/mutations.json`. Además, un login «encolado» contestaba
+    /// `{"queued":true}`, `staffLogin` no encontraba token y la pantalla decía
+    /// «Sesión expirada» en vez de «Sin conexión».
+    static func isNeverQueued(path relative: String) -> Bool {
+        let path = relative.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
+        return path == "auth"
+            || path.hasPrefix("auth/")
+            || path.hasPrefix("portal/login")
+            || path.hasPrefix("devices/push-token")
+    }
+
+    /// Ruta de la petición sin el prefijo del API (`/api`), en minúsculas y sin barras en los bordes.
+    private func relativePath(of req: URLRequest) -> String {
+        var path = req.url?.path ?? ""
+        let basePath = baseURL.path
+        if !basePath.isEmpty, basePath != "/", path.hasPrefix(basePath) {
+            path = String(path.dropFirst(basePath.count))
+        }
+        return path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
+    }
+
+    /// `true` si esta petición puede esperar en la cola sin conexión.
+    private func canQueueOffline(_ req: URLRequest) -> Bool {
+        let method = (req.httpMethod ?? "GET").uppercased()
+        guard Self.mutatingMethods.contains(method) else { return false }
+        return !Self.isNeverQueued(path: relativePath(of: req))
+    }
+
     /// Rutas cuyo 401 es la respuesta final: renovar la sesión no las arregla.
     private static let noRefreshPaths = ["/auth/login", "/portal/login", "/auth/session/refresh", "/auth/logout"]
 
@@ -242,6 +273,10 @@ final class ApiClient {
     /// Va directo por la red: sin cola offline (un refresh encolado no sirve de
     /// nada) y sin la renovación por 401 de `perform` (aquí el 401 es la respuesta).
     func refreshSessionToken(_ token: String) async throws -> Data {
+        // Modo demostración: la sesión es local y no caduca; nada sale del teléfono.
+        if DemoMode.isActive {
+            return Data("{\"access_token\":\"demo-token\",\"expiresAt\":\"2099-01-01T00:00:00Z\"}".utf8)
+        }
         var req = try buildRequest("auth/session/refresh", method: "POST")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -263,20 +298,46 @@ final class ApiClient {
         }
     }
 
+    /// Modo demostración: contesta `DemoBackend` en memoria, ANTES de `NetworkMonitor`,
+    /// de la caché sin conexión y de la cola de mutaciones. Nunca hay red, nunca hay
+    /// 401 y nunca se devuelve `queued:true`.
+    private func demoResponse(for req: URLRequest) async throws -> Data {
+        let method = (req.httpMethod ?? "GET").uppercased()
+        var query: [String: String] = [:]
+        if let url = req.url,
+           let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems {
+            for item in items { query[item.name] = item.value ?? "" }
+        }
+        let path = relativePath(of: req)
+        if let result = await DemoBackend.handle(method: method, path: path, query: query, body: req.httpBody) {
+            guard (200..<300).contains(result.status) else {
+                throw ApiError.http(result.status, String(data: result.data, encoding: .utf8))
+            }
+            return result.data
+        }
+        return Data("{}".utf8)
+    }
+
     private func performOnce(_ req: URLRequest) async throws -> Data {
+        if DemoMode.isActive {
+            return try await demoResponse(for: req)
+        }
         let method = (req.httpMethod ?? "GET").uppercased()
         let urlStr = req.url?.absoluteString ?? ""
         let authTag = String((req.value(forHTTPHeaderField: "Authorization") ?? "anon").prefix(48))
         let online = await NetworkMonitor.shared.isOnline
+        let queueable = canQueueOffline(req)
 
         if !online {
             if method == "GET", let hit = OfflineApiCache.shared.get(url: urlStr, authTag: authTag) {
                 return hit
             }
-            if Self.mutatingMethods.contains(method) {
+            if queueable {
                 enqueueOffline(req: req, urlStr: urlStr)
                 return Self.queuedBody
             }
+            // Acceso (`auth/*`, `portal/login`): no se encola. Se intenta la red de
+            // todos modos; si de verdad no hay, sale `ApiError.transport` («Sin conexión»).
         }
 
         do {
@@ -298,7 +359,7 @@ final class ApiClient {
             if method == "GET", let hit = OfflineApiCache.shared.get(url: urlStr, authTag: authTag) {
                 return hit
             }
-            if Self.mutatingMethods.contains(method) {
+            if queueable {
                 enqueueOffline(req: req, urlStr: urlStr)
                 return Self.queuedBody
             }
@@ -307,6 +368,8 @@ final class ApiClient {
     }
 
     private func enqueueOffline(req: URLRequest, urlStr: String) {
+        // Última defensa: un cuerpo de acceso (contraseña) jamás se persiste.
+        guard !Self.isNeverQueued(path: relativePath(of: req)) else { return }
         let rawBody = req.httpBody.flatMap { String(data: $0, encoding: .utf8) }
         let bodyStr = OfflineMediaStore.shared.externalizeDataUrls(rawBody)
         let ct = req.value(forHTTPHeaderField: "Content-Type") ?? "application/json"

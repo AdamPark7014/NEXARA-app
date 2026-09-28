@@ -48,19 +48,35 @@ final class SessionStore: ObservableObject {
     private var unlockObservers: [NSObjectProtocol] = []
 
     private init() {
-        self.currentUser = load()
-        if let token = currentUser?.token {
-            RealtimeBus.shared.start(token: token)
+        if DemoMode.launchRequested {
+            // Arranque con `-NEXARA_DEMO 1`: directo a la sesión de demostración, en memoria.
+            // No se lee ni se escribe el llavero, no se abre el socket ni se registra el push.
+            DemoMode.prepareForLaunch()
+            self.currentUser = DemoMode.sessionUser()
+        } else {
+            self.currentUser = load()
+            if let token = currentUser?.token {
+                RealtimeBus.shared.start(token: token)
+            }
+            if currentUser == nil, lastLoadStatus == errSecInteractionNotAllowed {
+                restoreWhenKeychainUnlocks()
+            }
         }
-        if currentUser == nil, lastLoadStatus == errSecInteractionNotAllowed {
-            restoreWhenKeychainUnlocks()
-        }
+    }
+
+    /// Sesión de demostración: SOLO en memoria (sin llavero, sin socket, sin push y sin
+    /// «acceso rápido»). Ver `DemoMode`.
+    func enterDemo() {
+        stopWaitingForUnlock()
+        currentUser = DemoMode.sessionUser()
     }
 
     var token: String? { currentUser?.token }
 
     func save(_ user: SessionUser) {
         currentUser = user
+        // La sesión demo nunca toca el llavero, el socket ni el registro de push.
+        if DemoMode.isActive { return }
         guard let data = try? JSONEncoder().encode(user) else { return }
         writeKeychain(data)
         QuickProfileStore.remember(user)
@@ -70,6 +86,13 @@ final class SessionStore: ObservableObject {
 
     func clear() {
         stopWaitingForUnlock()
+        if DemoMode.isActive {
+            // Salir del demo: no hay nada que borrar del llavero (si había una sesión
+            // real, se respeta) y se vuelve a la pantalla de acceso.
+            DemoMode.deactivate()
+            currentUser = nil
+            return
+        }
         currentUser = nil
         deleteKeychain()
         RealtimeBus.shared.stop()

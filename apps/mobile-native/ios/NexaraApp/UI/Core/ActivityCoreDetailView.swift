@@ -50,7 +50,8 @@ struct ActivityCoreDetailView: View {
     // MARK: Datos derivados
 
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
-    private var isCeo: Bool { CoreOrg.isCeo(session.currentUser?.email) }
+    /// En demo la persona sí captura evidencia de SUS actividades (con foto de muestra).
+    private var isCeo: Bool { !DemoMode.isActive && CoreOrg.isCeo(session.currentUser?.email) }
 
     private func text(_ key: String) -> String {
         ActivityParse.str(raw[key])

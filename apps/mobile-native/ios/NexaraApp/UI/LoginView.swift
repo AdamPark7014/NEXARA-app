@@ -14,6 +14,13 @@ struct LoginView: View {
 
     private let accent = NxBrand.primary
 
+    /// Correo y contraseña con algo escrito (sin contar espacios ni saltos de línea).
+    private var canSubmit: Bool {
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isLoading
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -108,7 +115,7 @@ struct LoginView: View {
                                 .textContentType(.password)
                                 .submitLabel(.go)
                                 .onSubmit {
-                                    guard !email.isEmpty, !password.isEmpty, !isLoading else { return }
+                                    guard canSubmit else { return }
                                     Task { await doLogin() }
                                 }
                                 Button { showPassword.toggle() } label: {
@@ -156,13 +163,41 @@ struct LoginView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(accent)
-                        .disabled(email.isEmpty || password.isEmpty || isLoading)
+                        .disabled(!canSubmit)
                     }
                     .padding(24)
                     .background(Color(.systemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
                     .padding(.horizontal, 20)
+
+                    // Modo demostración: recorre la app sin cuenta ni conexión, con datos
+                    // ficticios que viven solo en el teléfono.
+                    VStack(spacing: 6) {
+                        Button {
+                            DemoMode.activate()
+                            onLoggedIn()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Label("Explorar NEXARA con datos de muestra", systemImage: "play.rectangle")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(accent)
+                        .disabled(isLoading)
+                        .accessibilityIdentifier("demo-mode-button")
+
+                        Text("Sin cuenta ni conexión. Los datos son ficticios.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
 
                     Text("Tecnología que impulsa tu negocio")
                         .font(.caption)
@@ -194,14 +229,19 @@ struct LoginView: View {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        // Se recortan aquí también, no solo en `AuthRepository`: lo que se guarda como
+        // «último correo» y lo que viaja al servidor tiene que ser lo mismo.
+        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            _ = try await AuthRepository.shared.login(email: email, password: password, kind: kind)
+            _ = try await AuthRepository.shared.login(email: cleanEmail, password: cleanPassword, kind: kind)
             RememberMe.isEnabled = rememberMe
-            RememberMe.lastEmail = rememberMe ? email.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            RememberMe.lastEmail = rememberMe ? cleanEmail : ""
             quickProfiles = QuickProfileStore.load()
             await MainActor.run { onLoggedIn() }
         } catch {
-            errorMessage = error.toUserMessage()
+            // Mensaje propio del acceso: un 401 aquí NO es «sesión expirada».
+            errorMessage = AuthErrorMapper.loginMessage(error)
         }
     }
 }
