@@ -48,10 +48,20 @@ function pendingToApproval(p: PendingApproval): Approval {
   const stepNum = p.step?.stepNumber ?? 1;
   const urgencia: Urgencia = stepNum >= 3 ? "alta" : stepNum >= 2 ? "media" : "baja";
   const aprobador = p.step?.approverUser?.nombre ?? p.step?.approverRole?.nombre;
+  // Con el resumen del API se lee «Orden de compra OC-0012 · $48,250.00»; sin él, como siempre.
+  const r = p.resumen;
+  const importe =
+    r?.monto != null
+      ? new Intl.NumberFormat("es-MX", { style: "currency", currency: r.moneda === "USD" ? "USD" : "MXN" }).format(r.monto)
+      : null;
   return {
     key: String(p.id),
-    titulo: p.step?.name ? `${p.step.name} · ${tipo}` : tipo,
-    sub: aprobador ? `Folio ${folio} · Firma: ${aprobador}` : `Folio ${folio}`,
+    titulo: r?.titulo ? (importe ? `${r.titulo} · ${importe}` : r.titulo) : p.step?.name ? `${p.step.name} · ${tipo}` : tipo,
+    sub: r?.titulo
+      ? [tipo, r.detalle, aprobador ? `Firma: ${aprobador}` : null].filter(Boolean).join(" · ")
+      : aprobador
+        ? `Folio ${folio} · Firma: ${aprobador}`
+        : `Folio ${folio}`,
     urgencia,
   };
 }

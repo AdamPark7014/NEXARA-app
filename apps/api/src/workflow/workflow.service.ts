@@ -9,6 +9,7 @@ import {
 import { matchesAutoApproveCondition } from './workflow-auto-approve-condition.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { appUrls } from '../common/app-urls.js';
+import { resumenDe, resumirEntidades } from './entity-summary.js';
 
 /**
  * Quien puede decidir cualquier paso aunque no sea su aprobador: el equipo de desarrollo y los roles
@@ -219,7 +220,7 @@ export class WorkflowService {
     const sinAprobador = esAprobadorDeRespaldo(user)
       ? [{ step: { approverUserId: null, approverRoleId: null } }]
       : [];
-    return this.prisma.workflowApproval.findMany({
+    const pendientes = await this.prisma.workflowApproval.findMany({
       where: {
         status: 'PENDING',
         instance: { ...companyWhere(tenantId) },
@@ -259,6 +260,18 @@ export class WorkflowService {
       },
       orderBy: { createdAt: 'asc' },
     });
+
+    // «Compra con folio 99» no alcanza para decidir: se agrega de qué es y de cuánto (`resumen`).
+    // Un renglón sin resumen (tipo desconocido o entidad borrada) se entrega igual que siempre.
+    const resumenes = await resumirEntidades(
+      this.prisma,
+      pendientes.map((p) => ({ entityType: p.instance.entityType, entityId: p.instance.entityId })),
+      tenantId,
+    );
+    return pendientes.map((p) => ({
+      ...p,
+      resumen: resumenDe(resumenes, p.instance.entityType, p.instance.entityId),
+    }));
   }
 
   async decide(
