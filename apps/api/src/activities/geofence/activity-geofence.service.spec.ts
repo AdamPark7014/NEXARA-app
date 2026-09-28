@@ -9,7 +9,7 @@ function armar() {
   const alertas: any[] = [];
   const prisma: any = {
     activityEvidence: {
-      findUnique: jest.fn().mockResolvedValue({
+      findFirst: jest.fn().mockResolvedValue({
         entryLatitude: INICIO.lat,
         entryLongitude: INICIO.lng,
         entryPhotoUploadedAt: new Date('2026-09-17T15:00:00Z'),
@@ -71,7 +71,7 @@ describe('ActivityGeofenceService', () => {
 
   it('sin punto de inicio (evidencia vieja sin GPS) no bloquea la salida', async () => {
     const { service, prisma } = armar();
-    prisma.activityEvidence.findUnique.mockResolvedValue({ entryLatitude: null, entryLongitude: null });
+    prisma.activityEvidence.findFirst.mockResolvedValue({ entryLatitude: null, entryLongitude: null });
     await expect(service.validarSalida(7, 3, LEJOS.lat, LEJOS.lng)).resolves.toBeUndefined();
   });
 });
