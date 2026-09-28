@@ -170,6 +170,16 @@ class ActividadesUxTest {
     }
 
     @Test
+    fun autoasignarSigueVisibleConLaColaVacia() {
+        assertTrue(ActividadesUx.muestraAutoasignar(puede = true))
+        assertFalse(ActividadesUx.muestraAutoasignar(puede = false))
+        // Luis: por hacer 0 y hechas hoy 1. El botón no puede depender de la cola.
+        assertTrue(ActividadesUx.autoasignarProminente(puede = true, porHacer = 0))
+        assertFalse(ActividadesUx.autoasignarProminente(puede = true, porHacer = 2))
+        assertFalse(ActividadesUx.autoasignarProminente(puede = false, porHacer = 0))
+    }
+
+    @Test
     fun elEncabezadoDiceQueHacer() {
         assertEquals("Cargando tus actividades…", ActividadesUx.instruccionDia(0, cargando = true))
         assertEquals("Nada pendiente por ahora.", ActividadesUx.instruccionDia(0, cargando = false))
