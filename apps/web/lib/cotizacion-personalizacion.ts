@@ -9,7 +9,25 @@
 export type SeccionesOpcionales = { objetivo: boolean; alcance: boolean; planos: boolean; terminos: boolean; firma: boolean };
 export type ColumnasOpcionales = { marcaModelo: boolean; imagen: boolean; descuento: boolean; precioUnitario: boolean };
 export type CartaPresentacion = { dirigidaA: string; cargo?: string; mensaje: string };
-export type CondicionesComerciales = { formaPago: string; tiempoEntrega: string; garantia: string };
+export type CondicionesComerciales = { formaPago: string; tiempoEntrega: string; garantia: string; vigencia: string };
+
+/** Lo que imprime el PDF si la cotización no escribió el suyo. Igual que `cotizacion-formato-nexara.ts`. */
+export const ENTREGA_POR_OMISION =
+  "15 días naturales, o según disponibilidad de inventario al confirmar el pedido.";
+export const GARANTIA_POR_OMISION = "La otorgada por el fabricante.";
+
+export function fechaCortaMx(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Frase de vigencia del PDF cuando no se reescribió. */
+export function textoVigenciaPorOmision(dias: number | null, vence: string): string {
+  if (dias && dias > 0 && vence) return `${dias} días naturales (vence el ${vence})`;
+  if (dias && dias > 0) return `${dias} días naturales a partir de la fecha de emisión de esta propuesta.`;
+  return "Pon la fecha de validez y se escribe sola.";
+}
 export type Firmante = { nombre: string; cargo?: string };
 export type Moneda = "MXN" | "USD";
 
@@ -48,7 +66,7 @@ export function opcionesPorOmision(): OpcionesCotizacion {
     columnas: { marcaModelo: false, imagen: false, descuento: false, precioUnitario: true },
     carta: null,
     tipoCambioNota: "",
-    condiciones: { formaPago: "", tiempoEntrega: "", garantia: "" },
+    condiciones: { formaPago: "", tiempoEntrega: "", garantia: "", vigencia: "" },
     elaboro: null,
     autorizo: null,
   };
@@ -103,6 +121,7 @@ export function opcionesDesdeApi(crudo: unknown): OpcionesCotizacion {
       formaPago: cadena(k["formaPago"]),
       tiempoEntrega: cadena(k["tiempoEntrega"]),
       garantia: cadena(k["garantia"]),
+      vigencia: cadena(k["vigencia"]),
     },
     elaboro: firmante(o["elaboro"]),
     autorizo: autorizo ? { ...autorizo, ...(Number.isInteger(userId) && userId > 0 ? { userId } : {}) } : null,
@@ -140,6 +159,7 @@ export function opcionesParaApi(o: OpcionesCotizacion): OpcionesCotizacion {
       formaPago: limpio(o.condiciones.formaPago),
       tiempoEntrega: limpio(o.condiciones.tiempoEntrega),
       garantia: limpio(o.condiciones.garantia),
+      vigencia: limpio(o.condiciones.vigencia),
     },
     elaboro: firma(o.elaboro),
     autorizo: firma(o.autorizo),
@@ -155,6 +175,7 @@ export function conCondicionesSugeridas(o: OpcionesCotizacion, sugeridas: Condic
       formaPago: o.condiciones.formaPago || sugeridas.formaPago,
       tiempoEntrega: o.condiciones.tiempoEntrega || sugeridas.tiempoEntrega,
       garantia: o.condiciones.garantia || sugeridas.garantia,
+      vigencia: o.condiciones.vigencia || sugeridas.vigencia,
     },
   };
 }

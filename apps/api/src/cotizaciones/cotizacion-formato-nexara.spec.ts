@@ -98,6 +98,30 @@ describe('formato Nexara', () => {
     expect(f.letras).toContain('Novecientos tres mil setecientos veinticuatro pesos 24/100 M.N.');
     expect(f.cliente).toBe('Grupo Dice Puebla');
     expect(f.atencion).toBe('Eva Benavides');
+    expect(f.entrega).toBe('15 días naturales, o según disponibilidad de inventario al confirmar el pedido.');
+    expect(f.vigencia).toBe('7 días naturales (vence el 04/10/2026)');
+  });
+
+  it('tiempo de entrega, garantía y vigencia salen del texto de la cotización, no de otro campo', () => {
+    const f = formatoDesdeCotizacion({
+      ...grupoDice,
+      deliveryTime: '15 días naturales, o según disponibilidad de inventario al confirmar el pedido.',
+      opciones: {
+        condiciones: {
+          tiempoEntrega: '6 semanas',
+          garantia: 'Garantía 1 año, en el caso de la licencia es por 7 años',
+          vigencia: '2 días naturales a partir de la fecha de emisión de esta propuesta.',
+        },
+      },
+    });
+    expect(f.entrega).toBe('6 semanas');
+    expect(f.garantia).toBe('Garantía 1 año, en el caso de la licencia es por 7 años');
+    expect(f.vigencia).toBe('2 días naturales a partir de la fecha de emisión de esta propuesta.');
+  });
+
+  it('sin frase propia, el tiempo de entrega legado se conserva', () => {
+    const f = formatoDesdeCotizacion({ ...grupoDice, deliveryTime: '10 días hábiles' });
+    expect(f.entrega).toBe('10 días hábiles');
   });
 
   it('el PDF lleva el membrete, la firma y no imprime el costo', async () => {
@@ -114,5 +138,19 @@ describe('formato Nexara', () => {
     expect(texto).toContain('NEW ENGINEERING EXPERTISE AND RESOURCE ADVANCEMENT S.A. DE C.V.');
     expect(texto).not.toContain('169516');
     expect(texto).not.toContain('Costo');
+  });
+
+  it('la descripción larga, con saltos y viñetas, sale completa y sigue en la hoja siguiente', async () => {
+    const viñetas = Array.from({ length: 80 }, (_, i) => `• Característica ${i + 1}: detalle que no debe cortarse`).join('\n');
+    const pdf = await generarCotizacionNexaraPdf({
+      ...grupoDice,
+      items: [{ ...grupoDice.items[0], name: 'Disco duro', description: viñetas }],
+    });
+    const hojas = textoPorHoja(pdf);
+    const texto = hojas.join('\n');
+    expect(texto).toContain('Disco duro');
+    expect(texto).toContain('Característica 1:');
+    expect(texto).toContain('Característica 80:');
+    expect(hojas.length).toBeGreaterThan(1);
   });
 });

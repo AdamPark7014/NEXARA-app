@@ -474,7 +474,7 @@ const drawTableRow = (
       width: col.width - 6,
       height: rowH - ROW_PAD * 2,
       align: col.align,
-      ellipsis: i === 1,
+      ellipsis: false,
       lineGap: 0,
     });
     x += col.width;

@@ -19,8 +19,8 @@ export type CartaPresentacion = { dirigidaA: string; cargo?: string; mensaje: st
 export type Moneda = 'MXN' | 'USD';
 export type Firmante = { nombre: string; cargo?: string };
 
-/** Condiciones comerciales que alimentan los términos. Vacío = esa línea no se imprime. */
-export type CondicionesComerciales = { formaPago: string; tiempoEntrega: string; garantia: string };
+/** Condiciones comerciales que alimentan los términos y el PDF. Vacío = el PDF usa el texto por omisión. */
+export type CondicionesComerciales = { formaPago: string; tiempoEntrega: string; garantia: string; vigencia: string };
 
 /** Lo que se guarda en `Cotizacion.opciones`. */
 export type OpcionesCotizacion = {
@@ -66,7 +66,7 @@ export function opcionesPorOmision(): OpcionesCotizacion {
     columnas: { ...COLUMNAS_POR_OMISION },
     carta: null,
     tipoCambioNota: '',
-    condiciones: { formaPago: '', tiempoEntrega: '', garantia: '' },
+    condiciones: { formaPago: '', tiempoEntrega: '', garantia: '', vigencia: '' },
     elaboro: null,
     autorizo: null,
   };
@@ -119,8 +119,9 @@ export function normalizarOpciones(crudo: unknown): OpcionesCotizacion {
     tipoCambioNota: texto(o['tipoCambioNota'], 200),
     condiciones: {
       formaPago: texto(k['formaPago'], 300),
-      tiempoEntrega: texto(k['tiempoEntrega'], 300),
-      garantia: texto(k['garantia'], 300),
+      tiempoEntrega: texto(k['tiempoEntrega'], 4000),
+      garantia: texto(k['garantia'], 4000),
+      vigencia: texto(k['vigencia'], 4000),
     },
     elaboro: firmante(o['elaboro']),
     autorizo: autorizo ? { ...autorizo, ...(Number.isInteger(userId) && userId > 0 ? { userId } : {}) } : null,
@@ -170,6 +171,7 @@ export function condicionesPorOmision(segmento: unknown): CondicionesComerciales
       formaPago: 'Conforme a las bases de la licitación y al contrato que de ella derive.',
       tiempoEntrega: 'El que señalen las bases y el programa de trabajo del contrato.',
       garantia: 'La que exijan las bases; garantía del fabricante en equipos.',
+      vigencia: '',
       anticipoPct: 0,
       vigenciaDias: 30,
     };
@@ -179,6 +181,7 @@ export function condicionesPorOmision(segmento: unknown): CondicionesComerciales
       formaPago: 'Transferencia electrónica o depósito bancario.',
       tiempoEntrega: 'De 3 a 5 días hábiles a partir del anticipo, sujeto a inventario.',
       garantia: 'Garantía del fabricante en los equipos.',
+      vigencia: '',
       anticipoPct: 50,
       vigenciaDias: 15,
     };
@@ -187,6 +190,7 @@ export function condicionesPorOmision(segmento: unknown): CondicionesComerciales
     formaPago: 'Transferencia electrónica o depósito bancario.',
     tiempoEntrega: 'Según el programa de trabajo acordado con el cliente al confirmar el anticipo.',
     garantia: 'Garantía del fabricante en los equipos y 90 días en la mano de obra.',
+    vigencia: '',
     anticipoPct: 50,
     vigenciaDias: 15,
   };
@@ -228,7 +232,7 @@ const MAX_PARTIDAS_PLANTILLA = 400;
 
 function partidaDePlantilla(crudo: unknown): PartidaDePlantilla | null {
   const p = objeto(crudo);
-  const name = texto(p['name'], 200);
+  const name = texto(p['name'], 20_000);
   if (!name) return null;
   const numero = (v: unknown, min: number, max: number, omision: number) => {
     const n = Number(v);
@@ -237,7 +241,7 @@ function partidaDePlantilla(crudo: unknown): PartidaDePlantilla | null {
   const opcional = (v: unknown, max: number) => texto(v, max) || null;
   return {
     name,
-    description: opcional(p['description'], 2000),
+    description: opcional(p['description'], 20_000),
     unit: opcional(p['unit'], 40),
     qty: Math.round(numero(p['qty'], 1, 1_000_000, 1)),
     unitPrice: Math.round(numero(p['unitPrice'], 0, 1_000_000_000, 0) * 100) / 100,

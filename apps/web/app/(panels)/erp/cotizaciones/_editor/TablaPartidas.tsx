@@ -15,6 +15,7 @@ import {
   type Totales,
 } from "@/lib/cotizacion-documento";
 import { columnasDeTabla, type ColumnasOpcionales } from "@/lib/cotizacion-personalizacion";
+import { TextoAuto } from "./campos";
 import styles from "./editor.module.css";
 
 const SIN_EXTRAS: ColumnasOpcionales = { marcaModelo: false, imagen: false, descuento: false, precioUnitario: true };
@@ -242,7 +243,7 @@ export default function TablaPartidas({
   /** Columnas opcionales de «Personalizar» (marca/modelo, descuento, imagen). */
   columnas?: ColumnasOpcionales;
 }) {
-  const celdas = useRef(new Map<string, HTMLInputElement | HTMLSelectElement>());
+  const celdas = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>());
   const enfocar = useRef<{ key: string; col: Columna } | null>(null);
 
   useEffect(() => {
@@ -251,10 +252,10 @@ export default function TablaPartidas({
     enfocar.current = null;
     const el = celdas.current.get(`${key}:${col}`);
     el?.focus();
-    if (el instanceof HTMLInputElement) el.select();
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.select();
   });
 
-  const refDe = (key: string, col: Columna) => (el: HTMLInputElement | HTMLSelectElement | null) => {
+  const refDe = (key: string, col: Columna) => (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) => {
     if (el) celdas.current.set(`${key}:${col}`, el);
     else celdas.current.delete(`${key}:${col}`);
   };
@@ -263,7 +264,7 @@ export default function TablaPartidas({
   const enfocarCelda = (key: string, col: Columna) => {
     const el = celdas.current.get(`${key}:${col}`) ?? celdas.current.get(`${key}:desc`);
     el?.focus();
-    if (el instanceof HTMLInputElement) el.select();
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.select();
   };
 
   const cambiar = (key: string, cambio: Partial<PartidaEditor>) =>
@@ -307,14 +308,16 @@ export default function TablaPartidas({
   };
 
   /** Teclado común a todas las celdas de una fila existente. */
-  const teclado = (key: string, col: Columna) => (e: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const teclado = (key: string, col: Columna) => (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (e.nativeEvent.isComposing) return;
+    if (e.key === "Enter" && e.shiftKey) return;
     const fila = claves.indexOf(key);
-    if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
+    if (e.key === "Enter" && !e.altKey) {
       e.preventDefault();
       insertarDespues(key);
       return;
     }
+    if (e.currentTarget instanceof HTMLTextAreaElement) return;
     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !(e.currentTarget instanceof HTMLSelectElement) && !e.altKey) {
       const destino = claves[fila + (e.key === "ArrowDown" ? 1 : -1)];
       if (destino) {
@@ -398,15 +401,15 @@ export default function TablaPartidas({
           </span>
           <span role="cell" className={styles.celdaDesc} data-area="desc">
             <span className={styles.celdaDescCabeza}>
-              <input
+              <TextoAuto
                 ref={refDe(p.key, "desc")}
-                className={styles.celda}
+                variante="celda"
                 value={p.name}
                 title={p.name}
                 placeholder="Título de la partida"
                 disabled={!editable}
                 aria-label={`Descripción de la partida ${i + 1}`}
-                onChange={(e) => cambiar(p.key, { name: e.target.value })}
+                onValor={(v) => cambiar(p.key, { name: v })}
                 onKeyDown={teclado(p.key, "desc")}
               />
               {p.paqueteClave ? (
@@ -448,13 +451,14 @@ export default function TablaPartidas({
                 decimales={2}
                 onValor={(n) => ponerMargen(p, n)}
               />
-              <input
-                className={`${styles.celda} ${styles.detalleAmplio}`}
+              <TextoAuto
+                variante="celda"
+                className={styles.detalleAmplio}
                 value={p.description ?? ""}
-                placeholder="Descripción para el PDF. El costo y el margen no se imprimen."
+                placeholder="Descripción para el PDF. El costo y el margen no se imprimen. Los saltos de línea y las viñetas se imprimen."
                 disabled={!editable}
                 aria-label={`Detalle de la partida ${i + 1}`}
-                onChange={(e) => cambiar(p.key, { description: e.target.value || null })}
+                onValor={(v) => cambiar(p.key, { description: v || null })}
               />
             </span>
           </span>
@@ -620,7 +624,7 @@ function FilaNueva({
   columnas: ColumnasOpcionales;
   token: string | null;
   moneda: string;
-  refDe: (key: string, col: Columna) => (el: HTMLInputElement | HTMLSelectElement | null) => void;
+  refDe: (key: string, col: Columna) => (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) => void;
   alAgregar: (p: PartidaEditor) => void;
   alSubir: () => void;
 }) {

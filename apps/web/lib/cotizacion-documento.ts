@@ -362,6 +362,8 @@ export type DocumentoCotizacion = {
   issueDate: string;
   validUntil: string;
   depositPercent: number;
+  /** Tiempo de entrega legado (`Cotizacion.deliveryTime`). Si las condiciones no traen el suyo, el PDF lo usa. */
+  deliveryTime: string;
   partidas: PartidaEditor[];
   /** Términos reescritos (los demás son los del segmento). */
   terminos: TerminosPropios;
@@ -403,6 +405,7 @@ export function documentoVacio(segmento: Segmento = "COMERCIAL", hoy = new Date(
     issueDate: emision,
     validUntil: sumarDias(emision, 15),
     depositPercent: 50,
+    deliveryTime: "",
     partidas: [],
     terminos: {},
     opciones: opcionesPorOmision(),
@@ -433,6 +436,7 @@ export function documentoDesdeDetalle(d: CotizacionDetalle): DocumentoCotizacion
     issueDate: fechaCorta(d.issueDate) || hoyISO(),
     validUntil: fechaCorta(d.validUntil),
     depositPercent: Number(d.depositPercent ?? 50),
+    deliveryTime: d.deliveryTime?.trim() ?? "",
     partidas: partidasDesdeApi(d.items),
     terminos: terminosPropiosDeDetalle(d),
     opciones: opcionesDesdeApi(d.opciones),

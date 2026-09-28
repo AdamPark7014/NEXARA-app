@@ -1155,6 +1155,16 @@
   min-height: 38px;
   padding: 0 4px;
   border-bottom: 1px solid var(--doc-borde);
+  align-items: start;
+}
+
+.fila > [data-area="idx"],
+.fila > [data-area="unidad"],
+.fila > [data-area="cant"],
+.fila > [data-area="precio"],
+.fila > [data-area="total"],
+.fila > [data-area="menu"] {
+  padding-top: 6px;
 }
 
 .fila:hover {
@@ -1256,8 +1266,14 @@ select.celda {
 
 .celdaDescCabeza {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
+  min-width: 0;
+}
+
+.celdaDescCabeza .celdaTexto {
+  flex: 1 1 auto;
+  width: auto;
   min-width: 0;
 }
 
@@ -1278,6 +1294,14 @@ select.celda {
 .detallePartida .celda {
   height: 28px;
   font-size: 12px;
+}
+
+.detallePartida textarea.celdaTexto {
+  height: auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .detalleAmplio {

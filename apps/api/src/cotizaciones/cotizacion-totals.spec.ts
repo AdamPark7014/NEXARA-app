@@ -207,6 +207,17 @@ describe('calculateLine', () => {
   });
 });
 
+describe('normalizeItems', () => {
+  it('no recorta el título ni la descripción, y conserva saltos de línea', () => {
+    const name = `Disco duro ${'con características '.repeat(30)}`.trim();
+    const description = '• Subcategoría: unidad de estado sólido\n• Dimensiones: 2.5 pulgadas\n• Interfaz: SAS';
+    const [row] = normalizeItems([{ name, description, qty: 1, unitPrice: 10 }]);
+    expect(name.length).toBeGreaterThan(200);
+    expect(row?.name).toBe(name);
+    expect(row?.description).toBe(description);
+  });
+});
+
 describe('maxDiscountPercent', () => {
   it('devuelve el descuento mayor entre las líneas', () => {
     expect(maxDiscountPercent([{ discount: 5 }, { discount: 22 }, { discount: 10 }])).toBe(22);

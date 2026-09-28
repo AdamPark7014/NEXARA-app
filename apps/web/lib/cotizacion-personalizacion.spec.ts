@@ -40,20 +40,20 @@ describe("opciones de personalización", () => {
       carta: { dirigidaA: "  ", mensaje: "" },
       autorizo: { nombre: "   " },
       elaboro: { nombre: " Jorge Méndez ", cargo: " " },
-      condiciones: { formaPago: " Transferencia ", tiempoEntrega: "", garantia: "1 año " },
+      condiciones: { formaPago: " Transferencia ", tiempoEntrega: "", garantia: "1 año ", vigencia: " 2 días " },
     });
     expect(o.carta).toBeNull();
     expect(o.autorizo).toBeNull();
     expect(o.elaboro).toEqual({ nombre: "Jorge Méndez" });
-    expect(o.condiciones).toEqual({ formaPago: "Transferencia", tiempoEntrega: "", garantia: "1 año" });
+    expect(o.condiciones).toEqual({ formaPago: "Transferencia", tiempoEntrega: "", garantia: "1 año", vigencia: "2 días" });
   });
 
   it("las condiciones del segmento solo llenan lo que está vacío", () => {
     const o = conCondicionesSugeridas(
-      { ...opcionesPorOmision(), condiciones: { formaPago: "Cheque", tiempoEntrega: "", garantia: "" } },
-      { formaPago: "Transferencia", tiempoEntrega: "5 días", garantia: "Fabricante" },
+      { ...opcionesPorOmision(), condiciones: { formaPago: "Cheque", tiempoEntrega: "", garantia: "", vigencia: "Hasta el viernes" } },
+      { formaPago: "Transferencia", tiempoEntrega: "5 días", garantia: "Fabricante", vigencia: "" },
     );
-    expect(o.condiciones).toEqual({ formaPago: "Cheque", tiempoEntrega: "5 días", garantia: "Fabricante" });
+    expect(o.condiciones).toEqual({ formaPago: "Cheque", tiempoEntrega: "5 días", garantia: "Fabricante", vigencia: "Hasta el viernes" });
   });
 
   it("columnas de la tabla según lo que se enciende (el total siempre penúltimo)", () => {
@@ -93,7 +93,7 @@ describe("el documento con personalización", () => {
       items: [{ name: "Cámara", unit: "Pieza", qty: 3, unitPrice: 800, brand: "Hikvision" }],
     };
     const actual = { ...documentoVacio(), clientName: "Plaza Norte" };
-    const doc = documentoDesdePlantilla(contenido, actual, { formaPago: "Transferencia", tiempoEntrega: "", garantia: "" });
+    const doc = documentoDesdePlantilla(contenido, actual, { formaPago: "Transferencia", tiempoEntrega: "", garantia: "", vigencia: "" });
     expect(doc.clientName).toBe("Plaza Norte");
     expect(doc.segmento).toBe("OBRA");
     expect(doc.projectName).toBe("CCTV obra");

@@ -71,6 +71,8 @@ export type FormatoNexara = {
   trabajo: string;
   pagoCorto: string;
   entrega: string;
+  /** Frase de vigencia de las condiciones comerciales (la misma que edita la cotización). */
+  vigencia: string;
   condicionesPago: string;
   garantia: string;
   partidas: PartidaFormato[];
@@ -123,6 +125,23 @@ const diasEntre = (desde: Date | string | null | undefined, hasta: Date | string
   return dias > 0 ? dias : 15;
 };
 
+/** Lo que imprime «Tiempo de entrega» si la cotización no escribió el suyo. */
+export const ENTREGA_POR_OMISION = ENTREGA_DEFAULT;
+/** Lo que imprime «Garantía» si la cotización no escribió la suya. */
+export const GARANTIA_POR_OMISION = GARANTIA_DEFAULT;
+
+/**
+ * Vigencia de las condiciones comerciales. Si quien cotiza escribió una frase, esa es la que sale
+ * en el PDF; si no, la de siempre (días naturales y fecha de vencimiento).
+ */
+export function textoVigencia(dias: number, vence: string, propia?: string | null): string {
+  const escrito = String(propia ?? '').trim();
+  if (escrito) return escrito;
+  if (dias > 0 && vence) return `${dias} días naturales (vence el ${vence})`;
+  if (dias > 0) return `${dias} días naturales a partir de la fecha de emisión de esta propuesta.`;
+  return '15 días naturales';
+}
+
 const pagoCorto = (deposito: unknown): string => {
   const n = Math.round(Number(deposito ?? 50));
   if (!Number.isFinite(n) || n >= 100) return n >= 100 ? 'Contado' : '50% anticipo';
@@ -174,11 +193,14 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
   const empresa = String(quote.clientCompany ?? '').trim();
   const nombre = String(quote.clientName ?? '').trim();
   const atencionExplicita = String(quote.atencion ?? '').trim();
+  const dias = diasEntre(quote.issueDate, quote.validUntil);
+  const vence = fechaCorta(quote.validUntil);
   return {
     numero: String(quote.quoteNumber ?? '').trim() || 'COTIZACIÓN',
     fecha: fechaCorta(quote.issueDate) || fechaCorta(new Date()),
-    vence: fechaCorta(quote.validUntil),
-    vigenciaDias: diasEntre(quote.issueDate, quote.validUntil),
+    vence,
+    vigenciaDias: dias,
+    vigencia: textoVigencia(dias, vence, opciones.condiciones.vigencia),
     moneda,
     cliente: empresa || nombre || '—',
     atencion: atencionExplicita || (empresa && nombre && empresa !== nombre ? nombre : ''),
@@ -189,7 +211,7 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     responsable: String(quote.preparedBy ?? '').trim() || 'Christian Del Pozo',
     trabajo: String(quote.trabajo ?? '').trim() || 'Ventas',
     pagoCorto: pagoCorto(quote.depositPercent),
-    entrega: String(quote.deliveryTime ?? '').trim() || ENTREGA_DEFAULT,
+    entrega: opciones.condiciones.tiempoEntrega.trim() || String(quote.deliveryTime ?? '').trim() || ENTREGA_DEFAULT,
     condicionesPago: String(quote.paymentTerms ?? '').trim() || PAGO_DEFAULT,
     garantia: opciones.condiciones.garantia.trim() || GARANTIA_DEFAULT,
     partidas,
@@ -310,6 +332,66 @@ function franja(p: Lapiz, celdas: Array<[string, string]>) {
   p.y = y + h;
 }
 
+/** Parte un párrafo en renglones que caben en `ancho`, respetando los saltos de línea. */
+function partirTexto(p: Lapiz, valor: string, ancho: number, size: number, font: string): string[] {
+  p.doc.font(font).fontSize(size);
+  const usable = Math.max(8, ancho);
+  const lineas: string[] = [];
+  for (const parrafo of valor.replace(/\r\n/g, '\n').split('\n')) {
+    if (!parrafo) {
+      lineas.push('');
+      continue;
+    }
+    let resto = parrafo;
+    while (resto.length) {
+      if (p.doc.widthOfString(resto) <= usable) {
+        lineas.push(resto);
+        break;
+      }
+      let corte = 1;
+      let lo = 1;
+      let hi = resto.length;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (p.doc.widthOfString(resto.slice(0, mid)) <= usable) {
+          corte = mid;
+          lo = mid + 1;
+        } else hi = mid - 1;
+      }
+      let espacio = -1;
+      for (let i = corte; i > 0; i -= 1) {
+        if (resto[i - 1] === ' ') {
+          espacio = i - 1;
+          break;
+        }
+      }
+      const hasta = espacio > 0 ? espacio : Math.max(1, corte);
+      const trozo = resto.slice(0, hasta).trimEnd();
+      lineas.push(trozo || resto.slice(0, Math.max(1, corte)));
+      resto = resto.slice(trozo ? hasta : Math.max(1, corte)).replace(/^\s+/, '');
+    }
+  }
+  return lineas.length ? lineas : [''];
+}
+
+function altoRenglon(p: Lapiz, size: number, font: string): number {
+  p.doc.font(font).fontSize(size);
+  return Math.max(p.doc.currentLineHeight(true) + 1, size + 2);
+}
+
+/**
+ * Un renglón ya medido. Sin `width` PDFKit no lo parte ni abre una hoja en blanco al llegar al
+ * margen: el corte de página lo decide esta tabla.
+ */
+function renglonFijo(p: Lapiz, valor: string, x: number, y: number, ancho: number, font: string, size: number, color: string, align: 'left' | 'center' | 'right' = 'left') {
+  p.doc.font(font).fontSize(size).fillColor(color);
+  if (align === 'left') {
+    p.doc.text(valor || ' ', x, y, { lineBreak: false });
+    return;
+  }
+  p.doc.text(valor || ' ', x, y, { width: ancho, align, lineBreak: false });
+}
+
 function filaPartida(p: Lapiz, partida: PartidaFormato | null, anchos: number[], encabezado = false, zebra = false) {
   const x0 = LM;
   if (encabezado) {
@@ -327,50 +409,81 @@ function filaPartida(p: Lapiz, partida: PartidaFormato | null, anchos: number[],
   }
   if (!partida) return;
   const descAncho = anchos[1]! - 8;
+  const xDesc = x0 + anchos[0]! + 4;
   const titulo = partida.titulo || 'Concepto';
   const marca = [partida.marca ? `Marca: ${partida.marca}` : '', partida.modelo ? `Modelo: ${partida.modelo}` : '']
     .filter(Boolean)
     .join(' · ');
-  const hTitulo = altoDe(p, titulo, descAncho, 8.5, p.fb);
-  const hMarca = marca ? altoDe(p, marca, descAncho, 7.5) : 0;
-  const hDesc = partida.descripcion ? altoDe(p, partida.descripcion, descAncho, 7.5) : 0;
-  const h = Math.max(22, hTitulo + hMarca + hDesc + 8);
-  asegurar(p, h + 16);
-  if (p.y === TOP) filaPartida(p, null, anchos, true);
-  const y = p.y;
-  if (zebra) {
-    p.doc.save();
-    p.doc.rect(x0, y, AW, h).fill(TEAL_CLARO);
-    p.doc.restore();
+  const bloques: Array<{ texto: string; font: string; size: number; color: string }> = [
+    { texto: titulo, font: p.fb, size: 8.5, color: TINTA },
+  ];
+  if (marca) bloques.push({ texto: marca, font: p.f, size: 7.5, color: TEAL_OSC });
+  if (partida.descripcion) bloques.push({ texto: partida.descripcion, font: p.f, size: 7.5, color: GRIS });
+
+  const lineas: Array<{ t: string; font: string; size: number; color: string; lh: number }> = [];
+  for (const bloque of bloques) {
+    const lh = altoRenglon(p, bloque.size, bloque.font);
+    for (const t of partirTexto(p, bloque.texto, descAncho, bloque.size, bloque.font)) {
+      lineas.push({ t, font: bloque.font, size: bloque.size, color: bloque.color, lh });
+    }
   }
-  let x = x0;
+  const pad = 4;
+  const nuevaHojaDeTabla = () => {
+    hoja(p);
+    filaPartida(p, null, anchos, true);
+  };
+  if (p.y + lineas[0]!.lh + pad * 2 > BOTTOM) nuevaHojaDeTabla();
+
   const cant = Number.isInteger(partida.cantidad) ? String(partida.cantidad) : String(partida.cantidad);
   const celdas = [
-    { t: partida.partida, font: p.f, size: 8, color: TINTA, align: 'center' as const },
-    { t: '', font: p.f, size: 8, color: TINTA, align: 'left' as const },
-    { t: partida.unidad, font: p.f, size: 8, color: TINTA, align: 'center' as const },
-    { t: cant, font: p.f, size: 8, color: TINTA, align: 'center' as const },
-    { t: dinero(partida.precioUnitario), font: p.f, size: 8, color: TINTA, align: 'right' as const },
-    { t: dinero(partida.importe), font: p.f, size: 8, color: TINTA, align: 'right' as const },
+    { t: partida.partida, align: 'center' as const },
+    null,
+    { t: partida.unidad, align: 'center' as const },
+    { t: cant, align: 'center' as const },
+    { t: dinero(partida.precioUnitario), align: 'right' as const },
+    { t: dinero(partida.importe), align: 'right' as const },
   ];
-  celdas.forEach((c, i) => {
-    if (i !== 1) texto(p, c.t, x + 3, y + 4, anchos[i]! - 6, { font: c.font, size: c.size, color: c.color, align: c.align });
-    x += anchos[i]!;
-  });
-  let dy = y + 4;
-  texto(p, titulo, x0 + anchos[0]! + 4, dy, descAncho, { font: p.fb, size: 8.5, color: TINTA });
-  dy += hTitulo;
-  if (marca) {
-    texto(p, marca, x0 + anchos[0]! + 4, dy, descAncho, { size: 7.5, color: TEAL_OSC });
-    dy += hMarca;
+  let yCeldas = p.y;
+  let celdasPendientes = true;
+  const pintarCeldas = () => {
+    if (!celdasPendientes) return;
+    celdasPendientes = false;
+    let x = x0;
+    celdas.forEach((c, i) => {
+      if (c) renglonFijo(p, c.t, x + 3, yCeldas + pad, anchos[i]! - 6, p.f, 8, TINTA, c.align);
+      x += anchos[i]!;
+    });
+  };
+
+  let y = p.y + pad;
+  for (const linea of lineas) {
+    if (y + linea.lh > BOTTOM) {
+      pintarCeldas();
+      p.doc.save();
+      p.doc.strokeColor(LINEA).lineWidth(0.3).moveTo(x0, y).lineTo(x0 + AW, y).stroke();
+      p.doc.restore();
+      nuevaHojaDeTabla();
+      yCeldas = p.y;
+      y = p.y + pad;
+    }
+    if (zebra) {
+      p.doc.save();
+      p.doc.rect(x0, y, AW, linea.lh).fill(TEAL_CLARO);
+      p.doc.restore();
+    }
+    renglonFijo(p, linea.t, xDesc, y, descAncho, linea.font, linea.size, linea.color);
+    y += linea.lh;
   }
-  if (partida.descripcion) {
-    texto(p, partida.descripcion, x0 + anchos[0]! + 4, dy, descAncho, { size: 7.5, color: GRIS });
+  pintarCeldas();
+  if (zebra) {
+    p.doc.save();
+    p.doc.rect(x0, y, AW, pad).fill(TEAL_CLARO);
+    p.doc.restore();
   }
   p.doc.save();
-  p.doc.strokeColor(LINEA).lineWidth(0.3).moveTo(x0, y + h).lineTo(x0 + AW, y + h).stroke();
+  p.doc.strokeColor(LINEA).lineWidth(0.3).moveTo(x0, y + pad).lineTo(x0 + AW, y + pad).stroke();
   p.doc.restore();
-  p.y = y + h;
+  p.y = y + pad;
 }
 
 function totales(p: Lapiz, q: FormatoNexara) {
@@ -474,7 +587,7 @@ export function generarCotizacionNexaraPdf(quote: QuoteLike | FormatoNexara): Pr
   const condiciones: Array<[string, string]> = [
     ['Tiempo de entrega:', q.entrega],
     ['Condiciones de pago:', q.condicionesPago],
-    ['Vigencia:', `${q.vigenciaDias} días naturales${q.vence ? ` (vence el ${q.vence})` : ''}`],
+    ['Vigencia:', q.vigencia],
   ];
   if (q.garantia) condiciones.push(['Garantía:', q.garantia]);
   condiciones.push([

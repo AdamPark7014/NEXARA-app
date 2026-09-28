@@ -237,6 +237,7 @@ export default function PanelPersonalizar({
                           formaPago: sugeridas.formaPago,
                           tiempoEntrega: sugeridas.tiempoEntrega,
                           garantia: sugeridas.garantia,
+                          vigencia: d.opciones.condiciones.vigencia,
                         },
                       },
                     }))

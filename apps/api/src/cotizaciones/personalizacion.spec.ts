@@ -52,7 +52,7 @@ describe('normalizarOpciones', () => {
       secciones: { planos: false, firma: 'no' },
       columnas: { imagen: true },
       carta: { dirigidaA: '  Ing. Pérez ', mensaje: 'Estimado…', extra: 1 },
-      condiciones: { garantia: 'x'.repeat(900) },
+      condiciones: { garantia: 'x'.repeat(5000) },
       autorizo: { nombre: 'Christian Del Pozo', cargo: 'Dirección', userId: '3' },
       otraCosa: true,
     });
@@ -60,7 +60,7 @@ describe('normalizarOpciones', () => {
     expect(o.columnas.imagen).toBe(true);
     expect(o.columnas.precioUnitario).toBe(true);
     expect(o.carta).toEqual({ dirigidaA: 'Ing. Pérez', mensaje: 'Estimado…' });
-    expect(o.condiciones.garantia).toHaveLength(300);
+    expect(o.condiciones.garantia).toHaveLength(4000);
     expect(o.autorizo).toEqual({ nombre: 'Christian Del Pozo', cargo: 'Dirección', userId: 3 });
     expect(o).not.toHaveProperty('otraCosa');
   });

@@ -218,7 +218,7 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
       paqueteClave: item.paqueteClave?.trim() || null,
       paqueteCantidad: enteroONulo(item.paqueteCantidad),
       category: item.category?.trim() || 'Otros',
-      name: (item.name?.trim() || 'Concepto').slice(0, 200),
+      name: item.name?.trim() || 'Concepto',
       partida: item.partida?.trim().slice(0, 16) || null,
       description: item.description?.trim() || null,
       scope: item.scope?.trim() || null,
