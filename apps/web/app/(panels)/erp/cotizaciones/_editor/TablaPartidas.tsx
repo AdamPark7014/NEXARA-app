@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { smartQuoteSearch, type SmartOffer } from "@/lib/smart-quote-api";
 import { GRUPOS_PARTIDA, GRUPO_LABEL, formatoMoneda, type GrupoPartida } from "@/lib/cotizaciones-api";
 import {
@@ -15,7 +15,24 @@ import {
   type Totales,
 } from "@/lib/cotizacion-documento";
 import { columnasDeTabla, type ColumnasOpcionales } from "@/lib/cotizacion-personalizacion";
+import { normalizarLista, traeVineta } from "@/lib/vinetas-texto";
 import { TextoAuto } from "./campos";
+
+/** Al pegar una ficha con viñetas en la misma línea, cada una baja a su renglón. */
+function pegarLista(actual: string, e: ClipboardEvent<HTMLTextAreaElement>, aplicar: (valor: string) => void) {
+  const pegado = e.clipboardData.getData("text/plain");
+  if (!traeVineta(pegado)) return;
+  e.preventDefault();
+  const el = e.currentTarget;
+  const ini = el.selectionStart ?? actual.length;
+  const fin = el.selectionEnd ?? ini;
+  const formateado = normalizarLista(pegado);
+  const antes = actual.slice(0, ini);
+  const despues = actual.slice(fin);
+  const saltoAntes = antes.length > 0 && !antes.endsWith("\n") ? "\n" : "";
+  const saltoDespues = despues.length > 0 && !despues.startsWith("\n") ? "\n" : "";
+  aplicar(`${antes}${saltoAntes}${formateado}${saltoDespues}${despues}`);
+}
 import styles from "./editor.module.css";
 
 const SIN_EXTRAS: ColumnasOpcionales = { marcaModelo: false, imagen: false, descuento: false, precioUnitario: true };
@@ -414,6 +431,7 @@ export default function TablaPartidas({
                 disabled={!editable}
                 aria-label={`Descripción de la partida ${i + 1}`}
                 onValor={(v) => cambiar(p.key, { name: v })}
+                onPaste={(e) => pegarLista(p.name, e, (v) => cambiar(p.key, { name: v }))}
                 onKeyDown={teclado(p.key, "desc")}
               />
               {p.paqueteClave ? (
@@ -470,6 +488,7 @@ export default function TablaPartidas({
                 aria-label={`Detalle de la partida ${i + 1}`}
                 tabIndex={-1}
                 onValor={(v) => cambiar(p.key, { description: v || null })}
+                onPaste={(e) => pegarLista(p.description ?? "", e, (v) => cambiar(p.key, { description: v || null }))}
               />
             </span>
           </span>
