@@ -261,14 +261,18 @@ export function canOfferAssignmentCharge(email?: string | null): boolean {
 }
 
 /**
- * Solo Luis + Servicio: al asignarle no hay elección — siempre «Despacho a equipo» + cupo.
- * David / Antonio / Josué siguen eligiendo con canOfferAssignmentCharge.
+ * Siempre «Despacho a equipo», sin elegir a quien la ejecuta:
+ * - Luis + servicio: cupo; él se lo pasa a Antonio.
+ * - Antonio + servicio: quien asigna se lo deja a Antonio; Antonio elige al ingeniero.
+ * David y Josué siguen eligiendo con canOfferAssignmentCharge.
  */
 export function forcesDespachoOnly(
   email?: string | null,
   kind?: ActivityKind | null,
 ): boolean {
-  return norm(email) === ORG_EMAILS.luis && kind === 'servicio';
+  if (kind !== 'servicio') return false;
+  const e = norm(email);
+  return e === ORG_EMAILS.luis || e === ORG_EMAILS.antonio;
 }
 
 /**

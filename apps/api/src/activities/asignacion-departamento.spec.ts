@@ -95,6 +95,14 @@ describe('puedeDejarActividadA', () => {
     ).toBe(true);
   });
 
+  it('Antonio asigna a su ingeniero aunque lo haya creado otro departamento y no le reporte', () => {
+    const carolinaSuelta = { ...carolina, managerId: 1, departmentId: 99 };
+    const rosterRoto = roster.map((p) => (p.id === carolina.id ? carolinaSuelta : p));
+    expect(puedeDejarActividadA(actor(antonio), carolinaSuelta, rosterRoto)).toBe(true);
+    expect(puedeDejarActividadA(actor(luis), carolinaSuelta, rosterRoto)).toBe(false);
+    expect(puedeDejarActividadA(actor(joan), carolinaSuelta, rosterRoto)).toBe(false);
+  });
+
   it('el organigrama cruza departamento: David asigna a su ingeniero aunque el área no coincida', () => {
     const joanEnOtraArea = { ...joan, departmentId: 99 };
     expect(puedeDejarActividadA(actor(david), joanEnOtraArea, roster)).toBe(true);

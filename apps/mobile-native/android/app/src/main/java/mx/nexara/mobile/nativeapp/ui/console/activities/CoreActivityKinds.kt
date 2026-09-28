@@ -187,9 +187,16 @@ object CoreActivityKinds {
 
     fun canOfferAssignmentCharge(email: String?): Boolean = norm(email) in CHARGE_MANAGER_EMAILS
 
-    /** Solo Luis + Servicio: siempre «Despacho a equipo» + cupo. */
-    fun forcesDespachoOnly(email: String?, kind: String?): Boolean =
-        norm(email) == OrgEmails.LUIS && kind == SERVICIO
+    /**
+     * Siempre «Despacho a equipo», sin elegir ejecutor:
+     * Luis + servicio (cupo, se lo pasa a Antonio) y Antonio + servicio
+     * (él elige al ingeniero).
+     */
+    fun forcesDespachoOnly(email: String?, kind: String?): Boolean {
+        if (kind != SERVICIO) return false
+        val e = norm(email)
+        return e == OrgEmails.LUIS || e == OrgEmails.ANTONIO
+    }
 
     /** Solo Luis + Tarea / Proyecto / Comercial: ejecución directa, sin equipo. */
     fun forcesEjecucionOnly(email: String?, kind: String?): Boolean =

@@ -66,7 +66,8 @@ class CoreActivityKindsTest {
     @Test
     fun luisServicioIsDespachoOnlyAndTheRestEjecucion() {
         assertTrue(k.forcesDespachoOnly(OrgEmails.LUIS, "servicio"))
-        assertFalse(k.forcesDespachoOnly(OrgEmails.ANTONIO, "servicio"))
+        assertTrue(k.forcesDespachoOnly(OrgEmails.ANTONIO, "servicio"))
+        assertFalse(k.forcesDespachoOnly(OrgEmails.DAVID, "servicio"))
         assertTrue(k.forcesEjecucionOnly(OrgEmails.LUIS, "tarea"))
         assertTrue(k.forcesEjecucionOnly(OrgEmails.LUIS, "comercial"))
         assertFalse(k.forcesEjecucionOnly(OrgEmails.LUIS, "servicio"))

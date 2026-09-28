@@ -45,12 +45,19 @@ export function extrasDeTablero(email?: string | null): string[] {
 }
 
 /**
- * Para **asignar** trabajo, el flujo de despacho es más estrecho que el de ver: Luis coordina
- * servicios y se los pasa a José Antonio, que elige a quién de su equipo. Luis no asigna
- * directamente a soporte aunque los vea en su pizarra.
+ * Para **asignar** trabajo, el flujo de despacho es más estrecho que el de ver.
+ * Luis coordina servicios y se los deja a José Antonio: no elige al ingeniero.
+ * Antonio sí asigna a su soporte (Carolina, Alejandro, Roberto) aunque el
+ * organigrama no los cuelgue de él y aunque el servicio lo haya creado otro
+ * departamento. Luis no asigna directo a ese soporte.
  */
 const EXTRAS_ASIGNACION_POR_CORREO: Record<string, string[]> = {
   'direccion.operaciones@nexara.com.mx': ['jose.ramirez@nexara.com.mx'],
+  'jose.ramirez@nexara.com.mx': [
+    'soporte@nexara.com.mx',
+    'alejandro.gonzalez@nexara.com.mx',
+    'roberto.vivanco@nexara.com.mx',
+  ],
 };
 
 export function extrasDeAsignacion(email?: string | null): string[] {

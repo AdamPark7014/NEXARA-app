@@ -287,9 +287,12 @@ enum CoreActivityRules {
         chargeManagerEmails.contains(CoreOrg.normalized(email))
     }
 
-    /// Luis + Servicio: siempre «Despacho a equipo» con cupo.
+    /// Servicio a Luis (cupo, se lo pasa a Antonio) o a Antonio (él elige al ingeniero):
+    /// siempre despacho, sin elegir ejecutor.
     static func forcesDespachoOnly(_ email: String?, kind: CoreActivityKind?) -> Bool {
-        CoreOrg.normalized(email) == CoreOrg.luisEmail && kind == .servicio
+        guard kind == .servicio else { return false }
+        let normalized = CoreOrg.normalized(email)
+        return normalized == CoreOrg.luisEmail || normalized == CoreOrg.antonioEmail
     }
 
     /// Luis + Tarea / Proyecto / Comercial: ejecución directa.

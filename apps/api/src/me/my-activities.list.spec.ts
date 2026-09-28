@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { MyActivitiesService } from './my-activities.service.js';
 
 /**
@@ -7,6 +8,7 @@ import { MyActivitiesService } from './my-activities.service.js';
  */
 const LUIS = { id: 7, email: 'direccion.operaciones@nexara.com.mx' };
 const TECNICO = { id: 13, email: 'soporte@nexara.com.mx' };
+const DAVID = { id: 8, email: 'operaciones@nexara.com.mx' };
 
 function actividad(over: Record<string, unknown> = {}) {
   return {
@@ -84,7 +86,11 @@ describe('Mis actividades: lo asignado se ve', () => {
 
     expect(res.open.map((a) => a.id)).toEqual([90]);
     expect(res.open[0]).toEqual(
-      expect.objectContaining({ titulo: 'Mantenimiento preventivo', coreKind: 'tarea' }),
+      expect.objectContaining({
+        titulo: 'Mantenimiento preventivo',
+        coreKind: 'tarea',
+        autoAsignada: false,
+      }),
     );
     expect(res.open).toHaveLength(1);
     expect(res.seguimiento).toHaveLength(0);
@@ -155,5 +161,108 @@ describe('Mis actividades: lo asignado se ve', () => {
     expect(propias.responsableId).toBe(LUIS.id);
     expect(propias.companyId).toBe(4);
     expect(propias.assignees).toEqual({ none: { userId: LUIS.id } });
+  });
+
+  it('la autoasignación de Luis entra en Por hacer, aunque no sea un servicio', async () => {
+    const mia = actividad({
+      id: 3,
+      coreKind: 'tarea',
+      titulo: 'La dejé para mí',
+      creadoPorId: LUIS.id,
+      creador: { id: LUIS.id, nombre: 'Luis' },
+      assignmentCharge: 'ejecucion',
+    });
+    const { service } = build([fila(mia, { asignadoPor: { id: LUIS.id, nombre: 'Luis' } })]);
+
+    const res = await service.list(LUIS, 1);
+
+    expect(res.open).toEqual([
+      expect.objectContaining({ id: 3, titulo: 'La dejé para mí', autoAsignada: true, rol: 'LEAD' }),
+    ]);
+    expect(res.seguimiento).toHaveLength(0);
+  });
+
+  it('un ingeniero que se asigna el trabajo también lo ve, y no el de los demás', async () => {
+    const mia = actividad({
+      id: 4,
+      coreKind: 'servicio',
+      titulo: 'Mi visita',
+      creadoPorId: TECNICO.id,
+      creador: { id: TECNICO.id, nombre: 'Carolina' },
+      assignmentCharge: 'ejecucion',
+    });
+    const { service, prisma } = build([
+      fila(mia, { rol: 'LEAD', asignadoPor: { id: TECNICO.id, nombre: 'Carolina' } }),
+    ]);
+
+    const res = await service.list(TECNICO, 1);
+
+    expect(res.open).toEqual([
+      expect.objectContaining({ id: 4, autoAsignada: true, rol: 'LEAD', coreKind: 'servicio' }),
+    ]);
+    expect(prisma.activityAssignee.findMany.mock.calls[0][0].where.userId).toBe(TECNICO.id);
+    expect(prisma.activity.findMany.mock.calls[0][0].where.responsableId).toBe(TECNICO.id);
+  });
+
+  it('David autoasignado como responsable, sin fila de equipo, entra en Por hacer', async () => {
+    const mia = actividad({
+      id: 5,
+      coreKind: 'proyecto',
+      titulo: 'Mi proyecto',
+      creadoPorId: DAVID.id,
+      creador: { id: DAVID.id, nombre: 'David' },
+      assignmentCharge: 'ejecucion',
+    });
+    const { service } = build([], [mia]);
+
+    const res = await service.list(DAVID, 1);
+
+    expect(res.open).toEqual([
+      expect.objectContaining({ id: 5, autoAsignada: true, rol: 'LEAD', coreKind: 'proyecto' }),
+    ]);
+  });
+});
+
+describe('autoasignar', () => {
+  it('deja la actividad en ejecución a nombre de quien la crea', async () => {
+    const activities = { create: jest.fn().mockResolvedValue({ id: 3 }) };
+    const service = new MyActivitiesService(
+      {} as any,
+      activities as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.selfCreate(LUIS, 1, { titulo: 'La dejé para mí', coreKind: 'tarea' } as any);
+
+    expect(activities.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        titulo: 'La dejé para mí',
+        coreKind: 'tarea',
+        responsableId: LUIS.id,
+        creadoPorId: LUIS.id,
+        assignmentCharge: 'ejecucion',
+      }),
+      1,
+    );
+  });
+
+  it('un empleado sin encargo de área no se autoasigna por esta vía', async () => {
+    const activities = { create: jest.fn() };
+    const service = new MyActivitiesService(
+      {} as any,
+      activities as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await expect(service.selfCreate(TECNICO, 1, { titulo: 'No' } as any)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(activities.create).not.toHaveBeenCalled();
   });
 });

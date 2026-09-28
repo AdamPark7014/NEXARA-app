@@ -153,7 +153,9 @@ struct CoreAssignActivityView: View {
 
             if kind != nil && despachoOnly && !bridgeNeeded {
                 Section {
-                    Text("Solo en servicios: le dejas la actividad y cuántas personas ocupas; él manda a Antonio y Antonio elige al soporte.")
+                    Text(CoreOrg.normalized(personEmail) == CoreOrg.antonioEmail
+                         ? "Se la dejas a \(shortName). Él elige al ingeniero de su equipo. Tú no eliges quién la ejecuta."
+                         : "Solo en servicios: le dejas la actividad y cuántas personas ocupas; él manda a Antonio y Antonio elige al soporte.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Stepper("Personas que se ocupan: \(headcount)", value: $headcount, in: 1...50)
@@ -215,7 +217,7 @@ struct CoreAssignActivityView: View {
             }
 
             if let kind, !bridgeNeeded, chargeReady {
-                if !despachoOnly && !ejecucionOnly {
+                if !despachoOnly && !ejecucionOnly && !(effectiveCharge == .despacho && managerCanChoose) {
                     teamSection
                 }
                 CoreActivityFormView(
@@ -367,6 +369,14 @@ struct CoreAssignActivityView: View {
                     userId: targetId,
                     rol: "LEAD",
                     indicaciones: CoreActivityRules.dispatchHeadcountNote(headcount, extra: leadNotes)
+                )
+            } else if effectiveCharge == .despacho && managerCanChoose {
+                let notes = assignClean(leadNotes)
+                try await repo.addTeamMember(
+                    activityId: activityId,
+                    userId: targetId,
+                    rol: "LEAD",
+                    indicaciones: notes.isEmpty ? nil : notes
                 )
             } else if ejecucionOnly {
                 let notes = assignClean(leadNotes)

@@ -70,6 +70,14 @@ describe('quién asigna a quién (organigrama)', () => {
     expect(puedeAsignarA(antonio, org, 16)).toBe(false);
   });
 
+  it('Antonio asigna a su soporte aunque no le reporte; Luis no se lo salta', () => {
+    const sueltos = org.map((u) => (u.id === 13 || u.id === 40 ? { ...u, managerId: 1 } : u));
+    expect(puedeAsignarA(antonio, sueltos, 13)).toBe(true);
+    expect(puedeAsignarA(antonio, sueltos, 40)).toBe(true);
+    expect(puedeAsignarA(luis, sueltos, 13)).toBe(false);
+    expect(puedeAsignarA(luis, sueltos, 40)).toBe(false);
+  });
+
   it('Carolina no asigna a nadie, y nadie se asigna a sí mismo', () => {
     expect(org.every((u) => !puedeAsignarA(carolina, org, u.id))).toBe(true);
     expect(puedeAsignarA(david, org, 8)).toBe(false);
