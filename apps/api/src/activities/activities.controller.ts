@@ -157,6 +157,12 @@ export class ActivitiesController {
     }
   }
 
+  /**
+   * Siguiente folio AN. Lo pide el formulario al abrir y otra vez al guardar.
+   * En producción (47b798c6) exigía ACTIVITIES_MANAGE y respondía 403
+   * «No tienes permisos para esta acción» a administrativo (soluciones@, Daniela).
+   * Cualquier empleado que puede crear una actividad lo puede leer.
+   */
   @Get('next-an')
   @UseGuards(RbacGuard)
   @RBAC({

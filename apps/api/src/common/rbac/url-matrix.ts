@@ -251,12 +251,16 @@ export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
  * Asignar a otra persona lo sigue decidiendo el controlador (`ACTIVITIES_MANAGE`
  * y el candado de departamento). El folio (`GET /api/activities/next-an`) va aquí
  * porque el formulario lo pide al guardar: sin esa GET, el alta dejaba un 403
- * en pantalla aunque la actividad ya existiera.
+ * («No tienes permisos para esta acción») aunque la actividad ya existiera.
+ * El listado de proyectos y su cronograma son lo otro que ese formulario lee.
  */
 export const ACTIVIDAD_PROPIA_URL_RULES: UrlRule[] = [
   { path: '/api/activities', methods: ['POST'], scope: 'write' },
   { path: '/api/activities/next-an', methods: ['GET'], scope: 'read' },
   { path: '/api/me/activities', methods: ['POST'], scope: 'write' },
+  { path: '/api/operational-projects', methods: ['GET'], scope: 'read' },
+  { path: '/api/operational-projects/*', methods: ['GET'], scope: 'read' },
+  { path: '/api/proyectos/*/programacion', methods: ['GET'], scope: 'read' },
   { path: '/erp/mis-actividades', scope: 'write' },
   { path: '/erp/mis-actividades/**', scope: 'write' },
   { path: '/erp/pizarra', scope: 'write' },
