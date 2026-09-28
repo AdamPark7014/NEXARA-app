@@ -273,9 +273,10 @@ export class CrearProyectoProfesionalDto {
   @Min(0)
   siteCount?: number;
 
-  // --- Fechas ---
+  // --- Fechas (opcionales: se completan después en el proyecto) ---
+  @IsOptional()
   @IsDateString()
-  startDate!: string;
+  startDate?: string | null;
 
   @IsOptional()
   @IsDateString()
@@ -377,7 +378,7 @@ export class ActualizarProyectoProfesionalDto {
 
   @IsOptional()
   @IsDateString()
-  startDate?: string;
+  startDate?: string | null;
 
   @IsOptional()
   @IsDateString()

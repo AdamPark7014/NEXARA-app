@@ -25,11 +25,11 @@ describe("errores por paso", () => {
     expect(erroresDelPaso("datos", borrador({ siteCount: "4" }))).toEqual([]);
   });
 
-  it("fechas: el fin no puede ir antes del inicio", () => {
+  it("fechas: el inicio y el responsable no son obligatorios; el fin no puede ir antes", () => {
+    expect(erroresDelPaso("fechas", borrador({ startDate: "", endDate: "", responsableId: "" }))).toEqual([]);
     expect(erroresDelPaso("fechas", borrador({ startDate: "2026-09-20", endDate: "2026-09-10" }))).toEqual([
       "El fin planeado no puede ser antes del inicio.",
     ]);
-    expect(erroresDelPaso("fechas", borrador({ startDate: "" }))).toContain("Pon la fecha de inicio planeada.");
   });
 
   it("fechas: el presupuesto acepta comas y rechaza letras", () => {
@@ -54,7 +54,10 @@ describe("errores por paso", () => {
 
   it("el borrador completo junta los errores de todos los pasos", () => {
     expect(erroresDelBorrador(borrador())).toEqual([]);
-    expect(erroresDelBorrador(borradorVacio("2026-09-17", "")).length).toBeGreaterThanOrEqual(3);
+    expect(erroresDelBorrador(borradorVacio("2026-09-17", ""))).toEqual([
+      "Escribe el nombre del proyecto (al menos 3 letras).",
+      "Elige el cliente.",
+    ]);
   });
 });
 
@@ -68,6 +71,7 @@ describe("cuerpo del POST", () => {
   it("arma el alta completa y descarta renglones vacíos", () => {
     const cuerpo = cuerpoDeAlta(
       borrador({
+        startDate: "2026-09-17",
         endDate: "2026-12-15",
         budget: "250,000",
         siteCount: "3",

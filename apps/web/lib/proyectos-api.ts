@@ -169,7 +169,7 @@ type CabeceraProyecto = {
   vendorId: number;
   responsableId?: number | null;
   clientId: number;
-  startDate: string;
+  startDate?: string | null;
   endDate?: string | null;
   actualStartDate?: string | null;
   actualEndDate?: string | null;
@@ -434,7 +434,7 @@ export type CrearProyecto = {
   objective?: string;
   scopeSummary?: string;
   siteCount?: number;
-  startDate: string;
+  startDate?: string;
   endDate?: string;
   budgetAmount?: number;
   currency?: string;
@@ -460,7 +460,7 @@ export type ActualizarProyecto = Partial<{
   projectType: string;
   siteCount: number | null;
   responsableId: number | null;
-  startDate: string;
+  startDate: string | null;
   endDate: string | null;
   actualStartDate: string | null;
   actualEndDate: string | null;

@@ -450,7 +450,7 @@ export default function NuevoProyectoPage() {
         <div className={styles.grid2}>
           <div>
             <label className={styles.fieldLabel} htmlFor="inicio">
-              Inicio planeado *
+              Inicio planeado
             </label>
             <input
               id="inicio"
@@ -458,8 +458,8 @@ export default function NuevoProyectoPage() {
               type="date"
               value={b.startDate}
               onChange={(e) => cambiar("startDate", e.target.value)}
-              required
             />
+            <p className={styles.hint}>Opcional. Se puede anotar después, en el proyecto.</p>
           </div>
           <div>
             <label className={styles.fieldLabel} htmlFor="fin">
@@ -479,17 +479,16 @@ export default function NuevoProyectoPage() {
 
         <div>
           <label className={styles.fieldLabel} htmlFor="responsable">
-            Responsable del proyecto *
+            Responsable del proyecto
           </label>
           <PersonaSelect
             id="responsable"
             value={b.responsableId}
             onChange={(v) => cambiar("responsableId", v)}
             personas={personas}
-            vacio="Elige al responsable"
-            required
+            vacio="Sin responsable (queda quien lo crea)"
           />
-          <p className={styles.hint}>A quién se le pregunta por el proyecto. Entra solo al equipo.</p>
+          <p className={styles.hint}>Opcional. Si lo dejas vacío, el proyecto queda a nombre de quien lo crea.</p>
           {avisoPersonas ? <p className={styles.hint}>{avisoPersonas}</p> : null}
         </div>
 
@@ -1004,7 +1003,7 @@ export default function NuevoProyectoPage() {
           <div className={`${styles.panel} ${styles.panelHundido}`}>
             <h3 className={styles.panelTitle}>Fechas y dinero</h3>
             <span className={styles.rowWrap}>
-              Plan: {formatoFecha(b.startDate)} → {b.endDate ? formatoFecha(b.endDate) : "sin fin planeado"}
+              Plan: {b.startDate ? formatoFecha(b.startDate) : "sin inicio planeado"} → {b.endDate ? formatoFecha(b.endDate) : "sin fin planeado"}
             </span>
             <span className={styles.rowWrap}>
               Presupuesto: {importe !== null && Number.isFinite(importe) ? formatoMoneda(importe, b.currency) : "sin capturar"}

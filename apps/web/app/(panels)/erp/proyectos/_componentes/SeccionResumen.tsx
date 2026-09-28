@@ -73,8 +73,7 @@ function cambiosDe(p: ProyectoDetalle, f: FormCabecera): { cambios: ActualizarPr
     else cambios.siteCount = f.siteCount.trim() ? n : null;
   }
   if (f.responsableId !== antes.responsableId) cambios.responsableId = f.responsableId ? Number(f.responsableId) : null;
-  if (!f.startDate) errores.push("El inicio planeado no puede quedar vacío.");
-  else if (f.startDate !== antes.startDate) cambios.startDate = f.startDate;
+  if (f.startDate !== antes.startDate) cambios.startDate = f.startDate || null;
   if (f.endDate !== antes.endDate) cambios.endDate = f.endDate || null;
   if (f.actualStartDate !== antes.actualStartDate) cambios.actualStartDate = f.actualStartDate || null;
   if (f.actualEndDate !== antes.actualEndDate) cambios.actualEndDate = f.actualEndDate || null;

@@ -57,7 +57,7 @@ export type SharedOpsIdentity = {
   projectType: ServiceProjectType;
   scopeSummary: string | null;
   siteCount: number | null;
-  startDate: Date;
+  startDate: Date | null;
   endDate: Date | null;
   status: OperationalProjectStatus;
 };
@@ -68,7 +68,7 @@ export function opsPatchFromSales(sales: SharedSalesIdentity): {
   projectType: ServiceProjectType;
   scopeSummary: string | null;
   siteCount: number | null;
-  startDate: Date;
+  startDate: Date | null;
   endDate: Date | null;
   status: OperationalProjectStatus;
 } {
@@ -77,7 +77,7 @@ export function opsPatchFromSales(sales: SharedSalesIdentity): {
     projectType: sales.projectType,
     scopeSummary: sales.scopeSummary,
     siteCount: sales.siteCount,
-    startDate: sales.startDate || new Date(),
+    startDate: sales.startDate,
     endDate: sales.endDate,
     status: salesStatusToOps(sales.status),
   };
@@ -89,7 +89,7 @@ export function salesPatchFromOps(ops: SharedOpsIdentity): {
   projectType: ServiceProjectType;
   scopeSummary: string | null;
   siteCount: number | null;
-  startDate: Date;
+  startDate: Date | null;
   endDate: Date | null;
   status: SalesProjectStatus;
 } {

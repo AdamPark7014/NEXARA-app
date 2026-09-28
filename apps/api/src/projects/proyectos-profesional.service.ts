@@ -306,9 +306,9 @@ export class ProyectosProfesionalService {
     // Un cliente de otra empresa no se puede ligar: se contesta igual que si no existiera.
     if (client.companyId !== tenantId) throw new NotFoundException('Cliente no encontrado');
 
-    const startDate = this.fecha(dto.startDate)!;
+    const startDate = this.fecha(dto.startDate ?? null);
     const endDate = this.fecha(dto.endDate ?? null);
-    if (endDate && endDate < startDate) {
+    if (startDate && endDate && endDate < startDate) {
       throw new BadRequestException('El fin planeado no puede ser anterior al inicio planeado');
     }
 
@@ -443,7 +443,7 @@ export class ProyectosProfesionalService {
 
     const startDate = dto.startDate !== undefined ? this.fecha(dto.startDate) : undefined;
     const endDate = dto.endDate !== undefined ? this.fecha(dto.endDate) : undefined;
-    const inicio = startDate ?? actual.startDate;
+    const inicio = startDate !== undefined ? startDate : actual.startDate;
     const fin = endDate !== undefined ? endDate : actual.endDate;
     if (inicio && fin && fin < inicio) {
       throw new BadRequestException('El fin planeado no puede ser anterior al inicio planeado');
@@ -459,7 +459,7 @@ export class ProyectosProfesionalService {
         ...(dto.projectType !== undefined && { projectType: dto.projectType }),
         ...(dto.siteCount !== undefined && { siteCount: dto.siteCount ?? null }),
         ...(dto.responsableId !== undefined && { responsableId: dto.responsableId ?? null }),
-        ...(startDate !== undefined && startDate !== null && { startDate }),
+        ...(startDate !== undefined && { startDate }),
         ...(endDate !== undefined && { endDate }),
         ...(dto.actualStartDate !== undefined && { actualStartDate: this.fecha(dto.actualStartDate) }),
         ...(dto.actualEndDate !== undefined && { actualEndDate: this.fecha(dto.actualEndDate) }),

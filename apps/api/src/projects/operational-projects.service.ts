@@ -164,9 +164,9 @@ export class OperationalProjectsService {
   }
 
   async create(createDto: CreateOperationalProjectDto, userId: number) {
-    // Verify that the vendor exists and is the current user's own project
+    // Si no eligen vendedor, el proyecto queda a nombre de quien lo crea.
     const vendor = await this.prisma.user.findUnique({
-      where: { id: createDto.vendorId },
+      where: { id: createDto.vendorId ?? userId },
     });
 
     if (!vendor) {
@@ -184,6 +184,7 @@ export class OperationalProjectsService {
 
     // Create the operational project
     const companyId = await resolveRequiredCompanyId(this.prisma, (client as any).companyId);
+    const vendorId = createDto.vendorId ?? userId;
     const created = await this.projectRepo.create({
       data: {
         title: createDto.title,
@@ -193,9 +194,9 @@ export class OperationalProjectsService {
         siteCount: createDto.siteCount ?? null,
         salesProjectId: createDto.salesProjectId ?? null,
         status: 'ACTIVE',
-        vendorId: createDto.vendorId,
+        vendorId,
         clientId: createDto.clientId,
-        startDate: new Date(createDto.startDate),
+        startDate: createDto.startDate ? new Date(createDto.startDate) : null,
         endDate: createDto.endDate ? new Date(createDto.endDate) : null,
         companyId,
       },
@@ -240,8 +241,8 @@ export class OperationalProjectsService {
 
   /**
    * Proyecto mínimo para poder asignar la actividad: nombre y cliente tipo PROYECTO
-   * de la misma empresa. El responsable es quien lo crea y el inicio es hoy.
-   * Fechas, alcance y equipo se completan después en Proyectos.
+   * de la misma empresa. El responsable es quien lo crea. Fechas, alcance y equipo
+   * quedan vacíos y se completan después en Proyectos.
    */
   async quickCreate(dto: QuickCreateOperationalProjectDto, user: any, companyId?: number | null) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
@@ -256,13 +257,11 @@ export class OperationalProjectsService {
       throw new BadRequestException('El proyecto solo se liga a un cliente de tipo proyecto');
     }
     const serviceClientId = await this.ensureServiceClientForProject(sales, tenantId);
-    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
     return this.create(
       {
         title: dto.title.trim(),
         clientId: serviceClientId,
         vendorId: Number(user.id),
-        startDate: hoy,
         projectType: 'OTRO',
       },
       Number(user.id),
@@ -645,10 +644,12 @@ export class OperationalProjectsService {
   async getProjectDuration(projectId: number, companyId?: number | null) {
     const project = await this.findById(projectId, companyId);
 
-    const startDate = new Date(project.startDate);
-    const endDate = project.actualEndDate ? new Date(project.actualEndDate) : project.endDate ? new Date(project.endDate) : new Date();
-
-    const durationDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const startDate = project.startDate ? new Date(project.startDate) : null;
+    const endDate = project.actualEndDate ? new Date(project.actualEndDate) : project.endDate ? new Date(project.endDate) : null;
+    const durationDays =
+      startDate && endDate
+        ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
 
     return {
       startDate,
