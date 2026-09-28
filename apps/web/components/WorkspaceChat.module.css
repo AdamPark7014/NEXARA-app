@@ -927,6 +927,24 @@
   color: var(--foreground, #111);
 }
 
+.actionDanger:hover {
+  color: var(--nx-danger);
+  background: color-mix(in srgb, var(--nx-danger) 12%, transparent);
+}
+
+.msgDeleted,
+.replyCite {
+  margin-top: 4px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-tertiary, #98a2b3);
+}
+
+.replyCite {
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--nx-line, #e4e7ec);
+}
+
 /*
  * Colocación de los dos selectores de emoji. La caja, los colores y el teclado
  * viven en `components/chat/EmojiPicker.module.css`; aquí solo se dice desde

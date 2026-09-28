@@ -211,6 +211,15 @@ export class ChatController {
     return this.chat.openDirect(user.id, Number(body.userId), companyId);
   }
 
+  @Delete('messages/:id')
+  deleteMessage(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.chat.deleteMessage(id, user.id, companyId);
+  }
+
   @Patch('messages/:id')
   editMessage(
     @Param('id', ParseIntPipe) id: number,

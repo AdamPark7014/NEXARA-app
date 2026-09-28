@@ -917,6 +917,7 @@ model User {
   chatMemberships           ChatChannelMember[]        @relation("ChatChannelMember")
   chatMessagesAuthored      ChatMessage[]              @relation("ChatMessageAuthor")
   chatMessagesPinned        ChatMessage[]              @relation("ChatMessagePinner")
+  chatMessagesDeleted       ChatMessage[]              @relation("ChatMessageDeleter")
   chatReactions             ChatMessageReaction[]      @relation("ChatReactionUser")
   chatMessageReads          ChatMessageRead[]          @relation("ChatMessageReadUser")
   workflowStepsApprover     WorkflowStep[]             @relation("WorkflowStepApprover")
@@ -6326,12 +6327,17 @@ model ChatMessage {
   pinnedAt       DateTime?
   pinnedById     Int?
   editedAt       DateTime?
+  /// Borrado lógico. Las consultas del chat filtran `deletedAt: null`.
+  /// El texto queda en la fila (auditoría); la API no lo devuelve.
   deletedAt      DateTime?
+  /// Quién lo borró. Solo el CEO (usuario 1) puede llenar este campo.
+  deletedById    Int?
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
   channel        ChatChannel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
   author         User                  @relation("ChatMessageAuthor", fields: [authorId], references: [id])
   pinnedBy       User?                 @relation("ChatMessagePinner", fields: [pinnedById], references: [id], onDelete: SetNull)
+  deletedBy      User?                 @relation("ChatMessageDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
   parent         ChatMessage?          @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
   replies        ChatMessage[]         @relation("ChatThread")
   reactions      ChatMessageReaction[]
@@ -6343,6 +6349,7 @@ model ChatMessage {
   @@index([parentId, createdAt])
   @@index([channelId, pinnedAt])
   @@index([companyId])
+  @@index([deletedById])
   @@map("chat_messages")
 }
 
