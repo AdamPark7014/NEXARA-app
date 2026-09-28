@@ -15,6 +15,7 @@ const API_ROLE_EXTRA_PANELS: Record<string, string[]> = {
   coord_operaciones: ['ops', 'core', 'integra'],
   ing_campo: ['ops'],
   ing_soporte: ['ops', 'core', 'integra'],
+  enc_soporte: ['ops', 'core', 'integra'],
   coord_ventas: ['sales', 'core'],
   vendedor: ['sales'],
   lider_diseno: ['studio', 'core'],

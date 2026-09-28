@@ -9,30 +9,45 @@ import type { ChecklistHerramientas, RequisitoBorrador, RequisitoHerramienta } f
 const useUser = vi.hoisted(() => vi.fn());
 vi.mock("@/components/UserContext", () => ({ useUser }));
 
-function Editor({ inicial = [] as RequisitoBorrador[] }) {
+beforeEach(() => {
+  useUser.mockReturnValue({ user: { token: "jwt", permissions: [] }, token: "jwt" });
+  // El editor trae el catálogo de kits/herramientas al abrirse; aquí no interesa: lista vacía.
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function Editor({
+  inicial = [] as RequisitoBorrador[],
+  onToggle = () => undefined,
+}: {
+  inicial?: RequisitoBorrador[];
+  onToggle?: (v: boolean) => void;
+}) {
   const [filas, setFilas] = useState<RequisitoBorrador[]>(inicial);
-  return <HerramientasChecklistEditor value={filas} onChange={setFilas} />;
+  return <HerramientasChecklistEditor value={filas} onChange={setFilas} usePersonalKit={false} onToggleUsePersonalKit={onToggle} />;
 }
 
+const fila = (key: string, descripcion: string, cantidad = 1): RequisitoBorrador => ({ key, descripcion, cantidad });
+
 describe("HerramientasChecklistEditor", () => {
-  it("los atajos agregan filas con nombre libre y se pueden quitar", async () => {
-    render(<Editor />);
-    await userEvent.click(screen.getByRole("button", { name: "Escalera" }));
-    await userEvent.click(screen.getByRole("button", { name: "Escalera" }));
-    await userEvent.click(screen.getByRole("button", { name: "Multímetro" }));
+  it("lista los renglones con su cantidad y se pueden quitar", async () => {
+    render(<Editor inicial={[fila("a", "Escalera", 2), fila("b", "Multímetro")]} />);
+    expect((screen.getByLabelText("Cantidad de Escalera") as HTMLInputElement).value).toBe("2");
+    expect(screen.getByText("Multímetro")).toBeInTheDocument();
 
-    const nombres = screen.getAllByLabelText(/^Herramienta \d+$/).map((el) => (el as HTMLInputElement).value);
-    expect(nombres).toEqual(["Escalera", "Escalera 2", "Multímetro"]);
-
-    await userEvent.click(screen.getByRole("button", { name: "Quitar Escalera 2" }));
-    expect(screen.getAllByLabelText(/^Herramienta \d+$/)).toHaveLength(2);
+    await userEvent.click(screen.getByRole("button", { name: "Quitar Escalera" }));
+    expect(screen.queryByLabelText("Cantidad de Escalera")).toBeNull();
+    expect(screen.getByLabelText("Cantidad de Multímetro")).toBeInTheDocument();
   });
 
-  it("«Agregar herramienta» deja una fila vacía con cantidad 1", async () => {
-    render(<Editor />);
-    await userEvent.click(screen.getByRole("button", { name: "Agregar herramienta" }));
-    expect((screen.getByLabelText("Herramienta 1") as HTMLInputElement).value).toBe("");
-    expect((screen.getByLabelText(/^Cantidad de/) as HTMLInputElement).value).toBe("1");
+  it("«Kit personal» avisa al formulario cuando se marca", async () => {
+    const onToggle = vi.fn();
+    render(<Editor onToggle={onToggle} />);
+    await userEvent.click(screen.getByLabelText("Kit personal"));
+    expect(onToggle).toHaveBeenCalledWith(true);
   });
 });
 
@@ -136,7 +151,7 @@ describe("HerramientasChecklist", () => {
     expect(screen.getByText(/Carolina Pérez ·/)).toBeInTheDocument();
     expect(screen.getByText("Sin revisar")).toBeInTheDocument();
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls.find(([u]) => /\/activities\/5\/herramientas$/.test(String(u))) as [string, RequestInit];
     expect(url).toMatch(/\/activities\/5\/herramientas$/);
     expect(init.credentials).toBe("include");
   });
@@ -185,7 +200,10 @@ describe("HerramientasChecklist", () => {
       string,
       RequestInit,
     ];
-    expect(JSON.parse(String(put[1].body))).toEqual({ requisitos: [{ id: 1, descripcion: "Escalera", cantidad: 2 }] });
+    expect(JSON.parse(String(put[1].body))).toEqual({
+      requisitos: [expect.objectContaining({ id: 1, descripcion: "Escalera", cantidad: 2 })],
+      usePersonalKit: false,
+    });
   });
 
   it("sin permiso de gestión no ofrece definir, pero sí palomear", async () => {
