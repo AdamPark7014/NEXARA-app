@@ -17,7 +17,7 @@ import {
   REASSIGN_FORBIDDEN,
   type ChainActor,
 } from './activity-superiors.js';
-import { esDeTodaLaEmpresa, puedeAsignarA, tiposVisibles, type Alcanzador } from '../me/equipo-alcance.js';
+import { asignaEnTodaLaEmpresa, puedeAsignarA, tiposVisibles, type Alcanzador } from '../me/equipo-alcance.js';
 import { puedePedirApoyoEntreAreas } from './asignacion-departamento.js';
 
 /**
@@ -151,12 +151,12 @@ export class ActivityTeamService {
    * una nueva: así el historial de horas de esa persona no se fragmenta.
    */
   /**
-   * Asignar desde la pizarra o el detalle: solo a gente que alcanzas (tu organigrama o tu flujo de
-   * despacho) y en actividades de los tipos que coordinas. Dirección asigna a cualquiera.
+   * Asignar desde la pizarra o el detalle: organigrama hacia abajo o flujo de despacho.
+   * Coordinación y gerencia asignan a cualquiera, sin el recorte de tipo de la pizarra.
    * El reparto de despacho (`me/activities/:id/despacho`) ya valida su propio equipo.
    */
   async assertPuedeAsignar(actor: Alcanzador, activityId: number, userId: number, companyId?: number | null) {
-    if (esDeTodaLaEmpresa(actor)) return;
+    if (asignaEnTodaLaEmpresa(actor)) return;
     const tipos = tiposVisibles(actor);
     if (tipos) {
       const tenantId = requireCompanyId(companyId);

@@ -55,27 +55,31 @@ describe('quién asigna a quién (organigrama)', () => {
   const antonio = { id: 39, email: 'jose.ramirez@nexara.com.mx', roleKey: 'ing_soporte' };
   const carolina = { id: 13, email: 'soporte@nexara.com.mx', roleKey: 'ing_soporte' };
 
-  it('David solo a sus instaladores: ni a José Antonio ni a soporte', () => {
+  it('coordinación asigna a cualquiera, también fuera de su organigrama', () => {
     expect(puedeAsignarA(david, org, 16)).toBe(true);
     expect(puedeAsignarA(david, org, 12)).toBe(true);
-    expect(puedeAsignarA(david, org, 39)).toBe(false);
-    expect(puedeAsignarA(david, org, 13)).toBe(false);
+    expect(puedeAsignarA(david, org, 39)).toBe(true);
+    expect(puedeAsignarA(david, org, 13)).toBe(true);
+    expect(puedeAsignarA(luis, org, 40)).toBe(true);
+    expect(puedeAsignarA(david, org, 8)).toBe(false);
   });
 
-  it('Luis solo a José Antonio, que reparte a su equipo', () => {
-    expect(puedeAsignarA(luis, org, 39)).toBe(true);
-    expect(puedeAsignarA(luis, org, 13)).toBe(false);
+  it('el encargado de soporte reparte a su equipo y no a instalación', () => {
     expect(puedeAsignarA(antonio, org, 13)).toBe(true);
     expect(puedeAsignarA(antonio, org, 40)).toBe(true);
     expect(puedeAsignarA(antonio, org, 16)).toBe(false);
+    const encargado = { id: 90, email: 'nuevo.encargado@nexara.com.mx', roleKey: 'enc_soporte' };
+    const conEquipo = [...org, { id: 91, email: 'tecnico.nuevo@nexara.com.mx', managerId: 90 }];
+    expect(puedeAsignarA(encargado, conEquipo, 91)).toBe(true);
+    expect(puedeAsignarA(encargado, conEquipo, 16)).toBe(false);
   });
 
-  it('Antonio asigna a su soporte aunque no le reporte; Luis no se lo salta', () => {
+  it('Antonio asigna a su soporte aunque no le reporte; coordinación también', () => {
     const sueltos = org.map((u) => (u.id === 13 || u.id === 40 ? { ...u, managerId: 1 } : u));
     expect(puedeAsignarA(antonio, sueltos, 13)).toBe(true);
     expect(puedeAsignarA(antonio, sueltos, 40)).toBe(true);
-    expect(puedeAsignarA(luis, sueltos, 13)).toBe(false);
-    expect(puedeAsignarA(luis, sueltos, 40)).toBe(false);
+    expect(puedeAsignarA(luis, sueltos, 13)).toBe(true);
+    expect(puedeAsignarA(luis, sueltos, 40)).toBe(true);
   });
 
   it('Carolina no asigna a nadie, y nadie se asigna a sí mismo', () => {

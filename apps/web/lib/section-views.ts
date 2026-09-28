@@ -757,18 +757,18 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       subtitle: 'Asigna servicios al equipo y ejecuta las tuyas.',
     };
   }
-  // Admin (DIR_ADMIN / COORD_ADMIN): lectura de reportes para facturación y seguimiento
+  // Gerencia y coordinación administrativa asignan entre departamentos.
   if (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN) {
     return {
       viewMode: 'manage',
       defaultScope: 'team',
-      canCreate: false,
-      canEdit: false,
+      canCreate: true,
+      canEdit: true,
       canDelete: false,
-      canAssign: false,
+      canAssign: true,
       canApprove: false,
-      title: 'Órdenes de trabajo · Reportes',
-      subtitle: 'Evidencias y avances para facturar.',
+      title: 'Órdenes de trabajo · Asignación',
+      subtitle: 'Asigna actividades, también fuera de tu departamento.',
     };
   }
   if (OPS_MANAGERS.has(v2)) {
@@ -1574,8 +1574,6 @@ export function getOpsDashboardSectionConfig(user: UserAccessInput | null | unde
       subtitle: 'OT del equipo, alertas NOC y estado del día.',
     };
   }
-  // Admin roles (DIR_ADMIN/COORD_ADMIN) acceden OPS solo para lectura de
-  // reportes de campo — no deben poder crear, asignar ni aprobar OTs.
   if (!activities.canCreate && !activities.canAssign && !activities.canApprove) {
     return {
       ...activities,

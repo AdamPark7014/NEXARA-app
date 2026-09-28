@@ -196,7 +196,7 @@ export class ToolRequestsController {
   }
 
   @Get('kits/users')
-  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_MANAGE, PERMISSIONS.ACTIVITIES_MANAGE] })
   async getUsersKit(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
@@ -205,6 +205,7 @@ export class ToolRequestsController {
     return this.toolRequestsService.getUsersKit(
       {
         id: user.id,
+        email: user.email,
         isSuperAdmin: user.isSuperAdmin,
         permissions: user.permissions,
       },

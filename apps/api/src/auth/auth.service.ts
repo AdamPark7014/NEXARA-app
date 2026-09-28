@@ -14,7 +14,7 @@ import {
   isSuperAdminEmail,
   isCeoEquivalentEmail,
 } from '../common/platform-accounts.js';
-import { LEGACY_TO_V2, ROLES, puedeCotizar, type RoleKey } from '../common/rbac/roles.v2.js';
+import { LEGACY_TO_V2, ROLES, puedeCotizar, roleKeyFromRoleNombre, type RoleKey } from '../common/rbac/roles.v2.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { fechaAviso } from '../notifications/notification-push-meta.js';
 import { canManageTools } from '../tool-requests/tools-access.js';
@@ -22,6 +22,7 @@ import { canManageTools } from '../tool-requests/tools-access.js';
 type UserWithRole = {
   roleKey?: string | null;
   role?: {
+    nombre?: string | null;
     orgRoleKey?: string | null;
     accesoConsole?: boolean;
     accesoConsoleAdmin?: boolean;
@@ -91,7 +92,7 @@ export class AuthService {
     if (orgKey && LEGACY_TO_V2[orgKey]) {
       return LEGACY_TO_V2[orgKey];
     }
-    return null;
+    return roleKeyFromRoleNombre(user.role?.nombre);
   }
 
   /**
@@ -394,6 +395,19 @@ export class AuthService {
     // People: todos los empleados ven su propia info de RH
     permissions.push(PERMISSIONS.PANEL_PEOPLE, PERMISSIONS.PEOPLE_VIEW);
 
+    // Rol legacy con flags acceso* en false (Líder de Diseño, Administrativo):
+    // igual crea su actividad, se la asigna y sube la foto. No abre gestión ajena.
+    const legacyRole = roleKeyFromRoleNombre(role?.nombre);
+    if (role && legacyRole !== ROLES.CLIENTE) {
+      permissions.push(
+        PERMISSIONS.CONSOLE_ACCESS,
+        PERMISSIONS.ACTIVITIES_VIEW,
+        PERMISSIONS.EVIDENCES_VIEW,
+        PERMISSIONS.EVIDENCES_CREATE,
+        PERMISSIONS.GPS_VIEW,
+      );
+    }
+
     return Array.from(new Set(permissions));
   }
 
@@ -422,6 +436,16 @@ export class AuthService {
   ): string[] {
     if (!roleKey) return this.applyToolsManageByEmail(permissions, email);
     const set = new Set(permissions);
+
+    // Todo el personal interno crea su actividad, se la autoasigna y registra
+    // foto y GPS de lo suyo. ACTIVITIES_MANAGE (asignar a otros) no entra aquí.
+    if (roleKey !== 'cliente') {
+      set.add(PERMISSIONS.CONSOLE_ACCESS);
+      set.add(PERMISSIONS.ACTIVITIES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_CREATE);
+      set.add(PERMISSIONS.GPS_VIEW);
+    }
 
     // ── BI / Analytics ─────────────────────────────────────────────
     const V2_BI_ROLES = new Set(['ceo', 'dir_admin', 'dir_operaciones', 'coord_ventas', 'coord_operaciones', 'coord_admin', 'arquitecto']);

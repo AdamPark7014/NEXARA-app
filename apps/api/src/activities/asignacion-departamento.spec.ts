@@ -5,9 +5,8 @@ import {
 } from './asignacion-departamento';
 
 /**
- * Luis (Servicios) le pide a Antonio (Sistemas) que asigne a su ingeniero.
- * Carolina es ingeniera de Antonio: Luis no se la salta.
- * Joan es ingeniero de campo: no cruza de departamento.
+ * Coordinación y gerencia asignan a cualquiera, también a otro departamento.
+ * Antonio (encargado) asigna a su soporte. Joan, sin mando, no sale de su área.
  */
 const christian = persona(1, 'gerencia@nexara.com.mx', 'ceo', 1, null);
 const luis = persona(7, 'direccion.operaciones@nexara.com.mx', 'coord_operaciones', 31, 1);
@@ -56,10 +55,10 @@ describe('puedeDejarActividadA', () => {
     expect(puedeDejarActividadA(actor(luis), antonio, roster)).toBe(true);
   });
 
-  it('Luis no asigna directo al ingeniero de Antonio', () => {
-    expect(puedeDejarActividadA(actor(luis), carolina, roster)).toBe(false);
-    expect(puedeDejarActividadA(actor(luis), alejandro, roster)).toBe(false);
-    expect(mensajeAsignacionDenegada(luis)).toMatch(/coordinador/);
+  it('coordinación asigna directo al ingeniero de otro departamento', () => {
+    expect(puedeDejarActividadA(actor(luis), carolina, roster)).toBe(true);
+    expect(puedeDejarActividadA(actor(luis), alejandro, roster)).toBe(true);
+    expect(puedeDejarActividadA(actor(david), carolina, roster)).toBe(true);
   });
 
   it('un coordinador puede pedir apoyo a otro coordinador de otro departamento', () => {
@@ -71,9 +70,9 @@ describe('puedeDejarActividadA', () => {
     expect(puedeDejarActividadA(actor(dirAdmin), luis, roster)).toBe(true);
   });
 
-  it('un coordinador puede pedir apoyo a un encargado nuevo que tiene gente a su cargo', () => {
+  it('coordinación asigna también al ingeniero de un encargado de otra área', () => {
     expect(puedeDejarActividadA(actor(david), encargadoNuevo, roster)).toBe(true);
-    expect(puedeDejarActividadA(actor(david), ingenieroNuevo, roster)).toBe(false);
+    expect(puedeDejarActividadA(actor(david), ingenieroNuevo, roster)).toBe(true);
   });
 
   it('un ingeniero sigue limitado a su departamento', () => {
@@ -99,7 +98,7 @@ describe('puedeDejarActividadA', () => {
     const carolinaSuelta = { ...carolina, managerId: 1, departmentId: 99 };
     const rosterRoto = roster.map((p) => (p.id === carolina.id ? carolinaSuelta : p));
     expect(puedeDejarActividadA(actor(antonio), carolinaSuelta, rosterRoto)).toBe(true);
-    expect(puedeDejarActividadA(actor(luis), carolinaSuelta, rosterRoto)).toBe(false);
+    expect(puedeDejarActividadA(actor(luis), carolinaSuelta, rosterRoto)).toBe(true);
     expect(puedeDejarActividadA(actor(joan), carolinaSuelta, rosterRoto)).toBe(false);
   });
 

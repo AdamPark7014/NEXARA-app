@@ -443,8 +443,18 @@ export function kindsForAssignment(opts: {
     email: opts.creatorEmail,
     isSuperAdmin: opts.isSuperAdmin,
   });
-  if (!opts.targetEmail) return create;
-  return intersect(create, kindsForTarget(opts.targetEmail));
+  if (!opts.targetEmail) return create.length ? create : ['tarea'];
+  const visibles = intersect(create, kindsForTarget(opts.targetEmail));
+  // Autoasignación: si la intersección queda vacía (Roberto solo recibe servicio
+  // y no puede crear ninguno), igual puede darse una tarea a sí mismo.
+  if (
+    visibles.length === 0 &&
+    norm(opts.creatorEmail) &&
+    norm(opts.creatorEmail) === norm(opts.targetEmail)
+  ) {
+    return ['tarea'];
+  }
+  return visibles;
 }
 
 export function metaForKind(kind: ActivityKind): ActivityKindMeta {

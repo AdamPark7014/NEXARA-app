@@ -231,9 +231,13 @@ object CoreActivityKinds {
         isSuperAdmin: Boolean,
     ): List<String> {
         val create = kindsForCreator(roleKey, creatorEmail, isSuperAdmin)
-        if (targetEmail.isNullOrEmpty()) return create
+        if (targetEmail.isNullOrEmpty()) return if (create.isEmpty()) listOf(TAREA) else create
         val receive = kindsForTarget(targetEmail).toSet()
-        return ALL.filter { it in create && it in receive }
+        val visibles = ALL.filter { it in create && it in receive }
+        if (visibles.isEmpty() && norm(creatorEmail).isNotEmpty() && norm(creatorEmail) == norm(targetEmail)) {
+            return listOf(TAREA)
+        }
+        return visibles
     }
 
     fun isServicioBridgeEmail(email: String?): Boolean = norm(email) == OrgEmails.ANTONIO

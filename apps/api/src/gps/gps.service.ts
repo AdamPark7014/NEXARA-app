@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
@@ -43,6 +43,42 @@ export class GpsService {
     return { lat, lng };
   }
 
+  /**
+   * La app a veces manda el id de la asignación (u otro id) en `actividadId`.
+   * Si no hay actividad en la empresa, se intenta ese id como asignación y se
+   * guarda la actividad real. Si tampoco existe, 400: no un 500 de llave foránea.
+   */
+  private async resolveActividadId(
+    raw: number | undefined,
+    usuarioId: number,
+    companyId: number,
+  ): Promise<number | undefined> {
+    if (!raw) return undefined;
+    const id = Number(raw);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException('La actividad indicada no existe en esta empresa');
+    }
+    const activity = await this.prisma.activity.findFirst({
+      where: { id, ...companyWhere(companyId) },
+      select: { id: true },
+    });
+    if (activity) return activity.id;
+
+    const deLaPersona = await this.prisma.activityAssignee.findFirst({
+      where: { id, userId: usuarioId, ...companyWhere(companyId) },
+      select: { activityId: true },
+    });
+    if (deLaPersona) return deLaPersona.activityId;
+
+    const deLaEmpresa = await this.prisma.activityAssignee.findFirst({
+      where: { id, ...companyWhere(companyId) },
+      select: { activityId: true },
+    });
+    if (deLaEmpresa) return deLaEmpresa.activityId;
+
+    throw new BadRequestException('La actividad indicada no existe en esta empresa');
+  }
+
   async create(createGpsDto: CreateGpsDto, companyId?: number | null) {
     if (createGpsDto.usuarioId === undefined) {
       throw new Error('usuarioId requerido');
@@ -62,6 +98,11 @@ export class GpsService {
     }
 
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
+    const actividadId = await this.resolveActividadId(
+      createGpsDto.actividadId,
+      createGpsDto.usuarioId,
+      resolvedCompanyId,
+    );
     const data: Prisma.LocationTrackingUncheckedCreateInput = {
       usuarioId: createGpsDto.usuarioId,
       latitud: punto.lat,
@@ -72,7 +113,7 @@ export class GpsService {
       // null cuando la app no lo informa: «no lo sé» y «no era simulada» no son lo mismo.
       mockLocation: typeof createGpsDto.mockLocation === 'boolean' ? createGpsDto.mockLocation : null,
       companyId: resolvedCompanyId,
-      ...(createGpsDto.actividadId ? { actividadId: createGpsDto.actividadId } : {}),
+      ...(actividadId ? { actividadId } : {}),
     };
     if (createGpsDto.mockLocation === true) {
       // No se tira el punto (el recorrido no decide nómina), pero que quede dicho.
@@ -80,14 +121,22 @@ export class GpsService {
         `Ping GPS con ubicación simulada (usuarioId=${createGpsDto.usuarioId}); se guarda marcado`,
       );
     }
-    const creado = await this.prisma['locationTracking'].create({ data });
+    let creado;
+    try {
+      creado = await this.prisma['locationTracking'].create({ data });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+        throw new BadRequestException('La actividad indicada no existe en esta empresa');
+      }
+      throw err;
+    }
     // Geocerca de actividades: se mide sin hacer esperar al teléfono.
     void Promise.resolve(
       this.geofence?.evaluarPunto({
         userId: createGpsDto.usuarioId,
         latitude: punto.lat,
         longitude: punto.lng,
-        actividadId: createGpsDto.actividadId ?? null,
+        actividadId: actividadId ?? null,
       }),
     ).catch(() => undefined);
     return creado;

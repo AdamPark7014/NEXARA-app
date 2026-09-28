@@ -1,4 +1,6 @@
-import { ROLES, type RoleKey } from './roles.v2';
+import { AuthService } from '../../auth/auth.service';
+import { PERMISSIONS } from '../permissions';
+import { ROLES, roleKeyFromRoleNombre, type RoleKey } from './roles.v2';
 import { checkUrlAccess } from './url-matrix';
 
 /**
@@ -28,5 +30,64 @@ describe('matriz: alta y autoasignación de actividades', () => {
     expect(checkUrlAccess(ROLES.ADMINISTRATIVO, '/api/activities/next-an', 'GET').allowed).toBe(true);
     expect(checkUrlAccess(ROLES.ADMINISTRATIVO, '/api/operational-projects', 'POST').allowed).toBe(false);
     expect(checkUrlAccess(ROLES.VENDEDOR, '/api/operational-projects', 'POST').allowed).toBe(false);
+  });
+
+  it.each(PERSONAL)('%s sube la foto de lo suyo y registra su GPS', (role) => {
+    expect(checkUrlAccess(role, '/api/activity-evidence/9/entry-photo', 'POST').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/activity-evidence/9/exit-photo', 'POST').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/gps', 'POST').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/gps/me', 'GET').allowed).toBe(true);
+  });
+
+  it('quien asigna lista personas asignables; quien solo se autoasigna, no', () => {
+    for (const role of [
+      ROLES.COORD_OPERACIONES,
+      ROLES.COORD_ADMIN,
+      ROLES.COORD_VENTAS,
+      ROLES.ENC_SOPORTE,
+      ROLES.ARQUITECTO,
+      ROLES.DIR_OPERACIONES,
+    ]) {
+      expect(checkUrlAccess(role, '/api/users/assignable', 'GET').allowed).toBe(true);
+    }
+    expect(checkUrlAccess(ROLES.LIDER_DISENO, '/api/users/assignable', 'GET').allowed).toBe(false);
+    expect(checkUrlAccess(ROLES.ADMINISTRATIVO, '/api/users/assignable', 'GET').allowed).toBe(false);
+    expect(checkUrlAccess(ROLES.VENDEDOR, '/api/users/assignable', 'GET').allowed).toBe(false);
+    expect(checkUrlAccess(ROLES.ING_CAMPO, '/api/users/assignable', 'GET').allowed).toBe(false);
+  });
+});
+
+describe('rol mínimo: nombre legacy y permisos de actividad propia', () => {
+  const auth = Object.create(AuthService.prototype) as AuthService;
+
+  it('Líder de Diseño y Administrativo resuelven su roleKey aunque no haya clave en el usuario', () => {
+    expect(roleKeyFromRoleNombre('Líder de Diseño')).toBe(ROLES.LIDER_DISENO);
+    expect(roleKeyFromRoleNombre('Administrativo')).toBe(ROLES.ADMINISTRATIVO);
+    expect(roleKeyFromRoleNombre('Director Administrativo')).toBe(ROLES.DIR_ADMIN);
+    expect(
+      auth.resolveEffectiveRoleKey({
+        email: 'redes@nexara.com.mx',
+        roleKey: null,
+        role: { nombre: 'Líder de Diseño', orgRoleKey: null },
+      }),
+    ).toBe(ROLES.LIDER_DISENO);
+  });
+
+  it('un rol sin flags de gestión ve, evidencia y ficha su actividad, y no la administra', () => {
+    const perms = (auth as unknown as {
+      addV2RolePermissions: (base: string[], role: string, email: string) => string[];
+    }).addV2RolePermissions([], 'lider_diseno', 'redes@nexara.com.mx');
+    expect(perms).toEqual(expect.arrayContaining([
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.EVIDENCES_CREATE,
+      PERMISSIONS.GPS_VIEW,
+    ]));
+    expect(perms).not.toContain(PERMISSIONS.ACTIVITIES_MANAGE);
+    const vendedor = (auth as unknown as {
+      addV2RolePermissions: (base: string[], role: string, email: string) => string[];
+    }).addV2RolePermissions([], 'vendedor', 'ventas@nexara.com.mx');
+    expect(vendedor).toContain(PERMISSIONS.GPS_VIEW);
+    expect(vendedor).not.toContain(PERMISSIONS.ACTIVITIES_MANAGE);
   });
 });

@@ -1096,11 +1096,37 @@ export class ToolRequestsService {
   }
 
   async getUsersKit(
-    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
     userId?: number,
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
+    const canManageTools = hasToolsManageAccess(currentUser.email, currentUser.permissions);
+    const canAssign = Boolean(
+      currentUser.isSuperAdmin || currentUser.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE),
+    );
+    // Quien asigna una actividad consulta el kit de esa persona. Sin userId no
+    // se lista el inventario de herramientas de toda la empresa.
+    if (!canManageTools) {
+      if (!canAssign || !userId) return [];
+      return (this.prisma as any).toolKitAssignment.findMany({
+        where: { ...companyWhere(tenantId), userId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              role: { select: { nombre: true, accesoConsoleAdmin: true } },
+            },
+          },
+          inventoryItem: true,
+          events: { orderBy: { reportedAt: 'desc' } },
+        },
+        orderBy: [{ userId: 'asc' }, { assignedAt: 'desc' }],
+      });
+    }
+
     const userFilter = await this.kitVisibilityUserFilter(currentUser);
     if (userFilter === null) return [];
 
