@@ -26,7 +26,34 @@ export const MOTIVO_VALIDACION = {
   cierreAutomatico: 'Sin salida registrada: cierre automático',
   ubicacionVieja: 'La ubicación no era del momento',
   coordenadaRepetida: 'La misma coordenada exacta otra vez',
+  checadaWeb: 'Checada desde el navegador (habilitada temporalmente)',
 } as const;
+
+/**
+ * Ventana temporal para checar desde el navegador.
+ *
+ * Por decisión del dueño nadie checa desde la web (la ubicación de una pestaña se falsea). A veces hace
+ * falta abrir una excepción de emergencia —la app no funciona, el equipo se quedó sin teléfono—: dirección
+ * (o el desarrollador) fija `attendance.web_checkin_until` (fecha ISO) para una empresa. Mientras esa hora
+ * no llegue, la web puede checar; al llegar, **se cierra sola**. Toda checada hecha así queda marcada
+ * («desde el navegador») para que se pueda revisar.
+ */
+export const WEB_CHECKIN_SETTING_KEY = 'attendance.web_checkin_until';
+
+export type VentanaWebCheckin = { abierta: boolean; hasta: Date | null };
+
+/** Valor guardado (fecha ISO) → ¿está abierta la ventana ahora? Cualquier cosa rara = cerrada. */
+export function ventanaWebCheckin(valor: string | null | undefined, ahora: Date): VentanaWebCheckin {
+  const texto = String(valor ?? '').trim();
+  // Solo fechas ISO completas (`2026-09-30T23:59:00-06:00`): `new Date('0')` o `new Date('2099')` "parsean" y
+  // una ventana no debe abrirse por un valor mal escrito.
+  if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.test(texto)) {
+    return { abierta: false, hasta: null };
+  }
+  const hasta = new Date(texto);
+  if (Number.isNaN(hasta.getTime())) return { abierta: false, hasta: null };
+  return { abierta: ahora.getTime() < hasta.getTime(), hasta };
+}
 
 /** 422 cuando el teléfono reporta ubicación simulada. */
 export const MENSAJE_UBICACION_SIMULADA =

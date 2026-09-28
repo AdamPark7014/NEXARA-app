@@ -35,6 +35,9 @@ import {
 import {
   ETIQUETA_MOTIVO_RECHAZO,
   MENSAJE_SOLO_APP,
+  WEB_CHECKIN_SETTING_KEY,
+  ventanaWebCheckin,
+  type VentanaWebCheckin,
   MENSAJE_UBICACION_SIMULADA,
   MENSAJE_UBICACION_VIEJA,
   MENSAJE_VIAJE_IMPOSIBLE,
@@ -1406,6 +1409,20 @@ export class AttendanceService {
     }
   }
 
+  /** ¿Está abierta la ventana temporal para checar desde la web en esta empresa? Ante cualquier duda, cerrada. */
+  async ventanaWeb(companyId: number, ahora: Date = new Date()): Promise<VentanaWebCheckin> {
+    try {
+      const filas = await this.prisma.systemSetting.findMany({
+        where: { key: WEB_CHECKIN_SETTING_KEY, OR: [{ companyId: null }, { companyId }] },
+        select: { companyId: true, value: true },
+      });
+      const propia = filas.find((f) => f.companyId === companyId) ?? filas.find((f) => f.companyId == null);
+      return ventanaWebCheckin(propia?.value, ahora);
+    } catch {
+      return { abierta: false, hasta: null };
+    }
+  }
+
   async register(dto: CreateAttendanceDto, userId: number, req?: any, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
     if (!dto.photoBase64 || !String(dto.photoBase64).trim()) {
@@ -1439,8 +1456,16 @@ export class AttendanceService {
     // una pestaña se falsea desde la consola en dos líneas, así que aquí no se
     // puede afirmar dónde estuvo nadie. Quien no pueda usar su teléfono, que su
     // jefe le registre la checada con motivo (`registrarPorJefe`).
+    // Excepción: la ventana temporal que dirección abre para una empresa
+    // (`attendance.web_checkin_until`); mientras dura, la web puede checar y la checada
+    // queda marcada como hecha desde el navegador.
+    let checadaWeb = false;
     if (origen === 'WEB') {
-      await this.rechazar(contexto, MOTIVO_RECHAZO.desdeNavegador, MENSAJE_SOLO_APP);
+      const ventana = await this.ventanaWeb(tenantId);
+      if (!ventana.abierta) {
+        await this.rechazar(contexto, MOTIVO_RECHAZO.desdeNavegador, MENSAJE_SOLO_APP);
+      }
+      checadaWeb = true;
     }
 
     // Una posición guardada hace media hora no dice dónde está su dueño.
@@ -1502,6 +1527,11 @@ export class AttendanceService {
     }
     if (repetida) {
       sospechas.push({ validacion: 'REVISAR', motivo: MOTIVO_VALIDACION.coordenadaRepetida });
+    }
+    // Pendiente y no «revisar»: quedan a la vista de RH sin despertar a los jefes por cada checada mientras
+    // dura la excepción.
+    if (checadaWeb) {
+      sospechas.push({ validacion: 'PENDIENTE', motivo: MOTIVO_VALIDACION.checadaWeb });
     }
 
     const marca = this.marcaValidacion([hora, ubicacion, ...sospechas]);
