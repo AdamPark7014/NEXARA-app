@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
 
 /// PDF protegido a mostrar en hoja.
@@ -6,6 +7,12 @@ struct CorePdfItem: Identifiable {
     let id = UUID()
     let title: String
     let url: String
+}
+
+/// Hueco de un campo al que va la imagen adjunta (galería o archivo).
+private struct CampoAdjunto: Equatable {
+    let id: Int
+    let momento: String
 }
 
 private struct CameraRequest: Identifiable {
@@ -57,6 +64,12 @@ struct EvidenceCaptureFlowView: View {
     @State private var form: [String: String] = [:]
     @State private var formPrefilled = false
     @State private var showPdfImporter = false
+    /// Galería o archivo de una evidencia. La entrada y la salida no lo usan.
+    @State private var showAttachMenu = false
+    @State private var showImagePicker = false
+    @State private var imagePickerItem: PhotosPickerItem?
+    @State private var showImageImporter = false
+    @State private var campoAdjunto: CampoAdjunto?
     @State private var pdfSheet: CorePdfItem?
     /// Sube para que la tarjeta de ubicación se recargue tras cada envío.
     @State private var geofenceRefresh = 0
@@ -162,6 +175,25 @@ struct EvidenceCaptureFlowView: View {
         }
         .fileImporter(isPresented: $showPdfImporter, allowedContentTypes: [.pdf]) { result in
             handlePdf(result)
+        }
+        .confirmationDialog("Adjuntar imagen", isPresented: $showAttachMenu, titleVisibility: .visible) {
+            Button("Galería o capturas") { showImagePicker = true }
+            Button("Archivo") { showImageImporter = true }
+            Button("Cancelar", role: .cancel) { campoAdjunto = nil }
+        }
+        .photosPicker(isPresented: $showImagePicker, selection: $imagePickerItem, matching: .images)
+        .onChange(of: imagePickerItem) { item in
+            guard let item else { return }
+            Task { await loadPickedEvidence(item) }
+        }
+        .fileImporter(isPresented: $showImageImporter, allowedContentTypes: [.image]) { result in
+            switch result {
+            case .success(let url):
+                Task { await loadEvidenceFile(url) }
+            case .failure:
+                errorText = "No se pudo abrir el archivo."
+                campoAdjunto = nil
+            }
         }
         .sheet(item: $pdfSheet) { item in
             NavigationStack {
@@ -360,6 +392,15 @@ struct EvidenceCaptureFlowView: View {
             Text(CoreEvidence.momentoLabel(momento))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(taken ? Color.primary : Color.secondary)
+            Button("Adjuntar") {
+                guard let campoId = campo.id else { return }
+                errorText = nil
+                message = nil
+                campoAdjunto = CampoAdjunto(id: campoId, momento: momento)
+                showAttachMenu = true
+            }
+            .font(.caption2.weight(.semibold))
+            .disabled(!canCapture)
         }
     }
 
@@ -472,7 +513,7 @@ struct EvidenceCaptureFlowView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text(faltan == 0
                  ? "Ya documentaste todos los campos. Continúa al siguiente paso."
-                 : "Toma las fotos de cada campo en «Fotos por campo». Faltan \(faltan).")
+                 : "Toma o adjunta las fotos de cada campo en «Fotos por campo». Faltan \(faltan).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button {
@@ -488,7 +529,7 @@ struct EvidenceCaptureFlowView: View {
 
     private var evidencePhotosAction: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Toma al menos \(photoRequired) fotos del trabajo. Cada una guarda dónde se tomó.")
+            Text("Toma o adjunta al menos \(photoRequired) fotos del trabajo. Si hay GPS se guarda; si no, la foto igual vale.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if isCorrection && !(flow?.photoList.isEmpty ?? true) {
@@ -541,19 +582,31 @@ struct EvidenceCaptureFlowView: View {
                     camera = CameraRequest(step: CoreEvidence.evidencePhotos)
                 } label: {
                     Label("Tomar foto", systemImage: "camera.fill")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(busy)
 
                 Button {
-                    Task { await sendEvidencePhotos() }
+                    errorText = nil
+                    campoAdjunto = nil
+                    showAttachMenu = true
                 } label: {
-                    Label(busy ? "Enviando…" : "Enviar \(pendingPhotos.count) fotos", systemImage: "paperplane.fill")
+                    Label("Adjuntar", systemImage: "paperclip")
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(busy || pendingPhotos.count < photoRequired)
+                .buttonStyle(.bordered)
+                .disabled(busy)
             }
             .font(.subheadline)
+            Button {
+                Task { await sendEvidencePhotos() }
+            } label: {
+                Label(busy ? "Enviando…" : "Enviar \(pendingPhotos.count) fotos", systemImage: "paperplane.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(busy || pendingPhotos.count < photoRequired)
         }
     }
 
@@ -1083,5 +1136,94 @@ struct EvidenceCaptureFlowView: View {
         } catch {
             errorText = error.toUserMessage(fallback: "No se pudo guardar el formulario")
         }
+    }
+
+    // MARK: Adjuntar imagen (no entra ni sale por aquí)
+
+    @MainActor
+    private func loadPickedEvidence(_ item: PhotosPickerItem) async {
+        defer { imagePickerItem = nil }
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
+            errorText = "No se pudo leer la foto. Intenta con otra."
+            campoAdjunto = nil
+            return
+        }
+        await ingestEvidenceImage(data)
+    }
+
+    @MainActor
+    private func loadEvidenceFile(_ url: URL) async {
+        let started = url.startAccessingSecurityScopedResource()
+        defer { if started { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else {
+            errorText = "No se pudo leer el archivo."
+            campoAdjunto = nil
+            return
+        }
+        await ingestEvidenceImage(data)
+    }
+
+    /// Misma compresión que la cámara (`CorePhotoProcessing.jpeg`: 1280 px, JPEG 0.6).
+    @MainActor
+    private func ingestEvidenceImage(_ data: Data) async {
+        if data.starts(with: Data("%PDF".utf8)) {
+            errorText = "Esta evidencia solo acepta imagen. El PDF se carga en la hoja de servicio."
+            campoAdjunto = nil
+            return
+        }
+        if data.isEmpty {
+            errorText = "El archivo está vacío."
+            campoAdjunto = nil
+            return
+        }
+        if data.count > 15 * 1024 * 1024 {
+            errorText = "La imagen pesa más de 15 MB. Elige una más pequeña."
+            campoAdjunto = nil
+            return
+        }
+        guard let image = UIImage(data: data) else {
+            errorText = "No se pudo leer la imagen. Usa JPG o PNG."
+            campoAdjunto = nil
+            return
+        }
+        var jpeg = CorePhotoProcessing.jpeg(from: image)
+        if let actual = jpeg, actual.count > 5 * 1024 * 1024 {
+            jpeg = CorePhotoProcessing.jpeg(from: image, quality: 0.35)
+        }
+        guard let jpeg, jpeg.count <= 5 * 1024 * 1024 else {
+            errorText = "La imagen sigue pesando más de 5 MB después de comprimirla."
+            campoAdjunto = nil
+            return
+        }
+        busy = true
+        let coords = await ubicacionSiHayPermiso()
+        let limpio: DeviceCoords? = {
+            guard let coords, !(coords.latitude == 0 && coords.longitude == 0) else { return nil }
+            return coords
+        }()
+        let photo = CapturedGeoPhoto(
+            image: UIImage(data: jpeg) ?? image,
+            jpeg: jpeg,
+            coords: limpio,
+            capturedAt: Date()
+        )
+        if let destino = campoAdjunto {
+            campoAdjunto = nil
+            busy = false
+            if let fallo = await sendCampoPhoto(campoId: destino.id, momento: destino.momento, photo: photo) {
+                errorText = fallo
+            }
+        } else {
+            pendingPhotos.append(photo)
+            message = "Foto adjuntada (\(pendingPhotos.count) de \(photoRequired))"
+            busy = false
+        }
+    }
+
+    /// Si no hay permiso, la evidencia se guarda sin GPS. No pide el permiso ni falla.
+    @MainActor
+    private func ubicacionSiHayPermiso() async -> DeviceCoords? {
+        guard DeviceLocation.shared.hasPermission else { return nil }
+        return await DeviceLocation.shared.current()
     }
 }

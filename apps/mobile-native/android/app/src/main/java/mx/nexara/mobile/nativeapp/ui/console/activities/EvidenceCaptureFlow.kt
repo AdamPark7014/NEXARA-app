@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.console.activities
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -61,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
@@ -77,6 +79,9 @@ import mx.nexara.mobile.nativeapp.ui.common.GPS_REQUIRED_MESSAGE
 import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
 import mx.nexara.mobile.nativeapp.ui.common.GeoPhotoPreviewDialog
 import mx.nexara.mobile.nativeapp.ui.common.LiveCameraCaptureDialog
+import mx.nexara.mobile.nativeapp.ui.common.LivePhotoEncoding
+import mx.nexara.mobile.nativeapp.util.DeviceLocation
+import java.time.Instant
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedPdfButton
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_COMPLETED
@@ -104,6 +109,10 @@ private fun campoSlotKey(campoId: Long?, momento: String): String = "${campoId ?
 
 /** Hoja PDF: el API guarda base64; más de esto no pasa en una red de campo. */
 private const val MAX_PDF_BYTES = 15 * 1024 * 1024
+
+/** Imagen adjunta, antes de comprimirla. El JPEG resultante cabe en el tope de 5 MB del API. */
+private const val MAX_EVIDENCE_RAW_BYTES = 15 * 1024 * 1024
+private const val MAX_EVIDENCE_JPEG_BYTES = 5 * 1024 * 1024
 
 private const val MAX_EVIDENCE_PHOTOS = 12
 
@@ -498,6 +507,54 @@ fun EvidenceCaptureFlow(
         }
     }
 
+    // Galería / explorador solo para evidencias y fotos de campo. Entrada y salida no lo usan.
+    val attachKindRef = remember { mutableStateOf<String?>(null) }
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        val kind = attachKindRef.value
+        attachKindRef.value = null
+        if (uri == null) {
+            if (kind == KIND_CAMPO) campoPendiente = null
+            return@rememberLauncherForActivityResult
+        }
+        if (kind != KIND_EVIDENCE && kind != KIND_CAMPO) return@rememberLauncherForActivityResult
+        scope.launch {
+            busy = true
+            error = null
+            try {
+                val decoded = withContext(Dispatchers.IO) { evidencePhotoFromUri(context, uri) }
+                val geo = if (DeviceLocation.hasPermission(context)) {
+                    withTimeoutOrNull(2_500) { DeviceLocation.current(context, highAccuracy = false) }
+                } else {
+                    null
+                }
+                val usable = geo?.takeUnless { it.lat == 0.0 && it.lng == 0.0 }
+                pending = GeoPhoto(
+                    dataUrl = decoded.dataUrl,
+                    preview = decoded.preview,
+                    latitude = usable?.lat,
+                    longitude = usable?.lng,
+                    capturedAt = decoded.capturedAt,
+                    mock = usable?.mock == true,
+                    accuracyM = usable?.accuracyM,
+                )
+                pendingKind = kind
+                pendingError = null
+            } catch (e: Exception) {
+                error = e.message ?: "No se pudo adjuntar la imagen"
+                if (kind == KIND_CAMPO) campoPendiente = null
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun abrirAdjunto(kind: String) {
+        success = null
+        error = null
+        attachKindRef.value = kind
+        imagePicker.launch("image/*")
+    }
+
     NxPanelShell {
         NxIconText(
             text = "Captura de evidencias",
@@ -561,6 +618,10 @@ fun EvidenceCaptureFlow(
                         campoPendiente = campoId to momento
                         cameraKind = KIND_CAMPO
                     },
+                    onAdjuntar = { campoId, momento ->
+                        campoPendiente = campoId to momento
+                        abrirAdjunto(KIND_CAMPO)
+                    },
                 )
             }
 
@@ -606,7 +667,7 @@ fun EvidenceCaptureFlow(
                 // Con campos las fotos en sitio ya no son libres: van arriba, por campo.
                 step == STEP_PHOTOS && porCampos -> StepCard(
                     title = "$stepPrefix: Fotos por campo",
-                    description = "Toma las fotos de cada campo en la lista de arriba " +
+                    description = "Toma o adjunta las fotos de cada campo en la lista de arriba " +
                         "(${CoreActivityRules.camposResumen(campos)}). Las de «Después» " +
                         "puedes dejarlas para cuando termines.",
                     icon = NxGlyph.PHOTO.icon,
@@ -618,7 +679,8 @@ fun EvidenceCaptureFlow(
 
                 step == STEP_PHOTOS -> StepCard(
                     title = "$stepPrefix: Fotos en sitio (${drafts.size}/$photoRequired)",
-                    description = "Toma al menos $photoRequired fotos del trabajo. Cada una guarda dónde se tomó.",
+                    description = "Toma o adjunta al menos $photoRequired fotos del trabajo. " +
+                        "Adjuntar abre la galería o un archivo que ya tengas. Si hay GPS, se guarda; si no, la foto igual vale.",
                     icon = NxGlyph.PHOTO.icon,
                 ) {
                     DraftGrid(
@@ -638,8 +700,17 @@ fun EvidenceCaptureFlow(
                         ) {
                             Icon(NxGlyph.PHOTO.icon, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Agregar foto")
+                            Text("Tomar foto")
                         }
+                        OutlinedButton(
+                            onClick = { abrirAdjunto(KIND_EVIDENCE) },
+                            enabled = !busy && drafts.size < MAX_EVIDENCE_PHOTOS,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        ) {
+                            Text("Adjuntar")
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = { savePhotos() },
                             enabled = !busy && drafts.size >= photoRequired,
@@ -871,6 +942,68 @@ private fun thumbnailOf(src: Bitmap, maxEdge: Int = 320): Bitmap? = runCatching 
     )
 }.getOrNull()
 
+/**
+ * Imagen de galería o explorador, comprimida igual que la cámara (lado 1280, JPEG 60).
+ * Entrada y salida no pasan por aquí.
+ */
+private fun evidencePhotoFromUri(context: Context, uri: Uri): GeoPhoto {
+    val resolver = context.contentResolver
+    val mime = resolver.getType(uri).orEmpty().lowercase()
+    if (mime.contains("pdf")) {
+        throw IllegalArgumentException(
+            "Esta evidencia solo acepta imagen. El PDF se carga en la hoja de servicio.",
+        )
+    }
+    if (mime.isNotBlank() && !mime.startsWith("image/")) {
+        throw IllegalArgumentException("Solo se admite una imagen (JPG, PNG, WEBP o GIF).")
+    }
+    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+        ?: throw IllegalStateException("No se pudo leer el archivo")
+    if (bytes.isEmpty()) throw IllegalArgumentException("El archivo está vacío.")
+    if (bytes.size > MAX_EVIDENCE_RAW_BYTES) {
+        throw IllegalArgumentException("La imagen pesa más de 15 MB. Elige una más pequeña.")
+    }
+    if (bytes.size > 4 &&
+        bytes[0] == '%'.code.toByte() && bytes[1] == 'P'.code.toByte() &&
+        bytes[2] == 'D'.code.toByte() && bytes[3] == 'F'.code.toByte()
+    ) {
+        throw IllegalArgumentException(
+            "Esta evidencia solo acepta imagen. El PDF se carga en la hoja de servicio.",
+        )
+    }
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+        throw IllegalArgumentException("No se pudo leer la imagen. Usa JPG o PNG.")
+    }
+    var sample = 1
+    val edge = maxOf(bounds.outWidth, bounds.outHeight)
+    while (edge / sample > LivePhotoEncoding.MAX_EDGE_PX * 2) sample *= 2
+    val decoded = BitmapFactory.decodeByteArray(
+        bytes,
+        0,
+        bytes.size,
+        BitmapFactory.Options().apply { inSampleSize = sample },
+    ) ?: throw IllegalArgumentException("No se pudo leer la imagen. Usa JPG o PNG.")
+    val normalized = LivePhotoEncoding.normalize(decoded, 0)
+    var quality = LivePhotoEncoding.JPEG_QUALITY
+    var dataUrl = LivePhotoEncoding.toJpegDataUrl(normalized, quality)
+    while (dataUrl.substringAfter(',').length * 3 / 4 > MAX_EVIDENCE_JPEG_BYTES && quality > 35) {
+        quality -= 10
+        dataUrl = LivePhotoEncoding.toJpegDataUrl(normalized, quality)
+    }
+    if (dataUrl.substringAfter(',').length * 3 / 4 > MAX_EVIDENCE_JPEG_BYTES) {
+        throw IllegalArgumentException("La imagen sigue pesando más de 5 MB después de comprimirla.")
+    }
+    return GeoPhoto(
+        dataUrl = dataUrl,
+        preview = normalized,
+        latitude = null,
+        longitude = null,
+        capturedAt = Instant.now().toString(),
+    )
+}
+
 /** Lee el PDF elegido y lo devuelve como `data:application/pdf;base64,…`. */
 private fun readPdfAsDataUrl(context: Context, uri: Uri): String {
     val resolver = context.contentResolver
@@ -1065,6 +1198,7 @@ private fun CamposEvidenciaCard(
     thumbs: Map<String, Bitmap>,
     enabled: Boolean,
     onTomar: (campoId: Long, momento: String) -> Unit,
+    onAdjuntar: (campoId: Long, momento: String) -> Unit,
 ) {
     val faltan = CoreActivityRules.camposFaltantes(campos)
     Column(
@@ -1123,6 +1257,7 @@ private fun CamposEvidenciaCard(
                             thumb = thumbs[campoSlotKey(campo.id, momento)],
                             enabled = enabled && campo.id != null,
                             onClick = { campo.id?.let { onTomar(it, momento) } },
+                            onAdjuntar = { campo.id?.let { onAdjuntar(it, momento) } },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -1144,6 +1279,7 @@ private fun CampoSlot(
     thumb: Bitmap?,
     enabled: Boolean,
     onClick: () -> Unit,
+    onAdjuntar: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tomada = thumb != null || url != null
@@ -1201,6 +1337,13 @@ private fun CampoSlot(
             fontSize = 11.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (tomada) NxColors.Slate else NxColors.Muted,
+        )
+        Text(
+            "Adjuntar",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = NxColors.Brand,
+            modifier = Modifier.clickable(enabled = enabled, onClick = onAdjuntar),
         )
     }
 }
