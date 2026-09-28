@@ -20,6 +20,18 @@ export class AttendanceController {
     private readonly justifications: AttendanceJustificationsService,
   ) {}
 
+  /**
+   * ¿Puede la web checar ahora? Solo cuando dirección abrió la ventana temporal de la empresa. La pantalla
+   * lo consulta para decidir si ofrece el formulario o el aviso «se checa desde la app».
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @Get('web-checkin')
+  async webCheckin(@CurrentCompanyId() companyId: number | null) {
+    if (companyId == null) return { abierta: false, hasta: null };
+    const v = await this.attendanceService.ventanaWeb(companyId);
+    return { abierta: v.abierta, hasta: v.hasta ? v.hasta.toISOString() : null };
+  }
+
   /** Justificar la falta de un día (solo Christian): { userId, fecha: AAAA-MM-DD, motivo }. No crea checadas. */
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })

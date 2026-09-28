@@ -54,6 +54,7 @@ import styles from "./asistencias.module.css";
 const ChecadasRechazadas = dynamic(() => import("@/components/asistencias/ChecadasRechazadas"), { ssr: false });
 const HorariosEquipo = dynamic(() => import("@/components/asistencias/HorariosEquipo"), { ssr: false });
 const RegistroAsistido = dynamic(() => import("@/components/asistencias/RegistroAsistido"), { ssr: false });
+import ChecarEnWeb from "@/components/asistencias/ChecarEnWeb";
 type TabId = "equipo" | "comidas" | "trayectoria" | "rechazos" | "horarios";
 type Estado = "PRESENTE" | "COMPLETO" | "JUSTIFICADA" | "AUSENTE";
 type FilterEstado = "TODOS" | Estado;
@@ -737,9 +738,8 @@ export default function ErpAsistenciasPage() {
                 </InfoPopover>
               }
             >
-              <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-                Abre la app NEXARA en tu teléfono para registrar tu entrada o tu salida.
-              </p>
+              {/* Solo con la excepción temporal que abre dirección aparece el formulario; si no, «usa la app». */}
+              <ChecarEnWeb token={token} />
             </Section>
           ) : null}
 
