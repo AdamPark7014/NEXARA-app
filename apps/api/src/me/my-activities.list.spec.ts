@@ -1,0 +1,159 @@
+import { MyActivitiesService } from './my-activities.service.js';
+
+/**
+ * La cola de «Mis actividades» (web y apps, GET /me/activities) es lo asignado
+ * a esa persona. No se esconde por tipo ni por el departamento de quien la dejó,
+ * y no incluye el trabajo de alguien más.
+ */
+const LUIS = { id: 7, email: 'direccion.operaciones@nexara.com.mx' };
+const TECNICO = { id: 13, email: 'soporte@nexara.com.mx' };
+
+function actividad(over: Record<string, unknown> = {}) {
+  return {
+    id: 90,
+    anNumber: 'AN-0090',
+    titulo: 'Apoyo de otro departamento',
+    descripcion: null,
+    estatus: 'Pendiente',
+    prioridad: 'MEDIA',
+    coreKind: 'tarea',
+    ticketTypeCustom: null,
+    assignmentCharge: 'ejecucion',
+    fechaInicio: null,
+    fechaMaxima: null,
+    fechaAsignacion: new Date('2026-09-28T15:00:00.000Z'),
+    fechaFinalizacion: null,
+    periodoInicio: null,
+    periodoFin: null,
+    tiempoEstimadoMin: null,
+    tiempoMaximoMin: null,
+    creadoPorId: 8,
+    creador: { id: 8, nombre: 'David' },
+    project: null,
+    client: null,
+    activityEvidences: [],
+    scheduleChanges: [],
+    assignees: [],
+    ...over,
+  };
+}
+
+function fila(activity: ReturnType<typeof actividad>, over: Record<string, unknown> = {}) {
+  return {
+    rol: 'LEAD',
+    asignadoAt: activity.fechaAsignacion,
+    indicaciones: null,
+    ordenEjecucion: null,
+    ordenJustificacion: null,
+    ordenActualizadoAt: null,
+    aceptadaAt: null,
+    rechazadaAt: null,
+    motivoRechazo: null,
+    inicioRealAt: null,
+    finRealAt: null,
+    horasPlan: null,
+    saltoPrioridad: false,
+    asignadoPor: { id: 8, nombre: 'David' },
+    activity,
+    ...over,
+  };
+}
+
+function build(assigneeRows: unknown[], huerfanas: unknown[] = []) {
+  const prisma = {
+    activityAssignee: { findMany: jest.fn().mockResolvedValue(assigneeRows) },
+    activity: { findMany: jest.fn().mockResolvedValue(huerfanas) },
+  };
+  const service = new MyActivitiesService(
+    prisma as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+  );
+  return { service, prisma };
+}
+
+describe('Mis actividades: lo asignado se ve', () => {
+  it('Luis ve una tarea que le dejó otro departamento, no solo servicios', async () => {
+    const tarea = actividad({ id: 90, coreKind: 'tarea', titulo: 'Mantenimiento preventivo' });
+    const { service, prisma } = build([fila(tarea)]);
+
+    const res = await service.list(LUIS, 1);
+
+    expect(res.open.map((a) => a.id)).toEqual([90]);
+    expect(res.open[0]).toEqual(
+      expect.objectContaining({ titulo: 'Mantenimiento preventivo', coreKind: 'tarea' }),
+    );
+    expect(res.open).toHaveLength(1);
+    expect(res.seguimiento).toHaveLength(0);
+    expect(res.doneToday).toHaveLength(0);
+
+    const where = prisma.activityAssignee.findMany.mock.calls[0][0].where;
+    expect(where.userId).toBe(LUIS.id);
+    expect(where.companyId).toBe(1);
+    expect(where.retiradoAt).toBeNull();
+    expect(where.activity).toEqual({ deletedAt: null });
+    expect(JSON.stringify(where)).not.toContain('coreKind');
+  });
+
+  it('un miembro del equipo ve la actividad aunque no sea el responsable', async () => {
+    const servicio = actividad({
+      id: 44,
+      coreKind: 'servicio',
+      titulo: 'Visita en sitio',
+      assignmentCharge: 'ejecucion',
+      creadoPorId: 39,
+      creador: { id: 39, nombre: 'Antonio' },
+    });
+    const { service, prisma } = build([
+      fila(servicio, { rol: 'TECNICO', asignadoPor: { id: 39, nombre: 'Antonio' } }),
+    ]);
+
+    const res = await service.list(TECNICO, 1);
+
+    expect(res.open.map((a) => a.id)).toEqual([44]);
+    expect(res.open[0].rol).toBe('TECNICO');
+    expect(prisma.activityAssignee.findMany.mock.calls[0][0].where.userId).toBe(TECNICO.id);
+    expect(prisma.activity.findMany.mock.calls[0][0].where.responsableId).toBe(TECNICO.id);
+  });
+
+  it('el responsable sin fila de equipo igual la ve, y no revive una de la que lo sacaron', async () => {
+    const suelta = actividad({
+      id: 12,
+      coreKind: null,
+      titulo: 'Preventivo de contrato',
+      assignmentCharge: null,
+      creadoPorId: 1,
+      creador: { id: 1, nombre: 'Christian' },
+    });
+    const { service, prisma } = build([], [suelta]);
+
+    const res = await service.list(LUIS, 1);
+
+    expect(res.open.map((a) => ({ id: a.id, titulo: a.titulo }))).toEqual([
+      { id: 12, titulo: 'Preventivo de contrato' },
+    ]);
+    const where = prisma.activity.findMany.mock.calls[0][0].where;
+    expect(where.responsableId).toBe(LUIS.id);
+    expect(where.companyId).toBe(1);
+    expect(where.deletedAt).toBeNull();
+    expect(where.assignees).toEqual({ none: { userId: LUIS.id } });
+  });
+
+  it('no consulta ni devuelve actividades de otra persona ni de otra empresa', async () => {
+    const { service, prisma } = build([]);
+
+    const res = await service.list(LUIS, 4);
+
+    expect(res.open).toEqual([]);
+    const equipo = prisma.activityAssignee.findMany.mock.calls[0][0].where;
+    const propias = prisma.activity.findMany.mock.calls[0][0].where;
+    expect(equipo.userId).toBe(LUIS.id);
+    expect(equipo.companyId).toBe(4);
+    expect(propias.responsableId).toBe(LUIS.id);
+    expect(propias.companyId).toBe(4);
+    expect(propias.assignees).toEqual({ none: { userId: LUIS.id } });
+  });
+});

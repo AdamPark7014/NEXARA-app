@@ -291,6 +291,7 @@ export class TeamBoardService {
       now,
       tiposVisibles(viewer),
       rangoFinal,
+      viewer.id,
     );
     const workflow = await this.buildWorkflowPipeline(userIds, companyId, rangoFinal, now);
     return { ...base, users, workflow };
@@ -415,6 +416,7 @@ export class TeamBoardService {
       now,
       tiposVisibles(viewer),
       rango ?? this.resolveRange(null, null, now),
+      viewer.id,
     );
     return card;
   }
@@ -453,7 +455,8 @@ export class TeamBoardService {
     });
     for (const a of asLead) ids.add(a.id);
 
-    const tipos = tiposVisibles(viewer);
+    // El historial propio no se recorta por tipo: es lo que le asignaron.
+    const tipos = userId === viewer.id ? null : tiposVisibles(viewer);
     const activities = await this.prisma.activity.findMany({
       where: { id: { in: [...ids] }, deletedAt: null, ...(tipos ? { coreKind: { in: tipos } } : {}) },
       select: {
@@ -750,9 +753,13 @@ export class TeamBoardService {
     userIds: number[],
     companyId: number | null,
     now: Date,
-    /** Solo estos tipos de actividad (`coreKind`); `null` = todos. */
+    /**
+     * Solo estos tipos de actividad (`coreKind`) en las tarjetas de *otros*;
+     * `null` = todos. Las de `propietarioId` no se recortan: son su trabajo.
+     */
     tipos: string[] | null = null,
     rango?: BoardRange,
+    propietarioId?: number | null,
   ): Promise<TeamBoardUser[]> {
     // Día de México: el contenedor corre en UTC y el «hoy» cambiaba a las 18:00.
     const { desde: dayStart, hasta: dayEnd } = rango ?? this.resolveRange(null, null, now);
@@ -776,7 +783,16 @@ export class TeamBoardService {
           userId: { in: userIds },
           retiradoAt: null,
           ...(companyId != null ? { companyId } : {}),
-          ...(tipos ? { activity: { coreKind: { in: tipos } } } : {}),
+          // El tipo recorta el trabajo ajeno. Lo propio entra aunque sea de otro
+          // departamento o de un tipo que este coordinador no supervisa.
+          ...(tipos
+            ? {
+                OR: [
+                  ...(propietarioId != null ? [{ userId: propietarioId }] : []),
+                  { activity: { coreKind: { in: tipos } } },
+                ],
+              }
+            : {}),
         },
         include: {
           asignadoPor: { select: { id: true, nombre: true } },

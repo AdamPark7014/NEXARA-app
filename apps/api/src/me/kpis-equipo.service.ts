@@ -169,7 +169,9 @@ export class KpisEquipoService {
     const persona = scoped.find((u) => u.id === userId);
     if (!persona) throw new NotFoundException('Usuario fuera de tu alcance');
 
-    const datos = await this.cargar([userId], companyId, rango, tiposVisibles(viewer));
+    // El detalle propio no esconde lo que le asignaron por ser de otro tipo.
+    const tipos = userId === viewer.id ? null : tiposVisibles(viewer);
+    const datos = await this.cargar([userId], companyId, rango, tipos);
     const d = datos.get(userId) ?? vacio();
     const { dias, totales } = calculaKpisPersona({
       desde: rango.desde,

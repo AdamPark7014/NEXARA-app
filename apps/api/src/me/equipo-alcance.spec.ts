@@ -31,7 +31,7 @@ describe('equipo-alcance', () => {
     expect(alcanzaA({ id: 1, email: 'gerencia@nexara.com.mx', roleKey: 'ceo' }, users, 16)).toBe(true);
   });
 
-  it('Luis solo ve servicios; los demás todo', () => {
+  it('en la pizarra de otros, Luis solo ve servicios; los demás todo', () => {
     expect(tiposVisibles(luis)).toEqual(['servicio']);
     expect(tiposVisibles(david)).toBeNull();
     expect(tiposVisibles({ id: 1, email: 'gerencia@nexara.com.mx', roleKey: 'ceo' })).toBeNull();
