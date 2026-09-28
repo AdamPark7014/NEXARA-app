@@ -58,14 +58,16 @@ export function AvatarAro({
       role={etiqueta ? "img" : undefined}
       aria-hidden={etiqueta ? undefined : true}
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className={s.foto} src={src} alt="" />
-      ) : (
-        <span className={[s.ini, TINTAS[tintaPersona(nombre)]].join(" ")} aria-hidden="true">
-          {iniciales(nombre)}
-        </span>
-      )}
+      <span className={s.recorte}>
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className={s.foto} src={src} alt="" />
+        ) : (
+          <span className={[s.ini, TINTAS[tintaPersona(nombre)]].join(" ")} aria-hidden="true">
+            {iniciales(nombre)}
+          </span>
+        )}
+      </span>
     </span>
   );
 }

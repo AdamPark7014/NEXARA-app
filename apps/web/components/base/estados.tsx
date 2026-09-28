@@ -127,8 +127,12 @@ export function Avatar({ url, name, size = 32 }: { url?: string | null; name: st
   const src = url ? resolveAssetUrl(url) : null;
   const style = { width: size, height: size, fontSize: Math.round(size * 0.36) };
   if (src) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" width={size} height={size} className={s.avatar} style={style} />;
+    return (
+      <span className={s.avatar} style={style}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" className={s.avatarImg} />
+      </span>
+    );
   }
   return (
     <span className={s.avatar} style={style} aria-hidden="true">

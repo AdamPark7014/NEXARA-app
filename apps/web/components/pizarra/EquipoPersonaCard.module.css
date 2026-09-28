@@ -45,26 +45,53 @@
   box-sizing: border-box;
   width: var(--foto, 74px);
   height: var(--foto, 74px);
+  min-width: var(--foto, 74px);
+  max-width: var(--foto, 74px);
+  min-height: var(--foto, 74px);
+  max-height: var(--foto, 74px);
+  aspect-ratio: 1 / 1;
   flex: 0 0 auto;
   padding: 3px;
   border-radius: 50%;
   border: 3px solid var(--aro, var(--ui-border-strong));
-  display: grid;
-  place-items: center;
+  overflow: hidden;
+  display: block;
   margin-bottom: var(--ui-s2);
+}
+
+/* El aro es el borde de estado. La foto vive en este disco y no puede
+   crecer con el archivo original: un retrato alto se recorta, no tapa el nombre. */
+.recorte {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
 .aroTrabajando { --aro: var(--ui-success); }
 .aroRetraso { --aro: var(--ui-warning); }
 .aroLibre { --aro: var(--ui-info); }
 
-.foto,
+.foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  border-radius: 50%;
+}
+
 .ini {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  display: block;
-  object-fit: cover;
+  display: grid;
 }
 
 /* Sin foto: iniciales sobre una tinta estable por nombre. Nunca un hueco
