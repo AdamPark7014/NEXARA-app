@@ -27,10 +27,9 @@ import ClientSectorIcon from "@/components/erp/ClientSectorIcon";
 import { formatApiError } from "@/lib/erp-api";
 import {
   ALL_CLIENT_SECTORS,
-  canSeeClientesModule,
-  canSeeClientSector,
+  canAccessClientPadron,
   CLIENT_SECTOR_META,
-  clientSectorsForEmail,
+  clientSectorsForUser,
   type ClientSector,
 } from "@/lib/client-sectors";
 import {
@@ -187,7 +186,7 @@ export default function ClienteDetallePage() {
     };
   }, [token]);
 
-  const mySectors = useMemo(() => clientSectorsForEmail(user?.email), [user?.email]);
+  const mySectors = useMemo(() => clientSectorsForUser(user), [user]);
   const clientSectors = useMemo(
     () => (client?.sectors ?? []).map((s) => s.sector as ClientSector),
     [client],
@@ -221,12 +220,12 @@ export default function ClienteDetallePage() {
   }, [token, id]);
 
   useEffect(() => {
-    if (!canSeeClientesModule(user?.email)) {
+    if (!canAccessClientPadron(user)) {
       router.replace("/erp/pizarra");
       return;
     }
     void load();
-  }, [load, user?.email, router]);
+  }, [load, user, router]);
 
   const addSector = async (sector: ClientSector) => {
     if (!token) return;
@@ -666,7 +665,7 @@ export default function ClienteDetallePage() {
                     icon={<FolderOffOutlinedIcon />}
                     title="Sin proyectos todavía"
                     description={
-                      canSeeClientSector(user?.email, "PROYECTO") ? "Crea el primero con el formulario de abajo." : undefined
+                      mySectors.includes("PROYECTO") ? "Crea el primero con el formulario de abajo." : undefined
                     }
                   />
                 ) : (
@@ -721,7 +720,7 @@ export default function ClienteDetallePage() {
                     })}
                   </ul>
                 )}
-                {canSeeClientSector(user?.email, "PROYECTO") ? (
+                {mySectors.includes("PROYECTO") ? (
                   <form className={styles.nuevoProyecto} onSubmit={(e) => void onCreateProject(e)} noValidate>
                     <Campo id="proyecto-nombre" label="Nuevo proyecto" error={projectError ?? undefined}>
                       <input

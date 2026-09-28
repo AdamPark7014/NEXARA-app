@@ -68,7 +68,10 @@ export const COTIZACIONES_CORE_PATHS: PageRule[] = ['/erp/cotizaciones', '/erp/c
  */
 export const PROYECTOS_CORE_PATHS: PageRule[] = ['/erp/proyectos', '/erp/proyectos/**'];
 
-/** Clientes en Core (`/erp/clientes`): restringido a dirección/ventas. */
+/**
+ * Clientes en Core (`/erp/clientes`): coordinación, gerencia y comercial.
+ * Ingenieros y operativos no tienen estas páginas; el alta la confirma el API.
+ */
 export const CLIENTES_CORE_PATHS: PageRule[] = ['/erp/clientes', '/erp/clientes/**'];
 
 /**
@@ -122,6 +125,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ARQUITECTO]: [
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
+    ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
     ...CORE_OLA1_PAGE_PATHS,
@@ -149,6 +153,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.DIR_OPERACIONES]: [
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
+    ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
     '/erp/dashboard',
@@ -215,6 +220,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_ADMIN]: [
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
+    ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
     '/erp/dashboard',
@@ -272,6 +278,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ADMINISTRATIVO]: [
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
+    ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
     '/erp/dashboard',
@@ -310,6 +317,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_OPERACIONES]: [
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
+    ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
     '/ops/chat',
@@ -414,6 +422,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/documents/**',
     '/crm/quotes',
     '/crm/quotes/**',
+    ...CLIENTES_CORE_PATHS,
     '/integra/**',
     ...SELF_ATTENDANCE_PATHS,
   ],

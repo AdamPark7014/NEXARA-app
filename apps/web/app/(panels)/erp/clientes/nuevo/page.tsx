@@ -9,9 +9,9 @@ import { Alert, Button, ButtonLink, Card, CardHead, EmptyState, PageHead, Skelet
 import { formatApiError } from "@/lib/erp-api";
 import {
   ALL_CLIENT_SECTORS,
-  canSeeClientesModule,
+  canAccessClientPadron,
   CLIENT_SECTOR_META,
-  clientSectorsForEmail,
+  clientSectorsForUser,
   sectorFromSlug,
   type ClientSector,
 } from "@/lib/client-sectors";
@@ -37,7 +37,7 @@ const empty = {
 export default function NuevoClientePage() {
   const router = useRouter();
   const { user, token } = useUser();
-  const allowedSectors = useMemo(() => clientSectorsForEmail(user?.email), [user?.email]);
+  const allowedSectors = useMemo(() => clientSectorsForUser(user), [user]);
 
   const [form, setForm] = useState(empty);
   const [sectors, setSectors] = useState<ClientSector[]>([]);
@@ -45,7 +45,7 @@ export default function NuevoClientePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorTelefono, setErrorTelefono] = useState<string | null>(null);
-  /** null = consultando; la API decide quién agrega (jefes con personal a cargo, administración, dirección). */
+  /** null = consultando; la API decide quién agrega (coordinación, gerencia, encargada comercial). */
   const [puedeAgregar, setPuedeAgregar] = useState<boolean | null>(null);
 
   // El sector llega por la URL (?sector=comercial); se aplica cuando ya se sabe qué sectores ve la persona.
@@ -66,14 +66,14 @@ export default function NuevoClientePage() {
     };
   }, [token]);
 
-  if (!canSeeClientesModule(user?.email) || puedeAgregar === false) {
+  if (!canAccessClientPadron(user) || puedeAgregar === false) {
     return (
       <div className={styles.wrap}>
         <PageHead back={{ href: "/erp/clientes", label: "Clientes" }} title="Nuevo cliente" />
         <EmptyState
           icon={<LockOutlinedIcon />}
           title="No puedes dar de alta clientes"
-          description="Solo quien tiene personal a su cargo, Administración o Dirección puede agregar clientes. Pídele a tu jefe que lo registre."
+          description="Solo coordinación, gerencia y la encargada comercial pueden agregar clientes. Un ingeniero o un operativo no puede."
           action={<ButtonLink href="/erp/clientes">Volver a clientes</ButtonLink>}
         />
       </div>

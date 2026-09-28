@@ -17,6 +17,9 @@ const DAVID_JEFE = { id: 10, email: 'operaciones@nexara.com.mx', roleKey: 'ing_s
 const ADMINISTRATIVA = { id: 11, email: 'admin@nexara.com.mx', roleKey: 'administrativo' };
 const TECNICO = { id: 12, email: 'israel.ramos@nexara.com.mx', roleKey: 'ing_campo' };
 const VENDEDOR = { id: 13, email: 'vendedor@nexara.com.mx', roleKey: 'vendedor' };
+const LUIS = { id: 14, email: 'direccion.operaciones@nexara.com.mx', roleKey: 'coord_operaciones' };
+const DANIELA = { id: 15, email: 'daniela.hernandez@nexara.com.mx', roleKey: 'administrativo' };
+const LIDER = { id: 16, email: 'diseno@nexara.com.mx', roleKey: 'lider_diseno' };
 
 describe('permisos de clientes (reglas puras)', () => {
   it('Christian, su equivalente y la cuenta de desarrollo pueden desactivar y eliminar', () => {
@@ -32,18 +35,36 @@ describe('permisos de clientes (reglas puras)', () => {
     expect(canDeleteOrDeactivateClient(null)).toBe(false);
   });
 
-  it('agregan y editan: jefes con personal a cargo, roles administrativos y dirección', () => {
-    expect(canManageClients(DAVID_JEFE, true)).toBe(true);
+  it('agregan y editan: coordinación, gerencia, encargada comercial y un jefe que no es operativo', () => {
     expect(canManageClients(ADMINISTRATIVA, false)).toBe(true);
-    for (const roleKey of ['coord_admin', 'dir_admin', 'contabilidad', 'rh', 'coord_operaciones', 'dir_operaciones']) {
+    expect(canManageClients(DANIELA, false)).toBe(true);
+    expect(canManageClients(LUIS, false)).toBe(true);
+    expect(canManageClients(LIDER, true)).toBe(true);
+    for (const roleKey of [
+      'ceo',
+      'coord_admin',
+      'dir_admin',
+      'contabilidad',
+      'rh',
+      'coord_operaciones',
+      'dir_operaciones',
+      'coord_ventas',
+      'arquitecto',
+      'enc_soporte',
+    ]) {
       expect(canManageClients({ email: 'a@nexara.com.mx', roleKey }, false)).toBe(true);
     }
     expect(canManageClients(CHRISTIAN, false)).toBe(true);
   });
 
-  it('sin personal a cargo ni rol administrativo no agrega ni edita', () => {
+  it('un ingeniero u operativo no agrega ni edita, aunque tenga personal a cargo', () => {
     expect(canManageClients(TECNICO, false)).toBe(false);
+    expect(canManageClients(TECNICO, true)).toBe(false);
+    expect(canManageClients(DAVID_JEFE, true)).toBe(false);
+    expect(canManageClients({ email: 'soporte@nexara.com.mx', roleKey: 'ing_soporte' }, true)).toBe(false);
     expect(canManageClients(VENDEDOR, false)).toBe(false);
+    expect(canManageClients(VENDEDOR, true)).toBe(false);
+    expect(canManageClients({ email: 'd@nexara.com.mx', roleKey: 'disenador' }, true)).toBe(false);
     expect(canManageClients(undefined, true)).toBe(false);
   });
 
@@ -141,7 +162,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     expect(prisma.salesClient.update).toHaveBeenCalled();
   });
 
-  it('quien no tiene personal a cargo ni rol administrativo no edita', async () => {
+  it('quien no tiene personal a cargo ni rol de coordinación no edita', async () => {
     const { service, prisma } = buildService({ reportees: 0 });
     await expect(service.updateClient(5, { name: 'Otro' } as any, TECNICO, 7)).rejects.toThrow(
       new ForbiddenException(CLIENT_MANAGE_FORBIDDEN),
@@ -153,25 +174,92 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     expect(prisma.salesClient.create).not.toHaveBeenCalled();
   });
 
-  it('un jefe con personal a cargo sí edita', async () => {
+  it('un ingeniero con personal a cargo sigue sin poder crear ni editar', async () => {
+    const { service, prisma } = buildService({ reportees: 4 });
+    await expect(service.createClient({ name: 'Nuevo' } as any, DAVID_JEFE, 7)).rejects.toThrow(
+      new ForbiddenException(CLIENT_MANAGE_FORBIDDEN),
+    );
+    await expect(service.updateClient(5, { name: 'Otro' } as any, TECNICO, 7)).rejects.toThrow(
+      new ForbiddenException(CLIENT_MANAGE_FORBIDDEN),
+    );
+    expect(prisma.salesClient.create).not.toHaveBeenCalled();
+    expect(prisma.salesClient.update).not.toHaveBeenCalled();
+  });
+
+  it('un jefe que no es operativo sí edita', async () => {
     const { service, prisma } = buildService({ reportees: 2 });
-    await service.updateClient(5, { name: 'Otro' } as any, DAVID_JEFE, 7);
-    expect(prisma.user.count).toHaveBeenCalledWith({ where: { managerId: DAVID_JEFE.id, isActive: true } });
+    await service.updateClient(5, { name: 'Otro' } as any, LIDER, 7);
+    expect(prisma.user.count).toHaveBeenCalledWith({ where: { managerId: LIDER.id, isActive: true } });
     expect(prisma.salesClient.update).toHaveBeenCalled();
+  });
+
+  it('un coordinador crea el cliente en su empresa y en el sector de su área', async () => {
+    const { service, prisma } = buildService({ reportees: 0 });
+    prisma.salesClient.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: 9, serviceClientId: null, sectors: [], ...data }),
+    );
+    await service.createClient({ name: 'Cliente de Luis' } as any, LUIS, 7);
+    expect(prisma.salesClient.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Cliente de Luis',
+          companyId: 7,
+          sectors: { create: [expect.objectContaining({ sector: 'CORPORATIVO', companyId: 7 })] },
+        }),
+      }),
+    );
+  });
+
+  it('la encargada comercial crea en comercial, no en otro sector', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: 9, serviceClientId: null, sectors: [], ...data }),
+    );
+    await service.createClient({ name: 'Cliente de Daniela' } as any, DANIELA, 7);
+    expect(prisma.salesClient.create.mock.calls[0][0].data.sectors.create).toEqual([
+      expect.objectContaining({ sector: 'COMERCIAL', companyId: 7 }),
+    ]);
+    await expect(
+      service.createClient({ name: 'Otro', sectors: ['PROYECTO'] } as any, DANIELA, 7),
+    ).rejects.toThrow(/PROYECTO/);
+  });
+
+  it('el listado de un coordinador es de su empresa, no solo de los que él creó', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.findMany = jest.fn().mockResolvedValue([]);
+    await service.listClients(LUIS, undefined, undefined, 7);
+    const where = prisma.salesClient.findMany.mock.calls[0][0].where;
+    expect(where.companyId).toBe(7);
+    expect(where.ownerId).toBeUndefined();
+  });
+
+  it('un ingeniero, si llegara al servicio, no ve el padrón de la empresa', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.findMany = jest.fn().mockResolvedValue([]);
+    await service.listClients(TECNICO, undefined, undefined, 7);
+    const where = prisma.salesClient.findMany.mock.calls[0][0].where;
+    expect(where.companyId).toBe(7);
+    expect(where.ownerId).toBe(TECNICO.id);
   });
 
   it('dar de alta un cliente ya inactivo también es exclusivo de Christian', async () => {
     const { service } = buildService({ reportees: 2 });
-    await expect(service.createClient({ name: 'X', status: 'Inactivo' } as any, DAVID_JEFE, 7)).rejects.toThrow(
+    await expect(service.createClient({ name: 'X', status: 'Inactivo' } as any, ADMINISTRATIVA, 7)).rejects.toThrow(
       new ForbiddenException(CLIENT_DEACTIVATE_FORBIDDEN),
     );
   });
 
   it('expone los permisos del usuario', async () => {
     const { service } = buildService({ reportees: 1 });
-    await expect(service.getClientPermissions(DAVID_JEFE)).resolves.toEqual({
+    await expect(service.getClientPermissions(LUIS)).resolves.toEqual({
       puedeAgregar: true,
       puedeEditar: true,
+      puedeDesactivar: false,
+      puedeEliminar: false,
+    });
+    await expect(service.getClientPermissions(DAVID_JEFE)).resolves.toEqual({
+      puedeAgregar: false,
+      puedeEditar: false,
       puedeDesactivar: false,
       puedeEliminar: false,
     });

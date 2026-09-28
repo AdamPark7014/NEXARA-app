@@ -427,10 +427,14 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "erp-clients", panel: PANELS.ERP, path: "/clientes",
     label: "Clientes", description: "Proyecto, corporativo y comercial",
     icon: "🤝",
-    // Comercial únicamente en Core: dirección (CEO), dirección/comercial y equipo de ventas.
-    // Se alinea con la intención de `section-views` (SALES_MANAGERS / SALES_REP) y evita
-    // que roles operativos (p.ej. ingeniero de campo) vean Clientes por heredar ANY_INTERNAL.
-    allowedRoles: [R.CEO, R.DIRECTOR_COMMERCIAL, R.SALES_MANAGER, R.SALES_REP],
+    // Coordinación, gerencia y comercial. El menú fino lo decide `canAccessClientPadron`
+    // (correo del encargado o rol); un ingeniero no lo hereda por ANY_INTERNAL.
+    // Crear y editar lo vuelve a validar el API (`client-permissions`).
+    allowedRoles: [
+      R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
+      R.ARQUITECTO, R.COORD_OPERACIONES, R.PROJECT_MANAGER, R.MAINTENANCE_COORDINATOR,
+      R.SALES_MANAGER, R.ADMIN_STAFF, R.SALES_REP,
+    ],
     group: "Hoy", visible: true,
   },
   "erp-cotizaciones": {

@@ -27,9 +27,9 @@ import { useUser } from "@/components/UserContext";
 import { isCeoEquivalentEmail } from "@/lib/platform-accounts";
 import { formatApiError } from "@/lib/erp-api";
 import {
-  canSeeClientesModule,
+  canAccessClientPadron,
   CLIENT_SECTOR_META,
-  clientSectorsForEmail,
+  clientSectorsForUser,
   type ClientSector,
 } from "@/lib/client-sectors";
 import {
@@ -58,7 +58,7 @@ function encargadoCorto(c: SalesClient): string {
 export default function ClientesHubPage() {
   const router = useRouter();
   const { user, token } = useUser();
-  const allowedSectors = useMemo(() => clientSectorsForEmail(user?.email), [user?.email]);
+  const allowedSectors = useMemo(() => clientSectorsForUser(user), [user]);
   const showOwner = isCeoEquivalentEmail(user?.email) || Boolean(user?.isSuperAdmin);
 
   const [pedido, setPedido] = useState<ClientSector | null>(null);
@@ -159,7 +159,7 @@ export default function ClientesHubPage() {
     };
   }, [items, coincide, estado]);
 
-  if (!canSeeClientesModule(user?.email) || !sector) {
+  if (!canAccessClientPadron(user) || !sector) {
     return (
       <div className={styles.wrap}>
         <EmptyState

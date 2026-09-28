@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { listSalesClients, type SalesClient } from "@/lib/sales-api";
+import { getClientPermissions, listSalesClients, type SalesClient } from "@/lib/sales-api";
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
 import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
@@ -33,6 +33,7 @@ export function ClienteCombo({
   autoFocus?: boolean;
 }) {
   const [clientes, setClientes] = useState<SalesClient[] | null>(null);
+  const [puedeAgregar, setPuedeAgregar] = useState(false);
   const [abierto, setAbierto] = useState(false);
   const [activo, setActivo] = useState(0);
   const listaId = useId();
@@ -51,6 +52,17 @@ export function ClienteCombo({
     if (autoFocus) cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFocus, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let vivo = true;
+    getClientPermissions(token)
+      .then((p) => vivo && setPuedeAgregar(Boolean(p?.puedeAgregar)))
+      .catch(() => vivo && setPuedeAgregar(false));
+    return () => {
+      vivo = false;
+    };
+  }, [token]);
 
   const coincidencias = useMemo(() => {
     const q = doc.clientName.trim().toLowerCase();
@@ -161,9 +173,15 @@ export function ClienteCombo({
         </ul>
       ) : null}
       {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto ? (
-        <span className={styles.pastilla} title="Se da de alta en el CRM al guardar">
-          Cliente nuevo
-        </span>
+        puedeAgregar ? (
+          <span className={styles.pastilla} title="Se da de alta en Clientes al guardar y queda listo para el proyecto o la actividad">
+            Cliente nuevo
+          </span>
+        ) : (
+          <span className={styles.pastilla} title="Solo coordinación, gerencia y la encargada comercial pueden dar de alta clientes">
+            Elige un cliente que ya exista
+          </span>
+        )
       ) : null}
     </div>
   );

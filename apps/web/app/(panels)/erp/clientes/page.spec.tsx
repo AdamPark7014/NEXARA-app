@@ -24,7 +24,9 @@ vi.mock("@/lib/client-sectors", async (importOriginal) => {
   return {
     ...real,
     clientSectorsForEmail: () => ["PROYECTO", "COMERCIAL"],
+    clientSectorsForUser: () => ["PROYECTO", "COMERCIAL"],
     canSeeClientesModule: () => true,
+    canAccessClientPadron: () => true,
   };
 });
 
