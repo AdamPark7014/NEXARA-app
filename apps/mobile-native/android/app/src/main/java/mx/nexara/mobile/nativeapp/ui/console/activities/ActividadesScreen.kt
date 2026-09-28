@@ -661,8 +661,9 @@ private fun MisActividadesContent(
                             color = NxUi.Fg2,
                         )
                     }
-                    // Secundario y en gris: el primario de la pantalla es empezar la #1 (regla 4).
-                    if (canSelfAssign && open.isNotEmpty()) {
+                    // Siempre visible: con cola es secundario (el primario es la #1);
+                    // con la cola vacía también tiene que estar, aunque haya hechas hoy.
+                    if (ActividadesUx.muestraAutoasignar(canSelfAssign)) {
                         TextButton(
                             onClick = { onSelfAssign?.invoke() },
                             modifier = Modifier.heightIn(min = NxUi.TouchH),
@@ -675,6 +676,22 @@ private fun MisActividadesContent(
             val metricas = ActividadesUx.metricas(open.size, urgentes, done.size, seguimiento.size)
             if (metricas.isNotEmpty()) {
                 item { NxMetricStrip(items = metricas) }
+            }
+
+            // Cola vacía pero hay hechas hoy o seguimiento: la pantalla no está
+            // «vacía», así que el botón del estado vacío no sale. Este sí.
+            if (ActividadesUx.autoasignarProminente(canSelfAssign, open.size) &&
+                estado == NxEstadoPantalla.CONTENIDO
+            ) {
+                item {
+                    Button(
+                        onClick = { onSelfAssign?.invoke() },
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = NxUi.TouchH),
+                    ) {
+                        Text("Auto-asignarme una actividad", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
             }
 
             when (estado) {

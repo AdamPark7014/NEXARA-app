@@ -144,6 +144,19 @@ object ActividadesUx {
         else -> "Tienes $porHacer por hacer. Empieza por la #1."
     }
 
+    /**
+     * Auto-asignarse se ofrece a quien ya puede, con cola o sin ella.
+     * No depende del rol: la API manda `canSelfAssign` para todo el personal.
+     */
+    fun muestraAutoasignar(puede: Boolean): Boolean = puede
+
+    /**
+     * Con la cola vacía el botón es el primario, aunque haya hechas hoy o
+     * seguimiento (eso ya no es la pantalla vacía y antes se tragaba el botón).
+     * Con algo por hacer, el primario es empezar la #1 y este queda en el encabezado.
+     */
+    fun autoasignarProminente(puede: Boolean, porHacer: Int): Boolean = puede && porHacer <= 0
+
     const val METRICA_POR_HACER = "por_hacer"
     const val METRICA_HECHAS = "hechas_hoy"
     const val METRICA_SEGUIMIENTO = "seguimiento"
