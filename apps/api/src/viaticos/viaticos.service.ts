@@ -965,10 +965,24 @@ export class ViaticosService {
         actor?.id,
       )
       .catch(() => undefined);
-    return this.prisma['viatico'].findUnique({
+    const avanzado = await this.prisma['viatico'].findUnique({
       where: { id },
       include: { User: { select: { id: true, nombre: true } } },
     });
+    // Avisa a quien le toca ahora (p. ej. el CEO, paso final): sin esto no se enteraba de que ya le tocaba.
+    const siguiente = stepRoleAt(chain, nextStep);
+    if (siguiente) {
+      void this.notificationHierarchy
+        .notifyViaticNextApprover({
+          viaticId: id,
+          requesterName: avanzado?.User?.nombre ?? 'Un compañero',
+          amount,
+          role: siguiente,
+          companyId: viatico.companyId ?? companyId ?? null,
+        })
+        .catch(() => undefined);
+    }
+    return avanzado;
   }
 
   async markPagado(id: number, actorId?: number, companyId?: number | null) {

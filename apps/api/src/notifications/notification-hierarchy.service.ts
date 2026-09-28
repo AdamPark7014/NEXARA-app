@@ -13,7 +13,7 @@ import {
   type PortalTicketClientAction,
 } from './portal-ticket-notify.js';
 import { fechaAviso, horaAviso, nombreCorto } from './notification-push-meta.js';
-import { CEO_EQUIVALENT_EMAILS } from '../common/platform-accounts.js';
+import { CEO_EQUIVALENT_EMAILS, PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
 
 /**
  * Nombre de la actividad para el aviso. El folio (AN-0001) nunca es el identificador principal:
@@ -1630,6 +1630,51 @@ export class NotificationHierarchyService {
       }
     } catch (error) {
       this.logger.error(`Error notifying viatico requested:`, error);
+    }
+  }
+
+  /**
+   * Avisa a quien le toca el SIGUIENTE paso de un viático (p. ej. el CEO, paso final). Antes solo se
+   * avisaba a los supervisores al pedirlo y, al terminar, al solicitante: quien firmaba al final no se
+   * enteraba de que ya le tocaba. Se busca por rol dentro de la empresa; el CEO se reconoce además por
+   * ser el dueño de la plataforma.
+   */
+  async notifyViaticNextApprover(p: {
+    viaticId: number;
+    requesterName: string;
+    amount: number;
+    /** Rol del paso que sigue (`ceo`, `dir_admin`…). */
+    role: string;
+    companyId?: number | null;
+  }): Promise<number> {
+    try {
+      const porCorreo = p.role === 'ceo' ? [{ email: PLATFORM_OWNER_EMAIL }] : [];
+      const destinatarios = await this.prisma.user.findMany({
+        where: {
+          isActive: true,
+          OR: [{ roleKey: p.role }, ...porCorreo],
+          ...(p.companyId != null ? { companyMemberships: { some: { companyId: Number(p.companyId) } } } : {}),
+        },
+        select: { id: true },
+      });
+      for (const u of destinatarios) {
+        await this.notificationsService.createNotification({
+          userId: u.id,
+          type: 'VIATICO_ASSIGNED',
+          category: 'viatics',
+          title: 'Viático esperando tu autorización',
+          message: `${p.requesterName} pidió un viático de $${p.amount.toFixed(2)} y ya llegó a tu paso.`,
+          relatedEntityId: p.viaticId,
+          entityType: 'Viatico',
+          relatedUrl: appUrls.erpFinanceViatics(p.viaticId),
+          priority: 'high',
+          companyId: p.companyId ?? undefined,
+        });
+      }
+      return destinatarios.length;
+    } catch (error) {
+      this.logger.error('Error notifying next viatic approver:', error);
+      return 0;
     }
   }
 
