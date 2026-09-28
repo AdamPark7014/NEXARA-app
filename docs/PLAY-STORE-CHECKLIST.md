@@ -28,6 +28,9 @@ en el repo.
 > ## 🚀 v2 ENVIADA A REVISIÓN — 07-09-2026, 12:26
 >
 > `versionCode 7` / `versionName 1.0.1` subido a **Producción** y en revisión.
+> El siguiente AAB del repo es `versionCode` 13 / `versionName` 1.0.4
+> (`apps/mobile-native/android/gradle.properties`). Confirma en Play Console que
+> 13 no se haya consumido ya.
 > En cola fueron: la versión de producción, el cuestionario de Seguridad de
 > los datos, y la declaración de ID de publicidad (ya aplicada).
 >

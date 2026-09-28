@@ -21,12 +21,16 @@ Guía para compilar, versionar y publicar el AAB de Play Store con R8 habilitado
 
 Los valores viven en [`apps/mobile-native/android/gradle.properties`](../apps/mobile-native/android/gradle.properties):
 
-Valores actuales (06-09-2026):
+Valores actuales (28-09-2026):
 
 ```properties
-VERSION_CODE=7
-VERSION_NAME=1.0.1
+VERSION_CODE=13
+VERSION_NAME=1.0.4
 ```
+
+El 06-09 el repo decía 7 / 1.0.1. Play no reutiliza un `versionCode` ya subido
+(tampoco el de un bundle descartado). Antes de subir, confirma en Play Console
+que 13 sigue libre.
 
 `build.gradle.kts` los lee en `defaultConfig`; no hace falta editar el `.kts` en cada release.
 

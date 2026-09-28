@@ -7,6 +7,7 @@ import {
   esErrorDePermiso,
   faltanFotosDeCampos,
   hayErrores,
+  puedeSubirFotoDePunto,
   MAX_CAMPOS,
   nombreDeContentDisposition,
   nombreLibre,
@@ -218,5 +219,51 @@ describe("faltanFotosDeCampos", () => {
 
   it("sin campos no falta nada", () => {
     expect(faltanFotosDeCampos([])).toBe(0);
+  });
+});
+
+describe("puedeSubirFotoDePunto", () => {
+  it("el responsable y un asignado activo sí; un retirado, un ajeno y el lead de despacho no", () => {
+    expect(
+      puedeSubirFotoDePunto({
+        userId: 6,
+        responsableId: 6,
+        asignados: [],
+      }),
+    ).toBe(true);
+    expect(
+      puedeSubirFotoDePunto({
+        userId: 40,
+        responsableId: 6,
+        asignados: [{ userId: 40, rol: "MEMBER" }],
+      }),
+    ).toBe(true);
+    expect(
+      puedeSubirFotoDePunto({
+        userId: 7,
+        responsableId: 6,
+        asignados: [{ userId: 7, rol: "MEMBER", retirado: true }],
+      }),
+    ).toBe(false);
+    expect(puedeSubirFotoDePunto({ userId: 3, responsableId: 6, asignados: [] })).toBe(false);
+    expect(
+      puedeSubirFotoDePunto({
+        userId: 39,
+        responsableId: 39,
+        assignmentCharge: "despacho",
+        asignados: [{ userId: 39, rol: "LEAD" }],
+      }),
+    ).toBe(false);
+    expect(
+      puedeSubirFotoDePunto({
+        userId: 40,
+        responsableId: 39,
+        assignmentCharge: "despacho",
+        asignados: [
+          { userId: 39, rol: "LEAD" },
+          { userId: 40, rol: "MEMBER" },
+        ],
+      }),
+    ).toBe(true);
   });
 });

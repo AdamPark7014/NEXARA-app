@@ -14,6 +14,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
+import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
@@ -250,6 +251,16 @@ export default function ActivityDetailPage() {
   const miFila = (activity.assignees ?? []).find(
     (m) => (m.userId ?? m.user?.id) === user?.id && !m.retiradoAt,
   );
+  const puedeSubirPuntos = puedeSubirFotoDePunto({
+    userId: user?.id,
+    responsableId: activity.responsable?.id,
+    assignmentCharge: activity.assignmentCharge,
+    asignados: (activity.assignees ?? []).map((m) => ({
+      userId: m.userId ?? m.user?.id,
+      rol: m.rol,
+      retirado: Boolean(m.retiradoAt),
+    })),
+  });
   const semaforo = miFila?.semaforo ?? activity.semaforo ?? null;
   const chipSemaforo = semaforo
     ? textoChipSemaforo(
@@ -658,6 +669,7 @@ export default function ActivityDetailPage() {
         activityId={activity.id}
         anNumber={activity.anNumber}
         titulo={activity.titulo}
+        puedeSubir={puedeSubirPuntos}
         style={{ margin: "20px 0" }}
       />
 
