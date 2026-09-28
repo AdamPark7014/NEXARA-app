@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -25,6 +25,8 @@ type Props = {
   token: string;
   /** Recargar la actividad después de cancelar o pasarla. */
   onDone: () => void;
+  /** Misma fila que Pasar y Cancelar (Editar, Eliminar). */
+  extra?: ReactNode;
 };
 
 const MOTIVO_MIN = 10;
@@ -33,7 +35,7 @@ const MOTIVO_MIN = 10;
  * «Cancelar actividad» y «Pasar a otro compañero». Solo se muestran a los superiores de quien la
  * ejecuta (la API responde qué puede hacer quien consulta y vuelve a validarlo al guardar).
  */
-export default function ActivitySuperiorActions({ activityId, token, onDone }: Props) {
+export default function ActivitySuperiorActions({ activityId, token, onDone, extra }: Props) {
   const [acciones, setAcciones] = useState<Acciones | null>(null);
   const [dialogo, setDialogo] = useState<"cancelar" | "pasar" | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -135,7 +137,8 @@ export default function ActivitySuperiorActions({ activityId, token, onDone }: P
     }
   };
 
-  if (!acciones || (!acciones.puedeCancelar && !acciones.puedePasar && !aviso)) return null;
+  const haySuperiores = Boolean(acciones && (acciones.puedeCancelar || acciones.puedePasar));
+  if (!haySuperiores && !aviso && !extra) return null;
 
   const etiqueta: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" };
   const contador = (
@@ -151,9 +154,9 @@ export default function ActivitySuperiorActions({ activityId, token, onDone }: P
           <InlineAlert variant="success" message={aviso} onDismiss={() => setAviso(null)} />
         </div>
       ) : null}
-      {acciones.puedeCancelar || acciones.puedePasar ? (
+      {haySuperiores || extra ? (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {acciones.puedePasar ? (
+          {acciones?.puedePasar ? (
             <Button
               size="sm"
               variant="secondary"
@@ -163,7 +166,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone }: P
               Pasar a otro compañero
             </Button>
           ) : null}
-          {acciones.puedeCancelar ? (
+          {acciones?.puedeCancelar ? (
             <Button
               size="sm"
               variant="danger"
@@ -173,6 +176,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone }: P
               Cancelar actividad
             </Button>
           ) : null}
+          {extra}
         </div>
       ) : null}
 
@@ -245,7 +249,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone }: P
               style={erpInputStyle}
             >
               <option value="">Elige a la persona</option>
-              {acciones.personas.map((p) => (
+              {(acciones?.personas ?? []).map((p) => (
                 <option key={p.userId} value={p.userId}>
                   {p.nombre}
                   {p.responsable ? " · responsable" : p.rol === "APOYO" ? " · apoyo" : ""}

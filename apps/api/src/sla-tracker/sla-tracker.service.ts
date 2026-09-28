@@ -26,6 +26,7 @@ export class SlaTrackerService {
   async getStats(filters: { from?: Date; to?: Date; clientId?: number }) {
     const where: any = {
       ticketType: { not: null },
+      deletedAt: null,
     };
     if (filters.from || filters.to) {
       where.fechaAsignacion = {};
@@ -196,6 +197,7 @@ export class SlaTrackerService {
     const closedWhere: any = {
       ticketType: { not: null },
       fechaFinalizacion: { not: null },
+      deletedAt: null,
     };
     if (filters.from || filters.to) {
       closedWhere.fechaFinalizacion = {};
@@ -246,6 +248,7 @@ export class SlaTrackerService {
       where: {
         ticketType: { not: null },
         fechaFinalizacion: { gte: d14 },
+        deletedAt: null,
       },
       select: { fechaFinalizacion: true },
     });
@@ -253,6 +256,7 @@ export class SlaTrackerService {
       where: {
         ticketType: { not: null },
         fechaAsignacion: { gte: d14 },
+        deletedAt: null,
       },
       select: { fechaAsignacion: true },
     });

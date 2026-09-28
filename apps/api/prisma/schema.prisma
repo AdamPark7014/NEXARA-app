@@ -793,6 +793,7 @@ model User {
   actividadesAsignadas      Activity[]                 @relation("ResponsableActividades")
   actividadesAcsEntrada     Activity[]                 @relation("ActivityAcsEnteredBy")
   actividadesCanceladas     Activity[]                 @relation("ActivityCancelledBy")
+  actividadesEliminadas     Activity[]                 @relation("ActivityDeleter")
   evidencias                Evidence[]
   evidenciasAprobadas       Evidence[]                 @relation("EvidenceApprover")
   vehiculosRevisados        VehicleControl[]           @relation("VehicleDeliveryReviewer")
@@ -1237,6 +1238,9 @@ model Activity {
   cancelledById           Int?
   cancelledBy             User?                    @relation("ActivityCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   deletedAt               DateTime?
+  /// Quién la sacó de pizarra, listas y búsquedas. Solo el CEO (usuario 1).
+  deletedById             Int?
+  deletedBy               User?                    @relation("ActivityDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
   companyId               Int
   company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -1257,6 +1261,7 @@ model Activity {
   @@index([clientId])
   @@index([companyId])
   @@index([acsEnteredAt])
+  @@index([deletedById])
 }
 
 /// Solicitud de ayuda entre pares (mismo rango u org superior). No es el rechazo

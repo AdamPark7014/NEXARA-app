@@ -375,6 +375,13 @@ export function updateActivity(token: string, id: number, payload: Record<string
   });
 }
 
+/** Borrado lógico. El API responde 403 si quien llama no es el usuario 1. */
+export function deleteActivity(token: string, id: number) {
+  return apiFetch<{ id: number; anNumber: string | null; deleted: true }>(`activities/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
 export function assignTicketRequest(token: string, requestId: number, activityId: number) {
   return apiFetch(`client-ticket-requests/${requestId}/assign`, token, {
     method: "PATCH",

@@ -23,8 +23,17 @@ const USER_SELECT = {
 const DETAIL_INCLUDE = {
   fromUser: { select: USER_SELECT },
   toUser: { select: USER_SELECT },
-  activity: { select: { id: true, anNumber: true, titulo: true } },
+  activity: { select: { id: true, anNumber: true, titulo: true, deletedAt: true } },
 } as const;
+
+/** La solicitud sigue; el folio de una actividad borrada no se muestra ni se enlaza. */
+function sinActividadBorrada<T extends { activity: { deletedAt: Date | null } | null }>(row: T) {
+  if (!row.activity || row.activity.deletedAt) {
+    return { ...row, activity: null };
+  }
+  const { deletedAt: _omit, ...activity } = row.activity;
+  return { ...row, activity };
+}
 
 @Injectable()
 export class PeerRequestsService {
@@ -75,7 +84,7 @@ export class PeerRequestsService {
         take: 100,
       }),
     ]);
-    return { sent, received };
+    return { sent: sent.map(sinActividadBorrada), received: received.map(sinActividadBorrada) };
   }
 
   async create(
@@ -110,7 +119,7 @@ export class PeerRequestsService {
       throw new NotFoundException('No encontramos a esa persona');
     }
 
-    return this.prisma.activityPeerRequest.create({
+    const created = await this.prisma.activityPeerRequest.create({
       data: {
         fromUserId: viewer.id,
         toUserId,
@@ -121,6 +130,7 @@ export class PeerRequestsService {
       },
       include: DETAIL_INCLUDE,
     });
+    return sinActividadBorrada(created);
   }
 
   async accept(viewer: PeerViewer, companyId: number | null, id: number) {
@@ -149,7 +159,7 @@ export class PeerRequestsService {
       data: { status: 'ACCEPTED', activityId: activity.id },
       include: DETAIL_INCLUDE,
     });
-    return updated;
+    return sinActividadBorrada(updated);
   }
 
   async reject(viewer: PeerViewer, companyId: number | null, id: number, reason?: string) {
@@ -164,10 +174,11 @@ export class PeerRequestsService {
     });
     if (!request) throw new NotFoundException('Solicitud no encontrada o ya resuelta');
 
-    return this.prisma.activityPeerRequest.update({
+    const updated = await this.prisma.activityPeerRequest.update({
       where: { id: request.id },
       data: { status: 'REJECTED', rejectReason },
       include: DETAIL_INCLUDE,
     });
+    return sinActividadBorrada(updated);
   }
 }

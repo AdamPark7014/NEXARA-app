@@ -1,17 +1,19 @@
+import { CEO_CHRISTIAN_USER_ID, esCeoChristian } from '../common/ceo-user.js';
+
 /**
  * Quién puede borrar mensajes del chat interno.
  *
- * Allowlist explícita: solo Christian, usuario 1 (CEO). No alcanza el rol
- * `ceo` ni un correo equivalente (la cuenta de pruebas no puede). El endpoint
- * DELETE comprueba esta función con el id del JWT, no con el cuerpo.
+ * Misma allowlist que eliminar una actividad: solo Christian, usuario 1.
+ * No alcanza el rol `ceo` ni un correo equivalente (la cuenta de pruebas no
+ * puede). El endpoint DELETE comprueba esta función con el id del JWT.
  */
-export const CHAT_DELETE_USER_ID = 1;
+export const CHAT_DELETE_USER_ID = CEO_CHRISTIAN_USER_ID;
 
 /** Texto que ven las respuestas cuando el mensaje citado ya no existe. */
 export const MENSAJE_ELIMINADO = 'Mensaje eliminado';
 
 export function puedeEliminarMensajesDeChat(userId: number | null | undefined): boolean {
-  return Number(userId) === CHAT_DELETE_USER_ID;
+  return esCeoChristian(userId);
 }
 
 /**

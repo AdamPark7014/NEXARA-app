@@ -111,10 +111,16 @@ export function closedStatusVariants(): string[] {
 }
 
 /** `where` de Prisma para actividades cerradas. */
-export const CLOSED_ACTIVITY_WHERE = { estatus: { in: closedStatusVariants() } };
+export const CLOSED_ACTIVITY_WHERE = {
+  estatus: { in: closedStatusVariants() },
+  deletedAt: null,
+};
 
 /** `where` de Prisma para actividades abiertas (todo lo que no está cerrado). */
-export const OPEN_ACTIVITY_WHERE = { estatus: { notIn: closedStatusVariants() } };
+export const OPEN_ACTIVITY_WHERE = {
+  estatus: { notIn: closedStatusVariants() },
+  deletedAt: null,
+};
 
 /**
  * `where` de Prisma para actividades finalizadas **con éxito**.
@@ -124,6 +130,7 @@ export const OPEN_ACTIVITY_WHERE = { estatus: { notIn: closedStatusVariants() } 
  */
 export const FINISHED_ACTIVITY_WHERE = {
   estatus: { in: statusVariants(ACTIVITY_STATUS.FINALIZADA) },
+  deletedAt: null,
 };
 
 /** True si el valor almacenado corresponde a una actividad cerrada. */

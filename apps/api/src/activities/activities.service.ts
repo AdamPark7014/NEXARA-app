@@ -1,5 +1,7 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { esCeoChristian } from '../common/ceo-user.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
@@ -37,6 +39,7 @@ export class ActivitiesService {
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly domainEvents: DomainEventBusService,
+    @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
 
   // Dummy implementation to avoid controller errors
@@ -55,6 +58,8 @@ export class ActivitiesService {
       FROM "Activity"
       WHERE "companyId" = ${companyId}
         AND "anNumber" ~ '\\d+$'
+        -- Incluye filas con deletedAt: el folio es único aunque la actividad
+        -- ya no se vea. Si se filtraran, el siguiente alta reutilizaría AN-0001.
       ORDER BY CAST(substring("anNumber" FROM '(\\d+)$') AS INTEGER) DESC
       LIMIT 1
     `;
@@ -185,7 +190,7 @@ export class ActivitiesService {
   }
 
   async findAll(query?: PaginationQueryDto, companyId?: number | null) {
-    const where: any = { ...companyWhere(companyId ?? null) };
+    const where: any = { deletedAt: null, ...companyWhere(companyId ?? null) };
     if (query?.search) {
       where.OR = [
         { titulo: { contains: query.search, mode: 'insensitive' } },
@@ -226,6 +231,7 @@ export class ActivitiesService {
 
   async findAllDetailed() {
     return this.prisma['activity'].findMany({
+      where: { deletedAt: null },
       select: {
         id: true,
         anNumber: true,
@@ -284,7 +290,7 @@ export class ActivitiesService {
   async findByDepartment(departmentId: number) {
     // Busca actividades donde el responsable es de ese departamento
     return this.prisma['activity'].findMany({
-      where: { responsable: { departmentId } },
+      where: { deletedAt: null, responsable: { departmentId } },
       include: {
         creador: true,
         responsable: true,
@@ -306,7 +312,7 @@ export class ActivitiesService {
 
   async findByResponsible(userId: number, companyId?: number | null) {
     return this.prisma['activity'].findMany({
-      where: { responsableId: userId, ...companyWhere(companyId ?? null) },
+      where: { responsableId: userId, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: {
         creador: true,
         responsable: true,
@@ -332,7 +338,7 @@ export class ActivitiesService {
     // Actividades cuyo responsable está en la lista (p. ej. alcance de consola para admin)
     if (!userIds || userIds.length === 0) return [];
     return this.prisma['activity'].findMany({
-      where: { responsableId: { in: userIds }, ...companyWhere(companyId ?? null) },
+      where: { responsableId: { in: userIds }, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: {
         creador: true,
         responsable: true,
@@ -414,7 +420,7 @@ export class ActivitiesService {
 
   async findOne(id: number, companyId?: number | null) {
     const activity = await this.prisma['activity'].findFirst({
-      where: { id, ...companyWhere(companyId ?? null) },
+      where: { id, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: {
         creador: true,
         responsable: true,
@@ -1023,7 +1029,7 @@ export class ActivitiesService {
     companyId?: number | null,
   ) {
     const prev = await this.prisma['activity'].findFirst({
-      where: { id, ...companyWhere(companyId ?? null) },
+      where: { id, deletedAt: null, ...companyWhere(companyId ?? null) },
       select: {
         estatus: true,
         responsableId: true,
@@ -1206,12 +1212,30 @@ export class ActivitiesService {
     return updatedActivity;
   }
 
-  async remove(id: number, companyId?: number | null) {
+  /**
+   * Borrado lógico. Solo Christian (usuario 1). No usa `delete()`: el middleware
+   * de soft-delete reescribe esa llamada y se queda únicamente con `deletedAt`,
+   * así que `deletedById` no se guardaría.
+   */
+  async remove(id: number, companyId: number | null | undefined, userId: number) {
+    if (!esCeoChristian(userId)) {
+      throw new ForbiddenException('Solo el CEO puede eliminar actividades');
+    }
     const existing = await this.prisma['activity'].findFirst({
-      where: { id, ...companyWhere(companyId ?? null) },
-      select: { id: true, companyId: true },
+      where: { id, deletedAt: null, ...companyWhere(companyId ?? null) },
+      select: { id: true, companyId: true, anNumber: true },
     });
     assertCompanyAccess(existing, companyId, 'Actividad');
-    return this.prisma['activity'].delete({ where: { id } });
+    const now = new Date();
+    const updated = await this.prisma['activity'].update({
+      where: { id: existing.id },
+      data: { deletedAt: now, deletedById: userId },
+      select: { id: true, companyId: true, anNumber: true },
+    });
+    const payload = { id: updated.id, anNumber: updated.anNumber, deleted: true as const };
+    if (updated.companyId) {
+      this.realtime?.emitToCompany(updated.companyId, 'activity:updated', payload);
+    }
+    return payload;
   }
 }

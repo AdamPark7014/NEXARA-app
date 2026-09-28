@@ -324,6 +324,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
+    // Eliminar actividad: la matriz solo abre el DELETE al CEO. El servicio vuelve
+    // a exigir el usuario 1 (403 al resto, aunque otro rol ya tuviera la ruta).
+    { path: '/api/activities/*', methods: ['DELETE'], scope: 'approve' },
     // Faltas justificadas: solo Christian (el servicio lo vuelve a exigir por correo).
     { path: '/api/attendance/justificaciones', methods: ['GET', 'POST'], scope: 'approve' },
     { path: '/api/attendance/justificaciones/*', methods: ['DELETE'], scope: 'approve' },
