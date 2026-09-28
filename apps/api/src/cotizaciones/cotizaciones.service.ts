@@ -6,9 +6,11 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ApprovalThresholdService } from '../workflow/approval-thresholds.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CotizacionStatus, Prisma } from '@prisma/client';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
@@ -140,6 +142,8 @@ export class CotizacionesService {
     @Inject(forwardRef(() => CtPurchaseOrderService))
     private readonly ctPurchaseOrders: CtPurchaseOrderService,
     private readonly core: CotizacionesCoreService,
+    // Topes de aprobación por monto (política de empresa). Opcional: sin él, o sin tope configurado, no se exige nada.
+    @Optional() private readonly aprobacionPorMonto?: ApprovalThresholdService,
   ) {}
 
   private get db() {
@@ -1198,6 +1202,14 @@ export class CotizacionesService {
     if (!quote.items?.length) {
       throw new BadRequestException('Agrega al menos una partida antes de enviar la cotización.');
     }
+    // Si la empresa fijó un tope y esta cotización lo supera, sale solo con la autorización de dirección.
+    await this.aprobacionPorMonto?.exigir({
+      tipo: 'COTIZACION',
+      entityId: id,
+      monto: Number(quote.total),
+      actorId: senderId ?? quote.createdById,
+      companyId: quote.companyId,
+    });
 
     // Copias: sin repetir al destinatario principal.
     const copias = [...new Set((dto.cc ?? []).map((c) => c.trim().toLowerCase()).filter(Boolean))].filter(
@@ -1680,6 +1692,13 @@ export class CotizacionesService {
     if (!transicionPermitida(quote.status, ESTADO.APROBADA)) {
       throw new BadRequestException(motivoTransicionInvalida(quote.status, ESTADO.APROBADA));
     }
+    await this.aprobacionPorMonto?.exigir({
+      tipo: 'COTIZACION',
+      entityId: id,
+      monto: Number(quote.total),
+      actorId: userId,
+      companyId: quote.companyId,
+    });
     await this.core.registrarParticipante(id, userId, 'APROBO');
     const updated = await this.db.cotizacion.update({
       where: { id },

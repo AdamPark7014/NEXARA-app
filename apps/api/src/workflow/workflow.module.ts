@@ -7,6 +7,7 @@ import { WorkflowController } from './workflow.controller.js';
 import { AutoApprovalService } from './auto-approval.service.js';
 import { WorkflowSeedService } from './workflow-seed.service.js';
 import { WorkflowTimeoutCronService } from './workflow-timeout.cron.js';
+import { ApprovalThresholdService } from './approval-thresholds.service.js';
 import { ActivitiesModule } from '../activities/activities.module.js';
 
 @Module({
@@ -16,8 +17,9 @@ import { ActivitiesModule } from '../activities/activities.module.js';
     AutoApprovalService,
     WorkflowSeedService,
     WorkflowTimeoutCronService,
+    ApprovalThresholdService,
   ],
   controllers: [WorkflowController],
-  exports: [WorkflowService, AutoApprovalService, WorkflowSeedService],
+  exports: [WorkflowService, AutoApprovalService, WorkflowSeedService, ApprovalThresholdService],
 })
 export class WorkflowModule {}

@@ -8,6 +8,7 @@
  * solo viaje por tipo (no una consulta por aprobación) y siempre acotadas a la empresa.
  */
 import { companyWhere } from '../common/tenant/tenant-scope.js';
+import { tipoBase } from './approval-thresholds.js';
 
 export type ResumenEntidad = {
   titulo: string;
@@ -105,7 +106,8 @@ const CONSULTAS: Record<string, { modelo: string; select: Fila }> = {
 };
 
 const ALIAS: Record<string, string> = { QUOTE: 'COTIZACION', VIATICS: 'VIATIC' };
-const canonico = (tipo: string) => ALIAS[String(tipo).toUpperCase()] ?? String(tipo).toUpperCase();
+// `COTIZACION_MONTO` (autorización por monto) se resume como la cotización que es.
+const canonico = (tipo: string) => ALIAS[tipoBase(tipo)] ?? tipoBase(tipo);
 
 /**
  * Resúmenes de todas las entidades de una bandeja, una consulta por tipo. Lo que no se encuentre
