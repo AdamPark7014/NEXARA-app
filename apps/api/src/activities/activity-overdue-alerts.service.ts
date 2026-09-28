@@ -7,7 +7,6 @@ import { appUrls } from '../common/app-urls.js';
 import {
   CLAVE_RECORDATORIO_ATRASO,
   decisionAvisoAtraso,
-  etiquetaSemaforo,
   evaluarSemaforo,
   horasRecordatorioDe,
 } from './semaforo-actividad.js';
@@ -15,6 +14,7 @@ import {
   destinatariosDeAtraso,
   esCoordinacionDeDepartamento,
   ROLES_COORDINACION_DEPARTAMENTO,
+  textoAvisoAtraso,
   type PersonaAviso,
 } from './activity-overdue-recipients.js';
 
@@ -23,6 +23,7 @@ const LOTE = 400;
 type Fila = {
   id: number;
   companyId: number;
+  anNumber: string;
   titulo: string;
   estatus: string;
   fechaInicio: Date | null;
@@ -32,7 +33,7 @@ type Fila = {
   periodoFin: Date | null;
   overdueAlertedAt: Date | null;
   responsableId: number;
-  client: { name: string } | null;
+  responsable: { nombre: string } | null;
   assignees: Array<{ userId: number; inicioRealAt: Date | null; finRealAt: Date | null; retiradoAt: Date | null }>;
 };
 
@@ -80,6 +81,7 @@ export class ActivityOverdueAlertsService {
       select: {
         id: true,
         companyId: true,
+        anNumber: true,
         titulo: true,
         estatus: true,
         fechaInicio: true,
@@ -89,7 +91,7 @@ export class ActivityOverdueAlertsService {
         periodoFin: true,
         overdueAlertedAt: true,
         responsableId: true,
-        client: { select: { name: true } },
+        responsable: { select: { nombre: true } },
         assignees: {
           where: { retiradoAt: null },
           select: { userId: true, inicioRealAt: true, finRealAt: true, retiradoAt: true },
@@ -239,23 +241,26 @@ export class ActivityOverdueAlertsService {
       return false;
     }
 
-    const nombre = (fila.titulo || '').trim() || 'Actividad sin nombre';
-    const detalle =
-      luz.motivo === 'inicio'
-        ? 'Pasó su hora de inicio y no se ha iniciado'
-        : 'Pasó su fecha límite y sigue abierta';
-    const cliente = fila.client?.name?.trim();
-    const message = [detalle, etiquetaSemaforo(luz).replace(/^Atrasada · /, ''), cliente].filter(Boolean).join(' · ');
+    const quienesLaTienen = new Set<number>([
+      fila.responsableId,
+      ...fila.assignees.map((a) => a.userId),
+    ]);
 
     let alguno = false;
     for (const userId of destinos) {
+      const texto = textoAvisoAtraso({
+        anNumber: fila.anNumber,
+        titulo: fila.titulo,
+        nombreResponsable: fila.responsable?.nombre,
+        paraQuienLaTiene: quienesLaTienen.has(userId),
+      });
       try {
         await this.notifications.createNotification({
           userId,
           type: 'ACTIVITY_OVERDUE',
           category: 'activities',
-          title: `${nombre} está atrasada`,
-          message,
+          title: texto.title,
+          message: texto.message,
           icon: 'vencida',
           relatedEntityId: fila.id,
           entityType: 'Activity',

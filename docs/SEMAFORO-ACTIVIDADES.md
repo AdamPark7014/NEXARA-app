@@ -27,6 +27,8 @@ Sin fechas no hay con qué atrasarse: queda en tiempo. Cerrada, cancelada o con 
 
 El cron `actividades-atrasadas` (`*/5 * * * *`, `ActivityOverdueAlertsService`) revisa las abiertas cuyo inicio, tope o fin de periodo ya pasó, o que ya tienen marca de aviso. Si están en rojo y no se avisó (o ya toca el recordatorio), manda campana y push con `createNotification` (`type: ACTIVITY_OVERDUE`, prioridad alta, canal `ops`, ícono `vencida`). El push usa lo que ya hay: Web Push (VAPID) y FCM. No hay un canal nuevo.
 
+El título es `Actividad atrasada`. Al responsable y a quien está asignado: «Tu actividad {AN} · {título} está atrasada. Asegúrate de cumplirla en tiempo y forma.» Al jefe directo y a la coordinación: «La actividad {AN} · {título} de {nombre del responsable} está atrasada.» `relatedUrl` es `/erp/actividades/{id}`: al tocar el push (web, Android o iOS) o la campana se abre esa actividad.
+
 Destinatarios, de la misma empresa: responsable y asignados activos, el jefe directo de cada uno (`managerId`, no la cadena) y la coordinación del mismo departamento (`coord_operaciones`, `coord_admin`, `coord_ventas`, `enc_soporte`, `lider_diseno`, y el correo `jose.ramirez@nexara.com.mx`).
 
 `Activity.overdueAlertedAt` se escribe después de al menos un aviso y se borra cuando deja de estar en rojo, para que un atraso nuevo vuelva a avisar. No se reutiliza `slaAlertedAt` (ese campo es el de tickets).

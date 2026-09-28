@@ -1,5 +1,5 @@
 import { decisionAvisoAtraso, etiquetaSemaforo, evaluarSemaforo, horasRecordatorioDe } from './semaforo-actividad';
-import { destinatariosDeAtraso } from './activity-overdue-recipients';
+import { destinatariosDeAtraso, textoAvisoAtraso } from './activity-overdue-recipients';
 
 const AHORA = new Date('2026-09-18T18:00:00.000Z');
 const hace = (min: number) => new Date(AHORA.getTime() - min * 60_000);
@@ -178,5 +178,36 @@ describe('destinatarios del aviso', () => {
       },
     ]);
     expect(ids).toContain(4);
+  });
+});
+
+describe('texto del aviso', () => {
+  it('al responsable le pide cumplirla, con el folio y el título', () => {
+    expect(
+      textoAvisoAtraso({
+        anNumber: 'AN-1042',
+        titulo: 'Actualizar archivo SLA',
+        nombreResponsable: 'Carolina Juárez',
+        paraQuienLaTiene: true,
+      }),
+    ).toEqual({
+      title: 'Actividad atrasada',
+      message:
+        'Tu actividad AN-1042 · Actualizar archivo SLA está atrasada. Asegúrate de cumplirla en tiempo y forma.',
+    });
+  });
+
+  it('al jefe le dice de quién es', () => {
+    expect(
+      textoAvisoAtraso({
+        anNumber: 'AN-1042',
+        titulo: 'Actualizar archivo SLA',
+        nombreResponsable: 'Carolina Juárez',
+        paraQuienLaTiene: false,
+      }),
+    ).toEqual({
+      title: 'Actividad atrasada',
+      message: 'La actividad AN-1042 · Actualizar archivo SLA de Carolina Juárez está atrasada.',
+    });
   });
 });

@@ -65,3 +65,33 @@ export function destinatariosDeAtraso(
   }
   return [...ids];
 }
+
+export const TITULO_AVISO_ATRASO = 'Actividad atrasada';
+
+/**
+ * Texto del push y de la campana.
+ * Quien la tiene (responsable o asignado): «Tu actividad AN · título…».
+ * Jefe o coordinación: «La actividad AN · título de {nombre} está atrasada.»
+ * `relatedUrl` de la actividad es aparte: al tocarla se abre el detalle.
+ */
+export function textoAvisoAtraso(input: {
+  anNumber?: string | null;
+  titulo?: string | null;
+  nombreResponsable?: string | null;
+  paraQuienLaTiene: boolean;
+}): { title: string; message: string } {
+  const an = (input.anNumber || '').trim();
+  const titulo = (input.titulo || '').trim();
+  const pieza = [an, titulo].filter(Boolean).join(' · ') || 'sin nombre';
+  if (input.paraQuienLaTiene) {
+    return {
+      title: TITULO_AVISO_ATRASO,
+      message: `Tu actividad ${pieza} está atrasada. Asegúrate de cumplirla en tiempo y forma.`,
+    };
+  }
+  const nombre = (input.nombreResponsable || '').trim() || 'el responsable';
+  return {
+    title: TITULO_AVISO_ATRASO,
+    message: `La actividad ${pieza} de ${nombre} está atrasada.`,
+  };
+}
