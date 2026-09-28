@@ -120,3 +120,39 @@ describe('"hoy" se compara contra una columna @db.Date', () => {
     expect(fecha.toISOString().slice(0, 10)).toBe('2026-09-08');
   });
 });
+
+describe('actividadId que no es una actividad no revienta con 500', () => {
+  it('guarda el id de la actividad cuando sí existe en la empresa', async () => {
+    const { service, prisma } = build();
+    prisma.activity = { findFirst: jest.fn().mockResolvedValue({ id: 24 }) };
+    prisma.activityAssignee = { findFirst: jest.fn() };
+
+    await service.create(punto({ actividadId: 24 }) as any, 7);
+
+    expect(prisma.activityAssignee.findFirst).not.toHaveBeenCalled();
+    expect(prisma.locationTracking.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ actividadId: 24 }) }),
+    );
+  });
+
+  it('si llega el id de la asignación, lo traduce a la actividad', async () => {
+    const { service, prisma } = build();
+    prisma.activity = { findFirst: jest.fn().mockResolvedValue(null) };
+    prisma.activityAssignee = { findFirst: jest.fn().mockResolvedValueOnce({ activityId: 8 }) };
+
+    await service.create(punto({ actividadId: 24, usuarioId: 40 }) as any, 7);
+
+    expect(prisma.locationTracking.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ actividadId: 8 }) }),
+    );
+  });
+
+  it('si no existe ni como actividad ni como asignación, responde 400', async () => {
+    const { service, prisma } = build();
+    prisma.activity = { findFirst: jest.fn().mockResolvedValue(null) };
+    prisma.activityAssignee = { findFirst: jest.fn().mockResolvedValue(null) };
+
+    await expect(service.create(punto({ actividadId: 24 }) as any, 7)).rejects.toThrow(/no existe/);
+    expect(prisma.locationTracking.create).not.toHaveBeenCalled();
+  });
+});

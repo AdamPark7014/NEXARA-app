@@ -261,10 +261,21 @@ export const ACTIVIDAD_PROPIA_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects', methods: ['GET'], scope: 'read' },
   { path: '/api/operational-projects/*', methods: ['GET'], scope: 'read' },
   { path: '/api/proyectos/*/programacion', methods: ['GET'], scope: 'read' },
+  // Foto de entrada/salida de lo propio. El servicio exige estar en la actividad.
+  { path: '/api/activity-evidence/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+  { path: '/api/gps', methods: ['POST'], scope: 'write' },
+  { path: '/api/gps/me', methods: ['GET'], scope: 'read' },
+  { path: '/api/gps/consent', methods: ['PATCH'], scope: 'write' },
+  { path: '/api/gps/heartbeat', methods: ['POST'], scope: 'write' },
   { path: '/erp/mis-actividades', scope: 'write' },
   { path: '/erp/mis-actividades/**', scope: 'write' },
   { path: '/erp/pizarra', scope: 'write' },
   { path: '/erp/pizarra/**', scope: 'write' },
+];
+
+/** Quien asigna actividades necesita el selector. No abre el resto de `/api/users`. */
+export const USERS_ASSIGNABLE_URL_RULES: UrlRule[] = [
+  { path: '/api/users/assignable', methods: ['GET'], scope: 'read' },
 ];
 
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
@@ -346,6 +357,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
@@ -492,6 +504,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...USERS_ASSIGNABLE_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
@@ -631,6 +644,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
@@ -791,6 +805,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ENCARGADO DE SOPORTE — coordina soporte (puede asignar OT)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ENC_SOPORTE]: [
+    ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
@@ -850,6 +865,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD VENTAS — gerente comercial
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...USERS_ASSIGNABLE_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...CLIENTES_CORE_URL_RULES,

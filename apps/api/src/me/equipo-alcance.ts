@@ -45,11 +45,11 @@ export function extrasDeTablero(email?: string | null): string[] {
 }
 
 /**
- * Para **asignar** trabajo, el flujo de despacho es más estrecho que el de ver.
- * Luis coordina servicios y se los deja a José Antonio: no elige al ingeniero.
- * Antonio sí asigna a su soporte (Carolina, Alejandro, Roberto) aunque el
- * organigrama no los cuelgue de él y aunque el servicio lo haya creado otro
- * departamento. Luis no asigna directo a ese soporte.
+ * Para **asignar** trabajo, el flujo de despacho por correo sigue siendo estrecho.
+ * Antonio (encargado, aunque su rol diga ingeniero) asigna a su soporte
+ * (Carolina, Alejandro, Roberto) aunque el organigrama no los cuelgue de él.
+ * Coordinación y gerencia asignan a cualquiera por rol (`asignaEnTodaLaEmpresa`),
+ * no por estos correos.
  */
 const EXTRAS_ASIGNACION_POR_CORREO: Record<string, string[]> = {
   'direccion.operaciones@nexara.com.mx': ['jose.ramirez@nexara.com.mx'],
@@ -71,17 +71,39 @@ export function esDeTodaLaEmpresa(viewer: Alcanzador): boolean {
   return isCeoEquivalentEmail(email) || email === 'developer@nexara.com.mx';
 }
 
+/**
+ * Coordinación y gerencia asignan entre departamentos, a cualquiera.
+ * No abre la pizarra de toda la empresa (`esDeTodaLaEmpresa` / `alcanzaA`).
+ * El encargado de soporte y el de obra se quedan en su organigrama.
+ */
+const ROLES_ASIGNAN_A_CUALQUIERA = new Set([
+  'ceo',
+  'dir_admin',
+  'dir_operaciones',
+  'coord_admin',
+  'coord_operaciones',
+  'coord_ventas',
+]);
+
+export function asignaEnTodaLaEmpresa(viewer: Alcanzador): boolean {
+  if (esDeTodaLaEmpresa(viewer)) return true;
+  return ROLES_ASIGNAN_A_CUALQUIERA.has((viewer.roleKey || '').trim());
+}
+
 /** Quien mira y todo su organigrama hacia abajo. */
 export function subarbolIds(rootId: number, users: Array<{ id: number; managerId: number | null }>): Set<number> {
+  const root = Number(rootId);
   const hijos = new Map<number, number[]>();
   for (const u of users) {
     if (u.managerId == null) continue;
-    const lista = hijos.get(u.managerId) ?? [];
-    lista.push(u.id);
-    hijos.set(u.managerId, lista);
+    const padre = Number(u.managerId);
+    const hijo = Number(u.id);
+    const lista = hijos.get(padre) ?? [];
+    lista.push(hijo);
+    hijos.set(padre, lista);
   }
-  const out = new Set<number>([rootId]);
-  const cola = [rootId];
+  const out = new Set<number>([root]);
+  const cola = [root];
   while (cola.length) {
     const id = cola.shift()!;
     for (const hijo of hijos.get(id) ?? []) {
@@ -145,10 +167,10 @@ export function puedeAsignarA(
   users: Array<{ id: number; email: string; managerId: number | null }>,
   targetId: number,
 ): boolean {
-  if (targetId === viewer.id) return false;
-  if (esDeTodaLaEmpresa(viewer)) return true;
-  if (subarbolIds(viewer.id, users).has(targetId)) return true;
-  const target = users.find((u) => u.id === targetId);
+  if (Number(targetId) === Number(viewer.id)) return false;
+  if (asignaEnTodaLaEmpresa(viewer)) return true;
+  if (subarbolIds(viewer.id, users).has(Number(targetId))) return true;
+  const target = users.find((u) => Number(u.id) === Number(targetId));
   return Boolean(target && extrasDeAsignacion(viewer.email).includes(target.email.toLowerCase()));
 }
 

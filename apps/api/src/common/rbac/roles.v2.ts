@@ -132,6 +132,30 @@ export const ROLE_LABELS: Record<RoleKey, { es: string; en: string; departamento
   cliente:           { es: 'Cliente',              en: 'Client',                departamento: 'Externo' },
 };
 
+function sinAcentos(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+const ROLE_KEY_POR_NOMBRE: Map<string, RoleKey> = new Map(
+  (Object.entries(ROLE_LABELS) as Array<[RoleKey, { es: string }]>)
+    .sort((a, b) => b[1].es.length - a[1].es.length)
+    .map(([key, label]) => [sinAcentos(label.es), key]),
+);
+
+/**
+ * `Role.nombre` («Líder de Diseño», «Administrativo») cuando `User.roleKey` y
+ * `Role.orgRoleKey` vienen vacíos. Coincidencia exacta del rótulo, el más largo
+ * primero, para que «Administrativo» no se lea como «Director Administrativo».
+ */
+export function roleKeyFromRoleNombre(nombre?: string | null): RoleKey | null {
+  const normalizado = sinAcentos(nombre || '');
+  if (!normalizado) return null;
+  const exacto = ROLE_KEY_POR_NOMBRE.get(normalizado);
+  if (exacto) return exacto;
+  if (normalizado.includes('lider') && normalizado.includes('diseno')) return ROLES.LIDER_DISENO;
+  return null;
+}
+
 /** Mapeo legacy → v2 (para migración de usuarios existentes). */
 export const LEGACY_TO_V2: Record<string, RoleKey> = {
   arquitecto:           'arquitecto',

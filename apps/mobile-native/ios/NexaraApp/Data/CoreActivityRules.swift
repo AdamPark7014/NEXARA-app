@@ -274,9 +274,15 @@ enum CoreActivityRules {
     /// Creador × destinatario, en el orden fijo de los tipos.
     static func kindsForAssignment(creator: SessionUser?, targetEmail: String?) -> [CoreActivityKind] {
         let create = kindsForCreator(creator)
-        guard let targetEmail, !CoreOrg.normalized(targetEmail).isEmpty else { return create }
+        guard let targetEmail, !CoreOrg.normalized(targetEmail).isEmpty else {
+            return create.isEmpty ? [.tarea] : create
+        }
         let receive = Set(kindsForTarget(email: targetEmail))
-        return all.filter { create.contains($0) && receive.contains($0) }
+        let visibles = all.filter { create.contains($0) && receive.contains($0) }
+        if visibles.isEmpty && CoreOrg.normalized(creator?.email) == CoreOrg.normalized(targetEmail) {
+            return [.tarea]
+        }
+        return visibles
     }
 
     static func isAreaManager(_ email: String?) -> Bool {

@@ -28,6 +28,8 @@ describe('canOpenPage · guardas de ruta por rol', () => {
 
   it('todo el personal abre el formulario para autoasignarse una actividad', () => {
     for (const role of [
+      ROLES.LIDER_DISENO,
+      ROLES.ENC_SOPORTE,
       ROLES.ADMINISTRATIVO,
       ROLES.CONTABILIDAD,
       ROLES.RH,

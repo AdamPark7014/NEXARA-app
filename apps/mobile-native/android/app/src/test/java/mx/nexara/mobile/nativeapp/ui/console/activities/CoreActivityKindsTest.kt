@@ -45,6 +45,7 @@ class CoreActivityKindsTest {
     @Test
     fun selfAssignUsesOwnEmailBothSides() {
         assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.DANIELA, OrgEmails.DANIELA, null, false))
+        assertEquals(listOf("tarea"), k.kindsForAssignment(OrgEmails.ROBERTO, OrgEmails.ROBERTO, null, false))
         assertEquals(listOf("tarea", "proyecto", "obra", "comercial"), k.kindsForAssignment(OrgEmails.JOSUE, OrgEmails.JOSUE, null, false))
     }
 
