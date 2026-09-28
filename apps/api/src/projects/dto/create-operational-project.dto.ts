@@ -116,3 +116,13 @@ export class RemoveProjectEngineerDto {
   @IsNumber()
   engineerId!: number;
 }
+
+/** Alta desde el formulario de actividad: solo nombre y cliente de tipo proyecto. */
+export class QuickCreateOperationalProjectDto {
+  @IsString()
+  @MinLength(3)
+  title!: string;
+
+  @IsInt()
+  salesClientId!: number;
+}

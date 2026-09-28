@@ -12,7 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { OperationalProjectsService } from './operational-projects.service.js';
-import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
+import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto, QuickCreateOperationalProjectDto } from './dto/create-operational-project.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
@@ -36,6 +36,28 @@ export class OperationalProjectsController {
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   create(@Body() createDto: CreateOperationalProjectDto, @CurrentUser() user: any) {
     return this.operationalProjectsService.create(createDto, user.id);
+  }
+
+  /**
+   * Alta mínima desde el formulario de actividad (nombre + cliente de proyecto).
+   * Quien puede crear una actividad puede crear el proyecto; el alta completa
+   * (fechas, equipo, alcance) sigue en POST / y exige gestión de actividades.
+   */
+  @Post('alta-rapida')
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.PEOPLE_VIEW,
+    ],
+  })
+  quickCreate(
+    @Body() dto: QuickCreateOperationalProjectDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.operationalProjectsService.quickCreate(dto, user, companyId);
   }
 
   @Get()

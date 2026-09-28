@@ -326,6 +326,32 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('el alta de un proyecto crea el cliente PROYECTO solo con el nombre, también si el sector no es el suyo', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: 11, serviceClientId: null, sectors: [], ...data }),
+    );
+    await service.createClient({ name: 'Obra Norte', altaProyecto: true } as any, TECNICO, 7);
+    expect(prisma.salesClient.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Obra Norte',
+          tipo: 'PROYECTO',
+          taxId: null,
+          billingEmail: null,
+          companyId: 7,
+        }),
+      }),
+    );
+    await service.createClient({ name: 'Obra Sur', tipo: 'PROYECTO', altaProyecto: true } as any, DANIELA, 7);
+    await expect(
+      service.createClient({ name: 'Con RFC', altaProyecto: true, taxId: 'XAXX010101000' } as any, TECNICO, 7),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      service.createClient({ name: 'Comercial', altaProyecto: true, tipo: 'COMERCIAL' } as any, TECNICO, 7),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('un operativo lista clientes corporativos de su empresa y no los comerciales', async () => {
     const { service, prisma } = buildService();
     prisma.salesClient.findMany = jest.fn().mockResolvedValue([]);
@@ -337,5 +363,15 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     await expect(service.listClients(TECNICO, undefined, { sector: 'COMERCIAL' } as any, 7)).rejects.toThrow(
       ForbiddenException,
     );
+  });
+
+  it('un operativo lista los clientes de proyecto de su empresa para elegirlos en una actividad', async () => {
+    const { service, prisma } = buildService();
+    prisma.salesClient.findMany = jest.fn().mockResolvedValue([]);
+    await service.listClients(TECNICO, undefined, { sector: 'PROYECTO' } as any, 7);
+    const donde = prisma.salesClient.findMany.mock.calls[0][0].where;
+    expect(donde.companyId).toBe(7);
+    expect(donde.tipo).toBe('PROYECTO');
+    expect(donde.ownerId).toBeUndefined();
   });
 });

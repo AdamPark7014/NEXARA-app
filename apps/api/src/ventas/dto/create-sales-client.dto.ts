@@ -75,6 +75,14 @@ export class CreateSalesClientDto {
   @IsBoolean()
   altaRapida?: boolean;
 
+  /**
+   * Alta rápida al crear un proyecto desde una actividad.
+   * Solo el nombre, y solo tipo PROYECTO. No abre el padrón ni guarda datos fiscales.
+   */
+  @IsOptional()
+  @IsBoolean()
+  altaProyecto?: boolean;
+
   /** Sector legado. Si viene más de uno, queda un solo tipo (COMERCIAL si está en la lista). */
   @IsOptional()
   @IsArray()

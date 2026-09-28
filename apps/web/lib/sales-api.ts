@@ -1003,6 +1003,7 @@ export const createSalesClient = async (
     sectors?: Array<"PROYECTO" | "CORPORATIVO" | "COMERCIAL">;
     tipo?: "PROYECTO" | "CORPORATIVO" | "COMERCIAL";
     altaRapida?: boolean;
+    altaProyecto?: boolean;
   },
 ) => {
   return apiRequest<SalesClient>(

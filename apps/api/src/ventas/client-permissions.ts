@@ -5,9 +5,10 @@
  * modifica. Agregar y editar: coordinación y gerencia (y la encargada comercial, rol
  * `administrativo`), más quien tiene gente a su cargo salvo que su rol sea operativo.
  * Un ingeniero o un operativo no da de alta clientes aunque tenga personal reportándole,
- * con una excepción: al crear una actividad de servicio puede dar de alta rápido un
- * cliente CORPORATIVO con solo nombre y contacto (correo y teléfono). No edita el
- * padrón ni captura RFC ni datos fiscales.
+ * con dos excepciones de solo nombre (no editan el padrón ni capturan RFC):
+ * al crear una actividad de servicio, un operativo da de alta un CORPORATIVO con
+ * nombre y contacto; al crear un proyecto desde una actividad, quien puede crear
+ * esa actividad da de alta un PROYECTO con solo el nombre (`altaProyecto`).
  * Desactivar y eliminar: solo Christian (y su equivalente de pruebas); la cuenta de
  * desarrollo conserva el acceso técnico total.
  */

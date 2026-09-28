@@ -1,7 +1,8 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Último turno:** cursor
 - **Fecha:** 2026-09-28
+- **Hecho (proyecto desde la actividad):** en crear/editar actividad, junto al proyecto, «¿No está el proyecto? Créalo aquí» pide solo el nombre y un cliente tipo PROYECTO (el buscador de `ClienteTipoPicker`). Al crearlo queda seleccionado. Fechas, alcance y equipo se completan después en Proyectos. `POST /operational-projects/alta-rapida` lo puede quien ya puede crear una actividad (`ACTIVITIES_VIEW`, `ACTIVITIES_MANAGE`, `CONSOLE_ACCESS` o `PEOPLE_VIEW`; el alta completa del proyecto sigue exigiendo gestión). El responsable es quien lo crea, el inicio es hoy (America/Mexico_City), el tipo es OTRO y queda activo, en su `companyId`. Una cuenta de portal o de sucursal no puede. El cliente se elige entre los PROYECTO de la empresa (un operativo los ve para esto; el padrón sin filtro sigue siendo solo los suyos, y COMERCIAL no se abre). Si no existe, se crea ahí con solo el nombre (`altaProyecto`): sin RFC ni datos fiscales. Quien ya puede dar de alta clientes de su sector PROYECTO sigue usando el alta normal y puede completar datos en el mismo formulario. Un operativo no edita el padrón; Daniela no crea PROYECTO por el padrón, pero sí este nombre al crear la actividad. Sin migración. Despliegue: `cd /var/www/nexara-app && bash deploy/update.sh`.
 - **Hecho (deploy general, ~13:35-14:10):** Adam pidió «deployalo todo». Al retomar, `origin/main` tenía 7 commits nuevos de Cursor sin
   tocar localmente (bóveda de contraseñas + varios `fix`/`feat` suyos); se hizo `git pull --ff-only`, `npx prisma generate` (el schema
   había cambiado) y se corrieron las suites completas antes de tocar nada: **API 237/2 779, web 73/648** en verde de entrada.
