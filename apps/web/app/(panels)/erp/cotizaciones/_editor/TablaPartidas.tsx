@@ -88,6 +88,7 @@ function CeldaNumero({
   onKeyDown,
   placeholder,
   decimales = 0,
+  tabIndex,
 }: {
   /** Decimales fijos al mostrarla fuera de foco (precio: 2; cantidad: 0). */
   decimales?: number;
@@ -98,6 +99,8 @@ function CeldaNumero({
   refCelda?: (el: HTMLInputElement | null) => void;
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   placeholder?: string;
+  /** -1 para sacarla del recorrido de Tab (detalle: costo/margen) sin dejar de ser clicleable. */
+  tabIndex?: number;
 }) {
   const [texto, setTexto] = useState(aTexto(valor));
   const [enfocada, setEnfocada] = useState(false);
@@ -118,6 +121,7 @@ function CeldaNumero({
       placeholder={placeholder}
       disabled={!editable}
       aria-label={etiqueta}
+      tabIndex={tabIndex}
       onFocus={() => setEnfocada(true)}
       onBlur={() => setEnfocada(false)}
       onChange={(e) => {
@@ -418,6 +422,8 @@ export default function TablaPartidas({
                 </span>
               ) : null}
             </span>
+            {/* Detalle (marca, modelo, costo, margen, descripción del PDF): se abre con clic, no interrumpe
+                el Tab de la hoja de cálculo (descripción → unidad → cantidad → precio). */}
             <span className={styles.detallePartida}>
               <input
                 className={styles.celda}
@@ -425,6 +431,7 @@ export default function TablaPartidas({
                 placeholder="Marca"
                 disabled={!editable}
                 aria-label={`Marca de la partida ${i + 1}`}
+                tabIndex={-1}
                 onChange={(e) => cambiar(p.key, { brand: e.target.value || null })}
               />
               <input
@@ -433,6 +440,7 @@ export default function TablaPartidas({
                 placeholder="Modelo"
                 disabled={!editable}
                 aria-label={`Modelo de la partida ${i + 1}`}
+                tabIndex={-1}
                 onChange={(e) => cambiar(p.key, { model: e.target.value || null })}
               />
               <CeldaNumero
@@ -441,6 +449,7 @@ export default function TablaPartidas({
                 etiqueta={`Costo interno de la partida ${i + 1}`}
                 placeholder="Costo"
                 decimales={2}
+                tabIndex={-1}
                 onValor={(n) => ponerCosto(p, n)}
               />
               <CeldaNumero
@@ -449,6 +458,7 @@ export default function TablaPartidas({
                 etiqueta={`Margen sobre costo de la partida ${i + 1} (%)`}
                 placeholder={`${MARGEN_SOBRE_COSTO}%`}
                 decimales={2}
+                tabIndex={-1}
                 onValor={(n) => ponerMargen(p, n)}
               />
               <TextoAuto
@@ -458,6 +468,7 @@ export default function TablaPartidas({
                 placeholder="Descripción para el PDF. El costo y el margen no se imprimen. Los saltos de línea y las viñetas se imprimen."
                 disabled={!editable}
                 aria-label={`Detalle de la partida ${i + 1}`}
+                tabIndex={-1}
                 onValor={(v) => cambiar(p.key, { description: v || null })}
               />
             </span>
