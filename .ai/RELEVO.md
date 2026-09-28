@@ -2,7 +2,7 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-28
-- **Hecho:** Luis (coordinador) ya puede asignar o pedir apoyo fuera de su departamento. El alta de actividades ya no exige el mismo `departmentId` si quien asigna es coordinación/gerencia y el destino es otro mando o alguien de su equipo. Un empleado sin mando sigue limitado a su departamento. Validación en `POST/PATCH /activities` y al sumar gente al equipo. Sin migración. Despliegue: `cd /var/www/nexara-app && git pull --ff-only origin main && bash deploy/update.sh` (reconstruye `nexara-api`).
+- **Hecho:** Luis (coordinador) ya puede asignar o pedir apoyo fuera de su departamento. El alta de actividades ya no exige el mismo `departmentId` si quien asigna es coordinación/gerencia y el destino es otro mando o alguien de su equipo. Un empleado sin mando sigue limitado a su departamento. Validación en `POST/PATCH /activities` y al sumar gente al equipo. Sin migración. Despliegue (el script jala y, al ver el cambio en `apps/api`, reconstruye `nexara-api`): `cd /var/www/nexara-app && bash deploy/update.sh`. No hacer `git pull` antes: si el commit ya está en HEAD, el script no reconstruye. Si ya se jaló: `bash deploy/update.sh --force-all --no-pull`.
 
 - **Último turno anterior:** claude-code
 - **Fecha:** 2026-09-28
