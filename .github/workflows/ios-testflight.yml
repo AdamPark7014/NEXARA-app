@@ -556,11 +556,6 @@ jobs:
           /usr/bin/find "$APP_DIR" -type d -name '*.bundle' -print || true
           echo "::endgroup::"
 
-          # Versión y build de la app (ya parcheados en el paso anterior): los
-          # bundles conservados heredan estos valores si les faltan.
-          APP_VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Info.plist" 2>/dev/null || echo '1.0.0')"
-          APP_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_DIR/Info.plist" 2>/dev/null || echo '1')"
-
           add_if_missing() {
             local pl="$1" key="$2" val="$3"
             if ! /usr/libexec/PlistBuddy -c "Print :$key" "$pl" >/dev/null 2>&1; then
@@ -603,11 +598,24 @@ jobs:
             if [ -n "$manifest" ]; then
               echo "Keeping bundle with privacy manifest: $bundle (name='$name', CFBundleIdentifier='$id')"
               # Sin Info.plist PlistBuddy lo crea al añadir la primera clave.
+              #
+              # OJO: NO se le añaden CFBundleShortVersionString/CFBundleVersion.
+              # Se probaron antes (28-09) y con eso `altool --upload-app` fallaba
+              # con "Cannot determine the Apple ID from Bundle ID
+              # 'firebase-ios-sdk.FirebaseCore.resources' and platform 'IOS'. (12)":
+              # el SDK de Firebase YA trae su propio CFBundleIdentifier de fábrica
+              # (con pinta de bundle id real) en este `.bundle` de solo recursos
+              # (CFBundlePackageType=BNDL, sin ejecutable); al sumarle ademas una
+              # version que coincidia con la de la app, altool lo trataba como si
+              # fuera un producto propio que debe existir en App Store Connect, y
+              # al no encontrarlo abortaba la subida entera. Apple solo exige que
+              # el manifiesto de privacidad EXISTA (ITMS-91061); no exige que el
+              # bundle de recursos tenga version. Si el archivo NO tiene todavia
+              # CFBundleIdentifier (bundle propio nuestro, no de un SDK de
+              # terceros), sí se le pone uno para que `plutil -lint` no truene.
               add_if_missing "$binfo" CFBundleIdentifier "mx.nexara.mobile.resources.$(printf '%s' "${name%.bundle}" | tr -c 'A-Za-z0-9.-' '-')"
               add_if_missing "$binfo" CFBundleName "${name%.bundle}"
               add_if_missing "$binfo" CFBundlePackageType "BNDL"
-              add_if_missing "$binfo" CFBundleShortVersionString "$APP_VER"
-              add_if_missing "$binfo" CFBundleVersion "$APP_BUILD"
               /usr/bin/plutil -lint "$binfo" || { echo "ERROR: Info.plist parcheado de $name no valida"; exit 1; }
               kept=$((kept+1))
             elif is_third_party_bundle "$name" "$id"; then
