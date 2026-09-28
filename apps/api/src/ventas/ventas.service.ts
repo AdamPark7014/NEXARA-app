@@ -151,6 +151,18 @@ export class VentasService {
    * Sin nada explícito: el único sector de su área, o COMERCIAL si tiene varios o ninguno.
    */
   private resolveTipo(dto: CreateSalesClientDto, user: any): ClientSectorCode {
+    if (dto.altaProyecto) {
+      if (dto.altaRapida) {
+        throw new BadRequestException('El alta rápida de proyecto no se combina con la de servicio.');
+      }
+      if (dto.tipo && dto.tipo !== 'PROYECTO') {
+        throw new BadRequestException('El alta rápida de proyecto solo crea clientes de tipo proyecto.');
+      }
+      if (dto.sectors?.some((s) => s !== 'PROYECTO')) {
+        throw new BadRequestException('El alta rápida de proyecto solo crea clientes de tipo proyecto.');
+      }
+      return 'PROYECTO';
+    }
     if (dto.altaRapida && isOperationalClientRole(user?.roleKey)) {
       if (dto.tipo && dto.tipo !== 'CORPORATIVO') {
         throw new BadRequestException('El alta rápida solo crea clientes corporativos.');
@@ -169,6 +181,34 @@ export class VentasService {
     const defaults = this.defaultSectorsFor(user);
     if (defaults.length === 1) return defaults[0];
     return defaults.includes('COMERCIAL') ? 'COMERCIAL' : defaults[0];
+  }
+
+  /** Alta de proyecto desde una actividad: únicamente el nombre. */
+  private assertAltaProyecto(dto: CreateSalesClientDto) {
+    if (isInactiveClientStatus(dto.status)) {
+      throw new BadRequestException('El alta rápida de un cliente de proyecto lo deja activo.');
+    }
+    const pesados: Array<keyof CreateSalesClientDto> = [
+      'legalName',
+      'taxId',
+      'fiscalAddress',
+      'fiscalZipCode',
+      'fiscalRegime',
+      'billingEmail',
+      'billingPhone',
+      'industry',
+      'website',
+      'notes',
+      'ownerId',
+      'serviceClientId',
+    ];
+    for (const campo of pesados) {
+      if (String(dto[campo] ?? '').trim()) {
+        throw new BadRequestException(
+          'En el alta rápida de un cliente de proyecto solo se guarda el nombre. Lo demás se completa en Proyectos.',
+        );
+      }
+    }
   }
 
   /** El operativo solo manda nombre y contacto. Lo demás se rechaza, no se guarda en silencio. */
@@ -199,6 +239,8 @@ export class VentasService {
     if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user)) return true;
     if (clientSectorsForActor(user).includes(tipo)) return true;
     if (canManageClients(actor, false)) return true;
+    // El formulario de actividad elige un cliente de proyecto de la empresa, no solo los propios.
+    if (tipo === 'PROYECTO') return true;
     if (tipo === 'CORPORATIVO' && isOperationalClientRole(user?.roleKey)) return true;
     const reports = await this.hasDirectReports(user?.id);
     return canManageClients(actor, reports);
@@ -468,8 +510,11 @@ export class VentasService {
 
   async createClient(dto: CreateSalesClientDto, user?: any, companyId?: number | null) {
     const tipo = this.resolveTipo(dto, user);
-    const rapida = Boolean(dto.altaRapida) && tipo === 'CORPORATIVO' && isOperationalClientRole(user?.roleKey);
-    if (rapida) {
+    const altaProyecto = Boolean(dto.altaProyecto);
+    const rapida = !altaProyecto && Boolean(dto.altaRapida) && tipo === 'CORPORATIVO' && isOperationalClientRole(user?.roleKey);
+    if (altaProyecto) {
+      this.assertAltaProyecto(dto);
+    } else if (rapida) {
       const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
       if (!canQuickCreateCorporateClient(actor)) {
         throw new ForbiddenException(CLIENT_MANAGE_FORBIDDEN);
@@ -481,25 +526,26 @@ export class VentasService {
       if (isInactiveClientStatus(dto.status)) this.assertCanDeactivateClient(user);
       this.assertCanUseSectors(user, [tipo]);
     }
-    const ownerId = this.resolveOwnerForWrite(rapida ? undefined : dto.ownerId, user);
+    const minima = rapida || altaProyecto;
+    const ownerId = this.resolveOwnerForWrite(minima ? undefined : dto.ownerId, user);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
 
     const created = await this.prisma.salesClient.create({
       data: {
         name: dto.name,
-        legalName: rapida ? null : dto.legalName || null,
-        taxId: rapida ? null : dto.taxId || null,
-        fiscalAddress: rapida ? null : dto.fiscalAddress || null,
-        fiscalZipCode: rapida ? null : dto.fiscalZipCode?.trim() || null,
-        fiscalRegime: rapida ? null : dto.fiscalRegime?.trim() || null,
-        billingEmail: dto.billingEmail || null,
-        billingPhone: dto.billingPhone || null,
-        industry: rapida ? null : dto.industry || null,
-        website: rapida ? null : dto.website || null,
-        status: dto.status || CLIENT_STATUS_ACTIVE,
-        notes: rapida ? null : dto.notes || null,
+        legalName: minima ? null : dto.legalName || null,
+        taxId: minima ? null : dto.taxId || null,
+        fiscalAddress: minima ? null : dto.fiscalAddress || null,
+        fiscalZipCode: minima ? null : dto.fiscalZipCode?.trim() || null,
+        fiscalRegime: minima ? null : dto.fiscalRegime?.trim() || null,
+        billingEmail: altaProyecto ? null : dto.billingEmail || null,
+        billingPhone: altaProyecto ? null : dto.billingPhone || null,
+        industry: minima ? null : dto.industry || null,
+        website: minima ? null : dto.website || null,
+        status: altaProyecto ? CLIENT_STATUS_ACTIVE : dto.status || CLIENT_STATUS_ACTIVE,
+        notes: minima ? null : dto.notes || null,
         ownerId,
-        serviceClientId: rapida ? null : dto.serviceClientId ?? null,
+        serviceClientId: minima ? null : dto.serviceClientId ?? null,
         companyId: resolvedCompanyId,
         tipo,
         sectors: {

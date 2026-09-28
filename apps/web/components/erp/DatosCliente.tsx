@@ -176,6 +176,7 @@ export function ClienteTipoPicker({
   puedeCrear,
   puedeEditar,
   soloContacto,
+  altaSoloNombre,
   clientes,
   onSelect,
   onCreado,
@@ -187,6 +188,8 @@ export function ClienteTipoPicker({
   puedeCrear: boolean;
   puedeEditar: boolean;
   soloContacto?: boolean;
+  /** Alta de un cliente de proyecto: solo el nombre, sin contacto ni datos fiscales. */
+  altaSoloNombre?: boolean;
   clientes: SalesClient[];
   onSelect: (cliente: SalesClient) => void | Promise<void>;
   onCreado: (cliente: SalesClient) => void;
@@ -243,9 +246,11 @@ export function ClienteTipoPicker({
       {puedeCrear && editable ? (
         <div className={styles.bloque}>
           <p className={styles.nota}>
-            {soloContacto
-              ? "Puedes dar de alta aquí el nombre y el contacto. El RFC lo completa después coordinación."
-              : "Si no está en la lista, créalo con el nombre. Los datos fiscales se completan después."}
+            {altaSoloNombre
+              ? "Si no está en la lista, créalo con el nombre. Lo demás se completa después en Proyectos."
+              : soloContacto
+                ? "Puedes dar de alta aquí el nombre y el contacto. El RFC lo completa después coordinación."
+                : "Si no está en la lista, créalo con el nombre. Los datos fiscales se completan después."}
           </p>
           {soloContacto ? (
             <div className={styles.fila}>
@@ -268,16 +273,18 @@ export function ClienteTipoPicker({
               if (!token) return;
               setCreando(true);
               setError(null);
-              const payload = soloContacto
-                ? {
-                    name: q.trim(),
-                    status: "Activo" as const,
-                    tipo,
-                    altaRapida: true,
-                    billingEmail: correo.trim() || undefined,
-                    billingPhone: telefono.trim() || undefined,
-                  }
-                : { name: q.trim(), status: "Activo" as const, tipo, sectors: [tipo] };
+              const payload = altaSoloNombre
+                ? { name: q.trim(), status: "Activo" as const, tipo: "PROYECTO" as const, altaProyecto: true }
+                : soloContacto
+                  ? {
+                      name: q.trim(),
+                      status: "Activo" as const,
+                      tipo,
+                      altaRapida: true,
+                      billingEmail: correo.trim() || undefined,
+                      billingPhone: telefono.trim() || undefined,
+                    }
+                  : { name: q.trim(), status: "Activo" as const, tipo, sectors: [tipo] };
               createSalesClient(token, payload)
                 .then((creado) => {
                   onCreado(creado);

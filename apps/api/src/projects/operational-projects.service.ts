@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
-import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
+import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto, QuickCreateOperationalProjectDto } from './dto/create-operational-project.dto.js';
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
 import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { canDeleteOrDeactivateClient, type ClientActor } from '../ventas/client-permissions.js';
@@ -236,6 +236,77 @@ export class OperationalProjectsService {
     }
 
     return created;
+  }
+
+  /**
+   * Proyecto mínimo para poder asignar la actividad: nombre y cliente tipo PROYECTO
+   * de la misma empresa. El responsable es quien lo crea y el inicio es hoy.
+   * Fechas, alcance y equipo se completan después en Proyectos.
+   */
+  async quickCreate(dto: QuickCreateOperationalProjectDto, user: any, companyId?: number | null) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new ForbiddenException('No puedes crear un proyecto desde esta cuenta');
+    }
+    const tenantId = requireCompanyId(companyId);
+    const sales = await this.prisma.salesClient.findFirst({
+      where: { id: dto.salesClientId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(sales, tenantId, 'Cliente');
+    if (sales.tipo !== 'PROYECTO') {
+      throw new BadRequestException('El proyecto solo se liga a un cliente de tipo proyecto');
+    }
+    const serviceClientId = await this.ensureServiceClientForProject(sales, tenantId);
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    return this.create(
+      {
+        title: dto.title.trim(),
+        clientId: serviceClientId,
+        vendorId: Number(user.id),
+        startDate: hoy,
+        projectType: 'OTRO',
+      },
+      Number(user.id),
+    );
+  }
+
+  /** Cliente de operación de la misma empresa. Si el padrón aún no lo tiene, se crea aquí. */
+  private async ensureServiceClientForProject(
+    sales: {
+      id: number;
+      name: string;
+      legalName?: string | null;
+      taxId?: string | null;
+      billingEmail?: string | null;
+      billingPhone?: string | null;
+      fiscalAddress?: string | null;
+      serviceClientId?: number | null;
+    },
+    tenantId: number,
+  ): Promise<number> {
+    if (sales.serviceClientId) {
+      const existing = await this.prisma.serviceClient.findFirst({
+        where: { id: sales.serviceClientId, ...companyWhere(tenantId) },
+      });
+      assertCompanyAccess(existing, tenantId, 'Cliente');
+      return existing.id;
+    }
+    const serviceClient = await this.prisma.serviceClient.create({
+      data: {
+        name: sales.legalName?.trim() || sales.name,
+        contactName: sales.name,
+        contactEmail: sales.billingEmail ?? null,
+        contactPhone: sales.billingPhone ?? null,
+        address: sales.fiscalAddress ?? null,
+        accountCode: sales.taxId?.trim() || `SC-${sales.id}`,
+        isActive: true,
+        companyId: tenantId,
+      },
+    });
+    await this.prisma.salesClient.update({
+      where: { id: sales.id },
+      data: { serviceClientId: serviceClient.id },
+    });
+    return serviceClient.id;
   }
 
   async findAll(vendorId?: number, clientId?: number, status?: string, companyId?: number | null) {

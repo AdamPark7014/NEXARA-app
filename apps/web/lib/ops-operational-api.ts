@@ -173,3 +173,16 @@ export function createOperationalProject(token: string, dto: CreateOperationalPr
     "No se pudo crear el proyecto",
   );
 }
+
+/** Nombre y cliente de proyecto. Lo demás se completa en Proyectos. */
+export function quickCreateOperationalProject(
+  token: string,
+  dto: { title: string; salesClientId: number },
+) {
+  return opsProjectRequest<OperationalProject>(
+    "operational-projects/alta-rapida",
+    token,
+    { method: "POST", body: JSON.stringify(dto) },
+    "No se pudo crear el proyecto",
+  );
+}

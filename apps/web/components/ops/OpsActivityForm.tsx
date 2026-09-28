@@ -61,6 +61,7 @@ import {
 } from "@/lib/client-sectors";
 import { TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
 import { createMyActivity } from "@/lib/my-activities-api";
+import { quickCreateOperationalProject } from "@/lib/ops-operational-api";
 import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
 import { aInputFecha, hoyISO } from "@/lib/proyecto-plan";
 import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-periodo";
@@ -171,6 +172,11 @@ export default function OpsActivityForm({
   const [clientesCorporativos, setClientesCorporativos] = useState<SalesClient[]>([]);
   const [salesServicioId, setSalesServicioId] = useState<number | null>(null);
   const [permisosCliente, setPermisosCliente] = useState(NO_CLIENT_PERMISSIONS);
+  const [clientesProyecto, setClientesProyecto] = useState<SalesClient[]>([]);
+  const [salesProyectoId, setSalesProyectoId] = useState<number | null>(null);
+  const [altaProyectoAbierta, setAltaProyectoAbierta] = useState(false);
+  const [nombreProyecto, setNombreProyecto] = useState("");
+  const [creandoProyecto, setCreandoProyecto] = useState(false);
 
   const [tareaOtroOpen, setTareaOtroOpen] = useState(false);
 
@@ -241,13 +247,16 @@ export default function OpsActivityForm({
       setNextAnLoaded(true);
       setTicketRequests(Array.isArray(tickets) ? tickets : []);
 
+      const [permisos, proyectoRows] = await Promise.all([
+        getClientPermissions(token).catch(() => NO_CLIENT_PERMISSIONS),
+        listSalesClients(token, { sector: "PROYECTO" }).catch(() => [] as SalesClient[]),
+      ]);
+      setPermisosCliente(permisos);
+      setClientesProyecto([...proyectoRows].sort((a, b) => a.name.localeCompare(b.name, "es")));
+
       if (coreKind === "servicio") {
-        const [rows, permisos] = await Promise.all([
-          listSalesClients(token, { sector: "CORPORATIVO" }).catch(() => [] as SalesClient[]),
-          getClientPermissions(token).catch(() => NO_CLIENT_PERMISSIONS),
-        ]);
+        const rows = await listSalesClients(token, { sector: "CORPORATIVO" }).catch(() => [] as SalesClient[]);
         setClientesCorporativos(rows);
-        setPermisosCliente(permisos);
       }
 
       if (coreKind && ["proyecto", "obra", "servicio", "comercial"].includes(coreKind)) {
@@ -446,6 +455,60 @@ export default function OpsActivityForm({
       cancelled = true;
     };
   }, [requestId, ticketRequests, token, prefillFromRequest]);
+
+  const puedeClienteProyecto =
+    permisosCliente.puedeAgregar && clientSectorsForUser(user).includes("PROYECTO");
+
+  const crearProyectoRapido = async () => {
+    if (!token) return;
+    const title = nombreProyecto.trim();
+    if (title.length < 3) {
+      setError("El nombre del proyecto necesita al menos 3 caracteres");
+      return;
+    }
+    if (!salesProyectoId) {
+      setError("Elige o crea el cliente del proyecto");
+      return;
+    }
+    setCreandoProyecto(true);
+    setError(null);
+    try {
+      const creado = await quickCreateOperationalProject(token, { title, salesClientId: salesProyectoId });
+      const client = creado.client;
+      if (!client?.id) {
+        setError("El proyecto se creó, pero no quedó ligado a un cliente");
+        return;
+      }
+      const row: OperationalProjectRow = {
+        id: creado.id,
+        title: creado.title,
+        status: creado.status || "ACTIVE",
+        client: { id: client.id, name: client.name },
+        startDate: creado.startDate,
+        endDate: creado.endDate ?? null,
+      };
+      setProjects((prev) => [...prev.filter((p) => p.id !== row.id), row]);
+      setSectorClients((prev) => {
+        // Lista vacía = sin filtro de sector. Meter uno aquí ocultaría el resto de proyectos.
+        if (prev.length === 0 || prev.some((c) => c.serviceClientId === client.id)) return prev;
+        return [...prev, { serviceClientId: client.id, name: client.name, salesClientId: salesProyectoId }];
+      });
+      setForm((prev) => ({
+        ...prev,
+        projectMode: "with_project",
+        projectId: String(row.id),
+        clientId: String(client.id),
+        projectMilestoneId: "",
+      }));
+      setAltaProyectoAbierta(false);
+      setNombreProyecto("");
+      setSuccess(tone === "core" ? "Proyecto creado y seleccionado" : "Proyecto creado");
+    } catch (e) {
+      setError(apiErrorMessage(e, "No se pudo crear el proyecto"));
+    } finally {
+      setCreandoProyecto(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!token || !user) return;
@@ -899,6 +962,81 @@ export default function OpsActivityForm({
               value={activeProjects.find((p) => String(p.id) === form.projectId)?.client.name ?? ""}
               disabled
             />
+            <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setAltaProyectoAbierta((v) => !v)}
+                style={{
+                  justifySelf: "start",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  color: "var(--primary)",
+                  fontWeight: 650,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                }}
+              >
+                {altaProyectoAbierta ? "Cerrar alta de proyecto" : "¿No está el proyecto? Créalo aquí"}
+              </button>
+              {altaProyectoAbierta ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 10,
+                    padding: 12,
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface)",
+                  }}
+                >
+                  <label style={coreLabelStyle}>
+                    Nombre del proyecto *
+                    <input
+                      className="input"
+                      value={nombreProyecto}
+                      maxLength={200}
+                      placeholder="Ej. Cámaras sucursal norte"
+                      onChange={(e) => setNombreProyecto(e.target.value)}
+                      style={{ fontWeight: 400 }}
+                    />
+                  </label>
+                  <div style={{ fontSize: 13, fontWeight: 650, color: "var(--text-secondary)" }}>Cliente *</div>
+                  <ClienteTipoPicker
+                    token={token}
+                    tipo="PROYECTO"
+                    salesClientId={salesProyectoId}
+                    editable={!creandoProyecto}
+                    puedeCrear
+                    puedeEditar={puedeClienteProyecto}
+                    altaSoloNombre={!puedeClienteProyecto}
+                    clientes={clientesProyecto}
+                    onCreado={(creado) => {
+                      setClientesProyecto((prev) =>
+                        [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) =>
+                          a.name.localeCompare(b.name, "es"),
+                        ),
+                      );
+                      setSalesProyectoId(creado.id);
+                    }}
+                    onSelect={(c) => setSalesProyectoId(c.id)}
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={creandoProyecto || nombreProyecto.trim().length < 3 || !salesProyectoId}
+                    onClick={() => void crearProyectoRapido()}
+                  >
+                    {creandoProyecto ? "Creando…" : "Crear y usar este proyecto"}
+                  </Button>
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
+                    Fechas, alcance y equipo se completan después en Proyectos.
+                  </p>
+                </div>
+              ) : null}
+            </div>
           </>
         ) : (
           <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 10 }}>
