@@ -90,6 +90,7 @@ export class SearchService {
         this.prisma.activity.findMany({
           where: {
             ...scope,
+            deletedAt: null,
             OR: [
               { titulo: { contains: q, mode: 'insensitive' } },
               { descripcion: { contains: q, mode: 'insensitive' } },

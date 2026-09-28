@@ -222,8 +222,8 @@ export class AnalyticsService {
           user: { companyMemberships: { some: { companyId: tenantId } } },
         },
       }).catch(kpiFallback('analytics.service.ts:219', 0)),
-      this.prisma.activity.count({ where: { fechaAsignacion: { gte: startOfMonth }, ...scope } }).catch(kpiFallback('analytics.service.ts:220', 0)),
-      this.prisma.activity.count({ where: { estatus: { in: ['Pendiente', 'En Proceso'] }, ...scope } }).catch(kpiFallback('analytics.service.ts:221', 0)),
+      this.prisma.activity.count({ where: { fechaAsignacion: { gte: startOfMonth }, deletedAt: null, ...scope } }).catch(kpiFallback('analytics.service.ts:220', 0)),
+      this.prisma.activity.count({ where: { estatus: { in: ['Pendiente', 'En Proceso'] }, deletedAt: null, ...scope } }).catch(kpiFallback('analytics.service.ts:221', 0)),
       this.prisma.activity.count({
         where: {
           ...scope,
@@ -431,6 +431,7 @@ export class AnalyticsService {
       INNER JOIN "User" u ON u."id" = a."responsableId"
       WHERE a."fechaAsignacion" >= NOW() - INTERVAL '90 days'
         AND a."companyId" = ${tenantId}
+        AND a."deletedAt" IS NULL
       GROUP BY u."id", u."nombre"
       ORDER BY "completed" DESC, "avgEfficiency" DESC NULLS LAST
       LIMIT ${limit}
@@ -542,6 +543,7 @@ export class AnalyticsService {
       WHERE a."branchName" IS NOT NULL
         AND a."fechaAsignacion" >= NOW() - INTERVAL '180 days'
         AND a."companyId" = ${tenantId}
+        AND a."deletedAt" IS NULL
       GROUP BY sc."name", a."branchName"
       ORDER BY "total" DESC
       LIMIT ${limit}

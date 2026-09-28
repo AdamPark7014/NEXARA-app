@@ -30,8 +30,8 @@ export class AppService {
       totalMaintenanceOrders,
       openMaintenanceOrders,
     ] = await Promise.all([
-      this.prisma.activity.count(),
-      this.prisma.activity.groupBy({ by: ['estatus'], _count: { _all: true } }),
+      this.prisma.activity.count({ where: { deletedAt: null } }),
+      this.prisma.activity.groupBy({ by: ['estatus'], where: { deletedAt: null }, _count: { _all: true } }),
       this.prisma.evidence.count(),
       this.prisma.evidence.count({ where: { aprobada: true } }),
       this.prisma.expense.count(),

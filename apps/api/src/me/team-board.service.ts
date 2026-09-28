@@ -797,13 +797,16 @@ export class TeamBoardService {
           userId: { in: userIds },
           retiradoAt: null,
           ...(companyId != null ? { companyId } : {}),
+          // El include no hereda el soft-delete de Activity: sin esto, AN-0001
+          // (deletedAt puesto) seguiría en la tarjeta de Mi equipo.
+          activity: { deletedAt: null },
           // El tipo recorta el trabajo ajeno. Lo propio entra aunque sea de otro
           // departamento o de un tipo que este coordinador no supervisa.
           ...(tipos
             ? {
                 OR: [
                   ...(propietarioId != null ? [{ userId: propietarioId }] : []),
-                  { activity: { coreKind: { in: tipos } } },
+                  { activity: { coreKind: { in: tipos }, deletedAt: null } },
                 ],
               }
             : {}),

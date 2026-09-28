@@ -11,6 +11,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { Alert, Button, EmptyState, PageHead, Skeleton, Tabs } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
+import { getSocketBaseUrl } from "@/lib/api-base";
+import { createRealtimeSocket } from "@/lib/realtime-socket";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
 import AsignadasPorMiView from "@/components/pizarra/AsignadasPorMiView";
 import SolicitudesEquipoView from "@/components/pizarra/SolicitudesEquipoView";
@@ -128,6 +130,22 @@ export default function PizarraPage() {
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", tick);
+    };
+  }, [token, load]);
+
+  // La pizarra también escucha el socket: al borrar (o mover) una actividad
+  // sale de Mi equipo sin esperar los 30 s del refresco.
+  useEffect(() => {
+    if (!token) return;
+    const socket = createRealtimeSocket(getSocketBaseUrl(), { auth: { token } });
+    const onEntity = (payload?: { model?: string }) => {
+      if (payload?.model && payload.model !== "Activity") return;
+      void load();
+    };
+    socket.on("entity:updated", onEntity);
+    socket.on("activity:updated", () => void load());
+    return () => {
+      socket.disconnect();
     };
   }, [token, load]);
 

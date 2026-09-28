@@ -379,10 +379,12 @@ export class ActivitiesController {
   }
 
   @Delete(':id')
-  @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  remove(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
-    return this.activitiesService.remove(+id, companyId);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() user: { id?: number },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.activitiesService.remove(+id, companyId, Number(user?.id));
   }
 
   /**

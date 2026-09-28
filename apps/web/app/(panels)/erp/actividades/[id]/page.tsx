@@ -4,7 +4,9 @@
 // ahora vive aquí, que es la única superficie alcanzable.
 
 import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -25,6 +27,8 @@ import { countEvidenceFiles } from "@/lib/evidence-display";
 import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 import { formatApiError } from "@/lib/erp-api";
 import { chargeLabel, estatusUi } from "@/lib/activity-labels";
+import { esCeoChristian } from "@/lib/ceo-user";
+import { deleteActivity } from "@/lib/ops-activities-api";
 import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
@@ -50,6 +54,7 @@ import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
 import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
 import EngineeringOutlinedIcon from "@mui/icons-material/EngineeringOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
 const STATUSES = [
   "Pendiente",
@@ -109,7 +114,9 @@ type EditForm = {
 export default function ActivityDetailPage() {
   const { activity, error, reload, id, hrefs, core } = useActivityDetail();
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
+  const puedeEliminar = esCeoChristian(user?.id);
   const v2 = resolveV2RoleKey(user);
 
   const canEdit =
@@ -132,6 +139,7 @@ export default function ActivityDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [missingEvidence, setMissingEvidence] = useState<string[] | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ConfirmState | null>(null);
 
   const toDateLocal = (iso?: string | null) => {
     if (!iso) return "";
@@ -157,6 +165,25 @@ export default function ActivityDetailPage() {
     setMissingEvidence(null);
     setEditing(true);
   }, [activity]);
+
+  const pedirEliminar = useCallback(() => {
+    if (!activity || !puedeEliminar) return;
+    const folio = activity.anNumber?.trim() || "esta actividad";
+    setConfirmDelete({
+      title: "Eliminar actividad",
+      message: `¿Eliminar ${folio}? Deja de verse en la pizarra, en Mi equipo, en las listas y en las búsquedas.`,
+      confirmLabel: "Eliminar actividad",
+      danger: true,
+      fn: async () => {
+        try {
+          await deleteActivity(token, activity.id);
+          router.push(hrefs.back);
+        } catch (e) {
+          setSaveErr(formatApiError(e, "No se pudo eliminar la actividad"));
+        }
+      },
+    });
+  }, [activity, puedeEliminar, token, router, hrefs.back]);
 
   const saveEdit = useCallback(async () => {
     if (!token || !id) return;
@@ -259,7 +286,35 @@ export default function ActivityDetailPage() {
 
   return (
     <>
-      <ActivitySuperiorActions activityId={activity.id} token={token} onDone={reload} />
+      <ActivitySuperiorActions
+        activityId={activity.id}
+        token={token}
+        onDone={reload}
+        extra={
+          <>
+            {canEdit && !editing ? (
+              <Button size="sm" variant="ghost" onClick={openEdit} iconLeft={<EditOutlinedIcon fontSize="inherit" aria-hidden="true" />}>
+                Editar
+              </Button>
+            ) : null}
+            {puedeEliminar ? (
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={pedirEliminar}
+                iconLeft={<DeleteOutlineIcon fontSize="inherit" aria-hidden="true" />}
+              >
+                Eliminar actividad
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+      {saveErr && !editing ? (
+        <div style={{ marginBottom: 14 }}>
+          <InlineAlert variant="danger" message={saveErr} onDismiss={() => setSaveErr(null)} />
+        </div>
+      ) : null}
       {mostrarIniciar ? (
         <div
           style={{
@@ -426,9 +481,6 @@ export default function ActivityDetailPage() {
             {despacho && <Tag variant="accent">{chargeLabel("despacho")}</Tag>}
             <Tag variant={hasProject ? "accent" : "neutral"}>{hasProject ? "Con proyecto" : "Sin proyecto"}</Tag>
           </div>
-          {canEdit && !editing && (
-            <Button size="sm" variant="ghost" onClick={openEdit} iconLeft={<EditOutlinedIcon fontSize="inherit" aria-hidden="true" />}>Editar</Button>
-          )}
         </div>
 
         {!editing ? (
@@ -612,6 +664,7 @@ export default function ActivityDetailPage() {
       <DetailSection title="Incidencias y recomendaciones">
         <ActivityIssuesPanel activityId={Number(id)} token={token} canManage={Boolean(canEdit)} />
       </DetailSection>
+      <ConfirmDialog state={confirmDelete} onClose={() => setConfirmDelete(null)} />
     </>
   );
 }

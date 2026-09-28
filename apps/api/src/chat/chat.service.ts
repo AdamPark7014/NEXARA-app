@@ -1139,6 +1139,7 @@ export class ChatService {
       !kind || kind === 'ACTIVITY'
         ? this.prisma.activity.findMany({
             where: {
+              deletedAt: null,
               AND: [
                 activityScope,
                 ...(query

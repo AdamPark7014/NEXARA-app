@@ -22,6 +22,7 @@ import SentimentSatisfiedAltOutlinedIcon from "@mui/icons-material/SentimentSati
 import AddReactionOutlinedIcon from "@mui/icons-material/AddReactionOutlined";
 import MentionTextarea, { type MentionTextareaHandle } from "./chat/MentionTextarea";
 import EmojiPicker from "./chat/EmojiPicker";
+import { esCeoChristian } from "@/lib/ceo-user";
 import { isJumboEmoji } from "@/lib/chat-emoji";
 import { formatApiError } from "@/lib/erp-api";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -144,9 +145,6 @@ type DeletedPayload = {
   lastMessagePreview?: string | null;
   lastMessageAt?: string | null;
 };
-
-/** Christian (usuario 1). El DELETE del servidor rechaza a cualquier otro. */
-const CHAT_DELETE_USER_ID = 1;
 
 const FAVORITES_KEY = "nexara.chat.favorites";
 const DRAFTS_KEY = "nexara.chat.drafts";
@@ -569,7 +567,7 @@ export default function WorkspaceChat({
     threadRootRef.current = threadRoot;
   }, [threadRoot]);
 
-  const canDeleteMessages = currentUserId === CHAT_DELETE_USER_ID;
+  const canDeleteMessages = esCeoChristian(currentUserId);
   applyDeletedRef.current = (payload) => {
     const id = Number(payload?.id);
     if (!Number.isFinite(id) || id <= 0 || deletedSeenRef.current.has(id)) return;

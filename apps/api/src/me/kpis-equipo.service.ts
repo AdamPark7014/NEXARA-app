@@ -250,6 +250,7 @@ export class KpisEquipoService {
         where: {
           userId: { in: userIds },
           ...tenant,
+          activity: { deletedAt: null },
           OR: [
             { inicioRealAt: ventana },
             { finRealAt: ventana },
@@ -262,6 +263,7 @@ export class KpisEquipoService {
         where: {
           userId: { in: userIds },
           ...tenant,
+          activity: { deletedAt: null },
           OR: [
             { entryPhotoUploadedAt: ventana },
             { exitPhotoUploadedAt: ventana },
@@ -307,7 +309,7 @@ export class KpisEquipoService {
     const [actividades, asignacionesExtra, evidenciasExtra] = activityIds.length
       ? await Promise.all([
           this.prisma.activity.findMany({
-            where: { id: { in: activityIds } },
+            where: { id: { in: activityIds }, deletedAt: null },
             select: {
               id: true,
               anNumber: true,
