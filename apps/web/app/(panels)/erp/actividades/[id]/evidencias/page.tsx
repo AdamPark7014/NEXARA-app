@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
+import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -34,6 +35,16 @@ export default function ActivityEvidencesPage() {
   const canUpload = core
     ? !isCeoEmail(user?.email) && !reparte && (Boolean(myRow) || soyResponsable)
     : v2 === ROLES.ING_CAMPO || v2 === ROLES.ING_SOPORTE || user?.isSuperAdmin;
+  const puedeSubirPuntos = puedeSubirFotoDePunto({
+    userId: user?.id,
+    responsableId: activity?.responsable?.id,
+    assignmentCharge: activity?.assignmentCharge,
+    asignados: (activity?.assignees ?? []).map((m) => ({
+      userId: m.userId ?? m.user?.id,
+      rol: m.rol,
+      retirado: Boolean(m.retiradoAt),
+    })),
+  });
 
   useEffect(() => {
     if (typeof window === "undefined" || !activity?.id) return;
@@ -78,6 +89,7 @@ export default function ActivityEvidencesPage() {
         activityId={activity.id}
         anNumber={activity.anNumber}
         titulo={activity.titulo}
+        puedeSubir={puedeSubirPuntos}
         style={{ marginBottom: 20 }}
       />
 

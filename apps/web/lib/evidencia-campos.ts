@@ -3,7 +3,8 @@
  *
  * Quien asigna define **qué** hay que fotografiar —«Cámara 1», «Rack», «Canalización»— y
  * por cada cosa en qué momentos se pide foto: antes, en progreso, después, en cualquier
- * combinación. Quien ejecuta llena esos huecos desde las apps.
+ * combinación. El responsable y los asignados llenan cada hueco desde la web o desde
+ * las apps: cámara, o una imagen que ya tengan.
  *
  * Espejo de `apps/api/src/activities/evidence/evidence-fields.helpers.ts`: mismos momentos,
  * mismos límites y la misma regla para saber si dos nombres son «el mismo campo».
@@ -344,6 +345,32 @@ export async function quitarFotoDeCampo(
     { method: "POST", body: JSON.stringify({ momento }) },
   );
   return Array.isArray(data) ? data : [];
+}
+
+export type AsignadoParaFoto = {
+  userId?: number | null;
+  rol?: string | null;
+  retirado?: boolean;
+};
+
+/**
+ * Quién puede tomar o adjuntar la foto de un punto: el responsable y quien sigue
+ * asignado. En un despacho, el LEAD que solo reparte no sube evidencias.
+ */
+export function puedeSubirFotoDePunto(opts: {
+  userId?: number | null;
+  responsableId?: number | null;
+  assignmentCharge?: string | null;
+  asignados?: readonly AsignadoParaFoto[];
+}): boolean {
+  const userId = opts.userId;
+  if (userId == null || !Number.isFinite(userId)) return false;
+  const mia = (opts.asignados ?? []).find((m) => m.userId === userId && !m.retirado);
+  const soyResponsable = opts.responsableId === userId;
+  const despacho = (opts.assignmentCharge ?? "").toLowerCase() === "despacho";
+  const reparte = despacho && (mia?.rol === "LEAD" || (soyResponsable && !mia));
+  if (reparte) return false;
+  return Boolean(mia) || soyResponsable;
 }
 
 /** Huecos pendientes en toda la actividad (campo × momento). */

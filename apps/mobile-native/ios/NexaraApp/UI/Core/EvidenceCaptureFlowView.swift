@@ -287,8 +287,8 @@ struct EvidenceCaptureFlowView: View {
 
     // MARK: Evidencia por campos
 
-    /// Lista de campos con sus huecos: uno vacío abre la cámara, uno lleno
-    /// enseña la miniatura y se puede volver a tomar.
+    /// Lista de campos con sus huecos. En cada uno, «Tomar foto» abre la
+    /// cámara y «Adjuntar» abre galería o archivo.
     private var camposCard: some View {
         let faltan = CoreEvidence.missingCampoPhotos(campos)
         return VStack(alignment: .leading, spacing: 12) {
@@ -305,6 +305,9 @@ struct EvidenceCaptureFlowView: View {
             Text(CoreEvidence.camposSummary(campos))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(faltan == 0 ? CorePalette.green : Color.secondary)
+            Text("En cada punto: Tomar foto (cámara) o Adjuntar (galería o archivo).")
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
             ForEach(CoreEvidence.ordered(campos), id: \.rowKey) { campo in
                 campoRow(campo)
             }
@@ -392,15 +395,35 @@ struct EvidenceCaptureFlowView: View {
             Text(CoreEvidence.momentoLabel(momento))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(taken ? Color.primary : Color.secondary)
-            Button("Adjuntar") {
-                guard let campoId = campo.id else { return }
-                errorText = nil
-                message = nil
-                campoAdjunto = CampoAdjunto(id: campoId, momento: momento)
-                showAttachMenu = true
+            HStack(spacing: 4) {
+                Button {
+                    guard let campoId = campo.id else { return }
+                    errorText = nil
+                    message = nil
+                    camera = CameraRequest(step: CoreEvidence.evidencePhotos, campoId: campoId, momento: momento)
+                } label: {
+                    Text("Tomar foto")
+                        .font(.caption2.weight(.bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!canCapture)
+                Button {
+                    guard let campoId = campo.id else { return }
+                    errorText = nil
+                    message = nil
+                    campoAdjunto = CampoAdjunto(id: campoId, momento: momento)
+                    showAttachMenu = true
+                } label: {
+                    Text("Adjuntar")
+                        .font(.caption2.weight(.bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!canCapture)
             }
-            .font(.caption2.weight(.semibold))
-            .disabled(!canCapture)
         }
     }
 

@@ -131,6 +131,10 @@ describe("EvidenciaPorCampos", () => {
     expect(screen.getByText("Que se vea la etiqueta")).toBeInTheDocument();
     expect(screen.getAllByText("Pendiente")).toHaveLength(2);
     expect(screen.getByText(/Carolina Pérez ·/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tomar foto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Adjuntar" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/desde la app/)).not.toBeInTheDocument();
+    expect(screen.getByText(/responsable y los asignados/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Ver en grande: Cámara 1, antes" }));
     expect(screen.getByRole("dialog", { name: /Cámara 1 · Antes/ })).toBeInTheDocument();
@@ -187,6 +191,16 @@ describe("EvidenciaPorCampos", () => {
       screen.queryByRole("button", { name: "Definir qué fotografiar" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Quitar Cámara 1" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tomar foto" })).not.toBeInTheDocument();
+  });
+
+  it("el responsable o un asignado toma la foto o adjunta en cada punto", async () => {
+    render(<EvidenciaPorCampos activityId={5} anNumber="AN-0005" titulo="Cámaras" puedeSubir />);
+
+    expect(await screen.findByText("1 de 3 fotos")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Tomar foto" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "Adjuntar" })).toHaveLength(3);
+    expect(screen.queryByText(/desde la app/)).not.toBeInTheDocument();
   });
 
   it("descarga el ZIP con la sesión y el nombre que manda la API", async () => {

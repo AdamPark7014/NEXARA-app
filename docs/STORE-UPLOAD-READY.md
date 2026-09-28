@@ -15,11 +15,12 @@ Checklist final antes de publicar. **Android está listo para Play Console.** iO
 | Feature graphic | `apps/mobile-native/play-assets/feature-graphic-1024x500.png` |
 | **8 capturas teléfono** | `apps/mobile-native/play-assets/screenshots/phone/*.png` |
 
-### Versión actual (06-09-2026)
+### Versión actual (28-09-2026)
 
-- `VERSION_NAME=1.0.1`
-- `VERSION_CODE=7` — **confirma en Play Console cuál es el mayor ya SUBIDO** (incluidos
-  bundles descartados: Play no reutiliza ninguno) y usa ese número + 1.
+- `VERSION_NAME=1.0.4`
+- `VERSION_CODE=13` — **confirma en Play Console cuál es el mayor ya SUBIDO** (incluidos
+  bundles descartados: Play no reutiliza ninguno) y usa ese número + 1. El 06-09
+  este documento decía 7 / 1.0.1; el repo ya iba en 12 / 1.0.3.
 - `targetSdk=36`, `minSdk=24`
 
 > El AAB que hay en `app/build/outputs/bundle/release/` puede estar obsoleto. Comprueba

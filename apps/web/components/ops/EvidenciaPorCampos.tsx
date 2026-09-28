@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent } from "react";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
@@ -13,6 +13,12 @@ import EvidenciaCamposEditor from "@/components/ops/EvidenciaCamposEditor";
 import { FotoProtegida, Visor, type Foto } from "@/components/ops/EquipoEvidencias";
 import { formatApiError } from "@/lib/erp-api";
 import {
+  dataUrlDeImagen,
+  mensajeAdjuntoInvalido,
+  primerArchivo,
+  puntoDeFoto,
+} from "@/lib/evidencia-adjunto";
+import {
   MOMENTOS,
   MOMENTO_LABEL,
   borradoresDesdeCampos,
@@ -20,6 +26,7 @@ import {
   definirCamposEvidencia,
   esErrorDePermiso,
   fotosDeCampo,
+  guardarFotoDeCampo,
   hayErrores,
   obtenerCamposEvidencia,
   progresoDeCampos,
@@ -39,8 +46,60 @@ type Props = {
   canManage?: boolean;
   /** Por omisión: ver o revisar evidencias, o gestionar actividades (lo que pide el ZIP). */
   canDownload?: boolean;
+  /**
+   * El responsable y los asignados. Quien solo mira el detalle no ve Tomar foto ni Adjuntar.
+   */
+  puedeSubir?: boolean;
   style?: CSSProperties;
 };
+
+type DestinoFoto = { fieldId: number; momento: Momento };
+
+function destinoDeElemento(el: Element | null): DestinoFoto | null {
+  if (!el) return null;
+  const fieldId = Number(el.getAttribute("data-field-id"));
+  const momento = el.getAttribute("data-momento");
+  if (!fieldId || (momento !== "ANTES" && momento !== "EN_PROGRESO" && momento !== "DESPUES")) return null;
+  return { fieldId, momento };
+}
+
+function unicoHuecoPendiente(campos: readonly CampoEvidencia[]): DestinoFoto | null {
+  const pendientes: DestinoFoto[] = [];
+  for (const campo of campos) {
+    for (const momento of campo.momentos) {
+      if (!campo.fotos?.[momento]) pendientes.push({ fieldId: campo.id, momento });
+    }
+  }
+  return pendientes.length === 1 ? pendientes[0] : null;
+}
+
+/** GPS si el navegador lo da pronto. Si no, la foto del punto se guarda igual. */
+function leerUbicacionOpcional(): Promise<{ latitude: number; longitude: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const finish = (punto: { latitude: number; longitude: number } | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(puntoDeFoto(punto?.latitude, punto?.longitude));
+    };
+    const timer = window.setTimeout(() => finish(null), 2500);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        window.clearTimeout(timer);
+        finish({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      },
+      () => {
+        window.clearTimeout(timer);
+        finish(null);
+      },
+      { enableHighAccuracy: false, timeout: 2000, maximumAge: 60_000 },
+    );
+  });
+}
 
 const VERDE = "#16a34a";
 const NARANJA = "#d97706";
@@ -113,19 +172,48 @@ function Hueco({
   momento,
   foto,
   pedido,
+  puedeSubir,
+  ocupado,
   onAbrir,
+  onTomar,
+  onAdjuntar,
+  onSoltar,
+  onEntrar,
 }: {
   campo: CampoEvidencia;
   momento: Momento;
   foto: FotoDeCampo | null;
   pedido: boolean;
+  puedeSubir: boolean;
+  ocupado: boolean;
   onAbrir: () => void;
+  onTomar: () => void;
+  onAdjuntar: () => void;
+  onSoltar: (file: File) => void;
+  onEntrar: () => void;
 }) {
   const etiqueta = `${MOMENTO_LABEL[momento]}${pedido ? "" : " (ya no se pide)"}`;
   /** Hero por momento: alto suficiente para revisión en escritorio y móvil. */
   const alto = 320;
+  const ofrecer = puedeSubir && pedido;
+  const soltar = (event: DragEvent<HTMLElement>) => {
+    if (!ofrecer) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const file = primerArchivo(event.dataTransfer.files);
+    if (file) onSoltar(file);
+  };
   return (
-    <figure style={{ margin: 0, display: "grid", gap: 6, minWidth: 0 }}>
+    <figure
+      data-campo-slot=""
+      data-field-id={campo.id}
+      data-momento={momento}
+      onMouseEnter={ofrecer ? onEntrar : undefined}
+      onFocus={ofrecer ? onEntrar : undefined}
+      onDragOver={ofrecer ? (event) => event.preventDefault() : undefined}
+      onDrop={soltar}
+      style={{ margin: 0, display: "grid", gap: 6, minWidth: 0 }}
+    >
       <figcaption style={{ fontSize: 13, fontWeight: 750, color: pedido ? "inherit" : "var(--text-tertiary)" }}>
         {etiqueta}
       </figcaption>
@@ -178,6 +266,16 @@ function Hueco({
       <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.35, minHeight: 16 }}>
         {foto ? [corto(foto.por?.nombre), fmt(foto.capturedAt)].filter(Boolean).join(" · ") || "Tomada" : "Sin foto aún"}
       </span>
+      {ofrecer ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Button size="sm" variant="primary" onClick={onTomar} disabled={ocupado} iconLeft={<PhotoCameraOutlinedIcon fontSize="inherit" />}>
+            Tomar foto
+          </Button>
+          <Button size="sm" variant="secondary" onClick={onAdjuntar} disabled={ocupado}>
+            Adjuntar
+          </Button>
+        </div>
+      ) : null}
     </figure>
   );
 }
@@ -186,7 +284,15 @@ function Hueco({
  * «Evidencia por campos» en el detalle de la actividad: qué se pidió fotografiar, la foto
  * (o «Pendiente») de cada campo en cada momento, el avance, editar la lista y bajar el ZIP.
  */
-export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canManage, canDownload, style }: Props) {
+export default function EvidenciaPorCampos({
+  activityId,
+  anNumber,
+  titulo,
+  canManage,
+  canDownload,
+  puedeSubir = false,
+  style,
+}: Props) {
   const { user, token } = useUser();
   const tituloId = useId();
   const puedeEditar =
@@ -211,7 +317,14 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
   const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
   const [porBorrar, setPorBorrar] = useState<CampoEvidencia[] | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState<string | null>(null);
   const [visor, setVisor] = useState<{ fotos: Foto[]; index: number } | null>(null);
+  const tomarRef = useRef<HTMLInputElement>(null);
+  const adjuntarRef = useRef<HTMLInputElement>(null);
+  const destinoRef = useRef<DestinoFoto | null>(null);
+  const hoverRef = useRef<DestinoFoto | null>(null);
+  const listaRef = useRef<CampoEvidencia[]>([]);
 
   const cargar = useCallback(async () => {
     if (!token || !activityId) return;
@@ -239,7 +352,81 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
   }, [aviso]);
 
   const lista = useMemo(() => campos ?? [], [campos]);
+  listaRef.current = lista;
   const { requeridas, cumplidas } = useMemo(() => progresoDeCampos(lista), [lista]);
+
+  const subirFoto = useCallback(
+    async (file: File, destino: DestinoFoto) => {
+      if (!token || !puedeSubir) return;
+      const avisoArchivo = mensajeAdjuntoInvalido(file);
+      if (avisoArchivo) {
+        setErrorFoto(avisoArchivo);
+        return;
+      }
+      const clave = `${destino.fieldId}:${destino.momento}`;
+      setSubiendo(clave);
+      setErrorFoto(null);
+      try {
+        const dataUrl = await dataUrlDeImagen(file);
+        const geo = await leerUbicacionOpcional();
+        const punto = puntoDeFoto(geo?.latitude, geo?.longitude);
+        const nuevos = await guardarFotoDeCampo(token, activityId, destino.fieldId, {
+          momento: destino.momento,
+          photoUrl: dataUrl,
+          latitude: punto?.latitude,
+          longitude: punto?.longitude,
+          capturedAt: new Date().toISOString(),
+        });
+        setCampos(nuevos);
+        setAviso(`${MOMENTO_LABEL[destino.momento]} guardada.`);
+      } catch (e) {
+        setErrorFoto(formatApiError(e, "No se pudo guardar la foto"));
+      } finally {
+        setSubiendo(null);
+      }
+    },
+    [token, puedeSubir, activityId],
+  );
+
+  const elegirDestino = useCallback((desde: Element | null): DestinoFoto | null => {
+    return destinoDeElemento(desde) ?? hoverRef.current ?? unicoHuecoPendiente(listaRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!puedeSubir) return;
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      const file = primerArchivo(event.clipboardData?.files ?? null);
+      if (!file) return;
+      const destino = elegirDestino(target?.closest?.("[data-campo-slot]") ?? null);
+      if (!destino) {
+        setErrorFoto("Elige el punto (Antes, En progreso o Después) y pega de nuevo, o suelta la imagen sobre ese hueco.");
+        return;
+      }
+      event.preventDefault();
+      void subirFoto(file, destino);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [puedeSubir, elegirDestino, subirFoto]);
+
+  const abrirArchivo = (destino: DestinoFoto, tomar: boolean) => {
+    destinoRef.current = destino;
+    setErrorFoto(null);
+    const input = tomar ? tomarRef.current : adjuntarRef.current;
+    if (input) input.value = "";
+    input?.click();
+  };
+
+  const alElegirArchivo = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    const destino = destinoRef.current;
+    if (!file || !destino) return;
+    void subirFoto(file, destino);
+  };
 
   /** Todas las fotos en orden (campo → momento) para pasar de una a otra en el visor. */
   const galeria = useMemo(() => {
@@ -331,7 +518,7 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
               ? "Cargando…"
               : lista.length === 0
                 ? "Esta actividad no pide fotos por punto: el equipo sube fotos libres."
-                : "Qué hay que fotografiar y en qué momento. Las fotos se toman desde la app."}
+                : "Qué hay que fotografiar y en qué momento. El responsable y los asignados toman la foto aquí o adjuntan un archivo, una captura, con Ctrl+V o arrastrándola."}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -364,6 +551,36 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
             Reintentar
           </Button>
         </div>
+      ) : null}
+
+      {errorFoto ? (
+        <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>
+          {errorFoto}
+        </p>
+      ) : null}
+
+      {puedeSubir ? (
+        <>
+          <input
+            ref={tomarRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={alElegirArchivo}
+            style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+          />
+          <input
+            ref={adjuntarRef}
+            type="file"
+            accept="image/*"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={alElegirArchivo}
+            style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+          />
+        </>
       ) : null}
 
       {aviso ? (
@@ -466,7 +683,24 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
       ) : null}
 
       {!editando && lista.length > 0 ? (
-        <>
+        <div
+          onDragOver={puedeSubir ? (event) => event.preventDefault() : undefined}
+          onDrop={
+            puedeSubir
+              ? (event) => {
+                  event.preventDefault();
+                  const file = primerArchivo(event.dataTransfer.files);
+                  if (!file) return;
+                  const destino = elegirDestino((event.target as HTMLElement).closest?.("[data-campo-slot]") ?? null);
+                  if (!destino) {
+                    setErrorFoto("Suelta la imagen sobre el punto, o usa Adjuntar en ese hueco.");
+                    return;
+                  }
+                  void subirFoto(file, destino);
+                }
+              : undefined
+          }
+        >
           <Progreso cumplidas={cumplidas} requeridas={requeridas} />
           <ul
             style={{
@@ -529,9 +763,17 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
                           momento={m}
                           foto={foto}
                           pedido={campo.momentos.includes(m)}
+                          puedeSubir={puedeSubir}
+                          ocupado={subiendo != null}
                           onAbrir={() => {
                             const i = galeria.indice.get(`${campo.id}:${m}`);
                             if (i != null) setVisor({ fotos: galeria.fotos, index: i });
+                          }}
+                          onTomar={() => abrirArchivo({ fieldId: campo.id, momento: m }, true)}
+                          onAdjuntar={() => abrirArchivo({ fieldId: campo.id, momento: m }, false)}
+                          onSoltar={(file) => void subirFoto(file, { fieldId: campo.id, momento: m })}
+                          onEntrar={() => {
+                            hoverRef.current = { fieldId: campo.id, momento: m };
                           }}
                         />
                       );
@@ -541,7 +783,7 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
               );
             })}
           </ul>
-        </>
+        </div>
       ) : null}
 
       {visor ? (

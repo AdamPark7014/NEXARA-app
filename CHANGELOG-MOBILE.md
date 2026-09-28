@@ -3,6 +3,10 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).  
 App: `mx.nexara.mobile.nativeapp` · código en `apps/mobile-native/android/`.
 
+## [1.0.4] — 2026-09-28
+
+`versionCode` 13. Incluye el botón «Auto-asignarme» con la cola vacía y, en cada punto de evidencia («Antes», «En progreso», «Después»), «Tomar foto» junto a «Adjuntar» (galería o archivo). La foto de entrada y la de salida siguen siendo solo cámara.
+
 ## [1.0.0] — 2026-08-22
 
 Primera versión pública en Google Play de la app móvil 100 % nativa (Kotlin + Jetpack Compose), en paridad funcional con los paneles web de NEXARA.

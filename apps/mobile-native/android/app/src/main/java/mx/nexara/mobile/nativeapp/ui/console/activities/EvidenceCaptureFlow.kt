@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -1189,8 +1190,8 @@ private fun DraftGrid(
 
 /**
  * Evidencia por campos: cada campo con los huecos que pide («Antes», «En
- * progreso», «Después»). Un hueco vacío abre la cámara; uno lleno enseña la
- * miniatura y se puede volver a tomar.
+ * progreso», «Después»). En cada hueco, «Tomar foto» abre la cámara y
+ * «Adjuntar» abre galería o archivo.
  */
 @Composable
 private fun CamposEvidenciaCard(
@@ -1224,6 +1225,11 @@ private fun CamposEvidenciaCard(
                 fontSize = 12.5.sp,
                 color = if (faltan == 0) Color(CoreActivityRules.VERDE) else NxColors.Muted,
                 fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "En cada punto: Tomar foto (cámara) o Adjuntar (galería o archivo).",
+                fontSize = 12.sp,
+                color = NxColors.Slate,
             )
         }
 
@@ -1271,7 +1277,7 @@ private fun CamposEvidenciaCard(
     }
 }
 
-/** Un hueco: «Antes» vacío (toca para la cámara) o con su miniatura. */
+/** Un hueco: miniatura, y al lado «Tomar foto» y «Adjuntar». */
 @Composable
 private fun CampoSlot(
     momento: String,
@@ -1338,13 +1344,27 @@ private fun CampoSlot(
             fontWeight = FontWeight.SemiBold,
             color = if (tomada) NxColors.Slate else NxColors.Muted,
         )
-        Text(
-            "Adjuntar",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = NxColors.Brand,
-            modifier = Modifier.clickable(enabled = enabled, onClick = onAdjuntar),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            OutlinedButton(
+                onClick = onClick,
+                enabled = enabled,
+                modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+            ) {
+                Text("Tomar foto", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+            }
+            OutlinedButton(
+                onClick = onAdjuntar,
+                enabled = enabled,
+                modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+            ) {
+                Text("Adjuntar", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+        }
     }
 }
 
