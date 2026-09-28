@@ -1,0 +1,41 @@
+.bloque {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.campo {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary, #5c6570);
+}
+
+.campo span {
+  font-weight: 650;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.nota {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #5c6570);
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger, #b42318);
+}

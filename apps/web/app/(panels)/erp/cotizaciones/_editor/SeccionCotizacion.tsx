@@ -123,7 +123,7 @@ export default function SeccionCotizacion({
             value={doc.clientName}
             disabled={!editable}
             placeholder="Nombre del cliente"
-            onChange={(e) => cambiar((d) => ({ ...d, clientName: e.target.value, salesClientId: null }))}
+            onChange={(e) => cambiar((d) => ({ ...d, clientName: e.target.value }))}
           />
         </div>
         <div className={styles.campo}>

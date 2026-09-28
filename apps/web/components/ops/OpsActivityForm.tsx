@@ -46,9 +46,17 @@ import {
   type ClientTicketRequestRow,
   type OperationalProjectRow,
 } from "@/lib/ops-activities-api";
-import { listSalesClients } from "@/lib/sales-api";
+import { ClienteTipoPicker } from "@/components/erp/DatosCliente";
+import {
+  getClientPermissions,
+  listSalesClients,
+  NO_CLIENT_PERMISSIONS,
+  provisionSalesServiceClient,
+  type SalesClient,
+} from "@/lib/sales-api";
 import {
   clientSectorsForActivityKind,
+  clientSectorsForUser,
   type ClientSector,
 } from "@/lib/client-sectors";
 import { TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
@@ -160,6 +168,9 @@ export default function OpsActivityForm({
   const [sectorClients, setSectorClients] = useState<
     Array<{ serviceClientId: number; name: string; salesClientId: number }>
   >([]);
+  const [clientesCorporativos, setClientesCorporativos] = useState<SalesClient[]>([]);
+  const [salesServicioId, setSalesServicioId] = useState<number | null>(null);
+  const [permisosCliente, setPermisosCliente] = useState(NO_CLIENT_PERMISSIONS);
 
   const [tareaOtroOpen, setTareaOtroOpen] = useState(false);
 
@@ -230,6 +241,15 @@ export default function OpsActivityForm({
       setNextAnLoaded(true);
       setTicketRequests(Array.isArray(tickets) ? tickets : []);
 
+      if (coreKind === "servicio") {
+        const [rows, permisos] = await Promise.all([
+          listSalesClients(token, { sector: "CORPORATIVO" }).catch(() => [] as SalesClient[]),
+          getClientPermissions(token).catch(() => NO_CLIENT_PERMISSIONS),
+        ]);
+        setClientesCorporativos(rows);
+        setPermisosCliente(permisos);
+      }
+
       if (coreKind && ["proyecto", "obra", "servicio", "comercial"].includes(coreKind)) {
         const sectors = clientSectorsForActivityKind(coreKind as ActivityKind, user?.email);
         if (sectors.length) {
@@ -258,6 +278,12 @@ export default function OpsActivityForm({
   useEffect(() => {
     void loadMeta();
   }, [loadMeta]);
+
+  useEffect(() => {
+    if (coreKind !== "servicio" || !form.clientId) return;
+    const hit = clientesCorporativos.find((c) => String(c.serviceClientId) === form.clientId);
+    if (hit) setSalesServicioId(hit.id);
+  }, [coreKind, form.clientId, clientesCorporativos]);
 
   useEffect(() => {
     if (!initialClientId || isEdit || requestId) return;
@@ -440,6 +466,10 @@ export default function OpsActivityForm({
     }
     if (form.projectMode === "with_project" && !form.projectId) {
       setError("Selecciona un proyecto");
+      return;
+    }
+    if (coreKind === "servicio" && form.projectMode !== "with_project" && !form.clientId) {
+      setError("Elige o crea el cliente corporativo");
       return;
     }
     if (requireSchedule && (!form.fecha || !form.hora)) {
@@ -940,7 +970,58 @@ export default function OpsActivityForm({
                 ) : null}
               </div>
             ) : null}
-            {needsClientPicker ? (
+            {needsClientPicker && coreKind === "servicio" ? (
+              <ClienteTipoPicker
+                token={token}
+                tipo="CORPORATIVO"
+                salesClientId={salesServicioId}
+                editable
+                puedeCrear={
+                  (permisosCliente.puedeAgregar && clientSectorsForUser(user).includes("CORPORATIVO")) ||
+                  Boolean(permisosCliente.puedeAltaRapidaCorporativa)
+                }
+                puedeEditar={permisosCliente.puedeEditar && clientSectorsForUser(user).includes("CORPORATIVO")}
+                soloContacto={Boolean(permisosCliente.puedeAltaRapidaCorporativa) && !permisosCliente.puedeAgregar}
+                clientes={clientesCorporativos}
+                onCreado={(creado) => {
+                  setClientesCorporativos((prev) =>
+                    [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) => a.name.localeCompare(b.name, "es")),
+                  );
+                  setSalesServicioId(creado.id);
+                  void (async () => {
+                    if (!token) return;
+                    let serviceId = creado.serviceClientId ?? null;
+                    if (!serviceId) {
+                      try {
+                        const activado = await provisionSalesServiceClient(token, creado.id);
+                        serviceId = activado.serviceClient.id;
+                      } catch (e) {
+                        setError(apiErrorMessage(e, "El cliente se creó, pero no quedó listo para la actividad"));
+                        return;
+                      }
+                    }
+                    setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
+                  })();
+                }}
+                onSelect={async (c) => {
+                  setSalesServicioId(c.id);
+                  if (!token) return;
+                  try {
+                    let serviceId = c.serviceClientId ?? null;
+                    if (!serviceId) {
+                      const activado = await provisionSalesServiceClient(token, c.id);
+                      serviceId = activado.serviceClient.id;
+                      setClientesCorporativos((prev) =>
+                        prev.map((row) => (row.id === c.id ? { ...row, serviceClientId: serviceId } : row)),
+                      );
+                    }
+                    setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
+                  } catch (e) {
+                    setError(apiErrorMessage(e, "No se pudo usar ese cliente en la actividad"));
+                  }
+                }}
+              />
+            ) : needsClientPicker ? (
               <select
                 className="input"
                 value={form.clientId}

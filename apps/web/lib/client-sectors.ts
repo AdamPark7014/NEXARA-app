@@ -22,19 +22,19 @@ export const CLIENT_SECTOR_META: Record<
   PROYECTO: {
     slug: "proyecto",
     title: "Clientes de proyecto",
-    help: "Se usan en actividades de tipo proyecto u obra. Aquí también creas sus proyectos.",
+    help: "Se crean y se eligen en el módulo de Proyectos. Cada cliente es de un solo tipo.",
     icon: "proyecto",
   },
   CORPORATIVO: {
     slug: "corporativo",
     title: "Clientes corporativos",
-    help: "Se usan en actividades de tipo servicio.",
+    help: "Se eligen o se dan de alta al crear una actividad de servicio.",
     icon: "corporativo",
   },
   COMERCIAL: {
     slug: "comercial",
     title: "Clientes comerciales",
-    help: "Se usan en actividades de tipo comercial (también puedes sumarlos a otros sectores).",
+    help: "Se eligen, crean o editan dentro de la cotización. Solo el nombre es obligatorio.",
     icon: "comercial",
   },
 };

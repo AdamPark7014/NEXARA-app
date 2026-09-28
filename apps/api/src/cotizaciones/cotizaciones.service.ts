@@ -202,10 +202,9 @@ export class CotizacionesService {
   }
 
   /**
-   * Si el nombre no está en el padrón de esta empresa, lo da de alta con las
-   * mismas reglas que Clientes (coordinación y gerencia sí; un ingeniero no).
-   * El cliente queda en la empresa de la cotización y en el sector de quien lo crea,
-   * para poder usarlo enseguida en un proyecto o una actividad.
+   * Si el nombre no está en los clientes comerciales de esta empresa, lo da de alta
+   * como COMERCIAL (coordinación y gerencia sí; un ingeniero no). Solo hace falta
+   * el nombre: RFC y razón social se completan después, desde la misma cotización.
    */
   private async clientePorNombreOAlta(
     nombre: string,
@@ -220,7 +219,7 @@ export class CotizacionesService {
     actorId?: number,
   ) {
     const existente = await this.db.salesClient.findFirst({
-      where: { companyId, name: nombre },
+      where: { companyId, name: nombre, tipo: 'COMERCIAL' },
     });
     if (existente) return existente;
     const id = actor?.id ?? actorId;
@@ -236,11 +235,13 @@ export class CotizacionesService {
     return this.ventasService.createClient(
       {
         name: nombre,
-        legalName: (datos.legalName || nombre) ?? undefined,
+        legalName: datos.legalName || undefined,
         billingEmail: datos.billingEmail || undefined,
         billingPhone: datos.billingPhone || undefined,
         fiscalAddress: datos.fiscalAddress || undefined,
         status: 'Activo',
+        tipo: 'COMERCIAL',
+        sectors: ['COMERCIAL'],
       },
       quien ?? undefined,
       companyId,

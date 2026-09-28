@@ -205,7 +205,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
-    'erp-clients',
     'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
@@ -295,7 +294,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'erp-almacen',
-    'erp-clients',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -361,7 +359,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
-    'erp-clients',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -445,7 +442,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
-    'erp-clients',
     'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
@@ -498,7 +494,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
-    'erp-clients',
     'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
@@ -542,7 +537,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'erp-almacen',
-    'erp-clients',
     'erp-cotizaciones',
     'erp-organigrama',
     'erp-proyectos',
@@ -567,7 +561,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-quotes',
     'documents',
     'erp-almacen',
-    'erp-clients',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -689,7 +682,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'calendar',
     'chat',
     'documents',
-    'erp-clients',
     'erp-herramientas',
     'erp-organigrama',
     'erp-vehiculos',
@@ -748,7 +740,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-tenders',
     'dashboard',
     'documents',
-    'erp-clients',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -939,7 +930,7 @@ describe('modulos visibles por rol', () => {
     // `ops-my-*` son bandejas de otro; evidencias y contratos viven como pestana
     // dentro de Actividades y Mantenimiento; el ejecutivo sustituye al dashboard.
     // Tareas/Proyectos/Servicios y «Mis actividades» se consolidaron en la Pizarra;
-    // Clientes de Core se concede por persona (sectores por correo), no por rol.
+    // Clientes ya no es entrada de menú: cada tipo vive en cotización, proyecto o servicio.
     // `accounting` (pólizas) ya no es entrada de menú: vive en /erp/contabilidad/polizas.
     const shown = new Set(EXPECTED_MODULES.super_admin);
     expect(ALL_MODULES.filter((m) => !shown.has(m.id)).map((m) => m.id).sort()).toEqual([

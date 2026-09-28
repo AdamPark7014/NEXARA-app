@@ -39,6 +39,7 @@ import {
 import {
   canDeleteOrDeactivateClient,
   canManageClients,
+  canQuickCreateCorporateClient,
   CLIENT_DEACTIVATE_FORBIDDEN,
   CLIENT_DELETE_FORBIDDEN,
   CLIENT_MANAGE_FORBIDDEN,
@@ -46,6 +47,7 @@ import {
   CLIENT_STATUS_INACTIVE,
   clientPermissions,
   isInactiveClientStatus,
+  isOperationalClientRole,
   type ClientPermissions,
 } from './client-permissions.js';
 
@@ -144,17 +146,62 @@ export class VentasService {
     return canManageClients({ id: user?.id, email: user?.email, roleKey: user?.roleKey }, false);
   }
 
-  private requireFiscalForSectors(dto: CreateSalesClientDto) {
-    const missing: string[] = [];
-    if (!String(dto.legalName || '').trim()) missing.push('razón social');
-    if (!String(dto.taxId || '').trim()) missing.push('RFC');
-    if (!String(dto.fiscalAddress || '').trim()) missing.push('dirección fiscal');
-    if (!String(dto.fiscalZipCode || '').trim()) missing.push('CP fiscal');
-    if (!String(dto.fiscalRegime || '').trim()) missing.push('régimen fiscal');
-    if (!String(dto.billingEmail || '').trim()) missing.push('email de facturación');
-    if (missing.length) {
-      throw new BadRequestException(`Datos fiscales incompletos: ${missing.join(', ')}`);
+  /**
+   * Un solo tipo. `tipo` gana. Si el operativo pide alta rápida, es CORPORATIVO.
+   * Sin nada explícito: el único sector de su área, o COMERCIAL si tiene varios o ninguno.
+   */
+  private resolveTipo(dto: CreateSalesClientDto, user: any): ClientSectorCode {
+    if (dto.altaRapida && isOperationalClientRole(user?.roleKey)) {
+      if (dto.tipo && dto.tipo !== 'CORPORATIVO') {
+        throw new BadRequestException('El alta rápida solo crea clientes corporativos.');
+      }
+      if (dto.sectors?.some((s) => s !== 'CORPORATIVO')) {
+        throw new BadRequestException('El alta rápida solo crea clientes corporativos.');
+      }
+      return 'CORPORATIVO';
     }
+    if (dto.tipo && isClientSector(dto.tipo)) return dto.tipo;
+    if (dto.sectors?.length) {
+      const sectors = this.normalizeIncomingSectors(dto.sectors);
+      if (sectors.length === 1) return sectors[0];
+      return sectors.includes('COMERCIAL') ? 'COMERCIAL' : sectors[0];
+    }
+    const defaults = this.defaultSectorsFor(user);
+    if (defaults.length === 1) return defaults[0];
+    return defaults.includes('COMERCIAL') ? 'COMERCIAL' : defaults[0];
+  }
+
+  /** El operativo solo manda nombre y contacto. Lo demás se rechaza, no se guarda en silencio. */
+  private assertAltaRapida(dto: CreateSalesClientDto) {
+    const pesados: Array<keyof CreateSalesClientDto> = [
+      'legalName',
+      'taxId',
+      'fiscalAddress',
+      'fiscalZipCode',
+      'fiscalRegime',
+      'industry',
+      'website',
+      'notes',
+      'ownerId',
+      'serviceClientId',
+    ];
+    for (const campo of pesados) {
+      if (String(dto[campo] ?? '').trim()) {
+        throw new BadRequestException(
+          'En el alta rápida de una actividad de servicio solo se guarda el nombre y el contacto (correo y teléfono).',
+        );
+      }
+    }
+  }
+
+  private async puedeListarTipo(user: any, tipo: ClientSectorCode): Promise<boolean> {
+    const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
+    if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user)) return true;
+    if (clientSectorsForActor(user).includes(tipo)) return true;
+    if (canManageClients(actor, false)) return true;
+    if (tipo === 'CORPORATIVO' && isOperationalClientRole(user?.roleKey)) return true;
+    const reports = await this.hasDirectReports(user?.id);
+    return canManageClients(actor, reports);
   }
 
   private normalizeIncomingSectors(raw?: string[]): ClientSectorCode[] {
@@ -420,43 +467,43 @@ export class VentasService {
   }
 
   async createClient(dto: CreateSalesClientDto, user?: any, companyId?: number | null) {
-    await this.assertCanManageClients(user);
-    // Dar de alta un cliente ya inactivo equivale a desactivarlo.
-    if (isInactiveClientStatus(dto.status)) this.assertCanDeactivateClient(user);
-    const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
-    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
-    const explicitSectors = Boolean(dto.sectors?.length);
-    const sectors = explicitSectors ? this.normalizeIncomingSectors(dto.sectors) : this.defaultSectorsFor(user);
-    if (explicitSectors) {
-      this.assertCanUseSectors(user, sectors);
-      this.requireFiscalForSectors(dto);
-    } else if (clientSectorsForActor(user).length) {
-      // Alta rápida (cotización o proyecto): cae en el sector del área, sin exigir datos fiscales.
-      this.assertCanUseSectors(user, sectors);
+    const tipo = this.resolveTipo(dto, user);
+    const rapida = Boolean(dto.altaRapida) && tipo === 'CORPORATIVO' && isOperationalClientRole(user?.roleKey);
+    if (rapida) {
+      const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
+      if (!canQuickCreateCorporateClient(actor)) {
+        throw new ForbiddenException(CLIENT_MANAGE_FORBIDDEN);
+      }
+      this.assertAltaRapida(dto);
+    } else {
+      await this.assertCanManageClients(user);
+      // Dar de alta un cliente ya inactivo equivale a desactivarlo.
+      if (isInactiveClientStatus(dto.status)) this.assertCanDeactivateClient(user);
+      this.assertCanUseSectors(user, [tipo]);
     }
+    const ownerId = this.resolveOwnerForWrite(rapida ? undefined : dto.ownerId, user);
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
 
     const created = await this.prisma.salesClient.create({
       data: {
         name: dto.name,
-        legalName: dto.legalName || null,
-        taxId: dto.taxId || null,
-        fiscalAddress: dto.fiscalAddress || null,
-        fiscalZipCode: dto.fiscalZipCode?.trim() || null,
-        fiscalRegime: dto.fiscalRegime?.trim() || null,
+        legalName: rapida ? null : dto.legalName || null,
+        taxId: rapida ? null : dto.taxId || null,
+        fiscalAddress: rapida ? null : dto.fiscalAddress || null,
+        fiscalZipCode: rapida ? null : dto.fiscalZipCode?.trim() || null,
+        fiscalRegime: rapida ? null : dto.fiscalRegime?.trim() || null,
         billingEmail: dto.billingEmail || null,
         billingPhone: dto.billingPhone || null,
-        industry: dto.industry || null,
-        website: dto.website || null,
-        status: dto.status || null,
-        notes: dto.notes || null,
+        industry: rapida ? null : dto.industry || null,
+        website: rapida ? null : dto.website || null,
+        status: dto.status || CLIENT_STATUS_ACTIVE,
+        notes: rapida ? null : dto.notes || null,
         ownerId,
-        serviceClientId: dto.serviceClientId ?? null,
+        serviceClientId: rapida ? null : dto.serviceClientId ?? null,
         companyId: resolvedCompanyId,
+        tipo,
         sectors: {
-          create: sectors.map((sector) => ({
-            sector,
-            companyId: resolvedCompanyId,
-          })),
+          create: [{ sector: tipo, companyId: resolvedCompanyId }],
         },
       },
       include: this.clientInclude(),
@@ -478,12 +525,15 @@ export class VentasService {
         status: created.status,
         ownerId: created.ownerId,
         serviceClientId: created.serviceClientId,
-        sectors,
+        sectors: [tipo],
+        tipo,
       },
     });
 
-    // Legacy CRM (sin sectors en body): sigue provisionando OPS. Core solo si PROYECTO/CORPORATIVO.
-    if (!created.serviceClientId && (needsOpsProvision(sectors) || !dto.sectors?.length)) {
+    // Proyecto y corporativo necesitan cliente de operación para la actividad o el proyecto.
+    // Comercial (cotización) no. El alta del CRM viejo, sin tipo ni sector, sigue provisionando.
+    const explicito = Boolean(dto.tipo) || Boolean(dto.sectors?.length) || rapida;
+    if (!created.serviceClientId && (needsOpsProvision([tipo]) || !explicito)) {
       try {
         const provisioned = await this.provisionServiceClient(created.id, user, resolvedCompanyId);
         return provisioned.salesClient;
@@ -505,10 +555,13 @@ export class VentasService {
     let where: Record<string, unknown> = { ...companyWhere(companyId ?? null) };
 
     if (sector) {
-      this.assertCanUseSectors(user, [sector as ClientSectorCode]);
+      if (!isClientSector(sector)) throw new BadRequestException(`Sector inválido: ${sector}`);
+      if (!(await this.puedeListarTipo(user, sector))) {
+        this.assertCanUseSectors(user, [sector]);
+      }
       where = {
         ...where,
-        sectors: { some: { sector } },
+        tipo: sector,
       };
     } else if (this.vePadronDeLaEmpresa(user)) {
       if (ownerId) where = { ...where, ...this.buildScopedOwnerWhere(user, ownerId) };
@@ -561,18 +614,30 @@ export class VentasService {
 
   async addClientSector(id: number, sector: string, user?: any, companyId?: number | null) {
     if (!isClientSector(sector)) throw new BadRequestException('Sector inválido');
+    await this.assertCanManageClients(user);
     this.assertCanUseSectors(user, [sector]);
     const client = await this.getClient(id, user, companyId);
-    const existing = (client.sectors ?? []).map((s: { sector: string }) => s.sector);
-    if (existing.includes(sector)) return client;
+    if ((client as { tipo?: string }).tipo === sector) return client;
 
-    await this.prisma.salesClientSector.create({
-      data: {
-        salesClientId: id,
-        sector,
-        companyId: client.companyId,
-      },
+    await this.prisma.salesClient.update({
+      where: { id },
+      data: { tipo: sector },
     });
+    await this.prisma.salesClientSector.deleteMany({
+      where: { salesClientId: id, sector: { not: sector } },
+    });
+    const ya = await this.prisma.salesClientSector.findFirst({
+      where: { salesClientId: id, sector },
+    });
+    if (!ya) {
+      await this.prisma.salesClientSector.create({
+        data: {
+          salesClientId: id,
+          sector,
+          companyId: client.companyId,
+        },
+      });
+    }
 
     if (needsOpsProvision([sector]) && !client.serviceClientId) {
       try {
