@@ -56,10 +56,12 @@ export function DatosClienteOpcionales({
   token,
   clientId,
   puedeEditar,
+  textoBoton = "Completar datos del cliente",
 }: {
   token: string | null;
   clientId: number | null;
   puedeEditar: boolean;
+  textoBoton?: string;
 }) {
   const [datos, setDatos] = useState<Datos>(vacio);
   const [abierto, setAbierto] = useState(false);
@@ -86,7 +88,7 @@ export function DatosClienteOpcionales({
   return (
     <div className={styles.bloque}>
       <Button type="button" variant="secondary" size="sm" onClick={() => setAbierto((v) => !v)}>
-        {abierto ? "Ocultar datos del cliente" : "Completar datos del cliente"}
+        {abierto ? "Ocultar datos del cliente" : textoBoton}
       </Button>
       {abierto ? (
         <div className={styles.bloque}>
@@ -166,7 +168,8 @@ export function DatosClienteOpcionales({
 
 /**
  * Buscador de un solo tipo de cliente: elegir uno que ya existe, crearlo con el nombre
- * o —si es un operativo en una actividad de servicio— crearlo solo con nombre y contacto.
+ * o, en una actividad de servicio, dar de alta un corporativo (nombre obligatorio;
+ * correo, teléfono y RFC opcionales).
  */
 export function ClienteTipoPicker({
   token,
@@ -177,6 +180,7 @@ export function ClienteTipoPicker({
   puedeEditar,
   soloContacto,
   altaSoloNombre,
+  altaCorporativa,
   clientes,
   onSelect,
   onCreado,
@@ -190,6 +194,8 @@ export function ClienteTipoPicker({
   soloContacto?: boolean;
   /** Alta de un cliente de proyecto: solo el nombre, sin contacto ni datos fiscales. */
   altaSoloNombre?: boolean;
+  /** Actividad de servicio: nombre obligatorio; correo, teléfono y RFC opcionales. */
+  altaCorporativa?: boolean;
   clientes: SalesClient[];
   onSelect: (cliente: SalesClient) => void | Promise<void>;
   onCreado: (cliente: SalesClient) => void;
@@ -197,6 +203,7 @@ export function ClienteTipoPicker({
   const [q, setQ] = useState("");
   const [correo, setCorreo] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [rfc, setRfc] = useState("");
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -246,13 +253,15 @@ export function ClienteTipoPicker({
       {puedeCrear && editable ? (
         <div className={styles.bloque}>
           <p className={styles.nota}>
-            {altaSoloNombre
-              ? "Si no está en la lista, créalo con el nombre. Lo demás se completa después en Proyectos."
-              : soloContacto
-                ? "Puedes dar de alta aquí el nombre y el contacto. El RFC lo completa después coordinación."
-                : "Si no está en la lista, créalo con el nombre. Los datos fiscales se completan después."}
+            {altaCorporativa
+              ? "Solo el nombre es obligatorio. Correo, teléfono y RFC se pueden dejar vacíos."
+              : altaSoloNombre
+                ? "Si no está en la lista, créalo con el nombre. Lo demás se completa después en Proyectos."
+                : soloContacto
+                  ? "Puedes dar de alta aquí el nombre y el contacto. El RFC lo completa después coordinación."
+                  : "Si no está en la lista, créalo con el nombre. Los datos fiscales se completan después."}
           </p>
-          {soloContacto ? (
+          {altaCorporativa || soloContacto ? (
             <div className={styles.fila}>
               <label className={styles.campo}>
                 <span>Correo</span>
@@ -262,6 +271,12 @@ export function ClienteTipoPicker({
                 <span>Teléfono</span>
                 <input className="input" value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={60} />
               </label>
+              {altaCorporativa ? (
+                <label className={styles.campo}>
+                  <span>RFC</span>
+                  <input className="input" value={rfc} onChange={(e) => setRfc(e.target.value)} maxLength={40} />
+                </label>
+              ) : null}
             </div>
           ) : null}
           <Button
@@ -273,36 +288,52 @@ export function ClienteTipoPicker({
               if (!token) return;
               setCreando(true);
               setError(null);
-              const payload = altaSoloNombre
-                ? { name: q.trim(), status: "Activo" as const, tipo: "PROYECTO" as const, altaProyecto: true }
-                : soloContacto
-                  ? {
-                      name: q.trim(),
-                      status: "Activo" as const,
-                      tipo,
-                      altaRapida: true,
-                      billingEmail: correo.trim() || undefined,
-                      billingPhone: telefono.trim() || undefined,
-                    }
-                  : { name: q.trim(), status: "Activo" as const, tipo, sectors: [tipo] };
+              const payload = altaCorporativa
+                ? {
+                    name: q.trim(),
+                    status: "Activo" as const,
+                    tipo: "CORPORATIVO" as const,
+                    altaRapida: true,
+                    billingEmail: correo.trim() || undefined,
+                    billingPhone: telefono.trim() || undefined,
+                    taxId: rfc.trim() || undefined,
+                  }
+                : altaSoloNombre
+                  ? { name: q.trim(), status: "Activo" as const, tipo: "PROYECTO" as const, altaProyecto: true }
+                  : soloContacto
+                    ? {
+                        name: q.trim(),
+                        status: "Activo" as const,
+                        tipo,
+                        altaRapida: true,
+                        billingEmail: correo.trim() || undefined,
+                        billingPhone: telefono.trim() || undefined,
+                      }
+                    : { name: q.trim(), status: "Activo" as const, tipo, sectors: [tipo] };
               createSalesClient(token, payload)
                 .then((creado) => {
                   onCreado(creado);
                   setQ("");
                   setCorreo("");
                   setTelefono("");
+                  setRfc("");
                 })
                 .catch((e) => setError(formatApiError(e, "No se pudo crear el cliente")))
                 .finally(() => setCreando(false));
             }}
           >
-            {creando ? "Creando…" : "Crear cliente"}
+            {creando ? "Creando…" : altaCorporativa ? "+ Nuevo cliente corporativo" : "Crear cliente"}
           </Button>
         </div>
       ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
       {elegido ? <p className={styles.nota}>Cliente: {elegido.name}</p> : null}
-      <DatosClienteOpcionales token={token} clientId={puedeEditar ? salesClientId : null} puedeEditar={puedeEditar && editable} />
+      <DatosClienteOpcionales
+        token={token}
+        clientId={puedeEditar ? salesClientId : null}
+        puedeEditar={puedeEditar && editable}
+        textoBoton={altaCorporativa ? "Editar" : undefined}
+      />
     </div>
   );
 }
