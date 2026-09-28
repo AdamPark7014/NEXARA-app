@@ -199,7 +199,14 @@ export class ProyectosProfesionalController {
 
   /** Propuesta: una actividad por etapa con su periodo encadenado; nada se crea aquí. */
   @Get(':id/programacion')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.PEOPLE_VIEW,
+    ],
+  })
   programacion(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.programador.propuesta(id, companyId);
   }

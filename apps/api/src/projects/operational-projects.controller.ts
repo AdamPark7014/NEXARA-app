@@ -39,7 +39,14 @@ export class OperationalProjectsController {
   }
 
   @Get()
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.PEOPLE_VIEW,
+    ],
+  })
   findAll(
     @CurrentCompanyId() companyId: number | null,
     @Query('vendorId') vendorId?: string,
@@ -71,7 +78,14 @@ export class OperationalProjectsController {
   }
 
   @Get(':id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.PEOPLE_VIEW,
+    ],
+  })
   findById(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.operationalProjectsService.findById(id, companyId);
   }
