@@ -52,6 +52,10 @@ docker exec -i nexara-db psql -U <usuario> -d <base> -v company_id=<ID> -f - < a
 
 # 9. Alta de usuarios delegada: Antonio y Luis (soporte), David (instaladores). Christian da de alta todos los tipos de abajo sin concesión
 docker exec -i nexara-db psql -U <usuario> -d <base> -v company_id=<ID> -f - < apps/api/scripts/set-user-creation-grants.sql
+
+# 10. TEMPORAL: dejar que el personal pueda checar desde la web durante N horas (se cierra sola; las checadas quedan marcadas «desde el navegador»)
+docker exec -i nexara-db psql -U <usuario> -d <base> -v company_id=<ID> -v hours=48 -f - < apps/api/scripts/set-web-checkin-window.sql
+# Cerrarla antes: DELETE FROM system_settings WHERE key='attendance.web_checkin_until' AND "companyId"=<ID>;
 ```
 Antes de activar el paso 9 comprueba que existan los roles del sistema con `orgRoleKey` = `ing_soporte` e `ing_campo` (si falta uno, el alta responde «ese tipo no está configurado»). Los correos del script son los del organigrama sembrado (`jose.ramirez@`, `direccion.operaciones@`, `operaciones@nexara.com.mx`): confírmalos con los reales.
 El primer día hábil tras desplegar habrá dos avisos nuevos: **OC atrasadas (9:30)** y **«Tu día» (8:00)**. Cada persona puede elegir «solo el resumen y lo urgente» desde el panel «Tu día».
