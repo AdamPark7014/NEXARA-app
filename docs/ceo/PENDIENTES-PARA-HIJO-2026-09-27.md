@@ -49,7 +49,11 @@ docker exec -i nexara-db psql -U <usuario> -d <base> -v company_id=<ID> -f - < a
 
 # 8. SOLO cuando Christian defina los montos: topes de aprobación (los del script son ejemplos)
 docker exec -i nexara-db psql -U <usuario> -d <base> -v company_id=<ID> -f - < apps/api/scripts/set-approval-thresholds.sql
+
+# 9. Alta de usuarios delegada: Antonio y Luis (soporte), David (instaladores). Christian da de alta todos los tipos de abajo sin concesión
+docker exec -i nexara-db psql -U <usuario> -d <base> -v company_id=<ID> -f - < apps/api/scripts/set-user-creation-grants.sql
 ```
+Antes de activar el paso 9 comprueba que existan los roles del sistema con `orgRoleKey` = `ing_soporte` e `ing_campo` (si falta uno, el alta responde «ese tipo no está configurado»). Los correos del script son los del organigrama sembrado (`jose.ramirez@`, `direccion.operaciones@`, `operaciones@nexara.com.mx`): confírmalos con los reales.
 El primer día hábil tras desplegar habrá dos avisos nuevos: **OC atrasadas (9:30)** y **«Tu día» (8:00)**. Cada persona puede elegir «solo el resumen y lo urgente» desde el panel «Tu día».
 Comprobar después: con la contadora, `GET /api/employee-payments` → 403 y el módulo ya no sale en su menú; con Christian, todo igual; la contadora sigue timbrando/consultando Facturación.
 **Ojo:** el disco del servidor está al ~75 %; el build deja imágenes nuevas. Limpiar caché de build después.
