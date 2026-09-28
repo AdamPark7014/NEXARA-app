@@ -24,6 +24,10 @@
 Verificación: API `tsc` 0 errores, jest **222 suites / 2,697 pruebas** en verde; web `tsc` 0 errores, vitest **68 archivos / 613 pruebas** en verde (las 6 fallas previas quedaron resueltas: eran specs desactualizadas).
 
 ## B. Desplegar (en este orden; todos los pasos son reversibles)
+> **Atajo para los pasos 3, 4, 5, 7 y 9 (y la ventana temporal de checar en web):** en el servidor,
+> `bash apps/api/scripts/activar-perfil-ceo.sh` lista las empresas; con `COMPANY_ID=<id> APLICAR=1` lo aplica todo
+> (sin los topes del paso 8 ni el CFDI). Detalle abajo.
+
 ```bash
 # 1. Subir
 git pull --rebase origin main && git push origin main
