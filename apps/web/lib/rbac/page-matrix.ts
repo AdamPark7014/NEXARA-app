@@ -22,6 +22,14 @@ import { normalizeLegacyPath } from '@/lib/legacy-path-remap';
 
 export type PageRule = string; // path con comodines: /erp/**, /crm/quotes/*, /erp/users/:id
 
+/** Pizarra y el formulario de autoasignación. Quien ya tiene `CORE_OLA1_PAGE_PATHS` no lo necesita. */
+export const ACTIVIDAD_PROPIA_PAGE_PATHS: PageRule[] = [
+  '/erp/mis-actividades',
+  '/erp/mis-actividades/**',
+  '/erp/pizarra',
+  '/erp/pizarra/**',
+];
+
 /** Core ola1 — Pizarra / Asistencias / Chat / Actividades (paths canónicos ERP). */
 export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
   '/erp/mis-actividades',
@@ -151,6 +159,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
   [ROLES.DIR_OPERACIONES]: [
+    ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
     ...CLIENTES_CORE_PATHS,
@@ -218,6 +227,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
     ...CLIENTES_CORE_PATHS,
@@ -429,6 +439,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD VENTAS — gerente comercial ─────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/crm/**',
     ...CLIENTES_CORE_PATHS,
@@ -458,6 +469,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── VENDEDOR — su pipeline ──────────────────────────────────────────
   [ROLES.VENDEDOR]: [
+    ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/crm/**',
     ...CLIENTES_CORE_PATHS,
@@ -491,6 +503,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DISEÑADOR — Studio + apoyo en cotizaciones ───────────────────────
   [ROLES.DISENADOR]: [
+    ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/studio/**',
     '/crm/quotes/**',
@@ -505,6 +518,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── RH ───────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/erp',
     '/erp/dashboard',
@@ -531,6 +545,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── CONTABILIDAD ─────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/erp',
     '/erp/dashboard',

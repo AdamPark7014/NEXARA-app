@@ -180,6 +180,7 @@ describe('ActivitiesController', () => {
           departmentId: 40,
           roleKey: 'ing_campo',
           isSuperAdmin: false,
+          permissions: [PERMISSIONS.ACTIVITIES_MANAGE],
         },
         COMPANY_ID,
         { responsableId: 13, creadoPorId: 16 } as any,
@@ -194,11 +195,60 @@ describe('ActivitiesController', () => {
           departmentId: 40,
           roleKey: 'ing_campo',
           isSuperAdmin: false,
+          permissions: [PERMISSIONS.ACTIVITIES_MANAGE],
         },
         COMPANY_ID,
         { responsableId: 13, creadoPorId: 16 } as any,
       ),
     ).rejects.toThrow('Solo puedes asignar a tu propio departamento');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('administrativo se autoasigna sin permiso de gestión y sin salir a otro departamento', async () => {
+    const created = { id: 4, titulo: 'Mi trámite' };
+    const spy = jest.spyOn(service, 'create').mockResolvedValueOnce(created as any);
+
+    const result = await controller.create(
+      {
+        id: 21,
+        email: 'monica.garcia@nexara.com.mx',
+        departmentId: 3,
+        roleKey: 'administrativo',
+        isSuperAdmin: false,
+        permissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.PEOPLE_VIEW],
+      },
+      COMPANY_ID,
+      { responsableId: 21, creadoPorId: 21, titulo: 'Mi trámite', assignmentCharge: 'despacho' } as any,
+    );
+
+    expect(result).toEqual(created);
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responsableId: 21,
+        creadoPorId: 21,
+        assignmentCharge: 'ejecucion',
+      }),
+      COMPANY_ID,
+    );
+    expect(usersService.findOne).not.toHaveBeenCalled();
+  });
+
+  it('vendedor no asigna la actividad a otra persona', async () => {
+    const spy = jest.spyOn(service, 'create').mockResolvedValue({} as any);
+
+    await expect(
+      controller.create(
+        {
+          id: 30,
+          email: 'ventas@nexara.com.mx',
+          roleKey: 'vendedor',
+          isSuperAdmin: false,
+          permissions: [PERMISSIONS.PEOPLE_VIEW],
+        },
+        COMPANY_ID,
+        { responsableId: 21, creadoPorId: 30 } as any,
+      ),
+    ).rejects.toThrow('No tienes permisos para asignar actividades a otra persona');
     expect(spy).not.toHaveBeenCalled();
   });
 });

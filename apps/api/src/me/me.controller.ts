@@ -152,7 +152,7 @@ export class MeController {
     );
   }
 
-  /** Encargados de área: auto-asignarse una actividad (responsable = uno mismo). */
+  /** Cualquier persona del equipo: auto-asignarse una actividad (responsable = uno mismo). */
   @Post('activities')
   createMyActivity(
     @CurrentUser() user: any,

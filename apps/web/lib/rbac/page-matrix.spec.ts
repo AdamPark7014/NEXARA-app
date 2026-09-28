@@ -26,6 +26,25 @@ describe('canOpenPage · guardas de ruta por rol', () => {
     expect(canOpenPage(ROLES.VENDEDOR, '/erp/users')).toBe(false);
   });
 
+  it('todo el personal abre el formulario para autoasignarse una actividad', () => {
+    for (const role of [
+      ROLES.ADMINISTRATIVO,
+      ROLES.CONTABILIDAD,
+      ROLES.RH,
+      ROLES.ING_CAMPO,
+      ROLES.ING_SOPORTE,
+      ROLES.DISENADOR,
+      ROLES.VENDEDOR,
+      ROLES.COORD_VENTAS,
+      ROLES.DIR_OPERACIONES,
+      ROLES.COORD_ADMIN,
+    ]) {
+      expect(canOpenPage(role, '/erp/mis-actividades/nueva'), role).toBe(true);
+      expect(canOpenPage(role, '/erp/pizarra'), role).toBe(true);
+    }
+    expect(canOpenPage(ROLES.CLIENTE, '/erp/mis-actividades/nueva')).toBe(false);
+  });
+
   it('contabilidad entra en finanzas pero no en el laboratorio', () => {
     expect(canOpenPage(ROLES.CONTABILIDAD, '/erp/accounting')).toBe(true);
     expect(canOpenPage(ROLES.CONTABILIDAD, '/erp/invoicing')).toBe(true);

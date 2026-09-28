@@ -27,7 +27,7 @@ const CEO_EMAIL = 'gerencia@nexara.com.mx';
 /** Dos personas sumadas con menos de 5 s de diferencia están en el mismo nivel de la cadena. */
 const MISMO_MOMENTO_MS = 5_000;
 
-/** Encargados de área: se auto-asignan y ordenan su cola (con justificación). */
+/** Encargados de área: ordenan su cola (con justificación). Autoasignarse lo puede cualquiera. */
 export const AREA_MANAGER_EMAILS = new Set<string>([
   'developer@nexara.com.mx',
   'operaciones@nexara.com.mx',
@@ -767,14 +767,12 @@ export class MyActivitiesService {
   }
 
   /**
-   * Encargado de área: crea una actividad solo para sí mismo (ejecución directa).
+   * Cualquier persona del equipo crea una actividad solo para sí misma (ejecución directa).
    * No pasa por ACTIVITIES_MANAGE porque responsable y creador se fuerzan al viewer.
+   * Dirección general no usa esta cola.
    */
   async selfCreate(viewer: MyActivitiesViewer, companyId: number | null, dto: CreateActivityDto) {
     this.assertNotCeo(viewer);
-    if (!this.isAreaManager(viewer.email)) {
-      throw new ForbiddenException('Solo los encargados de área pueden auto-asignarse actividades');
-    }
     return this.activities.create(
       {
         ...dto,
@@ -1056,7 +1054,7 @@ export class MyActivitiesService {
       .sort((a, b) => (b.fechaFinalizacion?.getTime() ?? 0) - (a.fechaFinalizacion?.getTime() ?? 0));
 
     const manager = this.isAreaManager(viewer.email);
-    return { canReorder: manager, canSelfAssign: manager, open, seguimiento, doneToday };
+    return { canReorder: manager, canSelfAssign: true, open, seguimiento, doneToday };
   }
 
   async reorder(

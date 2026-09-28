@@ -118,18 +118,6 @@ fun CoreActivityFormScreen(
     ) {
         when {
             user == null -> NxLoadingBlock("Cargando…")
-            selfAssign && !CoreActivityKinds.isAreaManagerEmail(user.email) -> NxPanelShell {
-                Text("Auto-asignarse", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Solo los encargados de área pueden auto-asignarse actividades. Tu encargado te las asigna.",
-                    fontSize = 14.sp,
-                    color = NxColors.Muted,
-                )
-                TextButton(onClick = onCancel) {
-                    Text("← Volver a Mis actividades", color = NxColors.Brand, fontWeight = FontWeight.Bold)
-                }
-            }
             !selfAssign && (targetUserId == null || targetUserId <= 0L) ->
                 Text("Persona no válida.", color = NxColors.Danger, fontSize = 14.sp)
             else -> AssignFlow(

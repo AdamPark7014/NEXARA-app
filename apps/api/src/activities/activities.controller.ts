@@ -159,7 +159,14 @@ export class ActivitiesController {
 
   @Get('next-an')
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.PEOPLE_VIEW,
+    ],
+  })
   async getNextAn(@CurrentCompanyId() companyId: number | null) {
     const next = await this.activitiesService.getNextAnNumber(companyId);
     return { next };
@@ -172,18 +179,41 @@ export class ActivitiesController {
     return this.activitiesService.findAllDetailed();
   }
 
-  // CEO y Supervisor pueden crear/editar actividades
+  // Cualquier persona del equipo puede dar de alta una actividad a su nombre.
+  // Asignarla a otra persona sigue exigiendo gestión de actividades.
   @Post()
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.PEOPLE_VIEW,
+    ],
+  })
   async create(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Body() createActivityDto: CreateActivityDto,
   ) {
+    const selfAssign = Number(createActivityDto.responsableId) === Number(user?.id);
+    if (!selfAssign && !this.puedeGestionarActividades(user)) {
+      throw new ForbiddenException('No tienes permisos para asignar actividades a otra persona');
+    }
     if (!user.isSuperAdmin && createActivityDto.creadoPorId !== user.id) {
       throw new ForbiddenException(
         'Solo puedes asignar actividades creadas por ti',
+      );
+    }
+    if (selfAssign) {
+      return this.activitiesService.create(
+        {
+          ...createActivityDto,
+          responsableId: user.id,
+          creadoPorId: user.id,
+          assignmentCharge: 'ejecucion',
+        },
+        companyId,
       );
     }
 
@@ -388,6 +418,15 @@ export class ActivitiesController {
    * Determina si el usuario tiene scope de equipo para actividades.
    * Cubre tanto el modelo legacy (CONSOLE_ADMIN) como v2 (roleKey de manager).
    */
+  /** Gestión de actividades ajenas: mandos de operación, encargado de soporte o el permiso. */
+  private puedeGestionarActividades(user: any): boolean {
+    if (!user) return false;
+    if (user.isSuperAdmin) return true;
+    if (user.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE)) return true;
+    if (user.roleKey === 'enc_soporte') return true;
+    return this.isOpsManager(user);
+  }
+
   private isOpsManager(user: any): boolean {
     if (!user) return false;
     if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) return true;

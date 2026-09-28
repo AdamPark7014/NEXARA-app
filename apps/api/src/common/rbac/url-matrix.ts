@@ -198,6 +198,8 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/erp/actividades/servicios/**', scope: 'write' },
   { path: '/api/chat/**', scope: 'write' },
   { path: '/api/me/**', methods: ['GET'], scope: 'read' },
+  // Autoasignarse: el POST no cabe en el GET de arriba. El servicio fuerza responsable = quien crea.
+  { path: '/api/me/activities', methods: ['POST'], scope: 'write' },
   // APIs que usan las apps y la web Core para cualquier persona del equipo. Lo fino (solo lo
   // propio, solo jefes aprueban, solo quien ejecuta sube evidencia) lo decide cada servicio.
   ...SELF_ATTENDANCE_URL_RULES,
@@ -243,6 +245,24 @@ export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
   { path: '/api/activities/*/reasignar', methods: ['POST'], scope: 'approve' },
 ];
 
+/**
+ * Alta de una actividad a nombre propio y autoasignación.
+ *
+ * Asignar a otra persona lo sigue decidiendo el controlador (`ACTIVITIES_MANAGE`
+ * y el candado de departamento). El folio (`GET /api/activities/next-an`) va aquí
+ * porque el formulario lo pide al guardar: sin esa GET, el alta dejaba un 403
+ * en pantalla aunque la actividad ya existiera.
+ */
+export const ACTIVIDAD_PROPIA_URL_RULES: UrlRule[] = [
+  { path: '/api/activities', methods: ['POST'], scope: 'write' },
+  { path: '/api/activities/next-an', methods: ['GET'], scope: 'read' },
+  { path: '/api/me/activities', methods: ['POST'], scope: 'write' },
+  { path: '/erp/mis-actividades', scope: 'write' },
+  { path: '/erp/mis-actividades/**', scope: 'write' },
+  { path: '/erp/pizarra', scope: 'write' },
+  { path: '/erp/pizarra/**', scope: 'write' },
+];
+
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
 export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', scope: 'write' },
@@ -282,6 +302,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     // «Acceso a cuentas»: el API solo deja pasar al dueño de la plataforma; aquí solo se permite el camino.
     { path: '/api/account-access/**', methods: ['GET', 'POST'], scope: 'write' },
     ...COTIZACIONES_CORE_URL_RULES,
@@ -370,6 +391,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
@@ -424,6 +446,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -465,6 +488,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
@@ -822,6 +846,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD VENTAS — gerente comercial
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...CLIENTES_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
@@ -860,6 +885,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // VENDEDOR — CRM (sus leads, clientes, cotizaciones)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.VENDEDOR]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CLIENTES_CORE_URL_RULES,
@@ -929,6 +955,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DISEÑADOR — solo sus tareas en Studio
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DISENADOR]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     { path: '/studio', scope: 'read' },
@@ -964,6 +991,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // RH
   // ─────────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
@@ -1003,6 +1031,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CONTABILIDAD
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
