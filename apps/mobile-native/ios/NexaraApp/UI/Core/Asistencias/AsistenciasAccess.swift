@@ -39,6 +39,8 @@ enum AsistenciasAccess {
     }
 
     static func mode(for user: SessionUser?) -> AttendanceViewMode {
+        // Demo: ve a su equipo Y puede checar (es lo que se quiere enseñar).
+        if DemoMode.isActive { return .manageRegister }
         guard let user else { return .manage }
         if user.isSuperAdmin { return .manage }
         // Dirección (Christian) supervisa: en Core no tiene checador propio.

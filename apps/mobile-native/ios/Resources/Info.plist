@@ -40,25 +40,20 @@
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Mientras tu jornada esté abierta, NEXARA comparte tu ubicación con tu encargado, aunque la app esté cerrada. Se detiene al marcar tu salida.</string>
     <key>NSCameraUsageDescription</key>
-    <string>La app usa la cámara para adjuntar evidencias.</string>
+    <string>NEXARA usa la cámara para tomar las fotos de evidencia de tu trabajo (entrada, salida y actividades) y adjuntarlas a tu jornada.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>La app accede a fotos para adjuntar evidencias.</string>
+    <string>NEXARA accede a tus fotos solo para que elijas las imágenes que adjuntas como evidencia del trabajo (actividades, tickets y comprobantes).</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>La app guarda tus evidencias en la galería.</string>
+    <string>NEXARA solo guarda una imagen en tu galería cuando tú eliges guardarla o compartirla desde la app.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Se usa cuando grabas video con la cámara.</string>
-    <key>NSUserTrackingUsageDescription</key>
-    <string>Usamos identificadores anónimos para mejorar la app.</string>
+    <string>NEXARA usa el micrófono únicamente si grabas video como evidencia de tu trabajo con la cámara.</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>NEXARA usa Face ID para desbloquear la app y proteger la información de tu organización.</string>
     <key>UIBackgroundModes</key>
     <array>
         <string>remote-notification</string>
-        <string>fetch</string>
         <string>location</string>
     </array>
-    <key>LSSupportsOpeningDocumentsInPlace</key>
-    <true/>
-    <key>UIFileSharingEnabled</key>
-    <true/>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>

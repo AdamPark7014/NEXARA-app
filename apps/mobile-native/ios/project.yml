@@ -53,6 +53,12 @@ targets:
       - path: Resources/GoogleService-Info.plist
         optional: true
         buildPhase: resources
+      # Manifiesto de privacidad de la app (Apple lo exige desde mayo de 2024:
+      # APIs de "motivo requerido" y datos recopilados). NO es opcional: si
+      # falta, el proyecto no se genera y el flujo de TestFlight lo verifica
+      # tras archivar (debe quedar en la raíz del .app).
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: SocketIO
         product: SocketIO
@@ -61,13 +67,17 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: mx.nexara.mobile.NexaraApp
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # Solo iPhone ("1"). Apple revisó la 1.0 en un iPad Air porque el binario
+        # declaraba iPhone + iPad ("1,2") sin que la interfaz se hubiera diseñado
+        # ni probado para iPad. Se vuelve a "1,2" solo cuando exista versión de
+        # iPad; hasta entonces, iPhone-only.
+        TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # `INFOPLIST_FILE` en vez del bloque `info:` a propósito. Con `info:`,
         # XcodeGen REGENERA la plist con las claves que se listen aquí y borra
         # el resto: se habría llevado las siete cadenas de permisos
-        # (ubicación, cámara, fotos, micrófono, seguimiento) y Apple rechaza
+        # (ubicación, cámara, fotos, micrófono, Face ID) y Apple rechaza
         # cualquier binario que use esas API sin su descripción.
         INFOPLIST_FILE: Resources/Info.plist
         GENERATE_INFOPLIST_FILE: false
@@ -84,6 +94,28 @@ targets:
         Release:
           CODE_SIGN_ENTITLEMENTS: Resources/NexaraApp.Release.entitlements
 
+  # Pruebas de interfaz (XCUITest). Las usa el flujo `ios-screenshots.yml` para
+  # generar las capturas de la ficha desde el simulador de iPhone. NO entran en
+  # el archivado ni en `xcodebuild build`: el esquema las construye solo en la
+  # acción `test`. Sin firma: solo corren en simulador.
+  NexaraAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: NexaraAppUITests
+        excludes:
+          - "**/.gitkeep"
+    dependencies:
+      - target: NexaraApp
+    settings:
+      base:
+        TEST_TARGET_NAME: NexaraApp
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: mx.nexara.mobile.NexaraAppUITests
+        TARGETED_DEVICE_FAMILY: "1"
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGNING_ALLOWED: NO
+
 # XcodeGen no crea esquemas compartidos por su cuenta, y `xcodebuild -scheme`
 # solo ve los compartidos. Sin este bloque la construcción falla con
 # "scheme NexaraApp not found" incluso con el proyecto bien generado.
@@ -96,6 +128,8 @@ schemes:
       config: Debug
     test:
       config: Debug
+      targets:
+        - NexaraAppUITests
     profile:
       config: Release
     analyze:

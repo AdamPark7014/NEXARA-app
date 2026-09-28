@@ -22,10 +22,16 @@ final class OfflineSyncCoordinator {
             lock.unlock()
         }
 
+        // Modo demostración: la sesión es de mentira, no hay nada real que reenviar.
+        guard !DemoMode.isActive else { return }
         guard await NetworkMonitor.shared.isOnline else { return }
         guard var token = SessionStore.shared.token, !token.isEmpty else { return }
 
-        let pending = OfflineMutationQueue.shared.load()
+        let allPending = OfflineMutationQueue.shared.load()
+        // Un acceso encolado (contraseña en claro) no se reenvía: se descarta.
+        let stale = Set(allPending.filter { OfflineMutationQueue.isSensitive(url: $0.url) }.map(\.id))
+        if !stale.isEmpty { OfflineMutationQueue.shared.removeIds(stale) }
+        let pending = allPending.filter { !stale.contains($0.id) }
         guard !pending.isEmpty else { return }
 
         var done = Set<String>()

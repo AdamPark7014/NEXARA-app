@@ -8,7 +8,10 @@ struct OfflineBanner: View {
 
     var body: some View {
         Group {
-            if !network.isOnline {
+            if DemoMode.isActive {
+                // Modo demostración: nada sale del teléfono, no hay banner de conexión.
+                EmptyView()
+            } else if !network.isOnline {
                 banner(
                     pending > 0
                         ? "Sin conexión — \(pending) en cola (incl. fotos)"

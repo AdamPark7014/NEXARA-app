@@ -5,8 +5,10 @@ import SwiftUI
 /// users/profile/me`), más bloqueo de la app, cola offline y cierre de sesión.
 struct MyProfileView: View {
     @EnvironmentObject var session: SessionStore
+    @Environment(\.openURL) private var openURL
     @State private var appLockEnabled = AppLock.isEnabled
     @State private var confirmLogout = false
+    @State private var confirmDeleteAccount = false
 
     @State private var profile: MyProfileSnapshot?
     @State private var form = MyProfileFields()
@@ -295,6 +297,17 @@ struct MyProfileView: View {
         Section {
             Button(role: .destructive) { confirmLogout = true } label: {
                 Label("Cerrar sesión", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+            // Eliminación de cuenta (guideline 5.1.1(v)): se pide desde la app y
+            // se gestiona en la web (las cuentas las crea tu organización).
+            Button(role: .destructive) { confirmDeleteAccount = true } label: {
+                Label("Eliminar mi cuenta", systemImage: "person.crop.circle.badge.minus")
+            }
+            .confirmationDialog("¿Eliminar tu cuenta?", isPresented: $confirmDeleteAccount, titleVisibility: .visible) {
+                Button("Continuar en la web", role: .destructive) { openURL(NxAppMeta.eliminarCuentaURL) }
+                Button("Cancelar", role: .cancel) {}
+            } message: {
+                Text("La solicitud de eliminación de tu cuenta y tus datos se gestiona desde la web de NEXARA. Se abrirá en tu navegador para que la completes ahí.")
             }
         }
     }

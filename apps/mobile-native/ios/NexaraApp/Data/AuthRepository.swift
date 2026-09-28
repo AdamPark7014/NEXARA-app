@@ -53,11 +53,17 @@ final class AuthRepository {
     enum Kind { case user, client, branch }
 
     func login(email: String, password: String, kind: Kind) async throws -> SessionUser {
+        // Paridad con Android (`AuthRepository.kt`): se recortan correo y contraseña.
+        // Un espacio o un salto de línea que mete el teclado (o un «pegar» desde el
+        // correo de credenciales) hacía que el servidor contestara 401 aunque la
+        // contraseña fuera la buena.
+        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
         switch kind {
         case .user:
-            return try await staffLogin(email: email, password: password)
+            return try await staffLogin(email: cleanEmail, password: cleanPassword)
         case .client, .branch:
-            return try await portalLogin(email: email, password: password)
+            return try await portalLogin(email: cleanEmail, password: cleanPassword)
         }
     }
 
@@ -150,6 +156,8 @@ final class AuthRepository {
     /// companyId + navegación RBAC desde API (best-effort). Paridad Android `enrichSession`.
     func enrichSession(_ user: SessionUser) async -> SessionUser {
         if user.isClient || user.isBranchUser { return user }
+        // Modo demostración: la sesión ya trae su navegación completa.
+        if DemoMode.isActive { return user }
         var next = user
 
         if let data = try? await ApiClient.shared.get("company/mine") {
@@ -186,6 +194,7 @@ final class AuthRepository {
     func refreshProfile() async -> SessionUser? {
         guard var current = SessionStore.shared.currentUser else { return nil }
         guard !current.isClient, !current.isBranchUser else { return current }
+        if DemoMode.isActive { return current }
         guard let data = try? await ApiClient.shared.get("auth/profile") else { return current }
         let map = ConsoleHelpers.decodeMap(data)
         guard !map.isEmpty else { return current }
@@ -223,6 +232,8 @@ final class AuthRepository {
     func maybeExtendSession() async {
         guard let current = SessionStore.shared.currentUser else { return }
         if current.isClient || current.isBranchUser { return }
+        // Modo demostración: sin renovación de sesión ni consultas de permisos.
+        if DemoMode.isActive { return }
 
         if Self.needsRefresh(expiresAt: current.expiresAt) {
             // Revocada: `SessionRefresher` ya cerró sesión y ya avisó. Seguir
@@ -247,7 +258,8 @@ final class AuthRepository {
     /// `POST auth/session/refresh`. Una sola renovación a la vez para toda la app.
     @discardableResult
     func refreshSession() async -> SessionRefreshOutcome {
-        await SessionRefresher.shared.refresh()
+        if DemoMode.isActive { return .failed }
+        return await SessionRefresher.shared.refresh()
     }
 
     /// `true` si `expiresAt` no se conoce, no se entiende, ya pasó o faltan < 60 min.

@@ -14,6 +14,14 @@ extension ApiError {
             let server = Self.parseServerErrorBody(body)
             switch code {
             case 401:
+                // Un rechazo con motivo explícito (cuenta bloqueada por intentos
+                // fallidos, p. ej.) se muestra tal cual: decirle «Sesión expirada»
+                // a quien está bloqueado lo manda a reintentar en vano.
+                if let server, server.localizedCaseInsensitiveContains("bloqueada") {
+                    return server
+                }
+                // «Sesión expirada» es solo para el 401 de una sesión ya abierta; los
+                // errores del login (sin sesión) los traduce `LoginView` por su cuenta.
                 return "Sesión expirada. Inicia sesión de nuevo."
             case 403:
                 return server ?? "Sin permisos para esta acción."
@@ -29,11 +37,15 @@ extension ApiError {
                 return server ?? fallback
             }
         case .transport:
-            return "Sin conexión. Revisa tu red e intenta de nuevo."
+            // Sin red, timeout o servidor inalcanzable: nunca es «sesión expirada».
+            return Self.noConnectionMessage
         case .decoding(let e):
             return "Decodificación: \(e.localizedDescription)"
         }
     }
+
+    /// Texto único para «no llegué al servidor» (sin red, timeout, DNS, TLS).
+    static let noConnectionMessage = "Sin conexión con el servidor. Revisa tu internet e inténtalo de nuevo."
 
     var isSessionExpired: Bool {
         if case .http(401, _) = self { return true }
@@ -69,7 +81,7 @@ extension Error {
         }
         let ns = self as NSError
         if ns.domain == NSURLErrorDomain {
-            return "Sin conexión. Revisa tu red e intenta de nuevo."
+            return ApiError.noConnectionMessage
         }
         let msg = localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         return msg.isEmpty ? fallback : msg

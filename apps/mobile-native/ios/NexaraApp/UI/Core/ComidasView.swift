@@ -113,7 +113,8 @@ struct ComidasView: View {
         _fecha = State(initialValue: fecha ?? Date())
     }
 
-    private var isCeo: Bool { CoreOrg.isCeo(session.currentUser?.email) }
+    /// En demo la persona sí registra su comida (y ve la de su equipo).
+    private var isCeo: Bool { !DemoMode.isActive && CoreOrg.isCeo(session.currentUser?.email) }
     private var effectiveFecha: Date { externalFecha ?? fecha }
     private var isToday: Bool { AttendanceClock.isToday(effectiveFecha) }
 
