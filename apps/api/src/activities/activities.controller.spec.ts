@@ -10,6 +10,7 @@ import { RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { ForbiddenException } from '@nestjs/common';
 
 /**
  * `GET /activities` enruta a un método distinto del servicio según el alcance
@@ -20,7 +21,11 @@ import { DomainEventBusService } from '../domain-events/domain-event-bus.service
 describe('ActivitiesController', () => {
   let controller: ActivitiesController;
   let service: ActivitiesService;
-  let usersService: { findUsersForConsoleActivityScope: jest.Mock };
+  let usersService: {
+    findUsersForConsoleActivityScope: jest.Mock;
+    findOne: jest.Mock;
+    listAssignmentRoster: jest.Mock;
+  };
 
   const COMPANY_ID = 7;
   const activity = (id: number, titulo: string) => ({ id, titulo });
@@ -28,6 +33,8 @@ describe('ActivitiesController', () => {
   beforeEach(async () => {
     usersService = {
       findUsersForConsoleActivityScope: jest.fn().mockResolvedValue([{ id: 3 }, { id: 4 }]),
+      findOne: jest.fn(),
+      listAssignmentRoster: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -117,5 +124,81 @@ describe('ActivitiesController', () => {
 
     expect(result).toEqual(expected);
     expect(spy).toHaveBeenCalledWith(9, COMPANY_ID);
+  });
+
+  it('un coordinador asigna a Antonio aunque sea de otro departamento', async () => {
+    usersService.findOne.mockResolvedValue({
+      id: 39,
+      email: 'jose.ramirez@nexara.com.mx',
+      departmentId: 20,
+      roleKey: 'ing_soporte',
+      managerId: 1,
+    });
+    usersService.listAssignmentRoster.mockResolvedValue([
+      { id: 7, email: 'direccion.operaciones@nexara.com.mx', departmentId: 31, roleKey: 'coord_operaciones', managerId: 1 },
+      { id: 39, email: 'jose.ramirez@nexara.com.mx', departmentId: 20, roleKey: 'ing_soporte', managerId: 1 },
+      { id: 13, email: 'soporte@nexara.com.mx', departmentId: 20, roleKey: 'ing_soporte', managerId: 39 },
+    ]);
+    const created = { id: 1, titulo: 'Preventivo' };
+    const spy = jest.spyOn(service, 'create').mockResolvedValueOnce(created as any);
+
+    const result = await controller.create(
+      {
+        id: 7,
+        email: 'direccion.operaciones@nexara.com.mx',
+        departmentId: 31,
+        roleKey: 'coord_operaciones',
+        isSuperAdmin: false,
+      },
+      COMPANY_ID,
+      { responsableId: 39, creadoPorId: 7 } as any,
+    );
+
+    expect(result).toEqual(created);
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('un ingeniero no asigna fuera de su departamento', async () => {
+    usersService.findOne.mockResolvedValue({
+      id: 13,
+      email: 'soporte@nexara.com.mx',
+      departmentId: 20,
+      roleKey: 'ing_soporte',
+      managerId: 39,
+    });
+    usersService.listAssignmentRoster.mockResolvedValue([
+      { id: 16, email: 'joan.sanchez@nexara.com.mx', departmentId: 40, roleKey: 'ing_campo', managerId: 8 },
+      { id: 13, email: 'soporte@nexara.com.mx', departmentId: 20, roleKey: 'ing_soporte', managerId: 39 },
+    ]);
+    const spy = jest.spyOn(service, 'create').mockResolvedValue({} as any);
+
+    await expect(
+      controller.create(
+        {
+          id: 16,
+          email: 'joan.sanchez@nexara.com.mx',
+          departmentId: 40,
+          roleKey: 'ing_campo',
+          isSuperAdmin: false,
+        },
+        COMPANY_ID,
+        { responsableId: 13, creadoPorId: 16 } as any,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    await expect(
+      controller.create(
+        {
+          id: 16,
+          email: 'joan.sanchez@nexara.com.mx',
+          departmentId: 40,
+          roleKey: 'ing_campo',
+          isSuperAdmin: false,
+        },
+        COMPANY_ID,
+        { responsableId: 13, creadoPorId: 16 } as any,
+      ),
+    ).rejects.toThrow('Solo puedes asignar a tu propio departamento');
+    expect(spy).not.toHaveBeenCalled();
   });
 });

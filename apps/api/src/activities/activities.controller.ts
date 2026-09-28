@@ -30,6 +30,12 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 import { COLUMNAS_ACTIVIDADES } from '../common/excel/reportes.js';
+import {
+  mensajeAsignacionDenegada,
+  puedeDejarActividadA,
+  type ActorAsignacion,
+  type DestinoAsignacion,
+} from './asignacion-departamento.js';
 
 @Controller('activities')
 @UseGuards(UrlAccessGuard) // RBAC v2 — gate por URL/rol antes que RbacGuard legacy
@@ -185,9 +191,7 @@ export class ActivitiesController {
     if (!targetUser) {
       throw new ForbiddenException('Usuario responsable no encontrado');
     }
-    if (!user.isSuperAdmin && targetUser.departmentId !== user.departmentId) {
-      throw new ForbiddenException('Solo puedes asignar a tu propio departamento');
-    }
+    await this.assertResponsablePermitido(user, targetUser, companyId);
     return this.activitiesService.create(createActivityDto, companyId);
   }
 
@@ -262,12 +266,25 @@ export class ActivitiesController {
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateActivityDto: UpdateActivityDto,
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    if (updateActivityDto.responsableId != null) {
+      const prev = await this.activitiesService.findOne(+id, companyId);
+      if (prev && Number(prev.responsableId) !== Number(updateActivityDto.responsableId)) {
+        const targetUser = await this.usersService.findOne(
+          Number(updateActivityDto.responsableId),
+          companyId,
+        );
+        if (!targetUser) {
+          throw new ForbiddenException('Usuario responsable no encontrado');
+        }
+        await this.assertResponsablePermitido(user, targetUser, companyId);
+      }
+    }
     const actor = user?.id ? { id: user.id, nombre: user.nombre, email: user.email ?? null } : undefined;
     return this.activitiesService.update(+id, updateActivityDto, actor, companyId);
   }
@@ -330,6 +347,41 @@ export class ActivitiesController {
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   remove(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
     return this.activitiesService.remove(+id, companyId);
+  }
+
+  /**
+   * Mismo departamento, alcance de asignación (Luis → Antonio) o apoyo entre mandos.
+   * El empleado sin coordinación no sale de su departamento.
+   */
+  private async assertResponsablePermitido(
+    user: any,
+    targetUser: {
+      id: number;
+      email?: string | null;
+      departmentId?: number | null;
+      roleKey?: string | null;
+      managerId?: number | null;
+    },
+    companyId: number | null,
+  ) {
+    const actor: ActorAsignacion = {
+      id: Number(user?.id),
+      email: user?.email ?? null,
+      roleKey: user?.roleKey ?? null,
+      departmentId: user?.departmentId ?? null,
+      isSuperAdmin: Boolean(user?.isSuperAdmin),
+    };
+    const target: DestinoAsignacion = {
+      id: targetUser.id,
+      email: targetUser.email ?? '',
+      managerId: targetUser.managerId ?? null,
+      departmentId: targetUser.departmentId ?? null,
+      roleKey: targetUser.roleKey ?? null,
+    };
+    const roster = await this.usersService.listAssignmentRoster(companyId);
+    if (!puedeDejarActividadA(actor, target, roster)) {
+      throw new ForbiddenException(mensajeAsignacionDenegada(actor));
+    }
   }
 
   /**
