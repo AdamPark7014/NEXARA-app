@@ -7,6 +7,7 @@ describe('iter21 branch / bank / chat tenant stamps', () => {
     expect(TENANT_SCOPED_MODELS.has('BankTransaction')).toBe(true);
     expect(TENANT_SCOPED_MODELS.has('BankReconciliation')).toBe(true);
     expect(TENANT_SCOPED_MODELS.has('ChatMessage')).toBe(true);
+    expect(TENANT_SCOPED_MODELS.has('ChatMessageRead')).toBe(true);
   });
 
   it('fail-closed companyWhere for branch/bank/chat shapes', () => {

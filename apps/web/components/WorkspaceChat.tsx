@@ -90,6 +90,22 @@ type MentionEntity = {
   href?: string;
 };
 
+type ReceiptState = "sent" | "delivered" | "read";
+
+type MessageReceipt = {
+  state: ReceiptState;
+  readCount: number;
+  recipientCount: number;
+};
+
+type ReadPerson = {
+  id: number;
+  nombre: string;
+  avatarUrl: string | null;
+  readAt?: string;
+  delivered?: boolean;
+};
+
 type Message = {
   id: number;
   channelId: number;
@@ -106,6 +122,7 @@ type Message = {
   replyCount: number;
   reactions: Reaction[];
   channel?: { id: number; name: string; kind: ChannelKind; slug: string | null };
+  receipt?: MessageReceipt | null;
   /** Optimistic client id until server ack */
   clientMsgId?: string;
   pending?: boolean;
@@ -162,7 +179,71 @@ function avatarHue(id: number) {
 }
 
 function formatClock(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Mexico_City",
+  });
+}
+
+function formatMexicoDateTime(iso: string) {
+  return new Date(iso).toLocaleString("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function CheckMark() {
+  return (
+    <svg className={styles.tickSvg} width="15" height="11" viewBox="0 0 16 11" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M15.01 1.01a1 1 0 0 0-1.42 0L6.3 8.3 2.41 4.4A1 1 0 1 0 1 5.82l4.6 4.6a1 1 0 0 0 1.41 0l8-8a1 1 0 0 0 0-1.41z"
+      />
+    </svg>
+  );
+}
+
+function ReceiptTicks({
+  receipt,
+  pending,
+  failed,
+}: {
+  receipt?: MessageReceipt | null;
+  pending?: boolean;
+  failed?: boolean;
+}) {
+  if (failed) return <span className={styles.receiptFailed}>No se envió</span>;
+  const state: ReceiptState = pending || !receipt ? "sent" : receipt.state;
+  const title =
+    state === "read" ? "Visto por todos" : state === "delivered" ? "Entregado" : "Enviado";
+  const double = state === "delivered" || state === "read";
+  return (
+    <span
+      className={`${styles.ticks} ${state === "read" ? styles.ticksRead : ""}`}
+      title={title}
+      aria-label={title}
+    >
+      <CheckMark />
+      {double ? (
+        <span className={styles.tickSecond}>
+          <CheckMark />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function mergeMessage(prev: Message, incoming: Message): Message {
+  return {
+    ...prev,
+    ...incoming,
+    receipt: incoming.receipt ?? prev.receipt ?? null,
+  };
 }
 
 function dayKey(iso: string) {
@@ -392,6 +473,10 @@ export default function WorkspaceChat({
   const [composerEmojiFor, setComposerEmojiFor] = useState<"main" | "thread" | null>(null);
   const [hoveredReaction, setHoveredReaction] = useState<{ messageId: number; emoji: string } | null>(null);
   const [reactionsDialog, setReactionsDialog] = useState<{ messageId: number; emoji: string } | null>(null);
+  const [readInfoId, setReadInfoId] = useState<number | null>(null);
+  const [readInfo, setReadInfo] = useState<{ seen: ReadPerson[]; pending: ReadPerson[] } | null>(null);
+  const [readInfoLoading, setReadInfoLoading] = useState(false);
+  const [readInfoError, setReadInfoError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [unreadBoundary, setUnreadBoundary] = useState<{ channelId: number; before: string } | null>(null);
   const [notifyOn, setNotifyOn] = useState(() => {
@@ -568,6 +653,136 @@ export default function WorkspaceChat({
     notifyRef.current = notify;
   }, [notify]);
 
+  const deliveredAckRef = useRef<Set<string>>(new Set());
+  const seenAckRef = useRef<Set<string>>(new Set());
+  const receiptQueueRef = useRef<Map<string, { channelId: number; messageId: number; seen: boolean }>>(new Map());
+  const receiptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readOnlyRef = useRef(false);
+  readOnlyRef.current = Boolean(detail?.readOnly);
+  const readInfoIdRef = useRef<number | null>(null);
+  readInfoIdRef.current = readInfoId;
+
+  const applyReceipts = useCallback(
+    (receipts: Array<MessageReceipt & { messageId: number }> | undefined) => {
+      if (!receipts?.length) return;
+      const byId = new Map(receipts.map((r) => [r.messageId, r]));
+      const patch = (m: Message): Message => {
+        const next = byId.get(m.id);
+        if (!next) return m;
+        return {
+          ...m,
+          receipt: {
+            state: next.state,
+            readCount: next.readCount,
+            recipientCount: next.recipientCount,
+          },
+        };
+      };
+      setMessages((prev) => prev.map(patch));
+      setThreadReplies((prev) => prev.map(patch));
+      setThreadRoot((prev) => (prev && byId.has(prev.id) ? patch(prev) : prev));
+    },
+    [],
+  );
+
+  const reloadReadInfo = useCallback(
+    async (messageId: number) => {
+      setReadInfoLoading(true);
+      try {
+        const data = await apiFetch(`chat/messages/${messageId}/reads`, token);
+        if (readInfoIdRef.current !== messageId) return;
+        setReadInfo({
+          seen: Array.isArray(data?.seen) ? data.seen : [],
+          pending: Array.isArray(data?.pending) ? data.pending : [],
+        });
+        setReadInfoError(null);
+      } catch (e) {
+        if (readInfoIdRef.current !== messageId) return;
+        setReadInfoError(formatApiError(e, "No se pudo cargar quién lo vio"));
+      } finally {
+        if (readInfoIdRef.current === messageId) setReadInfoLoading(false);
+      }
+    },
+    [token],
+  );
+
+  const flushReceipts = useCallback(() => {
+    if (readOnlyRef.current) {
+      receiptQueueRef.current.clear();
+      return;
+    }
+    const queued = [...receiptQueueRef.current.values()];
+    receiptQueueRef.current.clear();
+    const byChannel = new Map<number, { delivered: number[]; seen: number[] }>();
+    for (const item of queued) {
+      const key = `${item.channelId}:${item.messageId}`;
+      const bucket = byChannel.get(item.channelId) ?? { delivered: [], seen: [] };
+      if (item.seen) {
+        if (!seenAckRef.current.has(key)) bucket.seen.push(item.messageId);
+      } else if (!deliveredAckRef.current.has(key) && !seenAckRef.current.has(key)) {
+        bucket.delivered.push(item.messageId);
+      }
+      byChannel.set(item.channelId, bucket);
+    }
+    for (const [channelId, bucket] of byChannel) {
+      const seen = [...new Set(bucket.seen)];
+      const delivered = [...new Set(bucket.delivered)].filter((id) => !seen.includes(id));
+      if (delivered.length) {
+        for (const id of delivered) deliveredAckRef.current.add(`${channelId}:${id}`);
+        void apiFetch(`chat/channels/${channelId}/delivered`, token, {
+          method: "POST",
+          body: JSON.stringify({ messageIds: delivered }),
+        }).catch(() => {
+          for (const id of delivered) deliveredAckRef.current.delete(`${channelId}:${id}`);
+        });
+      }
+      if (seen.length && document.visibilityState === "visible") {
+        for (const id of seen) seenAckRef.current.add(`${channelId}:${id}`);
+        void apiFetch(`chat/channels/${channelId}/reads`, token, {
+          method: "POST",
+          body: JSON.stringify({ messageIds: seen }),
+        }).catch(() => {
+          for (const id of seen) seenAckRef.current.delete(`${channelId}:${id}`);
+        });
+      }
+    }
+  }, [token]);
+
+  const queueReceipt = useCallback(
+    (channelId: number, messageId: number, seen: boolean) => {
+      if (readOnlyRef.current || !Number.isInteger(messageId) || messageId <= 0) return;
+      const key = `${channelId}:${messageId}`;
+      if (seen && seenAckRef.current.has(key)) return;
+      if (!seen && (deliveredAckRef.current.has(key) || seenAckRef.current.has(key))) return;
+      const prev = receiptQueueRef.current.get(key);
+      receiptQueueRef.current.set(key, { channelId, messageId, seen: Boolean(prev?.seen || seen) });
+      if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
+      receiptTimerRef.current = setTimeout(() => {
+        receiptTimerRef.current = null;
+        flushReceipts();
+      }, 280);
+    },
+    [flushReceipts],
+  );
+  const queueReceiptRef = useRef(queueReceipt);
+  const applyReceiptsRef = useRef(applyReceipts);
+  const reloadReadInfoRef = useRef(reloadReadInfo);
+  useEffect(() => {
+    queueReceiptRef.current = queueReceipt;
+    applyReceiptsRef.current = applyReceipts;
+    reloadReadInfoRef.current = reloadReadInfo;
+  }, [queueReceipt, applyReceipts, reloadReadInfo]);
+
+  const openReadInfo = useCallback(
+    (messageId: number) => {
+      setReadInfoId(messageId);
+      setReadInfo(null);
+      setReadInfoError(null);
+      void reloadReadInfo(messageId);
+    },
+    [reloadReadInfo],
+  );
+
   const selectChannel = useCallback((id: number) => {
     if (activeId != null) {
       draftsRef.current[activeId] = draft;
@@ -727,8 +942,17 @@ export default function WorkspaceChat({
     socket.on("chat:message", (msg: Message) => {
       const isMine = msg.authorId === currentUserId;
       const isMuted = mutedIdsRef.current.has(msg.channelId);
+      if (!isMine && msg.id > 0) {
+        queueReceiptRef.current(msg.channelId, msg.id, false);
+        const looking =
+          document.visibilityState === "visible" &&
+          ((msg.channelId === activeIdRef.current && !msg.parentId && nearBottomRef.current) ||
+            (msg.parentId != null && threadRootRef.current?.id === msg.parentId));
+        if (looking) queueReceiptRef.current(msg.channelId, msg.id, true);
+      }
       const mergeIncoming = (prev: Message[]) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
+        const existing = prev.find((m) => m.id === msg.id);
+        if (existing) return prev.map((m) => (m.id === msg.id ? mergeMessage(m, msg) : m));
         const withoutOptimistic = prev.filter(
           (m) =>
             !(
@@ -775,9 +999,11 @@ export default function WorkspaceChat({
     });
 
     socket.on("chat:message-updated", (msg: Message) => {
-      setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
-      setThreadReplies((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
-      if (threadRootRef.current?.id === msg.id) setThreadRoot(msg);
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? mergeMessage(m, msg) : m)));
+      setThreadReplies((prev) => prev.map((m) => (m.id === msg.id ? mergeMessage(m, msg) : m)));
+      if (threadRootRef.current?.id === msg.id) {
+        setThreadRoot((prev) => (prev ? mergeMessage(prev, msg) : msg));
+      }
       setPinned((prev) => {
         const exists = prev.some((m) => m.id === msg.id);
         if (msg.pinnedAt) {
@@ -796,7 +1022,16 @@ export default function WorkspaceChat({
       setPinned((prev) => prev.filter((m) => m.id !== payload.id));
     });
 
-    socket.on("chat:channel-activity", (payload: { channelId: number; preview?: string; at?: string }) => {
+    socket.on(
+      "chat:channel-activity",
+      (payload: { channelId: number; messageId?: number; authorId?: number; preview?: string; at?: string }) => {
+      if (
+        payload.messageId &&
+        payload.authorId !== currentUserId &&
+        payload.channelId !== activeIdRef.current
+      ) {
+        queueReceiptRef.current(payload.channelId, payload.messageId, false);
+      }
       if (payload.channelId === activeIdRef.current) return;
       setChannels((prev) =>
         prev.map((c) =>
@@ -826,6 +1061,17 @@ export default function WorkspaceChat({
       setDetail((prev) => (prev && prev.id === payload.id ? { ...prev, topic: payload.topic } : prev));
       setChannels((prev) => prev.map((c) => (c.id === payload.id ? { ...c, topic: payload.topic } : c)));
     });
+
+    socket.on(
+      "chat:receipt",
+      (payload: { receipts?: Array<MessageReceipt & { messageId: number }> }) => {
+        applyReceiptsRef.current(payload.receipts);
+        const openId = readInfoIdRef.current;
+        if (openId != null && payload.receipts?.some((r) => r.messageId === openId)) {
+          void reloadReadInfoRef.current(openId);
+        }
+      },
+    );
 
     socket.on("chat:members-changed", (payload: { channelId: number }) => {
       if (payload.channelId === activeIdRef.current) {
@@ -859,6 +1105,44 @@ export default function WorkspaceChat({
   }, [token, currentUserId, loadChannels, loadMessages]);
 
   useEffect(() => {
+    if (detail?.readOnly) return;
+    const incoming = [...messages, ...threadReplies, ...(threadRoot ? [threadRoot] : [])].filter(
+      (m) => m.authorId !== currentUserId && m.id > 0,
+    );
+    for (const m of incoming) queueReceipt(m.channelId, m.id, false);
+
+    const markVisible = (entries: IntersectionObserverEntry[]) => {
+      if (document.visibilityState !== "visible") return;
+      for (const entry of entries) {
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.55) continue;
+        const el = entry.target as HTMLElement;
+        const id = Number(el.dataset.incomingMsg);
+        const channelId = Number(el.dataset.channelId);
+        if (id > 0 && channelId > 0) queueReceipt(channelId, id, true);
+      }
+    };
+    const observer = new IntersectionObserver(markVisible, { threshold: [0.55, 1] });
+    document.querySelectorAll<HTMLElement>("[data-incoming-msg]").forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [messages, threadReplies, threadRoot, currentUserId, detail?.readOnly, queueReceipt]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== "visible" || detail?.readOnly) return;
+      document.querySelectorAll<HTMLElement>("[data-incoming-msg]").forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        const visible = rect.bottom > 0 && rect.top < window.innerHeight && rect.height > 0;
+        if (!visible) return;
+        const id = Number(el.dataset.incomingMsg);
+        const channelId = Number(el.dataset.channelId);
+        if (id > 0 && channelId > 0) queueReceipt(channelId, id, true);
+      });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [detail?.readOnly, queueReceipt]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -876,6 +1160,7 @@ export default function WorkspaceChat({
         setShowNewChannel(false);
         setShowDm(false);
         setShowInvite(false);
+        setReadInfoId(null);
         setThreadRoot(null);
         setShowMembers(false);
         setMobilePane((pane) => (pane === "panel" ? "chat" : pane));
@@ -1002,6 +1287,7 @@ export default function WorkspaceChat({
       author: { id: currentUserId, nombre: currentUserName, email: "" },
       replyCount: 0,
       reactions: [],
+      receipt: { state: "sent", readCount: 0, recipientCount: 0 },
     };
     setSending(true);
     if (parentId) {
@@ -1458,6 +1744,9 @@ export default function WorkspaceChat({
               highlightId === m.id ? styles.msgHighlight : ""
             } ${mine ? styles.msgMine : ""}`}
             id={`msg-${m.id}`}
+            {...(!mine && m.id > 0
+              ? { "data-incoming-msg": String(m.id), "data-channel-id": String(m.channelId) }
+              : {})}
           >
             {compact ? (
               <>
@@ -1480,6 +1769,18 @@ export default function WorkspaceChat({
                     </span>
                   )}
                   {m.editedAt && <span className={styles.edited}>(editado)</span>}
+                  {mine && (
+                    <button
+                      type="button"
+                      className={styles.receiptBtn}
+                      title="Visto por"
+                      aria-label="Visto por"
+                      disabled={Boolean(m.pending) || m.id < 0}
+                      onClick={() => openReadInfo(m.id)}
+                    >
+                      <ReceiptTicks receipt={m.receipt} pending={m.pending} failed={m.failed} />
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1656,7 +1957,32 @@ export default function WorkspaceChat({
                     Editar
                   </button>
                 )}
+                {mine && !m.pending && m.id > 0 && (
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    title="Visto por"
+                    onClick={() => openReadInfo(m.id)}
+                  >
+                    Info
+                  </button>
+                )}
               </div>
+              )}
+
+              {mine && compact && (
+                <div className={styles.receiptLine}>
+                  <button
+                    type="button"
+                    className={styles.receiptBtn}
+                    title="Visto por"
+                    aria-label="Visto por"
+                    disabled={Boolean(m.pending) || m.id < 0}
+                    onClick={() => openReadInfo(m.id)}
+                  >
+                    <ReceiptTicks receipt={m.receipt} pending={m.pending} failed={m.failed} />
+                  </button>
+                </div>
               )}
 
               {!m.parentId && m.replyCount > 0 && (
@@ -2871,6 +3197,61 @@ export default function WorkspaceChat({
               )}
             </div>
             <div className={styles.switcherHint}>↑↓ navegar · Enter abrir · Esc cerrar</div>
+          </div>
+        </div>
+      )}
+
+      {readInfoId != null && (
+        <div className={styles.modalBackdrop} role="presentation" onClick={() => setReadInfoId(null)}>
+          <div
+            className={`${styles.modal} ${styles.reactorsModal}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-modal-reads"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalTitle} id="chat-modal-reads">
+              Info · Visto por
+            </div>
+            {readInfoLoading && <div className={styles.loadingLine}>Cargando…</div>}
+            {readInfoError && <InlineAlert variant="danger" dense message={readInfoError} />}
+            {!readInfoLoading && readInfo && (
+              <div className={styles.reactorsList}>
+                <div className={styles.readSectionLabel}>Visto · {readInfo.seen.length}</div>
+                {readInfo.seen.map((person) => (
+                  <div key={`seen-${person.id}`} className={styles.reactorRow}>
+                    <ReactorAvatar user={person} />
+                    <div className={styles.reactorMeta}>
+                      <span className={styles.reactorName}>{person.nombre}</span>
+                      <span className={styles.reactorTime}>
+                        {person.readAt ? formatMexicoDateTime(person.readAt) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {readInfo.seen.length === 0 && (
+                  <div className={styles.readEmpty}>Nadie lo ha visto todavía.</div>
+                )}
+                <div className={styles.readSectionLabel}>Aún no · {readInfo.pending.length}</div>
+                {readInfo.pending.map((person) => (
+                  <div key={`pending-${person.id}`} className={styles.reactorRow}>
+                    <ReactorAvatar user={person} />
+                    <div className={styles.reactorMeta}>
+                      <span className={styles.reactorName}>{person.nombre}</span>
+                      <span className={styles.reactorTime}>{person.delivered ? "Entregado" : "Sin entregar"}</span>
+                    </div>
+                  </div>
+                ))}
+                {readInfo.pending.length === 0 && (
+                  <div className={styles.readEmpty}>Todos los destinatarios lo vieron.</div>
+                )}
+              </div>
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.actionBtn} onClick={() => setReadInfoId(null)}>
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -2032,3 +2032,64 @@
 .reactorEmoji {
   font-size: 14px;
 }
+
+.receiptBtn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: inherit;
+  line-height: 1;
+}
+
+.receiptBtn:disabled {
+  cursor: default;
+}
+
+.receiptLine {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.ticks {
+  display: inline-flex;
+  align-items: center;
+  color: #98a2b3;
+}
+
+.ticksRead {
+  color: #34b7f1;
+}
+
+.tickSvg {
+  display: block;
+}
+
+.tickSecond {
+  display: inline-flex;
+  margin-left: -8px;
+}
+
+.receiptFailed {
+  font-size: 11px;
+  color: #d92d20;
+}
+
+.readSectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary, #98a2b3);
+  padding: 8px 4px 4px;
+}
+
+.readEmpty {
+  font-size: 12.5px;
+  color: var(--text-tertiary, #98a2b3);
+  padding: 4px 8px 8px;
+}

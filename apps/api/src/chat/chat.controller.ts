@@ -173,6 +173,35 @@ export class ChatController {
     return this.chat.markRead(id, user.id, companyId);
   }
 
+  @Post('channels/:id/delivered')
+  markDelivered(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { messageIds?: number[] },
+  ) {
+    return this.chat.markMessagesDelivered(id, user.id, body?.messageIds ?? [], companyId);
+  }
+
+  @Post('channels/:id/reads')
+  markSeen(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { messageIds?: number[] },
+  ) {
+    return this.chat.markMessagesSeen(id, user.id, body?.messageIds ?? [], companyId);
+  }
+
+  @Get('messages/:id/reads')
+  messageReads(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.chat.getMessageReads(id, user.id, companyId);
+  }
+
   @Post('dm')
   openDm(
     @CurrentUser() user: { id: number },
