@@ -6,11 +6,16 @@
  * sin base de datos.
  */
 import { esMultiDia, periodoDeActividad } from './actividad-periodo.js';
-import { evaluarSemaforo, type Semaforo as SemaforoReloj } from './semaforo-actividad.js';
+import {
+  evaluarSemaforo,
+  type MotivoSemaforo as MotivoSemaforoReloj,
+  type Semaforo as SemaforoReloj,
+} from './semaforo-actividad.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Aceptacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
 export type Semaforo = SemaforoReloj;
+export type MotivoSemaforo = MotivoSemaforoReloj;
 
 /**
  * Ya no pinta el color: el semáforo lo decide el reloj (`semaforo-actividad.ts`).
@@ -142,8 +147,8 @@ export function cambiosAlIniciar(
 }
 
 /**
- * Semáforo por el reloj (ver `semaforo-actividad.ts`). La prioridad y el plan
- * no cambian el color: rojo es llegar tarde, naranja es que faltan pocos minutos.
+ * Semáforo por el reloj (ver `semaforo-actividad.ts`). La prioridad no cambia el color;
+ * rojo es llegar tarde (inicio, tope o plan ya excedido), naranja es que faltan pocos minutos.
  */
 export function semaforoDe(params: {
   prioridad?: string | null;
@@ -206,6 +211,8 @@ export function tiemposDto(
     ahora,
     periodoInicio: actividad.periodoInicio ?? null,
     periodoFin: actividad.periodoFin ?? null,
+    minutosPlan: plan,
+    minutosReales: reales,
   });
   return {
     aceptacion: aceptacionDe(fila),

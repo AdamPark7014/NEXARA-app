@@ -91,7 +91,7 @@ describe('calculaActividad', () => {
     expect(r.minutosAtraso).toBe(120);
   });
 
-  it('exceder el plan no pinta rojo si el tope sigue adelante', () => {
+  it('exceder el plan pinta rojo aunque el tope siga adelante', () => {
     const r = calculaActividad(
       {
         prioridad: 'Baja',
@@ -104,7 +104,8 @@ describe('calculaActividad', () => {
     );
     expect(r.minutosReales).toBe(120);
     expect(r.excedida).toBe(true);
-    expect(r.semaforo).toBe('verde');
+    expect(r.semaforo).toBe('rojo');
+    expect(r.minutosAtraso).toBe(60);
   });
 
   it('naranja si faltan pocos minutos para el inicio o el tope', () => {

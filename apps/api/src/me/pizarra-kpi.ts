@@ -190,6 +190,8 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
     cerrada: terminada,
     cancelada,
     periodo,
+    minutosPlan,
+    minutosReales,
     ahora,
   });
 

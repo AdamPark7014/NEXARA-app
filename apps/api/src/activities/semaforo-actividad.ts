@@ -4,21 +4,23 @@
  * Umbrales (los mismos en la pizarra, Mi equipo, los listados y el aviso):
  * - Rojo («Atrasada»): ya pasó la hora de inicio programada (`fechaInicio`) y
  *   nadie la ha iniciado, o ya pasó el tope (`fechaMaxima` o `fechaEntregaEsperada`,
- *   el que llegue primero; con periodo, el fin de su último día) y no está terminada.
+ *   el que llegue primero; con periodo, el fin de su último día) y no está terminada,
+ *   o ya lleva más tiempo real trabajado del que se planeó (`minutosPlan`/`minutosReales`;
+ *   en una actividad de varios días el plan es de una jornada y no cuenta para esto).
  * - Naranja («Por vencer» si falta el tope, «Atención» si falta la hora de inicio):
  *   faltan `UMBRAL_POR_VENCER_MIN` minutos o menos para ese instante, y todavía no es roja.
  * - Verde («En tiempo»): el resto. Sin fecha no hay con qué atrasarse. Lo cerrado
- *   o cancelado no se queda en rojo. La prioridad y el tiempo estimado no pintan
- *   el color (el exceso de plan sigue avisándose aparte, en `alertaExcesoAt`).
+ *   o cancelado no se queda en rojo. La prioridad no pinta el color. Pasar el plan
+ *   sigue avisándose aparte también, en `alertaExcesoAt` (ese aviso no cambia).
  *
  * Un periodo que todavía no empieza está programado: verde, aunque la prioridad
  * sea alta. Pasada la hora de inicio de su primer día, sí es roja si no arrancó.
  */
 import { workDateKey } from '../common/time/workday.js';
-import { finDelPeriodo, periodoDeActividad, periodoFuturo, type Periodo } from './actividad-periodo.js';
+import { esMultiDia, finDelPeriodo, periodoDeActividad, periodoFuturo, type Periodo } from './actividad-periodo.js';
 
 export type Semaforo = 'rojo' | 'amarillo' | 'verde';
-export type MotivoSemaforo = 'inicio' | 'tope';
+export type MotivoSemaforo = 'inicio' | 'tope' | 'plan';
 
 /** Minutos antes del inicio o del tope en los que el recuadro pasa a naranja. */
 export const UMBRAL_POR_VENCER_MIN = 30;
@@ -61,6 +63,10 @@ export function evaluarSemaforo(params: {
   periodoFin?: Date | string | null;
   /** Periodo ya leído (`inicio`/`fin` en `AAAA-MM-DD`). Gana sobre las columnas sueltas. */
   periodo?: Periodo | null;
+  /** Horas de plan ya en minutos (`minutosPlan` de `actividad-tiempos.ts`). Sin esto, no hay con qué comparar. */
+  minutosPlan?: number | null;
+  /** Minutos reales dedicados hasta ahora (o hasta `finRealAt`). */
+  minutosReales?: number | null;
   ahora?: Date;
 }): SemaforoTiempo {
   const ahora = params.ahora ?? new Date();
@@ -81,6 +87,17 @@ export function evaluarSemaforo(params: {
   }
   if (tope && tope.getTime() < ahora.getTime()) {
     atrasos.push({ motivo: 'tope', minutos: minutosEntre(tope, ahora) });
+  }
+  // Ya lleva más tiempo real del planeado. El plan es de una jornada: en una actividad de
+  // varios días el reloj corre de corrido y no significa nada (mismo criterio que `estaExcedida`).
+  if (
+    !esMultiDia(periodo) &&
+    params.minutosPlan != null &&
+    params.minutosPlan > 0 &&
+    params.minutosReales != null &&
+    params.minutosReales > params.minutosPlan
+  ) {
+    atrasos.push({ motivo: 'plan', minutos: params.minutosReales - params.minutosPlan });
   }
   if (atrasos.length) {
     const peor = atrasos.reduce((a, b) => (b.minutos > a.minutos ? b : a));

@@ -63,7 +63,7 @@ export type ActivityDetail = {
     semaforo?: Semaforo;
     minutosAtraso?: number | null;
     minutosParaVencer?: number | null;
-    motivoSemaforo?: "inicio" | "tope" | null;
+    motivoSemaforo?: "inicio" | "tope" | "plan" | null;
     minutosPlan?: number | null;
     minutosReales?: number | null;
     excedida?: boolean;
@@ -75,7 +75,7 @@ export type ActivityDetail = {
   semaforo?: Semaforo | null;
   minutosAtraso?: number | null;
   minutosParaVencer?: number | null;
-  motivoSemaforo?: "inicio" | "tope" | null;
+  motivoSemaforo?: "inicio" | "tope" | "plan" | null;
   minutosPlan?: number | null;
   minutosReales?: number | null;
   excedida?: boolean;
