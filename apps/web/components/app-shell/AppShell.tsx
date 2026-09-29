@@ -26,6 +26,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import CompanySwitcher from "@/components/CompanySwitcher";
+import { cargarContextoAlta } from "@/lib/delegated-users-api";
 import ModuleGuideBanner from "@/components/ModuleGuideBanner";
 import { NEXARA_LOGO_MARK } from "@/lib/brand";
 import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
@@ -185,6 +186,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const [paletteMounted, setPaletteMounted] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [serverNav, setServerNav] = useState<MeNavigation | null>(null);
+  /** Dirección o quien tenga gente a su cargo con tipos concedidos: «Mi perfil» pasa a «Perfiles». */
+  const [puedePerfiles, setPuedePerfiles] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLElement>(null);
@@ -263,6 +266,20 @@ export default function AppShell({ panel, children }: AppShellProps) {
       cancelled = true;
     };
   }, [user?.token]);
+
+  useEffect(() => {
+    if (!user?.token || panel !== "erp") {
+      setPuedePerfiles(false);
+      return;
+    }
+    let cancelled = false;
+    void cargarContextoAlta(user.token).then((ctx) => {
+      if (!cancelled) setPuedePerfiles(ctx.puede);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.token, panel]);
 
   const loadNotifPreview = async () => {
     if (!user?.token) return;
@@ -766,7 +783,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
                     {group.title}
                   </p>
                   {group.items.map((item) => {
-                    const target = getModuleUrl(item.id);
+                    // Quien tiene gente a su cargo entra a «Perfiles» en vez del formulario de un
+                    // solo perfil: ahí da de alta, cambia fotos y llega al suyo.
+                    const esPerfiles = item.id === "my-profile" && puedePerfiles;
+                    const target = esPerfiles ? "/erp/perfiles" : getModuleUrl(item.id);
+                    const etiqueta = esPerfiles ? "Perfiles" : item.label;
                     const active = target === activeMenuTarget;
                     return (
                       <Link
@@ -775,12 +796,12 @@ export default function AppShell({ panel, children }: AppShellProps) {
                         className={`${styles.menuItem} ${active ? styles.active : ""}`.trim()}
                         aria-current={active ? "page" : undefined}
                         // Colapsado el renglón es solo un icono: el globo dice el nombre.
-                        title={collapsed ? item.label : item.description || undefined}
+                        title={collapsed ? etiqueta : (esPerfiles ? "Tu perfil y el de tu gente" : item.description) || undefined}
                       >
                         <span className={styles.menuItemIcon} aria-hidden="true">
                           <ModuleIcon id={item.id} size={16} />
                         </span>
-                        <span className={styles.menuItemLabel}>{item.label}</span>
+                        <span className={styles.menuItemLabel}>{etiqueta}</span>
                       </Link>
                     );
                   })}
@@ -817,15 +838,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
           {userMenuOpen && (
             <div role="menu" aria-label="Cuenta" className={styles.userMenu}>
               <Link
-                href={profileUrl ?? homeUrl}
+                href={puedePerfiles ? "/erp/perfiles" : (profileUrl ?? homeUrl)}
                 role="menuitem"
                 onClick={() => setUserMenuOpen(false)}
                 className={styles.userMenuItem}
+                title={puedePerfiles ? "Tu perfil y el de tu gente" : undefined}
               >
                 <span className={styles.userMenuItemIcon} aria-hidden="true">
                   <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 </span>
-                Mi perfil
+                {puedePerfiles ? "Perfiles" : "Mi perfil"}
               </Link>
               <button
                 type="button"
