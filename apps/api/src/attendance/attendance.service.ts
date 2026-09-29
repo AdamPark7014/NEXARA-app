@@ -2210,6 +2210,7 @@ export class AttendanceService {
           userId: user.id,
           userName: user.nombre,
           email: user.email,
+          avatarUrl: user.avatarUrl,
           employeeNumber: user.employeeNumber || null,
           department: user.department?.nombre,
           roleName: user.role.nombre,

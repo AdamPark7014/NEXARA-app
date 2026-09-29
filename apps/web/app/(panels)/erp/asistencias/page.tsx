@@ -18,6 +18,7 @@ import { KPIS_PATH } from "@/lib/kpis-equipo";
 import { useUser } from "@/components/UserContext";
 import { getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
+import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import { attendanceMapUrl, googleMapsPointUrl, toCoord } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
@@ -63,6 +64,8 @@ interface ApiAttendanceUser {
   userId: number;
   userName?: string;
   email?: string;
+  /** Foto fija del perfil (la misma de Actividades y el celular); no es la de la checada. */
+  avatarUrl?: string | null;
   department?: string;
   roleName?: string;
   totalMinutes?: number;
@@ -216,6 +219,8 @@ function InsigniasChecada({ checada }: { checada?: ChecadaValidable }) {
           key={i.clave}
           title={i.detalle}
           style={{
+            display: "inline-block",
+            maxWidth: "100%",
             fontSize: 11,
             fontWeight: 700,
             lineHeight: 1.4,
@@ -223,7 +228,7 @@ function InsigniasChecada({ checada }: { checada?: ChecadaValidable }) {
             background: `color-mix(in srgb, ${i.color} 12%, var(--surface))`,
             border: `1px solid color-mix(in srgb, ${i.color} 35%, transparent)`,
             padding: "2px 7px",
-            borderRadius: 999,
+            borderRadius: 8,
           }}
         >
           {i.texto}
@@ -936,6 +941,7 @@ export default function ErpAsistenciasPage() {
                                   width: 48,
                                   height: 48,
                                   borderRadius: "50%",
+                                  overflow: "hidden",
                                   display: "grid",
                                   placeItems: "center",
                                   fontSize: 14,
@@ -944,7 +950,16 @@ export default function ErpAsistenciasPage() {
                                   background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
                                 }}
                               >
-                                {initials(m.nombre)}
+                                {resolveUserAvatarUrl(m.avatarUrl) ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={resolveUserAvatarUrl(m.avatarUrl)}
+                                    alt=""
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                  />
+                                ) : (
+                                  initials(m.nombre)
+                                )}
                               </div>
                               <span
                                 title={meta.label}

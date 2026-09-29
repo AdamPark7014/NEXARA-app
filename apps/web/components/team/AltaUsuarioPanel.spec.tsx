@@ -6,6 +6,7 @@ import AltaUsuarioPanel from "./AltaUsuarioPanel";
 
 const useUser = vi.hoisted(() => vi.fn());
 vi.mock("@/components/UserContext", () => ({ useUser }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const SOPORTE = { roleKey: "ing_soporte", etiqueta: "Soporte" };
 const INSTALADOR = { roleKey: "ing_campo", etiqueta: "Instalador" };
@@ -34,11 +35,12 @@ describe("AltaUsuarioPanel", () => {
     expect(screen.queryByRole("button", { name: /dar de alta/i })).toBeNull();
   });
 
-  it("con permiso muestra los tipos que puede dar de alta y el botón", async () => {
+  it("con permiso muestra los tipos que puede dar de alta, el botón y «Mi perfil»", async () => {
     vi.stubGlobal("fetch", respuestas([SOPORTE, INSTALADOR]));
     render(<AltaUsuarioPanel />);
     expect(await screen.findByRole("button", { name: "Dar de alta a alguien" })).toBeTruthy();
     expect(screen.getByText("Soporte, Instalador")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mi perfil" })).toBeTruthy();
   });
 
   it("da de alta con un solo tipo (queda elegido), manda el alta y muestra la contraseña una vez", async () => {
