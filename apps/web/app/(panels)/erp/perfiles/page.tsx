@@ -14,6 +14,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import AltaUsuarioPanel from "@/components/team/AltaUsuarioPanel";
+import AccesoCuentasEnlace from "@/components/team/AccesoCuentasEnlace";
 import { cargarContextoAlta } from "@/lib/delegated-users-api";
 
 export default function PerfilesPage() {
@@ -37,6 +38,8 @@ export default function PerfilesPage() {
         eyebrow="Gobierno · Equipo"
         title="Perfiles"
         subtitle="Da de alta a tu gente, cambia su foto fija y entra a tu propio perfil."
+        // Solo el dueño la ve: la contraseña de cualquiera, volviendo a escribir la suya.
+        actions={<AccesoCuentasEnlace />}
       />
       {puede === false ? (
         <EmptyState
