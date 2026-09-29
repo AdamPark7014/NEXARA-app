@@ -2,6 +2,17 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-29
+- **Hecho (tiempo previsto también es atraso):** `evaluarSemaforo` (`semaforo-actividad.ts`) gana un tercer motivo, `'plan'`:
+  si `minutosReales` supera `minutosPlan`, la tarjeta queda roja igual que por pasar el inicio o el tope (gana el peor de
+  los tres). En una actividad de varios días el plan es de una jornada y no cuenta (mismo criterio que ya tenía `excedida`).
+  Conectado en los dos lugares que ya tenían plan/real a la mano: `tiemposDto` (`actividad-tiempos.ts`, usa `activities.service.ts`
+  y `my-activities.service.ts`) y `calculaActividad` (`me/pizarra-kpi.ts`, la pizarra). El campo `excedida` del DTO no cambió,
+  solo ahora también pinta el color. **El cron `ACTIVITY_OVERDUE` (campana/push a jefe y coordinación) NO se tocó a propósito**:
+  sigue mirando solo fecha de inicio, tope y fin de periodo — una actividad roja solo por exceso de plan no dispara ese aviso.
+  Si Adam también quiere eso, falta extender `activity-overdue-alerts.service.ts` (su SQL inicial no trae `horasPlan` ni
+  candidatea por eso). Tipo `MotivoSemaforo` re-exportado desde `actividad-tiempos.ts` (antes solo vivía en `semaforo-actividad.ts`)
+  para que `my-activities.service.ts` no lo reescribiera a mano (eso rompió `tsc` la primera vez; ya corregido). Sin migración.
+  Despliegue: `cd /var/www/nexara-app && bash deploy/update.sh` (sin `--with-migrate`).
 - **Deploy general de la mañana:** Adam pidió desplegar todo. `origin/main` tenía trabajo de Cursor de la noche sin desplegar
   (líneas de abajo: margen de cotización, cierre solo Servicios, TestFlight, y **alta de usuarios con foto fija** en
   `/erp/organigrama`). Se corrió `tsc` + suite completa de API y web en verde (`npx prisma generate` de por medio, por la
