@@ -26,6 +26,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import CompanySwitcher from "@/components/CompanySwitcher";
+import { cargarContextoAlta } from "@/lib/delegated-users-api";
 import ModuleGuideBanner from "@/components/ModuleGuideBanner";
 import { NEXARA_LOGO_MARK } from "@/lib/brand";
 import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
@@ -185,6 +186,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const [paletteMounted, setPaletteMounted] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [serverNav, setServerNav] = useState<MeNavigation | null>(null);
+  /** Dirección o quien tenga gente a su cargo con tipos concedidos: «Mi perfil» pasa a «Perfiles». */
+  const [puedePerfiles, setPuedePerfiles] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLElement>(null);
@@ -263,6 +266,20 @@ export default function AppShell({ panel, children }: AppShellProps) {
       cancelled = true;
     };
   }, [user?.token]);
+
+  useEffect(() => {
+    if (!user?.token || panel !== "erp") {
+      setPuedePerfiles(false);
+      return;
+    }
+    let cancelled = false;
+    void cargarContextoAlta(user.token).then((ctx) => {
+      if (!cancelled) setPuedePerfiles(ctx.puede);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.token, panel]);
 
   const loadNotifPreview = async () => {
     if (!user?.token) return;
@@ -817,15 +834,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
           {userMenuOpen && (
             <div role="menu" aria-label="Cuenta" className={styles.userMenu}>
               <Link
-                href={profileUrl ?? homeUrl}
+                href={puedePerfiles ? "/erp/organigrama" : (profileUrl ?? homeUrl)}
                 role="menuitem"
                 onClick={() => setUserMenuOpen(false)}
                 className={styles.userMenuItem}
+                title={puedePerfiles ? "Tu perfil y el de tu gente" : undefined}
               >
                 <span className={styles.userMenuItemIcon} aria-hidden="true">
                   <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 </span>
-                Mi perfil
+                {puedePerfiles ? "Perfiles" : "Mi perfil"}
               </Link>
               <button
                 type="button"
