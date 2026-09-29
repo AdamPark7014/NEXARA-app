@@ -167,8 +167,13 @@ fun GeocercaActividadCard(
             }
         }
         Text(
-            "Iniciaste a las ${ActivityGeofence.horaDe(e.origen.at)}. Mantente a menos de $radio m de ese punto: " +
-                "la foto de salida solo se acepta ahí.",
+            if (e.exigeMismaUbicacion == true) {
+                "Iniciaste a las ${ActivityGeofence.horaDe(e.origen.at)}. Mantente a menos de $radio m de ese punto: " +
+                    "la foto de salida solo se acepta ahí."
+            } else {
+                "Iniciaste a las ${ActivityGeofence.horaDe(e.origen.at)}. La foto de salida lleva tu ubicación; " +
+                    "en esta área no hace falta que coincida con el inicio."
+            },
             fontSize = 12.sp,
             color = NxColors.Muted,
         )

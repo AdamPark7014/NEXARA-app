@@ -179,6 +179,8 @@ struct ActivityGeofenceAlert: Codable, Identifiable, Hashable {
 /// `GET activity-evidence/:activityId/geocerca`.
 struct ActivityGeofenceState: Codable, Hashable {
     let activityId: Int?
+    /// Solo Servicios. Si falta en el JSON, el cliente no pre-bloquea la salida.
+    let exigeMismaUbicacion: Bool
     let radioM: Int
     let origen: ActivityGeofenceOrigin?
     /// Hay foto de entrada y todavía no hay de salida.
@@ -191,12 +193,13 @@ struct ActivityGeofenceState: Codable, Hashable {
     let alertas: [ActivityGeofenceAlert]
 
     private enum CodingKeys: String, CodingKey {
-        case activityId, radioM, origen, seguimientoActivo, dentro, ultimo, puntos, alertas
+        case activityId, exigeMismaUbicacion, radioM, origen, seguimientoActivo, dentro, ultimo, puntos, alertas
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         activityId = c.geofenceInt(.activityId)
+        exigeMismaUbicacion = c.geofenceBool(.exigeMismaUbicacion) ?? false
         radioM = c.geofenceInt(.radioM) ?? ActivityGeofence.radioM
         origen = try? c.decode(ActivityGeofenceOrigin.self, forKey: .origen)
         seguimientoActivo = c.geofenceBool(.seguimientoActivo) ?? false

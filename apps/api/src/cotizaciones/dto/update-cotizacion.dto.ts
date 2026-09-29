@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsDateString, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CotizacionItemDto } from './cotizacion-item.dto.js';
 import { SEGMENTOS } from '../terminos-segmento.js';
 
@@ -106,6 +106,13 @@ export class UpdateCotizacionDto {
   @Min(0)
   @Max(100)
   depositPercent?: number;
+
+  /** Markup sobre el costo de toda la cotización. La partida lo hereda si no trae el suyo. Null lo quita. */
+  @IsOptional()
+  @IsNumber()
+  @Min(-100)
+  @Max(1000)
+  marginPercent?: number | null;
 
   @IsOptional()
   @IsString()

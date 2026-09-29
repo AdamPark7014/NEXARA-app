@@ -8,6 +8,11 @@ const CERCA = { lat: 19.0419, lng: -98.2063 }; // ~55 m
 function armar() {
   const alertas: any[] = [];
   const prisma: any = {
+    activity: {
+      findFirst: jest.fn().mockResolvedValue({
+        responsable: { department: { nombre: 'Servicios' } },
+      }),
+    },
     activityEvidence: {
       findFirst: jest.fn().mockResolvedValue({
         entryLatitude: INICIO.lat,
@@ -72,6 +77,21 @@ describe('ActivityGeofenceService', () => {
   it('sin punto de inicio (evidencia vieja sin GPS) no bloquea la salida', async () => {
     const { service, prisma } = armar();
     prisma.activityEvidence.findFirst.mockResolvedValue({ entryLatitude: null, entryLongitude: null });
+    await expect(service.validarSalida(7, 3, LEJOS.lat, LEJOS.lng)).resolves.toBeUndefined();
+  });
+
+  it('fuera de Servicios la salida se acepta lejos del inicio', async () => {
+    const { service, prisma } = armar();
+    prisma.activity.findFirst.mockResolvedValue({
+      responsable: { department: { nombre: 'Administración' } },
+    });
+    await expect(service.validarSalida(7, 3, LEJOS.lat, LEJOS.lng)).resolves.toBeUndefined();
+    expect(prisma.activityEvidence.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('sin actividad no exige coincidir la ubicación', async () => {
+    const { service, prisma } = armar();
+    prisma.activity.findFirst.mockResolvedValue(null);
     await expect(service.validarSalida(7, 3, LEJOS.lat, LEJOS.lng)).resolves.toBeUndefined();
   });
 });

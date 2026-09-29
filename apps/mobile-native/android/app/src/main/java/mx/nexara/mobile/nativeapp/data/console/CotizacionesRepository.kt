@@ -47,4 +47,7 @@ class CotizacionesRepository(context: Context) {
      */
     suspend fun pdf(id: Long): ByteArray =
         withContext(Dispatchers.IO) { api.pdf(id).use { it.bytes() } }
+
+    suspend fun pdfInterno(id: Long): ByteArray =
+        withContext(Dispatchers.IO) { api.pdfInterno(id).use { it.bytes() } }
 }

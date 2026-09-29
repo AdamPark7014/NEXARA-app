@@ -7,7 +7,13 @@ import {
   type CotizacionDetalle,
   type PaqueteCotizacion,
 } from "@/lib/cotizaciones-api";
-import { sumarDias, totalesDePartidas, type DocumentoCotizacion, type PartidaEditor } from "@/lib/cotizacion-documento";
+import {
+  aplicarMargenGeneral,
+  sumarDias,
+  totalesDePartidas,
+  type DocumentoCotizacion,
+  type PartidaEditor,
+} from "@/lib/cotizacion-documento";
 import {
   ENTREGA_POR_OMISION,
   GARANTIA_POR_OMISION,
@@ -307,6 +313,44 @@ export default function SeccionCotizacion({
       <div className={styles.bloque}>
         <div className={styles.bloqueCabeza}>
           <span className={styles.etiquetaConAyuda}>
+            <span className={styles.etiqueta}>Margen general</span>
+            <Ayuda titulo="el margen">
+              Markup sobre el costo: precio = costo × (1 + margen/100). 20% de $100 = $120, no $125. Se aplica a
+              todas las partidas que no tengan su propio margen. Si una partida ya tiene el suyo, ese gana.
+            </Ayuda>
+          </span>
+          <label className={styles.anticipo}>
+            <input
+              className={styles.input}
+              type="number"
+              min={-100}
+              max={1000}
+              step="0.01"
+              value={doc.marginPercent ?? ""}
+              disabled={!editable}
+              aria-label="Margen general sobre el costo"
+              placeholder="20"
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                const marginPercent = raw === "" || !Number.isFinite(Number(raw)) ? null : Number(raw);
+                cambiar((d) => ({
+                  ...d,
+                  marginPercent,
+                  partidas: aplicarMargenGeneral(d.partidas, marginPercent),
+                }));
+              }}
+            />
+            %
+          </label>
+        </div>
+        <p className={styles.pista}>
+          Markup sobre el costo: precio = costo × (1 + margen/100). 20% de $100 = $120, no $125.
+        </p>
+      </div>
+
+      <div className={styles.bloque}>
+        <div className={styles.bloqueCabeza}>
+          <span className={styles.etiquetaConAyuda}>
             <span className={styles.etiqueta}>Partidas</span>
             {editable ? (
               <Ayuda titulo="la tabla de partidas">
@@ -329,6 +373,7 @@ export default function SeccionCotizacion({
           token={token}
           totales={totales}
           columnas={doc.opciones.columnas}
+          margenGeneral={doc.marginPercent}
         />
       </div>
 

@@ -926,16 +926,19 @@ struct EvidenceCaptureFlowView: View {
         ActivityGeofence.esPuntoReal(latitude: flow?.entryLatitude?.value, longitude: flow?.entryLongitude?.value)
     }
 
-    /// Mensaje de bloqueo si el punto queda a más de 100 m de la foto de entrada
-    /// (mismo texto que el API); `nil` si la salida se puede registrar ahí.
-    private func exitZoneMessage(latitude: Double?, longitude: Double?) -> String? {
+    /// Mensaje de bloqueo si el punto queda fuera del radio y el API exige la misma
+    /// ubicación (solo Servicios). Sin la bandera, o en false, no se pre-bloquea.
+    private func exitZoneMessage(latitude: Double?, longitude: Double?) async -> String? {
+        let state = try? await ActivityGeofenceRepository.shared.estado(activityId: activityId)
+        guard state?.exigeMismaUbicacion == true else { return nil }
+        let radio = state?.radioM ?? ActivityGeofence.radioM
         guard let distancia = ActivityGeofence.distanciaAlOrigen(
             origenLat: flow?.entryLatitude?.value,
             origenLng: flow?.entryLongitude?.value,
             latitude: latitude,
             longitude: longitude
-        ), ActivityGeofence.fueraDeZona(distancia) else { return nil }
-        return ActivityGeofence.mensajeSalidaFueraDeZona(distancia: distancia)
+        ), ActivityGeofence.fueraDeZona(distancia, radioM: radio) else { return nil }
+        return ActivityGeofence.mensajeSalidaFueraDeZona(distancia: distancia, radioM: radio)
     }
 
     /// Antes de abrir la cámara de salida se mide dónde está: fuera de la zona
@@ -947,7 +950,7 @@ struct EvidenceCaptureFlowView: View {
             checkingExitZone = true
             let coords = await DeviceLocation.shared.current()
             checkingExitZone = false
-            if let blocked = exitZoneMessage(latitude: coords?.latitude, longitude: coords?.longitude) {
+            if let blocked = await exitZoneMessage(latitude: coords?.latitude, longitude: coords?.longitude) {
                 exitBlocked = blocked
                 geofenceRefresh += 1
                 return
@@ -967,7 +970,7 @@ struct EvidenceCaptureFlowView: View {
         guard let coords = photo.coords else { return GeoPhotoCaptureView.locationError }
         let isExit = step == CoreEvidence.exitPhoto
         // La salida se mide con la misma ubicación que viaja en la foto, como el API.
-        if isExit, let blocked = exitZoneMessage(latitude: coords.latitude, longitude: coords.longitude) {
+        if isExit, let blocked = await exitZoneMessage(latitude: coords.latitude, longitude: coords.longitude) {
             exitBlocked = blocked
             geofenceRefresh += 1
             return blocked

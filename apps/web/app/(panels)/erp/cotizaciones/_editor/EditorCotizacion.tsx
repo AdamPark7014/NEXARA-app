@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import { useUser } from "@/components/UserContext";
+import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { triggerFileDownload } from "@/lib/file-download";
 import { formatApiError } from "@/lib/erp-api";
 import {
@@ -19,6 +20,7 @@ import {
   listarPlantillas,
   obtenerCotizacion,
   urlPdfCotizacion,
+  urlPdfCotizacionInterno,
   versionesDeCotizacion,
   type CotizacionDetalle,
   type EstadoCotizacion,
@@ -140,6 +142,7 @@ export default function EditorCotizacion({
   plantillaId?: number | null;
 }) {
   const { token, user } = useUser();
+  const veCostos = hasPermission(user, PERMISSIONS.COTIZACIONES_ACCESS);
   const [arranque] = useState(() => {
     const doc = inicial ? documentoDesdeDetalle(inicial) : documentoVacio();
     return { doc, base: inicial ? payloadDeDocumento(doc) : null };
@@ -292,12 +295,17 @@ export default function EditorCotizacion({
     }
   }
 
-  async function descargarPdf() {
+  async function descargarPdf(interno = false) {
     if (!id || !(await asegurarGuardado())) return;
-    await triggerFileDownload(urlPdfCotizacion(id), `${detalle?.folio ?? `cotizacion-${id}`}.pdf`, {
-      authToken: token ?? undefined,
-      mimeType: "application/pdf",
-    });
+    const folio = detalle?.folio ?? `cotizacion-${id}`;
+    await triggerFileDownload(
+      interno ? urlPdfCotizacionInterno(id) : urlPdfCotizacion(id),
+      interno ? `${folio}-interno.pdf` : `${folio}.pdf`,
+      {
+        authToken: token ?? undefined,
+        mimeType: "application/pdf",
+      },
+    );
   }
 
   async function abrirEnvio() {
@@ -519,12 +527,23 @@ export default function EditorCotizacion({
           <button
             type="button"
             className={styles.secondaryBtn}
-            onClick={() => void descargarPdf()}
+            onClick={() => void descargarPdf(false)}
             disabled={!id}
-            title="Descarga la versión guardada"
+            title="PDF para el cliente: precios ya con margen, sin costo"
           >
-            Descargar PDF
+            PDF final
           </button>
+          {veCostos ? (
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => void descargarPdf(true)}
+              disabled={!id}
+              title="PDF interno: costo, markup sobre el costo y precio. No se envía al cliente."
+            >
+              PDF interno
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.primaryBtn}

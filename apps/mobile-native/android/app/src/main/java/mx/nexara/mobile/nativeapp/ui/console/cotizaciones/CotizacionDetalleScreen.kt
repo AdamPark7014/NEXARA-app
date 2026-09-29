@@ -22,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -102,6 +103,7 @@ fun CotizacionDetalleScreen(
                         descargando = state.descargandoPdf,
                         error = state.errorPdf,
                         onAbrir = vm::abrirPdf,
+                        onAbrirInterno = vm::abrirPdfInterno,
                         onDescartarError = vm::limpiarErrorPdf,
                     )
                 }
@@ -213,6 +215,7 @@ private fun BotonDePdf(
     descargando: Boolean,
     error: String?,
     onAbrir: () -> Unit,
+    onAbrirInterno: () -> Unit,
     onDescartarError: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -233,8 +236,15 @@ private fun BotonDePdf(
             } else {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("Abrir el PDF de la propuesta")
+                Text("PDF final")
             }
+        }
+        OutlinedButton(
+            onClick = onAbrirInterno,
+            enabled = !descargando,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("PDF interno (costo y margen)")
         }
         if (error != null) {
             NxErrorBlock(error, onRetry = { onDescartarError(); onAbrir() })

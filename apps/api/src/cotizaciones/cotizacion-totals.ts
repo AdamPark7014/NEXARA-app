@@ -169,11 +169,28 @@ export function maxDiscountPercent(items: Array<{ discount: number }>): number {
 }
 
 /**
+ * Markup sobre el costo, el mismo del cotizador: precio = costo × (1 + margen/100).
+ * 20% de 100 son 120. No es margen sobre el precio de venta.
+ */
+export function precioConMargenSobreCosto(costo: number, margen: number): number {
+  const c = Math.max(0, Number(costo) || 0);
+  const m = Number.isFinite(Number(margen)) ? Number(margen) : 0;
+  return Math.round((c * (1 + m / 100) + Number.EPSILON) * 100) / 100;
+}
+
+/**
  * Saneado de conceptos. Los porcentajes se acotan a [0, 100] y la cantidad a un
  * mínimo de 1, de modo que un payload manipulado no pueda producir importes
  * negativos ni descuentos superiores al 100 %.
+ *
+ * `margenGeneral` es el markup de la cotización. Si la partida no trae el suyo
+ * (`marginPercent` null) y hay costo, el precio queda en costo × (1 + general/100)
+ * y el margen de la partida se guarda null para que siga heredando.
  */
-export function normalizeItems(items: RawCotizacionItem[] | undefined | null): NormalizedCotizacionItem[] {
+export function normalizeItems(
+  items: RawCotizacionItem[] | undefined | null,
+  margenGeneral?: number | null,
+): NormalizedCotizacionItem[] {
   if (!items || !items.length) {
     throw new BadRequestException('Se requiere al menos un concepto');
   }
@@ -203,14 +220,24 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
     });
     const taxProvided = item.tax != null && item.tax !== '';
     const taxPercent = taxProvided ? percent(item.tax) : undefined;
+    const propioEnviado =
+      item.marginPercent != null && item.marginPercent !== '' && Number.isFinite(Number(item.marginPercent));
     const pricing = resolveQuoteLinePricing({
       unitCost: item.unitCost != null && item.unitCost !== '' ? Number(item.unitCost) : null,
       unitPrice: Number(item.unitPrice) || 0,
-      marginPercent:
-        item.marginPercent != null && item.marginPercent !== '' ? Number(item.marginPercent) : null,
+      marginPercent: propioEnviado ? Number(item.marginPercent) : null,
       supplierCode,
       taxPercent,
     });
+    const general =
+      margenGeneral != null && Number.isFinite(Number(margenGeneral)) ? Number(margenGeneral) : null;
+    let unitPrice = pricing.unitPrice;
+    // Sin margen propio no se inventa uno a partir del precio: null significa «usa el general».
+    let marginPercent: number | null = propioEnviado ? pricing.marginPercent : null;
+    if (!propioEnviado && general != null && pricing.unitCost != null && pricing.unitCost > 0) {
+      unitPrice = precioConMargenSobreCosto(pricing.unitCost, general);
+      marginPercent = null;
+    }
 
     return {
       productId: item.productId ? entero(item.productId) || null : null,
@@ -230,14 +257,14 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
       batchReference: item.batchReference?.trim() || null,
       unit: item.unit?.trim() || 'pieza',
       qty: Math.max(1, entero(item.qty, 1)),
-      unitPrice: pricing.unitPrice,
+      unitPrice,
       unitCost: pricing.unitCost,
       supplierId: item.supplierId ? entero(item.supplierId) || null : null,
       supplierSku: item.supplierSku?.trim() || null,
       productCtId: item.productCtId ? entero(item.productCtId) || null : null,
       supplierCode: pricing.supplierCode,
       supplierWarehouseCode: item.supplierWarehouseCode?.trim()?.slice(0, 10) || null,
-      marginPercent: pricing.marginPercent,
+      marginPercent,
       stockSnapshot: enteroONulo(item.stockSnapshot),
       leadTimeDays: enteroONulo(item.leadTimeDays),
       scoreReason: item.scoreReason?.trim() || null,

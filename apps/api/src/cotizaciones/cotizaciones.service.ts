@@ -167,8 +167,16 @@ export class CotizacionesService {
     return parsed;
   }
 
-  private normalizeItems(items: CreateCotizacionDto['items']) {
-    return normalizeItems(items as RawCotizacionItem[]);
+  private normalizeItems(items: RawCotizacionItem[] | CreateCotizacionDto['items'], margenGeneral?: number | null) {
+    return normalizeItems(items as RawCotizacionItem[], margenGeneral);
+  }
+
+  /** Markup general de la cotización, o null si no hay. Se acota para no guardar un precio absurdo. */
+  private margenGeneralDe(valor: number | null | undefined): number | null {
+    if (valor == null || (valor as unknown) === '') return null;
+    const n = Number(valor);
+    if (!Number.isFinite(n)) return null;
+    return Math.round(Math.min(1000, Math.max(-100, n)) * 100) / 100;
   }
 
   private calculateTotals(items: NormalizedCotizacionItem[]) {
@@ -256,7 +264,8 @@ export class CotizacionesService {
   ) {
     // El editor de Core guarda el borrador en cuanto hay cliente, antes de la primera partida: una
     // cotización sin partidas es un borrador válido (lo que no puede es enviarse así).
-    const items = dto.items?.length ? this.normalizeItems(dto.items) : [];
+    const margenGeneral = this.margenGeneralDe(dto.marginPercent);
+    const items = dto.items?.length ? this.normalizeItems(dto.items, margenGeneral) : [];
     const totals = this.calculateTotals(items);
     const status = normalizeStatus(dto.status) || CotizacionStatus.DRAFT;
     const segmento = normalizarSegmento(dto.segmento);
@@ -369,6 +378,7 @@ export class CotizacionesService {
       preparedRole: dto.preparedRole?.trim() || null,
       currency: dto.currency?.trim() || 'MXN',
       depositPercent: dto.depositPercent ?? 0,
+      marginPercent: margenGeneral,
       note: dto.note?.trim() || null,
       subtotal: round2(totals.subtotal),
       discountTotal: round2(totals.discountTotal),
@@ -826,6 +836,7 @@ export class CotizacionesService {
       preparedRole: dto.preparedRole?.trim(),
       currency: dto.currency?.trim(),
       depositPercent: dto.depositPercent,
+      marginPercent: dto.marginPercent !== undefined ? this.margenGeneralDe(dto.marginPercent) : undefined,
       note: dto.note?.trim(),
       opciones: dto.opciones ? (normalizarOpciones(dto.opciones) as unknown as Prisma.InputJsonValue) : undefined,
     };
@@ -844,9 +855,14 @@ export class CotizacionesService {
     let result: Awaited<ReturnType<typeof this.db.cotizacion.update>>;
     let finalItems: Array<{ discount: number }>;
 
+    const margenAlGuardar =
+      dto.marginPercent !== undefined
+        ? this.margenGeneralDe(dto.marginPercent)
+        : this.margenGeneralDe(existing.marginPercent == null ? null : Number(existing.marginPercent));
+
     if (dto.items) {
       // Quitar la última partida deja el borrador sin partidas, no es un error.
-      const items = dto.items.length ? this.normalizeItems(dto.items) : [];
+      const items = dto.items.length ? this.normalizeItems(dto.items, margenAlGuardar) : [];
       const totals = this.calculateTotals(items);
       const itemData = this.buildItemData(items);
 
@@ -862,6 +878,32 @@ export class CotizacionesService {
       // escrituras anidadas: `items: { create }` lanzaba PrismaClientValidationError
       // y el filtro lo devolvía como HTTP 400 INVALID_REQUEST. Las partidas se
       // escriben en su propia tabla; el padre solo recibe columnas.
+      const scalars = Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined));
+      result = await this.db.$transaction(async (tx) => {
+        await tx.cotizacionItem.deleteMany({ where: { cotizacionId: id } });
+        if (itemData.length) {
+          await tx.cotizacionItem.createMany({
+            data: itemData.map((item) => ({ ...item, cotizacionId: id })),
+          });
+        }
+        await tx.cotizacion.update({ where: { id }, data: scalars });
+        return tx.cotizacion.findFirstOrThrow({
+          where: { id },
+          include: { items: { orderBy: { id: 'asc' } }, createdBy: true },
+        });
+      });
+      finalItems = items;
+    } else if (dto.marginPercent != null && existing.items.length && margenAlGuardar != null) {
+      // Solo cambió el margen general: las partidas sin el suyo toman el precio nuevo.
+      const items = this.normalizeItems(existing.items as unknown as RawCotizacionItem[], margenAlGuardar);
+      const totals = this.calculateTotals(items);
+      const itemData = this.buildItemData(items);
+      updateData['subtotal'] = round2(totals.subtotal);
+      updateData['discountTotal'] = round2(totals.discountTotal);
+      updateData['taxTotal'] = round2(totals.taxTotal);
+      updateData['iepsTotal'] = round2(totals.iepsTotal);
+      updateData['retentionTotal'] = round2(totals.retentionTotal);
+      updateData['total'] = round2(totals.total);
       const scalars = Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined));
       result = await this.db.$transaction(async (tx) => {
         await tx.cotizacionItem.deleteMany({ where: { cotizacionId: id } });
@@ -2069,6 +2111,7 @@ export class CotizacionesService {
       preparedRole: quote.preparedRole,
       currency: quote.currency,
       depositPercent: quote.depositPercent,
+      marginPercent: quote.marginPercent != null ? Number(quote.marginPercent) : null,
       note: quote.note,
       subtotal: Number(quote.subtotal),
       discountTotal: Number(quote.discountTotal),

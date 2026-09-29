@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aplicarMargenGeneral,
   bloquesDesdeApi,
   bloquesParaApi,
   cambiosEntre,
@@ -210,6 +211,23 @@ describe("documento y autoguardado", () => {
     expect(faltaParaGuardar(doc)).toMatch(/cliente/);
     expect(faltaParaGuardar({ ...doc, clientName: "Hotel Centro" })).toBeNull();
     expect(faltaParaEnviar({ ...doc, clientName: "Hotel Centro" })).toEqual(["al menos una partida en 04 Cotización"]);
+  });
+
+  it("el margen general reprecio solo las partidas que no tienen el suyo", () => {
+    const propias = partidaNueva({ name: "Propia", unitCost: 100, marginPercent: 50, unitPrice: 150 });
+    const heredan = partidaNueva({ name: "Hereda", unitCost: 100, marginPercent: null, unitPrice: 100 });
+    const sinCosto = partidaNueva({ name: "Libre", unitCost: null, marginPercent: null, unitPrice: 80 });
+    const [a, b, c] = aplicarMargenGeneral([propias, heredan, sinCosto], 25);
+    expect(a?.unitPrice).toBe(150);
+    expect(a?.marginPercent).toBe(50);
+    expect(b?.unitPrice).toBe(125);
+    expect(b?.marginPercent).toBeNull();
+    expect(c?.unitPrice).toBe(80);
+    expect(precioConMargenSobreCosto(100, 20)).toBe(120);
+    expect(margenDesdePrecio(100, 120)).toBe(20);
+    const doc = documentoVacio("COMERCIAL", new Date(2026, 8, 18));
+    expect(doc.marginPercent).toBe(20);
+    expect(payloadDeDocumento({ ...doc, clientName: "Hotel", marginPercent: null }).marginPercent).toBeNull();
   });
 
   it("suma días sin tropezar con el cambio de mes", () => {

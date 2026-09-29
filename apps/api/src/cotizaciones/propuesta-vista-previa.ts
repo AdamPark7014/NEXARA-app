@@ -91,6 +91,7 @@ export function borradorSobreGuardada<Q extends Record<string, any>>(guardada: Q
     scope: texto(dto.scope, guardada['scope']),
     currency: texto(dto.currency, guardada['currency']) || guardada['currency'],
     depositPercent: dto.depositPercent ?? guardada['depositPercent'],
+    marginPercent: dto.marginPercent !== undefined ? dto.marginPercent : guardada['marginPercent'],
     note: texto(dto.note, guardada['note']),
     // Personalización: la del borrador completa (el editor manda todas las opciones juntas).
     opciones: dto.opciones ? normalizarOpciones(dto.opciones) : guardada['opciones'],
@@ -98,7 +99,10 @@ export function borradorSobreGuardada<Q extends Record<string, any>>(guardada: Q
 
   if (dto.items) {
     // Mismo cálculo que el guardado: sin partidas el borrador queda en ceros, no es un error.
-    const items = dto.items.length ? normalizeItems(dto.items as RawCotizacionItem[]) : [];
+    const general = dto.marginPercent !== undefined ? dto.marginPercent : guardada['marginPercent'];
+    const items = dto.items.length
+      ? normalizeItems(dto.items as RawCotizacionItem[], general == null ? null : Number(general))
+      : [];
     const totales = calculateTotals(items);
     mezcla['items'] = items.map((item) => ({ ...item, lineTotal: redondeo(calculateLine(item).total) }));
     mezcla['subtotal'] = redondeo(totales.subtotal);

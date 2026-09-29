@@ -80,6 +80,8 @@ export type CotizacionPdfPayload = {
   preparedRole?: string | null;
   currency: string;
   depositPercent: number;
+  /** Markup general sobre el costo. La partida lo hereda si no trae el suyo. */
+  marginPercent?: number | null;
   note?: string | null;
   subtotal: number;
   discountTotal: number;
@@ -402,10 +404,39 @@ const BASE_TABLE_COLS: TableCol[] = [
   { key: 'total', label: 'Importe', width: 74, align: 'right' },
 ];
 
-const scaleTableCols = (contentWidth: number): TableCol[] => {
-  const sum = BASE_TABLE_COLS.reduce((a, c) => a + c.width, 0);
+/** PDF interno: costo, markup (% y monto) y precio ya con margen. */
+const INTERNAL_TABLE_COLS: TableCol[] = [
+  { key: 'num', label: '#', width: 18, align: 'center' },
+  { key: 'desc', label: 'Partida', width: 148, align: 'left' },
+  { key: 'qty', label: 'Cant.', width: 32, align: 'center' },
+  { key: 'cost', label: 'Costo', width: 58, align: 'right' },
+  { key: 'mpct', label: 'Margen %', width: 48, align: 'right' },
+  { key: 'mamt', label: 'Margen $', width: 62, align: 'right' },
+  { key: 'price', label: 'Precio', width: 62, align: 'right' },
+  { key: 'total', label: 'Importe', width: 76, align: 'right' },
+];
+
+const scaleTableCols = (contentWidth: number, interno = false): TableCol[] => {
+  const base = interno ? INTERNAL_TABLE_COLS : BASE_TABLE_COLS;
+  const sum = base.reduce((a, c) => a + c.width, 0);
   const factor = contentWidth / sum;
-  return BASE_TABLE_COLS.map((col) => ({ ...col, width: Math.floor(col.width * factor) }));
+  return base.map((col) => ({ ...col, width: Math.floor(col.width * factor) }));
+};
+
+/** Markup de la partida: el suyo, si no el general, si no el que sale del precio guardado. */
+const margenDePartida = (
+  item: CotizacionPdfItem,
+  general: number | null | undefined,
+): { pct: number | null; monto: number | null } => {
+  const cost = item.unitCost != null ? Number(item.unitCost) : null;
+  const price = Number(item.unitPrice) || 0;
+  const qty = Number(item.qty) || 0;
+  if (cost == null || !(cost > 0)) return { pct: null, monto: null };
+  const propio =
+    item.marginPercent != null && Number.isFinite(Number(item.marginPercent)) ? Number(item.marginPercent) : null;
+  const generalN = general != null && Number.isFinite(Number(general)) ? Number(general) : null;
+  const pct = propio ?? generalN ?? Math.round((price / cost - 1) * 10000) / 100;
+  return { pct, monto: Math.round((price - cost) * qty * 100) / 100 };
 };
 
 const drawTableHeader = (ctx: PdfCtx, y: number, cols: TableCol[]): number => {
@@ -435,6 +466,38 @@ const measureRow = (ctx: PdfCtx, item: CotizacionPdfItem, cols: TableCol[]): num
   return Math.max(28, descH + ROW_PAD * 2);
 };
 
+const celdasDePartida = (
+  item: CotizacionPdfItem,
+  index: number,
+  currency: string,
+  interno: boolean,
+  margenGeneral: number | null | undefined,
+): string[] => {
+  if (!interno) {
+    return [
+      String(index + 1),
+      itemDescription(item),
+      String(item.qty),
+      item.unit || 'PZA',
+      formatMoney(item.unitPrice, currency),
+      `${item.tax || 0}%`,
+      formatMoney(item.lineTotal, currency),
+    ];
+  }
+  const { pct, monto } = margenDePartida(item, margenGeneral);
+  const sinCosto = item.unitCost == null || !(Number(item.unitCost) > 0);
+  return [
+    String(index + 1),
+    itemDescription(item),
+    String(item.qty),
+    sinCosto ? '—' : formatMoney(Number(item.unitCost), currency),
+    pct == null ? '—' : `${pct}%`,
+    monto == null ? '—' : formatMoney(monto, currency),
+    formatMoney(item.unitPrice, currency),
+    formatMoney(item.lineTotal, currency),
+  ];
+};
+
 const drawTableRow = (
   ctx: PdfCtx,
   y: number,
@@ -443,6 +506,8 @@ const drawTableRow = (
   currency: string,
   stripe: boolean,
   cols: TableCol[],
+  interno = false,
+  margenGeneral: number | null | undefined = null,
 ): number => {
   const { doc, margin } = ctx;
   const rowH = measureRow(ctx, item, cols);
@@ -453,22 +518,16 @@ const drawTableRow = (
     doc.restore();
   }
 
-  const cells = [
-    String(index + 1),
-    itemDescription(item),
-    String(item.qty),
-    item.unit || 'PZA',
-    formatMoney(item.unitPrice, currency),
-    `${item.tax || 0}%`,
-    formatMoney(item.lineTotal, currency),
-  ];
+  const cells = celdasDePartida(item, index, currency, interno, margenGeneral);
+  const ultima = cells.length - 1;
 
   let x = margin + 3;
   cells.forEach((cell, i) => {
     const col = cols[i];
-    if (i === 0 || i === 3 || i === 5) doc.font(fuente(doc, 'texto')).fontSize(8.5).fillColor(COLORS.muted);
-    else if (i === 1) doc.font(fuente(doc, 'texto')).fontSize(9).fillColor(COLORS.text);
-    else if (i === 6) doc.font(fuente(doc, 'semi')).fontSize(9).fillColor(COLORS.navy);
+    if (i === 0 || (!interno && (i === 3 || i === 5))) {
+      doc.font(fuente(doc, 'texto')).fontSize(8.5).fillColor(COLORS.muted);
+    } else if (i === 1) doc.font(fuente(doc, 'texto')).fontSize(9).fillColor(COLORS.text);
+    else if (i === ultima) doc.font(fuente(doc, 'semi')).fontSize(9).fillColor(COLORS.navy);
     else doc.font(fuente(doc, 'texto')).fontSize(9).fillColor(COLORS.text);
     boundedText(doc, cell, x, y + ROW_PAD, {
       width: col.width - 6,
@@ -489,8 +548,13 @@ const drawTableRow = (
   return y + rowH;
 };
 
-const drawItemsTable = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: number): number => {
-  const cols = scaleTableCols(ctx.contentWidth);
+const drawItemsTable = (
+  ctx: PdfCtx,
+  payload: CotizacionPdfPayload,
+  startY: number,
+  interno = false,
+): number => {
+  const cols = scaleTableCols(ctx.contentWidth, interno);
   let y = drawTableHeader(ctx, startY, cols);
 
   payload.items.forEach((item, index) => {
@@ -499,7 +563,7 @@ const drawItemsTable = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: numb
       y = addPage(ctx, payload.quoteNumber);
       y = drawTableHeader(ctx, y, cols);
     }
-    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1, cols);
+    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1, cols, interno, payload.marginPercent);
   });
 
   return y + 8;
@@ -560,7 +624,8 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
   sellNet = Math.round(sellNet * 100) / 100;
   costTotal = Math.round(costTotal * 100) / 100;
   const marginAmt = Math.round((sellNet - costTotal) * 100) / 100;
-  const marginPct = sellNet > 0 ? Math.round((marginAmt / sellNet) * 1000) / 10 : 0;
+  // Markup sobre el costo: 20% de $100 = $20 de margen y $120 de precio.
+  const marginPct = costTotal > 0 ? Math.round((marginAmt / costTotal) * 1000) / 10 : 0;
 
   y = ensureY(ctx, y, 88, payload.quoteNumber);
   doc.save();
@@ -572,7 +637,7 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
   const rows: Array<[string, string]> = [
     ['Costo proveedor (neto)', formatMoney(costTotal, payload.currency)],
     ['Precio al cliente (neto)', formatMoney(sellNet, payload.currency)],
-    ['Margen bruto', `${formatMoney(marginAmt, payload.currency)} (${marginPct}%)`],
+    ['Margen sobre el costo', `${formatMoney(marginAmt, payload.currency)} (${marginPct}%)`],
     ['IVA trasladado', formatMoney(payload.taxTotal, payload.currency)],
     ['Total al cliente', formatMoney(payload.total, payload.currency)],
   ];
@@ -744,7 +809,12 @@ export const generateCotizacionPdf = (
         .fillColor(COLORS.muted)
         .font(fuente(doc, 'semi'))
         .fontSize(8.5)
-        .text('DOCUMENTO INTERNO — incluye costos de proveedor', ctx.margin, y - 4);
+        .text(
+          'DOCUMENTO INTERNO — costo, markup sobre el costo y precio. No enviar al cliente.',
+          ctx.margin,
+          y - 4,
+          { width: ctx.contentWidth },
+        );
       y += 10;
     } else {
       doc.fillColor(COLORS.muted).font(fuente(doc, 'texto')).fontSize(8).text(
@@ -755,7 +825,7 @@ export const generateCotizacionPdf = (
       );
       y += 10;
     }
-    y = drawItemsTable(ctx, payload, y);
+    y = drawItemsTable(ctx, payload, y, options.internal === true);
     if (options.internal) {
       y = drawInternalEconomics(ctx, payload, y);
     }

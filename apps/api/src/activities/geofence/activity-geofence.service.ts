@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { saveBase64Photo } from '../../common/file-upload.util';
 import { RADIO_ACTIVIDAD_M, distanciaM, mensajeSalidaFueraDeZona, puntoReal, type Punto } from './geocerca';
+import { esDepartamentoServicios } from './area-servicios.js';
 import { puedeVerGpsDireccion } from '../../attendance/asistencia-confiable.js';
 
 /** Estatus de actividad que ya no se siguen. */
@@ -46,7 +47,9 @@ export function alertaDto(a: AlertaFila) {
  * - cada punto GPS de quien tiene una actividad iniciada se mide contra su punto de inicio;
  * - al salir del radio se abre una alerta y se avisa por push a la persona, sus jefes,
  *   el responsable/encargados de la actividad y Christian;
- * - la foto de salida no se acepta fuera del radio;
+ * - la foto de salida no se acepta fuera del radio, y solo en actividades del
+ *   departamento Servicios (el del responsable). En las demás áreas la foto de
+ *   salida sigue siendo obligatoria y con GPS, pero no tiene que coincidir con el inicio;
  * - la persona puede justificar la salida con motivo y foto.
  */
 @Injectable()
@@ -79,8 +82,21 @@ export class ActivityGeofenceService {
     return { punto, at: e.entryPhotoUploadedAt, salidaAt: e.exitPhotoUploadedAt, status: e.status, companyId: e.companyId };
   }
 
-  /** La foto de salida solo se acepta dentro del radio del punto de inicio. */
+  /**
+   * La salida tiene que tomarse en el punto de inicio solo si la actividad es del
+   * departamento Servicios (el del responsable). Las demás áreas cierran donde estén.
+   */
+  async exigeMismaUbicacion(activityId: number): Promise<boolean> {
+    const act = await this.prisma.activity.findFirst({
+      where: { id: activityId },
+      select: { responsable: { select: { department: { select: { nombre: true } } } } },
+    });
+    return esDepartamentoServicios(act?.responsable?.department?.nombre);
+  }
+
+  /** La foto de salida solo se acepta dentro del radio del punto de inicio, y solo en Servicios. */
   async validarSalida(activityId: number, userId: number, latitude: number, longitude: number) {
+    if (!(await this.exigeMismaUbicacion(activityId))) return;
     const o = await this.origen(activityId, userId);
     const punto = puntoReal(latitude, longitude);
     if (!o || !punto) return; // sin punto de inicio (evidencias viejas) no hay contra qué medir
@@ -191,8 +207,11 @@ export class ActivityGeofenceService {
         .filter((p): p is NonNullable<typeof p> => p != null);
     }
     const ultimo = puntos[0] ?? null;
+    const exigeMismaUbicacion = await this.exigeMismaUbicacion(activityId);
     return {
       activityId,
+      /** Solo Servicios: la foto de salida tiene que coincidir con el inicio. */
+      exigeMismaUbicacion,
       radioM: RADIO_ACTIVIDAD_M,
       origen: o ? { latitude: o.punto.lat, longitude: o.punto.lng, at: o.at } : null,
       seguimientoActivo: Boolean(o && !o.salidaAt && o.status !== 'COMPLETED'),
