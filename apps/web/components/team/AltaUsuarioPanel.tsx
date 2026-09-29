@@ -11,7 +11,6 @@
  * La foto se recorta al centro, se guarda en `avatarUrl` y es la que ven la web y las apps.
  */
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -45,7 +44,6 @@ const telefonoValido = (valor: string) => valor.replace(/\D/g, "").length >= 10 
 
 export default function AltaUsuarioPanel() {
   const { token } = useUser();
-  const router = useRouter();
   const [ctx, setCtx] = useState<ContextoAlta | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -175,20 +173,15 @@ export default function AltaUsuarioPanel() {
         <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
           Puedes dar de alta personal de tipo: <strong style={{ color: "var(--text-primary)" }}>{etiquetaTipos}</strong>
         </span>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Button variant="secondary" onClick={() => router.push("/erp/my-profile")}>
-            Mi perfil
-          </Button>
-          <Button variant="primary" onClick={abrir}>
-            Dar de alta a alguien
-          </Button>
-        </div>
+        <Button variant="primary" onClick={abrir}>
+          Dar de alta a alguien
+        </Button>
       </div>
 
       {ctx.equipo.length > 0 ? (
         <div style={{ display: "grid", gap: 8, padding: "0 0 16px" }}>
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Perfiles de tu equipo. La foto es la fija: la misma que se ve en actividades y en el celular.
+            Fotos del equipo. Es la foto fija del perfil, la misma que se ve en actividades y en el celular.
           </span>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {ctx.equipo.map((p) => {

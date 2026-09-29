@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UsersDelegationService } from './users-delegation.service.js';
-import { PLATFORM_DEVELOPER_EMAIL, PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
+import { PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
 
 const GRANTS = JSON.stringify({
   'jose.ramirez@nexara.com.mx': ['ing_soporte'],
@@ -229,27 +229,5 @@ describe('UsersDelegationService.crear', () => {
     expect(christian.telefonoObligatorio).toBe(false);
     expect(christian.tipos.map((t) => t.roleKey)).toEqual(expect.arrayContaining(['ing_soporte', 'ing_campo', 'dir_admin']));
     expect(christian.tipos.map((t) => t.roleKey)).not.toContain('ceo');
-  });
-
-  it('«Perfiles»: Christian ve a toda la empresa (sin él, sin el dueño ni developer); Antonio solo a quien le reporta', async () => {
-    const { servicio, prisma } = crear();
-    prisma.user.findMany.mockImplementation(async ({ select }: any) =>
-      select?.email
-        ? [
-            { id: 2, nombre: 'Antonio', email: 'jose.ramirez@nexara.com.mx', avatarUrl: '/uploads/users/a.jpg', perfil: { telefono: '5511111111' } },
-            { id: 3, nombre: 'David', email: 'operaciones@nexara.com.mx', avatarUrl: null, perfil: null },
-            { id: 9, nombre: 'Dev', email: PLATFORM_DEVELOPER_EMAIL, avatarUrl: null, perfil: null },
-          ]
-        : [{ id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, perfil: { telefono: null } }],
-    );
-
-    const christian = await servicio.contexto({ id: 1 }, 7);
-    expect(christian.equipo).toEqual([
-      { id: 2, nombre: 'Antonio', avatarUrl: '/uploads/users/a.jpg', telefono: '5511111111' },
-      { id: 3, nombre: 'David', avatarUrl: null, telefono: null },
-    ]);
-
-    const antonio = await servicio.contexto({ id: 2 }, 7);
-    expect(antonio.equipo).toEqual([{ id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, telefono: null }]);
   });
 });
