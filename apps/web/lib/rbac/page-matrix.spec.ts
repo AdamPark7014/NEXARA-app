@@ -47,6 +47,34 @@ describe('canOpenPage · guardas de ruta por rol', () => {
     expect(canOpenPage(ROLES.CLIENTE, '/erp/mis-actividades/nueva')).toBe(false);
   });
 
+  it('quien tiene gente a su cargo abre /erp/perfiles (bug real: redirigía al instante)', () => {
+    // La página se autogestiona con `cargarContextoAlta` (EmptyState si no puede), pero esta capa
+    // la bloqueaba antes de llegar ahí para cualquiera sin /erp/** — David y Luis (coord_operaciones)
+    // y Antonio (ing_soporte) veían el ítem «Perfiles» en el menú y, al entrar, rebotaban al home.
+    for (const role of [
+      ROLES.ARQUITECTO,
+      ROLES.DIR_OPERACIONES,
+      ROLES.COORD_ADMIN,
+      ROLES.ADMINISTRATIVO,
+      ROLES.COORD_OPERACIONES,
+      ROLES.ING_CAMPO,
+      ROLES.ING_SOPORTE,
+      ROLES.ENC_SOPORTE,
+      ROLES.COORD_VENTAS,
+      ROLES.VENDEDOR,
+      ROLES.LIDER_DISENO,
+      ROLES.DISENADOR,
+      ROLES.RH,
+      ROLES.CONTABILIDAD,
+    ]) {
+      expect(canOpenPage(role, '/erp/perfiles'), role).toBe(true);
+    }
+    // CEO y dirección administrativa ya entraban por su /erp/**; el cliente de portal no debe.
+    expect(canOpenPage(ROLES.CEO, '/erp/perfiles')).toBe(true);
+    expect(canOpenPage(ROLES.DIR_ADMIN, '/erp/perfiles')).toBe(true);
+    expect(canOpenPage(ROLES.CLIENTE, '/erp/perfiles')).toBe(false);
+  });
+
   it('contabilidad entra en finanzas pero no en el laboratorio', () => {
     expect(canOpenPage(ROLES.CONTABILIDAD, '/erp/accounting')).toBe(true);
     expect(canOpenPage(ROLES.CONTABILIDAD, '/erp/invoicing')).toBe(true);
