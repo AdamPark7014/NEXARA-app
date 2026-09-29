@@ -2,6 +2,25 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-29
+- **Hecho (Perfiles, segundo intento — página propia):** el primer intento metía Perfiles dentro de Organigrama; Adam dijo que
+  no, tenía otro plan para esa página. Reconstruido como `/erp/perfiles` (nueva, propia): sin permiso avisa «Aquí no hay nada
+  para ti todavía»; con permiso muestra exactamente lo mismo que antes (alta, fotos del equipo, botón «Mi perfil»). Organigrama
+  vuelve a ser solo el árbol de lectura, intacto. En el menú de cuenta (abajo izquierda) y en el ítem lateral, «Mi perfil» pasa
+  a «Perfiles» solo para quien tiene el permiso; los demás sin cambio. `equipoCompania()` en `users-delegation.service.ts`
+  (dirección ve toda la empresa) igual que el primer intento. Sin registrar en `access-matrix.ts`/`page-matrix.ts` (mismo
+  patrón que `/erp/acceso-cuentas`: sin middleware que lo exija, la página se autogestiona con `cargarContextoAlta`).
+- **Hecho (foto de perfil faltante en Asistencias):** Adam subió fotos vía Perfiles y no se veían en `/erp/asistencias`, solo en
+  Actividades. Causa: `getHierarchyAttendanceRange` (`attendance.service.ts`) nunca mandaba `avatarUrl` en la respuesta, y la
+  tarjeta ni lo intentaba (siempre iniciales). Se agrega `avatarUrl` al DTO y la tarjeta ya muestra la foto real con
+  `resolveUserAvatarUrl`, iniciales de respaldo si no hay. Sin migración.
+- **Hecho (badges de checada deformados):** `Fuera de sitio · N m` y similares (`InsigniasChecada`) usaban `border-radius: 999`
+  (pastilla); en la columna angosta el texto largo envolvía a varias líneas y el radio infinito los volvía un círculo/burbuja
+  ilegible (Adam lo reportó con captura). Cambiado a `borderRadius: 8` fijo — envuelve bien sin deformarse.
+- **Pendiente de aprobación (NO aplicado ni desplegado):** Adam pidió «mejora la UI de las cards de asistencia». Se le mostró
+  una propuesta (widget de `visualize`, antes/después del header + entrada/salida/timer) sin tocar el código real todavía.
+  Falta su respuesta antes de implementarla.
+- Pruebas de este bloque: API 245 suites / 2 944; web 78 archivos / 668; `tsc` limpio en ambos. Despliegue sin migración
+  (`bash deploy/update.sh`).
 - **Hecho (tiempo previsto también es atraso):** `evaluarSemaforo` (`semaforo-actividad.ts`) gana un tercer motivo, `'plan'`:
   si `minutosReales` supera `minutosPlan`, la tarjeta queda roja igual que por pasar el inicio o el tope (gana el peor de
   los tres). En una actividad de varios días el plan es de una jornada y no cuenta (mismo criterio que ya tenía `excedida`).
