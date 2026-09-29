@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
+import { PLATFORM_OWNER_EMAIL, isDeveloperSuperAdminEmail, isPlatformOwnerEmail } from '../common/platform-accounts.js';
 import { UsersService } from './users.service.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
 import { ROLE_LABELS, type RoleKey } from '../common/rbac/roles.v2.js';
@@ -146,6 +146,27 @@ export class UsersDelegationService {
     }));
   }
 
+  /** «Perfiles»: para dirección, toda la empresa (menos el dueño, developer y quien lo pide). */
+  private async equipoCompania(actorId: number, companyId: number) {
+    const filas = await this.prisma.user.findMany({
+      where: {
+        id: { not: actorId },
+        isActive: true,
+        companyMemberships: { some: { companyId } },
+      },
+      select: { id: true, nombre: true, email: true, avatarUrl: true, perfil: { select: { telefono: true } } },
+      orderBy: { nombre: 'asc' },
+    });
+    return filas
+      .filter((f: { email: string }) => !isPlatformOwnerEmail(f.email) && !isDeveloperSuperAdminEmail(f.email))
+      .map((f: { id: number; nombre: string; avatarUrl: string | null; perfil?: { telefono: string | null } | null }) => ({
+        id: f.id,
+        nombre: f.nombre,
+        avatarUrl: f.avatarUrl ?? null,
+        telefono: f.perfil?.telefono ?? null,
+      }));
+  }
+
   /**
    * Departamento del alta. Dirección puede elegirlo. Si no, el que se llama como el área del rol
    * («Soporte», «Operaciones»); si no existe, el de quien da de alta.
@@ -195,7 +216,9 @@ export class UsersDelegationService {
       return { ...CONTEXTO_VACIO, formulario: direccion ? 'completo' : 'basico' };
     }
     const tipos = tiposParaMostrar(roles);
-    const equipo = await this.equipoDirecto(actor.id, companyId);
+    // Dirección ve «Perfiles» de toda la empresa (puede cambiar la foto de cualquiera); los demás,
+    // solo de quien les reporta directo.
+    const equipo = direccion ? await this.equipoCompania(actor.id, companyId) : await this.equipoDirecto(actor.id, companyId);
     if (!direccion) {
       return {
         formulario: 'basico',
