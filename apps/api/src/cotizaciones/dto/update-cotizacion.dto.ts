@@ -1,4 +1,6 @@
+import { Transform } from 'class-transformer';
 import { IsArray, IsDateString, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
+import { margenDeEntrada } from '../cotizacion-totals.js';
 import { CotizacionItemDto } from './cotizacion-item.dto.js';
 import { SEGMENTOS } from '../terminos-segmento.js';
 
@@ -107,8 +109,9 @@ export class UpdateCotizacionDto {
   @Max(100)
   depositPercent?: number;
 
-  /** Markup sobre el costo de toda la cotización. La partida lo hereda si no trae el suyo. Null lo quita. */
+  /** Porcentaje sobre el total ya con IVA. 20 → total × 1.20. Null lo quita. */
   @IsOptional()
+  @Transform(({ value }) => margenDeEntrada(value))
   @IsNumber()
   @Min(-100)
   @Max(1000)

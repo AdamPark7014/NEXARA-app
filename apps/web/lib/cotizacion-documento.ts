@@ -209,46 +209,69 @@ export const esBloqueDePaquete = (b: Pick<BloqueEditor, "clave">) => b.clave.sta
 /** Unidades de la propuesta modelo, más las que se usan en obra. */
 export const UNIDADES = ["Pieza", "Servicio", "Licencia", "Insumo", "Metro", "Rollo", "Caja", "Kit", "Juego", "Lote", "Hora"] as const;
 
-/** Margen con el que cotiza Christian: porcentaje sobre el costo, no sobre el precio. 20% → precio = costo × 1.20. */
-export const MARGEN_SOBRE_COSTO = 20;
+/** Porcentaje con el que abre una cotización nueva. 20 → el total con IVA × 1.20. */
+export const MARGEN_INICIAL = 20;
 
-export function precioConMargenSobreCosto(costo: number, margen = MARGEN_SOBRE_COSTO): number {
-  const c = Math.max(0, Number(costo) || 0);
-  const m = Number.isFinite(Number(margen)) ? Number(margen) : MARGEN_SOBRE_COSTO;
-  return Math.round(c * (1 + m / 100) * 100) / 100;
-}
-
-/** El margen que produce `precio` a partir del costo (sobre costo, no sobre venta). */
-export function margenDesdePrecio(costo: number, precio: number): number {
-  if (!(Number(costo) > 0)) return MARGEN_SOBRE_COSTO;
-  return Math.round((Number(precio) / Number(costo) - 1) * 10000) / 100;
-}
-
-/** Margen usable: el de la partida, si no el general, si no el 20 % de captura. */
-export function margenParaPrecio(
-  propio: number | null | undefined,
-  general: number | null | undefined,
-): number {
-  if (propio != null && Number.isFinite(Number(propio))) return Number(propio);
-  if (general != null && Number.isFinite(Number(general))) return Number(general);
-  return MARGEN_SOBRE_COSTO;
-}
+const redondeoMargen = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Aplica el margen general a las partidas que no tienen el suyo.
- * Si la partida trae `marginPercent` (aunque sea 0), se queda. Sin costo, también.
- * Si el general se borra (`null`), los precios guardados no se recalculan.
+ * 20 es 20 %. No se multiplica por 100.
+ * «20,4» es 20.4: quitar la coma a ciegas lo volvía 204.
+ * Un Decimal de Prisma de 20.4 llega como `{ e: 1, d: [2040000] }`; el coeficiente no es el porcentaje.
  */
-export function aplicarMargenGeneral<T extends { marginPercent?: number | null; unitCost?: number | null; unitPrice: number }>(
-  partidas: T[],
-  general: number | null,
-): T[] {
-  if (general == null || !Number.isFinite(Number(general))) return partidas;
-  return partidas.map((p) => {
-    if (p.marginPercent != null && Number.isFinite(Number(p.marginPercent))) return p;
-    if (!(Number(p.unitCost) > 0)) return p;
-    return { ...p, marginPercent: null, unitPrice: precioConMargenSobreCosto(Number(p.unitCost), Number(general)) };
-  });
+export function porcentajeMargen(valor: unknown): number | null {
+  const n = numeroDeMargen(valor);
+  if (n == null) return null;
+  return redondeoMargen(Math.min(1000, Math.max(-100, n)));
+}
+
+export function textoDePorcentaje(valor: number | null | undefined): string {
+  const n = porcentajeMargen(valor);
+  return n == null ? "" : String(n);
+}
+
+function numeroDeMargen(valor: unknown): number | null {
+  if (valor == null || valor === "") return null;
+  if (typeof valor === "number") return Number.isFinite(valor) ? valor : null;
+  if (typeof valor === "string") return numeroDeTexto(valor);
+  if (typeof valor === "object") {
+    const o = valor as { toNumber?: () => number; s?: number; e?: number; d?: number[] };
+    if (typeof o.toNumber === "function") {
+      const n = o.toNumber();
+      return Number.isFinite(n) ? n : null;
+    }
+    if (Array.isArray(o.d) && typeof o.e === "number") return decimalJsANumero({ s: o.s, e: o.e, d: o.d });
+  }
+  return null;
+}
+
+function numeroDeTexto(texto: string): number | null {
+  let t = texto.trim().replace(/%/g, "").replace(/\s/g, "");
+  if (!t || t === "-" || t === "." || t === "," || t === "-." || t === "-,") return null;
+  const coma = t.lastIndexOf(",");
+  const punto = t.lastIndexOf(".");
+  if (coma >= 0 && punto >= 0) {
+    t = coma > punto ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  } else if (coma >= 0) {
+    t = t.replace(",", ".");
+  }
+  if (t.endsWith(".")) t = t.slice(0, -1);
+  if (!t || t === "-") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function decimalJsANumero(o: { s?: number; e: number; d: number[] }): number | null {
+  const LOG = 7;
+  let digitos = "";
+  for (let i = 0; i < o.d.length; i++) {
+    const trozo = String(Math.trunc(Math.abs(o.d[i] ?? 0)));
+    digitos += i === 0 ? trozo : trozo.padStart(LOG, "0");
+  }
+  if (!digitos) return 0;
+  const cientifico = digitos.length === 1 ? digitos : `${digitos[0]}.${digitos.slice(1)}`;
+  const n = (o.s === -1 ? -1 : 1) * Number(cientifico) * 10 ** o.e;
+  return Number.isFinite(n) ? n : null;
 }
 
 export type PartidaEditor = PartidaCotizacion & { key: string };
@@ -288,7 +311,7 @@ export function partidasDesdeApi(items: PartidaCotizacion[] | null | undefined):
     imagenUrl: p.imagenUrl ?? null,
     partida: p.partida ?? null,
     unitCost: p.unitCost == null || p.unitCost === ("" as unknown) ? null : Number(p.unitCost),
-    marginPercent: p.marginPercent == null || p.marginPercent === ("" as unknown) ? null : Number(p.marginPercent),
+    marginPercent: porcentajeMargen(p.marginPercent),
   }));
 }
 
@@ -315,9 +338,19 @@ export function importeDeLinea(p: Pick<PartidaCotizacion, "qty" | "unitPrice" | 
 
 const redondeo = (n: number) => Math.round(n * 100) / 100;
 
-export type Totales = { subtotal: number; iva: number; total: number; porGrupo: Record<GrupoPartida, number> };
+export type Totales = {
+  subtotal: number;
+  iva: number;
+  /** Subtotal + IVA, antes del margen. */
+  baseConIva: number;
+  margenPorcentaje: number | null;
+  margenMonto: number;
+  /** baseConIva × (1 + margen/100). Sin margen, es baseConIva. */
+  total: number;
+  porGrupo: Record<GrupoPartida, number>;
+};
 
-export function totalesDePartidas(partidas: PartidaCotizacion[]): Totales {
+export function totalesDePartidas(partidas: PartidaCotizacion[], margen?: number | null): Totales {
   const porGrupo: Record<GrupoPartida, number> = { EQUIPOS: 0, MATERIALES: 0, MANO_DE_OBRA: 0 };
   let subtotal = 0;
   let iva = 0;
@@ -329,10 +362,19 @@ export function totalesDePartidas(partidas: PartidaCotizacion[]): Totales {
     const grupo = (p.grupo as GrupoPartida) || "EQUIPOS";
     porGrupo[grupo] = (porGrupo[grupo] ?? 0) + linea;
   }
+  const subtotalR = redondeo(subtotal);
+  const ivaR = redondeo(iva);
+  const baseConIva = redondeo(subtotalR + ivaR);
+  const margenPorcentaje = porcentajeMargen(margen);
+  const total =
+    margenPorcentaje == null || margenPorcentaje === 0 ? baseConIva : redondeo(baseConIva * (1 + margenPorcentaje / 100));
   return {
-    subtotal: redondeo(subtotal),
-    iva: redondeo(iva),
-    total: redondeo(subtotal + iva),
+    subtotal: subtotalR,
+    iva: ivaR,
+    baseConIva,
+    margenPorcentaje,
+    margenMonto: redondeo(total - baseConIva),
+    total,
     porGrupo: {
       EQUIPOS: redondeo(porGrupo.EQUIPOS),
       MATERIALES: redondeo(porGrupo.MATERIALES),
@@ -390,8 +432,8 @@ export type DocumentoCotizacion = {
   validUntil: string;
   depositPercent: number;
   /**
-   * Markup general sobre el costo. Una partida lo hereda si su `marginPercent` es null.
-   * `null` = cada partida usa el suyo (o el 20 % al capturar el costo).
+   * Porcentaje sobre el total de las partidas ya con IVA.
+   * 20 → total final = (subtotal + IVA) × 1.20. No reescribe el precio de cada partida.
    */
   marginPercent: number | null;
   /** Tiempo de entrega legado (`Cotizacion.deliveryTime`). Si las condiciones no traen el suyo, el PDF lo usa. */
@@ -437,7 +479,7 @@ export function documentoVacio(segmento: Segmento = "COMERCIAL", hoy = new Date(
     issueDate: emision,
     validUntil: sumarDias(emision, 15),
     depositPercent: 50,
-    marginPercent: MARGEN_SOBRE_COSTO,
+    marginPercent: MARGEN_INICIAL,
     deliveryTime: "",
     partidas: [],
     terminos: {},
@@ -469,10 +511,7 @@ export function documentoDesdeDetalle(d: CotizacionDetalle): DocumentoCotizacion
     issueDate: fechaCorta(d.issueDate) || hoyISO(),
     validUntil: fechaCorta(d.validUntil),
     depositPercent: Number(d.depositPercent ?? 50),
-    marginPercent:
-      d.marginPercent == null || d.marginPercent === ("" as unknown) || !Number.isFinite(Number(d.marginPercent))
-        ? null
-        : Number(d.marginPercent),
+    marginPercent: porcentajeMargen(d.marginPercent),
     deliveryTime: d.deliveryTime?.trim() ?? "",
     partidas: partidasDesdeApi(d.items),
     terminos: terminosPropiosDeDetalle(d),
@@ -554,10 +593,7 @@ export function payloadDeDocumento(doc: DocumentoCotizacion): GuardarCotizacion 
     }),
     alcanceBloques: bloquesParaApi(doc.bloques),
     depositPercent: Math.min(100, Math.max(0, Math.round(Number(doc.depositPercent) || 0))),
-    marginPercent:
-      doc.marginPercent == null || !Number.isFinite(Number(doc.marginPercent))
-        ? null
-        : Math.round(Math.min(1000, Math.max(-100, Number(doc.marginPercent))) * 100) / 100,
+    marginPercent: porcentajeMargen(doc.marginPercent),
     note: escribirTerminos(doc.terminos),
     items: partidasParaApi(doc.partidas),
     currency: doc.moneda,

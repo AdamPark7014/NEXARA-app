@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
 import { importeConLetra } from './importe-letra.js';
+import { factorMargen } from './cotizacion-totals.js';
 import { normalizarOpciones } from './personalizacion.js';
 import { segmentosLista } from './vinetas-texto.js';
 
@@ -101,6 +102,8 @@ type QuoteLike = {
   paymentTerms?: string | null;
   deliveryTime?: string | null;
   depositPercent?: number | null;
+  /** 20 = el precio impreso ya incluye ese margen. Null o 0: el precio de la partida. */
+  marginPercent?: unknown;
   currency?: string | null;
   note?: string | null;
   opciones?: unknown;
@@ -164,6 +167,8 @@ function terminosDeNota(nota: string | null | undefined): string[] {
 export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
   const opciones = normalizarOpciones(quote.opciones);
   const moneda = String(quote.currency ?? 'MXN').toUpperCase() === 'USD' ? 'USD' : 'MXN';
+  // El PDF del cliente no enseña el margen: el precio de cada partida ya lo trae.
+  const factor = factorMargen(quote.marginPercent);
   const crudas = (quote.items ?? []).map((item, i) => {
     const qty = Number(item['qty'] ?? 0) || 0;
     const precio = Number(item['unitPrice'] ?? 0) || 0;
@@ -180,17 +185,21 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
       descripcion: String(item['description'] ?? '').trim(),
       unidad: String(item['unit'] ?? '').trim() || 'Pieza',
       cantidad: qty,
-      precioUnitario: round2(precio),
-      importe: round2(bruto),
+      precioUnitario: round2(precio * factor),
+      importe: round2(bruto * factor),
     };
-    return { fila, tax };
+    return { fila, tax, bruto };
   });
   const partidas = crudas.map((p) => p.fila);
+  const subtotalBase = round2(crudas.reduce((a, p) => a + p.bruto, 0));
+  const ivaBase = round2(crudas.reduce((a, p) => a + p.bruto * (p.tax / 100), 0));
   const subtotal = round2(partidas.reduce((a, p) => a + p.importe, 0));
-  const iva = round2(crudas.reduce((a, p) => a + p.fila.importe * (p.tax / 100), 0));
+  let iva = round2(crudas.reduce((a, p) => a + p.fila.importe * (p.tax / 100), 0));
   const tasas = new Set(crudas.map((p) => p.tax));
   const ivaPorciento = tasas.size === 1 ? [...tasas][0]! : 16;
-  const total = round2(subtotal + iva);
+  // Total = (subtotal + IVA) × (1 + margen/100). El centavo de redondeo cae en el IVA.
+  const total = round2((subtotalBase + ivaBase) * factor);
+  if (round2(subtotal + iva) !== total) iva = round2(total - subtotal);
   const empresa = String(quote.clientCompany ?? '').trim();
   const nombre = String(quote.clientName ?? '').trim();
   const atencionExplicita = String(quote.atencion ?? '').trim();

@@ -178,4 +178,24 @@ describe('formato Nexara', () => {
     expect(texto).toContain('Viñeta 01:');
     expect(texto).toContain('Viñeta 15:');
   });
+
+  it('el margen 20 va dentro del precio y del total: subtotal con IVA × 1.20, sin decir margen ni costo', async () => {
+    const f = formatoDesdeCotizacion({
+      quoteNumber: 'NEX-1',
+      issueDate: '2026-09-28',
+      validUntil: '2026-10-13',
+      currency: 'MXN',
+      marginPercent: 20,
+      items: [{ name: 'Poste', qty: 1, unitPrice: 100, unitCost: 80, tax: 16, discount: 0 }],
+    });
+    expect(f.partidas[0]!.precioUnitario).toBe(120);
+    expect(f.subtotal).toBe(120);
+    expect(f.iva).toBe(19.2);
+    expect(f.total).toBe(139.2);
+    const texto = textoPorHoja(await generarCotizacionNexaraPdf(f)).join('\n');
+    expect(texto).toContain('120.00');
+    expect(texto).toContain('139.20');
+    expect(texto).not.toContain('Costo');
+    expect(texto).not.toContain('Margen');
+  });
 });

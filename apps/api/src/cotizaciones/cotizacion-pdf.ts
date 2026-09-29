@@ -11,6 +11,7 @@ import {
   fuente,
   loadNexaraLogo,
 } from '../common/pdf/nexara-pdf-theme.js';
+import { porcentajeMargen } from './cotizacion-totals.js';
 
 /**
  * Cotización comercial — PDF producción.
@@ -80,7 +81,7 @@ export type CotizacionPdfPayload = {
   preparedRole?: string | null;
   currency: string;
   depositPercent: number;
-  /** Markup general sobre el costo. La partida lo hereda si no trae el suyo. */
+  /** Porcentaje sobre el total ya con IVA. 20 → el total guardado es × 1.20. */
   marginPercent?: number | null;
   note?: string | null;
   subtotal: number;
@@ -404,16 +405,15 @@ const BASE_TABLE_COLS: TableCol[] = [
   { key: 'total', label: 'Importe', width: 74, align: 'right' },
 ];
 
-/** PDF interno: costo, markup (% y monto) y precio ya con margen. */
+/** PDF interno: costo y precio de la partida. El margen es el de la cotización, en el resumen. */
 const INTERNAL_TABLE_COLS: TableCol[] = [
   { key: 'num', label: '#', width: 18, align: 'center' },
-  { key: 'desc', label: 'Partida', width: 148, align: 'left' },
+  { key: 'desc', label: 'Partida', width: 168, align: 'left' },
   { key: 'qty', label: 'Cant.', width: 32, align: 'center' },
-  { key: 'cost', label: 'Costo', width: 58, align: 'right' },
-  { key: 'mpct', label: 'Margen %', width: 48, align: 'right' },
-  { key: 'mamt', label: 'Margen $', width: 62, align: 'right' },
-  { key: 'price', label: 'Precio', width: 62, align: 'right' },
-  { key: 'total', label: 'Importe', width: 76, align: 'right' },
+  { key: 'cost', label: 'Costo', width: 64, align: 'right' },
+  { key: 'price', label: 'Precio', width: 64, align: 'right' },
+  { key: 'tax', label: 'IVA', width: 36, align: 'center' },
+  { key: 'total', label: 'Importe', width: 72, align: 'right' },
 ];
 
 const scaleTableCols = (contentWidth: number, interno = false): TableCol[] => {
@@ -421,22 +421,6 @@ const scaleTableCols = (contentWidth: number, interno = false): TableCol[] => {
   const sum = base.reduce((a, c) => a + c.width, 0);
   const factor = contentWidth / sum;
   return base.map((col) => ({ ...col, width: Math.floor(col.width * factor) }));
-};
-
-/** Markup de la partida: el suyo, si no el general, si no el que sale del precio guardado. */
-const margenDePartida = (
-  item: CotizacionPdfItem,
-  general: number | null | undefined,
-): { pct: number | null; monto: number | null } => {
-  const cost = item.unitCost != null ? Number(item.unitCost) : null;
-  const price = Number(item.unitPrice) || 0;
-  const qty = Number(item.qty) || 0;
-  if (cost == null || !(cost > 0)) return { pct: null, monto: null };
-  const propio =
-    item.marginPercent != null && Number.isFinite(Number(item.marginPercent)) ? Number(item.marginPercent) : null;
-  const generalN = general != null && Number.isFinite(Number(general)) ? Number(general) : null;
-  const pct = propio ?? generalN ?? Math.round((price / cost - 1) * 10000) / 100;
-  return { pct, monto: Math.round((price - cost) * qty * 100) / 100 };
 };
 
 const drawTableHeader = (ctx: PdfCtx, y: number, cols: TableCol[]): number => {
@@ -471,7 +455,6 @@ const celdasDePartida = (
   index: number,
   currency: string,
   interno: boolean,
-  margenGeneral: number | null | undefined,
 ): string[] => {
   if (!interno) {
     return [
@@ -484,16 +467,14 @@ const celdasDePartida = (
       formatMoney(item.lineTotal, currency),
     ];
   }
-  const { pct, monto } = margenDePartida(item, margenGeneral);
   const sinCosto = item.unitCost == null || !(Number(item.unitCost) > 0);
   return [
     String(index + 1),
     itemDescription(item),
     String(item.qty),
     sinCosto ? '—' : formatMoney(Number(item.unitCost), currency),
-    pct == null ? '—' : `${pct}%`,
-    monto == null ? '—' : formatMoney(monto, currency),
     formatMoney(item.unitPrice, currency),
+    `${item.tax || 0}%`,
     formatMoney(item.lineTotal, currency),
   ];
 };
@@ -507,7 +488,6 @@ const drawTableRow = (
   stripe: boolean,
   cols: TableCol[],
   interno = false,
-  margenGeneral: number | null | undefined = null,
 ): number => {
   const { doc, margin } = ctx;
   const rowH = measureRow(ctx, item, cols);
@@ -518,7 +498,7 @@ const drawTableRow = (
     doc.restore();
   }
 
-  const cells = celdasDePartida(item, index, currency, interno, margenGeneral);
+  const cells = celdasDePartida(item, index, currency, interno);
   const ultima = cells.length - 1;
 
   let x = margin + 3;
@@ -563,7 +543,7 @@ const drawItemsTable = (
       y = addPage(ctx, payload.quoteNumber);
       y = drawTableHeader(ctx, y, cols);
     }
-    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1, cols, interno, payload.marginPercent);
+    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1, cols, interno);
   });
 
   return y + 8;
@@ -580,6 +560,17 @@ const drawSummary = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): num
   if ((payload.iepsTotal || 0) > 0) rows.push(['IEPS', formatMoney(payload.iepsTotal || 0, payload.currency), false]);
   if ((payload.retentionTotal || 0) > 0) {
     rows.push(['Retenciones', `− ${formatMoney(payload.retentionTotal || 0, payload.currency)}`, false]);
+  }
+  const margen = porcentajeMargen(payload.marginPercent);
+  if (margen) {
+    const base =
+      payload.subtotal -
+      payload.discountTotal +
+      payload.taxTotal +
+      (payload.iepsTotal || 0) -
+      (payload.retentionTotal || 0);
+    const monto = Math.round((payload.total - base) * 100) / 100;
+    rows.push([`Margen ${margen}%`, formatMoney(monto, payload.currency), false]);
   }
   rows.push(['TOTAL', formatMoney(payload.total, payload.currency), true]);
   if (payload.depositPercent > 0) {
@@ -623,23 +614,31 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
   }
   sellNet = Math.round(sellNet * 100) / 100;
   costTotal = Math.round(costTotal * 100) / 100;
-  const marginAmt = Math.round((sellNet - costTotal) * 100) / 100;
-  // Markup sobre el costo: 20% de $100 = $20 de margen y $120 de precio.
-  const marginPct = costTotal > 0 ? Math.round((marginAmt / costTotal) * 1000) / 10 : 0;
+  const baseConIva =
+    payload.subtotal -
+    payload.discountTotal +
+    payload.taxTotal +
+    (payload.iepsTotal || 0) -
+    (payload.retentionTotal || 0);
+  const margenPct = porcentajeMargen(payload.marginPercent);
+  const margenMonto = Math.round((payload.total - baseConIva) * 100) / 100;
 
-  y = ensureY(ctx, y, 88, payload.quoteNumber);
+  y = ensureY(ctx, y, 116, payload.quoteNumber);
   doc.save();
-  doc.roundedRect(margin, y, contentWidth, 78, 5).fill(COLORS.fill);
-  doc.roundedRect(margin, y, contentWidth, 78, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
+  doc.roundedRect(margin, y, contentWidth, 104, 5).fill(COLORS.fill);
+  doc.roundedRect(margin, y, contentWidth, 104, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
   doc.restore();
 
-  doc.fillColor(COLORS.navy).font(fuente(doc, 'semi')).fontSize(10).text('Desglose interno (costo vs cliente)', margin + 12, y + 10);
+  doc.fillColor(COLORS.navy).font(fuente(doc, 'semi')).fontSize(10).text('Desglose interno', margin + 12, y + 10);
   const rows: Array<[string, string]> = [
-    ['Costo proveedor (neto)', formatMoney(costTotal, payload.currency)],
-    ['Precio al cliente (neto)', formatMoney(sellNet, payload.currency)],
-    ['Margen sobre el costo', `${formatMoney(marginAmt, payload.currency)} (${marginPct}%)`],
-    ['IVA trasladado', formatMoney(payload.taxTotal, payload.currency)],
-    ['Total al cliente', formatMoney(payload.total, payload.currency)],
+    ['Costo', formatMoney(costTotal, payload.currency)],
+    ['Subtotal de partidas', formatMoney(sellNet, payload.currency)],
+    ['IVA', formatMoney(payload.taxTotal, payload.currency)],
+    [
+      margenPct == null ? 'Margen' : `Margen ${margenPct}%`,
+      formatMoney(margenMonto, payload.currency),
+    ],
+    ['Total', formatMoney(payload.total, payload.currency)],
   ];
   let ly = y + 26;
   doc.font(fuente(doc, 'texto')).fontSize(9).fillColor(COLORS.text);
@@ -648,7 +647,7 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
     doc.text(value, margin + 12, ly, { width: contentWidth - 24, align: 'right' });
     ly += 13;
   }
-  return y + 88;
+  return y + 114;
 };
 
 const drawSection = (ctx: PdfCtx, y: number, title: string, quoteNumber: string): number => {
@@ -810,7 +809,7 @@ export const generateCotizacionPdf = (
         .font(fuente(doc, 'semi'))
         .fontSize(8.5)
         .text(
-          'DOCUMENTO INTERNO — costo, markup sobre el costo y precio. No enviar al cliente.',
+          'DOCUMENTO INTERNO — costo, IVA, margen y total. No enviar al cliente.',
           ctx.margin,
           y - 4,
           { width: ctx.contentWidth },

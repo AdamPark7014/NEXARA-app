@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   TITULO_TERMINO,
   type ClaveTermino,
@@ -8,8 +8,9 @@ import {
   type PaqueteCotizacion,
 } from "@/lib/cotizaciones-api";
 import {
-  aplicarMargenGeneral,
+  porcentajeMargen,
   sumarDias,
+  textoDePorcentaje,
   totalesDePartidas,
   type DocumentoCotizacion,
   type PartidaEditor,
@@ -68,7 +69,7 @@ export default function SeccionCotizacion({
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
   const [aplicando, setAplicando] = useState<string | null>(null);
 
-  const totales = useMemo(() => totalesDePartidas(doc.partidas), [doc.partidas]);
+  const totales = useMemo(() => totalesDePartidas(doc.partidas, doc.marginPercent), [doc.partidas, doc.marginPercent]);
   const vigenciaDias = diasEntre(doc.issueDate, doc.validUntil);
   const entregaTexto = doc.opciones.condiciones.tiempoEntrega.trim() || doc.deliveryTime.trim() || ENTREGA_POR_OMISION;
   const garantiaTexto = doc.opciones.condiciones.garantia.trim() || GARANTIA_POR_OMISION;
@@ -310,43 +311,11 @@ export default function SeccionCotizacion({
         </div>
       ) : null}
 
-      <div className={styles.bloque}>
-        <div className={styles.bloqueCabeza}>
-          <span className={styles.etiquetaConAyuda}>
-            <span className={styles.etiqueta}>Margen general</span>
-            <Ayuda titulo="el margen">
-              Markup sobre el costo: precio = costo × (1 + margen/100). 20% de $100 = $120, no $125. Se aplica a
-              todas las partidas que no tengan su propio margen. Si una partida ya tiene el suyo, ese gana.
-            </Ayuda>
-          </span>
-          <label className={styles.anticipo}>
-            <input
-              className={styles.input}
-              type="number"
-              min={-100}
-              max={1000}
-              step="0.01"
-              value={doc.marginPercent ?? ""}
-              disabled={!editable}
-              aria-label="Margen general sobre el costo"
-              placeholder="20"
-              onChange={(e) => {
-                const raw = e.target.value.trim();
-                const marginPercent = raw === "" || !Number.isFinite(Number(raw)) ? null : Number(raw);
-                cambiar((d) => ({
-                  ...d,
-                  marginPercent,
-                  partidas: aplicarMargenGeneral(d.partidas, marginPercent),
-                }));
-              }}
-            />
-            %
-          </label>
-        </div>
-        <p className={styles.pista}>
-          Markup sobre el costo: precio = costo × (1 + margen/100). 20% de $100 = $120, no $125.
-        </p>
-      </div>
+      <CampoMargen
+        valor={doc.marginPercent}
+        editable={editable}
+        onValor={(marginPercent) => cambiar((d) => ({ ...d, marginPercent }))}
+      />
 
       <div className={styles.bloque}>
         <div className={styles.bloqueCabeza}>
@@ -373,7 +342,8 @@ export default function SeccionCotizacion({
           token={token}
           totales={totales}
           columnas={doc.opciones.columnas}
-          margenGeneral={doc.marginPercent}
+          margenPorcentaje={totales.margenPorcentaje}
+          margenMonto={totales.margenMonto}
         />
       </div>
 
@@ -498,5 +468,61 @@ export default function SeccionCotizacion({
           </ul>
       </div>
     </Hoja>
+  );
+}
+
+/**
+ * Un solo porcentaje. El texto se queda mientras se escribe («20.») para que el
+ * siguiente dígito no se pegue y 20 se vuelva 204. Al salir se ve el número.
+ */
+function CampoMargen({
+  valor,
+  editable,
+  onValor,
+}: {
+  valor: number | null;
+  editable: boolean;
+  onValor: (n: number | null) => void;
+}) {
+  const [texto, setTexto] = useState(() => textoDePorcentaje(valor));
+  const [enfocado, setEnfocado] = useState(false);
+  useEffect(() => {
+    if (!enfocado) setTexto(textoDePorcentaje(valor));
+  }, [valor, enfocado]);
+
+  return (
+    <div className={styles.margenCampo}>
+      <label className={styles.etiqueta} htmlFor="cot-margen">
+        Margen
+      </label>
+      <span className={styles.margenCaja}>
+        <input
+          id="cot-margen"
+          className={styles.input}
+          inputMode="decimal"
+          autoComplete="off"
+          value={texto}
+          disabled={!editable}
+          placeholder="20"
+          aria-label="Porcentaje de margen"
+          onFocus={() => setEnfocado(true)}
+          onBlur={() => {
+            setEnfocado(false);
+            setTexto(textoDePorcentaje(valor));
+          }}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^\d.,%-]/g, "");
+            setTexto(raw);
+            if (raw.trim() === "" || raw === "-" || raw === "." || raw === "," || raw === "-." || raw === "-,") {
+              onValor(null);
+              return;
+            }
+            const n = porcentajeMargen(raw);
+            if (n != null) onValor(n);
+          }}
+        />
+        <span aria-hidden="true">%</span>
+      </span>
+    </div>
   );
 }

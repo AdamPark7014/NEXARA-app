@@ -1,9 +1,11 @@
 import {
   calculateLine,
   calculateTotals,
+  factorMargen,
   maxDiscountPercent,
   normalizeItems,
-  precioConMargenSobreCosto,
+  porcentajeMargen,
+  totalConMargen,
   type NormalizedCotizacionItem,
 } from './cotizacion-totals.js';
 
@@ -89,22 +91,35 @@ describe('normalizeItems', () => {
     expect(row.laborRate).toBe(0);
   });
 
-  it('el margen es markup sobre el costo: 20% de 100 son 120', () => {
-    expect(precioConMargenSobreCosto(100, 20)).toBe(120);
+  it('no reescribe el precio de la partida: el margen va sobre el total', () => {
+    const [fila] = normalizeItems([
+      { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 100, marginPercent: 50 },
+    ]);
+    expect(fila.unitPrice).toBe(100);
+    expect(fila.unitCost).toBe(100);
   });
 
-  it('el margen general aplica a la partida que no tiene el suyo y no pisa el de la que sí', () => {
-    const [heredada, propia] = normalizeItems(
-      [
-        { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 0, marginPercent: null },
-        { name: 'Licencia', qty: 1, unitCost: 100, unitPrice: 150, marginPercent: 50 },
-      ],
-      25,
-    );
-    expect(heredada.unitPrice).toBe(125);
-    expect(heredada.marginPercent).toBeNull();
-    expect(propia.unitPrice).toBe(150);
-    expect(propia.marginPercent).toBe(50);
+  it('20 se queda en 20: ni el Decimal ni la coma decimal lo vuelven 204', () => {
+    expect(porcentajeMargen(20)).toBe(20);
+    expect(porcentajeMargen('20')).toBe(20);
+    expect(porcentajeMargen('20.00')).toBe(20);
+    expect(porcentajeMargen('20%')).toBe(20);
+    expect(porcentajeMargen('20,4')).toBe(20.4);
+    expect(porcentajeMargen('20.')).toBe(20);
+    // decimal.js: 20.4 = { e: 1, d: [2040000] }. Leer el coeficiente a pelo da 204.
+    expect(porcentajeMargen({ s: 1, e: 1, d: [2040000] })).toBe(20.4);
+    expect(porcentajeMargen({ s: 1, e: 1, d: [20] })).toBe(20);
+    expect(porcentajeMargen(0.2)).toBe(0.2);
+    expect(factorMargen(20)).toBe(1.2);
+    expect(factorMargen(null)).toBe(1);
+  });
+
+  it('el total final es el subtotal con IVA por 1.20 cuando el margen es 20', () => {
+    expect(totalConMargen(116, 20)).toBe(139.2);
+    const totals = calculateTotals([item({ qty: 1, unitPrice: 100, tax: 16 })], 20);
+    expect(totals.subtotal).toBe(100);
+    expect(totals.taxTotal).toBe(16);
+    expect(totals.total).toBe(139.2);
   });
 });
 
