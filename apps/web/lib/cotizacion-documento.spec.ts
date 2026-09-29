@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  aplicarMargenGeneral,
   bloquesDesdeApi,
   bloquesParaApi,
   cambiosEntre,
@@ -14,11 +13,10 @@ import {
   leerObjetivo,
   mover,
   nuevoBloque,
-  margenDesdePrecio,
   partidaNueva,
   partidasParaApi,
-  precioConMargenSobreCosto,
   payloadDeDocumento,
+  porcentajeMargen,
   sumarDias,
   totalesDePartidas,
 } from "./cotizacion-documento";
@@ -122,9 +120,23 @@ describe("partidas y totales", () => {
     expect(p).not.toHaveProperty("key");
   });
 
-  it("el margen es sobre el costo: 20% de 100 son 120, no 125", () => {
-    expect(precioConMargenSobreCosto(100, 20)).toBe(120);
-    expect(margenDesdePrecio(100, 120)).toBe(20);
+  it("20% sobre el total con IVA: 100 + IVA 16 son 116, y el total es 139.20", () => {
+    const t = totalesDePartidas([partidaNueva({ name: "Poste", qty: 1, unitPrice: 100, tax: 16 })], 20);
+    expect(t.subtotal).toBe(100);
+    expect(t.iva).toBe(16);
+    expect(t.baseConIva).toBe(116);
+    expect(t.total).toBe(139.2);
+    expect(t.margenMonto).toBe(23.2);
+  });
+
+  it("20 no se muestra como 204: ni la coma, ni el Decimal, ni un porciento de más", () => {
+    expect(porcentajeMargen(20)).toBe(20);
+    expect(porcentajeMargen("20.00")).toBe(20);
+    expect(porcentajeMargen("20%")).toBe(20);
+    expect(porcentajeMargen("20,4")).toBe(20.4);
+    expect(porcentajeMargen({ s: 1, e: 1, d: [2040000] })).toBe(20.4);
+    expect(porcentajeMargen({ s: 1, e: 1, d: [20] })).toBe(20);
+    expect(porcentajeMargen(0.2)).toBe(0.2);
   });
 });
 
@@ -213,21 +225,20 @@ describe("documento y autoguardado", () => {
     expect(faltaParaEnviar({ ...doc, clientName: "Hotel Centro" })).toEqual(["al menos una partida en 04 Cotización"]);
   });
 
-  it("el margen general reprecio solo las partidas que no tienen el suyo", () => {
-    const propias = partidaNueva({ name: "Propia", unitCost: 100, marginPercent: 50, unitPrice: 150 });
-    const heredan = partidaNueva({ name: "Hereda", unitCost: 100, marginPercent: null, unitPrice: 100 });
-    const sinCosto = partidaNueva({ name: "Libre", unitCost: null, marginPercent: null, unitPrice: 80 });
-    const [a, b, c] = aplicarMargenGeneral([propias, heredan, sinCosto], 25);
-    expect(a?.unitPrice).toBe(150);
-    expect(a?.marginPercent).toBe(50);
-    expect(b?.unitPrice).toBe(125);
-    expect(b?.marginPercent).toBeNull();
-    expect(c?.unitPrice).toBe(80);
-    expect(precioConMargenSobreCosto(100, 20)).toBe(120);
-    expect(margenDesdePrecio(100, 120)).toBe(20);
+  it("el margen no cambia el precio de la partida y 20 se guarda como 20", () => {
     const doc = documentoVacio("COMERCIAL", new Date(2026, 8, 18));
     expect(doc.marginPercent).toBe(20);
+    const conPrecio = {
+      ...doc,
+      clientName: "Hotel",
+      marginPercent: 20,
+      partidas: [partidaNueva({ name: "Poste", unitCost: 100, unitPrice: 100 })],
+    };
+    expect(payloadDeDocumento(conPrecio).marginPercent).toBe(20);
+    expect(payloadDeDocumento(conPrecio).items?.[0]?.unitPrice).toBe(100);
     expect(payloadDeDocumento({ ...doc, clientName: "Hotel", marginPercent: null }).marginPercent).toBeNull();
+    const leido = documentoDesdeDetalle({ ...detalle, marginPercent: "20.00" } as unknown as CotizacionDetalle);
+    expect(leido.marginPercent).toBe(20);
   });
 
   it("suma días sin tropezar con el cambio de mes", () => {

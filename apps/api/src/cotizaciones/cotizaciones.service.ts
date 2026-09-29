@@ -34,6 +34,7 @@ import {
   calculateTotals,
   maxDiscountPercent,
   normalizeItems,
+  porcentajeMargen,
   type NormalizedCotizacionItem,
   type RawCotizacionItem,
 } from './cotizacion-totals.js';
@@ -167,20 +168,17 @@ export class CotizacionesService {
     return parsed;
   }
 
-  private normalizeItems(items: RawCotizacionItem[] | CreateCotizacionDto['items'], margenGeneral?: number | null) {
-    return normalizeItems(items as RawCotizacionItem[], margenGeneral);
+  private normalizeItems(items: RawCotizacionItem[] | CreateCotizacionDto['items']) {
+    return normalizeItems(items as RawCotizacionItem[]);
   }
 
-  /** Markup general de la cotización, o null si no hay. Se acota para no guardar un precio absurdo. */
+  /** Porcentaje de margen (20 = 20 %). Null si no hay. No lo multiplica por 100. */
   private margenGeneralDe(valor: number | null | undefined): number | null {
-    if (valor == null || (valor as unknown) === '') return null;
-    const n = Number(valor);
-    if (!Number.isFinite(n)) return null;
-    return Math.round(Math.min(1000, Math.max(-100, n)) * 100) / 100;
+    return porcentajeMargen(valor);
   }
 
-  private calculateTotals(items: NormalizedCotizacionItem[]) {
-    return calculateTotals(items);
+  private calculateTotals(items: NormalizedCotizacionItem[], margen?: number | null) {
+    return calculateTotals(items, margen);
   }
 
   private buildItemData(items: ReturnType<CotizacionesService['normalizeItems']>) {
@@ -265,8 +263,8 @@ export class CotizacionesService {
     // El editor de Core guarda el borrador en cuanto hay cliente, antes de la primera partida: una
     // cotización sin partidas es un borrador válido (lo que no puede es enviarse así).
     const margenGeneral = this.margenGeneralDe(dto.marginPercent);
-    const items = dto.items?.length ? this.normalizeItems(dto.items, margenGeneral) : [];
-    const totals = this.calculateTotals(items);
+    const items = dto.items?.length ? this.normalizeItems(dto.items) : [];
+    const totals = this.calculateTotals(items, margenGeneral);
     const status = normalizeStatus(dto.status) || CotizacionStatus.DRAFT;
     const segmento = normalizarSegmento(dto.segmento);
 
@@ -548,8 +546,28 @@ export class CotizacionesService {
     const conNomenclatura = Boolean(quote.folioNomenclatura) && tieneNomenclatura(quote.quoteNumber);
     const claveAutor = quote.folioNomenclatura || autor?.clave || null;
 
+    const itemsNumericos = (quote.items ?? []).map((item: any) => ({
+      ...item,
+      qty: Number(item.qty ?? 0),
+      unitPrice: Number(item.unitPrice ?? 0),
+      unitCost: item.unitCost == null ? null : Number(item.unitCost),
+      marginPercent: porcentajeMargen(item.marginPercent),
+      lineTotal: Number(item.lineTotal ?? 0),
+      laborHours: Number(item.laborHours ?? 0),
+      laborRate: Number(item.laborRate ?? 0),
+    }));
+
     return {
       ...quote,
+      items: itemsNumericos,
+      subtotal: Number(quote.subtotal ?? 0),
+      discountTotal: Number(quote.discountTotal ?? 0),
+      taxTotal: Number(quote.taxTotal ?? 0),
+      iepsTotal: Number(quote.iepsTotal ?? 0),
+      retentionTotal: Number(quote.retentionTotal ?? 0),
+      total: Number(quote.total ?? 0),
+      // Número plano: un Decimal `{ d: [2040000] }` en el input se leía como 204.
+      marginPercent: porcentajeMargen(quote.marginPercent),
       folio: quote.quoteNumber,
       folioBase: conNomenclatura ? folioSinCadena(quote.quoteNumber) : quote.quoteNumber,
       conNomenclatura,
@@ -862,8 +880,8 @@ export class CotizacionesService {
 
     if (dto.items) {
       // Quitar la última partida deja el borrador sin partidas, no es un error.
-      const items = dto.items.length ? this.normalizeItems(dto.items, margenAlGuardar) : [];
-      const totals = this.calculateTotals(items);
+      const items = dto.items.length ? this.normalizeItems(dto.items) : [];
+      const totals = this.calculateTotals(items, margenAlGuardar);
       const itemData = this.buildItemData(items);
 
       updateData['subtotal'] = round2(totals.subtotal);
@@ -893,30 +911,20 @@ export class CotizacionesService {
         });
       });
       finalItems = items;
-    } else if (dto.marginPercent != null && existing.items.length && margenAlGuardar != null) {
-      // Solo cambió el margen general: las partidas sin el suyo toman el precio nuevo.
-      const items = this.normalizeItems(existing.items as unknown as RawCotizacionItem[], margenAlGuardar);
-      const totals = this.calculateTotals(items);
-      const itemData = this.buildItemData(items);
+    } else if (dto.marginPercent !== undefined && existing.items.length) {
+      // Solo cambió el porcentaje: las partidas se quedan y el total se recalcula.
+      const items = this.normalizeItems(existing.items as unknown as RawCotizacionItem[]);
+      const totals = this.calculateTotals(items, margenAlGuardar);
       updateData['subtotal'] = round2(totals.subtotal);
       updateData['discountTotal'] = round2(totals.discountTotal);
       updateData['taxTotal'] = round2(totals.taxTotal);
       updateData['iepsTotal'] = round2(totals.iepsTotal);
       updateData['retentionTotal'] = round2(totals.retentionTotal);
       updateData['total'] = round2(totals.total);
-      const scalars = Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined));
-      result = await this.db.$transaction(async (tx) => {
-        await tx.cotizacionItem.deleteMany({ where: { cotizacionId: id } });
-        if (itemData.length) {
-          await tx.cotizacionItem.createMany({
-            data: itemData.map((item) => ({ ...item, cotizacionId: id })),
-          });
-        }
-        await tx.cotizacion.update({ where: { id }, data: scalars });
-        return tx.cotizacion.findFirstOrThrow({
-          where: { id },
-          include: { items: { orderBy: { id: 'asc' } }, createdBy: true },
-        });
+      result = await this.db.cotizacion.update({
+        where: { id },
+        data: Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined)),
+        include: { items: { orderBy: { id: 'asc' } }, createdBy: true },
       });
       finalItems = items;
     } else {
@@ -2063,6 +2071,18 @@ export class CotizacionesService {
       return generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote));
     }
 
+    let totales: ReturnType<CotizacionesService['calculateTotals']> | null = null;
+    if (Array.isArray(quote.items) && quote.items.length) {
+      try {
+        totales = this.calculateTotals(
+          this.normalizeItems(quote.items as RawCotizacionItem[]),
+          porcentajeMargen(quote.marginPercent),
+        );
+      } catch {
+        totales = null;
+      }
+    }
+
     const items = quote.items.map((item: any) => ({
       category: item.category,
       name: item.name,
@@ -2111,14 +2131,14 @@ export class CotizacionesService {
       preparedRole: quote.preparedRole,
       currency: quote.currency,
       depositPercent: quote.depositPercent,
-      marginPercent: quote.marginPercent != null ? Number(quote.marginPercent) : null,
+      marginPercent: porcentajeMargen(quote.marginPercent),
       note: quote.note,
-      subtotal: Number(quote.subtotal),
-      discountTotal: Number(quote.discountTotal),
-      taxTotal: Number(quote.taxTotal),
-      iepsTotal: Number(quote.iepsTotal || 0),
-      retentionTotal: Number(quote.retentionTotal || 0),
-      total: Number(quote.total),
+      subtotal: totales ? round2(totales.subtotal) : Number(quote.subtotal),
+      discountTotal: totales ? round2(totales.discountTotal) : Number(quote.discountTotal),
+      taxTotal: totales ? round2(totales.taxTotal) : Number(quote.taxTotal),
+      iepsTotal: totales ? round2(totales.iepsTotal) : Number(quote.iepsTotal || 0),
+      retentionTotal: totales ? round2(totales.retentionTotal) : Number(quote.retentionTotal || 0),
+      total: totales ? round2(totales.total) : Number(quote.total),
       company: company
         ? {
             legalName: company.legalName || 'NEXARA',

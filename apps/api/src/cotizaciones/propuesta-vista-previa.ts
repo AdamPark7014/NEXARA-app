@@ -15,7 +15,7 @@
  */
 import { BadRequestException } from '@nestjs/common';
 import { normalizarBloques } from './alcance-bloques.js';
-import { calculateLine, calculateTotals, normalizeItems, type RawCotizacionItem } from './cotizacion-totals.js';
+import { calculateLine, calculateTotals, normalizeItems, porcentajeMargen, type RawCotizacionItem } from './cotizacion-totals.js';
 import { ordenarPlanos } from './planos-cotizacion.js';
 import { normalizarSegmento } from './terminos-segmento.js';
 import { normalizarOpciones } from './personalizacion.js';
@@ -91,7 +91,8 @@ export function borradorSobreGuardada<Q extends Record<string, any>>(guardada: Q
     scope: texto(dto.scope, guardada['scope']),
     currency: texto(dto.currency, guardada['currency']) || guardada['currency'],
     depositPercent: dto.depositPercent ?? guardada['depositPercent'],
-    marginPercent: dto.marginPercent !== undefined ? dto.marginPercent : guardada['marginPercent'],
+    marginPercent:
+      dto.marginPercent !== undefined ? porcentajeMargen(dto.marginPercent) : porcentajeMargen(guardada['marginPercent']),
     note: texto(dto.note, guardada['note']),
     // Personalización: la del borrador completa (el editor manda todas las opciones juntas).
     opciones: dto.opciones ? normalizarOpciones(dto.opciones) : guardada['opciones'],
@@ -99,11 +100,10 @@ export function borradorSobreGuardada<Q extends Record<string, any>>(guardada: Q
 
   if (dto.items) {
     // Mismo cálculo que el guardado: sin partidas el borrador queda en ceros, no es un error.
-    const general = dto.marginPercent !== undefined ? dto.marginPercent : guardada['marginPercent'];
-    const items = dto.items.length
-      ? normalizeItems(dto.items as RawCotizacionItem[], general == null ? null : Number(general))
-      : [];
-    const totales = calculateTotals(items);
+    const general =
+      dto.marginPercent !== undefined ? porcentajeMargen(dto.marginPercent) : porcentajeMargen(guardada['marginPercent']);
+    const items = dto.items.length ? normalizeItems(dto.items as RawCotizacionItem[]) : [];
+    const totales = calculateTotals(items, general);
     mezcla['items'] = items.map((item) => ({ ...item, lineTotal: redondeo(calculateLine(item).total) }));
     mezcla['subtotal'] = redondeo(totales.subtotal);
     mezcla['discountTotal'] = redondeo(totales.discountTotal);

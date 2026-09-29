@@ -58,27 +58,34 @@ describe('PDF de cotización', () => {
     expect(buffer.toString('latin1')).toContain('Inter');
   });
 
-  it('el PDF interno imprime costo, markup y precio por partida', async () => {
+  it('el PDF interno imprime costo, IVA, margen y total', async () => {
     const buffer = await generateCotizacionPdf(
-      base([
-        {
-          name: 'Cámara IP 4 MP',
-          qty: 2,
-          unitCost: 100,
-          marginPercent: 20,
-          unitPrice: 120,
-          discount: 0,
-          tax: 16,
-          lineTotal: 240,
-        },
-      ]),
+      {
+        ...base([
+          {
+            name: 'Cámara IP 4 MP',
+            qty: 2,
+            unitCost: 100,
+            unitPrice: 100,
+            discount: 0,
+            tax: 16,
+            lineTotal: 232,
+          },
+        ]),
+        subtotal: 200,
+        taxTotal: 32,
+        // 200 + IVA 32 = 232; con 20 % el total es 278.40
+        total: 278.4,
+        marginPercent: 20,
+      },
       { internal: true },
     );
     const texto = textoPorHoja(buffer).join('\n');
     expect(texto).toContain('DOCUMENTO INTERNO');
     expect(texto).toContain('Costo');
-    expect(texto).toContain('Margen');
-    expect(texto).toContain('20%');
-    expect(texto).toContain('Margen sobre el costo');
+    expect(texto).toContain('IVA');
+    expect(texto).toContain('Margen 20%');
+    expect(texto).toContain('278.40');
+    expect(texto).not.toContain('Margen sobre el costo');
   });
 });

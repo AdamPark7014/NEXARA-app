@@ -2434,8 +2434,8 @@ model Cotizacion {
   preparedRole    String?                  @db.VarChar(120)
   currency        String                   @default("MXN") @db.VarChar(10)
   depositPercent  Int                      @default(0)
-  /// Margen general: markup sobre el costo (precio = costo × (1 + %/100)).
-  /// Una partida lo hereda cuando su `marginPercent` es null; si tiene el suyo, ese gana.
+  /// Porcentaje sobre el total de las partidas ya con IVA. 20 → total × 1.20.
+  /// No es markup por partida. Null = el total es subtotal + IVA.
   marginPercent   Decimal?                 @db.Decimal(7, 2)
   note            String?                  @db.Text
   subtotal        Decimal                  @default(0) @db.Decimal(12, 2)

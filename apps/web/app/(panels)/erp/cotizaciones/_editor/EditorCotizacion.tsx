@@ -392,7 +392,7 @@ export default function EditorCotizacion({
   );
 
   // ─── Lo que se ve ──────────────────────────────────────────────────────
-  const totales = useMemo(() => totalesDePartidas(doc.partidas), [doc.partidas]);
+  const totales = useMemo(() => totalesDePartidas(doc.partidas, doc.marginPercent), [doc.partidas, doc.marginPercent]);
   const completas = seccionesCompletas(doc, detalle?.planos?.length ?? 0);
   const plantillaSegmento = plantillas.find((p) => p.segmento === doc.segmento) ?? null;
   const version = `${Math.max(1, (detalle?.revision ?? 1) + (detalle?.sentAt && detalle.estado === "BORRADOR" ? 1 : 0))}.0`;

@@ -168,14 +168,92 @@ export function maxDiscountPercent(items: Array<{ discount: number }>): number {
   return items.reduce((max, it) => Math.max(max, Number(it.discount) || 0), 0);
 }
 
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 /**
- * Markup sobre el costo, el mismo del cotizador: precio = costo × (1 + margen/100).
- * 20% de 100 son 120. No es margen sobre el precio de venta.
+ * Porcentaje tal como lo escribe Christian: 20 es 20 %, no 0.20 ni 2000.
+ * Acepta número, texto («20», «20.5», «20%», «20,5») y un Decimal de Prisma
+ * (`"20.00"` o `{ s, e, d }`). No multiplica por 100: un 20 se queda en 20.
+ * El objeto Decimal de 20.4 trae los dígitos `2040000`; leerlos a pelo da 204.
  */
-export function precioConMargenSobreCosto(costo: number, margen: number): number {
-  const c = Math.max(0, Number(costo) || 0);
-  const m = Number.isFinite(Number(margen)) ? Number(margen) : 0;
-  return Math.round((c * (1 + m / 100) + Number.EPSILON) * 100) / 100;
+export function porcentajeMargen(valor: unknown): number | null {
+  const n = numeroDeMargen(valor);
+  if (n == null) return null;
+  return round2(Math.min(1000, Math.max(-100, n)));
+}
+
+/**
+ * Lo que entra en el DTO. `undefined` (el campo no vino) se queda en `undefined`
+ * para no borrar el margen en un PATCH parcial. `null` o `""` lo quitan.
+ */
+export function margenDeEntrada(valor: unknown): number | null | undefined {
+  if (valor === undefined) return undefined;
+  return porcentajeMargen(valor);
+}
+
+/** 20 → 1.20. Sin porcentaje, el total no se mueve. */
+export function factorMargen(valor: unknown): number {
+  const pct = porcentajeMargen(valor);
+  if (pct == null) return 1;
+  return 1 + pct / 100;
+}
+
+/**
+ * Total final = (subtotal de partidas ya con IVA, descuentos, IEPS y retención) × (1 + margen/100).
+ * 100 + IVA 16 = 116; con 20 % el total es 139.20.
+ */
+export function totalConMargen(baseConImpuestos: number, margen: unknown): number {
+  const base = Number(baseConImpuestos) || 0;
+  return round2(base * factorMargen(margen));
+}
+
+function numeroDeMargen(valor: unknown): number | null {
+  if (valor == null || valor === '') return null;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
+  if (typeof valor === 'string') return numeroDeTexto(valor);
+  if (typeof valor === 'object') {
+    const o = valor as { toNumber?: () => number; s?: number; e?: number; d?: number[] };
+    if (typeof o.toNumber === 'function') {
+      const n = o.toNumber();
+      return Number.isFinite(n) ? n : null;
+    }
+    if (Array.isArray(o.d) && typeof o.e === 'number') return decimalJsANumero({ s: o.s, e: o.e, d: o.d });
+  }
+  return null;
+}
+
+/** «20,5» es 20.5. Quitar la coma a ciegas convertía «20,4» en 204. */
+function numeroDeTexto(texto: string): number | null {
+  let t = texto.trim().replace(/%/g, '').replace(/\s/g, '');
+  if (!t || t === '-' || t === '.' || t === ',' || t === '-.' || t === '-,') return null;
+  const coma = t.lastIndexOf(',');
+  const punto = t.lastIndexOf('.');
+  if (coma >= 0 && punto >= 0) {
+    t = coma > punto ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+  } else if (coma >= 0) {
+    t = t.replace(',', '.');
+  }
+  if (t.endsWith('.')) t = t.slice(0, -1);
+  if (!t || t === '-') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * decimal.js guarda el coeficiente en base 1e7 y el exponente del dígito más
+ * significativo. 20.4 es `{ e: 1, d: [2040000] }`, no 204.
+ */
+function decimalJsANumero(o: { s?: number; e: number; d: number[] }): number | null {
+  const LOG = 7;
+  let digitos = '';
+  for (let i = 0; i < o.d.length; i++) {
+    const trozo = String(Math.trunc(Math.abs(o.d[i] ?? 0)));
+    digitos += i === 0 ? trozo : trozo.padStart(LOG, '0');
+  }
+  if (!digitos) return 0;
+  const cientifico = digitos.length === 1 ? digitos : `${digitos[0]}.${digitos.slice(1)}`;
+  const n = (o.s === -1 ? -1 : 1) * Number(cientifico) * 10 ** o.e;
+  return Number.isFinite(n) ? n : null;
 }
 
 /**
@@ -183,13 +261,11 @@ export function precioConMargenSobreCosto(costo: number, margen: number): number
  * mínimo de 1, de modo que un payload manipulado no pueda producir importes
  * negativos ni descuentos superiores al 100 %.
  *
- * `margenGeneral` es el markup de la cotización. Si la partida no trae el suyo
- * (`marginPercent` null) y hay costo, el precio queda en costo × (1 + general/100)
- * y el margen de la partida se guarda null para que siga heredando.
+ * El precio de la partida se guarda como viene. El margen de la cotización no
+ * es un markup por renglón: se aplica después, sobre el total ya con IVA.
  */
 export function normalizeItems(
   items: RawCotizacionItem[] | undefined | null,
-  margenGeneral?: number | null,
 ): NormalizedCotizacionItem[] {
   if (!items || !items.length) {
     throw new BadRequestException('Se requiere al menos un concepto');
@@ -220,24 +296,16 @@ export function normalizeItems(
     });
     const taxProvided = item.tax != null && item.tax !== '';
     const taxPercent = taxProvided ? percent(item.tax) : undefined;
-    const propioEnviado =
-      item.marginPercent != null && item.marginPercent !== '' && Number.isFinite(Number(item.marginPercent));
     const pricing = resolveQuoteLinePricing({
       unitCost: item.unitCost != null && item.unitCost !== '' ? Number(item.unitCost) : null,
       unitPrice: Number(item.unitPrice) || 0,
-      marginPercent: propioEnviado ? Number(item.marginPercent) : null,
+      marginPercent: null,
       supplierCode,
       taxPercent,
     });
-    const general =
-      margenGeneral != null && Number.isFinite(Number(margenGeneral)) ? Number(margenGeneral) : null;
-    let unitPrice = pricing.unitPrice;
-    // Sin margen propio no se inventa uno a partir del precio: null significa «usa el general».
-    let marginPercent: number | null = propioEnviado ? pricing.marginPercent : null;
-    if (!propioEnviado && general != null && pricing.unitCost != null && pricing.unitCost > 0) {
-      unitPrice = precioConMargenSobreCosto(pricing.unitCost, general);
-      marginPercent = null;
-    }
+    // El precio capturado se respeta aunque sea igual al costo. El margen comercial
+    // no reescribe la partida: va sobre el total con IVA.
+    const unitPrice = round2(Math.max(0, Number(item.unitPrice) || 0));
 
     return {
       productId: item.productId ? entero(item.productId) || null : null,
@@ -264,7 +332,7 @@ export function normalizeItems(
       productCtId: item.productCtId ? entero(item.productCtId) || null : null,
       supplierCode: pricing.supplierCode,
       supplierWarehouseCode: item.supplierWarehouseCode?.trim()?.slice(0, 10) || null,
-      marginPercent,
+      marginPercent: porcentajeMargen(item.marginPercent),
       stockSnapshot: enteroONulo(item.stockSnapshot),
       leadTimeDays: enteroONulo(item.leadTimeDays),
       scoreReason: item.scoreReason?.trim() || null,
@@ -286,17 +354,19 @@ export function normalizeItems(
 /**
  * Totales de la cotización.
  *
- * Orden de aplicación: descuento sobre el subtotal, e impuestos y retención
- * sobre la base ya descontada. La retención resta del total.
+ * Descuento sobre el subtotal; IVA, IEPS y retención sobre la base ya
+ * descontada. La mano de obra entra en esa base (se cobra).
  *
- * OJO — `laborHours` y `laborRate` NO entran en ningún total: se imprimen en el
- * PDF como línea informativa ("MO: Xh x $Y") pero no se facturan. Si la mano de
- * obra debe cobrarse aparte del `unitPrice`, esto es una fuga de ingresos; si va
- * incluida en el precio unitario, es correcto. Comportamiento vigente
- * documentado en `cotizacion-totals.spec.ts`.
+ * El margen, si viene, no toca el precio de cada partida: el total final es
+ * ese importe ya con IVA × (1 + margen/100). Subtotal e IVA se quedan sin
+ * margen para poder enseñarlos aparte. Sin margen, el total es la suma de
+ * las líneas, igual que antes.
  */
-export function calculateTotals(items: NormalizedCotizacionItem[]): CotizacionTotals {
-  return items.reduce<CotizacionTotals>(
+export function calculateTotals(
+  items: NormalizedCotizacionItem[],
+  margen?: number | null,
+): CotizacionTotals {
+  const acc = items.reduce<CotizacionTotals>(
     (acc, item) => {
       const line = calculateLine(item);
       return {
@@ -319,4 +389,7 @@ export function calculateTotals(items: NormalizedCotizacionItem[]): CotizacionTo
       total: 0,
     },
   );
+  const pct = porcentajeMargen(margen);
+  if (pct == null || pct === 0) return acc;
+  return { ...acc, total: totalConMargen(acc.total, pct) };
 }

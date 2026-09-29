@@ -11,7 +11,7 @@
 - **Secciones:** Portada · Objetivo · Alcance · Planos · Partidas · Términos · Firma. Cada una se puede prender o apagar por cotización.
 - **Segmentos:** `COMERCIAL`, `OBRA`, `LICITACION`, `SERVICIO`.
 - **Folio y versiones:** el folio es `NEX-<clave de RH>-<consecutivo de 4 dígitos por persona>` (`NXR-AAAA-######` es solo el formato antiguo). Al enviarse suma las siglas de quienes intervinieron y la revisión (`…-R2`, `…-R3`); además cada edición guarda una versión numerada. Es el equivalente de tus «V1, V2, V5».
-- **Costo y margen por partida:** `unitCost` y `marginPercent`. En el cotizador el margen es **markup sobre el costo** (precio = costo × (1 + %/100); 20 % de $100 = $120, no $125). El cotizador inteligente de proveedor (`sellFromCost`) sigue siendo margen sobre el precio de venta (venta = costo ÷ (1 − margen); 30 % de 100 ≈ 142.86) y no se usa para reescribir el precio de la partida. Hay además un margen general de la cotización (`Cotizacion.marginPercent`): se aplica a las partidas cuyo margen está vacío; si la partida tiene el suyo (aunque sea 0), ese gana. El PDF **interno** lista por partida costo, margen (% y monto) y precio, con totales. El PDF **final** (formato Nexara) lleva el precio ya con margen y no imprime costo ni margen. Hay una regla global de 20 % al capturar, pero **hoy no se revisa** como mínimo al crear, editar ni enviar.
+- **Margen de la cotización:** un solo porcentaje (`Cotizacion.marginPercent`) sobre el total de las partidas **ya con IVA**. Escribir 20 deja el total en (subtotal − descuento + IVA + IEPS − retención) × 1.20. El precio de cada partida se guarda como se captura; no es markup sobre el costo ni se reescribe al cambiar el porcentaje. El costo (`unitCost`) sigue en la partida para el PDF interno. El cotizador inteligente de proveedor (`sellFromCost`) sigue siendo margen sobre el precio de venta (venta = costo ÷ (1 − margen); 30 % de 100 ≈ 142.86) y no reescribe la partida. El PDF **final** imprime precios y total ya con ese margen y con IVA, sin costo ni margen. El PDF **interno** muestra costo, IVA, el margen y el total. Una cotización nueva abre en 20 %. Vacío o 0 no mueve el total.
 - **Paquetes:** «cámara bala instalada», «cámara domo instalada», «poste de 3 m instalado» generan sus partidas y el texto de alcance juntos.
 - **Precios de CT** sincronizados y motor de cotización inteligente (`smart-quote`) para partidas de distribuidor.
 - **Flujo de revisión interna:** una cotización se puede pasar a otra persona («falta el precio del NVR») antes de enviarse.
@@ -56,7 +56,7 @@ Nueve plantillas base, el catálogo maestro y el kit de campo. Todas con cantida
 | Anticipo por omisión | Comercial 50 % · Obra 50 % · Licencias 100 % · Póliza por periodo · Licitación 0 % |
 | Vigencia por omisión | 15 días (30 en licitación) |
 | Garantía | Fabricante en equipos; 90 días en instalación |
-| Margen | Sobre el precio de venta, por partida (30 % por omisión con CT; regla global de 20 % mínimo, sin conectar) |
+| Margen | Un porcentaje sobre el total de las partidas ya con IVA. 20 % → total × 1.20. No es markup por partida. |
 | Grupos del PDF técnico | Equipos · Materiales · Mano de obra (con subtotal) |
 
 ## 5. Catálogo real (minado de 331 documentos; frecuencia = qué tanto cotizas)

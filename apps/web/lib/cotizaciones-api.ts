@@ -91,7 +91,7 @@ export type PartidaCotizacion = {
   partida?: string | null;
   /** Costo mayorista. Interno: no sale en el PDF. */
   unitCost?: number | null;
-  /** Margen % sobre el costo. Interno: no sale en el PDF. */
+  /** Margen % que traía la partida. El precio no sale de aquí: el margen de la cotización va sobre el total con IVA. */
   marginPercent?: number | null;
 };
 
@@ -244,7 +244,7 @@ export type CotizacionDetalle = {
   planos?: PlanoCotizacion[] | null;
   note?: string | null;
   depositPercent?: number;
-  /** Markup general sobre el costo. Null = cada partida usa el suyo. */
+  /** Porcentaje sobre el total ya con IVA. 20 → total × 1.20. Null = sin margen. */
   marginPercent?: number | null;
   currency?: string | null;
   subtotal: number;
@@ -321,7 +321,7 @@ export type GuardarCotizacion = {
   issueDate?: string;
   validUntil?: string;
   depositPercent?: number;
-  /** Markup general sobre el costo. `null` lo borra. */
+  /** Porcentaje sobre el total ya con IVA. `null` lo quita. */
   marginPercent?: number | null;
   /** Términos reescritos por quien cotiza (solo los que cambió), con sus títulos. */
   note?: string | null;

@@ -1593,6 +1593,26 @@ select.celda {
   padding: 1px 8px;
 }
 
+.margenCampo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.margenCaja {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--doc-suave);
+  font-size: 14px;
+}
+
+.margenCaja .input {
+  width: 5.75rem;
+  text-align: right;
+}
+
 .anticipo {
   display: inline-flex;
   align-items: center;
