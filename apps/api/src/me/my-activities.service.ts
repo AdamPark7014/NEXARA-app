@@ -15,6 +15,7 @@ import {
   rangoPrioridad,
   tiemposDto,
   type Aceptacion,
+  type MotivoSemaforo,
   type Prioridad,
   type Semaforo,
 } from '../activities/actividad-tiempos.js';
@@ -141,7 +142,7 @@ export type MyActivityItem = {
   semaforo: Semaforo;
   minutosAtraso: number | null;
   minutosParaVencer: number | null;
-  motivoSemaforo: 'inicio' | 'tope' | null;
+  motivoSemaforo: MotivoSemaforo | null;
   /** Tiempo estimado en minutos (horasPlan × 60) y tiempo realmente dedicado. */
   minutosPlan: number | null;
   minutosReales: number | null;

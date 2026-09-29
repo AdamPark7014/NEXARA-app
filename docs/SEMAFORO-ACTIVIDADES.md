@@ -8,7 +8,7 @@ La función canónica es `evaluarSemaforo` en `apps/api/src/activities/semaforo-
 
 | Color | Chip | Cuándo |
 | --- | --- | --- |
-| Rojo `#dc2626` | `Atrasada · {tiempo}` | Pasó `fechaInicio` y nadie la ha iniciado, **o** pasó el tope y no está terminada. El chip usa el atraso mayor. |
+| Rojo `#dc2626` | `Atrasada · {tiempo}` | Pasó `fechaInicio` y nadie la ha iniciado, **o** pasó el tope y no está terminada, **o** ya lleva más tiempo real trabajado del que se planeó (`horasPlan`). El chip usa el atraso mayor de los tres. |
 | Naranja `#d97706` | `Atención · {tiempo}` si falta el inicio; `Por vencer · {tiempo}` si falta el tope | Faltan 30 minutos o menos para ese instante y todavía no es roja. Si los dos están cerca, gana el que llega antes. |
 | Azul `#2563eb` | `En tiempo` y, si se puede iniciar, `Sin iniciar` | En tiempo y todavía no arranca. |
 | Verde `#16a34a` | `En tiempo` | En tiempo y ya arrancó (`inicioRealAt` o estatus en proceso / por validar). |
@@ -21,7 +21,7 @@ Sin fechas no hay con qué atrasarse: queda en tiempo. Cerrada, cancelada o con 
 - **Tope:** el más temprano entre `fechaMaxima` y `fechaEntregaEsperada`.
 - **Periodo de varios días:** el tope es el fin del último día (`finDelPeriodo`, America/Mexico_City), no la hora citada del primer día. Antes del primer día está programada y se ve en tiempo aunque la prioridad sea alta. Pasada la hora de inicio del primer día, si no arrancó, es roja.
 - **Arrancó** (para no pintar «pasó el inicio»): hay `inicioRealAt` en quien la hace, o el estatus coincide con proceso / validar. En la pizarra se usa el tiempo real de esa persona.
-- **El tiempo estimado no pinta el color.** Exceder las horas de plan deja `excedida` y el aviso que ya existía (`alertaExcesoAt`, cada 15 min). No pone la tarjeta en rojo ni en naranja.
+- **Pasar el tiempo estimado también pinta roja la tarjeta** (`minutosPlan`/`minutosReales` en `evaluarSemaforo`, motivo `plan`). En una actividad de varios días el plan es de una jornada y el reloj corre de corrido, así que no cuenta para esto (mismo criterio que `excedida`). Exceder el plan también deja `excedida: true` en el DTO y sigue mandando aparte el aviso que ya existía (`alertaExcesoAt`, cada 15 min, tipo `ACTIVITY_OVERTIME` — no es el mismo aviso que el de abajo). **El cron de abajo (`ACTIVITY_OVERDUE`, campana/push a jefe y coordinación) no cambió**: solo mira `fechaInicio`, el tope y el fin de periodo, así que una actividad roja *solo* por exceso de plan (sin ninguna fecha vencida) se ve roja en la pantalla pero no dispara ese aviso.
 
 ## Avisos al pasar a rojo
 

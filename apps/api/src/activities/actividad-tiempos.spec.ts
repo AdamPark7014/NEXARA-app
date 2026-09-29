@@ -126,7 +126,7 @@ describe('semáforo', () => {
     ).toBe('rojo');
   });
 
-  it('exceder el plan no la pone roja si el tope sigue adelante', () => {
+  it('exceder el plan la pone roja aunque el tope siga adelante', () => {
     expect(
       semaforoDe({
         prioridad: 'Baja',
@@ -137,7 +137,7 @@ describe('semáforo', () => {
         estatus: 'En Proceso',
         ahora: AHORA,
       }),
-    ).toBe('verde');
+    ).toBe('rojo');
   });
 
   it('prioridad MEDIA sin hora vencida no es naranja', () => {
@@ -187,7 +187,7 @@ describe('semáforo', () => {
 });
 
 describe('tiemposDto', () => {
-  it('arma la vista que consumen las apps', () => {
+  it('arma la vista que consumen las apps; ya pasado el plan, también queda roja', () => {
     const dto = tiemposDto(
       { aceptadaAt: hace(200), inicioRealAt: hace(155), horasPlan: '2', saltoPrioridad: true },
       { prioridad: 'urgente', fechaMaxima: null, estatus: 'En Proceso' },
@@ -199,9 +199,20 @@ describe('tiemposDto', () => {
       minutosPlan: 120,
       minutosReales: 155,
       excedida: true,
-      semaforo: 'verde',
+      semaforo: 'rojo',
+      minutosAtraso: 35,
+      motivoSemaforo: 'plan',
       saltoPrioridad: true,
     });
+  });
+
+  it('dentro del plan sigue en tiempo', () => {
+    const dto = tiemposDto(
+      { aceptadaAt: hace(90), inicioRealAt: hace(90), horasPlan: '2' },
+      { prioridad: 'Media', estatus: 'En Proceso' },
+      AHORA,
+    );
+    expect(dto).toMatchObject({ minutosPlan: 120, minutosReales: 90, excedida: false, semaforo: 'verde' });
   });
 
   it('rechazada conserva el motivo y no cuenta tiempo', () => {

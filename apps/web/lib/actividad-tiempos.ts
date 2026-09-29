@@ -37,7 +37,7 @@ export const SEMAFORO_UI: Record<Semaforo, { label: string; color: string }> = {
   verde: { label: "En tiempo", color: "#16a34a" },
 };
 
-export type MotivoSemaforo = "inicio" | "tope";
+export type MotivoSemaforo = "inicio" | "tope" | "plan";
 
 export type SemaforoTiempo = {
   semaforo: Semaforo;

@@ -111,6 +111,56 @@ describe('semáforo por el reloj', () => {
     expect(luz.semaforo).toBe('rojo');
     expect(luz.motivo).toBe('inicio');
   });
+
+  it('rojo si ya lleva más tiempo real del planeado, aunque siga dentro del tope', () => {
+    const luz = evaluarSemaforo({
+      inicioRealAt: hace(155),
+      fechaMaxima: en(200),
+      estatus: 'En Proceso',
+      minutosPlan: 120,
+      minutosReales: 155,
+      ahora: AHORA,
+    });
+    expect(luz.semaforo).toBe('rojo');
+    expect(luz.motivo).toBe('plan');
+    expect(luz.minutosAtraso).toBe(35);
+    expect(etiquetaSemaforo(luz)).toBe('Atrasada · 35 min');
+  });
+
+  it('dentro del plan, o sin plan, no pinta roja por eso', () => {
+    expect(
+      evaluarSemaforo({ estatus: 'En Proceso', minutosPlan: 120, minutosReales: 90, ahora: AHORA }).semaforo,
+    ).toBe('verde');
+    expect(
+      evaluarSemaforo({ estatus: 'En Proceso', minutosPlan: null, minutosReales: 500, ahora: AHORA }).semaforo,
+    ).toBe('verde');
+  });
+
+  it('en una actividad de varios días, pasar el plan no la pone roja (el plan es de una jornada)', () => {
+    const luz = evaluarSemaforo({
+      periodoInicio: '2026-09-16',
+      periodoFin: '2026-09-25',
+      inicioRealAt: hace(3000),
+      estatus: 'En Proceso',
+      minutosPlan: 120,
+      minutosReales: 3000,
+      ahora: AHORA,
+    });
+    expect(luz.semaforo).toBe('verde');
+  });
+
+  it('el peor atraso gana: si el plan lleva más tiempo excedido que el tope, se reporta el del plan', () => {
+    const luz = evaluarSemaforo({
+      inicioRealAt: hace(500),
+      fechaMaxima: hace(10),
+      estatus: 'En Proceso',
+      minutosPlan: 120,
+      minutosReales: 500,
+      ahora: AHORA,
+    });
+    expect(luz.motivo).toBe('plan');
+    expect(luz.minutosAtraso).toBe(380);
+  });
 });
 
 describe('aviso de atraso, una vez', () => {
