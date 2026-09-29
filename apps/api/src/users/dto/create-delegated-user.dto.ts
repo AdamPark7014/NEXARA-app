@@ -60,11 +60,42 @@ export class CreateDelegatedUserDto {
   managerId?: number;
 }
 
-/** Cambiar después la foto fija o el teléfono de alguien del equipo. */
+/**
+ * Editar después a alguien del equipo: nombre, teléfono y foto los cambia cualquiera con el
+ * permiso; rol, departamento, jefe y número de empleado, solo dirección (el servicio lo exige).
+ */
 export class UpdateDelegatedUserDto {
   @IsOptional()
   @Transform(textoOpcional)
   @IsString()
   @MaxLength(30)
   telefono?: string;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsString()
+  @MinLength(3)
+  @MaxLength(180)
+  nombre?: string;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsIn(ALL_ROLES)
+  roleKey?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  departmentId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  managerId?: number;
+
+  @IsOptional()
+  @Transform(textoOpcional)
+  @IsString()
+  @MaxLength(40)
+  employeeNumber?: string;
 }

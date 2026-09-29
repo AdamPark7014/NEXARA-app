@@ -19,10 +19,10 @@ import { useUser } from "@/components/UserContext";
 import FotoPerfilCampo from "@/components/team/FotoPerfilCampo";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import {
-  cambiarFotoEquipo,
   cargarContextoAlta,
   contrasenaAceptable,
   crearUsuarioDelegado,
+  editarPersonaEquipo,
   generarContrasena,
   type ContextoAlta,
   type PersonaEquipo,
@@ -66,6 +66,12 @@ export default function AltaUsuarioPanel() {
   const [editando, setEditando] = useState<PersonaEquipo | null>(null);
   const [fotoEquipo, setFotoEquipo] = useState<File | null>(null);
   const [previewEquipo, setPreviewEquipo] = useState<string | null>(null);
+  const [nombreEquipo, setNombreEquipo] = useState("");
+  const [telefonoEquipo, setTelefonoEquipo] = useState("");
+  const [roleKeyEquipo, setRoleKeyEquipo] = useState("");
+  const [departmentIdEquipo, setDepartmentIdEquipo] = useState("");
+  const [managerIdEquipo, setManagerIdEquipo] = useState("");
+  const [employeeNumberEquipo, setEmployeeNumberEquipo] = useState("");
   const [errorEquipo, setErrorEquipo] = useState<string | null>(null);
   const [guardandoFoto, setGuardandoFoto] = useState(false);
   const [recarga, setRecarga] = useState(0);
@@ -150,18 +156,29 @@ export default function AltaUsuarioPanel() {
     }
   };
 
-  const guardarFoto = async () => {
-    if (!editando || !fotoEquipo || guardandoFoto) return;
+  const nombreEquipoOk = nombreEquipo.trim().length >= 3;
+  const telefonoEquipoOk = telefonoEquipo.trim() === "" || telefonoValido(telefonoEquipo);
+
+  const guardarEdicion = async () => {
+    if (!editando || guardandoFoto || !nombreEquipoOk || !telefonoEquipoOk) return;
     setGuardandoFoto(true);
     setErrorEquipo(null);
     try {
-      await cambiarFotoEquipo(token, editando.id, { foto: fotoEquipo });
+      await editarPersonaEquipo(token, editando.id, {
+        foto: fotoEquipo,
+        nombre: nombreEquipo.trim(),
+        telefono: telefonoEquipo.trim() || undefined,
+        roleKey: completo && roleKeyEquipo ? roleKeyEquipo : undefined,
+        departmentId: completo && departmentIdEquipo ? Number(departmentIdEquipo) : undefined,
+        managerId: completo && managerIdEquipo ? Number(managerIdEquipo) : undefined,
+        employeeNumber: completo && employeeNumberEquipo.trim() ? employeeNumberEquipo.trim() : undefined,
+      });
       setEditando(null);
       setFotoEquipo(null);
       setPreviewEquipo(null);
       setRecarga((n) => n + 1);
     } catch (err) {
-      setErrorEquipo(err instanceof Error ? err.message : "No se pudo cambiar la foto.");
+      setErrorEquipo(err instanceof Error ? err.message : "No se pudo guardar el cambio.");
     } finally {
       setGuardandoFoto(false);
     }
@@ -188,7 +205,7 @@ export default function AltaUsuarioPanel() {
       {ctx.equipo.length > 0 ? (
         <div style={{ display: "grid", gap: 8, padding: "0 0 16px" }}>
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Perfiles de tu equipo. La foto es la fija: la misma que se ve en actividades y en el celular.
+            Perfiles de tu equipo. Edita foto, nombre y teléfono; la foto es la fija, la misma que se ve en actividades y en el celular.
           </span>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {ctx.equipo.map((p) => {
@@ -209,10 +226,16 @@ export default function AltaUsuarioPanel() {
                       setEditando(p);
                       setFotoEquipo(null);
                       setPreviewEquipo(src || null);
+                      setNombreEquipo(p.nombre);
+                      setTelefonoEquipo(p.telefono ?? "");
+                      setRoleKeyEquipo(p.roleKey ?? "");
+                      setDepartmentIdEquipo(p.departmentId != null ? String(p.departmentId) : "");
+                      setManagerIdEquipo(p.managerId != null ? String(p.managerId) : "");
+                      setEmployeeNumberEquipo(p.employeeNumber ?? "");
                       setErrorEquipo(null);
                     }}
                   >
-                    Cambiar foto
+                    Editar
                   </Button>
                 </div>
               );
@@ -367,7 +390,7 @@ export default function AltaUsuarioPanel() {
         )}
       </Modal>
 
-      <Modal open={editando != null} onClose={() => setEditando(null)} title={editando ? `Foto de ${editando.nombre}` : "Foto"}>
+      <Modal open={editando != null} onClose={() => setEditando(null)} title={editando ? `Editar a ${editando.nombre}` : "Editar"}>
         <div style={{ display: "grid", gap: 12 }}>
           <FotoPerfilCampo
             previewUrl={previewEquipo}
@@ -376,13 +399,68 @@ export default function AltaUsuarioPanel() {
               setPreviewEquipo(url);
             }}
           />
+          <label style={campo}>
+            Nombre completo
+            <input style={entrada} value={nombreEquipo} onChange={(e) => setNombreEquipo(e.target.value)} autoComplete="off" required />
+          </label>
+          <label style={campo}>
+            Teléfono
+            <input style={entrada} inputMode="tel" value={telefonoEquipo} onChange={(e) => setTelefonoEquipo(e.target.value)} autoComplete="off" />
+          </label>
+          {completo ? (
+            <>
+              <label style={campo}>
+                Tipo de usuario
+                <select style={entrada} value={roleKeyEquipo} onChange={(e) => setRoleKeyEquipo(e.target.value)}>
+                  <option value="">Sin cambio</option>
+                  {ctx.tipos.map((t) => (
+                    <option key={t.roleKey} value={t.roleKey}>
+                      {t.etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={campo}>
+                Departamento
+                <select style={entrada} value={departmentIdEquipo} onChange={(e) => setDepartmentIdEquipo(e.target.value)}>
+                  <option value="">Sin cambio</option>
+                  {ctx.departamentos.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={campo}>
+                Jefe
+                <select style={entrada} value={managerIdEquipo} onChange={(e) => setManagerIdEquipo(e.target.value)}>
+                  <option value="">Sin cambio</option>
+                  {ctx.jefes.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={campo}>
+                Número de empleado
+                <input style={entrada} value={employeeNumberEquipo} onChange={(e) => setEmployeeNumberEquipo(e.target.value)} autoComplete="off" />
+              </label>
+            </>
+          ) : null}
           {errorEquipo ? <InlineAlert variant="danger" message={errorEquipo} /> : null}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <Button type="button" variant="ghost" onClick={() => setEditando(null)}>
               Cancelar
             </Button>
-            <Button type="button" variant="primary" loading={guardandoFoto} disabled={!fotoEquipo || guardandoFoto} onClick={() => void guardarFoto()}>
-              Guardar foto
+            <Button
+              type="button"
+              variant="primary"
+              loading={guardandoFoto}
+              disabled={guardandoFoto || !nombreEquipoOk || !telefonoEquipoOk}
+              onClick={() => void guardarEdicion()}
+            >
+              Guardar
             </Button>
           </div>
         </div>

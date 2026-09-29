@@ -85,6 +85,61 @@ describe("AltaUsuarioPanel", () => {
     expect((within(dialogo).getByRole("button", { name: "Crear usuario" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("edita a alguien del equipo: nombre, teléfono y foto para todos; rol, departamento y jefe solo si eres dirección", async () => {
+    const contexto = {
+      formulario: "completo",
+      tipos: [SOPORTE, INSTALADOR],
+      rolAutomatico: false,
+      jefeAutomatico: false,
+      telefonoObligatorio: false,
+      puede: true,
+      departamentos: [{ id: 20, nombre: "Soporte" }],
+      jefes: [{ id: 1, nombre: "Christian" }],
+      equipo: [
+        {
+          id: 57,
+          nombre: "Instalador Viejo",
+          avatarUrl: null,
+          telefono: "5511112222",
+          roleKey: "ing_campo",
+          departmentId: 30,
+          managerId: 1,
+          employeeNumber: "NX-57",
+        },
+      ],
+    };
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes("users/delegated/contexto")) return { ok: true, json: async () => contexto };
+      if (init?.method === "PATCH") {
+        return {
+          ok: true,
+          json: async () => ({ id: 57, nombre: "Instalador Nuevo", avatarUrl: null, telefono: "5511112222", roleKey: "ing_soporte", departmentId: 20, managerId: 1, employeeNumber: "NX-57" }),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    });
+    vi.stubGlobal("fetch", f);
+    render(<AltaUsuarioPanel />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect((within(dialogo).getByLabelText("Nombre completo") as HTMLInputElement).value).toBe("Instalador Viejo");
+    expect((within(dialogo).getByLabelText("Teléfono") as HTMLInputElement).value).toBe("5511112222");
+    expect((within(dialogo).getByLabelText("Número de empleado") as HTMLInputElement).value).toBe("NX-57");
+
+    await userEvent.clear(within(dialogo).getByLabelText("Nombre completo"));
+    await userEvent.type(within(dialogo).getByLabelText("Nombre completo"), "Instalador Nuevo");
+    await userEvent.selectOptions(within(dialogo).getByLabelText("Tipo de usuario"), "ing_soporte");
+    await userEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const patch = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([, i]) => i?.method === "PATCH")!;
+    const cuerpo = patch[1].body as FormData;
+    expect(cuerpo.get("nombre")).toBe("Instalador Nuevo");
+    expect(cuerpo.get("roleKey")).toBe("ing_soporte");
+    expect(cuerpo.get("telefono")).toBe("5511112222");
+  });
+
   it("si el API rechaza el alta, muestra el motivo y deja corregir", async () => {
     vi.stubGlobal("fetch", respuestas([SOPORTE], () => ({ ok: false, cuerpo: { message: "El correo ya está registrado (Otra Persona)." } })));
     render(<AltaUsuarioPanel />);

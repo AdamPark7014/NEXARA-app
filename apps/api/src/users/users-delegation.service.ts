@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { PLATFORM_OWNER_EMAIL, isDeveloperSuperAdminEmail, isPlatformOwnerEmail } from '../common/platform-accounts.js';
 import { UsersService } from './users.service.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
+import type { UpdateUserDto } from './dto/update-user.dto.js';
 import { ROLE_LABELS, type RoleKey } from '../common/rbac/roles.v2.js';
 import {
   USER_CREATION_GRANTS_SETTING_KEY,
@@ -36,6 +37,28 @@ export type AltaDelegada = {
   avatarUrl?: string | null;
 };
 
+export type PersonaEquipo = {
+  id: number;
+  nombre: string;
+  avatarUrl: string | null;
+  telefono: string | null;
+  roleKey: string | null;
+  departmentId: number | null;
+  managerId: number | null;
+  employeeNumber: string | null;
+};
+
+type PersonaEquipoFila = {
+  id: number;
+  nombre: string;
+  avatarUrl: string | null;
+  roleKey?: string | null;
+  departmentId?: number | null;
+  managerId?: number | null;
+  employeeNumber?: string | null;
+  perfil?: { telefono: string | null } | null;
+};
+
 export type ContextoAlta = {
   formulario: FormularioAlta;
   tipos: TipoUsuario[];
@@ -48,7 +71,7 @@ export type ContextoAlta = {
   puede: boolean;
   departamentos: { id: number; nombre: string }[];
   jefes: { id: number; nombre: string }[];
-  equipo: { id: number; nombre: string; avatarUrl: string | null; telefono: string | null }[];
+  equipo: PersonaEquipo[];
 };
 
 const CONTEXTO_VACIO: ContextoAlta = {
@@ -135,14 +158,27 @@ export class UsersDelegationService {
         isActive: true,
         companyMemberships: { some: { companyId } },
       },
-      select: { id: true, nombre: true, avatarUrl: true, perfil: { select: { telefono: true } } },
+      select: {
+        id: true,
+        nombre: true,
+        avatarUrl: true,
+        roleKey: true,
+        departmentId: true,
+        managerId: true,
+        employeeNumber: true,
+        perfil: { select: { telefono: true } },
+      },
       orderBy: { nombre: 'asc' },
     });
-    return filas.map((f: { id: number; nombre: string; avatarUrl: string | null; perfil?: { telefono: string | null } | null }) => ({
+    return filas.map((f: PersonaEquipoFila) => ({
       id: f.id,
       nombre: f.nombre,
       avatarUrl: f.avatarUrl ?? null,
       telefono: f.perfil?.telefono ?? null,
+      roleKey: f.roleKey ?? null,
+      departmentId: f.departmentId ?? null,
+      managerId: f.managerId ?? null,
+      employeeNumber: f.employeeNumber ?? null,
     }));
   }
 
@@ -154,16 +190,30 @@ export class UsersDelegationService {
         isActive: true,
         companyMemberships: { some: { companyId } },
       },
-      select: { id: true, nombre: true, email: true, avatarUrl: true, perfil: { select: { telefono: true } } },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        avatarUrl: true,
+        roleKey: true,
+        departmentId: true,
+        managerId: true,
+        employeeNumber: true,
+        perfil: { select: { telefono: true } },
+      },
       orderBy: { nombre: 'asc' },
     });
     return filas
       .filter((f: { email: string }) => !isPlatformOwnerEmail(f.email) && !isDeveloperSuperAdminEmail(f.email))
-      .map((f: { id: number; nombre: string; avatarUrl: string | null; perfil?: { telefono: string | null } | null }) => ({
+      .map((f: PersonaEquipoFila) => ({
         id: f.id,
         nombre: f.nombre,
         avatarUrl: f.avatarUrl ?? null,
         telefono: f.perfil?.telefono ?? null,
+        roleKey: f.roleKey ?? null,
+        departmentId: f.departmentId ?? null,
+        managerId: f.managerId ?? null,
+        employeeNumber: f.employeeNumber ?? null,
       }));
   }
 
@@ -367,19 +417,28 @@ export class UsersDelegationService {
   }
 
   /**
-   * Cambia la foto fija (o el teléfono) de alguien que ya existe.
-   * Dirección puede con cualquiera de la empresa. Un jefe, solo con quien le reporta.
+   * Edita a alguien que ya existe: foto, teléfono y nombre los cambia cualquiera con el permiso
+   * (dirección con cualquiera de la empresa; un jefe, solo con quien le reporta). Rol, departamento,
+   * jefe y número de empleado, solo dirección — para los demás esos campos, si llegan, se ignoran.
    * La foto de checada no entra por aquí: esto escribe `User.avatarUrl`.
    */
   async actualizarFoto(
     sesion: UsuarioSesion,
     userId: number,
-    cambio: { avatarUrl?: string | null; telefono?: string },
+    cambio: {
+      avatarUrl?: string | null;
+      telefono?: string;
+      nombre?: string;
+      roleKey?: string;
+      departmentId?: number;
+      managerId?: number;
+      employeeNumber?: string;
+    },
     companyId: number,
   ) {
     const actor = await this.actor(sesion);
     if (!(await this.tieneSubordinados(actor.id, companyId))) {
-      throw new ForbiddenException('Solo quien tiene personal a su cargo puede cambiar estas fotos.');
+      throw new ForbiddenException('Solo quien tiene personal a su cargo puede editar perfiles.');
     }
     const concesiones = await this.concesiones(companyId);
     const direccion = esDireccion(actor, PLATFORM_OWNER_EMAIL);
@@ -388,21 +447,57 @@ export class UsersDelegationService {
     }
     const destino = await this.prisma.user.findFirst({
       where: { id: userId, companyMemberships: { some: { companyId } } },
-      select: { id: true, nombre: true, managerId: true, avatarUrl: true, isActive: true },
+      select: { id: true, nombre: true, email: true, managerId: true, avatarUrl: true, isActive: true },
     });
     if (!destino || destino.isActive === false) throw new BadRequestException('No encontramos a esa persona.');
-    if (!direccion && destino.managerId !== actor.id) {
-      throw new ForbiddenException('Solo puedes cambiar la foto de quien te reporta.');
+    if (isPlatformOwnerEmail(destino.email) || isDeveloperSuperAdminEmail(destino.email)) {
+      throw new ForbiddenException('Esa cuenta no se edita desde aquí.');
     }
+    if (!direccion && destino.managerId !== actor.id) {
+      throw new ForbiddenException('Solo puedes editar a quien te reporta.');
+    }
+    const soloDireccion = ['roleKey', 'departmentId', 'managerId', 'employeeNumber'] as const;
+    if (!direccion && soloDireccion.some((campo) => cambio[campo] !== undefined)) {
+      throw new ForbiddenException('Rol, departamento, jefe y número de empleado solo los cambia dirección.');
+    }
+
     const telefono = cambio.telefono !== undefined ? String(cambio.telefono).trim() : undefined;
     if (telefono !== undefined && !telefonoAceptable(telefono, true)) {
       throw new BadRequestException('Escribe un teléfono de 10 dígitos.');
     }
+    const nombre = cambio.nombre !== undefined ? String(cambio.nombre).trim() : undefined;
+    if (nombre !== undefined && nombre.length < 3) throw new BadRequestException('Escribe el nombre completo.');
     const avatarUrl = String(cambio.avatarUrl ?? '').trim();
-    if (!avatarUrl && telefono === undefined) throw new BadRequestException('No hay nada que cambiar.');
 
-    if (avatarUrl) {
-      await this.prisma.user.update({ where: { id: destino.id }, data: { avatarUrl } });
+    const data: Record<string, unknown> = {};
+    if (avatarUrl) data.avatarUrl = avatarUrl;
+    if (nombre !== undefined) data.nombre = nombre;
+
+    if (direccion && cambio.roleKey !== undefined) {
+      const rol = await this.prisma.role.findFirst({ where: { orgRoleKey: cambio.roleKey }, select: { id: true } });
+      if (!rol) throw new BadRequestException('Ese tipo de usuario no está configurado. Avisa a dirección.');
+      data.roleId = rol.id;
+    }
+    if (direccion && cambio.departmentId !== undefined) {
+      data.departmentId = cambio.departmentId;
+    }
+    if (direccion && cambio.managerId !== undefined) {
+      if (cambio.managerId === destino.id) throw new BadRequestException('No puede ser su propio jefe.');
+      data.managerId = cambio.managerId;
+    }
+    if (direccion && cambio.employeeNumber !== undefined) {
+      data.employeeNumber = String(cambio.employeeNumber).trim();
+    }
+
+    if (!Object.keys(data).length && telefono === undefined) {
+      throw new BadRequestException('No hay nada que cambiar.');
+    }
+
+    // Reusa UsersService.update (resuelve rol/depto/jefe, sincroniza el número de empleado y
+    // empuja el cambio a control de acceso) en vez de tocar la fila a mano.
+    let actualizado: any = destino;
+    if (Object.keys(data).length) {
+      actualizado = await this.users.update(destino.id, data as UpdateUserDto, companyId);
     }
     if (telefono !== undefined) {
       await this.prisma.userProfile.upsert({
@@ -418,7 +513,7 @@ export class UsersDelegationService {
           entityType: 'User',
           entityId: destino.id,
           action: 'AVATAR_DELEGATED',
-          changes: { creadoPor: actor.id, conFoto: Boolean(avatarUrl) },
+          changes: { editadoPor: actor.id, campos: [...Object.keys(data), ...(telefono !== undefined ? ['telefono'] : [])] },
           companyId,
         },
         actor.id,
@@ -427,10 +522,14 @@ export class UsersDelegationService {
 
     return {
       id: destino.id as number,
-      nombre: destino.nombre as string,
+      nombre: (actualizado.nombre as string | undefined) ?? destino.nombre,
       avatarUrl: avatarUrl || destino.avatarUrl || null,
       previousAvatar: (destino.avatarUrl as string | null) ?? null,
       telefono: telefono ?? null,
+      roleKey: (actualizado.roleKey as string | null | undefined) ?? null,
+      departmentId: (actualizado.departmentId as number | null | undefined) ?? null,
+      managerId: (actualizado.managerId as number | null | undefined) ?? null,
+      employeeNumber: (actualizado.employeeNumber as string | null | undefined) ?? null,
     };
   }
 }

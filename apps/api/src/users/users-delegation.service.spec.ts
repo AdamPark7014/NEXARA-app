@@ -23,8 +23,19 @@ const ROLES: Record<string, any> = {
   dir_admin: { id: 103, accesoConsoleAdmin: true },
 };
 
+const ROLE_ID_TO_KEY: Record<number, string> = Object.fromEntries(Object.entries(ROLES).map(([k, r]) => [r.id, k]));
+
 function crear(opts: { grants?: string | null; sinRol?: string; sinSubordinados?: boolean; departamentos?: { id: number; nombre: string }[] } = {}) {
   const create = jest.fn(async (dto: any) => ({ id: 500, nombre: dto.nombre, email: dto.email, departmentId: dto.departmentId, employeeNumber: 'NX-500', avatarUrl: dto.avatarUrl ?? null, passwordHash: 'x' }));
+  const update = jest.fn(async (id: number, data: any) => ({
+    id,
+    nombre: data.nombre,
+    avatarUrl: data.avatarUrl,
+    roleKey: data.roleId != null ? ROLE_ID_TO_KEY[data.roleId] ?? null : undefined,
+    departmentId: data.departmentId,
+    managerId: data.managerId,
+    employeeNumber: data.employeeNumber,
+  }));
   const log = jest.fn(async () => ({}));
   const prisma: any = {
     systemSetting: { findMany: jest.fn(async () => (opts.grants === null ? [] : [{ companyId: 7, value: opts.grants ?? GRANTS }])) },
@@ -42,7 +53,7 @@ function crear(opts: { grants?: string | null; sinRol?: string; sinSubordinados?
     userProfile: { upsert: jest.fn(async (args: any) => args) },
     role: { findFirst: jest.fn(async ({ where }: any) => (where.orgRoleKey === opts.sinRol ? null : ROLES[where.orgRoleKey] ?? null)) },
   };
-  return { servicio: new UsersDelegationService(prisma, { create } as any, { log } as any), create, log, prisma };
+  return { servicio: new UsersDelegationService(prisma, { create, update } as any, { log } as any), create, update, log, prisma };
 }
 
 const alta = (roleKey: string, extra: Record<string, unknown> = {}) => ({
@@ -205,14 +216,58 @@ describe('UsersDelegationService.crear', () => {
   it('Antonio cambia la foto de quien le reporta; no la de otro. Christian sí puede con cualquiera', async () => {
     const { servicio, prisma } = crear();
     prisma.user.findFirst.mockImplementation(async ({ where }: any) => {
-      if (where.id === 57) return { id: 57, nombre: 'Instalador', managerId: 2, avatarUrl: '/uploads/users/vieja.jpg', isActive: true };
-      if (where.id === 8) return { id: 8, nombre: 'David', managerId: 1, avatarUrl: null, isActive: true };
+      if (where.id === 57) return { id: 57, nombre: 'Instalador', email: 'inst@nexara.com.mx', managerId: 2, avatarUrl: '/uploads/users/vieja.jpg', isActive: true };
+      if (where.id === 8) return { id: 8, nombre: 'David', email: 'operaciones@nexara.com.mx', managerId: 1, avatarUrl: null, isActive: true };
       return null;
     });
     const propia = await servicio.actualizarFoto({ id: 2 }, 57, { avatarUrl: '/uploads/users/nueva.jpg' }, 7);
     expect(propia).toMatchObject({ id: 57, avatarUrl: '/uploads/users/nueva.jpg', previousAvatar: '/uploads/users/vieja.jpg' });
     await expect(servicio.actualizarFoto({ id: 2 }, 8, { avatarUrl: '/uploads/users/no.jpg' }, 7)).rejects.toBeInstanceOf(ForbiddenException);
     await expect(servicio.actualizarFoto({ id: 1 }, 8, { avatarUrl: '/uploads/users/ceo.jpg' }, 7)).resolves.toMatchObject({ id: 8 });
+  });
+
+  it('el nombre lo cambia cualquiera con el permiso; rol, departamento, jefe y número de empleado, no', async () => {
+    const { servicio, update, prisma } = crear();
+    prisma.user.findFirst.mockImplementation(async ({ where }: any) =>
+      where.id === 57 ? { id: 57, nombre: 'Instalador', email: 'inst@nexara.com.mx', managerId: 2, avatarUrl: null, isActive: true } : null,
+    );
+    const r = await servicio.actualizarFoto({ id: 2 }, 57, { nombre: 'Instalador Nuevo' }, 7);
+    expect(update).toHaveBeenCalledWith(57, { nombre: 'Instalador Nuevo' }, 7);
+    expect(r).toMatchObject({ id: 57, nombre: 'Instalador Nuevo' });
+
+    await expect(servicio.actualizarFoto({ id: 2 }, 57, { roleKey: 'ing_campo' }, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(servicio.actualizarFoto({ id: 2 }, 57, { departmentId: 44 }, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(servicio.actualizarFoto({ id: 2 }, 57, { managerId: 1 }, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(servicio.actualizarFoto({ id: 2 }, 57, { employeeNumber: 'NX-99' }, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it('dirección sí puede cambiar rol, departamento, jefe y número de empleado', async () => {
+    const { servicio, update, prisma } = crear();
+    prisma.user.findFirst.mockImplementation(async ({ where }: any) =>
+      where.id === 8 ? { id: 8, nombre: 'David', email: 'operaciones@nexara.com.mx', managerId: 1, avatarUrl: null, isActive: true } : null,
+    );
+    const r = await servicio.actualizarFoto(
+      { id: 1 },
+      8,
+      { roleKey: 'ing_campo', departmentId: 44, managerId: 3, employeeNumber: 'NX-88' },
+      7,
+    );
+    expect(update).toHaveBeenCalledWith(8, { roleId: 102, departmentId: 44, managerId: 3, employeeNumber: 'NX-88' }, 7);
+    expect(r).toMatchObject({ id: 8, roleKey: 'ing_campo', departmentId: 44, managerId: 3, employeeNumber: 'NX-88' });
+  });
+
+  it('nadie puede quedar como su propio jefe, ni editar al dueño o al developer desde aquí', async () => {
+    const { servicio, prisma } = crear();
+    prisma.user.findFirst.mockImplementation(async ({ where }: any) =>
+      where.id === 8 ? { id: 8, nombre: 'David', email: 'operaciones@nexara.com.mx', managerId: 1, avatarUrl: null, isActive: true } : null,
+    );
+    await expect(servicio.actualizarFoto({ id: 1 }, 8, { managerId: 8 }, 7)).rejects.toBeInstanceOf(BadRequestException);
+
+    prisma.user.findFirst.mockImplementation(async ({ where }: any) =>
+      where.id === 1 ? { id: 1, nombre: 'Christian', email: PLATFORM_OWNER_EMAIL, managerId: null, avatarUrl: null, isActive: true } : null,
+    );
+    await expect(servicio.actualizarFoto({ id: 1 }, 1, { nombre: 'Otro' }, 7)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('David ve el formulario básico con el rol automático; Christian el completo', async () => {
@@ -236,20 +291,32 @@ describe('UsersDelegationService.crear', () => {
     prisma.user.findMany.mockImplementation(async ({ select }: any) =>
       select?.email
         ? [
-            { id: 2, nombre: 'Antonio', email: 'jose.ramirez@nexara.com.mx', avatarUrl: '/uploads/users/a.jpg', perfil: { telefono: '5511111111' } },
-            { id: 3, nombre: 'David', email: 'operaciones@nexara.com.mx', avatarUrl: null, perfil: null },
-            { id: 9, nombre: 'Dev', email: PLATFORM_DEVELOPER_EMAIL, avatarUrl: null, perfil: null },
+            {
+              id: 2,
+              nombre: 'Antonio',
+              email: 'jose.ramirez@nexara.com.mx',
+              avatarUrl: '/uploads/users/a.jpg',
+              roleKey: 'ing_soporte',
+              departmentId: 20,
+              managerId: 1,
+              employeeNumber: 'NX-2',
+              perfil: { telefono: '5511111111' },
+            },
+            { id: 3, nombre: 'David', email: 'operaciones@nexara.com.mx', avatarUrl: null, roleKey: 'coord_operaciones', departmentId: 30, managerId: 1, employeeNumber: null, perfil: null },
+            { id: 9, nombre: 'Dev', email: PLATFORM_DEVELOPER_EMAIL, avatarUrl: null, roleKey: 'dev', departmentId: null, managerId: null, employeeNumber: null, perfil: null },
           ]
-        : [{ id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, perfil: { telefono: null } }],
+        : [{ id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, roleKey: 'ing_soporte', departmentId: 20, managerId: 2, employeeNumber: null, perfil: { telefono: null } }],
     );
 
     const christian = await servicio.contexto({ id: 1 }, 7);
     expect(christian.equipo).toEqual([
-      { id: 2, nombre: 'Antonio', avatarUrl: '/uploads/users/a.jpg', telefono: '5511111111' },
-      { id: 3, nombre: 'David', avatarUrl: null, telefono: null },
+      { id: 2, nombre: 'Antonio', avatarUrl: '/uploads/users/a.jpg', telefono: '5511111111', roleKey: 'ing_soporte', departmentId: 20, managerId: 1, employeeNumber: 'NX-2' },
+      { id: 3, nombre: 'David', avatarUrl: null, telefono: null, roleKey: 'coord_operaciones', departmentId: 30, managerId: 1, employeeNumber: null },
     ]);
 
     const antonio = await servicio.contexto({ id: 2 }, 7);
-    expect(antonio.equipo).toEqual([{ id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, telefono: null }]);
+    expect(antonio.equipo).toEqual([
+      { id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, telefono: null, roleKey: 'ing_soporte', departmentId: 20, managerId: 2, employeeNumber: null },
+    ]);
   });
 });

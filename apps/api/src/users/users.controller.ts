@@ -175,7 +175,10 @@ export class UsersController {
     );
   }
 
-  /** Foto fija o teléfono de alguien del equipo. No usa la selfie de checada ni la de entrada/salida. */
+  /**
+   * Edita a alguien del equipo: foto, teléfono, nombre y (solo dirección) rol/departamento/jefe/
+   * número de empleado. No usa la selfie de checada ni la de entrada/salida.
+   */
   @Patch('delegated/:id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @UseInterceptors(FileInterceptor('avatar', buildAvatarUploadOptions(__dirname)))
@@ -190,11 +193,28 @@ export class UsersController {
     const resultado = await this.delegation.actualizarFoto(
       user,
       id,
-      { avatarUrl: file ? `/uploads/users/${file.filename}` : undefined, telefono: body.telefono },
+      {
+        avatarUrl: file ? `/uploads/users/${file.filename}` : undefined,
+        telefono: body.telefono,
+        nombre: body.nombre,
+        roleKey: body.roleKey,
+        departmentId: body.departmentId,
+        managerId: body.managerId,
+        employeeNumber: body.employeeNumber,
+      },
       companyId,
     );
     this.olvidarAvatar(resultado.previousAvatar, resultado.avatarUrl);
-    return { id: resultado.id, nombre: resultado.nombre, avatarUrl: resultado.avatarUrl, telefono: resultado.telefono };
+    return {
+      id: resultado.id,
+      nombre: resultado.nombre,
+      avatarUrl: resultado.avatarUrl,
+      telefono: resultado.telefono,
+      roleKey: resultado.roleKey ?? null,
+      departmentId: resultado.departmentId,
+      managerId: resultado.managerId,
+      employeeNumber: resultado.employeeNumber,
+    };
   }
 
   @Get()

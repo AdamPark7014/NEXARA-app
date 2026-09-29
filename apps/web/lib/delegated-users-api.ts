@@ -16,6 +16,10 @@ export type PersonaEquipo = {
   nombre: string;
   avatarUrl: string | null;
   telefono: string | null;
+  roleKey: string | null;
+  departmentId: number | null;
+  managerId: number | null;
+  employeeNumber: string | null;
 };
 
 export type ContextoAlta = {
@@ -167,14 +171,37 @@ export async function crearUsuarioDelegado(token: string, alta: AltaUsuario): Pr
   return (await res.json()) as UsuarioCreado;
 }
 
-/** Cambia la foto fija (o el teléfono) de alguien que ya está en el equipo. */
-export async function cambiarFotoEquipo(
-  token: string,
-  userId: number,
-  cambio: { foto?: File | null; telefono?: string },
-): Promise<{ id: number; nombre: string; avatarUrl: string | null }> {
+export type EdicionPersona = {
+  foto?: File | null;
+  telefono?: string;
+  nombre?: string;
+  /** Estos cuatro solo los respeta el API si quien edita es dirección. */
+  roleKey?: string;
+  departmentId?: number;
+  managerId?: number;
+  employeeNumber?: string;
+};
+
+export type PersonaEditada = {
+  id: number;
+  nombre: string;
+  avatarUrl: string | null;
+  telefono: string | null;
+  roleKey: string | null;
+  departmentId: number | null;
+  managerId: number | null;
+  employeeNumber: string | null;
+};
+
+/** Edita a alguien que ya está en el equipo: foto, teléfono, nombre y, si eres dirección, rol/departamento/jefe/número. */
+export async function editarPersonaEquipo(token: string, userId: number, cambio: EdicionPersona): Promise<PersonaEditada> {
   const cuerpo = new FormData();
   if (cambio.telefono) cuerpo.append("telefono", cambio.telefono);
+  if (cambio.nombre) cuerpo.append("nombre", cambio.nombre);
+  if (cambio.roleKey) cuerpo.append("roleKey", cambio.roleKey);
+  if (cambio.departmentId) cuerpo.append("departmentId", String(cambio.departmentId));
+  if (cambio.managerId) cuerpo.append("managerId", String(cambio.managerId));
+  if (cambio.employeeNumber) cuerpo.append("employeeNumber", cambio.employeeNumber);
   if (cambio.foto) cuerpo.append("avatar", cambio.foto, cambio.foto.name || "avatar.jpg");
   const res = await fetch(buildApiUrl(`users/delegated/${userId}`), {
     method: "PATCH",
@@ -182,8 +209,8 @@ export async function cambiarFotoEquipo(
     credentials: "include",
     body: cuerpo,
   });
-  if (!res.ok) throw new Error(await mensajeDeError(res, "No se pudo cambiar la foto."));
-  return (await res.json()) as { id: number; nombre: string; avatarUrl: string | null };
+  if (!res.ok) throw new Error(await mensajeDeError(res, "No se pudo guardar el cambio."));
+  return (await res.json()) as PersonaEditada;
 }
 
 // Sin 0/O, 1/l/I: se lee y se dicta sin confusiones.

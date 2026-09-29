@@ -2,6 +2,21 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-29
+- **Hecho (editar perfiles, no solo la foto):** Adam probó `/erp/perfiles` y solo tenía «Cambiar foto» por persona; pidió poder
+  editar de verdad. El botón por persona pasa a «Editar» y abre un modal con foto, nombre y teléfono (los cambia cualquiera con
+  el permiso, con quien le reporta; dirección con cualquiera de la empresa). Si quien edita es dirección, el modal suma tipo de
+  usuario, departamento, jefe y número de empleado — para los demás esos cuatro ni se muestran, y si llegaran igual al API los
+  rechaza con 403 (`UsersDelegationService.actualizarFoto`, nombre sin cambiar por no romper la firma que ya usa el controlador).
+  Esos cuatro campos ahora reusan `UsersService.update` en vez de un `prisma.user.update` a mano: valida rol/departamento/jefe
+  contra la empresa, sincroniza el número de empleado en la membresía y empuja el cambio a control de acceso (ACS), igual que
+  la edición general de usuarios — antes se perdía ese empuje si se editaba desde aquí. Nadie puede quedar como su propio jefe;
+  ni el dueño ni la cuenta de desarrollo se editan desde este módulo (antes no había ese candado). `equipoDirecto()`/
+  `equipoCompania()` ahora también traen `roleKey`/`departmentId`/`managerId`/`employeeNumber` de cada persona para que el modal
+  llegue precargado. Tipos `PersonaEquipo` (API y web) y `UpdateDelegatedUserDto` crecieron con esos cuatro campos opcionales.
+  `apps/web/lib/delegated-users-api.ts`: `cambiarFotoEquipo` → `editarPersonaEquipo` (único caller, `AltaUsuarioPanel.tsx`, ya
+  actualizado). Sin migración. Pruebas nuevas en `users-delegation.service.spec.ts` (permiso por campo, auto-jefe, cuentas
+  protegidas) y `AltaUsuarioPanel.spec.tsx` (edición con y sin permiso de dirección). Verificado: API `tsc` 0, jest 245/2 947 en
+  verde (incluida `users-delegation.service.spec.ts` con 21 pruebas); web `tsc` 0, vitest 78/671 en verde. **Falta desplegar.**
 - **Hecho (Perfiles, segundo intento — página propia):** el primer intento metía Perfiles dentro de Organigrama; Adam dijo que
   no, tenía otro plan para esa página. Reconstruido como `/erp/perfiles` (nueva, propia): sin permiso avisa «Aquí no hay nada
   para ti todavía»; con permiso muestra exactamente lo mismo que antes (alta, fotos del equipo, botón «Mi perfil»). Organigrama
