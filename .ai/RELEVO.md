@@ -2,6 +2,22 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-29
+- **Hecho (bug real: `/erp/perfiles` no abría para David, Antonio y Luis):** Adam probó con la cuenta de
+  David (coordinador de operaciones) y el ítem «Perfiles» del menú se veía, pero al entrar rebotaba —
+  igual le habría pasado a Antonio y Luis. Causa: `page-matrix.ts` (RBAC v2 del frontend, whitelist de
+  páginas por rol) nunca tuvo `/erp/perfiles` registrado; `AppShell.tsx` tiene un guard
+  (`accessGuardWarning` = `!canUserAccessPath(...)`) que redirige a la entrada del panel apenas detecta
+  una ruta fuera de la whitelist del rol — el swap del ítem del menú («Mi perfil» → «Perfiles») usa un
+  chequeo distinto (`cargarContextoAlta`), así que el link SÍ aparecía pero la página nunca cargaba. Solo
+  CEO, `super_admin` y `dir_admin` tienen `/erp/**` y por eso a mí (probando como Christian) nunca me
+  tocó. Agregado `'/erp/perfiles'` junto a `'/erp/my-profile'` en los 14 roles que no tienen ese comodín
+  (arquitecto, dir_operaciones, coord_admin, administrativo, coord_operaciones, ing_campo, ing_soporte,
+  enc_soporte, coord_ventas, vendedor, lider_diseno, disenador, rh, contabilidad). `cliente` (portal)
+  sigue sin acceso, correcto. Prueba nueva en `page-matrix.spec.ts` que cubre los 14 roles + CEO/dir_admin
+  (sí) + cliente (no), para que no se vuelva a colar. Sin migración. Verificado: web `tsc` 0, vitest
+  78/672 en verde. **Falta desplegar.**
+- **Pedido de Adam en el mismo turno:** en el modal de editar perfil, «Jefe» → «Jefe directo» (creación y
+  edición, `AltaUsuarioPanel.tsx`). Ya aplicado, sin pruebas que lo referenciaran por texto.
 - **Hecho (editar perfiles, no solo la foto):** Adam probó `/erp/perfiles` y solo tenía «Cambiar foto» por persona; pidió poder
   editar de verdad. El botón por persona pasa a «Editar» y abre un modal con foto, nombre y teléfono (los cambia cualquiera con
   el permiso, con quien le reporta; dirección con cualquiera de la empresa). Si quien edita es dirección, el modal suma tipo de

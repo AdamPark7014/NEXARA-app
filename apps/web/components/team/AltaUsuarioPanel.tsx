@@ -339,7 +339,7 @@ export default function AltaUsuarioPanel() {
                   </select>
                 </label>
                 <label style={campo}>
-                  Jefe
+                  Jefe directo
                   <select style={entrada} value={managerId} onChange={(e) => setManagerId(e.target.value)}>
                     <option value="">Tú</option>
                     {ctx.jefes.map((j) => (
@@ -432,7 +432,7 @@ export default function AltaUsuarioPanel() {
                 </select>
               </label>
               <label style={campo}>
-                Jefe
+                Jefe directo
                 <select style={entrada} value={managerIdEquipo} onChange={(e) => setManagerIdEquipo(e.target.value)}>
                   <option value="">Sin cambio</option>
                   {ctx.jefes.map((j) => (
