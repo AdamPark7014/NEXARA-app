@@ -1,8 +1,6 @@
-# Alta de usuarios y «Perfiles»
+# Alta de usuarios
 
 El módulo está en `/erp/organigrama`. Solo lo ve quien tiene **subordinados directos** (`managerId`, activos, de su empresa; el lateral del organigrama no cuenta) y además puede crear algún tipo. El API repite esa regla: sin subordinados, `GET /api/users/delegated/contexto` trae `puede: false` y `POST /api/users/delegated` responde 403.
-
-**«Mi perfil» pasa a «Perfiles»** en el menú de la cuenta (abajo a la izquierda) para quien tiene ese permiso — lleva directo a Organigrama en vez de al formulario de un solo perfil. Ahí, además de dar de alta, ve la lista de fotos de su gente (con «Cambiar foto») y un botón «Mi perfil» para editar el suyo. Quien no tiene el permiso sigue viendo «Mi perfil» normal. Dirección ve **toda la empresa** en esa lista (menos él mismo, el dueño y la cuenta de desarrollo); un encargado como Antonio, Luis o David solo ve a quien le reporta directo.
 
 El tipo que cada quien crea sale de la política `users.creation_grants` (por correo, no por rol: David y Luis comparten `coord_operaciones`). Dirección no necesita esa fila.
 
