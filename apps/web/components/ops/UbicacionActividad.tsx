@@ -279,7 +279,9 @@ export default function UbicacionActividadCard({
             Ubicación de la actividad
           </h3>
           <p style={{ margin: "2px 0 0", fontSize: 12.5, lineHeight: 1.4, color: "var(--text-secondary)" }}>
-            Mantente a no más de {radio} m del punto donde iniciaste: la foto de salida solo se acepta dentro de ese radio.
+            {estado?.exigeMismaUbicacion === true
+              ? `Mantente a no más de ${radio} m del punto donde iniciaste: la foto de salida solo se acepta dentro de ese radio.`
+              : "La foto de salida lleva tu ubicación. En esta área no hace falta que coincida con el punto de inicio."}
           </p>
         </div>
         {chipEstado}

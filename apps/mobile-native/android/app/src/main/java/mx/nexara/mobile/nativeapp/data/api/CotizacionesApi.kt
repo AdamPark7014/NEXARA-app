@@ -52,6 +52,11 @@ interface CotizacionesApi {
     @Streaming
     @GET("cotizaciones/{id}/pdf")
     suspend fun pdf(@Path("id") id: Long): ResponseBody
+
+    /** PDF interno: costo, markup y precio. La API responde 403 si el rol no ve costos. */
+    @Streaming
+    @GET("cotizaciones/{id}/pdf/internal")
+    suspend fun pdfInterno(@Path("id") id: Long): ResponseBody
 }
 
 // ── Piezas compartidas por la lista y el detalle ─────────────────────────────

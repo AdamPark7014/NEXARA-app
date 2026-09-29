@@ -224,6 +224,33 @@ export function margenDesdePrecio(costo: number, precio: number): number {
   return Math.round((Number(precio) / Number(costo) - 1) * 10000) / 100;
 }
 
+/** Margen usable: el de la partida, si no el general, si no el 20 % de captura. */
+export function margenParaPrecio(
+  propio: number | null | undefined,
+  general: number | null | undefined,
+): number {
+  if (propio != null && Number.isFinite(Number(propio))) return Number(propio);
+  if (general != null && Number.isFinite(Number(general))) return Number(general);
+  return MARGEN_SOBRE_COSTO;
+}
+
+/**
+ * Aplica el margen general a las partidas que no tienen el suyo.
+ * Si la partida trae `marginPercent` (aunque sea 0), se queda. Sin costo, también.
+ * Si el general se borra (`null`), los precios guardados no se recalculan.
+ */
+export function aplicarMargenGeneral<T extends { marginPercent?: number | null; unitCost?: number | null; unitPrice: number }>(
+  partidas: T[],
+  general: number | null,
+): T[] {
+  if (general == null || !Number.isFinite(Number(general))) return partidas;
+  return partidas.map((p) => {
+    if (p.marginPercent != null && Number.isFinite(Number(p.marginPercent))) return p;
+    if (!(Number(p.unitCost) > 0)) return p;
+    return { ...p, marginPercent: null, unitPrice: precioConMargenSobreCosto(Number(p.unitCost), Number(general)) };
+  });
+}
+
 export type PartidaEditor = PartidaCotizacion & { key: string };
 
 export function partidaNueva(parcial: Partial<PartidaCotizacion> = {}): PartidaEditor {
@@ -362,6 +389,11 @@ export type DocumentoCotizacion = {
   issueDate: string;
   validUntil: string;
   depositPercent: number;
+  /**
+   * Markup general sobre el costo. Una partida lo hereda si su `marginPercent` es null.
+   * `null` = cada partida usa el suyo (o el 20 % al capturar el costo).
+   */
+  marginPercent: number | null;
   /** Tiempo de entrega legado (`Cotizacion.deliveryTime`). Si las condiciones no traen el suyo, el PDF lo usa. */
   deliveryTime: string;
   partidas: PartidaEditor[];
@@ -405,6 +437,7 @@ export function documentoVacio(segmento: Segmento = "COMERCIAL", hoy = new Date(
     issueDate: emision,
     validUntil: sumarDias(emision, 15),
     depositPercent: 50,
+    marginPercent: MARGEN_SOBRE_COSTO,
     deliveryTime: "",
     partidas: [],
     terminos: {},
@@ -436,6 +469,10 @@ export function documentoDesdeDetalle(d: CotizacionDetalle): DocumentoCotizacion
     issueDate: fechaCorta(d.issueDate) || hoyISO(),
     validUntil: fechaCorta(d.validUntil),
     depositPercent: Number(d.depositPercent ?? 50),
+    marginPercent:
+      d.marginPercent == null || d.marginPercent === ("" as unknown) || !Number.isFinite(Number(d.marginPercent))
+        ? null
+        : Number(d.marginPercent),
     deliveryTime: d.deliveryTime?.trim() ?? "",
     partidas: partidasDesdeApi(d.items),
     terminos: terminosPropiosDeDetalle(d),
@@ -517,6 +554,10 @@ export function payloadDeDocumento(doc: DocumentoCotizacion): GuardarCotizacion 
     }),
     alcanceBloques: bloquesParaApi(doc.bloques),
     depositPercent: Math.min(100, Math.max(0, Math.round(Number(doc.depositPercent) || 0))),
+    marginPercent:
+      doc.marginPercent == null || !Number.isFinite(Number(doc.marginPercent))
+        ? null
+        : Math.round(Math.min(1000, Math.max(-100, Number(doc.marginPercent))) * 100) / 100,
     note: escribirTerminos(doc.terminos),
     items: partidasParaApi(doc.partidas),
     currency: doc.moneda,

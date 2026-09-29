@@ -246,6 +246,8 @@ const ActivityEvidenceFlow = () => {
 
   /** Mensaje de bloqueo si `punto` queda fuera del radio del inicio; `null` si puede registrar la salida. */
   const bloqueoPorZona = (punto: PuntoGeo | null): string | null => {
+    // Sin la bandera del API (o en false) no se pre-bloquea: la regla es solo Servicios.
+    if (geocerca.estado?.exigeMismaUbicacion !== true) return null;
     const origen = origenActividad();
     const aqui = punto ? puntoReal(punto.latitude, punto.longitude) : null;
     if (!origen || !aqui) return null;
@@ -2783,10 +2785,16 @@ const ActivityEvidenceFlow = () => {
             Toma la foto de salida en el sitio. Se capturará automáticamente tu ubicación GPS — es
             obligatoria para cerrar la actividad.
           </p>
-          <p className={styles.stepDescription}>
-            Debe tomarse a no más de {geocerca.estado?.radioM ?? RADIO_ACTIVIDAD_M} m del punto donde
-            iniciaste la actividad.
-          </p>
+          {geocerca.estado?.exigeMismaUbicacion === true ? (
+            <p className={styles.stepDescription}>
+              Debe tomarse a no más de {geocerca.estado?.radioM ?? RADIO_ACTIVIDAD_M} m del punto donde
+              iniciaste la actividad.
+            </p>
+          ) : (
+            <p className={styles.stepDescription}>
+              En esta área la foto de salida no tiene que coincidir con el punto de inicio.
+            </p>
+          )}
           {zonaSalidaError && !pendingPhoto ? (
             <div style={{ marginBottom: 12 }}>
               <AvisoFueraDeZona mensaje={zonaSalidaError} />

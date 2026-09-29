@@ -3,6 +3,7 @@ import {
   calculateTotals,
   maxDiscountPercent,
   normalizeItems,
+  precioConMargenSobreCosto,
   type NormalizedCotizacionItem,
 } from './cotizacion-totals.js';
 
@@ -86,6 +87,24 @@ describe('normalizeItems', () => {
     const [row] = normalizeItems([{ laborHours: -4, laborRate: -100 }]);
     expect(row.laborHours).toBe(0);
     expect(row.laborRate).toBe(0);
+  });
+
+  it('el margen es markup sobre el costo: 20% de 100 son 120', () => {
+    expect(precioConMargenSobreCosto(100, 20)).toBe(120);
+  });
+
+  it('el margen general aplica a la partida que no tiene el suyo y no pisa el de la que sí', () => {
+    const [heredada, propia] = normalizeItems(
+      [
+        { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 0, marginPercent: null },
+        { name: 'Licencia', qty: 1, unitCost: 100, unitPrice: 150, marginPercent: 50 },
+      ],
+      25,
+    );
+    expect(heredada.unitPrice).toBe(125);
+    expect(heredada.marginPercent).toBeNull();
+    expect(propia.unitPrice).toBe(150);
+    expect(propia.marginPercent).toBe(50);
   });
 });
 

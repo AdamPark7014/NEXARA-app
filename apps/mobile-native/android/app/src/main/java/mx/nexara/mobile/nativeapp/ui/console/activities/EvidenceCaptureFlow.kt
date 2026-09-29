@@ -296,10 +296,12 @@ fun EvidenceCaptureFlow(
             val cerca = geocerca ?: runCatching { withContext(Dispatchers.IO) { repo.geocerca(activity.id) } }
                 .getOrNull()
                 ?.also { geocerca = it }
-            val distancia = ActivityGeofence.distanciaAlInicio(cerca, lat, lng)
-            if (distancia != null && distancia > (cerca?.radioM ?: ActivityGeofence.RADIO_M)) {
-                pendingError = ActivityGeofence.mensajeSalida(distancia, cerca?.radioM ?: ActivityGeofence.RADIO_M)
-                return false
+            if (cerca?.exigeMismaUbicacion == true) {
+                val distancia = ActivityGeofence.distanciaAlInicio(cerca, lat, lng)
+                if (distancia != null && distancia > (cerca.radioM ?: ActivityGeofence.RADIO_M)) {
+                    pendingError = ActivityGeofence.mensajeSalida(distancia, cerca.radioM ?: ActivityGeofence.RADIO_M)
+                    return false
+                }
             }
         }
         busy = true

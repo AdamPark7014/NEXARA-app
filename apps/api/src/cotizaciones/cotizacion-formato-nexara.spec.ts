@@ -139,6 +139,7 @@ describe('formato Nexara', () => {
     expect(texto).toContain('NEW ENGINEERING EXPERTISE AND RESOURCE ADVANCEMENT S.A. DE C.V.');
     expect(texto).not.toContain('169516');
     expect(texto).not.toContain('Costo');
+    expect(texto).not.toContain('Margen');
   });
 
   it('la descripción larga, con saltos y viñetas, sale completa y sigue en la hoja siguiente', async () => {

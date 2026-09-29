@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } 
 import { smartQuoteSearch, type SmartOffer } from "@/lib/smart-quote-api";
 import { GRUPOS_PARTIDA, GRUPO_LABEL, formatoMoneda, type GrupoPartida } from "@/lib/cotizaciones-api";
 import {
-  MARGEN_SOBRE_COSTO,
   UNIDADES,
   importeDeLinea,
   margenDesdePrecio,
+  margenParaPrecio,
   mover,
   partidaNueva,
   precioConMargenSobreCosto,
@@ -254,6 +254,7 @@ export default function TablaPartidas({
   token,
   totales,
   columnas = SIN_EXTRAS,
+  margenGeneral = null,
 }: {
   partidas: PartidaEditor[];
   setPartidas: (f: (p: PartidaEditor[]) => PartidaEditor[]) => void;
@@ -261,6 +262,8 @@ export default function TablaPartidas({
   moneda: string;
   token: string | null;
   totales: Totales;
+  /** Markup de la cotización. La partida lo hereda si su margen está vacío. */
+  margenGeneral?: number | null;
   /** Columnas opcionales de «Personalizar» (marca/modelo, descuento, imagen). */
   columnas?: ColumnasOpcionales;
 }) {
@@ -291,23 +294,37 @@ export default function TablaPartidas({
   const cambiar = (key: string, cambio: Partial<PartidaEditor>) =>
     setPartidas((lista) => lista.map((p) => (p.key === key ? { ...p, ...cambio } : p)));
 
-  /** Costo interno: el precio de venta sale del margen sobre el costo (20% si aún no hay). */
+  /** Costo interno. El margen vacío hereda el general (o 20 % al capturar) y no se estampa en la partida. */
   const ponerCosto = (p: PartidaEditor, costo: number) => {
     if (!Number.isFinite(costo) || costo <= 0) {
       cambiar(p.key, { unitCost: null });
       return;
     }
-    const margen = p.marginPercent == null || !Number.isFinite(Number(p.marginPercent)) ? MARGEN_SOBRE_COSTO : Number(p.marginPercent);
-    cambiar(p.key, { unitCost: costo, marginPercent: margen, unitPrice: precioConMargenSobreCosto(costo, margen) });
+    const propio =
+      p.marginPercent != null && Number.isFinite(Number(p.marginPercent)) ? Number(p.marginPercent) : null;
+    const margen = margenParaPrecio(propio, margenGeneral);
+    cambiar(p.key, {
+      unitCost: costo,
+      marginPercent: propio,
+      unitPrice: precioConMargenSobreCosto(costo, margen),
+    });
   };
 
   const ponerMargen = (p: PartidaEditor, margen: number) => {
-    const m = Number.isFinite(margen) ? margen : MARGEN_SOBRE_COSTO;
-    if (p.unitCost != null && Number(p.unitCost) > 0) {
-      cambiar(p.key, { marginPercent: m, unitPrice: precioConMargenSobreCosto(Number(p.unitCost), m) });
+    if (!Number.isFinite(margen)) {
+      const heredado = margenParaPrecio(null, margenGeneral);
+      if (p.unitCost != null && Number(p.unitCost) > 0) {
+        cambiar(p.key, { marginPercent: null, unitPrice: precioConMargenSobreCosto(Number(p.unitCost), heredado) });
+        return;
+      }
+      cambiar(p.key, { marginPercent: null });
       return;
     }
-    cambiar(p.key, { marginPercent: m });
+    if (p.unitCost != null && Number(p.unitCost) > 0) {
+      cambiar(p.key, { marginPercent: margen, unitPrice: precioConMargenSobreCosto(Number(p.unitCost), margen) });
+      return;
+    }
+    cambiar(p.key, { marginPercent: margen });
   };
 
   const ponerPrecio = (p: PartidaEditor, precio: number) => {
@@ -474,7 +491,7 @@ export default function TablaPartidas({
                 valor={p.marginPercent == null ? Number.NaN : Number(p.marginPercent)}
                 editable={editable}
                 etiqueta={`Margen sobre costo de la partida ${i + 1} (%)`}
-                placeholder={`${MARGEN_SOBRE_COSTO}%`}
+                placeholder={`${margenParaPrecio(null, margenGeneral)}%`}
                 decimales={2}
                 tabIndex={-1}
                 onValor={(n) => ponerMargen(p, n)}
@@ -602,6 +619,7 @@ export default function TablaPartidas({
           columnas={columnas}
           token={token}
           moneda={moneda}
+          margenGeneral={margenGeneral}
           refDe={refDe}
           alSubir={() => {
             const ultima = partidas[partidas.length - 1];
@@ -646,6 +664,7 @@ function FilaNueva({
   columnas,
   token,
   moneda,
+  margenGeneral = null,
   refDe,
   alAgregar,
   alSubir,
@@ -654,6 +673,7 @@ function FilaNueva({
   columnas: ColumnasOpcionales;
   token: string | null;
   moneda: string;
+  margenGeneral?: number | null;
   refDe: (key: string, col: Columna) => (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) => void;
   alAgregar: (p: PartidaEditor) => void;
   alSubir: () => void;
@@ -724,10 +744,10 @@ function FilaNueva({
         unit: "Pieza",
         qty: cantidadSana,
         unitCost: Number(o.costMxn) > 0 ? Number(o.costMxn) : null,
-        marginPercent: Number(o.costMxn) > 0 ? MARGEN_SOBRE_COSTO : null,
+        marginPercent: null,
         unitPrice:
           Number(o.costMxn) > 0
-            ? precioConMargenSobreCosto(Number(o.costMxn), MARGEN_SOBRE_COSTO)
+            ? precioConMargenSobreCosto(Number(o.costMxn), margenParaPrecio(null, margenGeneral))
             : Number(o.sellPriceSuggested || o.precio || 0),
         grupo: "EQUIPOS",
         brand: o.marca ?? null,

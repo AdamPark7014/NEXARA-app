@@ -429,6 +429,8 @@ data class GeocercaAlertaDto(
 
 data class GeocercaDto(
     val activityId: Long? = null,
+    /** Solo Servicios: la foto de salida tiene que coincidir con el inicio. Ausente = no bloquear en el cliente. */
+    val exigeMismaUbicacion: Boolean? = null,
     val radioM: Int? = null,
     val origen: GeocercaOrigenDto? = null,
     val seguimientoActivo: Boolean? = null,

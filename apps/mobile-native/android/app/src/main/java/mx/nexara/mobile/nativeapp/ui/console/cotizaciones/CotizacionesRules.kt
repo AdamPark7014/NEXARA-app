@@ -434,9 +434,11 @@ object CotizacionesRules {
     }
 
     /** Nombre del archivo con el que se guarda el PDF en el teléfono. */
-    fun nombreArchivoPdf(id: Long, folio: String?): String {
+    fun nombreArchivoPdf(id: Long, folio: String?, interno: Boolean = false): String {
         val base = folio?.trim()?.ifEmpty { null } ?: "cotizacion-$id"
-        return base.replace(Regex("[^A-Za-z0-9._-]"), "-").trim('-').ifEmpty { "cotizacion-$id" } + ".pdf"
+        val limpio = base.replace(Regex("[^A-Za-z0-9._-]"), "-").trim('-').ifEmpty { "cotizacion-$id" }
+        val nombre = if (interno) "$limpio-interno" else limpio
+        return "$nombre.pdf"
     }
 
     /** Qué no hace esta pantalla. */

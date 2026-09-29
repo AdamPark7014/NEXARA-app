@@ -171,15 +171,20 @@ class CotizacionDetalleViewModel(app: Application) : AndroidViewModel(app) {
      * Un fallo aquí no toca el detalle que está en pantalla: se avisa aparte,
      * porque no poder bajar el PDF no invalida lo que se está leyendo.
      */
-    fun abrirPdf() {
+    fun abrirPdf() = bajarPdf(interno = false)
+
+    /** Costo, markup y precio. La API responde 403 si el rol no ve costos. */
+    fun abrirPdfInterno() = bajarPdf(interno = true)
+
+    private fun bajarPdf(interno: Boolean) {
         val id = cotizacionId
         if (id <= 0L || _state.value.descargandoPdf) return
         _state.update { it.copy(descargandoPdf = true, errorPdf = null) }
         viewModelScope.launch {
             try {
-                val bytes = repo.pdf(id)
+                val bytes = if (interno) repo.pdfInterno(id) else repo.pdf(id)
                 val app = getApplication<Application>()
-                val nombre = CotizacionesRules.nombreArchivoPdf(id, _state.value.cotizacion?.folio)
+                val nombre = CotizacionesRules.nombreArchivoPdf(id, _state.value.cotizacion?.folio, interno)
                 val archivo = withContext(Dispatchers.IO) { savePdfToCache(app, nombre, bytes) }
                 openFile(app, archivo, "application/pdf")
                 _state.update { it.copy(descargandoPdf = false) }
@@ -187,7 +192,9 @@ class CotizacionDetalleViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         descargandoPdf = false,
-                        errorPdf = e.toUserMessage("No se pudo abrir el PDF de la cotización"),
+                        errorPdf = e.toUserMessage(
+                            if (interno) "No se pudo abrir el PDF interno" else "No se pudo abrir el PDF de la cotización",
+                        ),
                     )
                 }
             }

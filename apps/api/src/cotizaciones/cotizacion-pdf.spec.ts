@@ -1,4 +1,5 @@
 import { generateCotizacionPdf, warrantyLines, type CotizacionPdfPayload } from './cotizacion-pdf';
+import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
 
 const partida = (name: string, warrantyMonths?: number) => ({
   name,
@@ -55,5 +56,29 @@ describe('PDF de cotización', () => {
     expect(buffer.length).toBeGreaterThan(60_000);
     expect(buffer.toString('latin1')).toContain('Montserrat');
     expect(buffer.toString('latin1')).toContain('Inter');
+  });
+
+  it('el PDF interno imprime costo, markup y precio por partida', async () => {
+    const buffer = await generateCotizacionPdf(
+      base([
+        {
+          name: 'Cámara IP 4 MP',
+          qty: 2,
+          unitCost: 100,
+          marginPercent: 20,
+          unitPrice: 120,
+          discount: 0,
+          tax: 16,
+          lineTotal: 240,
+        },
+      ]),
+      { internal: true },
+    );
+    const texto = textoPorHoja(buffer).join('\n');
+    expect(texto).toContain('DOCUMENTO INTERNO');
+    expect(texto).toContain('Costo');
+    expect(texto).toContain('Margen');
+    expect(texto).toContain('20%');
+    expect(texto).toContain('Margen sobre el costo');
   });
 });

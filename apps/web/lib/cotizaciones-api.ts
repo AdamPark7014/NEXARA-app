@@ -244,6 +244,8 @@ export type CotizacionDetalle = {
   planos?: PlanoCotizacion[] | null;
   note?: string | null;
   depositPercent?: number;
+  /** Markup general sobre el costo. Null = cada partida usa el suyo. */
+  marginPercent?: number | null;
   currency?: string | null;
   subtotal: number;
   taxTotal: number;
@@ -319,6 +321,8 @@ export type GuardarCotizacion = {
   issueDate?: string;
   validUntil?: string;
   depositPercent?: number;
+  /** Markup general sobre el costo. `null` lo borra. */
+  marginPercent?: number | null;
   /** Términos reescritos por quien cotiza (solo los que cambió), con sus títulos. */
   note?: string | null;
   activityId?: number;
@@ -465,6 +469,11 @@ export function aplicarPaquete(
 /** URL del PDF «Propuesta técnica» (requiere sesión). */
 export function urlPdfCotizacion(id: number) {
   return buildApiUrl(`cotizaciones/${id}/pdf`);
+}
+
+/** PDF interno: costo, markup y precio. Solo quien ve costos (`cotizaciones.access`). */
+export function urlPdfCotizacionInterno(id: number) {
+  return buildApiUrl(`cotizaciones/${id}/pdf/internal`);
 }
 
 /**

@@ -2,8 +2,9 @@ import { erpFetch } from "@/lib/erp-api";
 
 /**
  * Geocerca de actividades (espejo web de apps/api/src/activities/geofence/geocerca.ts):
- * quien inicia una actividad (foto de entrada con GPS) debe permanecer y registrar la
- * salida dentro de este radio alrededor de ese punto.
+ * quien inicia una actividad (foto de entrada con GPS) se mide contra este radio.
+ * La foto de salida tiene que coincidir con el inicio solo si el responsable es de
+ * Servicios (`exigeMismaUbicacion`). En las demás áreas la foto y el GPS siguen, sin ese tope.
  */
 export const RADIO_ACTIVIDAD_M = 100;
 
@@ -35,6 +36,8 @@ export type GeocercaAlerta = {
 
 export type GeocercaEstado = {
   activityId: number;
+  /** Solo el departamento Servicios: la salida tiene que tomarse donde inició. */
+  exigeMismaUbicacion?: boolean;
   radioM: number;
   origen: (PuntoGeo & { at: string | null }) | null;
   seguimientoActivo: boolean;
