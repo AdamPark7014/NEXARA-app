@@ -1,7 +1,20 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Último turno:** cursor
 - **Fecha:** 2026-09-30
+- **Hecho (cursor, verificación de producción + CI Android):** producción corre `489fe64b` (código
+  idéntico a `135d4533`, que solo añadió este relevo); contenedores `nexara-web`/`nexara-api`
+  recreados 18:46 UTC por otro despliegue y sanos; verificado dentro de los contenedores que el
+  build trae el picker de horas/minutos (chunk de `pizarra/[userId]/asignar`) y la transacción de
+  `addEvidencePhoto`. Migraciones: la última aplicada es `20260929180000_cotizacion_margen_general`
+  y no hay nuevas. `app.`/`core.`/`nexara.com.mx` y `api.nexara.com.mx/api/health` responden 200.
+  CI de `135d4533`: todo verde salvo Android, que compilaba y pasaba tests pero fallaba el chequeo
+  de «errores crudos»: `EvidenceCaptureFlow.kt` mostraba `e.message` al adjuntar imagen → ahora
+  `e.toUserMessage(...)`. Local: API `tsc` 0 y jest 2979/2979 (1 timeout del PDF solo bajo carga,
+  pasa aislado); web `tsc` 0 y vitest 688/688 (1 timeout de viáticos bajo carga, pasa aislado);
+  Android compile + unit tests OK. **Ojo:** en el servidor `deploy/docker/Dockerfile.web` tiene
+  un cache-bust fijo editado a mano y hay `*.bak-recordarme-20260926` sin trackear; no se tocaron.
+  En local queda sin commitear `cotizaciones/_editor/editor.module.css` de otro agente; no se tocó.
 - **Hecho (margen % por partida en cotizaciones, pedido de Quina/Monica por WhatsApp):** el cliente
   pidió capturar costo/margen/precio por renglón, no un solo margen global — Adam mandó capturas de
   WhatsApp y un ejemplo en Excel. Cada partida (`CotizacionItem.marginPercent`, ya existía en el

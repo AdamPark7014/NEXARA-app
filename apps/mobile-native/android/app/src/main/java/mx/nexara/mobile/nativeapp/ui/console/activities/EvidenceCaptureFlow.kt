@@ -627,7 +627,7 @@ fun EvidenceCaptureFlow(
                 pendingKind = kind
                 pendingError = null
             } catch (e: Exception) {
-                error = e.message ?: "No se pudo adjuntar la imagen"
+                error = e.toUserMessage("No se pudo adjuntar la imagen")
                 if (kind == KIND_CAMPO) campoPendiente = null
             } finally {
                 busy = false
