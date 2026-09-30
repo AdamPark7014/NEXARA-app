@@ -53,7 +53,10 @@ export default function ActivityDetailShell({
       setActivity(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la actividad");
-      setActivity(null);
+      // Un refresh que falla (la mutación sí llegó, el refetch no) no debe borrar lo que ya
+      // se veía bien de esta misma actividad. Si es otra actividad la que nunca cargó, ahí sí
+      // se limpia — seguir mostrando la anterior bajo esta URL sería peor que no mostrar nada.
+      setActivity((prev) => (prev?.id === numericId ? prev : null));
     } finally {
       setLoading(false);
     }

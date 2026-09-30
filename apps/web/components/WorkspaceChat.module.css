@@ -1962,6 +1962,8 @@
   .headerMeta .iconBtn {
     padding: 0 8px;
     font-size: 11px;
+    min-width: 40px;
+    height: 40px;
   }
 
   .composerWrap {

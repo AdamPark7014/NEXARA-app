@@ -657,8 +657,9 @@ export default function UsersPage() {
     try {
       const data = await apiFetch("roles/org-templates", token);
       setRoleTemplates(asList<OrgRoleTemplate>(data));
-    } catch {
+    } catch (e) {
       setRoleTemplates([]);
+      setSaveErr(formatApiError(e, "No se pudieron cargar las plantillas de rol"));
     }
   };
   const closeModal = () => { setModal(null); setTarget(null); setSaveErr(null); };

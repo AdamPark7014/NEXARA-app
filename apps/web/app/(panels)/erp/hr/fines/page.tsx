@@ -148,9 +148,11 @@ export default function FinesPage() {
     if (!token) return;
     setLoading(true);
     try {
+      // Sin `limit`, el API regresa la plantilla completa en un arreglo (no paginado):
+      // con `?limit=100` alguien quedaba fuera del selector sin ningún aviso.
       const [finesData, staffData] = await Promise.all([
         apiFetch("fines", token),
-        apiFetch("users/hr-staff?limit=100", token),
+        apiFetch("users/hr-staff", token),
       ]);
       setItems(Array.isArray(finesData) ? finesData : (finesData?.data ?? []));
       setStaff(Array.isArray(staffData) ? staffData : (staffData?.data ?? []));

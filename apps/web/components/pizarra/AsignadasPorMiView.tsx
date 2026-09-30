@@ -126,7 +126,31 @@ export default function AsignadasPorMiView({
   if (loading && items.length === 0) {
     return <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>Cargando…</p>;
   }
-  if (error) return <p style={{ color: "#dc2626", fontSize: 14 }}>{error}</p>;
+  if (error) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <p style={{ color: "#dc2626", fontSize: 14, margin: 0 }}>{error}</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+          style={{
+            minHeight: 32,
+            padding: "4px 12px",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            color: "var(--text-secondary)",
+            fontSize: 13,
+            fontWeight: 650,
+            cursor: loading ? "default" : "pointer",
+          }}
+        >
+          {loading ? "Reintentando…" : "Reintentar"}
+        </button>
+      </div>
+    );
+  }
   if (items.length === 0) {
     return (
       <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>

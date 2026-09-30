@@ -288,6 +288,7 @@ export default function ExpensesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [initialForm, setInitialForm] = useState(emptyForm);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -436,8 +437,10 @@ export default function ExpensesPage() {
   }, [visibleItems]);
 
   const openNew = () => {
+    const inicial = { ...emptyForm, fecha: todayStamp() };
     setEditing(null);
-    setForm({ ...emptyForm, fecha: todayStamp() });
+    setForm(inicial);
+    setInitialForm(inicial);
     setEvidenceFile(null);
     setSaveErr(null);
     setFormErrors({});
@@ -445,19 +448,24 @@ export default function ExpensesPage() {
   };
 
   const openEdit = (e: Expense) => {
-    setEditing(e);
-    setForm({
+    const inicial = {
       concepto: e.concepto ?? "",
       monto: e.monto ?? 0,
       categoria: e.categoria ?? "Servicios",
       esRecurrente: e.esRecurrente ?? false,
       fecha: e.fecha?.slice(0, 10) ?? todayStamp(),
-    });
+    };
+    setEditing(e);
+    setForm(inicial);
+    setInitialForm(inicial);
     setEvidenceFile(null);
     setSaveErr(null);
     setFormErrors({});
     setShowForm(true);
   };
+
+  const formDirty =
+    evidenceFile != null || (Object.keys(form) as Array<keyof typeof form>).some((k) => form[k] !== initialForm[k]);
 
   const closeForm = () => {
     setShowForm(false);
@@ -1035,6 +1043,7 @@ export default function ExpensesPage() {
       <Modal
         open={showForm}
         onClose={closeForm}
+        dirty={formDirty && !saving}
         title={editing ? "Editar gasto" : "Registrar gasto"}
         footer={
           <>

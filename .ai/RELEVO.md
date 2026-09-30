@@ -1,6 +1,45 @@
 # RELEVO
 
 - **Último turno:** claude-code
+- **Hecho (auditoría grande de bugs y UI/UX — Android + web):** Adam pidió «una pasada grandísima»
+  a las apps móviles y a la web porque «tienen muchos errores». Se lanzaron 4 agentes de lectura en
+  paralelo (Android, iOS, web operativo, web back-office) más el que arregló lo de «Kit personal»
+  (commit `4129a7fc`, ver abajo). De ~28 hallazgos concretos con archivo y línea, se arreglaron los de
+  mayor impacto y menor riesgo:
+  - **Android:** «Vaciar cola» offline ya pide confirmación (borraba TODO sin avisar — mismo tipo de
+    daño que la evidencia libre). El detalle de actividad ya no se queda mudo si falla un refresh tras
+    cancelar/pasar de compañero (antes no decía nada y se veía el estatus viejo sin explicación). Los
+    tres íconos del compositor de chat y el de «Opciones» del mensaje volvieron al tamaño de toque de
+    Material3 (estaban forzados por debajo de lo accesible). «Abrir en la web» sin navegador instalado
+    ahora avisa en vez de quedarse mudo. `MyProfileScreen` ya no adivina éxito/error buscando la
+    palabra «guardado» en el texto (frágil).
+  - **Web:** el detalle de actividad ya no borra toda la pantalla si un refresh falla después de una
+    acción que sí funcionó (ahora conserva lo último bueno y avisa con «Reintentar», salvo que sea
+    literalmente otra actividad la que nunca cargó). «Eliminar actividad» ya no convive con el modo
+    editar (evitaba un caso raro donde el error de borrar podía perderse). «Asignadas por mí» ya tiene
+    botón de reintentar. Los íconos del header del chat en móvil suben a 40px. Gastos y Pagos a
+    empleados ya avisan antes de cerrar el modal con cambios sin guardar (mismo patrón que Documentos,
+    pero les faltaba el prop `dirty`). Cuatro secciones de Contabilidad (periodos, centros de costo,
+    presupuestos, presupuesto vs. real) y dos más (plantillas de rol en Usuarios, proyectos en el
+    detalle de Cliente) dejaron de tragarse el error silenciosamente mostrando «no hay nada» en vez de
+    avisar que algo falló.
+  - **El bug recurrente de `limit=100`/`limit=50` (ya conocido, «siete pantallas» en agosto) seguía
+    vivo en más lugares:** pólizas contables y movimientos bancarios ahora cargan por tandas de 500
+    (igual que ya se hizo para Facturas) con «Cargar más» si hay más; **`users/hr-staff` se llamaba con
+    `?limit=50` desde RH y `?limit=100` desde Sanciones, truncando la plantilla completa de cualquier
+    empresa con más personal que eso — se quitó el parámetro: ese endpoint, sin `limit`, ya regresaba
+    la lista completa sin paginar (estaba hecho para eso, solo que nadie lo estaba usando así).**
+  - **iOS:** el agente confirmó que el diff de «foto y nombre arriba de Más» (commit `cc395ab8`)
+    compila bien a mano (orden del init memberwise correcto). Encontró 7 más, el más importante:
+    `ChecklistVehiculoView.swift` tiene el MISMO bug que se arregló para evidencia libre (fotos del
+    checklist de vehículo solo en memoria, se pierden si se cierra la hoja o muere la app) — **no se
+    tocó**, por no seguir apilando cambios de iOS sin poder compilarlos. Queda en la cola para quien
+    tenga Mac, junto con el resto de hallazgos de iOS (detalle completo en la respuesta de esa sesión,
+    no repetido aquí por espacio).
+  Verificado: API sin tocar en esta ronda; web `tsc` 0, vitest 78/675 en dos rondas; Android
+  `compileDebugKotlin` y `testDebugUnitTest` en verde en tres rondas. **Falta desplegar** (web) y
+  **falta compilar + subir build nuevo** (Android — mismo pendiente que evidencia libre y
+  autoasignarse, un solo build serviría para las tres cosas).
 - **Fecha:** 2026-09-30
 - **Hecho (bug real: «Kit personal» se perdía al asignar — Luis mandó captura por WhatsApp):** Luis
   (`coord_operaciones`) le mandó a Adam una captura: en el flujo de asignar (`/erp/pizarra/[userId]/asignar`,

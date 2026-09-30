@@ -163,6 +163,7 @@ export default function ClienteDetallePage() {
 
   const [client, setClient] = useState<SalesClient | null>(null);
   const [projects, setProjects] = useState<OperationalProject[]>([]);
+  const [projectsLoadErr, setProjectsLoadErr] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -204,12 +205,14 @@ export default function ClienteDetallePage() {
     try {
       const c = await getSalesClient(token, id);
       setClient(c);
+      setProjectsLoadErr(null);
       if (c.serviceClientId) {
         try {
           const all = await listOperationalProjects(token);
           setProjects(all.filter((p) => p.client?.id === c.serviceClientId));
-        } catch {
+        } catch (e) {
           setProjects([]);
+          setProjectsLoadErr(formatApiError(e, "No se pudieron cargar los proyectos de este cliente"));
         }
       } else {
         setProjects([]);
@@ -660,6 +663,11 @@ export default function ClienteDetallePage() {
               </Alert>
             ) : (
               <>
+                {projectsLoadErr ? (
+                  <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void load()}>Reintentar</LinkButton>}>
+                    {projectsLoadErr}
+                  </Alert>
+                ) : null}
                 {projects.length === 0 ? (
                   <EmptyState
                     icon={<FolderOffOutlinedIcon />}
