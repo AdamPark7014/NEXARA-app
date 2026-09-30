@@ -2,6 +2,26 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-30
+- **Hecho (quiebre angosto de la tabla de cotizaciones, cierre de iOS y Android):** con Costo y Margen %
+  como columnas fijas (9 en total), el quiebre «sin columnas opcionales» seguía en 560px — entre 560 y
+  900px la tabla se apretaba sin pasar a modo apilado (Marca/Modelo como «M.» sueltos, Costo/Margen sin
+  caja visible). Se sube ese quiebre a 900px, igualándolo al de columnas opcionales (que quedó idéntico
+  y se borró por duplicado). Verificado en el navegador a 700px (apilado, con valores) y 1100px
+  (columnas). **Desplegado** (`43627301`).
+  **iOS:** con la ayuda de Adam entré a App Store Connect (Chrome del propio Adam, ya con su sesión) —
+  la versión 1.0 llevaba desde el lunes «Pendiente de revisión» con el build 5. Se quitó de la cola
+  («eliminar esta versión del proceso de revisión»), se adjuntó el build 6 y se guardó. **Adam mismo la
+  volvió a mandar a revisión** (el botón «Añadir a revisión» lo apretó él, no yo). Capturas, descripción
+  y demás metadatos ya estaban completos de antes; no se tocaron.
+  **Android:** el AAB (versionCode 14 / 1.0.5, ver arriba) pesa 24.4 MB — por encima del límite de 10 MB
+  de la herramienta de subida de archivos de esta sesión (Claude en Chrome), así que no pude arrastrarlo
+  yo. Adam dijo haberlo adjuntado él mismo, pero al recargar «Crear versión de producción» (dos veces,
+  en pestañas distintas) el cuadro de subida seguía vacío y el texto decía «Ningún app bundle... se
+  incluirá en esta versión» — sin bundle real adjuntado pese a lo que se veía en su pantalla. Se le dio
+  de nuevo la ruta exacta del archivo para que lo arrastre él. **Si retomas esto sin haber visto el
+  cierre: entra a Play Console → NEXARA → Producción → esa versión en borrador y confirma con tus
+  propios ojos que el app bundle 14 (1.0.5) aparece antes de tocar nada — esta sesión no logró
+  confirmarlo.**
 - **Hecho (margen por partida: de campo escondido a columna real; Adam insistió con captura):** el
   primer intento (campo «Margen %» bajo el título, ensanchado de 4.25rem a 6rem) seguía sin verse como
   algo editable — Adam mandó otra captura: «sigo sin ver la columna... solo el general», y luego «es
