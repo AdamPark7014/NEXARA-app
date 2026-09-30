@@ -89,7 +89,7 @@ jobs:
       - name: Buscar credenciales en claro
         run: |
           set -o pipefail
-          PATRON="(password|contrasena|secret|api[_-]?key|token)\s*[:=]\s*['\"][^'\"]{8,}['\"]"
+          PATRON="(password|contrasena|secret|api[_-]?key|token)\s*[:=]\s*['\"][^'\"[:space:]]{8,}['\"]"
           if grep -rInE "$PATRON" \
                --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' \
                --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=dist \

@@ -374,11 +374,6 @@ final class CoreRepository {
         )
     }
 
-    /// Quita una foto de evidencia libre por índice (borrador antes de enviar, o edición posterior).
-    func removeEvidencePhoto(activityId: Int, index: Int) async throws -> EvidenceFlowState? {
-        try await postEvidence("activity-evidence/\(activityId)/evidence-photo/\(index)/remove", body: EmptyPayload())
-    }
-
     /// Evidencia por campos: una foto de un campo en un momento. El API responde
     /// con la lista COMPLETA de campos de la actividad (`CampoDto[]`, no el
     /// flujo); `nil` si quedó en la cola sin conexión.
@@ -446,7 +441,7 @@ final class CoreRepository {
         )
     }
 
-    /// Quita una foto de evidencia ya guardada.
+    /// Quita una foto de evidencia libre por índice: borrador antes de enviar o foto ya enviada.
     func removeEvidencePhoto(activityId: Int, index: Int) async throws -> EvidenceFlowState? {
         struct Body: Encodable {}
         return try await postEvidence(
