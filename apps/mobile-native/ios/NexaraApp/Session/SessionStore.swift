@@ -16,6 +16,8 @@ struct SessionUser: Codable, Equatable {
     var isBranchUser: Bool
     var clientId: String?
     var branchId: String?
+    /// Foto fija del perfil (paridad con Android `SessionUser.avatarUrl`).
+    var avatarUrl: String? = nil
     /// Clave canónica del backend (`mapSessionUser`); prioriza sobre `role`.
     var roleKey: String? = nil
     var orgRoleKey: String? = nil
