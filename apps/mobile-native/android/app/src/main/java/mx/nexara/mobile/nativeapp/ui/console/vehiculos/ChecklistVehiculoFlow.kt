@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -29,6 +30,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -87,6 +90,19 @@ fun ChecklistVehiculoFlow(
     var nivel by remember { mutableStateOf<String?>(null) }
     var abierta by remember { mutableStateOf<Slot?>(null) }
     var aviso by remember { mutableStateOf<String?>(null) }
+    var confirmaSalir by remember { mutableStateOf(false) }
+    val tieneAvance = fotos.isNotEmpty() || km.isNotBlank() || nivel != null
+
+    fun pedirSalir() {
+        if (tieneAvance && !enviando) confirmaSalir = true else onCancelar()
+    }
+
+    BackHandler(enabled = !enviando) {
+        if (paso == Paso.FOTOS) pedirSalir() else {
+            aviso = null
+            paso = Paso.entries[paso.ordinal - 1]
+        }
+    }
 
     val metas = fotos.mapValues { (_, foto) ->
         ChecklistVehiculoRules.SlotMeta(
@@ -181,7 +197,7 @@ fun ChecklistVehiculoFlow(
             OutlinedButton(
                 onClick = {
                     aviso = null
-                    if (paso == Paso.FOTOS) onCancelar() else paso = Paso.entries[paso.ordinal - 1]
+                    if (paso == Paso.FOTOS) pedirSalir() else paso = Paso.entries[paso.ordinal - 1]
                 },
                 enabled = !enviando,
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
@@ -215,6 +231,27 @@ fun ChecklistVehiculoFlow(
                 abierta = null
             },
             onDismiss = { abierta = null },
+        )
+    }
+
+    if (confirmaSalir) {
+        AlertDialog(
+            onDismissRequest = { confirmaSalir = false },
+            title = { Text("¿Salir sin enviar?") },
+            text = {
+                Text("Las fotos del checklist solo viven en esta pantalla hasta que las envías. Si sales ahora, hay que volver a tomarlas.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmaSalir = false
+                        onCancelar()
+                    },
+                ) { Text("Salir y perder fotos") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmaSalir = false }) { Text("Seguir aquí") }
+            },
         )
     }
 }
