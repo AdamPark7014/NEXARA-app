@@ -1486,8 +1486,10 @@ select.celda {
 }
 
 /* Tabla angosta (vista previa al lado o teléfono): cada partida en dos renglones. */
-@container (max-width: 560px) {
-  /* Un contenedor no se consulta a sí mismo: la plantilla va en las filas. */
+@container (max-width: 900px) {
+  /* Un contenedor no se consulta a sí mismo: la plantilla va en las filas. Con Costo y Margen % ya
+     fijos (9 columnas), el quiebre pasó de 560px a 900px: haya o no columnas opcionales, ya no caben
+     cómodas por debajo de eso. */
   .fila,
   .filaTotal {
     --cols: 22px minmax(0, 0.7fr) minmax(0, 0.4fr) minmax(0, 0.55fr) minmax(0, 0.55fr) minmax(0, 0.8fr) minmax(0, 0.8fr) 30px;
@@ -2152,79 +2154,11 @@ select.celda {
 
 /* ─── Columnas opcionales de la tabla ─────────────────────────────────── */
 
-/* En pantalla ancha sus celdas son columnas de la misma rejilla. */
+/* En pantalla ancha sus celdas son columnas de la misma rejilla. Angosto: el quiebre de arriba
+   («@container (max-width: 900px) { .fila, .filaTotal { ... } }») ya cubre haya o no columnas
+   opcionales — Costo y Margen % son fijos y ya no caben cómodos por debajo de eso sin ellas. */
 .celdaExtras {
   display: contents;
-}
-
-/*
- * Con columnas opcionales la tabla necesita más ancho del que hay junto a la vista previa: a partir
- * de 900 px de contenedor cada partida pasa a tres renglones (datos, importes y extras).
- */
-@container (max-width: 900px) {
-  .tablaExtras .fila,
-  .tablaExtras .filaTotal {
-    --cols: 22px minmax(0, 0.7fr) minmax(0, 0.4fr) minmax(0, 0.55fr) minmax(0, 0.55fr) minmax(0, 0.8fr) minmax(0, 0.8fr) 30px;
-  }
-  .tablaExtras .filaCabeza {
-    display: none;
-  }
-  .tablaExtras .fila {
-    grid-template-areas:
-      "idx desc desc desc desc desc desc menu"
-      ". unidad cant costo margen precio total total"
-      ". extras extras extras extras extras extras extras";
-    padding: 4px;
-    row-gap: 2px;
-  }
-  .tablaExtras .fila > [data-area="idx"] {
-    grid-area: idx;
-  }
-  .tablaExtras .fila > [data-area="desc"] {
-    grid-area: desc;
-  }
-  .tablaExtras .fila > [data-area="unidad"] {
-    grid-area: unidad;
-  }
-  .tablaExtras .fila > [data-area="cant"] {
-    grid-area: cant;
-  }
-  .tablaExtras .fila > [data-area="costo"] {
-    grid-area: costo;
-  }
-  .tablaExtras .fila > [data-area="margen"] {
-    grid-area: margen;
-  }
-  .tablaExtras .fila > [data-area="precio"] {
-    grid-area: precio;
-  }
-  .tablaExtras .fila > [data-area="total"] {
-    grid-area: total;
-  }
-  .tablaExtras .fila > [data-area="menu"] {
-    grid-area: menu;
-  }
-  .tablaExtras .fila > .celdaExtras {
-    grid-area: extras;
-    display: flex;
-    gap: 4px;
-  }
-  .tablaExtras .fila > .celdaExtras > * {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-  .tablaExtras .fila > .celdaExtrasVacias {
-    display: none;
-  }
-  .tablaExtras .filaTotal {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .tablaExtras .filaTotal > :first-child {
-    grid-column: 1;
-  }
-  .tablaExtras .filaTotal > :last-child {
-    grid-column: 2;
-  }
 }
 
 /* La miniatura no crece con los demás extras. */
