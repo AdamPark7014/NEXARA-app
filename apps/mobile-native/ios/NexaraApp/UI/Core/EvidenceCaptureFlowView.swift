@@ -61,6 +61,10 @@ struct EvidenceCaptureFlowView: View {
     @State private var errorText: String?
     @State private var camera: CameraRequest?
     @State private var pendingPhotos: [CapturedGeoPhoto] = []
+    /// Urls ya confirmadas en el servidor para esta evidencia (recuperadas del GET + las que se
+    /// van mandando en cuanto se toman). Fuente de verdad para el envío final; `pendingPhotos` es
+    /// solo lo capturado en esta sesión, para pintar la miniatura real.
+    @State private var confirmedPhotoURLs: [String] = []
     @State private var form: [String: String] = [:]
     @State private var formPrefilled = false
     @State private var showPdfImporter = false
@@ -572,7 +576,7 @@ struct EvidenceCaptureFlowView: View {
                                 .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                             Button {
-                                pendingPhotos.removeAll { $0.id == photo.id }
+                                Task { await removeDraftPhoto(photo) }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.title3)
@@ -596,9 +600,14 @@ struct EvidenceCaptureFlowView: View {
                     }
                 }
             }
-            Text("\(pendingPhotos.count) de \(photoRequired) fotos")
+            Text("\(confirmedPhotoURLs.count) de \(photoRequired) fotos")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(pendingPhotos.count >= photoRequired ? CorePalette.green : Color.secondary)
+                .foregroundStyle(confirmedPhotoURLs.count >= photoRequired ? CorePalette.green : Color.secondary)
+            if confirmedPhotoURLs.count > pendingPhotos.count {
+                Text("\(confirmedPhotoURLs.count - pendingPhotos.count) de un intento anterior ya guardadas (no se muestran aquí, pero cuentan).")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             HStack(spacing: 8) {
                 Button {
                     errorText = nil
@@ -625,11 +634,11 @@ struct EvidenceCaptureFlowView: View {
             Button {
                 Task { await sendEvidencePhotos() }
             } label: {
-                Label(busy ? "Enviando…" : "Enviar \(pendingPhotos.count) fotos", systemImage: "paperplane.fill")
+                Label(busy ? "Enviando…" : "Enviar \(confirmedPhotoURLs.count) fotos", systemImage: "paperplane.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(busy || pendingPhotos.count < photoRequired)
+            .disabled(busy || confirmedPhotoURLs.count < photoRequired)
         }
     }
 
@@ -804,13 +813,13 @@ struct EvidenceCaptureFlowView: View {
             )
         default:
             GeoPhotoCaptureView(
-                title: "Tu foto en sitio \(pendingPhotos.count + 1)",
+                title: "Tu foto en sitio \(confirmedPhotoURLs.count + 1)",
                 confirmLabel: "Usar esta foto",
                 requireLocation: false,
                 onConfirm: { photo in
-                    pendingPhotos.append(photo)
-                    camera = nil
-                    return nil
+                    let error = await sendEvidencePhoto(photo)
+                    if error == nil { camera = nil }
+                    return error
                 },
                 onCancel: { camera = nil }
             )
@@ -825,6 +834,12 @@ struct EvidenceCaptureFlowView: View {
             flow = try await CoreRepository.shared.evidenceFlow(activityId: activityId)
             // Solo el GET trae los campos: los POST de cada paso no los mandan.
             campos = flow?.campos ?? []
+            // Recupera fotos libres ya guardadas (de un intento anterior que se interrumpió):
+            // `pendingPhotos` empieza vacío porque no hay imagen local que mostrar, pero el envío
+            // final las incluye igual — nada se pierde ni se duplica.
+            if flow?.status == CoreEvidence.evidencePhotos {
+                confirmedPhotoURLs = flow?.photoList ?? []
+            }
             loadError = nil
         } catch {
             loadError = error.toUserMessage(fallback: "No se pudo cargar tu evidencia")
@@ -1055,6 +1070,63 @@ struct EvidenceCaptureFlowView: View {
         }
     }
 
+    /// Foto de evidencia libre («fotos en sitio», sin campos): se manda de inmediato, igual que
+    /// `sendCampoPhoto`. Antes solo se acumulaba en `pendingPhotos` (memoria) y se perdía si la
+    /// persona salía de la pantalla o la app moría en segundo plano antes de tocar «enviar».
+    @MainActor
+    private func sendEvidencePhoto(_ photo: CapturedGeoPhoto) async -> String? {
+        busy = true
+        defer { busy = false }
+        let geo = photo.coords.map {
+            PhotoGeoPayload(latitude: $0.latitude, longitude: $0.longitude, capturedAt: CoreFormat.isoString(photo.capturedAt))
+        }
+        do {
+            let saved = try await CoreRepository.shared.addEvidencePhotoDraft(
+                activityId: activityId,
+                photoUrl: photo.dataUrl,
+                geo: geo
+            )
+            pendingPhotos.append(photo)
+            errorText = nil
+            if saved == nil {
+                // En cola sin conexión: no está en el GET todavía, pero sí sobrevive un reinicio
+                // de la app (la cola de ApiClient queda en disco).
+                confirmedPhotoURLs.append(photo.dataUrl)
+                message = CoreError.queuedOffline.errorDescription
+            } else {
+                confirmedPhotoURLs = saved?.photoList ?? confirmedPhotoURLs + [photo.dataUrl]
+                message = "Foto agregada (\(confirmedPhotoURLs.count) de \(photoRequired))"
+            }
+            return nil
+        } catch {
+            return error.toUserMessage(fallback: "No se pudo guardar la foto")
+        }
+    }
+
+    /// Quita una foto en borrador — ya viajó al servidor, hay que avisarle también. El índice del
+    /// servidor es el de `pendingPhotos` corrido por las que se recuperaron de un intento anterior
+    /// (esas van primero en `confirmedPhotoURLs`).
+    @MainActor
+    private func removeDraftPhoto(_ photo: CapturedGeoPhoto) async {
+        guard let localIndex = pendingPhotos.firstIndex(where: { $0.id == photo.id }) else { return }
+        let recoveredCount = max(0, confirmedPhotoURLs.count - pendingPhotos.count)
+        let serverIndex = recoveredCount + localIndex
+        busy = true
+        defer { busy = false }
+        do {
+            let saved = try await CoreRepository.shared.removeEvidencePhoto(activityId: activityId, index: serverIndex)
+            pendingPhotos.removeAll { $0.id == photo.id }
+            if let saved {
+                confirmedPhotoURLs = saved.photoList
+            } else if serverIndex < confirmedPhotoURLs.count {
+                confirmedPhotoURLs.remove(at: serverIndex)
+            }
+            errorText = nil
+        } catch {
+            errorText = error.toUserMessage(fallback: "No se pudo quitar la foto")
+        }
+    }
+
     @MainActor
     private func sendEvidencePhotos() async {
         if porCampos {
@@ -1064,7 +1136,7 @@ struct EvidenceCaptureFlowView: View {
                 return
             }
         } else {
-            guard pendingPhotos.count >= photoRequired else {
+            guard confirmedPhotoURLs.count >= photoRequired else {
                 errorText = "Se requieren al menos \(photoRequired) fotos de evidencia."
                 return
             }
@@ -1073,11 +1145,16 @@ struct EvidenceCaptureFlowView: View {
         defer { busy = false }
         // Con campos se manda la lista vacía: el API ya las tiene por campo, y
         // reenviarlas las guardaba otra vez como fotos libres (salían dobles en el ZIP).
+        // Sin campos, las fotos libres ya viajaron una a una (`addEvidencePhotoDraft`): aquí solo
+        // se reenvía la lista ya confirmada, para que el API valide el mínimo y avance el paso.
         var urls: [String] = []
         var geo: [PhotoGeoPayload?] = []
         if !porCampos {
-            urls = pendingPhotos.map(\.dataUrl)
-            geo = pendingPhotos.map { photo -> PhotoGeoPayload? in
+            urls = confirmedPhotoURLs
+            // Las recuperadas de un intento anterior no traen geo (el GET no la incluye); las de
+            // esta sesión sí, y van al final porque `confirmedPhotoURLs` se llena en ese orden.
+            let recoveredCount = max(0, confirmedPhotoURLs.count - pendingPhotos.count)
+            geo = Array(repeating: nil, count: recoveredCount) + pendingPhotos.map { photo -> PhotoGeoPayload? in
                 guard let coords = photo.coords else { return nil }
                 return PhotoGeoPayload(
                     latitude: coords.latitude,
@@ -1094,6 +1171,7 @@ struct EvidenceCaptureFlowView: View {
                 correction: correction
             )
             pendingPhotos = []
+            confirmedPhotoURLs = []
             await afterSave(saved, step: CoreEvidence.evidencePhotos, correction: correction)
         } catch {
             errorText = error.toUserMessage(fallback: "No se pudieron guardar las fotos")
@@ -1240,9 +1318,10 @@ struct EvidenceCaptureFlowView: View {
                 errorText = fallo
             }
         } else {
-            pendingPhotos.append(photo)
-            message = "Foto adjuntada (\(pendingPhotos.count) de \(photoRequired))"
             busy = false
+            if let fallo = await sendEvidencePhoto(photo) {
+                errorText = fallo
+            }
         }
     }
 

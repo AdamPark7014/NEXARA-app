@@ -1,7 +1,45 @@
 # RELEVO
 
 - **Último turno:** claude-code
-- **Fecha:** 2026-09-29
+- **Fecha:** 2026-09-30
+- **Hecho (evidencia libre que se perdía — API, web, Android, iOS):** Luis reportó que tomaba varias
+  fotos de evidencia («fotos en sitio», sin campos), salía de la pantalla y volvía, y ya no estaban.
+  Causa: esa foto solo se acumulaba en memoria del cliente (React state en web, `remember` de Compose
+  en Android, `@State` en iOS); nada llegaba al servidor hasta tocar «enviar». Las fotos **por campo**
+  nunca tuvieron este problema porque ya mandaban cada una de inmediato. Arreglo: nuevo endpoint
+  `POST activity-evidence/:id/evidence-photos/draft` (commit `a21b1973`) que agrega una foto sin cerrar
+  el paso — mismo espíritu que las de campo. Los tres clientes ahora mandan cada foto libre al tomarla,
+  no al final: web (`ActivityEvidenceFlow.tsx`, mismo commit), Android (`EvidenceCaptureFlow.kt`, commit
+  `2e32ed81`, reusa el interceptor de cola offline sin tocarlo — la ruta no estaba en ninguna lista de
+  «solo en línea»), iOS (`EvidenceCaptureFlowView.swift` + `CoreRepository.swift`, sin commitear
+  todavía). `removeEvidencePhoto` ya no exige el mínimo mientras se sigue capturando y ahora realinea
+  `evidencePhotosGeo` al quitar una foto (antes quedaba desfasado).
+  **iOS, nota importante:** `CapturedGeoPhoto` exige una `UIImage` local — no se puede reconstruir una
+  miniatura real de una foto recuperada del servidor sin descargarla. Se optó por NO tocar
+  `pendingPhotos` (sigue siendo solo lo capturado en esta sesión, para la miniatura) y agregar
+  `confirmedPhotoURLs: [String]` como fuente de verdad para el conteo, el botón «Enviar» y el envío
+  final — se hidrata del GET al abrir la pantalla. Si hay fotos recuperadas de un intento anterior, un
+  texto lo avisa («N de un intento anterior ya guardadas») pero no se pueden quitar una por una desde
+  ahí (limitación aceptada: si Adam quiere poder quitarlas, hace falta cargarlas con `AsyncImage` desde
+  la URL, no se hizo por riesgo de compilar sin Mac para verificar). **No se pudo compilar ni correr
+  tests de iOS en esta sesión** (Windows, sin Xcode): el cambio se revisó a mano con cuidado y siguiendo
+  el patrón ya probado de `sendCampoPhoto`, pero alguien con Mac debe compilar antes de generar un
+  build nuevo — sobre todo porque el build de iOS ya tenía pendiente el reenvío a Apple tras el rechazo
+  del 28-09 (ver esa entrada más abajo).
+  Verificado: API `tsc` 0, jest 246/2 954 (incluye `activity-evidence-draft-photos.spec.ts`, nuevo);
+  web `tsc` 0, vitest 78/672; Android `:app:compileDebugKotlin` y `:app:testDebugUnitTest` en verde.
+  Desplegado a producción (API + web). Android: falta compilar y subir un build nuevo (ver pendiente
+  de «Auto-asignarme» abajo, mismo build serviría para las dos cosas).
+- **Diagnóstico (David no puede autoasignarse actividades):** el código ya está arreglado desde ayer
+  (commit `fad23c2e`, 28-09 20:23 UTC — el botón ya no se escondía con la cola vacía) pero **nunca se
+  compiló un AAB con ese fix**: el último artefacto construido es `NEXARA-v1.0.2-vc11.aab`/mapping
+  v12-1.0.3 del 22-09, seis días antes del fix. David sigue con esa versión instalada. Falta: subir
+  `versionCode`/`versionName` (13/1.0.4, el siguiente libre — ver `apps/mobile-native/play-releases/`),
+  `pwsh -File scripts/build-play-aab.ps1 -VersionCode 13 -VersionName 1.0.4 -Clean` (keystore y
+  `key.properties` ya están en el repo local) y decidir con Adam cómo llega al teléfono de David:
+  ¿subida formal a Play (revisión, tarda) o un APK de debug/release directo para probar ya? Este mismo
+  build llevaría también el arreglo de evidencia libre de arriba.
+- **Hecho (bug real: `/erp/perfiles` no abría para David, Antonio y Luis):**
 - **Hecho (bug real: `/erp/perfiles` no abría para David, Antonio y Luis):** Adam probó con la cuenta de
   David (coordinador de operaciones) y el ítem «Perfiles» del menú se veía, pero al entrar rebotaba —
   igual le habría pasado a Antonio y Luis. Causa: `page-matrix.ts` (RBAC v2 del frontend, whitelist de
