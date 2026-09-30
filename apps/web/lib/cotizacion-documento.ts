@@ -274,6 +274,22 @@ function decimalJsANumero(o: { s?: number; e: number; d: number[] }): number | n
   return Number.isFinite(n) ? n : null;
 }
 
+const redondeo = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Precio al cliente a partir del costo interno y el margen de la partida: costo × (1 + margen/100).
+ * `null` si falta el costo o el margen — ahí el precio se sigue escribiendo a mano, como siempre.
+ */
+export function precioConMargen(
+  unitCost: number | null | undefined,
+  marginPercent: number | null | undefined,
+): number | null {
+  const costo = unitCost == null ? null : Number(unitCost);
+  const margen = porcentajeMargen(marginPercent);
+  if (costo == null || !Number.isFinite(costo) || costo <= 0 || margen == null) return null;
+  return redondeo(costo * (1 + margen / 100));
+}
+
 export type PartidaEditor = PartidaCotizacion & { key: string };
 
 export function partidaNueva(parcial: Partial<PartidaCotizacion> = {}): PartidaEditor {
@@ -335,8 +351,6 @@ export function importeDeLinea(p: Pick<PartidaCotizacion, "qty" | "unitPrice" | 
   const base = Number(p.qty || 0) * Number(p.unitPrice || 0) + Number(p.laborHours || 0) * Number(p.laborRate || 0);
   return base - base * (Number(p.discount || 0) / 100);
 }
-
-const redondeo = (n: number) => Math.round(n * 100) / 100;
 
 export type Totales = {
   subtotal: number;
