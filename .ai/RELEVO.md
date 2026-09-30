@@ -13,18 +13,23 @@
   descuadrar la rejilla. Verificado a mano en el navegador (ruta temporal `/tmp-preview-margen`, borrada
   después): costo 100 + margen 50 → precio 150 solo, subtotal se recalcula. web `tsc` 0, vitest 81/81
   archivos (688/688). **Desplegado** (`08c1bdb4`).
-- **Hecho (iOS: build 6 a TestFlight):** `CFBundleVersion` 5 → 6 (App Store Connect rechaza un build ya
-  subido o menor), tag `ios-testflight-1.0.0-6` empujado → dispara `.github/workflows/ios-testflight.yml`
-  en macOS runners. Trae los fixes de evidencia libre, checklist de vehículo y avatarUrl de sesión que
-  se fusionaron hoy desde la rama de Cursor Cloud Agent. Revisar en GitHub Actions que termine en verde
-  y en App Store Connect → TestFlight que el build 6 quede disponible para probar.
-- **Hecho (Android: build en curso al cerrar este relevo):** `VERSION_CODE` 13 → 14, `VERSION_NAME`
-  1.0.4 → 1.0.5, `pwsh scripts/build-play-aab.ps1 -BumpVersionCode -VersionName 1.0.5 -Clean` — trae
-  todos los arreglos acumulados sin subir (autoasignarse, evidencia libre, foto/nombre en «Más»,
-  auditoría de UI/UX, «Kit personal», el `DurationField` duplicado, evidencia libre en cola, checklist
-  de vehículo). **Falta confirmar que terminó y subir el `.aab` a Play Console a mano** (no hay
-  publicación automática configurada): `apps/mobile-native/android/app/build/outputs/bundle/release/app-release.aab`.
-  Play Console → la app (`mx.nexara.mobile.nativeapp`) → Producción o prueba interna → Crear versión.
+- **Hecho (iOS: build 6 a TestFlight, terminado en verde):** `CFBundleVersion` 5 → 6 (App Store Connect
+  rechaza un build ya subido o menor), tag `ios-testflight-1.0.0-6` empujado → workflow
+  `ios-testflight.yml` corrió en macOS runners y terminó `success` (run 36767760994). Trae los fixes de
+  evidencia libre, checklist de vehículo y avatarUrl de sesión fusionados hoy desde Cursor Cloud Agent.
+  **Falta:** en App Store Connect → TestFlight confirmar que el build 6 quedó disponible y, si aplica,
+  mandarlo a revisión de Apple (el rechazo del 28-09 seguía pendiente de reenvío).
+- **Hecho (Android: AAB firmado, build exitoso, sin subir a Play):** `VERSION_CODE` 13 → 14,
+  `VERSION_NAME` 1.0.4 → 1.0.5 (commit `aef82e66`); `pwsh scripts/build-play-aab.ps1 -BumpVersionCode
+  -VersionName 1.0.5 -Clean` → `BUILD SUCCESSFUL in 13m 34s`, AAB de 24.4 MB. Trae todos los arreglos
+  acumulados sin subir (autoasignarse, evidencia libre, foto/nombre en «Más», auditoría de UI/UX, «Kit
+  personal», el `DurationField` duplicado, evidencia libre en cola, checklist de vehículo). No hay
+  publicación automática a Play configurada (sin cuenta de servicio ni fastlane): el `.aab` se mandó a
+  Adam por archivo — **falta que él lo suba a mano** en Play Console → `mx.nexara.mobile.nativeapp` →
+  Producción o prueba interna → Crear versión. El archivo queda en
+  `apps/mobile-native/android/app/build/outputs/bundle/release/app-release.aab` (no versionado; se
+  pierde si se hace `-Clean` de nuevo sin respaldarlo antes). El `mapping.txt` de esta versión sí quedó
+  archivado: `apps/mobile-native/play-releases/mapping-v14-1.0.5.txt`.
 - **Hecho (cursor, verificación de producción + CI Android):** producción corre `489fe64b` (código
   idéntico a `135d4533`, que solo añadió este relevo); contenedores `nexara-web`/`nexara-api`
   recreados 18:46 UTC por otro despliegue y sanos; verificado dentro de los contenedores que el
