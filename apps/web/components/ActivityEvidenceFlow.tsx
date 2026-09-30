@@ -35,6 +35,7 @@ import styles from './ActivityEvidenceFlow.module.css';
 import { Socket } from 'socket.io-client';
 import ConfirmDialog, { type ConfirmState } from '@/components/ui/ConfirmDialog';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { geoDeFotosGuardadas, mensajeFotoNoGuardada, type GeoDeFoto } from '@/lib/evidencia-fotos';
 import PhoneField from '@/components/PhoneField';
 import UbicacionActividadCard, { AvisoFueraDeZona, useGeocerca } from '@/components/ops/UbicacionActividad';
 import {
@@ -390,17 +391,25 @@ const ActivityEvidenceFlow = () => {
   }, [requestedActivityId, loading, flowData?.activityId]);
 
   // Cuando selecciona una actividad
-  const handleActivitySelect = async (activityId: number) => {
+  /**
+   * `refresh`: relectura de la misma actividad por un aviso en tiempo real. No toca `loading`
+   * (liberaría los botones con una foto aún subiendo) ni lo que la persona tiene abierto: campo
+   * elegido, foto en grande o inventario sin sincronizar.
+   */
+  const handleActivitySelect = async (activityId: number, refresh = false) => {
     setSelectedActivityId(activityId);
-    setLoading(true);
-    setError(null);
-    setSuccessMsg(null);
-    setInventoryItems([]);
-    setInventoryNotes('');
-    setInventoryPreviousCount(0);
-    setCamposEvidencia([]);
-    setCampoTarget(null);
-    setGalleryLightbox(null);
+    if (!refresh) {
+      setLoading(true);
+      setError(null);
+      setSuccessMsg(null);
+      setInventoryItems([]);
+      setInventoryNotes('');
+      setInventoryPreviousCount(0);
+      setCamposEvidencia([]);
+      setCampoTarget(null);
+      setGalleryLightbox(null);
+      setEvidenceGeo([]);
+    }
 
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${activityId}`), {
@@ -445,8 +454,14 @@ const ActivityEvidenceFlow = () => {
           stepsForKind: Array.isArray(data.stepsForKind) ? data.stepsForKind : undefined,
           avancesAnteriores: Array.isArray(data.avancesAnteriores) ? data.avancesAnteriores : [],
         });
+        // Sin la ubicación de las fotos ya guardadas, el envío final mandaría `null` por cada foto
+        // de un intento anterior y el servidor sobrescribiría su ubicación.
+        setEvidenceGeo(geoDeFotosGuardadas(data.evidencePhotosGeo, (data.evidencePhotos || []).length));
 
-        if ((data.activity?.workType || currentActivity?.workType) === 'PREVENTIVE_INVENTORY') {
+        if (
+          !refresh &&
+          (data.activity?.workType || currentActivity?.workType) === 'PREVENTIVE_INVENTORY'
+        ) {
           const invRes = await fetch(buildApiUrl(`inventories/activity/${activityId}`), {
             headers: { Authorization: `Bearer ${user!.token}` },
           });
@@ -489,6 +504,11 @@ const ActivityEvidenceFlow = () => {
           setInventoryNotes(invData?.notes || '');
           setInventoryPreviousCount(Number(invData?.previousCount || 0));
         }
+      } else if (res.status !== 404) {
+        // Solo «no existe» abre un flujo nuevo: con un 500 o un proxy caído la pantalla volvía a
+        // «foto de entrada» sin fotos, como si se hubiera perdido todo lo capturado.
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(JSON.stringify(errorData ?? {}));
       } else {
         // Crear nuevo flujo
         const currentActivity = actividades.find((activity) => activity.id === activityId);
@@ -508,9 +528,17 @@ const ActivityEvidenceFlow = () => {
         setInventoryPreviousCount(0);
       }
     } catch (err) {
-      setError('Error al cargar evidencias');
+      if (!refresh) {
+        setError(
+          formatApiError(err, 'No se pudieron cargar tus evidencias. Revisa tu conexión e intenta de nuevo.'),
+        );
+        // Nunca subir fotos a la actividad anterior mientras se ve otra seleccionada.
+        setFlowData((prev) => (prev && prev.activityId !== activityId ? null : prev));
+        // Sin esto el efecto de `?activityId=` reintentaría sin fin al bajar `loading`.
+        setRequestedActivityId((prev) => (prev === activityId ? null : prev));
+      }
     } finally {
-      setLoading(false);
+      if (!refresh) setLoading(false);
     }
   };
 
@@ -526,7 +554,7 @@ const ActivityEvidenceFlow = () => {
     const scheduleRefresh = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
-        handleActivitySelect(Number(selectedActivityId));
+        handleActivitySelect(Number(selectedActivityId), true);
         void recargarGeocercaRef.current();
       }, 350);
     };
@@ -667,9 +695,12 @@ const ActivityEvidenceFlow = () => {
   };
   const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
   /** Ubicación de cada foto de evidencia (mismo orden que flowData.evidencePhotos). */
-  const [evidenceGeo, setEvidenceGeo] = useState<
-    Array<{ latitude: number; longitude: number; capturedAt: string } | null>
-  >([]);
+  const [evidenceGeo, setEvidenceGeo] = useState<Array<GeoDeFoto | null>>([]);
+  /**
+   * Una foto libre a la vez (agregar o quitar): el servidor reescribe la lista completa, así que
+   * dos envíos cruzados pueden perder una foto, y quitar es por posición.
+   */
+  const fotoEnCursoRef = useRef(false);
 
   /** Cámara en vivo (como en Asistencias): el usuario se acomoda y toca «Tomar foto». */
   const [liveKind, setLiveKind] = useState<PendingPhoto['kind'] | null>(null);
@@ -908,6 +939,11 @@ const ActivityEvidenceFlow = () => {
   const adjuntarEvidencia = async (file: File) => {
     if (!flowData) return;
     if (flowData.step !== 'EVIDENCE_PHOTOS') return;
+    // Pegar o soltar mientras sube otra: al terminar se cerraría la vista previa de la nueva.
+    if (fotoEnCursoRef.current) {
+      setError('Espera a que termine de subir la foto anterior.');
+      return;
+    }
     const aviso = mensajeAdjuntoInvalido(file);
     if (aviso) {
       setError(aviso);
@@ -945,6 +981,9 @@ const ActivityEvidenceFlow = () => {
    */
   const addEvidencePhoto = async (photo: PendingPhoto): Promise<boolean> => {
     if (!flowData || !user?.token) return false;
+    if (fotoEnCursoRef.current) return false;
+    fotoEnCursoRef.current = true;
+    const activityId = flowData.activityId;
     const previas = flowData.evidencePhotos.length;
     const punto = puntoDeFoto(photo.latitude, photo.longitude);
     setLoading(true);
@@ -963,28 +1002,32 @@ const ActivityEvidenceFlow = () => {
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || 'No se pudo guardar la foto. Intenta de nuevo.');
+        setError(
+          formatApiError(new Error(JSON.stringify(errorData ?? {})), 'No se pudo guardar la foto. Intenta de nuevo.'),
+        );
         return false;
       }
-      const updated = await res.json();
-      const updatedPhotos: string[] = Array.isArray(updated?.evidencePhotos)
+      const updated = await res.json().catch(() => null);
+      const delServidor = Array.isArray(updated?.evidencePhotos);
+      const updatedPhotos: string[] = delServidor
         ? updated.evidencePhotos
         : [...flowData.evidencePhotos, photo.dataUrl];
-      setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+      setFlowData((prev) =>
+        prev && prev.activityId === activityId ? { ...prev, evidencePhotos: updatedPhotos } : prev,
+      );
       setEvidenceGeo((prev) => {
+        if (delServidor) return geoDeFotosGuardadas(updated.evidencePhotosGeo, updatedPhotos.length);
         const alineadas = prev.slice(0, previas);
         while (alineadas.length < previas) alineadas.push(null);
-        return [
-          ...alineadas,
-          punto ? { ...punto, capturedAt: photo.capturedAt } : null,
-        ];
+        return [...alineadas, punto ? { ...punto, capturedAt: photo.capturedAt } : null];
       });
       setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
       return true;
     } catch (err) {
-      setError(formatApiError(err, 'No se pudo guardar la foto. Intenta de nuevo.'));
+      setError(mensajeFotoNoGuardada(err, 'No se pudo guardar la foto. Intenta de nuevo.'));
       return false;
     } finally {
+      fotoEnCursoRef.current = false;
       setLoading(false);
     }
   };
@@ -1057,24 +1100,40 @@ const ActivityEvidenceFlow = () => {
   // Remover foto de evidencia — ya está guardada en el servidor, hay que avisarle también.
   const handleRemoveEvidencePhoto = async (index: number) => {
     if (!flowData || !user?.token) return;
+    if (fotoEnCursoRef.current) return;
+    fotoEnCursoRef.current = true;
+    const activityId = flowData.activityId;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(
-        buildApiUrl(`activity-evidence/${flowData.activityId}/evidence-photo/${index}/remove`),
+        buildApiUrl(`activity-evidence/${activityId}/evidence-photo/${index}/remove`),
         { method: 'POST', headers: { Authorization: `Bearer ${user.token}` } },
       );
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || 'No se pudo quitar la foto.');
+        setError(formatApiError(new Error(JSON.stringify(errorData ?? {})), 'No se pudo quitar la foto.'));
         return;
       }
-      const updatedPhotos = flowData.evidencePhotos.filter((_, i) => i !== index);
-      setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
-      setEvidenceGeo((prev) => prev.filter((_, i) => i !== index));
+      const updated = await res.json().catch(() => null);
+      if (Array.isArray(updated?.evidencePhotos)) {
+        const fotos: string[] = updated.evidencePhotos;
+        setFlowData((prev) =>
+          prev && prev.activityId === activityId ? { ...prev, evidencePhotos: fotos } : prev,
+        );
+        setEvidenceGeo(geoDeFotosGuardadas(updated.evidencePhotosGeo, fotos.length));
+      } else {
+        setFlowData((prev) =>
+          prev && prev.activityId === activityId
+            ? { ...prev, evidencePhotos: prev.evidencePhotos.filter((_, i) => i !== index) }
+            : prev,
+        );
+        setEvidenceGeo((prev) => prev.filter((_, i) => i !== index));
+      }
     } catch (err) {
-      setError(formatApiError(err, 'No se pudo quitar la foto.'));
+      setError(mensajeFotoNoGuardada(err, 'No se pudo quitar la foto.', 'quitar'));
     } finally {
+      fotoEnCursoRef.current = false;
       setLoading(false);
     }
   };

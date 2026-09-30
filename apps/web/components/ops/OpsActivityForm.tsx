@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import Button from "@/components/ui/Button";
@@ -163,6 +163,13 @@ export default function OpsActivityForm({
   const [nextAnLoaded, setNextAnLoaded] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  /** Doble clic: el segundo llega antes de que `saving` deshabilite el botón. */
+  const enviandoRef = useRef(false);
+  /**
+   * La actividad ya existe pero un paso posterior falló (p. ej. ligar el ticket): volver a
+   * enviar solo repite esos pasos, nunca crea otra.
+   */
+  const creadaRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showOtroModal, setShowOtroModal] = useState(false);
@@ -569,6 +576,8 @@ export default function OpsActivityForm({
       isEdit,
     });
 
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setSaving(true);
     try {
       if (isEdit && activityId) {
@@ -576,10 +585,13 @@ export default function OpsActivityForm({
         setSuccess(tone === "core" ? "Actividad actualizada" : "OT actualizada");
         onSuccess?.(activityId);
       } else {
-        const created = selfAssign
-          ? await createMyActivity(token, payload)
-          : await createActivity(token, payload);
-        const newId = Number(created?.id);
+        const yaCreada = creadaRef.current;
+        const newId =
+          yaCreada ??
+          Number(
+            (selfAssign ? await createMyActivity(token, payload) : await createActivity(token, payload))?.id,
+          );
+        if (!yaCreada && newId > 0) creadaRef.current = newId;
         if (puedeDefinirCampos && campos.length > 0 && newId > 0) {
           try {
             await definirCamposEvidencia(token, newId, campos);
@@ -602,6 +614,7 @@ export default function OpsActivityForm({
             : "Error al guardar",
       );
     } finally {
+      enviandoRef.current = false;
       setSaving(false);
     }
   };
@@ -676,6 +689,7 @@ export default function OpsActivityForm({
     } catch {
       setNextAn("");
     }
+    creadaRef.current = null;
     if (newId > 0) onSuccess?.(newId);
   };
 
