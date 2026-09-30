@@ -1,7 +1,30 @@
 # RELEVO
 
-- **Último turno:** cursor
+- **Último turno:** claude-code
 - **Fecha:** 2026-09-30
+- **Hecho (margen por partida: de campo escondido a columna real; Adam insistió con captura):** el
+  primer intento (campo «Margen %» bajo el título, ensanchado de 4.25rem a 6rem) seguía sin verse como
+  algo editable — Adam mandó otra captura: «sigo sin ver la columna... solo el general», y luego «es
+  una columna y se puede editar por partida... cada partida nueva puede llevar un porcentaje distinto».
+  Costo y Margen % salieron del detalle (donde quedan Marca/Modelo/Descripción del PDF) y se volvieron
+  columnas de verdad entre Cantidad y Precio — igual que el Excel de Quina. `columnasDeTabla()` pasó de
+  7 a 9 columnas fijas (Costo y Margen no son de «Personalizar», nunca se imprimen en el PDF final); se
+  actualizaron los dos quiebres angostos (`@container` ≤900px con columnas opcionales y ≤560px) para no
+  descuadrar la rejilla. Verificado a mano en el navegador (ruta temporal `/tmp-preview-margen`, borrada
+  después): costo 100 + margen 50 → precio 150 solo, subtotal se recalcula. web `tsc` 0, vitest 81/81
+  archivos (688/688). **Desplegado** (`08c1bdb4`).
+- **Hecho (iOS: build 6 a TestFlight):** `CFBundleVersion` 5 → 6 (App Store Connect rechaza un build ya
+  subido o menor), tag `ios-testflight-1.0.0-6` empujado → dispara `.github/workflows/ios-testflight.yml`
+  en macOS runners. Trae los fixes de evidencia libre, checklist de vehículo y avatarUrl de sesión que
+  se fusionaron hoy desde la rama de Cursor Cloud Agent. Revisar en GitHub Actions que termine en verde
+  y en App Store Connect → TestFlight que el build 6 quede disponible para probar.
+- **Hecho (Android: build en curso al cerrar este relevo):** `VERSION_CODE` 13 → 14, `VERSION_NAME`
+  1.0.4 → 1.0.5, `pwsh scripts/build-play-aab.ps1 -BumpVersionCode -VersionName 1.0.5 -Clean` — trae
+  todos los arreglos acumulados sin subir (autoasignarse, evidencia libre, foto/nombre en «Más»,
+  auditoría de UI/UX, «Kit personal», el `DurationField` duplicado, evidencia libre en cola, checklist
+  de vehículo). **Falta confirmar que terminó y subir el `.aab` a Play Console a mano** (no hay
+  publicación automática configurada): `apps/mobile-native/android/app/build/outputs/bundle/release/app-release.aab`.
+  Play Console → la app (`mx.nexara.mobile.nativeapp`) → Producción o prueba interna → Crear versión.
 - **Hecho (cursor, verificación de producción + CI Android):** producción corre `489fe64b` (código
   idéntico a `135d4533`, que solo añadió este relevo); contenedores `nexara-web`/`nexara-api`
   recreados 18:46 UTC por otro despliegue y sanos; verificado dentro de los contenedores que el
