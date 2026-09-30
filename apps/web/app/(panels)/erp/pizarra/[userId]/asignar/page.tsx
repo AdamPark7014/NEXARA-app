@@ -35,6 +35,7 @@ import {
   fetchTeamBoardUser,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
+import { sumarPendientes, type PasoEquipo } from "@/lib/asignar-equipo";
 
 const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), {
   ssr: false,
@@ -128,7 +129,25 @@ const secondaryButton: CSSProperties = {
 
 const nextHint: CSSProperties = { fontSize: 14, color: "var(--text-secondary)", margin: 0 };
 
-function TeamErrorBox({ error }: { error: { activityId: number; text: string } }) {
+/** La actividad ya existe: mientras se suma al equipo (o si falló) el formulario no se muestra. */
+function EquipoPendienteBox({
+  activityId,
+  sumando,
+  error,
+  onRetry,
+}: {
+  activityId: number;
+  sumando: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  if (sumando || !error) {
+    return (
+      <div role="status" aria-busy={sumando} style={{ fontSize: 14, color: "var(--text-secondary)" }}>
+        Actividad creada. Sumando al equipo…
+      </div>
+    );
+  }
   return (
     <div
       role="alert"
@@ -144,14 +163,19 @@ function TeamErrorBox({ error }: { error: { activityId: number; text: string } }
       }}
     >
       <span>
-        <strong>La actividad ya se creó</strong>, pero no se pudo sumar a todo el equipo: {error.text}
+        <strong>La actividad ya se creó</strong>, pero no se pudo sumar a todo el equipo: {error}
       </span>
       <span style={{ color: "var(--text-secondary)" }}>
-        No la vuelvas a crear: abre la actividad y revisa quién quedó.
+        «Reintentar» solo suma a quien faltó; no crea otra actividad.
       </span>
-      <Link href={`/erp/actividades/${error.activityId}`} style={secondaryButton}>
-        Abrir la actividad →
-      </Link>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <button type="button" onClick={onRetry} style={primaryButton}>
+          Reintentar
+        </button>
+        <Link href={`/erp/actividades/${activityId}`} style={secondaryButton}>
+          Abrir la actividad →
+        </Link>
+      </div>
     </div>
   );
 }
@@ -234,8 +258,10 @@ export default function AsignarActividadPage() {
   const [planHoras, setPlanHoras] = useState(1);
   const [planMinutos, setPlanMinutos] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  /** La actividad ya existe pero falló sumar al equipo: no se debe volver a crear. */
-  const [teamError, setTeamError] = useState<{ activityId: number; text: string } | null>(null);
+  /** La actividad ya existe: quién falta sumar al equipo. Mientras exista, no se vuelve a crear. */
+  const [pendiente, setPendiente] = useState<{ activityId: number; pasos: PasoEquipo[] } | null>(null);
+  const [sumando, setSumando] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
 
   const horasPlan = horasPlanDe(planHoras, planMinutos);
   const planValido = horasPlan > 0;
@@ -377,76 +403,91 @@ export default function AsignarActividadPage() {
     setExtraIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const handleSuccess = async (activityId: number) => {
+  /** A quién se suma al equipo, en orden, según el encargo elegido. */
+  const planEquipo = (): PasoEquipo[] => {
+    // Servicio a Luis o a Antonio: solo el LEAD. El ingeniero lo elige quien reparte.
+    if (despachoOnly) {
+      return [
+        {
+          userId,
+          indicaciones: formatDispatchHeadcountNote(headcount, leadNotes),
+          rol: "LEAD",
+          horasPlan,
+        },
+      ];
+    }
+    // Despacho a otro mando: no se elige aquí a quien la ejecuta.
+    // Luis + tarea/proyecto/comercial: ejecución personal, sin equipo. Siempre se manda: aunque
+    // no haya indicaciones, el tiempo estimado sí va.
+    if ((effectiveCharge === "despacho" && canOfferAssignmentCharge(person?.email)) || ejecucionOnly) {
+      return [{ userId, indicaciones: leadNotes.trim(), rol: "LEAD", horasPlan }];
+    }
+
+    const pasos: PasoEquipo[] = [
+      {
+        userId,
+        indicaciones:
+          leadNotes.trim() ||
+          (autoPeerCoordinators.length ? "Coordinación de su equipo en esta actividad." : undefined),
+        rol: "LEAD",
+        horasPlan,
+      },
+    ];
+    const peerIds = new Set(autoPeerCoordinators.map((u) => u.id));
+    for (const peer of autoPeerCoordinators) {
+      if (peer.id === userId || extraIds.includes(peer.id)) continue;
+      pasos.push({
+        userId: peer.id,
+        indicaciones: "Coordinación de su equipo en esta actividad cruzada (instalación / soporte).",
+        rol: "LEAD",
+        horasPlan,
+      });
+    }
+    for (const id of extraIds) {
+      pasos.push({
+        userId: id,
+        indicaciones: extraNotes[id],
+        rol: peerIds.has(id) || id === userId ? "LEAD" : "TECNICO",
+        horasPlan,
+      });
+    }
+    return pasos;
+  };
+
+  const correrPasos = async (activityId: number, pasos: PasoEquipo[]) => {
     const fichaAsignada = `/erp/pizarra/${userId}?asignada=${activityId}`;
     if (!token) {
       router.push(fichaAsignada);
       return;
     }
+    setSumando(true);
     setTeamError(null);
-    try {
-      // Servicio a Luis o a Antonio: solo el LEAD. El ingeniero lo elige quien reparte.
-      if (despachoOnly) {
-        await addTeamMember(
-          token,
-          activityId,
-          userId,
-          formatDispatchHeadcountNote(headcount, leadNotes),
-          "LEAD",
-          horasPlan,
-        );
-        router.push(fichaAsignada);
-        return;
-      }
-
-      // Despacho a otro mando: no se elige aquí a quien la ejecuta.
-      if (effectiveCharge === "despacho" && canOfferAssignmentCharge(person?.email)) {
-        await addTeamMember(token, activityId, userId, leadNotes.trim(), "LEAD", horasPlan);
-        router.push(fichaAsignada);
-        return;
-      }
-
-      // Luis + tarea/proyecto/comercial: ejecución personal, sin equipo.
-      if (ejecucionOnly) {
-        // Siempre se manda: aunque no haya indicaciones, el tiempo estimado sí va.
-        await addTeamMember(token, activityId, userId, leadNotes.trim(), "LEAD", horasPlan);
-        router.push(fichaAsignada);
-        return;
-      }
-
-      await addTeamMember(
-        token,
-        activityId,
-        userId,
-        leadNotes.trim() ||
-          (autoPeerCoordinators.length ? "Coordinación de su equipo en esta actividad." : undefined),
-        "LEAD",
-        horasPlan,
-      );
-
-      const peerIds = new Set(autoPeerCoordinators.map((u) => u.id));
-      for (const peer of autoPeerCoordinators) {
-        if (peer.id === userId) continue;
-        if (extraIds.includes(peer.id)) continue;
-        await addTeamMember(
-          token,
-          activityId,
-          peer.id,
-          "Coordinación de su equipo en esta actividad cruzada (instalación / soporte).",
-          "LEAD",
-          horasPlan,
-        );
-      }
-
-      for (const id of extraIds) {
-        const rol = peerIds.has(id) || id === userId ? "LEAD" : "TECNICO";
-        await addTeamMember(token, activityId, id, extraNotes[id], rol, horasPlan);
-      }
-    } catch (e) {
-      setTeamError({ activityId, text: formatApiError(e, "error de conexión") });
+    const { pendientes, error } = await sumarPendientes(pasos, (p) =>
+      addTeamMember(token, activityId, p.userId, p.indicaciones, p.rol, p.horasPlan),
+    );
+    setSumando(false);
+    if (pendientes.length) {
+      setPendiente({ activityId, pasos: pendientes });
+      const quien =
+        pendientes[0].userId === userId
+          ? person?.nombre
+          : boardUsers.find((u) => u.id === pendientes[0].userId)?.nombre;
+      const motivo = formatApiError(error, "error de conexión");
+      setTeamError(quien ? `${shortName(quien)}: ${motivo}` : motivo);
       return;
     }
     router.push(fichaAsignada);
+  };
+
+  const handleSuccess = (activityId: number) => {
+    const pasos = planEquipo();
+    setPendiente({ activityId, pasos });
+    void correrPasos(activityId, pasos);
+  };
+
+  const reintentarEquipo = () => {
+    if (!pendiente || sumando) return;
+    void correrPasos(pendiente.activityId, pendiente.pasos);
   };
 
   if (!Number.isFinite(userId)) {
@@ -567,7 +608,6 @@ export default function AsignarActividadPage() {
           </button>
         </div>
       ) : null}
-      {teamError ? <TeamErrorBox error={teamError} /> : null}
 
       <section>
         <h2 style={{ ...stepTitle, marginBottom: 10 }}>
@@ -1033,11 +1073,14 @@ export default function AsignarActividadPage() {
                 {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
               </span>
             </h2>
-            {teamError ? (
-              <div style={{ marginBottom: 12 }}>
-                <TeamErrorBox error={teamError} />
-              </div>
-            ) : null}
+            {pendiente ? (
+              <EquipoPendienteBox
+                activityId={pendiente.activityId}
+                sumando={sumando}
+                error={teamError}
+                onRetry={reintentarEquipo}
+              />
+            ) : (
             <OpsActivityForm
               key={`${kind}-${effectiveCharge ?? "none"}-${despachoOnly ? headcount : "x"}`}
               tone="core"
@@ -1052,8 +1095,9 @@ export default function AsignarActividadPage() {
               forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
               requireSchedule={Boolean(kindMeta.requiresSchedule)}
               onCancel={() => router.push(`/erp/pizarra/${userId}`)}
-              onSuccess={(id) => void handleSuccess(id)}
+              onSuccess={handleSuccess}
             />
+            )}
           </section>
         </>
       ) : bridgeNeeded ? null : kindMeta && chargeReady && !planValido ? (

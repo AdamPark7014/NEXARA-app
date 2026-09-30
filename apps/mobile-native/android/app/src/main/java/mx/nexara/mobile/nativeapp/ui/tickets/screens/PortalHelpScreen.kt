@@ -55,8 +55,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 
 data class PortalHelpUiState(
     val isLoading: Boolean = true,
@@ -150,8 +149,7 @@ private fun formatPublishedAt(raw: String?): String {
     if (raw.isNullOrBlank()) return ""
     return runCatching {
         val instant = Instant.parse(raw)
-        val formatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("es-MX"))
-        formatter.format(instant.atZone(ZoneId.systemDefault()))
+        NxFormat.patron("d MMM yyyy").format(instant.atZone(ZoneId.systemDefault()))
     }.getOrDefault(raw.take(10))
 }
 

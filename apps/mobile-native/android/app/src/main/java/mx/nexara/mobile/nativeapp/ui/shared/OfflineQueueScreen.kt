@@ -68,14 +68,21 @@ import mx.nexara.mobile.nativeapp.data.offline.OfflineSyncStatus
 import mx.nexara.mobile.nativeapp.data.offline.QueuedMutation
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.text.style.TextOverflow
 import java.net.URI
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.Instant
+import java.time.ZoneId
+
+private val FORMATO_COLA = NxFormat.patron("dd MMM HH:mm")
+
+private fun formatoCola(epochMillis: Long): String =
+    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(FORMATO_COLA)
 
 enum class OfflineMutationKind(
     val label: String,
@@ -120,6 +127,7 @@ fun OfflineQueueScreen(
     var wasOffline by remember { mutableStateOf(!NetworkMonitor.isOnline.value) }
     var autoSyncPulse by remember { mutableStateOf(false) }
     var confirmarVaciar by remember { mutableStateOf(false) }
+    var porDescartar by remember { mutableStateOf<QueuedMutation?>(null) }
     val isOnline by NetworkMonitor.isOnline.collectAsState()
     val syncStatus by OfflineSyncCoordinator.syncStatus.collectAsState()
 
@@ -232,11 +240,7 @@ fun OfflineQueueScreen(
                     isFirst = index == 0,
                     isLast = index == items.lastIndex,
                     isOnline = isOnline,
-                    onDiscard = {
-                        NexaraOffline.mediaStore().purgeRefsInBody(item.body)
-                        queue.removeIds(setOf(item.id))
-                        refresh()
-                    },
+                    onDiscard = { porDescartar = item },
                     onRetry = {
                         scope.launch {
                             val ok = OfflineSyncCoordinator.replaySingle(queue, auth.token(), item.id)
@@ -278,6 +282,34 @@ fun OfflineQueueScreen(
             },
         )
     }
+
+    porDescartar?.let { pendiente ->
+        val tipo = classifyOfflineMutation(pendiente).label.lowercase()
+        AlertDialog(
+            onDismissRequest = { porDescartar = null },
+            title = { Text("¿Descartar este cambio?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "El cambio de $tipo nunca llegará al servidor y no se puede recuperar.",
+                    fontSize = 13.sp,
+                    color = NxColors.Muted,
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    NexaraOffline.mediaStore().purgeRefsInBody(pendiente.body)
+                    queue.removeIds(setOf(pendiente.id))
+                    refresh()
+                    messageError = false
+                    message = "Cambio descartado"
+                    porDescartar = null
+                }) { Text("Descartar") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { porDescartar = null }) { Text("Cancelar") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -307,9 +339,7 @@ private fun SyncStatusCard(
     isOnline: Boolean,
     syncStatus: OfflineSyncStatus,
 ) {
-    val lastSyncLabel = syncStatus.lastSyncAt?.let { ts ->
-        SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(Date(ts))
-    }
+    val lastSyncLabel = syncStatus.lastSyncAt?.let(::formatoCola)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -366,15 +396,14 @@ private fun OfflineTimelineItem(
     val path = remember(item.url) {
         runCatching { URI(item.url).path }.getOrNull()?.removePrefix("/api/") ?: item.url
     }
-    val whenCreated = remember(item.createdAt) {
-        SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(Date(item.createdAt))
-    }
+    val whenCreated = remember(item.createdAt) { formatoCola(item.createdAt) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
+                // Regresa a su lugar: el diálogo de confirmación decide si se borra.
                 SwipeToDismissBoxValue.EndToStart -> {
                     onDiscard()
-                    true
+                    false
                 }
                 SwipeToDismissBoxValue.StartToEnd -> {
                     if (isOnline) onRetry()
@@ -481,6 +510,8 @@ private fun OfflineTimelineItem(
                                         "Intentos: ${item.attempts}" + (item.lastError?.let { " · $it" } ?: ""),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = NxColors.Warning,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -489,12 +520,12 @@ private fun OfflineTimelineItem(
                             }
                         }
                         if (isOnline) {
-                            Icon(
-                                Icons.Outlined.Sync,
-                                "Reintentar",
-                                modifier = Modifier.size(20.dp),
-                                tint = NxColors.Muted.copy(alpha = 0.5f),
-                            )
+                            IconButton(onClick = onRetry) {
+                                Icon(Icons.Outlined.Sync, "Reintentar", tint = NxColors.Brand)
+                            }
+                        }
+                        IconButton(onClick = onDiscard) {
+                            Icon(Icons.Outlined.Delete, "Descartar", tint = NxColors.Danger)
                         }
                     }
                 }

@@ -49,6 +49,8 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.ChronoField
 import java.util.Locale
 
 /** Espaciado en múltiplos de 4 dp; los márgenes de pantalla son [ScreenH]. */
@@ -283,8 +285,42 @@ fun nxFriendlyError(raw: String?): String {
 
 object NxFormat {
     private val ES_MX: Locale = Locale.forLanguageTag("es-MX")
-    private val DIA: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", ES_MX)
-    private val DIA_HORA: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", ES_MX)
+
+    /*
+     * Abreviaturas fijas: `MMM`/`EEE` de la JVM y de Android salen de CLDR, y cada
+     * versión (JDK 17 vs 21, Android 8 vs 14) da «sep», «sept» o «sep.». La misma
+     * fecha no puede verse distinto según el teléfono ni tumbar pruebas en CI.
+     */
+    private val MESES_CORTOS: Map<Long, String> = listOf(
+        "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic",
+    ).mapIndexed { i, mes -> (i + 1).toLong() to mes }.toMap()
+    private val DIAS_CORTOS: Map<Long, String> = listOf(
+        "lun", "mar", "mié", "jue", "vie", "sáb", "dom",
+    ).mapIndexed { i, dia -> (i + 1).toLong() to dia }.toMap()
+    private val TOKEN_CORTO = Regex("(?<![ML])MMM(?!M)|(?<!E)EEE(?!E)")
+
+    /**
+     * Igual que `DateTimeFormatter.ofPattern(pattern, es-MX)`, pero `MMM` y `EEE`
+     * usan las abreviaturas fijas de arriba. Úsalo en todo formato con mes o día corto.
+     */
+    fun patron(pattern: String): DateTimeFormatter {
+        val builder = DateTimeFormatterBuilder()
+        var desde = 0
+        for (token in TOKEN_CORTO.findAll(pattern)) {
+            if (token.range.first > desde) builder.appendPattern(pattern.substring(desde, token.range.first))
+            if (token.value == "MMM") {
+                builder.appendText(ChronoField.MONTH_OF_YEAR, MESES_CORTOS)
+            } else {
+                builder.appendText(ChronoField.DAY_OF_WEEK, DIAS_CORTOS)
+            }
+            desde = token.range.last + 1
+        }
+        if (desde < pattern.length) builder.appendPattern(pattern.substring(desde))
+        return builder.toFormatter(ES_MX)
+    }
+
+    private val DIA: DateTimeFormatter = patron("d MMM yyyy")
+    private val DIA_HORA: DateTimeFormatter = patron("d MMM yyyy, HH:mm")
 
     /** `1234.5` → `$1,234.50`; con otra moneda la agrega al final (`$10.00 USD`). */
     fun money(amount: Any?, currency: String? = "MXN"): String {

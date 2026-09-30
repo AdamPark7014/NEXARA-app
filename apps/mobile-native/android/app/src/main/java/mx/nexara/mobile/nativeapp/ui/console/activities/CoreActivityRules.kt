@@ -18,6 +18,7 @@ import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceReviewDto
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 
 /**
@@ -786,9 +787,9 @@ object CoreActivityRules {
             ?: runCatching { LocalDateTime.parse(value).atZone(zone).toInstant() }.getOrNull()
     }
 
-    private val WHEN_FORMAT = DateTimeFormatter.ofPattern("EEE d MMM · HH:mm", ES_MX)
+    private val WHEN_FORMAT = NxFormat.patron("EEE d MMM · HH:mm")
     private val CLOCK_FORMAT = DateTimeFormatter.ofPattern("HH:mm", ES_MX)
-    private val FULL_FORMAT = DateTimeFormatter.ofPattern("d MMM yyyy · HH:mm", ES_MX)
+    private val FULL_FORMAT = NxFormat.patron("d MMM yyyy · HH:mm")
     private val LOCAL_INPUT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
 
     /** «lun 14 sep · 09:30» */

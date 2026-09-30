@@ -59,7 +59,8 @@ export class ActivityToolsController {
         allowedKitUserIds: Array.isArray(body?.allowedKitUserIds)
           ? (body!.allowedKitUserIds as number[]).filter((n) => Number.isFinite(n) && Number(n) > 0).map((n) => Number(n))
           : [],
-        usePersonalKit: Boolean(body?.usePersonalKit),
+        // Si no viene, no se toca: un cliente que no conoce el kit no debe apagarlo.
+        usePersonalKit: typeof body?.usePersonalKit === 'boolean' ? body.usePersonalKit : undefined,
       },
       companyId,
     );

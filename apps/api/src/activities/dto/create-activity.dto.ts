@@ -6,16 +6,20 @@ import {
   IsDateString,
   IsEnum,
   Matches,
+  MaxLength,
 } from 'class-validator';
 import { ActivityType, ActivityWorkType, TicketType } from '@prisma/client';
 
+/** Los topes de largo son los de cada columna (`@db.VarChar` en schema.prisma). */
 export class CreateActivityDto {
   @IsOptional()
   @IsString()
+  @MaxLength(20, { message: 'El folio no puede pasar de 20 caracteres' })
   anNumber?: string;
 
   @IsNotEmpty()
   @IsString()
+  @MaxLength(200, { message: '«¿Qué hay que hacer?» no puede pasar de 200 caracteres; el detalle va en indicaciones' })
   titulo!: string;
 
   @IsOptional()
@@ -28,6 +32,7 @@ export class CreateActivityDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(50, { message: 'El estatus no puede pasar de 50 caracteres' })
   estatus?: string;
 
   @IsOptional()
@@ -44,6 +49,7 @@ export class CreateActivityDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120, { message: 'El tipo de tarea no puede pasar de 120 caracteres' })
   ticketTypeCustom?: string;
 
   @IsOptional()
@@ -60,22 +66,27 @@ export class CreateActivityDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(160, { message: 'El nombre de la sucursal no puede pasar de 160 caracteres' })
   branchName?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(60, { message: 'El número de sucursal no puede pasar de 60 caracteres' })
   branchNumber?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120, { message: 'La ciudad no puede pasar de 120 caracteres' })
   branchCity?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120, { message: 'El estado no puede pasar de 120 caracteres' })
   branchState?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(220, { message: 'La dirección no puede pasar de 220 caracteres' })
   branchAddress?: string;
 
   @IsOptional()
@@ -142,6 +153,7 @@ export class CreateActivityDto {
   /** Tipo Core: tarea|proyecto|obra|servicio|comercial */
   @IsOptional()
   @IsString()
+  @MaxLength(20, { message: 'El tipo de actividad no puede pasar de 20 caracteres' })
   coreKind?: string;
 
   /** Encargo: ejecucion (la hace el responsable) | despacho (la reparte a su equipo) */

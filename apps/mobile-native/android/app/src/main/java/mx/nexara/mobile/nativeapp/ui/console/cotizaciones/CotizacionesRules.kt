@@ -10,6 +10,7 @@ import mx.nexara.mobile.nativeapp.data.api.CotizacionGrupoDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionPartidaDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionResumenDto
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.Dinero
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 
 /**
  * Cotizaciones en el teléfono: qué se enseña de cada una y en qué orden.
@@ -446,6 +447,6 @@ object CotizacionesRules {
         "Consulta. Crear y editar una cotización, mandarla al cliente y decidirla se hacen desde la computadora."
 
     private val ESPANOL = Locale.forLanguageTag("es-MX")
-    private val FORMATO_CORTO = DateTimeFormatter.ofPattern("d MMM", ESPANOL)
-    private val FORMATO_LARGO = DateTimeFormatter.ofPattern("d MMM yyyy", ESPANOL)
+    private val FORMATO_CORTO = NxFormat.patron("d MMM")
+    private val FORMATO_LARGO = NxFormat.patron("d MMM yyyy")
 }

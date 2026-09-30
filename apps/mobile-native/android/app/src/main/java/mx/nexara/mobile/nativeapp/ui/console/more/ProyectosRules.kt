@@ -2,8 +2,8 @@ package mx.nexara.mobile.nativeapp.ui.console.more
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 
 /**
  * Proyectos en el teléfono: una tarjeta por proyecto en vez de la tabla de la
@@ -13,6 +13,8 @@ import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
  * Sin Android: se prueba en la JVM (`ProyectosRulesTest`).
  */
 object ProyectosRules {
+
+    private val FORMATO_CORTO = NxFormat.patron("d MMM")
 
     /** `SaludProyecto` del servidor (`apps/api/src/projects/proyecto-salud.ts`). */
     enum class Salud(val clave: String, val etiqueta: String) {
@@ -163,7 +165,7 @@ object ProyectosRules {
         val fecha = runCatching {
             LocalDate.parse(texto.substring(0, 10), DateTimeFormatter.ISO_LOCAL_DATE)
         }.getOrNull() ?: return null
-        return fecha.format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("es-MX")))
+        return fecha.format(FORMATO_CORTO)
     }
 
     /** Qué no hace esta pantalla. */
