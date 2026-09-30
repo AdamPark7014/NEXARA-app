@@ -413,6 +413,83 @@ fun EvidenceCaptureFlow(
         }
     }
 
+    /**
+     * Foto de evidencia libre («fotos en sitio», sin campos): se manda de inmediato, igual que
+     * [sendCampoFoto]. Antes se acumulaba solo en `drafts` (memoria) y se perdía si la persona
+     * salía de la pantalla o la app moría en segundo plano antes de tocar «enviar».
+     */
+    suspend fun sendEvidencePhoto(photo: GeoPhoto): Boolean {
+        busy = true
+        pendingError = null
+        return try {
+            val geo = if (photo.latitude != null && photo.longitude != null) {
+                EvidencePhotoGeoRequest(photo.latitude, photo.longitude, photo.capturedAt)
+            } else {
+                null
+            }
+            val saved = withContext(Dispatchers.IO) {
+                repo.addEvidencePhotoDraft(
+                    activityId = activity.id,
+                    photoUrl = photo.dataUrl,
+                    lat = photo.latitude,
+                    lng = photo.longitude,
+                    capturedAt = photo.capturedAt,
+                )
+            }
+            if (saved.status == null) {
+                // El interceptor offline respondió «en cola»: la foto no está en el GET todavía,
+                // pero sí sobrevive un reinicio de la app (queda en la cola persistida en disco).
+                drafts = drafts + DraftPhoto(photo.dataUrl, geo, thumbnailOf(photo.preview))
+                successIcon = Icons.Outlined.CloudOff
+                success = "Sin conexión: se enviará sola en cuanto vuelva la red."
+            } else {
+                // La url que vuelve es la del archivo ya guardado, no el data URL que se mandó:
+                // la miniatura de las fotos que ya estaban se conserva emparejando por url (los
+                // índices se recorren si alguien quitó una a medio camino); la nueva usa la vista
+                // previa que se acaba de tomar.
+                val previas = drafts
+                drafts = saved.evidencePhotos.orEmpty().mapIndexed { i, url ->
+                    val g = CoreActivityRules.geoAt(saved.evidencePhotosGeo, i)
+                    val thumb = previas.firstOrNull { it.url == url }?.thumb ?: thumbnailOf(photo.preview)
+                    DraftPhoto(url = url, geo = g?.toRequest(), thumb = thumb)
+                }
+                successIcon = NxGlyph.PHOTO.icon
+                success = "Foto agregada (${drafts.size} de $photoRequired)"
+            }
+            error = null
+            true
+        } catch (e: Exception) {
+            pendingError = e.toUserMessage("No se pudo guardar la foto")
+            false
+        } finally {
+            busy = false
+        }
+    }
+
+    /** Quita una foto en borrador — ya viajó al servidor, hay que avisarle también. */
+    fun removeDraftPhoto(index: Int) {
+        scope.launch {
+            busy = true
+            error = null
+            try {
+                val previas = drafts
+                val saved = withContext(Dispatchers.IO) { repo.removeEvidencePhoto(activity.id, index) }
+                drafts = if (saved.status != null) {
+                    saved.evidencePhotos.orEmpty().mapIndexed { i, url ->
+                        val g = CoreActivityRules.geoAt(saved.evidencePhotosGeo, i)
+                        DraftPhoto(url = url, geo = g?.toRequest(), thumb = previas.firstOrNull { it.url == url }?.thumb)
+                    }
+                } else {
+                    previas.filterIndexed { i, _ -> i != index }
+                }
+            } catch (e: Exception) {
+                error = e.toUserMessage("No se pudo quitar la foto")
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     fun savePhotos() {
         // Con campos las fotos ya viajaron una por una: aquí solo se avanza el paso.
         if (!porCampos && drafts.size < photoRequired) {
@@ -689,7 +766,7 @@ fun EvidenceCaptureFlow(
                     DraftGrid(
                         drafts = drafts,
                         enabled = !busy,
-                        onRemove = { index -> drafts = drafts.filterIndexed { i, _ -> i != index } },
+                        onRemove = { index -> removeDraftPhoto(index) },
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
@@ -868,16 +945,12 @@ fun EvidenceCaptureFlow(
                         }
                     }
                 } else if (kind == KIND_EVIDENCE) {
-                    val geo = if (photo.latitude != null && photo.longitude != null) {
-                        EvidencePhotoGeoRequest(photo.latitude, photo.longitude, photo.capturedAt)
-                    } else {
-                        null
+                    scope.launch {
+                        if (sendEvidencePhoto(photo)) {
+                            pending = null
+                            pendingKind = null
+                        }
                     }
-                    drafts = drafts + DraftPhoto(photo.dataUrl, geo, thumbnailOf(photo.preview))
-                    successIcon = NxGlyph.PHOTO.icon
-                    success = "Foto agregada (${drafts.size} de $photoRequired)"
-                    pending = null
-                    pendingKind = null
                 } else if (kind == KIND_ENTRY && avisoOrden != null && !ordenResuelto) {
                     // Hay otra de más prioridad sin empezar: se pregunta antes de mandar la foto.
                     preguntaOrden = true

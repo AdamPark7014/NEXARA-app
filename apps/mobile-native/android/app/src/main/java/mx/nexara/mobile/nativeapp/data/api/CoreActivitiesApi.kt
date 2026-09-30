@@ -649,6 +649,12 @@ data class EvidencePhotosWithGeoRequest(
     val photoGeo: List<EvidencePhotoGeoRequest?>,
 )
 
+/** Una foto de evidencia libre en borrador — viaja sola, en cuanto se toma. */
+data class EvidencePhotoDraftRequest(
+    val photoUrl: String,
+    val photoGeo: EvidencePhotoGeoRequest?,
+)
+
 /** Corrección de un paso devuelto: mismo payload que el paso original. */
 data class EvidenceResubmitRequest(
     val step: String,
@@ -908,6 +914,23 @@ interface CoreActivitiesApi {
     suspend fun evidencePhotos(
         @Path("id") activityId: Long,
         @Body body: EvidencePhotosWithGeoRequest,
+    ): EvidenceFlowDto
+
+    /**
+     * Una foto de evidencia libre, en cuanto se toma (no cierra el paso). Así nada se pierde
+     * si la persona sale de la pantalla antes de tocar «enviar». Ver `evidencePhotos`.
+     */
+    @POST("activity-evidence/{id}/evidence-photos/draft")
+    suspend fun addEvidencePhotoDraft(
+        @Path("id") activityId: Long,
+        @Body body: EvidencePhotoDraftRequest,
+    ): EvidenceFlowDto
+
+    /** Quita una foto de evidencia libre por índice (borrador o, después de enviado, edición). */
+    @POST("activity-evidence/{id}/evidence-photo/{index}/remove")
+    suspend fun removeEvidencePhoto(
+        @Path("id") activityId: Long,
+        @Path("index") index: Int,
     ): EvidenceFlowDto
 
     /**
