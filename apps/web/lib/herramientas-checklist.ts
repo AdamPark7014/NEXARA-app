@@ -151,6 +151,16 @@ export function hayErroresRequisitos(errores: ErroresRequisitos): boolean {
 }
 
 /**
+ * ¿Hay algo que guardar en el checklist? Marcar solo «Kit personal» (sin tocar el
+ * almacén) sigue siendo una decisión que hay que persistir, aunque la lista de
+ * renglones quede vacía: antes de que existiera el flag, una lista vacía de verdad
+ * no tenía nada que mandar a la API.
+ */
+export function debeGuardarChecklist(herramientas: readonly unknown[], usaKit: boolean): boolean {
+  return herramientas.length > 0 || usaKit;
+}
+
+/**
  * Avance del checklist a partir de lo que devolvió la API. Un renglón cuenta como listo
  * solo con un palomeo en `ok`: marcarlo «falta o está dañado» es lo que no deja iniciar.
  */

@@ -4,6 +4,7 @@ import {
   avanceChecklist,
   borradoresDesdeChecklist,
   claveRequisito,
+  debeGuardarChecklist,
   descripcionLibre,
   hayErroresRequisitos,
   requisitoVacio,
@@ -140,6 +141,23 @@ describe("borradoresDesdeChecklist", () => {
 
   it("una lista vacía da un borrador vacío", () => {
     expect(borradoresDesdeChecklist([])).toEqual([]);
+  });
+});
+
+describe("debeGuardarChecklist", () => {
+  it("sin renglones y sin kit personal no hay nada que guardar", () => {
+    expect(debeGuardarChecklist([], false)).toBe(false);
+  });
+
+  it("marcar «Kit personal» solo (Almacén vacío) sí hay que guardarlo", () => {
+    // Bug real: Luis asignó a José Antonio con «Kit personal» marcado y el buscador de
+    // Almacén vacío. El formulario se saltaba el PUT porque no había renglones, así que
+    // el flag nunca llegaba a la API y quedaba como si Antonio no llevara su kit.
+    expect(debeGuardarChecklist([], true)).toBe(true);
+  });
+
+  it("con renglones hay que guardar aunque no se use el kit", () => {
+    expect(debeGuardarChecklist([{ descripcion: "Escalera" }], false)).toBe(true);
   });
 });
 
