@@ -636,6 +636,9 @@ fun ConsoleNavHost(
                             launchSingleTop = true
                         }
                     },
+                    onOpenProfile = {
+                        navController.navigate(ConsoleRoutes.MyProfile) { launchSingleTop = true }
+                    },
                 )
             }
             nxComposable(ConsoleRoutes.Vehiculos, style = NxNavAnimStyle.Push) {

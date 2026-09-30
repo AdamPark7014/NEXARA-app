@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FactCheck
@@ -39,17 +41,29 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import mx.nexara.mobile.nativeapp.data.SessionRevision
+import mx.nexara.mobile.nativeapp.data.SessionStore
+import mx.nexara.mobile.nativeapp.data.SessionUser
+import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.console.ConsoleRoutes
 import mx.nexara.mobile.nativeapp.ui.console.CoreExtraModule
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -89,6 +103,7 @@ fun CoreExtraModule.icon(): ImageVector = when (this) {
 fun MoreHubScreen(
     modules: List<CoreExtraModule>,
     onOpen: (CoreExtraModule) -> Unit,
+    onOpenProfile: () -> Unit = {},
 ) {
     // Agrupar por «Hoy», «Recursos», «Finanzas», «Gobierno», en ese orden.
     val groupsInOrder = remember(modules) {
@@ -100,12 +115,22 @@ fun MoreHubScreen(
             CoreExtraModule.Group.GOBIERNO,
         ).mapNotNull { g -> grouped[g]?.takeIf { it.isNotEmpty() }?.let { g to it } }
     }
+    val context = LocalContext.current
+    val revision by SessionRevision.valor.collectAsState()
+    val user by produceState<SessionUser?>(initialValue = null, revision) {
+        value = SessionStore(context).load()
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(NxColors.Surface),
         contentPadding = NxSpacing.ListPadding,
         verticalArrangement = Arrangement.spacedBy(NxSpacing.S),
     ) {
+        user?.let { sessionUser ->
+            item(key = "profile-header", contentType = "profile") {
+                ProfileHeaderCard(user = sessionUser, onClick = onOpenProfile)
+            }
+        }
         groupsInOrder.forEachIndexed { gi, (group, list) ->
             item(key = "header-${group.name}", contentType = "header") {
                 GroupHeader(title = group.title, topPadding = if (gi == 0) 0.dp else NxSpacing.M)
@@ -113,6 +138,69 @@ fun MoreHubScreen(
             items(list, key = { it.key }, contentType = { "module" }) { module ->
                 ExtraCard(module = module, onOpen = onOpen)
             }
+        }
+    }
+}
+
+/** Quién eres, arriba del todo: foto (o iniciales) y nombre — «Más» hace de menú de cuenta. */
+@Composable
+private fun ProfileHeaderCard(user: SessionUser, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
+        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            val avatarUrl = user.avatarUrl
+            if (!avatarUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = toAbsoluteAssetUrl(avatarUrl),
+                    contentDescription = user.nombre,
+                    modifier = Modifier.size(52.dp).clip(CircleShape).border(2.dp, NxColors.Brand, CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                val initials = user.nombre.split(" ")
+                    .take(2)
+                    .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                    .joinToString("")
+                    .ifBlank { "?" }
+                Box(
+                    modifier = Modifier.size(52.dp).clip(CircleShape).background(NxColors.Brand),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(initials, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    user.nombre.ifBlank { "Tu cuenta" },
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = NxColors.Slate,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (user.department.isNotBlank()) {
+                    Text(
+                        user.department,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = NxColors.Muted,
+            )
         }
     }
 }
