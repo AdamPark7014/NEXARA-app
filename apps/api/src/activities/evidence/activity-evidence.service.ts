@@ -797,6 +797,44 @@ export class ActivityEvidenceService {
   }
 
   /**
+   * Agregar UNA foto de evidencia libre en cuanto se toma, sin cerrar el paso. Mismo espíritu que
+   * las fotos por campo: cada una se manda de inmediato, así nada se pierde si la persona sale de
+   * la pantalla (o la app muere en segundo plano) antes de tocar «enviar». El envío final
+   * (`saveEvidencePhotos`) sigue siendo el que valida el mínimo y avanza el paso.
+   */
+  async addEvidencePhoto(
+    activityId: number,
+    userId: number,
+    photoUrl: string,
+    geo: { latitude?: unknown; longitude?: unknown; capturedAt?: unknown } | null | undefined,
+    companyId?: number | null,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
+
+    if (evidence.status !== 'EVIDENCE_PHOTOS') {
+      throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
+    }
+    if (!photoUrl) {
+      throw new BadRequestException('Falta la foto.');
+    }
+
+    const photos = [...(evidence.evidencePhotos || []), photoUrl];
+    const existingGeo: Array<PhotoGeo | null> = Array.isArray(evidence.evidencePhotosGeo)
+      ? [...(evidence.evidencePhotosGeo as Array<PhotoGeo | null>)]
+      : [];
+    while (existingGeo.length < photos.length - 1) existingGeo.push(null);
+    existingGeo.push(sanitizePhotoGeo([geo ?? null], 1)?.[0] ?? null);
+
+    return this.prisma.activityEvidence.update({
+      where: { id: evidence.id },
+      data: {
+        evidencePhotos: photos,
+        evidencePhotosGeo: existingGeo.some(Boolean) ? (existingGeo as Prisma.InputJsonValue) : Prisma.DbNull,
+      },
+    });
+  }
+
+  /**
    * Guardar hoja de servicio PDF
    */
   async saveServiceSheetPdf(
@@ -1692,21 +1730,30 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Índice de foto inválido');
     }
 
-    const activity = await this.loadActivityForTenant(activityId, companyId);
-    const minPhotos =
-      activity?.workType === 'PREVENTIVE_INVENTORY'
-        ? 1
-        : clampEvidencePhotoRequired(activity.evidencePhotoRequired);
-    if (evidence.evidencePhotos.length <= minPhotos) {
-      throw new BadRequestException(`Mínimo ${minPhotos} foto${minPhotos > 1 ? 's' : ''} de evidencia son requeridas`);
+    // Todavía capturando (no se ha enviado el paso): se puede bajar hasta 0, el envío final ya
+    // exige el mínimo. El mínimo solo aplica editando una evidencia que ya se envió.
+    if (evidence.status !== 'EVIDENCE_PHOTOS') {
+      const activity = await this.loadActivityForTenant(activityId, companyId);
+      const minPhotos =
+        activity?.workType === 'PREVENTIVE_INVENTORY'
+          ? 1
+          : clampEvidencePhotoRequired(activity.evidencePhotoRequired);
+      if (evidence.evidencePhotos.length <= minPhotos) {
+        throw new BadRequestException(`Mínimo ${minPhotos} foto${minPhotos > 1 ? 's' : ''} de evidencia son requeridas`);
+      }
     }
 
     const updatedPhotos = evidence.evidencePhotos.filter((_: string, i: number) => i !== index);
+    const existingGeo = Array.isArray(evidence.evidencePhotosGeo)
+      ? (evidence.evidencePhotosGeo as Array<PhotoGeo | null>)
+      : [];
+    const updatedGeo = existingGeo.filter((_, i) => i !== index);
 
     return this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
         evidencePhotos: updatedPhotos,
+        evidencePhotosGeo: updatedGeo.some(Boolean) ? (updatedGeo as Prisma.InputJsonValue) : Prisma.DbNull,
       },
     });
   }
