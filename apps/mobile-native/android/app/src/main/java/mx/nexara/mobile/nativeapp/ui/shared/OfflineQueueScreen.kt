@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.SyncProblem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,6 +58,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.offline.NetworkMonitor
@@ -117,6 +119,7 @@ fun OfflineQueueScreen(
     var messageError by remember { mutableStateOf(false) }
     var wasOffline by remember { mutableStateOf(!NetworkMonitor.isOnline.value) }
     var autoSyncPulse by remember { mutableStateOf(false) }
+    var confirmarVaciar by remember { mutableStateOf(false) }
     val isOnline by NetworkMonitor.isOnline.collectAsState()
     val syncStatus by OfflineSyncCoordinator.syncStatus.collectAsState()
 
@@ -203,14 +206,7 @@ fun OfflineQueueScreen(
                     Text(if (isSyncing) "Sincronizando…" else "Sincronizar ahora")
                 }
                 if (items.isNotEmpty()) {
-                    OutlinedButton(
-                        onClick = {
-                            items.forEach { NexaraOffline.mediaStore().purgeRefsInBody(it.body) }
-                            queue.clear()
-                            refresh()
-                            message = "Cola descartada"
-                        },
-                    ) { Text("Vaciar cola") }
+                    OutlinedButton(onClick = { confirmarVaciar = true }) { Text("Vaciar cola") }
                 }
             }
         }
@@ -254,6 +250,33 @@ fun OfflineQueueScreen(
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+
+    if (confirmarVaciar) {
+        AlertDialog(
+            onDismissRequest = { confirmarVaciar = false },
+            title = { Text("¿Vaciar la cola?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Se pierden las ${items.size} mutaciones sin sincronizar de este aparato " +
+                        "(fotos, cambios de actividad) y no se pueden recuperar.",
+                    fontSize = 13.sp,
+                    color = NxColors.Muted,
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    items.forEach { NexaraOffline.mediaStore().purgeRefsInBody(it.body) }
+                    queue.clear()
+                    refresh()
+                    message = "Cola descartada"
+                    confirmarVaciar = false
+                }) { Text("Vaciar cola") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmarVaciar = false }) { Text("Cancelar") }
+            },
+        )
     }
 }
 

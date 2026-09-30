@@ -162,9 +162,18 @@ fun ActivityDetailScreen(
 
     LaunchedEffect(activity.id, recarga) {
         loadingDetail = true
-        detail = runCatching {
+        val recargado = runCatching {
             withContext(Dispatchers.IO) { repo.activityById(activity.id) }
-        }.getOrElse { detail }
+        }
+        if (recargado.isFailure) {
+            // No hay un estado de error propio en esta pantalla: sin avisar, se queda
+            // viendo el resumen de la lista (o lo de antes de la acción) sin saber por qué.
+            snackbarHostState.showSnackbar(
+                if (recarga == 0) "No se pudo cargar el detalle completo — mostrando lo que ya tenías"
+                else "No se pudo actualizar la actividad — sigue viendo lo anterior",
+            )
+        }
+        detail = recargado.getOrElse { detail }
         editEstatus = detail.estatus
         editPrioridad = detail.prioridad ?: ""
         editDescripcion = detail.descripcion ?: ""

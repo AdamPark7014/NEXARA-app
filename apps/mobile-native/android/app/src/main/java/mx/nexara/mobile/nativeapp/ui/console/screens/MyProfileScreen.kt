@@ -62,6 +62,8 @@ data class MyProfileUiState(
     val saving: Boolean = false,
     val error: String? = null,
     val saveMessage: String? = null,
+    /** Color del `saveMessage`: antes se adivinaba buscando «guardado» en el texto. */
+    val saveSuccess: Boolean = false,
     val telefono: String = "",
     val fechaNacimiento: String = "",
     val direccion: String = "",
@@ -209,12 +211,13 @@ class MyProfileViewModel(app: android.app.Application) : AndroidViewModel(app) {
                         ),
                     )
                 }
-                _state.update { it.copy(saving = false, saveMessage = "Perfil guardado") }
+                _state.update { it.copy(saving = false, saveMessage = "Perfil guardado", saveSuccess = true) }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
                         saving = false,
                         saveMessage = e.toUserMessage("No se pudo guardar"),
+                        saveSuccess = false,
                     )
                 }
             }
@@ -385,7 +388,7 @@ fun MyProfileScreen(
                         if (!profileState.saveMessage.isNullOrBlank()) {
                             Text(
                                 profileState.saveMessage!!,
-                                color = if (profileState.saveMessage!!.contains("guardado", true)) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                                color = if (profileState.saveSuccess) Color(0xFF059669) else MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }

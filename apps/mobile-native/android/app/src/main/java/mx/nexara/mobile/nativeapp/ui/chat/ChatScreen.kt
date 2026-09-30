@@ -2554,7 +2554,6 @@ private fun ChatComposeBar(
                 IconButton(
                     onClick = onAttachClick,
                     enabled = canAttach,
-                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         Icons.Default.AttachFile,
@@ -2579,14 +2578,12 @@ private fun ChatComposeBar(
             IconButton(
                 onClick = onPickActivity,
                 enabled = canAttach,
-                modifier = Modifier.size(36.dp),
             ) {
                 Icon(NxIcons.Assignment, contentDescription = "Mencionar actividad", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(
                 onClick = onPickEvidence,
                 enabled = canAttach,
-                modifier = Modifier.size(36.dp),
             ) {
                 Icon(NxGlyph.PHOTO.icon, contentDescription = "Mencionar evidencia", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -2970,10 +2967,7 @@ private fun ChatMessageCard(
                     }
                     Box {
                         if (!isOwn) {
-                            IconButton(
-                                onClick = { menuExpanded = true },
-                                modifier = Modifier.size(28.dp),
-                            ) {
+                            IconButton(onClick = { menuExpanded = true }) {
                                 Icon(
                                     Icons.Default.MoreVert,
                                     "Opciones",
