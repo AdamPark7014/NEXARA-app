@@ -1286,7 +1286,7 @@ select.celda {
 
 .detallePartida {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5.5rem 4.25rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5.5rem 6rem;
   gap: 2px 4px;
   padding: 0 4px 2px;
 }
