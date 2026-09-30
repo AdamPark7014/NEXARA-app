@@ -564,19 +564,29 @@ struct EvidenceCaptureFlowView: View {
                     .font(.caption)
                     .foregroundStyle(CorePalette.orange)
             }
-            if !pendingPhotos.isEmpty {
+            // Miniaturas: las de esta sesión (UIImage) + las ya guardadas al salir y volver
+            // (AuthenticatedImage). Antes solo se veían las de esta sesión y la gente creía
+            // que había que empezar de cero aunque el contador sí las sumaba.
+            if !confirmedPhotoURLs.isEmpty || !pendingPhotos.isEmpty {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 8)], spacing: 8) {
-                    ForEach(pendingPhotos) { photo in
+                    ForEach(Array(confirmedPhotoURLs.enumerated()), id: \.offset) { index, url in
+                        let local = pendingPhotoMatching(url: url, index: index)
                         ZStack(alignment: .topTrailing) {
-                            Image(uiImage: photo.image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(minWidth: 0, maxWidth: .infinity)
-                                .frame(height: 90)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            Group {
+                                if let local {
+                                    Image(uiImage: local.image)
+                                        .resizable()
+                                        .scaledToFill()
+                                } else {
+                                    AuthenticatedImage(url: url)
+                                }
+                            }
+                            .frame(minWidth: 0, maxWidth: .infinity)
+                            .frame(height: 90)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                             Button {
-                                Task { await removeDraftPhoto(photo) }
+                                Task { await removeConfirmedPhoto(at: index, local: local) }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.title3)
@@ -588,7 +598,7 @@ struct EvidenceCaptureFlowView: View {
                             .disabled(busy)
                         }
                         .overlay(alignment: .bottomLeading) {
-                            if photo.coords != nil {
+                            if local?.coords != nil {
                                 Image(systemName: "location.fill")
                                     .font(.caption2)
                                     .foregroundStyle(Color.white)
@@ -604,7 +614,7 @@ struct EvidenceCaptureFlowView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(confirmedPhotoURLs.count >= photoRequired ? CorePalette.green : Color.secondary)
             if confirmedPhotoURLs.count > pendingPhotos.count {
-                Text("\(confirmedPhotoURLs.count - pendingPhotos.count) de un intento anterior ya guardadas (no se muestran aquí, pero cuentan).")
+                Text("Ya tienes \(confirmedPhotoURLs.count - pendingPhotos.count) guardada(s) de antes: puedes seguir agregando o quitarlas.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -1111,14 +1121,32 @@ struct EvidenceCaptureFlowView: View {
         guard let localIndex = pendingPhotos.firstIndex(where: { $0.id == photo.id }) else { return }
         let recoveredCount = max(0, confirmedPhotoURLs.count - pendingPhotos.count)
         let serverIndex = recoveredCount + localIndex
+        await removeConfirmedPhoto(at: serverIndex, local: photo)
+    }
+
+    /// Empareja una URL confirmada con la miniatura local de esta sesión (si la hay).
+    private func pendingPhotoMatching(url: String, index: Int) -> CapturedGeoPhoto? {
+        if let exact = pendingPhotos.first(where: { $0.dataUrl == url }) { return exact }
+        // Tras el draft el servidor devuelve `/uploads/…`, no el data URL: las locales van al final.
+        let recoveredCount = max(0, confirmedPhotoURLs.count - pendingPhotos.count)
+        let localIndex = index - recoveredCount
+        guard localIndex >= 0, localIndex < pendingPhotos.count else { return nil }
+        return pendingPhotos[localIndex]
+    }
+
+    @MainActor
+    private func removeConfirmedPhoto(at serverIndex: Int, local: CapturedGeoPhoto?) async {
+        guard serverIndex >= 0, serverIndex < confirmedPhotoURLs.count else { return }
         busy = true
         defer { busy = false }
         do {
             let saved = try await CoreRepository.shared.removeEvidencePhoto(activityId: activityId, index: serverIndex)
-            pendingPhotos.removeAll { $0.id == photo.id }
+            if let local {
+                pendingPhotos.removeAll { $0.id == local.id }
+            }
             if let saved {
                 confirmedPhotoURLs = saved.photoList
-            } else if serverIndex < confirmedPhotoURLs.count {
+            } else {
                 confirmedPhotoURLs.remove(at: serverIndex)
             }
             errorText = nil

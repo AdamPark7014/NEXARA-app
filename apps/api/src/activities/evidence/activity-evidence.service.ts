@@ -809,28 +809,49 @@ export class ActivityEvidenceService {
     geo: { latitude?: unknown; longitude?: unknown; capturedAt?: unknown } | null | undefined,
     companyId?: number | null,
   ) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
-
-    if (evidence.status !== 'EVIDENCE_PHOTOS') {
-      throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
-    }
     if (!photoUrl) {
       throw new BadRequestException('Falta la foto.');
     }
+    // getOrCreate fuera de la transacción (puede crear fila); el append sí va
+    // serializado: dos fotos a la vez no pueden leer la misma lista y pisarse.
+    const seeded = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
+    if (seeded.status !== 'EVIDENCE_PHOTOS') {
+      throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
+    }
 
-    const photos = [...(evidence.evidencePhotos || []), photoUrl];
-    const existingGeo: Array<PhotoGeo | null> = Array.isArray(evidence.evidencePhotosGeo)
-      ? [...(evidence.evidencePhotosGeo as Array<PhotoGeo | null>)]
-      : [];
-    while (existingGeo.length < photos.length - 1) existingGeo.push(null);
-    existingGeo.push(sanitizePhotoGeo([geo ?? null], 1)?.[0] ?? null);
+    const punto = sanitizePhotoGeo([geo ?? null], 1)?.[0] ?? null;
 
-    return this.prisma.activityEvidence.update({
-      where: { id: evidence.id },
-      data: {
-        evidencePhotos: photos,
-        evidencePhotosGeo: existingGeo.some(Boolean) ? (existingGeo as Prisma.InputJsonValue) : Prisma.DbNull,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // Relee dentro de la tx para no perder una foto que acaba de entrar.
+      const evidence = await tx.activityEvidence.findFirst({
+        where: { id: seeded.id },
+      });
+      if (!evidence || evidence.status !== 'EVIDENCE_PHOTOS') {
+        throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
+      }
+
+      const actuales = evidence.evidencePhotos || [];
+      // Reenvío offline de la misma foto: no duplicar.
+      if (actuales.includes(photoUrl)) {
+        return evidence;
+      }
+
+      const photos = [...actuales, photoUrl];
+      const existingGeo: Array<PhotoGeo | null> = Array.isArray(evidence.evidencePhotosGeo)
+        ? [...(evidence.evidencePhotosGeo as Array<PhotoGeo | null>)]
+        : [];
+      while (existingGeo.length < photos.length - 1) existingGeo.push(null);
+      existingGeo.push(punto);
+
+      return tx.activityEvidence.update({
+        where: { id: evidence.id },
+        data: {
+          evidencePhotos: photos,
+          evidencePhotosGeo: existingGeo.some(Boolean)
+            ? (existingGeo as Prisma.InputJsonValue)
+            : Prisma.DbNull,
+        },
+      });
     });
   }
 

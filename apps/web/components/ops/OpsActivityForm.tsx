@@ -33,6 +33,7 @@ import {
 } from "@/lib/ops-activity-form";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
+import { DurationWheelPicker, joinMinutes, splitMinutes } from "@/components/ui/DurationWheelPicker";
 import {
   apiErrorMessage,
   assignTicketRequest,
@@ -1337,51 +1338,78 @@ export default function OpsActivityForm({
         </div>
         {isCore ? (
           <>
-            <label style={coreLabelStyle}>
-              ¿Cuánto tiempo toma? (min)
-              <input
-                className="input"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                placeholder="Ej. 90"
-                value={form.tiempoEstimadoMin}
-                onChange={(e) => setForm({ ...form, tiempoEstimadoMin: e.target.value })}
-                style={{ fontWeight: 400 }}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ ...coreLabelStyle, display: "block", marginBottom: 8 }}>
+                ¿Cuánto tiempo toma?
+              </label>
+              <DurationWheelPicker
+                horas={splitMinutes(Number(form.tiempoEstimadoMin) || 0).horas}
+                minutos={splitMinutes(Number(form.tiempoEstimadoMin) || 0).minutos}
+                onChange={({ horas, minutos }) =>
+                  setForm({
+                    ...form,
+                    tiempoEstimadoMin: String(joinMinutes(horas, minutos) || ""),
+                  })
+                }
+                maxHoras={24}
+                minuteStep={5}
+                hint="Gira las ruedas. Se guarda en minutos para el API."
               />
-            </label>
-            <label style={coreLabelStyle}>
-              Máximo permitido (min)
-              <input
-                className="input"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                placeholder="Ej. 120"
-                value={form.tiempoMaximoMin}
-                onChange={(e) => setForm({ ...form, tiempoMaximoMin: e.target.value })}
-                style={{ fontWeight: 400 }}
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ ...coreLabelStyle, display: "block", marginBottom: 8 }}>
+                Máximo permitido
+              </label>
+              <DurationWheelPicker
+                horas={splitMinutes(Number(form.tiempoMaximoMin) || 0).horas}
+                minutos={splitMinutes(Number(form.tiempoMaximoMin) || 0).minutos}
+                onChange={({ horas, minutos }) =>
+                  setForm({
+                    ...form,
+                    tiempoMaximoMin: String(joinMinutes(horas, minutos) || ""),
+                  })
+                }
+                maxHoras={24}
+                minuteStep={5}
               />
-            </label>
+            </div>
           </>
         ) : (
           <>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              placeholder="Tiempo esperado (min)"
-              value={form.tiempoEstimadoMin}
-              onChange={(e) => setForm({ ...form, tiempoEstimadoMin: e.target.value })}
-            />
-            <input
-              className="input"
-              type="number"
-              min={0}
-              placeholder="Tiempo máximo (min)"
-              value={form.tiempoMaximoMin}
-              onChange={(e) => setForm({ ...form, tiempoMaximoMin: e.target.value })}
-            />
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 650, marginBottom: 6 }}>
+                Tiempo esperado
+              </label>
+              <DurationWheelPicker
+                horas={splitMinutes(Number(form.tiempoEstimadoMin) || 0).horas}
+                minutos={splitMinutes(Number(form.tiempoEstimadoMin) || 0).minutos}
+                onChange={({ horas, minutos }) =>
+                  setForm({
+                    ...form,
+                    tiempoEstimadoMin: String(joinMinutes(horas, minutos) || ""),
+                  })
+                }
+                maxHoras={24}
+                minuteStep={5}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 650, marginBottom: 6 }}>
+                Tiempo máximo
+              </label>
+              <DurationWheelPicker
+                horas={splitMinutes(Number(form.tiempoMaximoMin) || 0).horas}
+                minutos={splitMinutes(Number(form.tiempoMaximoMin) || 0).minutos}
+                onChange={({ horas, minutos }) =>
+                  setForm({
+                    ...form,
+                    tiempoMaximoMin: String(joinMinutes(horas, minutos) || ""),
+                  })
+                }
+                maxHoras={24}
+                minuteStep={5}
+              />
+            </div>
           </>
         )}
         {pendingRequestId && (

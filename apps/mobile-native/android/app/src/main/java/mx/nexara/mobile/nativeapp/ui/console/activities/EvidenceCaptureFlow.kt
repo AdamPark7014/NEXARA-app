@@ -190,13 +190,20 @@ fun EvidenceCaptureFlow(
 
     var drafts by remember(activity.id) { mutableStateOf<List<DraftPhoto>>(emptyList()) }
     LaunchedEffect(flow?.id, flow?.status, flow?.evidencePhotos) {
-        if (step == STEP_PHOTOS) {
-            val current = flow
-            drafts = current?.evidencePhotos.orEmpty().mapIndexed { i, url ->
-                val geo = CoreActivityRules.geoAt(current?.evidencePhotosGeo, i)
-                DraftPhoto(url = url, geo = geo?.toRequest(), thumb = null)
-            }
+        if (step != STEP_PHOTOS) return@LaunchedEffect
+        val servidor = flow?.evidencePhotos.orEmpty()
+        // Conserva fotos locales (data URL / cola offline) que el GET todavía no trae:
+        // si solo pusiéramos la lista del servidor, al refrescar se perdían las que
+        // siguen en cola y la gente tenía que volver a tomarlas.
+        val localesPendientes = drafts.filter { local ->
+            local.url.startsWith("data:", ignoreCase = true) &&
+                servidor.none { it == local.url }
         }
+        drafts = servidor.mapIndexed { i, url ->
+            val geo = CoreActivityRules.geoAt(flow?.evidencePhotosGeo, i)
+            val thumb = drafts.firstOrNull { it.url == url }?.thumb
+            DraftPhoto(url = url, geo = geo?.toRequest(), thumb = thumb)
+        } + localesPendientes
     }
 
     var formValues by remember(activity.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
