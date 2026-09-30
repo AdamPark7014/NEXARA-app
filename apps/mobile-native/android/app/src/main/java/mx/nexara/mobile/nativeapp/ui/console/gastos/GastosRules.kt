@@ -8,6 +8,7 @@ import java.util.Locale
 import mx.nexara.mobile.nativeapp.data.api.GastoDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.Dinero
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxMetric
 
 /**
@@ -454,6 +455,6 @@ object GastosRules {
         "$n ${if (n == 1) singular else plural}"
 
     private val ESPANOL = Locale.forLanguageTag("es-MX")
-    private val FORMATO_CORTO = DateTimeFormatter.ofPattern("d MMM", ESPANOL)
-    private val FORMATO_LARGO = DateTimeFormatter.ofPattern("d MMM yyyy", ESPANOL)
+    private val FORMATO_CORTO = NxFormat.patron("d MMM")
+    private val FORMATO_LARGO = NxFormat.patron("d MMM yyyy")
 }

@@ -156,6 +156,33 @@ function isCompoundUniqueScalar(value: unknown): boolean {
   return false;
 }
 
+const RELATION_WRITE_OPS = new Set([
+  'connect', 'disconnect', 'connectOrCreate', 'create', 'createMany',
+  'update', 'updateMany', 'upsert', 'delete', 'deleteMany',
+]);
+
+/**
+ * `updateMany` solo acepta columnas: un `data` con escrituras anidadas
+ * (`createdBy: { connect }`, `approvals: { create }`) revienta con
+ * PrismaClientValidationError. Esos updates van como `update` nativo con la
+ * empresa dentro del where único (Prisma 5: `{ id, companyId }` es válido).
+ */
+export function hasRelationWrites(data: unknown): boolean {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  for (const value of Object.values(data as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || value instanceof Date) continue;
+    if (Object.keys(value as object).some((key) => RELATION_WRITE_OPS.has(key))) return true;
+  }
+  return false;
+}
+
+function hasScalarTopLevelId(where: unknown): boolean {
+  if (!where || typeof where !== 'object' || Array.isArray(where)) return false;
+  if (!Object.prototype.hasOwnProperty.call(where, 'id')) return false;
+  const id = (where as { id: unknown }).id;
+  return typeof id === 'number' || typeof id === 'string';
+}
+
 function tenantScopeId(companyId: number | null): number {
   return companyId != null && Number.isFinite(companyId) && companyId > 0 ? companyId : -1;
 }
@@ -267,6 +294,13 @@ export function planTenantQuery(action: string, args: any, companyId: number | n
       };
     }
     if (action === 'update') {
+      if (hasRelationWrites(safeArgs.data)) {
+        return {
+          type: 'query',
+          action: 'update',
+          args: { ...safeArgs, where: { [compound.key]: compound.value, companyId: scopeId } },
+        };
+      }
       return {
         type: 'updateThenRead',
         where: filter,
@@ -307,12 +341,6 @@ export function planTenantQuery(action: string, args: any, companyId: number | n
   }
 
   const already = whereAlreadyHasCompanyScope(safeArgs.where);
-  const idOnly =
-    !!safeArgs.where &&
-    typeof safeArgs.where === 'object' &&
-    !Array.isArray(safeArgs.where) &&
-    Object.keys(safeArgs.where).length === 1 &&
-    Object.prototype.hasOwnProperty.call(safeArgs.where, 'id');
 
   if (!already && (action === 'findUnique' || action === 'findUniqueOrThrow')) {
     return {
@@ -322,14 +350,21 @@ export function planTenantQuery(action: string, args: any, companyId: number | n
     };
   }
 
-  if (!already && idOnly && (action === 'update' || action === 'delete')) {
-    const scoped = { id: (safeArgs.where as { id: unknown }).id, companyId: scopeId };
+  // `{ id }` o `{ id, estatus }`: la empresa va al mismo nivel. Envuelto en AND
+  // el where deja de ser único y update/delete fallan con validación.
+  if (!already && hasScalarTopLevelId(safeArgs.where) && (action === 'update' || action === 'delete')) {
+    const scoped = { ...(safeArgs.where as Record<string, unknown>), companyId: scopeId };
     if (action === 'delete') return { type: 'deleteMany', where: scoped };
+    if (hasRelationWrites(safeArgs.data)) {
+      return { type: 'query', action: 'update', args: { ...safeArgs, where: scoped } };
+    }
+    // La relectura va solo por id: un filtro como `estatus` puede dejar de cumplirse tras el update.
+    const byId = { id: (safeArgs.where as { id: unknown }).id, companyId: scopeId };
     return {
       type: 'updateThenRead',
       where: scoped,
       data: safeArgs.data,
-      read: { where: scoped, ...readShape(safeArgs) },
+      read: { where: byId, ...readShape(safeArgs) },
     };
   }
 
@@ -368,6 +403,14 @@ export async function runWithTenantScope(
     const existing = await forward('findFirst', { where: plan.lookup, select: { id: true } });
     if (existing?.id != null) {
       const data = plan.update ?? {};
+      if (hasRelationWrites(data)) {
+        return forward('update', {
+          where: { id: existing.id, companyId: plan.lookup.companyId ?? scopeId },
+          data,
+          ...(plan.select ? { select: plan.select } : {}),
+          ...(plan.include ? { include: plan.include } : {}),
+        });
+      }
       if (Object.keys(data).length > 0) {
         const many = await forward('updateMany', {
           where: { id: existing.id, companyId: plan.lookup.companyId ?? scopeId },

@@ -167,6 +167,19 @@ export function mapPrismaError(
           message: 'Referencia inválida a otro registro',
           errorCode: 'INVALID_REFERENCE',
         };
+      // Texto más largo que la columna (p. ej. un título de más de 200 caracteres).
+      case 'P2000':
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Uno de los textos es demasiado largo. Acórtalo e intenta de nuevo.',
+          errorCode: 'VALUE_TOO_LONG',
+        };
+      case 'P2034':
+        return {
+          status: HttpStatus.CONFLICT,
+          message: 'Otro cambio se guardó al mismo tiempo. Vuelve a intentarlo.',
+          errorCode: 'WRITE_CONFLICT',
+        };
       default:
         return null;
     }

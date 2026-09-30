@@ -46,6 +46,18 @@ describe('mapPrismaError', () => {
     );
   });
 
+  it('mapea un texto mas largo que la columna a 400 (titulo de actividad de mas de 200)', () => {
+    const mapped = mapPrismaError(prismaError('PrismaClientKnownRequestError', 'P2000'));
+    expect(mapped?.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(mapped?.errorCode).toBe('VALUE_TOO_LONG');
+  });
+
+  it('mapea un conflicto de escritura concurrente a 409', () => {
+    expect(mapPrismaError(prismaError('PrismaClientKnownRequestError', 'P2034'))?.status).toBe(
+      HttpStatus.CONFLICT,
+    );
+  });
+
   it('deja pasar codigos de Prisma desconocidos', () => {
     // Sin mapeo conocido se trata como error interno: mejor un 500 generico
     // que inventar un codigo que no corresponde.

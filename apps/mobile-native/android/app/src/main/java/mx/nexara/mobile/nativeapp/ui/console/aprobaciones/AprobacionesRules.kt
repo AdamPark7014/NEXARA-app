@@ -13,6 +13,7 @@ import mx.nexara.mobile.nativeapp.data.api.AprobacionPendienteDto
 import mx.nexara.mobile.nativeapp.data.api.DecisionRespuestaDto
 import mx.nexara.mobile.nativeapp.data.api.WfPasoDto
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.Dinero
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxMetric
 
 /**
@@ -507,6 +508,6 @@ object AprobacionesRules {
     const val GRIS = 0xFF94A3B8L
 
     private val ESPANOL: Locale = Locale.forLanguageTag("es-MX")
-    private val FORMATO_CORTO = DateTimeFormatter.ofPattern("d MMM", ESPANOL)
+    private val FORMATO_CORTO = NxFormat.patron("d MMM")
     private val FORMATO_HORA = DateTimeFormatter.ofPattern("HH:mm", ESPANOL)
 }

@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import mx.nexara.mobile.nativeapp.data.api.KitAsignacionDto
 import mx.nexara.mobile.nativeapp.data.api.PrestamoHerramientaDto
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 
 /**
  * Las cuentas de Herramientas, sin una sola línea de Android: así se prueban en
@@ -106,7 +107,7 @@ object HerramientasRules {
     // ── Fechas ───────────────────────────────────────────────────────────────
 
     private val FORMATO_CORTO: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("es-MX"))
+        mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat.patron("d MMM yyyy")
 
     /**
      * Texto ISO del API → el día que le toca en México.
