@@ -2527,6 +2527,8 @@ model CotizacionItem {
   supplierCode          String?    @db.VarChar(20)
   /// Almacén CT API de surtido (14A Puebla, 35A MTY, …).
   supplierWarehouseCode String?    @db.VarChar(10)
+  /// Margen % de esta partida. Con `unitCost`, `unitPrice` sale de costo × (1 + margen/100) —
+  /// independiente del margen de la cotización (`Cotizacion.marginPercent`), que va sobre el total.
   marginPercent         Decimal?   @db.Decimal(7, 2)
   stockSnapshot         Int?
   leadTimeDays          Int?

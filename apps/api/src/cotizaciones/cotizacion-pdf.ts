@@ -405,15 +405,16 @@ const BASE_TABLE_COLS: TableCol[] = [
   { key: 'total', label: 'Importe', width: 74, align: 'right' },
 ];
 
-/** PDF interno: costo y precio de la partida. El margen es el de la cotización, en el resumen. */
+/** PDF interno: costo, margen % propio y precio de cada partida. El margen general va en el resumen. */
 const INTERNAL_TABLE_COLS: TableCol[] = [
   { key: 'num', label: '#', width: 18, align: 'center' },
-  { key: 'desc', label: 'Partida', width: 168, align: 'left' },
-  { key: 'qty', label: 'Cant.', width: 32, align: 'center' },
-  { key: 'cost', label: 'Costo', width: 64, align: 'right' },
-  { key: 'price', label: 'Precio', width: 64, align: 'right' },
-  { key: 'tax', label: 'IVA', width: 36, align: 'center' },
-  { key: 'total', label: 'Importe', width: 72, align: 'right' },
+  { key: 'desc', label: 'Partida', width: 150, align: 'left' },
+  { key: 'qty', label: 'Cant.', width: 30, align: 'center' },
+  { key: 'cost', label: 'Costo', width: 58, align: 'right' },
+  { key: 'margin', label: 'Margen', width: 40, align: 'right' },
+  { key: 'price', label: 'Precio', width: 58, align: 'right' },
+  { key: 'tax', label: 'IVA', width: 32, align: 'center' },
+  { key: 'total', label: 'Importe', width: 68, align: 'right' },
 ];
 
 const scaleTableCols = (contentWidth: number, interno = false): TableCol[] => {
@@ -468,11 +469,13 @@ const celdasDePartida = (
     ];
   }
   const sinCosto = item.unitCost == null || !(Number(item.unitCost) > 0);
+  const sinMargenPropio = item.marginPercent == null;
   return [
     String(index + 1),
     itemDescription(item),
     String(item.qty),
     sinCosto ? '—' : formatMoney(Number(item.unitCost), currency),
+    sinMargenPropio ? '—' : `${item.marginPercent}%`,
     formatMoney(item.unitPrice, currency),
     `${item.tax || 0}%`,
     formatMoney(item.lineTotal, currency),
@@ -622,14 +625,11 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
     (payload.retentionTotal || 0);
   const margenPct = porcentajeMargen(payload.marginPercent);
   const margenMonto = Math.round((payload.total - baseConIva) * 100) / 100;
+  // Margen efectivo de las partidas que sí traen costo (propio o heredado): (venta − costo) / costo.
+  // Aparte del margen de la cotización (arriba): ese va sobre el total, este es lo que en realidad
+  // se está dejando en las partidas donde hay costo capturado.
+  const margenPartidasPct = costTotal > 0 ? Math.round(((sellNet - costTotal) / costTotal) * 10000) / 100 : null;
 
-  y = ensureY(ctx, y, 116, payload.quoteNumber);
-  doc.save();
-  doc.roundedRect(margin, y, contentWidth, 104, 5).fill(COLORS.fill);
-  doc.roundedRect(margin, y, contentWidth, 104, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
-  doc.restore();
-
-  doc.fillColor(COLORS.navy).font(fuente(doc, 'semi')).fontSize(10).text('Desglose interno', margin + 12, y + 10);
   const rows: Array<[string, string]> = [
     ['Costo', formatMoney(costTotal, payload.currency)],
     ['Subtotal de partidas', formatMoney(sellNet, payload.currency)],
@@ -640,6 +640,18 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
     ],
     ['Total', formatMoney(payload.total, payload.currency)],
   ];
+  if (margenPartidasPct != null) {
+    rows.push([`Margen de las partidas (${margenPartidasPct}%)`, formatMoney(sellNet - costTotal, payload.currency)]);
+  }
+
+  const boxH = 18 + rows.length * 13 + 10;
+  y = ensureY(ctx, y, boxH + 12, payload.quoteNumber);
+  doc.save();
+  doc.roundedRect(margin, y, contentWidth, boxH, 5).fill(COLORS.fill);
+  doc.roundedRect(margin, y, contentWidth, boxH, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
+  doc.restore();
+
+  doc.fillColor(COLORS.navy).font(fuente(doc, 'semi')).fontSize(10).text('Desglose interno', margin + 12, y + 10);
   let ly = y + 26;
   doc.font(fuente(doc, 'texto')).fontSize(9).fillColor(COLORS.text);
   for (const [label, value] of rows) {
@@ -647,7 +659,7 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
     doc.text(value, margin + 12, ly, { width: contentWidth - 24, align: 'right' });
     ly += 13;
   }
-  return y + 114;
+  return y + boxH + 10;
 };
 
 const drawSection = (ctx: PdfCtx, y: number, title: string, quoteNumber: string): number => {

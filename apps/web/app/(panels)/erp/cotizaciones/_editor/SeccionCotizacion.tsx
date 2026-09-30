@@ -316,6 +316,12 @@ export default function SeccionCotizacion({
         editable={editable}
         onValor={(marginPercent) => cambiar((d) => ({ ...d, marginPercent }))}
       />
+      {doc.marginPercent != null && doc.marginPercent !== 0 && doc.partidas.some((p) => p.marginPercent != null) ? (
+        <p className={styles.pista}>
+          Ojo: este margen se suma al de las partidas que ya traen el suyo (abajo, en «Detalle»). Si solo quieres
+          controlar el margen partida por partida, deja este campo en 0.
+        </p>
+      ) : null}
 
       <div className={styles.bloque}>
         <div className={styles.bloqueCabeza}>

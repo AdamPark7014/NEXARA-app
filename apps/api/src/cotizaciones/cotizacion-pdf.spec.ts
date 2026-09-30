@@ -88,4 +88,43 @@ describe('PDF de cotización', () => {
     expect(texto).toContain('278.40');
     expect(texto).not.toContain('Margen sobre el costo');
   });
+
+  it('el PDF interno también imprime el margen propio de cada partida', async () => {
+    const buffer = await generateCotizacionPdf(
+      {
+        ...base([
+          {
+            name: 'Cámara IP 4 MP',
+            qty: 2,
+            unitCost: 100,
+            marginPercent: 15,
+            // 100 × 1.15 = 115
+            unitPrice: 115,
+            discount: 0,
+            tax: 16,
+            lineTotal: 266.8,
+          },
+          {
+            name: 'Cable UTP',
+            qty: 1,
+            unitPrice: 50,
+            discount: 0,
+            tax: 16,
+            lineTotal: 58,
+          },
+        ]),
+        subtotal: 280,
+        taxTotal: 44.8,
+        total: 324.8,
+      },
+      { internal: true },
+    );
+    const texto = textoPorHoja(buffer).join('\n');
+    // Cámara: 15% propio se imprime en la tabla de partidas.
+    expect(texto).toContain('15%');
+    // Cable: sin margen propio, la celda se queda en «—», no inventa un porcentaje.
+    expect(texto).toContain('—');
+    // Desglose interno: margen efectivo de las partidas con costo — (200 − ~173.9) / 173.9, redondeado.
+    expect(texto).toContain('Margen de las partidas');
+  });
 });

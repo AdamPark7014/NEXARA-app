@@ -17,6 +17,7 @@ import {
   partidasParaApi,
   payloadDeDocumento,
   porcentajeMargen,
+  precioConMargen,
   sumarDias,
   totalesDePartidas,
 } from "./cotizacion-documento";
@@ -137,6 +138,14 @@ describe("partidas y totales", () => {
     expect(porcentajeMargen({ s: 1, e: 1, d: [2040000] })).toBe(20.4);
     expect(porcentajeMargen({ s: 1, e: 1, d: [20] })).toBe(20);
     expect(porcentajeMargen(0.2)).toBe(0.2);
+  });
+
+  it("margen de la partida: costo × (1 + margen/100), y null cuando falta alguno de los dos", () => {
+    expect(precioConMargen(100, 50)).toBe(150);
+    expect(precioConMargen(100, 0)).toBe(100);
+    expect(precioConMargen(null, 50)).toBeNull();
+    expect(precioConMargen(100, null)).toBeNull();
+    expect(precioConMargen(0, 50)).toBeNull();
   });
 });
 

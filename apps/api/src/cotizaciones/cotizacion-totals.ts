@@ -207,6 +207,16 @@ export function totalConMargen(baseConImpuestos: number, margen: unknown): numbe
   return round2(base * factorMargen(margen));
 }
 
+/**
+ * Precio al cliente a partir del costo interno y el margen de la partida: costo × (1 + margen/100).
+ * `null` si falta el costo o el margen — ahí el precio se respeta tal como se capturó.
+ */
+export function precioConMargen(unitCost: number | null, margen: unknown): number | null {
+  const pct = porcentajeMargen(margen);
+  if (unitCost == null || !(unitCost > 0) || pct == null) return null;
+  return round2(unitCost * (1 + pct / 100));
+}
+
 function numeroDeMargen(valor: unknown): number | null {
   if (valor == null || valor === '') return null;
   if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
@@ -261,8 +271,11 @@ function decimalJsANumero(o: { s?: number; e: number; d: number[] }): number | n
  * mínimo de 1, de modo que un payload manipulado no pueda producir importes
  * negativos ni descuentos superiores al 100 %.
  *
- * El precio de la partida se guarda como viene. El margen de la cotización no
- * es un markup por renglón: se aplica después, sobre el total ya con IVA.
+ * El precio de la partida se guarda como viene, **salvo** que traiga costo interno y margen propio:
+ * ahí el precio sale de costo × (1 + margen/100) — el servidor manda, no lo que haya calculado el
+ * navegador. Sin uno de los dos, el precio capturado se respeta tal cual. Esto es aparte del margen
+ * de la cotización (`Cotizacion.marginPercent`), que sigue sin ser un markup por renglón: se aplica
+ * después, sobre el total ya con IVA (ver `calculateTotals`).
  */
 export function normalizeItems(
   items: RawCotizacionItem[] | undefined | null,
@@ -303,9 +316,13 @@ export function normalizeItems(
       supplierCode,
       taxPercent,
     });
-    // El precio capturado se respeta aunque sea igual al costo. El margen comercial
-    // no reescribe la partida: va sobre el total con IVA.
-    const unitPrice = round2(Math.max(0, Number(item.unitPrice) || 0));
+    // Con costo y margen de la partida, el precio sale de ahí (costo × (1 + margen/100)) — la fuente
+    // de verdad es el servidor, no lo que haya calculado el navegador. Sin uno de los dos, el precio
+    // capturado se respeta tal cual, aunque sea igual al costo. El margen de la cotización (aparte,
+    // Cotizacion.marginPercent) no reescribe la partida: va sobre el total ya con IVA.
+    const margenPartida = porcentajeMargen(item.marginPercent);
+    const precioDeMargen = precioConMargen(pricing.unitCost, margenPartida);
+    const unitPrice = precioDeMargen ?? round2(Math.max(0, Number(item.unitPrice) || 0));
 
     return {
       productId: item.productId ? entero(item.productId) || null : null,
@@ -332,7 +349,7 @@ export function normalizeItems(
       productCtId: item.productCtId ? entero(item.productCtId) || null : null,
       supplierCode: pricing.supplierCode,
       supplierWarehouseCode: item.supplierWarehouseCode?.trim()?.slice(0, 10) || null,
-      marginPercent: porcentajeMargen(item.marginPercent),
+      marginPercent: margenPartida,
       stockSnapshot: enteroONulo(item.stockSnapshot),
       leadTimeDays: enteroONulo(item.leadTimeDays),
       scoreReason: item.scoreReason?.trim() || null,

@@ -8,6 +8,7 @@ import {
   importeDeLinea,
   mover,
   partidaNueva,
+  precioConMargen,
   type PartidaEditor,
   type Totales,
 } from "@/lib/cotizacion-documento";
@@ -293,13 +294,18 @@ export default function TablaPartidas({
   const cambiar = (key: string, cambio: Partial<PartidaEditor>) =>
     setPartidas((lista) => lista.map((p) => (p.key === key ? { ...p, ...cambio } : p)));
 
-  /** Costo interno. No mueve el precio: el margen va sobre el total con IVA. */
+  /** Costo interno. Con margen % ya puesto, el precio al cliente se recalcula de inmediato. */
   const ponerCosto = (p: PartidaEditor, costo: number) => {
-    if (!Number.isFinite(costo) || costo <= 0) {
-      cambiar(p.key, { unitCost: null });
-      return;
-    }
-    cambiar(p.key, { unitCost: costo });
+    const unitCost = Number.isFinite(costo) && costo > 0 ? costo : null;
+    const precio = precioConMargen(unitCost, p.marginPercent);
+    cambiar(p.key, precio == null ? { unitCost } : { unitCost, unitPrice: precio });
+  };
+
+  /** Margen % de la partida. Con costo interno, recalcula el precio al cliente; sin costo, solo se guarda. */
+  const ponerMargenPartida = (p: PartidaEditor, margen: number) => {
+    const marginPercent = Number.isFinite(margen) ? margen : null;
+    const precio = precioConMargen(p.unitCost, marginPercent);
+    cambiar(p.key, precio == null ? { marginPercent } : { marginPercent, unitPrice: precio });
   };
 
   const ponerPrecio = (p: PartidaEditor, precio: number) => {
@@ -457,6 +463,15 @@ export default function TablaPartidas({
                 decimales={2}
                 tabIndex={-1}
                 onValor={(n) => ponerCosto(p, n)}
+              />
+              <CeldaNumero
+                valor={p.marginPercent == null ? Number.NaN : Number(p.marginPercent)}
+                editable={editable}
+                etiqueta={`Margen % de la partida ${i + 1}`}
+                placeholder="Margen %"
+                decimales={2}
+                tabIndex={-1}
+                onValor={(n) => ponerMargenPartida(p, n)}
               />
               <TextoAuto
                 variante="celda"

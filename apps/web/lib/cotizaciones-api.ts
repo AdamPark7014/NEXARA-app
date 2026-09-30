@@ -91,7 +91,11 @@ export type PartidaCotizacion = {
   partida?: string | null;
   /** Costo mayorista. Interno: no sale en el PDF. */
   unitCost?: number | null;
-  /** Margen % que traía la partida. El precio no sale de aquí: el margen de la cotización va sobre el total con IVA. */
+  /**
+   * Margen % de esta partida. Con costo interno, el precio al cliente sale de ahí (costo × (1 +
+   * margen/100)); sin margen aquí, el precio se sigue escribiendo a mano. Independiente del margen
+   * de la cotización, que sigue yendo sobre el total ya con IVA.
+   */
   marginPercent?: number | null;
 };
 

@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ActivityToolsService } from './activity-tools.service.js';
+import { ActivityToolsController } from './activity-tools.controller.js';
 
 const EMPRESA = 7;
 const ACTIVIDAD = 10;
@@ -129,9 +130,8 @@ describe('definirRequisitos', () => {
   });
 
   it('marca «kit personal» aunque la lista de renglones venga vacía (como manda el controller)', async () => {
-    // Luis asigna a José Antonio con «Kit personal» marcado y el Almacén vacío: el
-    // controller siempre manda `usePersonalKit` como booleano (Boolean(body?.usePersonalKit)),
-    // así que este objeto —no un arreglo plano— es la forma real del payload.
+    // Luis asigna a José Antonio con «Kit personal» marcado y el Almacén vacío: este objeto
+    // —no un arreglo plano— es la forma real que el controller le pasa al servicio.
     const { service, prisma } = build({ requisitos: [] });
     await service.definirRequisitos(
       ACTIVIDAD,
@@ -148,6 +148,25 @@ describe('definirRequisitos', () => {
   it('un guardado normal (sin tocar el flag) no toca usesPersonalKit', async () => {
     const { service, prisma } = build({ requisitos: [] });
     await service.definirRequisitos(ACTIVIDAD, [{ descripcion: 'Escalera' }], EMPRESA);
+    expect(prisma.activity.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT activities/:id/herramientas (controller)', () => {
+  it('con {requisitos: [], usePersonalKit: true} guarda el kit', async () => {
+    const { service, prisma } = build({ requisitos: [] });
+    const controller = new ActivityToolsController(service);
+    await controller.definir(ACTIVIDAD, { requisitos: [], usePersonalKit: true, allowedKitUserIds: [31] }, EMPRESA);
+    expect(prisma.activity.update).toHaveBeenCalledWith({
+      where: { id: ACTIVIDAD },
+      data: { usesPersonalKit: true },
+    });
+  });
+
+  it('sin usePersonalKit en el cuerpo no apaga el kit que ya tenía la OT', async () => {
+    const { service, prisma } = build({ requisitos: [] });
+    const controller = new ActivityToolsController(service);
+    await controller.definir(ACTIVIDAD, { requisitos: [{ descripcion: 'Escalera' }] }, EMPRESA);
     expect(prisma.activity.update).not.toHaveBeenCalled();
   });
 });

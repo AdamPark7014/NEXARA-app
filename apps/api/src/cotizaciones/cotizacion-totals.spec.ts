@@ -91,12 +91,41 @@ describe('normalizeItems', () => {
     expect(row.laborRate).toBe(0);
   });
 
-  it('no reescribe el precio de la partida: el margen va sobre el total', () => {
+  it('con costo y margen propio, el precio sale de ahí: costo × (1 + margen/100)', () => {
     const [fila] = normalizeItems([
-      { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 100, marginPercent: 50 },
+      { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 999, marginPercent: 50 },
+    ]);
+    expect(fila.unitPrice).toBe(150);
+    expect(fila.unitCost).toBe(100);
+    expect(fila.marginPercent).toBe(50);
+  });
+
+  it('con margen 0 en la partida, el precio queda igual al costo (0 sí cuenta, no es "sin margen")', () => {
+    const [fila] = normalizeItems([
+      { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 999, marginPercent: 0 },
     ]);
     expect(fila.unitPrice).toBe(100);
-    expect(fila.unitCost).toBe(100);
+  });
+
+  it('sin margen propio (o sin costo), el precio capturado se respeta tal cual', () => {
+    const sinMargen = normalizeItems([
+      { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 100 },
+    ])[0];
+    expect(sinMargen.unitPrice).toBe(100);
+
+    const sinCosto = normalizeItems([
+      { name: 'Switch', qty: 2, unitPrice: 100, marginPercent: 50 },
+    ])[0];
+    expect(sinCosto.unitPrice).toBe(100);
+  });
+
+  it('el margen de la partida es aparte del margen de la cotización: ese sigue yendo sobre el total', () => {
+    const [fila] = normalizeItems([
+      { name: 'Switch', qty: 2, unitCost: 100, unitPrice: 999, marginPercent: 50 },
+    ]);
+    // El precio de la partida (150) no cambia por el margen general de la cotización:
+    // ese se aplica aparte, sobre el total ya con IVA (ver calculateTotals).
+    expect(fila.unitPrice).toBe(150);
   });
 
   it('20 se queda en 20: ni el Decimal ni la coma decimal lo vuelven 204', () => {
