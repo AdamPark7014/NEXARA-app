@@ -247,8 +247,10 @@ export default function HrPage() {
     if (!user?.token) return;
     setLoading(true);
     try {
+      // Sin `limit`, el API regresa la plantilla completa en un arreglo (no paginado):
+      // con `?limit=50` cualquier empresa con más de 50 personas perdía personal de la lista sin aviso.
       const [data, rolesData, deptsData] = await Promise.all([
-        apiFetch("users/hr-staff?limit=50", user.token),
+        apiFetch("users/hr-staff", user.token),
         apiFetch("users/roles", user.token),
         apiFetch("users/departments", user.token),
       ]);

@@ -119,6 +119,9 @@ export default function BankingPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   /** Sube para volver a pedir los movimientos de la cuenta elegida. */
   const [txReload, setTxReload] = useState(0);
+  /** Tope del DTO (`@Max(100)`); tandas de 5 páginas · 100 = 500 movimientos antes de avisar. */
+  const [txTandas, setTxTandas] = useState(1);
+  const [txParcial, setTxParcial] = useState<{ cargadas: number; total: number } | null>(null);
   const selectedId = selected?.id ?? null;
 
   const load = useCallback(async () => {
@@ -137,21 +140,43 @@ export default function BankingPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => { setTxTandas(1); }, [selectedId]);
+
   useEffect(() => {
     if (!token || selectedId == null) return;
     let vivo = true;
-    setLoadingTx(true);
-    setTxError(null);
-    apiFetch(`accounting/banking/accounts/${selectedId}/transactions?limit=100`, token)
-      .then((data) => { if (vivo) setTxs(Array.isArray(data) ? data : (data?.data ?? [])); })
-      .catch((e) => {
+    const PAGINAS_POR_TANDA = 5;
+    (async () => {
+      setLoadingTx(true);
+      setTxError(null);
+      try {
+        const acumuladas: BankTransaction[] = [];
+        let total = 0;
+        for (let pagina = 1; pagina <= txTandas * PAGINAS_POR_TANDA; pagina += 1) {
+          const data = await apiFetch(
+            `accounting/banking/accounts/${selectedId}/transactions?limit=100&page=${pagina}`,
+            token,
+          );
+          const rows: BankTransaction[] = Array.isArray(data) ? data : (data?.data ?? []);
+          acumuladas.push(...rows);
+          const informado = Array.isArray(data) ? undefined : data?.meta?.total;
+          total = informado ?? acumuladas.length;
+          if (rows.length < 100 || acumuladas.length >= total) break;
+        }
+        if (!vivo) return;
+        setTxs(acumuladas);
+        setTxParcial(total > acumuladas.length ? { cargadas: acumuladas.length, total } : null);
+      } catch (e) {
         if (!vivo) return;
         setTxError(formatApiError(e, "No se pudieron cargar los movimientos"));
         setTxs([]);
-      })
-      .finally(() => { if (vivo) setLoadingTx(false); });
+        setTxParcial(null);
+      } finally {
+        if (vivo) setLoadingTx(false);
+      }
+    })();
     return () => { vivo = false; };
-  }, [token, selectedId, txReload]);
+  }, [token, selectedId, txReload, txTandas]);
 
   const deferredTxSearch = useDeferredValue(txSearch);
   const visibleTxs = useMemo(() => {
@@ -220,11 +245,15 @@ export default function BankingPage() {
       {
         label: "Por conciliar",
         value: porConciliar,
-        hint: selected ? `movimientos de ${selected.name}` : "selecciona una cuenta",
+        hint: !selected
+          ? "selecciona una cuenta"
+          : txParcial
+            ? `de los ${txParcial.cargadas} movimientos cargados de ${txParcial.total}`
+            : `movimientos de ${selected.name}`,
         tone: porConciliar > 0 ? "warning" : "default",
       },
     ];
-  }, [accounts, txs, totalBalance, selected]);
+  }, [accounts, txs, totalBalance, selected, txParcial]);
 
   const openNewAccount = () => { setEditingAccount(null); setForm({ ...emptyForm }); setFormErr(null); setShowForm(true); };
   const openEditAccount = (a: BankAccount) => {
@@ -554,6 +583,16 @@ export default function BankingPage() {
                   ? <EmptyState title="No se pudieron cargar los movimientos" description={txError} action={<Button size="sm" variant="secondary" onClick={() => setTxReload((n) => n + 1)}>Reintentar</Button>} />
                   : (
                     <>
+                      {txParcial && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "0 0 12px" }}>
+                          <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
+                            Se cargaron los {txParcial.cargadas} movimientos más recientes de {txParcial.total}. La búsqueda y los filtros solo miran los cargados.
+                          </p>
+                          <Button size="sm" variant="secondary" onClick={() => setTxTandas((n) => n + 1)} disabled={loadingTx}>
+                            Cargar más
+                          </Button>
+                        </div>
+                      )}
                       <DataTable
                         columns={txColumns}
                         rows={visibleTxs}

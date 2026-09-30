@@ -346,6 +346,7 @@ function EmployeePaymentsContent() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [initialForm, setInitialForm] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -498,6 +499,7 @@ function EmployeePaymentsContent() {
   const openNew = () => {
     setEditing(null);
     setForm({ ...emptyForm });
+    setInitialForm({ ...emptyForm });
     setEvidenceFiles([]);
     setSaveErr(null);
     setFormErrors({});
@@ -505,8 +507,7 @@ function EmployeePaymentsContent() {
   };
 
   const openEdit = (p: Payment) => {
-    setEditing(p);
-    setForm({
+    const inicial = {
       userId: String(p.userId),
       concepto: p.concepto ?? "",
       periodFrom: p.periodFrom.slice(0, 10),
@@ -515,12 +516,19 @@ function EmployeePaymentsContent() {
       totalMinutes: p.totalMinutes ?? 0,
       note: p.note ?? "",
       status: (p.status as PaymentStatus) || "Borrador",
-    });
+    };
+    setEditing(p);
+    setForm(inicial);
+    setInitialForm(inicial);
     setEvidenceFiles([]);
     setSaveErr(null);
     setFormErrors({});
     setShowForm(true);
   };
+
+  const formDirty =
+    evidenceFiles.length > 0 ||
+    (Object.keys(form) as Array<keyof typeof form>).some((k) => form[k] !== initialForm[k]);
 
   const closeForm = () => {
     setShowForm(false);
@@ -1119,6 +1127,7 @@ function EmployeePaymentsContent() {
       <Modal
         open={showForm}
         onClose={closeForm}
+        dirty={formDirty && !saving}
         title={editing ? "Editar pago" : "Registrar pago"}
         maxWidth={560}
         footer={

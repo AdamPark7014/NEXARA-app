@@ -217,8 +217,10 @@ export default function ActivityDetailPage() {
     }
   }, [token, id, form, reload]);
 
-  if (error) return <DetailError message={error} onRetry={reload} />;
-  if (!activity) return null;
+  if (!activity) {
+    if (error) return <DetailError message={error} onRetry={reload} />;
+    return null;
+  }
 
   const branch = [activity.branchName, activity.branchCity, activity.branchState].filter(Boolean).join(" · ");
 
@@ -308,7 +310,7 @@ export default function ActivityDetailPage() {
                 Editar
               </Button>
             ) : null}
-            {puedeEliminar ? (
+            {puedeEliminar && !editing ? (
               <Button
                 size="sm"
                 variant="danger"
@@ -321,6 +323,19 @@ export default function ActivityDetailPage() {
           </>
         }
       />
+      {error ? (
+        <div style={{ marginBottom: 14 }}>
+          <InlineAlert
+            variant="danger"
+            message={`No se pudo actualizar: ${error}`}
+            action={
+              <Button size="sm" variant="ghost" onClick={reload}>
+                Reintentar
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
       {saveErr && !editing ? (
         <div style={{ marginBottom: 14 }}>
           <InlineAlert variant="danger" message={saveErr} onDismiss={() => setSaveErr(null)} />

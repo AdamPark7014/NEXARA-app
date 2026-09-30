@@ -290,6 +290,9 @@ export default function AccountingPage() {
   const [filterTipo, setFilterTipo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Tope del DTO (`@Max(100)`); tandas de 5 páginas · 100 = 500 pólizas antes de avisar que falta cargar más. */
+  const [tandas, setTandas] = useState(1);
+  const [parcial, setParcial] = useState<{ cargadas: number; total: number } | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -310,6 +313,7 @@ export default function AccountingPage() {
   // ── Períodos fiscales ────────────────────────────────────────────────
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
   const [periodsLoading, setPeriodsLoading] = useState(false);
+  const [periodsLoadErr, setPeriodsLoadErr] = useState<string | null>(null);
   const [showPeriodForm, setShowPeriodForm] = useState(false);
   const [periodForm, setPeriodForm] = useState({ ...emptyPeriodForm });
   const [periodSaveErr, setPeriodSaveErr] = useState<string | null>(null);
@@ -349,6 +353,7 @@ export default function AccountingPage() {
   // ── Presupuestos / centros de costo ─────────────────────────────────
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [costCentersLoading, setCostCentersLoading] = useState(false);
+  const [costCentersLoadErr, setCostCentersLoadErr] = useState<string | null>(null);
   const [showCostCenterForm, setShowCostCenterForm] = useState(false);
   const [costCenterForm, setCostCenterForm] = useState({ ...emptyCostCenterForm });
   const [costCenterSaveErr, setCostCenterSaveErr] = useState<string | null>(null);
@@ -356,6 +361,7 @@ export default function AccountingPage() {
 
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [budgetsLoading, setBudgetsLoading] = useState(false);
+  const [budgetsLoadErr, setBudgetsLoadErr] = useState<string | null>(null);
   const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [budgetForm, setBudgetForm] = useState({ ...emptyBudgetForm });
   const [budgetSaveErr, setBudgetSaveErr] = useState<string | null>(null);
@@ -364,6 +370,7 @@ export default function AccountingPage() {
   const [budgetVsActualYear, setBudgetVsActualYear] = useState(String(new Date().getFullYear()));
   const [budgetVsActual, setBudgetVsActual] = useState<Budget[]>([]);
   const [budgetVsActualLoading, setBudgetVsActualLoading] = useState(false);
+  const [budgetVsActualLoadErr, setBudgetVsActualLoadErr] = useState<string | null>(null);
 
   // ── Loaders ───────────────────────────────────────────────────────
   const loadAccountOptions = useCallback(async () => {
@@ -387,12 +394,25 @@ export default function AccountingPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch("accounting/journal-entries?limit=100", token);
-      setItems(Array.isArray(data) ? data : (data.data ?? []));
+      const acumuladas: JournalEntry[] = [];
+      let total = 0;
+      const PAGINAS_POR_TANDA = 5;
+      for (let pagina = 1; pagina <= tandas * PAGINAS_POR_TANDA; pagina += 1) {
+        const data = await apiFetch(`accounting/journal-entries?limit=100&page=${pagina}`, token);
+        const rows: JournalEntry[] = Array.isArray(data) ? data : (data?.data ?? []);
+        acumuladas.push(...rows);
+        const informado = Array.isArray(data) ? undefined : data?.meta?.total;
+        total = informado ?? acumuladas.length;
+        if (rows.length < 100 || acumuladas.length >= total) break;
+      }
+      setItems(acumuladas);
+      setParcial(total > acumuladas.length ? { cargadas: acumuladas.length, total } : null);
     } catch (e) {
       setError(formatApiError(e, "No se pudieron cargar las pólizas"));
+      setItems([]);
+      setParcial(null);
     } finally { setLoading(false); }
-  }, [token]);
+  }, [token, tandas]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -415,10 +435,12 @@ export default function AccountingPage() {
   const loadPeriods = useCallback(async () => {
     if (!token) return;
     setPeriodsLoading(true);
+    setPeriodsLoadErr(null);
     try {
       const data = await apiFetch("accounting/accounts/fiscal-periods", token);
       setPeriods(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e) {
+      setPeriodsLoadErr(formatApiError(e, "No se pudieron cargar los periodos fiscales"));
       setPeriods([]);
     } finally {
       setPeriodsLoading(false);
@@ -478,10 +500,12 @@ export default function AccountingPage() {
   const loadCostCenters = useCallback(async () => {
     if (!token) return;
     setCostCentersLoading(true);
+    setCostCentersLoadErr(null);
     try {
       const data = await apiFetch("accounting/accounts/cost-centers", token);
       setCostCenters(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e) {
+      setCostCentersLoadErr(formatApiError(e, "No se pudieron cargar los centros de costo"));
       setCostCenters([]);
     } finally {
       setCostCentersLoading(false);
@@ -491,10 +515,12 @@ export default function AccountingPage() {
   const loadBudgets = useCallback(async () => {
     if (!token) return;
     setBudgetsLoading(true);
+    setBudgetsLoadErr(null);
     try {
       const data = await apiFetch("accounting/budgets", token);
       setBudgets(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e) {
+      setBudgetsLoadErr(formatApiError(e, "No se pudieron cargar los presupuestos"));
       setBudgets([]);
     } finally {
       setBudgetsLoading(false);
@@ -507,13 +533,15 @@ export default function AccountingPage() {
       return;
     }
     setBudgetVsActualLoading(true);
+    setBudgetVsActualLoadErr(null);
     try {
       const data = await apiFetch(
         `accounting/budgets/vs-actual?costCenterId=${budgetVsActualCostCenter}&year=${budgetVsActualYear}`,
         token,
       );
       setBudgetVsActual(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e) {
+      setBudgetVsActualLoadErr(formatApiError(e, "No se pudo comparar el presupuesto contra lo real"));
       setBudgetVsActual([]);
     } finally {
       setBudgetVsActualLoading(false);
@@ -1493,6 +1521,16 @@ export default function AccountingPage() {
                 <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
               </div>
             )}
+            {parcial && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "0 0 12px" }}>
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
+                  Se cargaron las {parcial.cargadas} pólizas más recientes de {parcial.total}. La búsqueda y los filtros solo miran las cargadas.
+                </p>
+                <Button size="sm" variant="secondary" onClick={() => setTandas((n) => n + 1)} disabled={loading}>
+                  Cargar más
+                </Button>
+              </div>
+            )}
             {loading && items.length === 0 ? (
               <div aria-busy="true" style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando pólizas…</div>
             ) : !error || items.length > 0 ? (
@@ -1621,6 +1659,15 @@ export default function AccountingPage() {
                   <Button size="sm" variant="ghost" onClick={() => { setShowPeriodForm(false); setPeriodSaveErr(null); }}>Cancelar</Button>
                   <Button size="sm" variant="primary" onClick={() => void savePeriod()} disabled={periodSaving}>{periodSaving ? "Guardando…" : "Crear periodo"}</Button>
                 </div>
+              </div>
+            )}
+            {periodsLoadErr && (
+              <div style={{ marginBottom: 14 }}>
+                <InlineAlert
+                  variant="danger"
+                  message={periodsLoadErr}
+                  action={<Button size="sm" variant="ghost" onClick={() => void loadPeriods()}>Reintentar</Button>}
+                />
               </div>
             )}
             {periodsLoading ? (
@@ -1872,6 +1919,15 @@ export default function AccountingPage() {
                 </div>
               </div>
             )}
+            {costCentersLoadErr && (
+              <div style={{ marginBottom: 14 }}>
+                <InlineAlert
+                  variant="danger"
+                  message={costCentersLoadErr}
+                  action={<Button size="sm" variant="ghost" onClick={() => void loadCostCenters()}>Reintentar</Button>}
+                />
+              </div>
+            )}
             {costCentersLoading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
             ) : (
@@ -1894,6 +1950,15 @@ export default function AccountingPage() {
               </div>
             }
           >
+            {budgetVsActualLoadErr && (
+              <div style={{ marginBottom: 14 }}>
+                <InlineAlert
+                  variant="danger"
+                  message={budgetVsActualLoadErr}
+                  action={<Button size="sm" variant="ghost" onClick={() => void loadBudgetVsActual()}>Reintentar</Button>}
+                />
+              </div>
+            )}
             {!budgetVsActualCostCenter ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Selecciona un centro de costo para ver el comparativo.</div>
             ) : budgetVsActualLoading ? (
@@ -2008,6 +2073,15 @@ export default function AccountingPage() {
                   <Button size="sm" variant="ghost" onClick={() => { setShowBudgetForm(false); setBudgetSaveErr(null); }}>Cancelar</Button>
                   <Button size="sm" variant="primary" onClick={() => void saveBudget()} disabled={budgetSaving}>{budgetSaving ? "Guardando…" : "Crear presupuesto"}</Button>
                 </div>
+              </div>
+            )}
+            {budgetsLoadErr && (
+              <div style={{ marginBottom: 14 }}>
+                <InlineAlert
+                  variant="danger"
+                  message={budgetsLoadErr}
+                  action={<Button size="sm" variant="ghost" onClick={() => void loadBudgets()}>Reintentar</Button>}
+                />
               </div>
             )}
             {budgetsLoading ? (
