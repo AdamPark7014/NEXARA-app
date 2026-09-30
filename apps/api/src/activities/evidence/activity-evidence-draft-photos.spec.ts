@@ -42,6 +42,7 @@ function armar(evidenceOverrides: Record<string, unknown> = {}) {
       }),
     },
     activityAssignee: { findFirst: jest.fn(async () => null) },
+    $transaction: jest.fn(async (fn: any) => fn(prisma)),
   };
   const service = new ActivityEvidenceService(prisma, {} as any, {} as any);
   return { service, prisma, evidence };
@@ -66,6 +67,13 @@ describe('ActivityEvidenceService.addEvidencePhoto', () => {
       await service.addEvidencePhoto(2, 7, url, null, 1);
     }
     expect(evidence.evidencePhotos).toEqual(['/1.jpg', '/2.jpg', '/3.jpg']);
+  });
+
+  it('el mismo photoUrl dos veces (reintento offline) no se duplica', async () => {
+    const { service, evidence } = armar({ evidencePhotos: ['/a.jpg'] });
+    const r = await service.addEvidencePhoto(2, 7, '/a.jpg', null, 1);
+    expect(r.evidencePhotos).toEqual(['/a.jpg']);
+    expect(evidence.evidencePhotos).toEqual(['/a.jpg']);
   });
 
   it('rechaza si ya no está en el paso de evidencias (ya enviado o en otro paso)', async () => {

@@ -815,22 +815,19 @@ private fun ActivityFormPanel(
             )
         }
         Gap()
-        OutlinedTextField(
-            value = form.tiempoEstimadoMin,
-            onValueChange = { v -> form = form.copy(tiempoEstimadoMin = v.filter { it.isDigit() }.take(5)) },
-            label = { Text("¿Cuántos minutos esperas que tome?") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
+        DurationField(
+            label = "¿Cuánto tiempo toma?",
+            minutesText = form.tiempoEstimadoMin,
+            onMinutesText = { form = form.copy(tiempoEstimadoMin = it) },
             modifier = Modifier.fillMaxWidth(),
         )
         Gap()
-        OutlinedTextField(
-            value = form.tiempoMaximoMin,
-            onValueChange = { v -> form = form.copy(tiempoMaximoMin = v.filter { it.isDigit() }.take(5)) },
-            label = { Text("Tope máximo (min)") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
+        DurationField(
+            label = "Tope máximo",
+            minutesText = form.tiempoMaximoMin,
+            onMinutesText = { form = form.copy(tiempoMaximoMin = it) },
             modifier = Modifier.fillMaxWidth(),
+            optional = true,
         )
         Gap()
         OutlinedTextField(
@@ -1187,6 +1184,162 @@ private fun HourField(label: String, value: String, onChange: (String) -> Unit, 
             },
             dismissButton = {
                 TextButton(onClick = { open = false }) { Text("Cancelar") }
+            },
+        )
+    }
+}
+
+/**
+ * Duración con el mismo TimePicker de Material (ruedas de hora y minuto).
+ * Se guarda como minutos totales en el texto del formulario.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DurationField(
+    label: String,
+    minutesText: String,
+    onMinutesText: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    optional: Boolean = false,
+) {
+    var open by remember { mutableStateOf(false) }
+    val total = minutesText.toIntOrNull() ?: 0
+    val parts = DurationParts.fromMinutes(total)
+    val shown = if (total <= 0 && optional) "" else DurationParts.label(parts.horas, parts.minutos)
+    Box(modifier) {
+        OutlinedTextField(
+            value = shown,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            supportingText = {
+                Text("Gira horas y minutos; no hace falta contar solo en minutos.")
+            },
+        )
+        Box(Modifier.matchParentSize().clickable { open = true })
+    }
+    if (open) {
+        val state = rememberTimePickerState(
+            initialHour = parts.horas.coerceIn(0, 23),
+            initialMinute = parts.minutos.coerceIn(0, 59),
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(label) },
+            text = {
+                Column {
+                    Text(
+                        "Horas · Minutos",
+                        color = NxColors.Muted,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TimePicker(state = state)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val mins = DurationParts.toMinutes(state.hour, state.minute)
+                        onMinutesText(if (mins <= 0) "" else mins.toString())
+                        open = false
+                    },
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                Row {
+                    if (optional || total > 0) {
+                        TextButton(
+                            onClick = {
+                                onMinutesText("")
+                                open = false
+                            },
+                        ) { Text("Quitar") }
+                    }
+                    TextButton(onClick = { open = false }) { Text("Cancelar") }
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Duración con el mismo TimePicker de Material (ruedas de hora y minuto).
+ * Se guarda como minutos totales en el texto del formulario.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DurationField(
+    label: String,
+    minutesText: String,
+    onMinutesText: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    optional: Boolean = false,
+) {
+    var open by remember { mutableStateOf(false) }
+    val total = minutesText.toIntOrNull() ?: 0
+    val parts = DurationParts.fromMinutes(total)
+    val shown = if (total <= 0 && optional) "" else DurationParts.label(parts.horas, parts.minutos)
+    Box(modifier) {
+        OutlinedTextField(
+            value = shown,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            supportingText = {
+                Text("Gira horas y minutos; no hace falta contar solo en minutos.")
+            },
+        )
+        Box(Modifier.matchParentSize().clickable { open = true })
+    }
+    if (open) {
+        val state = rememberTimePickerState(
+            initialHour = parts.horas.coerceIn(0, 23),
+            initialMinute = parts.minutos.coerceIn(0, 59),
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(label) },
+            text = {
+                Column {
+                    Text(
+                        "Horas · Minutos",
+                        color = NxColors.Muted,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TimePicker(state = state)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val mins = DurationParts.toMinutes(state.hour, state.minute)
+                        onMinutesText(if (mins <= 0) "" else mins.toString())
+                        open = false
+                    },
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                Row {
+                    if (optional || total > 0) {
+                        TextButton(
+                            onClick = {
+                                onMinutesText("")
+                                open = false
+                            },
+                        ) { Text("Quitar") }
+                    }
+                    TextButton(onClick = { open = false }) { Text("Cancelar") }
+                }
             },
         )
     }

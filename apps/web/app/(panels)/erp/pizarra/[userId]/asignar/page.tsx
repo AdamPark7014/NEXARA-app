@@ -28,6 +28,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
+import { DurationWheelPicker } from "@/components/ui/DurationWheelPicker";
 import { Skeleton } from "@/components/base";
 import { CHARGE_LABEL, initials, shortName } from "@/lib/activity-labels";
 import {
@@ -851,36 +852,20 @@ export default function AsignarActividadPage() {
               ¿Cuánto tiempo toma? *
             </h2>
             <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              Cuánto debería tomarle. Con esto se compara el tiempo real y se avisa si se pasa.
+              Cuánto debería tomarle. Gira las ruedas de horas y minutos — no hace falta hacer la cuenta mental.
             </p>
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <label style={{ display: "grid", gap: 4, width: 130 }}>
-              <span style={fieldLabel}>Horas</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={99}
-                value={planHoras}
-                onChange={(e) => setPlanHoras(Math.max(0, Math.min(99, Number(e.target.value) || 0)))}
-                style={numberStyle}
-              />
-            </label>
-            <label style={{ display: "grid", gap: 4, width: 130 }}>
-              <span style={fieldLabel}>Minutos</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={59}
-                step={5}
-                value={planMinutos}
-                onChange={(e) => setPlanMinutos(Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
-                style={numberStyle}
-              />
-            </label>
-          </div>
+          <DurationWheelPicker
+            horas={planHoras}
+            minutos={planMinutos}
+            onChange={({ horas, minutos }) => {
+              setPlanHoras(horas);
+              setPlanMinutos(minutos);
+            }}
+            maxHoras={24}
+            minuteStep={5}
+            hint={!planValido ? "Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede." : undefined}
+          />
           {!planValido ? (
             <p style={{ margin: 0, fontSize: 13, color: "#b45309" }}>
               Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede.

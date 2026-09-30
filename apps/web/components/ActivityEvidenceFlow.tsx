@@ -390,6 +390,19 @@ const ActivityEvidenceFlow = () => {
     handleActivitySelect(requestedActivityId);
   }, [requestedActivityId, loading, flowData?.activityId]);
 
+  // Al volver a la pestaña (salió a otra pantalla / app y regresó): rehidrata fotos
+  // ya guardadas para no enseñar la lista vacía y forzar a empezar de cero.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!flowData?.activityId || loading) return;
+      void handleActivitySelect(flowData.activityId, true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [flowData?.activityId, loading]);
+
   // Cuando selecciona una actividad
   /**
    * `refresh`: relectura de la misma actividad por un aviso en tiempo real. No toca `loading`
