@@ -1,6 +1,43 @@
 # RELEVO
 
 - **Último turno:** claude-code
+- **Fecha:** 2026-09-30
+- **Hecho (margen % por partida en cotizaciones, pedido de Quina/Monica por WhatsApp):** el cliente
+  pidió capturar costo/margen/precio por renglón, no un solo margen global — Adam mandó capturas de
+  WhatsApp y un ejemplo en Excel. Cada partida (`CotizacionItem.marginPercent`, ya existía en el
+  schema pero era un no-op para el precio) ahora, con costo interno puesto, calcula el precio al
+  cliente como costo × (1 + margen/100) — markup sobre costo, igual que pidió Quina, NO el margen
+  sobre venta que usa `sellFromCost` en el cotizador inteligente (son cosas distintas, no se tocó esa).
+  Es aparte del margen de la cotización (`Cotizacion.marginPercent`, sigue yendo una sola vez sobre el
+  total con IVA, sin tocar ese cálculo para no arriesgar cotizaciones ya enviadas) — si se usan los dos
+  a la vez se suman, y el editor avisa de eso bajo el campo de margen general. El servidor recalcula el
+  precio en `normalizeItems` (no confía en lo que mande el navegador). PDF interno: costo, margen % y
+  precio por partida, más un renglón de margen ponderado de las partidas en el desglose. PDF final (el
+  que ve el cliente): sin cambios, sigue sin costo ni margen, solo precio ya incluido. Sin migración
+  real (solo un comentario `///` en el schema). Verificado: API jest 248/248 suites, 2979/2979 pruebas,
+  `tsc` 0; web vitest 81/81 archivos, 688/688 pruebas, `tsc` 0. **Desplegado.**
+- **Hecho (rescate de un checkpoint-commit de Cursor Cloud Agent que se llevó este trabajo a otra
+  rama):** a medio hacer el margen por partida, la automatización de Cursor Cloud Agent hizo un commit
+  de respaldo (`checkpoint before checking out cursor/cloud-agent-1790788798658-1ofgu`) de TODO lo sin
+  confirmar en el checkout compartido — mi trabajo de cotizaciones mezclado con archivos que Cursor
+  traía a medias (evidencia libre, picker de horas, checklist de vehículo) — y cambió el checkout a esa
+  rama, dejando `main` local un commit adelante pero sin ese checkout activo. Nada se perdió (`git
+  reflog` lo confirmó), pero hubo que separar con cuidado lo mío de lo de Cursor sin usar ningún
+  comando destructivo (nada de `reset --hard`, `checkout --`, `clean` ni `stash drop`): `checkout main`
+  → `reset --soft` al commit anterior (no toca el índice) → `git add` solo de mis archivos → el resto
+  (ya duplicado byte a byte en la rama de Cursor, confirmado con `git diff` antes de tocar nada) a un
+  `git stash` con nombre, que se queda ahí sin borrar. Esa rama de Cursor traía además un bug real:
+  `CoreActivityFormScreen.kt` tenía la función `DurationField` pegada dos veces, idéntica — Kotlin la
+  veía como overload conflictivo y no compilaba. Se dejó una sola copia, recompiló limpio, y la rama
+  (con evidencia libre + picker de horas/minutos + **el pendiente de iOS que había quedado para una
+  sesión con Mac: `ChecklistVehiculoView.swift` avisa antes de perder las fotos del checklist de
+  vehículo al salir sin enviar**) se fusionó a `main` sin conflictos, con jest/vitest/tsc/Android en
+  verde antes y después de fusionar, y se borró (local y remota) según la regla del repo. Se quitó de
+  paso un script de depuración (`.ai/tmp-probe.js`) que se había colado en el checkpoint. **Ojo para
+  quien retome:** queda un `git stash` viejo (mensaje «leftover: WIP de Cursor recuperado del
+  checkpoint...») con versiones desactualizadas de `ActivityEvidenceFlow.tsx`, `OpsActivityForm.tsx` y
+  `asignar/page.tsx` — ya están superadas por lo que se fusionó a main, se puede tirar cuando Adam lo
+  pida por su nombre (`stash drop`), no antes.
 - **Hecho (auditoría grande de bugs y UI/UX — Android + web):** Adam pidió «una pasada grandísima»
   a las apps móviles y a la web porque «tienen muchos errores». Se lanzaron 4 agentes de lectura en
   paralelo (Android, iOS, web operativo, web back-office) más el que arregló lo de «Kit personal»
