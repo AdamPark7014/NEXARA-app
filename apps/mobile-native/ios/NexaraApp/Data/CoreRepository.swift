@@ -63,6 +63,15 @@ struct EvidencePhotosPayload: Encodable {
     let photoGeo: [PhotoGeoPayload?]
 }
 
+/// Una foto de evidencia libre en borrador — viaja sola, en cuanto se toma.
+struct EvidencePhotoDraftPayload: Encodable {
+    let photoUrl: String
+    let photoGeo: PhotoGeoPayload?
+}
+
+/// Cuerpo vacío para un POST que no necesita datos (p. ej. quitar por índice).
+struct EmptyPayload: Encodable {}
+
 struct ServiceSheetPdfPayload: Encodable {
     let pdfUrl: String
 }
@@ -353,6 +362,21 @@ final class CoreRepository {
             )
         }
         return try await postEvidence("activity-evidence/\(activityId)/evidence-photos", body: photos)
+    }
+
+    /// Una foto de evidencia libre en cuanto se toma, sin cerrar el paso. Mismo espíritu que
+    /// `submitCampoPhoto`: así nada se pierde si la persona sale de la pantalla (o la app muere en
+    /// segundo plano) antes de tocar «enviar». `submitEvidencePhotos` sigue siendo el envío final.
+    func addEvidencePhotoDraft(activityId: Int, photoUrl: String, geo: PhotoGeoPayload?) async throws -> EvidenceFlowState? {
+        try await postEvidence(
+            "activity-evidence/\(activityId)/evidence-photos/draft",
+            body: EvidencePhotoDraftPayload(photoUrl: photoUrl, photoGeo: geo)
+        )
+    }
+
+    /// Quita una foto de evidencia libre por índice (borrador antes de enviar, o edición posterior).
+    func removeEvidencePhoto(activityId: Int, index: Int) async throws -> EvidenceFlowState? {
+        try await postEvidence("activity-evidence/\(activityId)/evidence-photo/\(index)/remove", body: EmptyPayload())
     }
 
     /// Evidencia por campos: una foto de un campo en un momento. El API responde
