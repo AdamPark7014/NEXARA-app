@@ -15,6 +15,7 @@ import {
   type CampoBorrador,
 } from "@/lib/evidencia-campos";
 import {
+  debeGuardarChecklist,
   definirRequisitos,
   hayErroresRequisitos,
   validarRequisitos,
@@ -605,9 +606,15 @@ export default function OpsActivityForm({
     }
   };
 
-  /** El PUT de herramientas: `false` y deja el aviso cuando falla (la actividad ya existe). */
+  /**
+   * El PUT de herramientas: `false` y deja el aviso cuando falla (la actividad ya existe).
+   *
+   * No solo hay que llamar a la API cuando hay renglones: marcar «Kit personal» sin tocar
+   * el almacén también es una decisión que hay que guardar, o el checkbox se ve marcado
+   * en el formulario pero nunca llega a la actividad (`debeGuardarChecklist`).
+   */
   const guardarHerramientas = async (newId: number) => {
-    if (!puedeDefinirCampos || herramientas.length === 0 || !(newId > 0)) return true;
+    if (!puedeDefinirCampos || !debeGuardarChecklist(herramientas, usaKit) || !(newId > 0)) return true;
     try {
       await definirRequisitos(
         token,

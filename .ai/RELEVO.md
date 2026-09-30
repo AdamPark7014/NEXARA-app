@@ -1,6 +1,41 @@
 # RELEVO
 
 - **Último turno:** claude-code
+- **Fecha:** 2026-09-30
+- **Hecho (bug real: «Kit personal» se perdía al asignar — Luis mandó captura por WhatsApp):** Luis
+  (`coord_operaciones`) le mandó a Adam una captura: en el flujo de asignar (`/erp/pizarra/[userId]/asignar`,
+  José Antonio de destino), marcó «Kit personal» sin tocar el buscador de «Almacén de herramientas» (lo
+  dejó vacío), le dio «Asignar actividad» y la pantalla le devolvió «Error interno del servidor» junto al
+  botón. Investigué a fondo todo el camino real de ese clic — creación de la actividad (`activities.service.ts`),
+  RBAC de asignación cruzada de departamento Luis→Antonio (`asignacion-departamento.ts`, que ya documenta
+  este mismo flujo de despacho), validación de inventario y kit en `activity-tools.service.ts`, y si las 216
+  migraciones de Prisma estaban realmente aplicadas en producción (sí, una por una, sin faltantes) — sin
+  lograr reproducir un 500 real con exactamente ese payload. Sí encontré y confirmé por `git log` una
+  regresión concreta, del mismo commit que metió «Kit personal» (`4ecc6131`, 24-09): `guardarHerramientas`
+  en `OpsActivityForm.tsx` se salta por completo el PUT a `/activities/:id/herramientas` cuando la lista de
+  renglones está vacía (`herramientas.length === 0`) — una condición que tenía sentido ANTES de que
+  existiera el flag de kit («si no hay nada que guardar, no llames a la API»), pero que nadie actualizó
+  cuando se agregó `usaKit` como una segunda razón independiente para guardar. Resultado: marcar el
+  checkbox sin agregar nada del almacén se veía bien en pantalla pero nunca llegaba a la API — la actividad
+  quedaba con `usesPersonalKit=false` en silencio, sin aviso ni error. Arreglo: función pura nueva
+  `debeGuardarChecklist(herramientas, usaKit)` en `lib/herramientas-checklist.ts`
+  (`herramientas.length > 0 || usaKit`), usada en el gate de `guardarHerramientas`. De paso, el mock
+  compartido de `activity-tools.service.spec.ts` (`build()`) nunca tuvo `prisma.activity.update` — la
+  llamada que persiste `usesPersonalKit` dentro de la transacción — así que esa ruta llevaba desde el 24-09
+  sin cobertura real (cualquier prueba que mandara el payload tal como lo arma el controller habría tronado
+  con `TypeError: tx.activity.update is not a function`). Se agregó el mock y dos pruebas: una que manda
+  exactamente la forma que manda el controller (objeto `{requisitos: [], usePersonalKit: true}`, no el
+  arreglo plano viejo de las pruebas anteriores) y confirma que sí se llama `activity.update`, y otra que
+  confirma que un guardado normal no lo toca por accidente. **Ojo:** no pude confirmar que ESTE fue el 500
+  exacto que vio Luis — el contenedor de producción se recicló entre el reporte y esta sesión (deploy de
+  16:13 de hoy, para otro fix) y se perdieron los logs con el stacktrace real. Si el «Error interno del
+  servidor» vuelve a aparecer al asignar, lo primero es capturar `docker logs nexara-api` ANTES de
+  redesplegar — `all-exception.filter.ts` sí registra `originalMessage` y `stack` completos, solo que no
+  sobreviven a un `docker compose up` que recrea el contenedor.
+  Verificado: API `tsc` 0, jest 245/246 suites en verde (2955/2956 — la 1 que falla,
+  `propuesta-tecnica-pdf.spec.ts`, es un timeout de 5 s en un test de PDF ajeno a este cambio, pasa solo en
+  aislado: es lento bajo `--runInBand` con 2 956 pruebas, no lo causó este fix); web `tsc` 0, vitest
+  78/78 archivos, 675/675 en verde. Sin migración. **Desplegado a producción.**
 - **Hecho (foto y nombre arriba de «Más», Android + iOS):** Adam pidió que se viera la foto de
   perfil y el nombre «arriba del todo» en el menú de la app, amigable. Ninguna de las dos apps tiene
   drawer: «Más» es lo más parecido a un menú de cuenta, así que ahí va, como primera tarjeta, con

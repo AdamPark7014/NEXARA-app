@@ -34,6 +34,7 @@ function build(opts: { requisitos?: unknown[]; actividad?: unknown; asignado?: u
           ? { id: ACTIVIDAD, companyId: EMPRESA, estatus: 'Pendiente', titulo: 'Alta de cámaras', anNumber: 'AN-1' }
           : opts.actividad,
       ),
+      update: jest.fn().mockResolvedValue({}),
     },
     activityToolRequirement: {
       findMany: jest.fn().mockResolvedValue(opts.requisitos ?? []),
@@ -125,6 +126,29 @@ describe('definirRequisitos', () => {
     expect(prisma.activityToolRequirement.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: [1] } },
     });
+  });
+
+  it('marca «kit personal» aunque la lista de renglones venga vacía (como manda el controller)', async () => {
+    // Luis asigna a José Antonio con «Kit personal» marcado y el Almacén vacío: el
+    // controller siempre manda `usePersonalKit` como booleano (Boolean(body?.usePersonalKit)),
+    // así que este objeto —no un arreglo plano— es la forma real del payload.
+    const { service, prisma } = build({ requisitos: [] });
+    await service.definirRequisitos(
+      ACTIVIDAD,
+      { requisitos: [], allowedKitUserIds: [5], usePersonalKit: true },
+      EMPRESA,
+    );
+
+    expect(prisma.activity.update).toHaveBeenCalledWith({
+      where: { id: ACTIVIDAD },
+      data: { usesPersonalKit: true },
+    });
+  });
+
+  it('un guardado normal (sin tocar el flag) no toca usesPersonalKit', async () => {
+    const { service, prisma } = build({ requisitos: [] });
+    await service.definirRequisitos(ACTIVIDAD, [{ descripcion: 'Escalera' }], EMPRESA);
+    expect(prisma.activity.update).not.toHaveBeenCalled();
   });
 });
 
