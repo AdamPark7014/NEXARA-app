@@ -247,6 +247,31 @@ export class ActivityEvidenceController {
     );
   }
 
+  /** Una foto de evidencia libre, en cuanto se toma (no cierra el paso). Ver `saveEvidencePhotos`. */
+  @Post(':activityId/evidence-photos/draft')
+  async addEvidencePhoto(
+    @Param('activityId') activityId: string,
+    @Body()
+    body: {
+      photoUrl: string;
+      photoGeo?: { latitude: number; longitude: number; capturedAt?: string } | null;
+    },
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    let fileUrl = body.photoUrl;
+    if (body.photoUrl && (body.photoUrl.startsWith('data:') || body.photoUrl.includes(';base64,'))) {
+      fileUrl = saveBase64Photo(body.photoUrl, __dirname, 'activities');
+    }
+    return this.service.addEvidencePhoto(
+      parseInt(activityId, 10),
+      req.user.id,
+      fileUrl,
+      body.photoGeo,
+      companyId,
+    );
+  }
+
   @Post(':activityId/service-sheet-pdf')
   async saveServiceSheetPdf(
     @Param('activityId') activityId: string,

@@ -938,21 +938,55 @@ const ActivityEvidenceFlow = () => {
     }
   };
 
-  const addEvidencePhoto = (photo: PendingPhoto) => {
-    if (!flowData) return;
+  /**
+   * Manda la foto libre de inmediato (igual que las fotos por campo): así nada se pierde si
+   * la persona sale de la pantalla antes de tocar «enviar». El envío final solo valida el
+   * mínimo y avanza el paso; las fotos ya están guardadas desde que se tomaron.
+   */
+  const addEvidencePhoto = async (photo: PendingPhoto): Promise<boolean> => {
+    if (!flowData || !user?.token) return false;
     const previas = flowData.evidencePhotos.length;
-    const updatedPhotos = [...flowData.evidencePhotos, photo.dataUrl];
     const punto = puntoDeFoto(photo.latitude, photo.longitude);
-    setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
-    setEvidenceGeo((prev) => {
-      const alineadas = prev.slice(0, previas);
-      while (alineadas.length < previas) alineadas.push(null);
-      return [
-        ...alineadas,
-        punto ? { ...punto, capturedAt: photo.capturedAt } : null,
-      ];
-    });
-    setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/evidence-photos/draft`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({
+          photoUrl: photo.dataUrl,
+          photoGeo: punto ? { ...punto, capturedAt: photo.capturedAt } : null,
+        }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        setError(errorData.message || 'No se pudo guardar la foto. Intenta de nuevo.');
+        return false;
+      }
+      const updated = await res.json();
+      const updatedPhotos: string[] = Array.isArray(updated?.evidencePhotos)
+        ? updated.evidencePhotos
+        : [...flowData.evidencePhotos, photo.dataUrl];
+      setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+      setEvidenceGeo((prev) => {
+        const alineadas = prev.slice(0, previas);
+        while (alineadas.length < previas) alineadas.push(null);
+        return [
+          ...alineadas,
+          punto ? { ...punto, capturedAt: photo.capturedAt } : null,
+        ];
+      });
+      setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
+      return true;
+    } catch (err) {
+      setError(formatApiError(err, 'No se pudo guardar la foto. Intenta de nuevo.'));
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendCampoPhoto = async (photo: PendingPhoto): Promise<boolean> => {
@@ -1005,8 +1039,8 @@ const ActivityEvidenceFlow = () => {
         if (ok) setPendingPhoto(null);
         return;
       }
-      addEvidencePhoto(pendingPhoto);
-      setPendingPhoto(null);
+      const agregada = await addEvidencePhoto(pendingPhoto);
+      if (agregada) setPendingPhoto(null);
       return;
     }
     const ok =
@@ -1020,13 +1054,29 @@ const ActivityEvidenceFlow = () => {
     openCamera(pendingPhoto.kind);
   };
 
-  // Remover foto de evidencia
-  const handleRemoveEvidencePhoto = (index: number) => {
-    if (!flowData) return;
-    const updatedPhotos = flowData.evidencePhotos.filter((_, i) => i !== index);
-    setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
-    setEvidenceGeo((prev) => prev.filter((_, i) => i !== index));
+  // Remover foto de evidencia — ya está guardada en el servidor, hay que avisarle también.
+  const handleRemoveEvidencePhoto = async (index: number) => {
+    if (!flowData || !user?.token) return;
+    setLoading(true);
     setError(null);
+    try {
+      const res = await fetch(
+        buildApiUrl(`activity-evidence/${flowData.activityId}/evidence-photo/${index}/remove`),
+        { method: 'POST', headers: { Authorization: `Bearer ${user.token}` } },
+      );
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        setError(errorData.message || 'No se pudo quitar la foto.');
+        return;
+      }
+      const updatedPhotos = flowData.evidencePhotos.filter((_, i) => i !== index);
+      setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+      setEvidenceGeo((prev) => prev.filter((_, i) => i !== index));
+    } catch (err) {
+      setError(formatApiError(err, 'No se pudo quitar la foto.'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Guardar todas las fotos de evidencia y avanzar
