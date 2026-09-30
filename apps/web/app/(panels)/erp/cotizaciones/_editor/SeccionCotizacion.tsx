@@ -330,9 +330,12 @@ export default function SeccionCotizacion({
             {editable ? (
               <Ayuda titulo="la tabla de partidas">
                 Enter agrega una fila (Mayús+Enter, un salto en el título) · Tab cambia de celda · ↑↓ cambian de fila ·
-                Retroceso en un título vacío quita la fila. La descripción del PDF es el recuadro de abajo: crece con
-                el texto y conserva saltos de línea y viñetas. La última fila busca en el catálogo mientras escribes;
-                el menú ⋯ de cada renglón tiene el grupo (equipos, materiales o mano de obra), subir, bajar y quitar.
+                Retroceso en un título vacío quita la fila. Debajo del título están Marca, Modelo, Costo y Margen %
+                de esa partida: con costo y margen puestos ahí, el precio de esa fila sale solo (costo × margen) —
+                aparte del margen general de arriba, que sigue yendo sobre el total. La descripción del PDF es el
+                recuadro de abajo: crece con el texto y conserva saltos de línea y viñetas. La última fila busca en
+                el catálogo mientras escribes; el menú ⋯ de cada renglón tiene el grupo (equipos, materiales o mano
+                de obra), subir, bajar y quitar.
               </Ayuda>
             ) : null}
           </span>
