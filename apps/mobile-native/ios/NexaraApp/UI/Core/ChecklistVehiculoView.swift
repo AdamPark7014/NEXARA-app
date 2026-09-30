@@ -39,6 +39,11 @@ struct ChecklistVehiculoView: View {
     @State private var enviando = false
     @State private var error: String?
     @State private var infoFotos = false
+    @State private var confirmaSalir = false
+
+    private var tieneAvance: Bool {
+        !fotos.isEmpty || !odometro.trimmingCharacters(in: .whitespaces).isEmpty || combustible != nil
+    }
 
     private var odometroKm: Int? {
         Int(odometro.trimmingCharacters(in: .whitespaces))
@@ -86,6 +91,15 @@ struct ChecklistVehiculoView: View {
         }
         .navigationTitle("\(accion.titulo) · \(vehiculo)")
         .navigationBarTitleDisplayMode(.inline)
+        .interactiveDismissDisabled(tieneAvance && !enviando)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cerrar") {
+                    if tieneAvance { confirmaSalir = true } else { dismiss() }
+                }
+                .disabled(enviando)
+            }
+        }
         .fullScreenCover(item: $camara) { slot in
             GeoPhotoCaptureView(
                 title: slot.label,
@@ -104,6 +118,12 @@ struct ChecklistVehiculoView: View {
             Button("Entendido", role: .cancel) {}
         } message: {
             Text("Se toman con la cámara. El sistema rechaza fotos de la galería.")
+        }
+        .alert("¿Salir sin enviar?", isPresented: $confirmaSalir) {
+            Button("Seguir aquí", role: .cancel) {}
+            Button("Salir y perder fotos", role: .destructive) { dismiss() }
+        } message: {
+            Text("Las fotos del checklist solo viven en esta pantalla hasta que las envías. Si sales ahora, hay que volver a tomarlas.")
         }
     }
 
