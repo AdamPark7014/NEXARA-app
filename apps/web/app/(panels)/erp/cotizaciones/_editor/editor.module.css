@@ -1120,7 +1120,7 @@
 /* ─── 04 Cotización: partidas como hoja de cálculo ────────────────────── */
 
 .tabla {
-  --cols: 28px minmax(0, 1fr) 88px 56px 100px 112px 32px;
+  --cols: 28px minmax(0, 1fr) 88px 56px 76px 76px 100px 112px 32px;
   border: 1px solid var(--doc-borde);
   border-radius: var(--doc-radio-campo);
   background: var(--doc-superficie);
@@ -1286,7 +1286,7 @@ select.celda {
 
 .detallePartida {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5.5rem 6rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 2px 4px;
   padding: 0 4px 2px;
 }
@@ -1490,7 +1490,7 @@ select.celda {
   /* Un contenedor no se consulta a sí mismo: la plantilla va en las filas. */
   .fila,
   .filaTotal {
-    --cols: 22px minmax(0, 0.95fr) minmax(0, 0.5fr) minmax(0, 1.15fr) minmax(0, 1.2fr) 30px;
+    --cols: 22px minmax(0, 0.7fr) minmax(0, 0.4fr) minmax(0, 0.55fr) minmax(0, 0.55fr) minmax(0, 0.8fr) minmax(0, 0.8fr) 30px;
   }
   .fila .celda {
     padding: 0 4px;
@@ -1500,9 +1500,9 @@ select.celda {
   }
   .fila {
     grid-template-areas:
-      "idx desc desc desc desc menu"
-      ". unidad cant precio total total"
-      ". extras extras extras extras extras";
+      "idx desc desc desc desc desc desc menu"
+      ". unidad cant costo margen precio total total"
+      ". extras extras extras extras extras extras extras";
     padding: 4px;
     row-gap: 2px;
   }
@@ -1517,6 +1517,12 @@ select.celda {
   }
   .fila > [data-area="cant"] {
     grid-area: cant;
+  }
+  .fila > [data-area="costo"] {
+    grid-area: costo;
+  }
+  .fila > [data-area="margen"] {
+    grid-area: margen;
   }
   .fila > [data-area="precio"] {
     grid-area: precio;
@@ -2158,16 +2164,16 @@ select.celda {
 @container (max-width: 900px) {
   .tablaExtras .fila,
   .tablaExtras .filaTotal {
-    --cols: 22px minmax(0, 0.95fr) minmax(0, 0.5fr) minmax(0, 1.15fr) minmax(0, 1.2fr) 30px;
+    --cols: 22px minmax(0, 0.7fr) minmax(0, 0.4fr) minmax(0, 0.55fr) minmax(0, 0.55fr) minmax(0, 0.8fr) minmax(0, 0.8fr) 30px;
   }
   .tablaExtras .filaCabeza {
     display: none;
   }
   .tablaExtras .fila {
     grid-template-areas:
-      "idx desc desc desc desc menu"
-      ". unidad cant precio total total"
-      ". extras extras extras extras extras";
+      "idx desc desc desc desc desc desc menu"
+      ". unidad cant costo margen precio total total"
+      ". extras extras extras extras extras extras extras";
     padding: 4px;
     row-gap: 2px;
   }
@@ -2182,6 +2188,12 @@ select.celda {
   }
   .tablaExtras .fila > [data-area="cant"] {
     grid-area: cant;
+  }
+  .tablaExtras .fila > [data-area="costo"] {
+    grid-area: costo;
+  }
+  .tablaExtras .fila > [data-area="margen"] {
+    grid-area: margen;
   }
   .tablaExtras .fila > [data-area="precio"] {
     grid-area: precio;
