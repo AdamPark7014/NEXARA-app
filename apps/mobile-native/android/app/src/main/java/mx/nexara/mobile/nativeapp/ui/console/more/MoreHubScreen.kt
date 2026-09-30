@@ -337,8 +337,9 @@ private fun abrirEnLaWeb(context: android.content.Context, module: CoreExtraModu
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(module.webUrl)).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    // Sin navegador instalado no se cae la app: simplemente no pasa nada.
+    // Sin navegador instalado no se cae la app: se avisa en vez de quedar el botón mudo.
     runCatching { context.startActivity(intent) }.recoverCatching { e ->
         if (e !is ActivityNotFoundException) throw e
+        android.widget.Toast.makeText(context, "No hay un navegador instalado para abrirlo", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
