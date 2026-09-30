@@ -23,6 +23,7 @@ import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCamposJson
 import mx.nexara.mobile.nativeapp.data.api.EvidenceFlowDto
+import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoDraftRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotosWithGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceResubmitRequest
@@ -267,6 +268,29 @@ class CoreActivitiesRepository(context: Context) {
         photoUrls: List<String>,
         photoGeo: List<EvidencePhotoGeoRequest?>,
     ): EvidenceFlowDto = api.evidencePhotos(activityId, EvidencePhotosWithGeoRequest(photoUrls, photoGeo))
+
+    /**
+     * Una foto de evidencia libre, en cuanto se toma (no cierra el paso). Mismo espíritu que
+     * [campoFoto]: se manda de inmediato, así nada se pierde si sale de la pantalla antes de
+     * tocar «enviar». `evidencePhotos` sigue siendo el envío final.
+     */
+    suspend fun addEvidencePhotoDraft(
+        activityId: Long,
+        photoUrl: String,
+        lat: Double? = null,
+        lng: Double? = null,
+        capturedAt: String? = null,
+    ): EvidenceFlowDto = api.addEvidencePhotoDraft(
+        activityId,
+        EvidencePhotoDraftRequest(
+            photoUrl = photoUrl,
+            photoGeo = if (lat != null && lng != null) EvidencePhotoGeoRequest(lat, lng, capturedAt.orEmpty()) else null,
+        ),
+    )
+
+    /** Quita una foto de evidencia libre por índice (borrador antes de enviar, o edición posterior). */
+    suspend fun removeEvidencePhoto(activityId: Long, index: Int): EvidenceFlowDto =
+        api.removeEvidencePhoto(activityId, index)
 
     /**
      * Evidencia por campos: una foto de un campo en un momento
