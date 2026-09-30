@@ -31,6 +31,7 @@ final class AuthRepository {
         let orgRoleKey: String?
         let department: String?
         let departamento: String?
+        let avatarUrl: String?
         let permissions: [String]?
         let isSuperAdmin: Bool?
         let isClient: Bool?
@@ -86,6 +87,7 @@ final class AuthRepository {
             isBranchUser: u?.isBranchUser ?? false,
             clientId: u?.clientId?.value.nilIfEmpty,
             branchId: u?.branchId?.value.nilIfEmpty,
+            avatarUrl: u?.avatarUrl,
             roleKey: u?.roleKey,
             orgRoleKey: u?.orgRoleKey,
             navPanels: nil,
@@ -207,6 +209,7 @@ final class AuthRepository {
         if let dept = ConsoleHelpers.mapStr(map, "department", "departamento").nilIfEmpty {
             current.department = dept
         }
+        if let avatarUrl = ConsoleHelpers.mapStr(map, "avatarUrl").nilIfEmpty { current.avatarUrl = avatarUrl }
         // La lista de permisos se sustituye entera, nunca se fusiona: fusionar
         // dejaría vivo un permiso que el servidor acaba de retirar.
         if let permissions = map["permissions"] as? [String] {
