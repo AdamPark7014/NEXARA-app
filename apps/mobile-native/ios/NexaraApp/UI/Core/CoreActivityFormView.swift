@@ -53,8 +53,10 @@ struct CoreActivityFormView: View {
     @State private var tareaOtro = ""
     @State private var withSchedule = true
     @State private var fecha = CoreSchedule.defaultStart()
-    @State private var estimado = ""
-    @State private var maximo = ""
+    @State private var estimadoHoras = 1
+    @State private var estimadoMinutos = 0
+    @State private var maximoHoras = 0
+    @State private var maximoMinutos = 0
     @State private var fotos = 4
     @State private var nextAn = ""
     @State private var projects: [CoreProjectOption] = []
@@ -196,10 +198,54 @@ struct CoreActivityFormView: View {
                     DatePicker("Día", selection: $fecha, displayedComponents: .date)
                     DatePicker("Hora", selection: $fecha, displayedComponents: .hourAndMinute)
                 }
-                TextField("¿Cuántos minutos esperas que tome?", text: $estimado)
-                    .keyboardType(.numberPad)
-                TextField("Tope máximo (min)", text: $maximo)
-                    .keyboardType(.numberPad)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("¿Cuánto tiempo toma?")
+                        .font(.subheadline.weight(.semibold))
+                    Text(Self.durationLabel(horas: estimadoHoras, minutos: estimadoMinutos))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Picker("Horas", selection: $estimadoHoras) {
+                            ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        Picker("Minutos", selection: $estimadoMinutos) {
+                            ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
+                                Text("\($0) min").tag($0)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                    }
+                    .frame(height: 120)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tope máximo (opcional)")
+                        .font(.subheadline.weight(.semibold))
+                    Text(Self.durationLabel(horas: maximoHoras, minutos: maximoMinutos))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Picker("Horas máx.", selection: $maximoHoras) {
+                            ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        Picker("Minutos máx.", selection: $maximoMinutos) {
+                            ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
+                                Text("\($0) min").tag($0)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                    }
+                    .frame(height: 120)
+                }
             } header: {
                 Text(kind.requiresSchedule ? "Agenda * (hora de México)" : "Agenda (hora de México)")
             }
@@ -250,6 +296,13 @@ struct CoreActivityFormView: View {
     }
 
     @MainActor
+    private static func durationLabel(horas: Int, minutos: Int) -> String {
+        if horas <= 0 && minutos <= 0 { return "Sin tiempo" }
+        if horas <= 0 { return "\(minutos) min" }
+        if minutos <= 0 { return horas == 1 ? "1 h" : "\(horas) h" }
+        return "\(horas) h \(minutos) min"
+    }
+
     private func submit() async {
         guard !saving else { return }
         error = nil
@@ -314,8 +367,14 @@ struct CoreActivityFormView: View {
             projectId: kind.withProject ? project?.id : nil,
             clientId: kind.withProject ? (project?.clientId ?? clientId) : clientId,
             responsableId: responsableId,
-            tiempoEstimadoMin: Int(coreClean(estimado)),
-            tiempoMaximoMin: Int(coreClean(maximo)),
+            tiempoEstimadoMin: {
+                let total = estimadoHoras * 60 + estimadoMinutos
+                return total > 0 ? total : nil
+            }(),
+            tiempoMaximoMin: {
+                let total = maximoHoras * 60 + maximoMinutos
+                return total > 0 ? total : nil
+            }(),
             fechaInicio: when,
             fechaEntregaEsperada: when,
             fechaMaxima: when,
