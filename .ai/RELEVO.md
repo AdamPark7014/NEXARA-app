@@ -1,6 +1,15 @@
 # RELEVO
 
 - **Último turno:** claude-code
+- **Hecho (foto y nombre arriba de «Más», Android + iOS):** Adam pidió que se viera la foto de
+  perfil y el nombre «arriba del todo» en el menú de la app, amigable. Ninguna de las dos apps tiene
+  drawer: «Más» es lo más parecido a un menú de cuenta, así que ahí va, como primera tarjeta, con
+  foto (o iniciales) + nombre + departamento, y lleva a Mi perfil al tocarla. Android (commit
+  `a942d0eb`, compila y tests en verde) lee `SessionStore` local, sin red. iOS (commit `cc395ab8`,
+  **sin compilar, sin Mac**) nunca guardaba `avatarUrl` en la sesión — se agregó el campo
+  (`Codable` con default `nil`, las sesiones ya guardadas en Keychain siguen bien) y se hidrata en
+  login y se refresca en `GET auth/profile`. Mismo pendiente que la evidencia libre: alguien con Mac
+  debe compilar antes de generar build.
 - **Fecha:** 2026-09-30
 - **Hecho (evidencia libre que se perdía — API, web, Android, iOS):** Luis reportó que tomaba varias
   fotos de evidencia («fotos en sitio», sin campos), salía de la pantalla y volvía, y ya no estaban.
