@@ -57,7 +57,9 @@ describe("opciones de personalización", () => {
   });
 
   it("columnas de la tabla según lo que se enciende (el total siempre penúltimo)", () => {
-    expect(columnasDeTabla(opcionesPorOmision().columnas).split(" ").filter((c) => c.endsWith("px"))).toHaveLength(6);
+    expect(columnasDeTabla(opcionesPorOmision().columnas).split(" ").filter((c) => c.endsWith("px"))).toHaveLength(8);
+    const base = columnasDeTabla(opcionesPorOmision().columnas);
+    expect(base).toContain("56px 76px 76px 100px"); // cant · costo · margen % · precio, siempre van
     const todas = columnasDeTabla({ marcaModelo: true, descuento: true, imagen: true, precioUnitario: true });
     expect(todas).toContain("84px 92px 60px 44px 112px 32px");
   });

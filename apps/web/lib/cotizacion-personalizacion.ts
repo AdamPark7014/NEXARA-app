@@ -203,8 +203,9 @@ export function diasDeVigencia(emision: string, validez: string): number | null 
 }
 
 /**
- * Plantilla de columnas de la tabla de partidas: # · descripción · unidad · cantidad · precio ·
- * [marca · modelo · desc. % · imagen] · total · menú.
+ * Plantilla de columnas de la tabla de partidas: # · descripción · unidad · cantidad · costo ·
+ * margen % · precio · [marca · modelo · desc. % · imagen] · total · menú. Costo y margen son de la
+ * partida (no de «Personalizar»): siempre van, nunca se imprimen en el PDF final del cliente.
  */
 export function columnasDeTabla(c: ColumnasOpcionales): string {
   return [
@@ -212,6 +213,8 @@ export function columnasDeTabla(c: ColumnasOpcionales): string {
     "minmax(0, 1fr)",
     "88px",
     "56px",
+    "76px",
+    "76px",
     "100px",
     ...(c.marcaModelo ? ["84px", "92px"] : []),
     ...(c.descuento ? ["60px"] : []),

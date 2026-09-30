@@ -372,6 +372,16 @@ export default function TablaPartidas({
         <span role="columnheader" className={styles.derecha}>
           Cant.
         </span>
+        <span role="columnheader" className={styles.derecha} title="Costo interno de la partida. No se imprime en el PDF final.">
+          Costo
+        </span>
+        <span
+          role="columnheader"
+          className={styles.derecha}
+          title="Margen % de esta partida. Con costo, el precio sale de ahí (costo × margen). No se imprime en el PDF final."
+        >
+          Margen %
+        </span>
         <span
           role="columnheader"
           className={`${styles.derecha} ${columnas.precioUnitario ? "" : styles.cabeceraApagada}`}
@@ -434,8 +444,8 @@ export default function TablaPartidas({
                 </span>
               ) : null}
             </span>
-            {/* Detalle (marca, modelo, costo, margen, descripción del PDF): se abre con clic, no interrumpe
-                el Tab de la hoja de cálculo (descripción → unidad → cantidad → precio). */}
+            {/* Detalle (marca, modelo, descripción del PDF): no interrumpe el Tab de la hoja de cálculo
+                (descripción → unidad → cantidad → costo → margen → precio). */}
             <span className={styles.detallePartida}>
               <input
                 className={styles.celda}
@@ -454,24 +464,6 @@ export default function TablaPartidas({
                 aria-label={`Modelo de la partida ${i + 1}`}
                 tabIndex={-1}
                 onChange={(e) => cambiar(p.key, { model: e.target.value || null })}
-              />
-              <CeldaNumero
-                valor={p.unitCost == null ? Number.NaN : Number(p.unitCost)}
-                editable={editable}
-                etiqueta={`Costo interno de la partida ${i + 1}`}
-                placeholder="Costo"
-                decimales={2}
-                tabIndex={-1}
-                onValor={(n) => ponerCosto(p, n)}
-              />
-              <CeldaNumero
-                valor={p.marginPercent == null ? Number.NaN : Number(p.marginPercent)}
-                editable={editable}
-                etiqueta={`Margen % de la partida ${i + 1}`}
-                placeholder="Margen %"
-                decimales={2}
-                tabIndex={-1}
-                onValor={(n) => ponerMargenPartida(p, n)}
               />
               <TextoAuto
                 variante="celda"
@@ -509,6 +501,26 @@ export default function TablaPartidas({
               etiqueta={`Cantidad de la partida ${i + 1}`}
               onValor={(n) => cambiar(p.key, { qty: n })}
               onKeyDown={teclado(p.key, "cant")}
+            />
+          </span>
+          <span role="cell" data-area="costo">
+            <CeldaNumero
+              valor={p.unitCost == null ? Number.NaN : Number(p.unitCost)}
+              editable={editable}
+              etiqueta={`Costo interno de la partida ${i + 1}`}
+              placeholder="Costo"
+              decimales={2}
+              onValor={(n) => ponerCosto(p, n)}
+            />
+          </span>
+          <span role="cell" data-area="margen">
+            <CeldaNumero
+              valor={p.marginPercent == null ? Number.NaN : Number(p.marginPercent)}
+              editable={editable}
+              etiqueta={`Margen % de la partida ${i + 1}`}
+              placeholder="Margen %"
+              decimales={2}
+              onValor={(n) => ponerMargenPartida(p, n)}
             />
           </span>
           <span role="cell" data-area="precio">
