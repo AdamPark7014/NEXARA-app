@@ -123,7 +123,14 @@ export function Stat({
         {dot ? <span className={s.statDot} style={{ background: dot }} aria-hidden="true" /> : null}
         {label}
       </span>
-      <span className={[s.statValue, valor].filter(Boolean).join(" ")}>{value}</span>
+      <span className={[s.statValue, valor].filter(Boolean).join(" ")}>
+        {value}
+        {href ? (
+          <span className={s.statArrow} aria-hidden="true">
+            ›
+          </span>
+        ) : null}
+      </span>
       {hint ? <span className={s.statHint}>{hint}</span> : null}
     </>
   );

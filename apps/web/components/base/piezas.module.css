@@ -112,6 +112,26 @@
   background: var(--ui-hover);
 }
 
+.statLink .statLabel {
+  text-decoration: underline;
+  text-decoration-color: var(--ui-border);
+  text-underline-offset: 3px;
+}
+
+.statLink:hover .statLabel,
+.statLink:focus-visible .statLabel {
+  text-decoration-color: currentColor;
+}
+
+/** Flechita siempre visible junto al número: así se distingue de una cifra suelta sin pasar el mouse. */
+.statArrow {
+  margin-left: 6px;
+  font-size: 0.6em;
+  font-weight: 500;
+  color: var(--ui-fg-3);
+  vertical-align: middle;
+}
+
 .statLabel {
   display: inline-flex;
   align-items: center;
