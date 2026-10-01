@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, EmptyState, InfoPopover, PageHead, SkeletonRows, Stat, StatRow } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
-import FlujoKpiStrip from "@/components/pizarra/FlujoKpiStrip";
 import { formatApiError } from "@/lib/erp-api";
 import { erpFetch } from "@/lib/erp-api";
 import {
@@ -91,19 +90,26 @@ export default function FlujoActividadesPage() {
       ) : null}
 
       {w ? (
-        <>
-          <FlujoKpiStrip workflow={w} detalleHref={null} />
-          <StatRow cols={3}>
-            <Stat label="A tiempo" value={w.slaOnTime} tone="brand" href="/erp/pizarra/flujo/slaOnTime" />
-            <Stat
-              label="Tarde / vencidas"
-              value={w.slaLate}
-              tone={w.slaLate ? "danger" : "default"}
-              href="/erp/pizarra/flujo/slaLate"
-            />
-            <Stat label="% a tiempo" value={formatPct(w.slaPct)} />
-          </StatRow>
-        </>
+        <StatRow cols={8}>
+          <Stat label="Asignadas" value={w.assigned} href="/erp/pizarra/flujo/assigned" />
+          <Stat label="Iniciadas" value={w.started} href="/erp/pizarra/flujo/started" />
+          <Stat label="Con evidencias" value={w.evidence} href="/erp/pizarra/flujo/evidence" />
+          <Stat label="Cerradas" value={w.closed} tone="brand" href="/erp/pizarra/flujo/closed" />
+          <Stat
+            label="Rechazadas entre compañeros"
+            value={w.peerRejected}
+            tone={w.peerRejected > 0 ? "warning" : "default"}
+            href="/erp/pizarra/flujo/peerRejected"
+          />
+          <Stat label="A tiempo" value={w.slaOnTime} tone="brand" href="/erp/pizarra/flujo/slaOnTime" />
+          <Stat
+            label="Tarde / vencidas"
+            value={w.slaLate}
+            tone={w.slaLate ? "danger" : "default"}
+            href="/erp/pizarra/flujo/slaLate"
+          />
+          <Stat label="% a tiempo" value={formatPct(w.slaPct)} />
+        </StatRow>
       ) : null}
     </div>
   );
