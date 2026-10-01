@@ -2,6 +2,22 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-01
+- **Hecho (Flujo del periodo: el clic no se notaba — sin señal visual persistente):** Adam probó el
+  fix de «cada número abre su lista» y reportó «sigue igual». El `href` del `Stat` sí funcionaba,
+  pero no había ninguna señal visible sin pasar el mouse (el fondo solo cambiaba en `:hover`), así
+  que en una captura se ve idéntico a antes. Se agregó una flechita «›» siempre visible junto al
+  número y un subrayado punteado en la etiqueta cuando el `Stat` es clicable (`piezas.module.css` /
+  `piezas.tsx`). **Importante:** si la pestaña ya estaba abierta desde antes del despliegue
+  anterior, un simple refresh (F5) también hace falta — React ya tenía cargado el bundle viejo en
+  memoria.
+- **Hecho (Flujo del periodo: ventana de checar desde la web, 5 días más):** Antonio avisó por
+  WhatsApp que no le dejaba cargar su asistencia («se checa desde la app NEXARA»): la excepción
+  `attendance.web_checkin_until` (companyId 1, NEXARA) había vencido el 30-sep. Se corrió de nuevo
+  `set-web-checkin-window.sql` (vía `docker exec -i nexara-db psql`, sin tocar código ni
+  redesplegar) con `hours=120` → vence el 06-oct 17:12 UTC. El backend la relee de la tabla en cada
+  consulta (sin caché) y la pantalla de «Mi jornada» se refresca sola cada 5 min, así que no hace
+  falta nada más. Para la próxima vez: `apps/api/scripts/set-web-checkin-window.sql`, o
+  `COMPANY_ID=1 APLICAR=1 HORAS=120 bash apps/api/scripts/activar-perfil-ceo.sh` desde el servidor.
 - **Hecho (Flujo del periodo: cada número abre su lista real, ya no son cifras vagas):** Adam vio
   «Asignadas 57, Iniciadas 52…» en Actividades → Asignadas por mí y dijo que no especificaban nada
   (ni de quién, ni cuáles). Se agregó `GET me/kpis/flujo/:bucket` (`me.controller.ts` →
