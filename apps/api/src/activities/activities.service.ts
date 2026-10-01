@@ -27,6 +27,7 @@ import {
   loadActivityChain,
   MOTIVO_MINIMO,
 } from './activity-superiors.js';
+import { normalizarMomento, normalizarMomentos, progresoDeCampos, type Momento } from './evidence/evidence-fields.helpers.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -1124,27 +1125,55 @@ export class ActivitiesService {
       const next = String(updateActivityDto.estatus);
       const prevStatus = String(prev?.estatus || '');
       if (/finalizada|completada/i.test(next) && !/finalizada|completada/i.test(prevStatus)) {
-        const evidences = await this.prisma['evidence'].findMany({
-          where: {
-            actividadId: id,
-            ...(companyId != null ? companyWhere(companyId) : {}),
-          },
-          select: { tipoEvidencia: true },
+        const campos = await this.prisma.activityEvidenceField.findMany({
+          where: { activityId: id, ...(companyId != null ? companyWhere(companyId) : {}) },
+          select: { nombre: true, momentos: true, fotos: { select: { momento: true } } },
         });
-        const types = new Set(evidences.map((e: any) => String(e.tipoEvidencia || '')));
-        const hasEntry = [...types].some((t) => /llegada|entrada|entry/i.test(t));
-        const hasExit = [...types].some((t) => /salida|exit/i.test(t));
-        const hasSheet = [...types].some((t) => /hoja|servicio|sheet/i.test(t));
-        const missing: string[] = [];
-        if (!hasEntry) missing.push('Foto de llegada/entrada');
-        if (!hasExit && !hasSheet) missing.push('Foto de salida o Hoja de servicio');
-        if (missing.length) {
-          throw new BadRequestException({
-            statusCode: 400,
-            message: 'No se puede finalizar: faltan evidencias mínimas',
-            missingEvidence: missing,
-            error: `Faltan: ${missing.join(', ')}`,
+        if (campos.length > 0) {
+          // Esta actividad pide «Evidencia por campos»: eso manda — no las categorías fijas
+          // de abajo, que nada escribe desde que existe este flujo (quedaban bloqueando para
+          // siempre cualquier actividad con campos propios, aunque estuvieran 100% completos).
+          const progreso = progresoDeCampos(
+            campos.map((c) => {
+              const fotos: Partial<Record<Momento, true>> = {};
+              for (const f of c.fotos) {
+                const m = normalizarMomento(f.momento);
+                if (m) fotos[m] = true;
+              }
+              return { nombre: c.nombre, momentos: normalizarMomentos(c.momentos), fotos };
+            }),
+          );
+          if (!progreso.completo) {
+            throw new BadRequestException({
+              statusCode: 400,
+              message: 'No se puede finalizar: faltan evidencias mínimas',
+              missingEvidence: progreso.faltantes,
+              error: `Faltan: ${progreso.faltantes.join(', ')}`,
+            });
+          }
+        } else {
+          const evidences = await this.prisma['evidence'].findMany({
+            where: {
+              actividadId: id,
+              ...(companyId != null ? companyWhere(companyId) : {}),
+            },
+            select: { tipoEvidencia: true },
           });
+          const types = new Set(evidences.map((e: any) => String(e.tipoEvidencia || '')));
+          const hasEntry = [...types].some((t) => /llegada|entrada|entry/i.test(t));
+          const hasExit = [...types].some((t) => /salida|exit/i.test(t));
+          const hasSheet = [...types].some((t) => /hoja|servicio|sheet/i.test(t));
+          const missing: string[] = [];
+          if (!hasEntry) missing.push('Foto de llegada/entrada');
+          if (!hasExit && !hasSheet) missing.push('Foto de salida o Hoja de servicio');
+          if (missing.length) {
+            throw new BadRequestException({
+              statusCode: 400,
+              message: 'No se puede finalizar: faltan evidencias mínimas',
+              missingEvidence: missing,
+              error: `Faltan: ${missing.join(', ')}`,
+            });
+          }
         }
       }
     }
