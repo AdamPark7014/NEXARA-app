@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { PDFDocument as PDFLibDocument } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 import { bufferParaPdf, imagenParaPdf, type ImagenPdf } from '../common/pdf/imagen-para-pdf.js';
@@ -1033,7 +1034,10 @@ const FRANJA_PLANO = 34;
 
 type Planos = {
   imagenes: Array<{ nombre: string; imagen: NonNullable<ReturnType<typeof imagenParaPdf>> }>;
-  /** Anexos que no son imagen local (PDF, enlaces o archivos que no están en disco). */
+  /** Planos en PDF (lo normal en CAD): sus páginas reales se anexan al final, sin convertirlas a
+   * imagen — así no pierden la nitidez del plano. */
+  pdfs: Array<{ nombre: string; archivo: string }>;
+  /** Anexos que de verdad no se pueden imprimir (remotos o que ya no están en disco). */
   otros: string[];
 };
 
@@ -1043,12 +1047,16 @@ type Planos = {
  */
 function prepararPlanos(planos: PropuestaPlano[]): Planos {
   const vistos = new Set<string>();
-  const listos: Planos = { imagenes: [], otros: [] };
+  const listos: Planos = { imagenes: [], pdfs: [], otros: [] };
   for (const plano of planos) {
     if (!plano?.url || vistos.has(plano.url)) continue;
     vistos.add(plano.url);
     const nombre = plano.nombre?.trim() || plano.url;
     const archivo = archivoDePlano(plano.url);
+    if (archivo && /\.pdf$/i.test(archivo)) {
+      listos.pdfs.push({ nombre, archivo });
+      continue;
+    }
     const imagen = archivo && /\.(png|jpe?g)$/i.test(archivo) ? imagenParaPdf(archivo, { maxLado: 1600 }) : null;
     if (imagen?.ancho && imagen.alto) listos.imagenes.push({ nombre, imagen });
     else listos.otros.push(nombre);
@@ -1090,12 +1098,40 @@ function seccionPlanos(ctx: Ctx, planos: Planos) {
     });
   }
 
+  if (planos.pdfs.length) {
+    abrirSeccion(ctx, numeroSeccion, 'Planos');
+    parrafo(ctx, 'Planos anexos a este documento (páginas al final):', 7, true);
+    const nombresPdf = planos.pdfs.map((p) => p.nombre);
+    nombresPdf.forEach((n, i) => vineta(ctx, n, conQuienViaja(nombresPdf, i)));
+  }
+
   const nombres = planos.otros;
   if (!nombres.length) return;
 
   abrirSeccion(ctx, numeroSeccion, 'Planos');
   parrafo(ctx, 'Anexos que acompañan a esta propuesta:', 7, true);
   nombres.forEach((n, i) => vineta(ctx, n, conQuienViaja(nombres, i)));
+}
+
+/**
+ * Anexa al final las páginas reales de los planos en PDF (CAD, planos impresos a PDF): se copian
+ * tal cual, sin pasar por imagen, para no perder nitidez ni texto seleccionable. Un plano corrupto
+ * o ilegible se salta, no tumba la propuesta entera.
+ */
+async function anexarPlanosPdf(buffer: Buffer, pdfs: Planos['pdfs']): Promise<Buffer> {
+  if (!pdfs.length) return buffer;
+  const final = await PDFLibDocument.load(buffer);
+  for (const { archivo } of pdfs) {
+    try {
+      const bytes = await fs.promises.readFile(archivo);
+      const ajeno = await PDFLibDocument.load(bytes);
+      const paginas = await final.copyPages(ajeno, ajeno.getPageIndices());
+      paginas.forEach((pagina) => final.addPage(pagina));
+    } catch {
+      /* un plano corrupto o protegido se omite, no tumba la propuesta */
+    }
+  }
+  return Buffer.from(await final.save());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1786,8 +1822,8 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload, secc
   const hayAlcance = payload.alcance.some(
     (b) => b && (b.titulo?.trim() || b.texto?.trim() || (b.vinetas ?? []).some((v) => String(v).trim())),
   );
-  const planos: Planos = numeros.planos ? prepararPlanos(payload.planos) : { imagenes: [], otros: [] };
-  const hayPlanos = planos.imagenes.length + planos.otros.length > 0;
+  const planos: Planos = numeros.planos ? prepararPlanos(payload.planos) : { imagenes: [], pdfs: [], otros: [] };
+  const hayPlanos = planos.imagenes.length + planos.pdfs.length + planos.otros.length > 0;
   const indice = incluidas.map((s) => ({
     numero: numeros[s.clave]!,
     titulo: s.titulo,
@@ -1813,5 +1849,6 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload, secc
   numerarPaginas(ctx);
 
   doc.end();
-  return listo;
+  const base = await listo;
+  return anexarPlanosPdf(base, planos.pdfs);
 }

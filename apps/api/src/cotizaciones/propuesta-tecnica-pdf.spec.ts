@@ -15,6 +15,7 @@ import { objetivoDePropuesta } from './objetivo-plantilla.js';
 import { bloqueAlcanceDePaquete, buscarPaquete, partidasDePaquete } from './paquetes.js';
 import { terminosDeCotizacion } from './terminos-segmento.js';
 import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
+import { PDFDocument as PDFLibDocument } from 'pdf-lib';
 
 function payloadDePrueba(): PropuestaPayload {
   const paquete = buscarPaquete('camara-bala-instalada')!;
@@ -160,6 +161,42 @@ describe('PDF Propuesta técnica', () => {
     const texto = textoPorHoja(await generarPropuestaTecnicaPdf(payload)).join('\n');
     expect(texto).toContain('Plano perdido');
     expect(texto).toContain('Plano remoto');
+  });
+
+  it('un plano en PDF (lo normal en CAD) anexa sus páginas reales, no las convierte a imagen', async () => {
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'nexara-planos-'));
+    const planoPdf = await PDFLibDocument.create();
+    const hoja1 = planoPdf.addPage([1224, 792]);
+    hoja1.drawText('RED CCTV_IPADE — hoja 1 de 2', { x: 40, y: 700, size: 24 });
+    const hoja2 = planoPdf.addPage([1224, 792]);
+    hoja2.drawText('RED CCTV_IPADE — hoja 2 de 2', { x: 40, y: 700, size: 24 });
+    fs.writeFileSync(path.join(carpeta, 'plano.pdf'), await planoPdf.save());
+    const antes = process.env['UPLOADS_ROOT'];
+    process.env['UPLOADS_ROOT'] = carpeta;
+    try {
+      const payload = payloadDePrueba();
+      payload.planos = [{ url: '/uploads/plano.pdf', nombre: 'RED CCTV_IPADE', tipo: 'pdf' }];
+      const sinPlano = { ...payloadDePrueba(), planos: [] };
+      const [conPlano, base] = await Promise.all([
+        generarPropuestaTecnicaPdf(payload),
+        generarPropuestaTecnicaPdf(sinPlano),
+      ]);
+      // pdf-lib reescribe el PDF al fusionar (objetos comprimidos): el conteo crudo de «/Type /Page»
+      // de `paginas()` ya no aplica, se cuenta con la misma librería que hizo la fusión.
+      const [paginasConPlano, paginasBase] = await Promise.all([
+        PDFLibDocument.load(conPlano).then((d) => d.getPageCount()),
+        PDFLibDocument.load(base).then((d) => d.getPageCount()),
+      ]);
+      // +1 por la hoja «03 Planos» que avisa dónde están, +2 por las hojas reales del plano.
+      // `textoPorHoja` es un lector hecho a mano para la salida cruda de PDFKit: una vez que
+      // pdf-lib reescribe el documento (objetos comprimidos) ya no puede leerlo, así que la prueba
+      // de verdad es el conteo de páginas, no el texto del PDF final.
+      expect(paginasConPlano).toBe(paginasBase + 3);
+    } finally {
+      if (antes === undefined) delete process.env['UPLOADS_ROOT'];
+      else process.env['UPLOADS_ROOT'] = antes;
+      fs.rmSync(carpeta, { recursive: true, force: true });
+    }
   });
 
   it('encabeza la hoja de cotización con total, anticipo y vigencia', async () => {
