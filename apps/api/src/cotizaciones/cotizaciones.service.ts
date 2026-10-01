@@ -19,6 +19,7 @@ import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
 import { formatoDesdeCotizacion, generarCotizacionNexaraPdf } from './cotizacion-formato-nexara.js';
+import type { PlanoArchivo } from '../common/pdf/planos-pdf.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -1005,8 +1006,9 @@ export class CotizacionesService {
     try {
       const guardada = await this.findOne(id, companyId);
       const quote = borradorSobreGuardada(guardada, borrador);
-      // Lo que ve quien cotiza es el mismo PDF que se descarga: el formato de Christian.
-      const pdf = await generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote));
+      // Lo que ve quien cotiza es el mismo PDF que se descarga: el formato de Christian, con planos.
+      const planos = await this.planosDePropuesta(quote);
+      const pdf = await generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote), planos as PlanoArchivo[]);
       const secciones: SeccionesPropuesta = { cotizacion: 1 };
       return { pdf, secciones };
     } finally {
@@ -2065,10 +2067,11 @@ export class CotizacionesService {
   }
 
   private async buildPdf(quote: any, internal = false) {
-    // Lo que sale al cliente (y lo que se adjunta al enviarla) es el formato de Christian.
-    // La vista interna conserva el formato anterior, que es el único con costo y margen.
+    // Lo que sale al cliente (y lo que se adjunta al enviarla) es el formato de Christian, con sus
+    // planos (propios y heredados del levantamiento): sin esto se imprimía sin ellos.
     if (!internal) {
-      return generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote));
+      const planos = await this.planosDePropuesta(quote);
+      return generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote), planos as PlanoArchivo[]);
     }
 
     let totales: ReturnType<CotizacionesService['calculateTotals']> | null = null;

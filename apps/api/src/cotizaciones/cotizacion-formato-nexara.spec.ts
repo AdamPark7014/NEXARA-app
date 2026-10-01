@@ -1,8 +1,11 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import { PDFDocument as PDFLibDocument } from 'pdf-lib';
 import { formatoDesdeCotizacion, generarCotizacionNexaraPdf } from './cotizacion-formato-nexara.js';
 import { importeConLetra } from './importe-letra.js';
 import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
+import { loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
 
 /**
  * Las 5 partidas de Grupo Dice Puebla (NEX260927001).
@@ -146,6 +149,53 @@ describe('formato Nexara', () => {
   it('la firma impresa de Christian queda en los assets (pidió Monica que fuera fija en todas)', () => {
     const firma = path.resolve(__dirname, '../assets/cotizacion-nexara/firma_christian.png');
     expect(fs.existsSync(firma)).toBe(true);
+  });
+
+  it('un plano en PDF (el que de verdad descarga el cliente) anexa sus páginas reales', async () => {
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'nexara-cot-planos-'));
+    const planoPdf = await PDFLibDocument.create();
+    planoPdf.addPage([1224, 792]).drawText('RED CCTV_IPADE', { x: 40, y: 700, size: 24 });
+    fs.writeFileSync(path.join(carpeta, 'plano.pdf'), await planoPdf.save());
+    const antes = process.env['UPLOADS_ROOT'];
+    process.env['UPLOADS_ROOT'] = carpeta;
+    try {
+      const planos = [{ url: '/uploads/plano.pdf', nombre: 'RED CCTV_IPADE', tipo: 'pdf' }];
+      const [conPlano, sinPlano] = await Promise.all([
+        generarCotizacionNexaraPdf(grupoDice, planos),
+        generarCotizacionNexaraPdf(grupoDice),
+      ]);
+      // pdf-lib reescribe el PDF al fusionar: el conteo de páginas se hace con la misma librería.
+      const [paginasCon, paginasSin] = await Promise.all([
+        PDFLibDocument.load(conPlano).then((d) => d.getPageCount()),
+        PDFLibDocument.load(sinPlano).then((d) => d.getPageCount()),
+      ]);
+      expect(paginasCon).toBe(paginasSin + 1);
+    } finally {
+      if (antes === undefined) delete process.env['UPLOADS_ROOT'];
+      else process.env['UPLOADS_ROOT'] = antes;
+      fs.rmSync(carpeta, { recursive: true, force: true });
+    }
+  });
+
+  it('un plano en imagen (el que de verdad descarga el cliente) sale a página completa', async () => {
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'nexara-cot-plano-img-'));
+    fs.writeFileSync(path.join(carpeta, 'plano.png'), loadNexaraLogo()!);
+    const antes = process.env['UPLOADS_ROOT'];
+    process.env['UPLOADS_ROOT'] = carpeta;
+    try {
+      const planos = [{ url: '/uploads/plano.png', nombre: 'Sembrado de cámaras', tipo: 'imagen' }];
+      const [conPlano, sinPlano] = await Promise.all([
+        generarCotizacionNexaraPdf(grupoDice, planos),
+        generarCotizacionNexaraPdf(grupoDice),
+      ]);
+      const texto = textoPorHoja(conPlano).join('\n');
+      expect(texto).toContain('Sembrado de cámaras');
+      expect(textoPorHoja(sinPlano).join('\n')).not.toContain('Sembrado de cámaras');
+    } finally {
+      if (antes === undefined) delete process.env['UPLOADS_ROOT'];
+      else process.env['UPLOADS_ROOT'] = antes;
+      fs.rmSync(carpeta, { recursive: true, force: true });
+    }
   });
 
   it('la descripción larga, con saltos y viñetas, sale completa y sigue en la hoja siguiente', async () => {
