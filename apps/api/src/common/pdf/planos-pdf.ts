@@ -74,18 +74,30 @@ export function clasificarPlanos(planos: PlanoArchivo[]): PlanosClasificados {
 }
 
 /**
- * Anexa al final las páginas reales de los planos en PDF: se copian tal cual, sin pasar por
- * imagen. Un plano corrupto o ilegible se salta, no tumba el documento.
+ * Anexa las páginas reales de los planos en PDF: se copian tal cual, sin pasar por imagen. Un
+ * plano corrupto o ilegible se salta, no tumba el documento.
+ *
+ * `antesDeFinal` conserva esa cantidad de páginas finales del documento base después de lo
+ * anexado — así el cierre (ATENTAMENTE y firma) se queda hasta el final de verdad, con los
+ * planos antes y no después.
  */
-export async function anexarPaginasPdf(buffer: Buffer, pdfs: PlanosClasificados['pdfs']): Promise<Buffer> {
+export async function anexarPaginasPdf(
+  buffer: Buffer,
+  pdfs: PlanosClasificados['pdfs'],
+  opts: { antesDeFinal?: number } = {},
+): Promise<Buffer> {
   if (!pdfs.length) return buffer;
   const final = await PDFLibDocument.load(buffer);
+  let cursor = Math.max(0, final.getPageCount() - (opts.antesDeFinal ?? 0));
   for (const { archivo } of pdfs) {
     try {
       const bytes = await fs.promises.readFile(archivo);
       const ajeno = await PDFLibDocument.load(bytes);
       const paginas = await final.copyPages(ajeno, ajeno.getPageIndices());
-      paginas.forEach((pagina) => final.addPage(pagina));
+      paginas.forEach((pagina) => {
+        final.insertPage(cursor, pagina);
+        cursor += 1;
+      });
     } catch {
       /* un plano corrupto o protegido se omite, no tumba el documento */
     }

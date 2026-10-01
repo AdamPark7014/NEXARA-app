@@ -1,7 +1,22 @@
 # RELEVO
 
 - **Último turno:** claude-code
-- **Fecha:** 2026-09-30
+- **Fecha:** 2026-10-01
+- **Hecho (planos: orden de página — firma al final de verdad, no antes):** tras el fix de `3595081c`
+  (planos embebidos en el PDF que de verdad descarga el cliente, `cotizacion-formato-nexara.ts`), Adam
+  reportó que los planos salían al final y el cierre (ATENTAMENTE + firma) quedaba antes — pidió que el
+  cierre vaya siempre hasta el final de verdad. Se reordenó: la lista de «ANEXOS» no imprimibles y las
+  imágenes de plano a página completa ahora van antes del cierre (antes iban después); el cierre se
+  mueve a una hoja propia cuando hubo algún anexo con página propia, para no encimarse con un plano (bug
+  real que se hubiera visto: la imagen no avanzaba `p.y` tras dibujarse). Los planos en PDF real (los que
+  se anexan con `pdf-lib`, páginas vectoriales tal cual) ahora se **insertan** antes de la última página
+  del documento (la del cierre) en vez de añadirse siempre al final — `anexarPaginasPdf()` en
+  `common/pdf/planos-pdf.ts` ganó la opción `antesDeFinal`. Imágenes de plano también quedaron centradas
+  horizontalmente (antes pegadas al margen izquierdo). Test nuevo que fija el orden (la página del plano
+  antes que la del cierre, cierre siempre en la última página). Verificado con los dos planos reales de
+  la cotización 13 (bajados de nuevo por `scp`): 4 páginas — 1) datos/partidas, 2) IPADE A-01, 3) RED CCTV
+  IPADE, 4) ATENTAMENTE + firma — confirmado con PyMuPDF. `tsc` 0, jest API 2983/2983. **Pendiente
+  desplegar y pedirle a Adam que confirme en una cotización real.**
 - **Hecho (quiebre angosto de la tabla de cotizaciones, cierre de iOS y Android):** con Costo y Margen %
   como columnas fijas (9 en total), el quiebre «sin columnas opcionales» seguía en 560px — entre 560 y
   900px la tabla se apretaba sin pasar a modo apilado (Marca/Modelo como «M.» sueltos, Costo/Margen sin
