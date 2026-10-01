@@ -2,6 +2,30 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-01
+- **Hecho (Evidencia por campos: nadie la documenta sin haber tomado antes la entrada):** Adam vio
+  en el panel que AN-0031 tenía «Evidencia por campos» 2/2 sin que a Antonio le apareciera hecho el
+  Paso 1 — el stepper de `ActivityEvidenceFlow` y la pantalla de «Evidencia por campos» son dos
+  flujos independientes en la misma página, y nada impedía documentar campos sin haber tomado la
+  entrada. `ActivityEvidenceFieldsService.guardarFoto()` ahora exige que el `ActivityEvidence` del
+  usuario tenga `entryPhotoUrl` antes de guardar cualquier foto de campo («Primero toma la foto de
+  entrada (Paso 1)…»); sin entrada, no hay campos. 3 tests (`activity-evidence-fields-paso1.spec.ts`).
+- **Hecho (excepción puntual: adjuntar entrada/salida en vez de cámara — AN-0031 de Antonio):** tras
+  destrabar el cierre (ver abajo), Antonio reportó que ya tenía las fotos de entrada/salida «en el
+  carrete» y pedía adjuntarlas en vez de volver a tomarlas con la cámara. Adam fue explícito: la
+  regla de «solo cámara en vivo» (`lib/evidencia-adjunto.ts` lo documenta así: la galería se puede
+  falsear) se queda igual para todos — esto es una excepción puntual, **solo para esa asignación**,
+  que se cierra sola. Se agregó `evidence.allow_attach:<activityId>` en `system_settings` (mismo
+  patrón que `attendance.web_checkin_until`): pura (`adjuntar-entrada-salida.ts`,
+  `ventanaAdjuntarEntradaSalida`, 5 tests) + expuesta como `allowAttach`/`allowAttachUntil` en
+  `GET activity-evidence/:activityId`. En `ActivityEvidenceFlow.tsx`, el Paso 1 y el Paso 5 muestran
+  un botón «📎 Adjuntar (excepción)» junto al de cámara solo cuando `allowAttach` es cierto — reusa
+  `dataUrlDeImagen`/`getGeolocation`/`setPendingPhoto` ya existentes (mismo flujo de vista previa y
+  envío que la cámara en vivo; la ubicación sigue siendo la de ahora mismo, de donde sea que se
+  adjunte). Nada cambia para nadie más. Ventana abierta para AN-0031 (companyId 1) por 6 horas vía
+  `apps/api/scripts/set-evidence-attach-window.sql` (correrlo de nuevo con otras horas la amplía;
+  `DELETE FROM system_settings WHERE key = 'evidence.allow_attach:31'...` la cierra antes). `tsc` 0,
+  285/285 en `src/activities`, 2998/2998 en todo el API. **Pendiente: confirmar con Adam/Antonio que
+  ya ve el botón y que las fotos quedan guardadas.**
 - **Hecho (gate de «Finalizar actividad»: no veía la Evidencia por campos — AN-0031 de Antonio):**
   por WhatsApp, Antonio no podía cerrar AN-0031 («no me aparece el botón de finalizar»). En la base:
   su «Evidencia por campos» (Cámara 1, Antes+Después) estaba 100% completa (`activity_evidence_fields`
