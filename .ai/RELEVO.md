@@ -2,6 +2,14 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-01
+- **Hecho (/erp/pizarra/flujo: una sola franja, sin el reglón desalineado):** Adam mandó captura de
+  esa página y dijo «se ve horrible» — la causa concreta: eran dos `StatRow` separados (uno de 6
+  columnas con `FlujoKpiStrip`, otro de 3 columnas debajo) sobre el mismo ancho, así que las
+  columnas de la segunda fila quedaban el doble de anchas que las de la primera y no alineaban —
+  más la redundancia de «A tiempo» como % en la primera fila y como conteo en la segunda. Se
+  reemplazaron ambos por un solo `StatRow cols={8}` con los 8 valores reales (ya no se reusa
+  `FlujoKpiStrip` en esta página; esa sigue igual donde sí se usa: la franja compacta de Actividades
+  y Mi equipo). `tsc` 0, 34/34 en los specs de pizarra/team-board-api.
 - **Hecho (Flujo del periodo: el clic no se notaba — sin señal visual persistente):** Adam probó el
   fix de «cada número abre su lista» y reportó «sigue igual». El `href` del `Stat` sí funcionaba,
   pero no había ninguna señal visible sin pasar el mouse (el fondo solo cambiaba en `:hover`), así
