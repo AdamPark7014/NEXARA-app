@@ -15,6 +15,7 @@ import { NotificationHierarchyService } from '../../notifications/notification-h
 import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
 import { ActivityEvidenceFieldsService } from './activity-evidence-fields.service.js';
 import { progresoDeCampos } from './evidence-fields.helpers.js';
+import { claveVentanaAdjuntar, ventanaAdjuntarEntradaSalida } from './adjuntar-entrada-salida.js';
 import {
   debeAutoAceptar,
   esCerrada,
@@ -1046,6 +1047,7 @@ export class ActivityEvidenceService {
     // Qué hay que documentar en esta actividad. Sin campos, `campos: []` y la persona
     // ve el flujo de siempre: N fotos libres.
     const campos = await this.camposDeActividad(activityId, evidence.activity.companyId);
+    const ventanaAdjuntar = await this.leerVentanaAdjuntar(activityId, evidence.activity.companyId);
     return {
       ...evidence,
       assigneeIndicaciones: evidence.activity.assignees[0]?.indicaciones ?? null,
@@ -1054,7 +1056,27 @@ export class ActivityEvidenceService {
       campos,
       camposProgreso: progresoDeCampos(campos),
       avancesAnteriores: await this.previousProgress(activityId, evidence.userId),
+      allowAttach: ventanaAdjuntar.abierta,
+      allowAttachUntil: ventanaAdjuntar.hasta ? ventanaAdjuntar.hasta.toISOString() : null,
     };
+  }
+
+  /**
+   * Excepción puntual (Adam, por WhatsApp) a que la entrada/salida solo se tomen con cámara en
+   * vivo: una actividad con la excepción abierta puede adjuntar esas dos en vez de tomarlas. Se
+   * guarda como `system_settings` con vencimiento — se cierra sola, no hay que acordarse de
+   * quitarla.
+   */
+  private async leerVentanaAdjuntar(activityId: number, companyId: number | null) {
+    try {
+      const fila = await this.prisma.systemSetting.findFirst({
+        where: { key: claveVentanaAdjuntar(activityId), ...(companyId != null ? companyWhere(companyId) : {}) },
+        select: { value: true },
+      });
+      return ventanaAdjuntarEntradaSalida(fila?.value, new Date());
+    } catch {
+      return { abierta: false, hasta: null };
+    }
   }
 
   /**

@@ -132,6 +132,8 @@ interface EvidenceFlowData {
   stepsForKind?: EvidenceStep[];
   /** «Avance anterior de <nombre>»: lo que dejó quien la tenía antes (solo lectura). */
   avancesAnteriores?: AvanceAnterior[];
+  /** Excepción puntual y con vencimiento: entrada/salida se pueden adjuntar, no solo cámara. */
+  allowAttach?: boolean;
 }
 
 type AvanceAnterior = {
@@ -466,6 +468,7 @@ const ActivityEvidenceFlow = () => {
           progressPct: data.progressPct != null ? Number(data.progressPct) : undefined,
           stepsForKind: Array.isArray(data.stepsForKind) ? data.stepsForKind : undefined,
           avancesAnteriores: Array.isArray(data.avancesAnteriores) ? data.avancesAnteriores : [],
+          allowAttach: data.allowAttach === true,
         });
         // Sin la ubicación de las fotos ya guardadas, el envío final mandaría `null` por cada foto
         // de un intento anterior y el servidor sobrescribiría su ubicación.
@@ -726,6 +729,9 @@ const ActivityEvidenceFlow = () => {
   const adjuntoRef = useRef<HTMLInputElement | null>(null);
   /** Hueco de campo al que va el archivo que se está eligiendo. `null` = foto libre. */
   const adjuntoCampoRef = useRef<{ fieldId: number; momento: Momento } | null>(null);
+  /** Excepción puntual (`flowData.allowAttach`): adjuntar entrada o salida en vez de cámara. */
+  const adjuntoEntradaRef = useRef<HTMLInputElement | null>(null);
+  const adjuntoSalidaRef = useRef<HTMLInputElement | null>(null);
 
   const stopLiveStream = useCallback(() => {
     liveStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -980,6 +986,31 @@ const ActivityEvidenceFlow = () => {
         longitude: geo?.longitude ?? null,
         capturedAt: new Date().toISOString(),
       });
+    } catch (err) {
+      setError(photoErrorText(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Excepción puntual (`flowData.allowAttach`, con vencimiento): adjuntar la entrada o la salida
+   * en vez de tomarla con la cámara. La ubicación sigue siendo la de ahora mismo (de donde sea que
+   * se adjunte) — solo se salta la cámara, no el GPS.
+   */
+  const attachEntryOrExitPhoto = async (kind: 'entry' | 'exit', file: File) => {
+    if (!flowData?.allowAttach) return;
+    const aviso = mensajeAdjuntoInvalido(file);
+    if (aviso) {
+      setError(aviso);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const dataUrl = await dataUrlDeImagen(file);
+      const geo = await getGeolocation();
+      setPendingPhoto({ kind, dataUrl, latitude: geo.latitude, longitude: geo.longitude, capturedAt: new Date().toISOString() });
     } catch (err) {
       setError(photoErrorText(err));
     } finally {
@@ -2081,6 +2112,29 @@ const ActivityEvidenceFlow = () => {
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
+            {flowData.allowAttach ? (
+              <>
+                <input
+                  ref={adjuntoEntradaRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) void attachEntryOrExitPhoto('entry', file);
+                  }}
+                />
+                <button
+                  className={`${styles.actionButton} ${styles.actionSecondary}`}
+                  onClick={() => adjuntoEntradaRef.current?.click()}
+                  disabled={loading || cameraActive}
+                  title="Excepción puntual: adjunta una foto que ya tienes, en vez de tomarla ahora"
+                >
+                  📎 Adjuntar (excepción)
+                </button>
+              </>
+            ) : null}
           </div>
         </div>
       )}
@@ -2945,6 +2999,29 @@ const ActivityEvidenceFlow = () => {
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
+            {flowData.allowAttach ? (
+              <>
+                <input
+                  ref={adjuntoSalidaRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) void attachEntryOrExitPhoto('exit', file);
+                  }}
+                />
+                <button
+                  className={`${styles.actionButton} ${styles.actionSecondary}`}
+                  onClick={() => adjuntoSalidaRef.current?.click()}
+                  disabled={loading}
+                  title="Excepción puntual: adjunta una foto que ya tienes, en vez de tomarla ahora"
+                >
+                  📎 Adjuntar (excepción)
+                </button>
+              </>
+            ) : null}
           </div>
         </div>
       )}

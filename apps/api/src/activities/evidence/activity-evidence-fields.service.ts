@@ -211,6 +211,20 @@ export class ActivityEvidenceFieldsService {
       throw new BadRequestException('Indica el momento de la foto: antes, en progreso o después.');
     }
 
+    // El flujo va por pasos: nadie documenta un campo sin haber tomado antes su foto de
+    // entrada (Paso 1), aunque la active por el formulario web en vez de la pantalla del flujo.
+    // findFirst, no findUnique(activityId_userId): el aislamiento de tenant mete companyId y
+    // ese where no es el de la llave única.
+    const miEvidencia = await this.prisma.activityEvidence.findFirst({
+      where: { activityId: params.activityId, userId: params.userId, ...companyWhere(activity.companyId) },
+      select: { entryPhotoUrl: true },
+    });
+    if (!miEvidencia?.entryPhotoUrl) {
+      throw new BadRequestException(
+        'Primero toma la foto de entrada (Paso 1) antes de subir evidencia por campos.',
+      );
+    }
+
     const campo = await this.prisma.activityEvidenceField.findFirst({
       where: { id: params.fieldId, activityId: params.activityId, ...companyWhere(activity.companyId) },
       select: { id: true, nombre: true, momentos: true },
