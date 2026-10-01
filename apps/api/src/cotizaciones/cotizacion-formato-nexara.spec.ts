@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { formatoDesdeCotizacion, generarCotizacionNexaraPdf } from './cotizacion-formato-nexara.js';
 import { importeConLetra } from './importe-letra.js';
 import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
@@ -140,6 +141,11 @@ describe('formato Nexara', () => {
     expect(texto).not.toContain('169516');
     expect(texto).not.toContain('Costo');
     expect(texto).not.toContain('Margen');
+  });
+
+  it('la firma impresa de Christian queda en los assets (pidió Monica que fuera fija en todas)', () => {
+    const firma = path.resolve(__dirname, '../assets/cotizacion-nexara/firma_christian.png');
+    expect(fs.existsSync(firma)).toBe(true);
   });
 
   it('la descripción larga, con saltos y viñetas, sale completa y sigue en la hoja siguiente', async () => {

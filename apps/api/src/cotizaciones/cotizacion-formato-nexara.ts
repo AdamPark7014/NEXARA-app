@@ -646,9 +646,17 @@ export function generarCotizacionNexaraPdf(quote: QuoteLike | FormatoNexara): Pr
   }
 
   p.y += 22;
-  asegurar(p, 90);
+  asegurar(p, 150);
   texto(p, 'ATENTAMENTE', LM, p.y, AW, { font: p.fb, size: 9, color: TINTA, align: 'center' });
-  p.y += 28;
+  p.y += 18;
+  // Firma impresa de Christian: queda fija en todas las cotizaciones (pidió Monica por WhatsApp).
+  const firma = path.join(directorioAssets(), 'firma_christian.png');
+  const firmaW = 110;
+  const firmaH = firmaW * (232 / 288);
+  if (fs.existsSync(firma)) {
+    p.doc.image(firma, LM + (AW - firmaW) / 2, p.y, { width: firmaW, height: firmaH });
+  }
+  p.y += firmaH - 8;
   const firmaX = LM + AW * 0.275;
   p.doc.save();
   p.doc.strokeColor(CARBON).lineWidth(0.8).moveTo(firmaX, p.y).lineTo(firmaX + AW * 0.45, p.y).stroke();
