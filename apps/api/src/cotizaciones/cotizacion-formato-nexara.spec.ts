@@ -188,9 +188,17 @@ describe('formato Nexara', () => {
         generarCotizacionNexaraPdf(grupoDice, planos),
         generarCotizacionNexaraPdf(grupoDice),
       ]);
-      const texto = textoPorHoja(conPlano).join('\n');
+      const hojas = textoPorHoja(conPlano);
+      const texto = hojas.join('\n');
       expect(texto).toContain('Sembrado de cámaras');
       expect(textoPorHoja(sinPlano).join('\n')).not.toContain('Sembrado de cámaras');
+
+      // El cierre (ATENTAMENTE y firma) va al final de verdad: después del plano, no antes.
+      const paginaDelPlano = hojas.findIndex((h) => h.includes('Sembrado de cámaras'));
+      const paginaDelCierre = hojas.findIndex((h) => h.includes('CHRISTIAN EDUARDO DEL POZO SÁNCHEZ'));
+      expect(paginaDelPlano).toBeGreaterThanOrEqual(0);
+      expect(paginaDelCierre).toBe(hojas.length - 1);
+      expect(paginaDelPlano).toBeLessThan(paginaDelCierre);
     } finally {
       if (antes === undefined) delete process.env['UPLOADS_ROOT'];
       else process.env['UPLOADS_ROOT'] = antes;
