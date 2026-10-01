@@ -165,8 +165,7 @@ object CoreActivityKinds {
         // Soporte de Antonio
         OrgEmails.CAROLINA to listOf(TAREA, PROYECTO, SERVICIO),
         OrgEmails.ALEJANDRO to listOf(TAREA, PROYECTO, SERVICIO),
-        // Roberto: solo atiende servicios.
-        OrgEmails.ROBERTO to listOf(SERVICIO),
+        OrgEmails.ROBERTO to listOf(TAREA, PROYECTO, SERVICIO),
         // Comercial / admin
         OrgEmails.DANIELA to listOf(TAREA, COMERCIAL),
         OrgEmails.MONICA to listOf(TAREA, COMERCIAL),

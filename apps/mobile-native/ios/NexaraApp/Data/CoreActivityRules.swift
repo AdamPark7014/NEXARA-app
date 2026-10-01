@@ -231,8 +231,7 @@ enum CoreActivityRules {
         CoreOrg.juanEmail: [.tarea, .proyecto, .obra],
         CoreOrg.carolinaEmail: [.tarea, .proyecto, .servicio],
         CoreOrg.alejandroEmail: [.tarea, .proyecto, .servicio],
-        // Roberto: solo atiende servicios.
-        CoreOrg.robertoEmail: [.servicio],
+        CoreOrg.robertoEmail: [.tarea, .proyecto, .servicio],
         CoreOrg.danielaEmail: [.tarea, .comercial],
         CoreOrg.monicaEmail: [.tarea, .comercial],
         CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial],

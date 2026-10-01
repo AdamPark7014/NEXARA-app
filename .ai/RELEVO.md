@@ -2,6 +2,28 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-01
+- **Hecho (Roberto Vivanco solo podía recibir «Servicio», no «Tarea»):** Antonio (su jefe directo,
+  managerId 39→40) no podía asignarle una tarea de recolección de material — el selector de «Tipo
+  de actividad» solo le mostraba Servicio («Solo ves los tipos que Roberto Paul puede recibir»).
+  Investigué permisos de organigrama y correo (`equipo-alcance.ts`) y Roberto está completamente
+  dentro del alcance de Antonio por los dos caminos — el límite real estaba en
+  `apps/web/lib/activity-kinds.ts`: `RECEIVE_BY_EMAIL[roberto]` tenía un comentario explícito
+  («Roberto: solo atiende servicios») y solo `['servicio']`, a diferencia de Carolina/Alejandro
+  (su mismo equipo de soporte) que ya tenían `['tarea', 'proyecto', 'servicio']`. Se iguala a
+  Roberto con ellos — decisión explícita de Adam («absolutamente todos deben tener tareas»). Mismo
+  cambio espejado en `CoreActivityKinds.kt` (Android) y `CoreActivityRules.swift` (iOS) para que no
+  reaparezca el mismo límite ahí; **las apps nativas necesitan su propio build/release para
+  llevarlo** (no las toca este deploy web). `tsc` 0, 480/480 en `lib/`.
+- **Pendiente (ni bug ni feature — solo que Adam no sabía que ya existe):** pidió poder
+  activar/desactivar perfiles desde el CEO (bloquear login y asignación nueva, conservar historial,
+  reactivable). **Ya existe, completo**, en `/erp/users` (tarjeta «Usuarios y accesos» en Dashboard
+  y Vista ejecutiva): botón Activar/Desactivar por fila y en bloque, filtro Activo/Inactivo,
+  `isActive=false` ya bloquea login (`auth.service.ts`) y ya excluye de a quién se le puede asignar
+  (`team-board.service.ts` filtra `isActive: true`), quita del chat y apaga el acceso físico (ACS)
+  — reactivar lo regresa todo con los mismos accesos (`users.service.ts#updateHrFields`). Christian
+  ya tiene acceso total (`isSuperAdmin` por correo `gerencia@nexara.com.mx`). Se le explicó a Adam
+  dónde está; **no se tocó código** porque no hacía falta. Si en verdad falta un acceso directo en
+  el sidebar de Christian (no alcancé a ubicar el archivo que arma esos ítems), revisar después.
 - **Hecho (Evidencia por campos: nadie la documenta sin haber tomado antes la entrada):** Adam vio
   en el panel que AN-0031 tenía «Evidencia por campos» 2/2 sin que a Antonio le apareciera hecho el
   Paso 1 — el stepper de `ActivityEvidenceFlow` y la pantalla de «Evidencia por campos» son dos
