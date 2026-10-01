@@ -94,8 +94,13 @@ export default function FlujoActividadesPage() {
         <>
           <FlujoKpiStrip workflow={w} detalleHref={null} />
           <StatRow cols={3}>
-            <Stat label="A tiempo" value={w.slaOnTime} tone="brand" />
-            <Stat label="Tarde / vencidas" value={w.slaLate} tone={w.slaLate ? "danger" : "default"} />
+            <Stat label="A tiempo" value={w.slaOnTime} tone="brand" href="/erp/pizarra/flujo/slaOnTime" />
+            <Stat
+              label="Tarde / vencidas"
+              value={w.slaLate}
+              tone={w.slaLate ? "danger" : "default"}
+              href="/erp/pizarra/flujo/slaLate"
+            />
             <Stat label="% a tiempo" value={formatPct(w.slaPct)} />
           </StatRow>
         </>

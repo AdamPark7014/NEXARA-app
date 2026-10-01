@@ -156,6 +156,45 @@ export type WorkflowPipeline = {
   slaPct: number | null;
 };
 
+/** Cada número de «Flujo del periodo» se puede pedir por separado: qué actividades lo componen. */
+export type WorkflowBucket =
+  | "assigned"
+  | "started"
+  | "evidence"
+  | "closed"
+  | "peerRejected"
+  | "slaOnTime"
+  | "slaLate";
+
+export const WORKFLOW_BUCKET_LABELS: Record<WorkflowBucket, string> = {
+  assigned: "Asignadas",
+  started: "Iniciadas",
+  evidence: "Con evidencias",
+  closed: "Cerradas",
+  peerRejected: "Rechazadas entre compañeros",
+  slaOnTime: "A tiempo",
+  slaLate: "Tarde / vencidas",
+};
+
+export type WorkflowBucketItem = {
+  id: number;
+  activityId: number | null;
+  anNumber: string | null;
+  titulo: string;
+  estatus: string | null;
+  persona: { id: number; nombre: string; avatarUrl: string | null; puesto: string | null } | null;
+  fecha: string;
+  detalle: string | null;
+};
+
+export type WorkflowBucketResponse = {
+  scope: "company" | "subtree";
+  desde: string;
+  hasta: string;
+  bucket: WorkflowBucket;
+  items: WorkflowBucketItem[];
+};
+
 /** Contrato C: lo que repartió quien mira. */
 export type AsignadaPorMiItem = {
   id: number;
@@ -311,6 +350,15 @@ export function fetchAsignadasPorMi(
   rango?: BoardRange,
 ): Promise<AsignadasPorMiResponse> {
   return erpFetch<AsignadasPorMiResponse>(`me/board/asignadas-por-mi${rangeQuery(rango)}`, token);
+}
+
+/** Detalle de un balde del pipeline (qué actividades componen ese número). */
+export function fetchWorkflowBucket(
+  token: string,
+  bucket: WorkflowBucket,
+  rango?: BoardRange,
+): Promise<WorkflowBucketResponse> {
+  return erpFetch<WorkflowBucketResponse>(`me/kpis/flujo/${bucket}${rangeQuery(rango)}`, token);
 }
 
 export function fetchTeamBoardHistory(

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import s from "./piezas.module.css";
 
@@ -102,6 +103,7 @@ export function Stat({
   tone = "default",
   dot,
   title,
+  href,
 }: {
   label: ReactNode;
   value: ReactNode;
@@ -110,17 +112,31 @@ export function Stat({
   /** Punto de color antes de la etiqueta (p. ej. estado de la pizarra). */
   dot?: string;
   title?: string;
+  /** Si se da, la cifra abre esa página (p. ej. la lista de lo que la compone). */
+  href?: string;
 }) {
   const valor =
     tone === "brand" ? s.statValueBrand : tone === "warning" ? s.statValueWarning : tone === "danger" ? s.statValueDanger : "";
-  return (
-    <div className={s.stat} title={title}>
+  const contenido = (
+    <>
       <span className={s.statLabel}>
         {dot ? <span className={s.statDot} style={{ background: dot }} aria-hidden="true" /> : null}
         {label}
       </span>
       <span className={[s.statValue, valor].filter(Boolean).join(" ")}>{value}</span>
       {hint ? <span className={s.statHint}>{hint}</span> : null}
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} className={[s.stat, s.statLink].filter(Boolean).join(" ")} title={title}>
+        {contenido}
+      </Link>
+    );
+  }
+  return (
+    <div className={s.stat} title={title}>
+      {contenido}
     </div>
   );
 }

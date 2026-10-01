@@ -2,6 +2,26 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-01
+- **Hecho (Flujo del periodo: cada número abre su lista real, ya no son cifras vagas):** Adam vio
+  «Asignadas 57, Iniciadas 52…» en Actividades → Asignadas por mí y dijo que no especificaban nada
+  (ni de quién, ni cuáles). Se agregó `GET me/kpis/flujo/:bucket` (`me.controller.ts` →
+  `TeamBoardService.getWorkflowActivities`) que lista las actividades reales detrás de cada balde
+  (assigned/started/evidence/closed/slaOnTime/slaLate con `activityAssignee`; peerRejected con
+  `activityPeerRequest`). Para que el número de la franja y la lista nunca se desacoplen, se extrajo
+  `clasificarActividad()` en `workflow-kpis.ts` como única fuente de verdad — tanto el conteo
+  (`accumulateWorkflow`, sin cambio de comportamiento) como el detalle la usan. `Stat`
+  (`components/base/piezas.tsx`) ganó un `href` opcional (se vuelve `<Link>`, mismas clases CSS,
+  sin tocar los ~30 usos existentes que no lo pasan). `FlujoKpiStrip` enlaza 5 de los 6 números
+  (no «A tiempo», que es un % y no un balde) a `/erp/pizarra/flujo/[bucket]` (página nueva, mismo
+  patrón que `/erp/pizarra/flujo`: `RangoSelector`, tarjetas `PersonaPhotoCard` con link a
+  `/erp/actividades/:id`). La página de detalle (`/erp/pizarra/flujo`) también enlaza sus 2 cifras
+  de SLA (A tiempo / Tarde). Backend: 3 tests nuevos (`workflow-bucket.spec.ts`) + 170/170 en
+  `src/me`. Web: `tsc` 0 (tras limpiar `.next/types` de una ruta temporal vieja de la sesión
+  anterior), 34/34 en los specs de `team-board-api`/`base`/`pizarra`. **No lo probé a mano en el
+  navegador**: Docker Desktop no arrancó en esta máquina (ya documentado, sin forzar «Reset to
+  factory defaults» — borraría la BD local) y no hay stack local levantado para loguearme como
+  CEO. **Desplegado, pendiente que Adam confirme en Actividades → cualquier pestaña con Flujo del
+  periodo, dando clic en un número.**
 - **Hecho (planos: orden de página — firma al final de verdad, no antes):** tras el fix de `3595081c`
   (planos embebidos en el PDF que de verdad descarga el cliente, `cotizacion-formato-nexara.ts`), Adam
   reportó que los planos salían al final y el cierre (ATENTAMENTE + firma) quedaba antes — pidió que el

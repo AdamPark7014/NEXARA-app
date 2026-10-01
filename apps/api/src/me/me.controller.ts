@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -25,6 +26,7 @@ import {
   type RevisarEvidenciaDto,
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
+import { isWorkflowBucket } from './workflow-kpis.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
 import { PeerRequestsService } from './peer-requests.service.js';
 import { HorasExtraService } from './horas-extra.service.js';
@@ -450,6 +452,34 @@ export class MeController {
         isSuperAdmin: Boolean(user.isSuperAdmin),
       },
       companyId,
+      this.teamBoard.resolveRange(desde, hasta),
+    );
+  }
+
+  /** Detalle de un balde del pipeline (qué actividades componen ese número). */
+  @Get('kpis/flujo/:bucket')
+  kpisFlujoBalde(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('bucket') bucket: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    if (!isWorkflowBucket(bucket)) {
+      throw new BadRequestException('Balde de flujo inválido');
+    }
+    return this.teamBoard.getWorkflowActivities(
+      {
+        id: Number(user.id),
+        roleKey: user.roleKey ?? null,
+        email: user.email ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+      },
+      companyId,
+      bucket,
       this.teamBoard.resolveRange(desde, hasta),
     );
   }
