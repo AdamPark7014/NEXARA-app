@@ -2,6 +2,20 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-01
+- **Hecho (gate de «Finalizar actividad»: no veía la Evidencia por campos — AN-0031 de Antonio):**
+  por WhatsApp, Antonio no podía cerrar AN-0031 («no me aparece el botón de finalizar»). En la base:
+  su «Evidencia por campos» (Cámara 1, Antes+Después) estaba 100% completa (`activity_evidence_fields`
+  / `activity_evidence_field_photos`), pero el gate de `ActivitiesService.update()` (Armor, antes de
+  pasar a Finalizada) solo miraba el modelo `Evidence` **viejo** (`tipoEvidencia` = llegada/salida/
+  hoja) — y ese modelo llevaba 0 filas para esta actividad porque nada de los flujos actuales
+  (ActivityEvidence de 5 pasos, ni Evidencia por campos) escribe ahí. Cualquier actividad con
+  plantilla de campos propios quedaba bloqueada para siempre, sin importar qué tan completa
+  estuviera. Fix: si la actividad tiene `activity_evidence_fields`, su `progresoDeCampos()` (de
+  `evidence-fields.helpers.ts`, la misma función pura que ya usa la pantalla «Evidencia por
+  campos») manda y se salta el chequeo viejo; sin campos propios, sigue el flujo de siempre
+  (sin tocarlo, para no regresar nada). 4 tests nuevos (`activities-evidence-gate.spec.ts`) +
+  277/277 en `src/activities` + 2990/2990 en todo el API. **Pendiente: que Antonio vuelva a
+  intentar cerrar AN-0031** (ya no debería faltarle nada).
 - **Hecho (/erp/pizarra/flujo: una sola franja, sin el reglón desalineado):** Adam mandó captura de
   esa página y dijo «se ve horrible» — la causa concreta: eran dos `StatRow` separados (uno de 6
   columnas con `FlujoKpiStrip`, otro de 3 columnas debajo) sobre el mismo ancho, así que las
