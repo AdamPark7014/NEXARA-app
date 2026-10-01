@@ -1,8 +1,8 @@
 import PDFDocument from 'pdfkit';
-import { PDFDocument as PDFLibDocument } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 import { bufferParaPdf, imagenParaPdf, type ImagenPdf } from '../common/pdf/imagen-para-pdf.js';
+import { anexarPaginasPdf, archivoLocalDePlano, clasificarPlanos, type PlanosClasificados } from '../common/pdf/planos-pdf.js';
 import { loadNexaraLogo, PDF_FUENTES, registrarFuentesCorporativas } from '../common/pdf/nexara-pdf-theme.js';
 
 /**
@@ -299,35 +299,6 @@ const dominio = (url: string) =>
     .replace(/^https?:\/\//i, '')
     .replace(/\/+$/, '')
     .replace(/^(?!www\.)/i, 'www.');
-
-/**
- * Archivo local de un anexo; `null` si es remoto o no existe.
- *
- * Los anexos se guardan con URL `/uploads/<carpeta>/<archivo>` (o `/<carpeta>/<archivo>` en los
- * flujos viejos) y el disco está en `UPLOADS_ROOT` o en `<raíz del repo>/uploads`, que no es el
- * directorio de trabajo del API. Por eso se prueban varias raíces antes de rendirse.
- */
-function archivoDePlano(url: string): string | null {
-  try {
-    if (!url || /^https?:\/\//i.test(url)) return null;
-    const limpio = url.split('?')[0]!.replace(/^\/+/, '');
-    const sinPrefijo = limpio.replace(/^uploads\//, '');
-    const raices = [
-      process.env['UPLOADS_ROOT']?.trim(),
-      path.resolve(process.cwd(), 'uploads'),
-      path.resolve(process.cwd(), '..', 'uploads'),
-      path.resolve(process.cwd(), '..', '..', 'uploads'),
-    ].filter((r): r is string => Boolean(r));
-
-    const candidatos = [path.resolve(process.cwd(), limpio), ...raices.map((raiz) => path.join(raiz, sinPrefijo))];
-    for (const candidato of candidatos) {
-      if (fs.existsSync(candidato) && fs.statSync(candidato).isFile()) return candidato;
-    }
-  } catch {
-    /* un anexo ilegible no tumba la propuesta */
-  }
-  return null;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Marca: se lee una vez por proceso y se embebe una vez por documento
@@ -1032,37 +1003,11 @@ const LADO_PLANO = 1224;
 /** Franja inferior de la hoja del plano (sección, nombre y número de página). */
 const FRANJA_PLANO = 34;
 
-type Planos = {
-  imagenes: Array<{ nombre: string; imagen: NonNullable<ReturnType<typeof imagenParaPdf>> }>;
-  /** Planos en PDF (lo normal en CAD): sus páginas reales se anexan al final, sin convertirlas a
-   * imagen — así no pierden la nitidez del plano. */
-  pdfs: Array<{ nombre: string; archivo: string }>;
-  /** Anexos que de verdad no se pueden imprimir (remotos o que ya no están en disco). */
-  otros: string[];
-};
+type Planos = PlanosClasificados;
 
-/**
- * Anexos listos para imprimir, preparados antes de la portada para que su índice diga exactamente
- * lo que trae el documento.
- */
-function prepararPlanos(planos: PropuestaPlano[]): Planos {
-  const vistos = new Set<string>();
-  const listos: Planos = { imagenes: [], pdfs: [], otros: [] };
-  for (const plano of planos) {
-    if (!plano?.url || vistos.has(plano.url)) continue;
-    vistos.add(plano.url);
-    const nombre = plano.nombre?.trim() || plano.url;
-    const archivo = archivoDePlano(plano.url);
-    if (archivo && /\.pdf$/i.test(archivo)) {
-      listos.pdfs.push({ nombre, archivo });
-      continue;
-    }
-    const imagen = archivo && /\.(png|jpe?g)$/i.test(archivo) ? imagenParaPdf(archivo, { maxLado: 1600 }) : null;
-    if (imagen?.ancho && imagen.alto) listos.imagenes.push({ nombre, imagen });
-    else listos.otros.push(nombre);
-  }
-  return listos;
-}
+/** Anexos listos para imprimir, preparados antes de la portada para que su índice diga
+ * exactamente lo que trae el documento. */
+const prepararPlanos = (planos: PropuestaPlano[]): Planos => clasificarPlanos(planos);
 
 /**
  * Cada plano a página completa y a su propia proporción, con una franja fina abajo para la sección
@@ -1113,26 +1058,6 @@ function seccionPlanos(ctx: Ctx, planos: Planos) {
   nombres.forEach((n, i) => vineta(ctx, n, conQuienViaja(nombres, i)));
 }
 
-/**
- * Anexa al final las páginas reales de los planos en PDF (CAD, planos impresos a PDF): se copian
- * tal cual, sin pasar por imagen, para no perder nitidez ni texto seleccionable. Un plano corrupto
- * o ilegible se salta, no tumba la propuesta entera.
- */
-async function anexarPlanosPdf(buffer: Buffer, pdfs: Planos['pdfs']): Promise<Buffer> {
-  if (!pdfs.length) return buffer;
-  const final = await PDFLibDocument.load(buffer);
-  for (const { archivo } of pdfs) {
-    try {
-      const bytes = await fs.promises.readFile(archivo);
-      const ajeno = await PDFLibDocument.load(bytes);
-      const paginas = await final.copyPages(ajeno, ajeno.getPageIndices());
-      paginas.forEach((pagina) => final.addPage(pagina));
-    } catch {
-      /* un plano corrupto o protegido se omite, no tumba la propuesta */
-    }
-  }
-  return Buffer.from(await final.save());
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 04 Cotización
@@ -1221,7 +1146,7 @@ const MAX_BYTES_MINIATURA = 200 * 1024;
 
 /** Imagen del producto lista para embeber: 3× el lado impreso (~216 ppp), alfa aplanado en blanco. */
 function prepararMiniatura(url: string): ImagenPdf | null {
-  const archivo = archivoDePlano(url);
+  const archivo = archivoLocalDePlano(url);
   if (!archivo || !/\.(png|jpe?g)$/i.test(archivo)) return null;
   let llave: string;
   try {
@@ -1850,5 +1775,5 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload, secc
 
   doc.end();
   const base = await listo;
-  return anexarPlanosPdf(base, planos.pdfs);
+  return anexarPaginasPdf(base, planos.pdfs);
 }

@@ -10,6 +10,7 @@ import { importeConLetra } from './importe-letra.js';
 import { factorMargen } from './cotizacion-totals.js';
 import { normalizarOpciones } from './personalizacion.js';
 import { segmentosLista } from './vinetas-texto.js';
+import { anexarPaginasPdf, clasificarPlanos, type PlanoArchivo } from '../common/pdf/planos-pdf.js';
 
 const TEAL = '#1FAF8D';
 const TEAL_OSC = '#15735F';
@@ -555,8 +556,19 @@ function totales(p: Lapiz, q: FormatoNexara) {
   p.y = y + h;
 }
 
-export function generarCotizacionNexaraPdf(quote: QuoteLike | FormatoNexara): Promise<Buffer> {
+/**
+ * Cotización en el formato de Christian — el que de verdad descarga y manda el cliente — más sus
+ * planos (plano de CAD, hoja de servicio del levantamiento, fotos): sin ellos, pidió Monica por
+ * WhatsApp, solo quedan listados como nombre suelto. Una imagen va a página completa; un PDF (lo
+ * normal en CAD y en la hoja de servicio) anexa sus páginas reales al final, sin convertirlo a
+ * imagen, así no pierde nitidez ni texto seleccionable.
+ */
+export async function generarCotizacionNexaraPdf(
+  quote: QuoteLike | FormatoNexara,
+  planos: PlanoArchivo[] = [],
+): Promise<Buffer> {
   const q = 'partidas' in quote && 'letras' in quote ? (quote as FormatoNexara) : formatoDesdeCotizacion(quote as QuoteLike);
+  const anexos = clasificarPlanos(planos);
   const dir = directorioAssets();
   const doc = new PDFDocument({ size: 'LETTER', margin: 0, autoFirstPage: false, bufferPages: true });
   doc.info.Title = `Cotización ${q.numero}`;
@@ -668,6 +680,33 @@ export function generarCotizacionNexaraPdf(quote: QuoteLike | FormatoNexara): Pr
   p.y += 12;
   texto(p, FIRMA.razon, LM, p.y, AW, { font: p.fb, size: 8, color: TINTA, align: 'center' });
 
+  if (anexos.otros.length) {
+    hoja(p);
+    texto(p, 'ANEXOS', LM, p.y, AW, { font: p.fb, size: 10, color: TEAL_OSC });
+    p.y += 16;
+    texto(p, 'Anexos que acompañan a esta cotización (no se pudieron imprimir aquí):', LM, p.y, AW, { size: 8, color: TINTA });
+    p.y += 14;
+    for (const nombre of anexos.otros) {
+      texto(p, `•  ${nombre}`, LM + 4, p.y, AW - 8, { size: 8, color: TINTA });
+      p.y += 13;
+    }
+  }
+  // Cada plano en imagen a página completa, como dice la ayuda del editor de «03 Planos».
+  for (const { nombre, imagen } of anexos.imagenes) {
+    hoja(p);
+    texto(p, nombre, LM, p.y, AW, { font: p.fb, size: 9, color: CARBON });
+    p.y += 16;
+    const altoDisponible = BOTTOM - p.y;
+    const escala = Math.min(AW / imagen.ancho, altoDisponible / imagen.alto, 1);
+    const ancho = Math.round(imagen.ancho * escala);
+    const alto = Math.round(imagen.alto * escala);
+    try {
+      p.doc.image(imagen.datos, LM, p.y, { width: ancho, height: alto });
+    } catch {
+      /* un anexo corrupto deja su hueco en blanco, no tumba la cotización */
+    }
+  }
+
   const total = p.pagina;
   const rango = doc.bufferedPageRange();
   for (let i = 0; i < rango.count; i += 1) {
@@ -680,5 +719,6 @@ export function generarCotizacionNexaraPdf(quote: QuoteLike | FormatoNexara): Pr
     });
   }
   doc.end();
-  return listo;
+  const base = await listo;
+  return anexarPaginasPdf(base, anexos.pdfs);
 }
