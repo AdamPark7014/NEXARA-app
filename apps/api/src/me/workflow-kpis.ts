@@ -57,39 +57,70 @@ export function emptyWorkflowPipeline(): WorkflowPipelineCounts {
   };
 }
 
-export function accumulateWorkflow(
-  counts: WorkflowPipelineCounts,
-  a: WorkflowActivityInput,
-  now: Date = new Date(),
-): void {
-  if (a.cancelada) return;
+/** Los baldes del pipeline que se pueden pedir por separado (el detalle de cada número). */
+export const WORKFLOW_BUCKETS = [
+  'assigned',
+  'started',
+  'evidence',
+  'closed',
+  'peerRejected',
+  'slaOnTime',
+  'slaLate',
+] as const;
+export type WorkflowBucket = (typeof WORKFLOW_BUCKETS)[number];
 
-  counts.assigned += 1;
+export function isWorkflowBucket(v: string): v is WorkflowBucket {
+  return (WORKFLOW_BUCKETS as readonly string[]).includes(v);
+}
+
+type Clasificacion = Record<Exclude<WorkflowBucket, 'peerRejected'>, boolean>;
+
+/**
+ * En qué baldes del pipeline cae una actividad — única fuente de verdad: tanto el conteo
+ * (`accumulateWorkflow`) como el detalle por balde (`TeamBoardService.getWorkflowActivities`) la
+ * usan, para que el número de la franja y la lista que se abre al dar clic siempre coincidan.
+ */
+export function clasificarActividad(a: WorkflowActivityInput, now: Date = new Date()): Clasificacion {
+  const vacia: Clasificacion = { assigned: false, started: false, evidence: false, closed: false, slaOnTime: false, slaLate: false };
+  if (a.cancelada) return vacia;
 
   const closed = /finaliz|cerrad/i.test(a.estatus ?? '');
   const started =
     Boolean(asDate(a.inicioRealAt)) ||
     closed ||
     /en proceso|por validar/i.test(a.estatus ?? '');
-  if (started) counts.started += 1;
-
   const ev = a.evidenceStatus ?? '';
-  if (EVIDENCE_IN_PROGRESS.test(ev) || /por validar/i.test(a.estatus ?? '')) {
-    counts.evidence += 1;
-  }
+  const evidence = EVIDENCE_IN_PROGRESS.test(ev) || /por validar/i.test(a.estatus ?? '');
 
-  if (closed) counts.closed += 1;
-
+  let slaOnTime = false;
+  let slaLate = false;
   const deadline = deadlineOf(a);
-  if (!deadline) return;
-
-  const fin = asDate(a.fechaFinalizacion);
-  if (closed && fin) {
-    if (fin.getTime() <= deadline.getTime()) counts.slaOnTime += 1;
-    else counts.slaLate += 1;
-  } else if (!closed && now.getTime() > deadline.getTime()) {
-    counts.slaLate += 1;
+  if (deadline) {
+    const fin = asDate(a.fechaFinalizacion);
+    if (closed && fin) {
+      if (fin.getTime() <= deadline.getTime()) slaOnTime = true;
+      else slaLate = true;
+    } else if (!closed && now.getTime() > deadline.getTime()) {
+      slaLate = true;
+    }
   }
+
+  return { assigned: true, started, evidence, closed, slaOnTime, slaLate };
+}
+
+export function accumulateWorkflow(
+  counts: WorkflowPipelineCounts,
+  a: WorkflowActivityInput,
+  now: Date = new Date(),
+): void {
+  const c = clasificarActividad(a, now);
+  if (!c.assigned) return;
+  counts.assigned += 1;
+  if (c.started) counts.started += 1;
+  if (c.evidence) counts.evidence += 1;
+  if (c.closed) counts.closed += 1;
+  if (c.slaOnTime) counts.slaOnTime += 1;
+  if (c.slaLate) counts.slaLate += 1;
 }
 
 export function finalizeWorkflow(counts: WorkflowPipelineCounts): WorkflowPipelineCounts {

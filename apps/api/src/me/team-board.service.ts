@@ -32,9 +32,11 @@ import {
 } from './pizarra-kpi.js';
 import {
   accumulateWorkflow,
+  clasificarActividad,
   emptyWorkflowPipeline,
   finalizeWorkflow,
   withPeerRejects,
+  type WorkflowBucket,
   type WorkflowPipelineCounts,
 } from './workflow-kpis.js';
 
@@ -203,6 +205,30 @@ export type AsignadasPorMiResponse = {
   items: AsignadaPorMiItem[];
 };
 
+/** Una fila del detalle de un balde del pipeline de flujo (Ola C). */
+export type WorkflowBucketItem = {
+  /** Id de la actividad (o del rechazo peer, si no hay actividad ligada). */
+  id: number;
+  /** Para enlazar a `/erp/actividades/:id`; null si el rechazo no quedó ligado a una actividad. */
+  activityId: number | null;
+  anNumber: string | null;
+  titulo: string;
+  estatus: string | null;
+  persona: { id: number; nombre: string; avatarUrl: string | null; puesto: string | null } | null;
+  /** Fecha que explica por qué cayó en este balde (asignación, cierre o rechazo). */
+  fecha: Date;
+  /** Texto corto extra (p. ej. «De Fulano a Mengano · motivo»), solo en `peerRejected`. */
+  detalle: string | null;
+};
+
+export type WorkflowBucketResponse = {
+  scope: 'company' | 'subtree';
+  desde: string;
+  hasta: string;
+  bucket: WorkflowBucket;
+  items: WorkflowBucketItem[];
+};
+
 type Viewer = {
   id: number;
   roleKey?: string | null;
@@ -326,6 +352,131 @@ export class TeamBoardService {
       hasta: workDateKey(rangoFinal.hasta),
       workflow,
     };
+  }
+
+  /**
+   * Detalle de un balde del pipeline (qué actividades son esas «30 cerradas»): mismas filas y el
+   * mismo `clasificarActividad` que cuenta `buildWorkflowPipeline`, para que el número de la
+   * franja y la lista que se abre al dar clic nunca se desacoplen.
+   */
+  async getWorkflowActivities(
+    viewer: Viewer,
+    companyId: number | null,
+    bucket: WorkflowBucket,
+    rango?: BoardRange,
+  ): Promise<WorkflowBucketResponse> {
+    const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
+    const rangoFinal = rango ?? this.resolveRange(null, null, now);
+    const userIds = scoped.map((u) => u.id);
+    const base = {
+      scope: (companyWide ? 'company' : 'subtree') as 'company' | 'subtree',
+      desde: workDateKey(rangoFinal.desde),
+      hasta: workDateKey(rangoFinal.hasta),
+      bucket,
+    };
+    if (userIds.length === 0) return { ...base, items: [] };
+
+    if (bucket === 'peerRejected') {
+      if (companyId == null) return { ...base, items: [] };
+      const rechazos = await this.prisma.activityPeerRequest.findMany({
+        where: {
+          companyId,
+          status: 'REJECTED',
+          toUserId: { in: userIds },
+          updatedAt: { gte: rangoFinal.desde, lte: rangoFinal.hasta },
+        },
+        include: {
+          fromUser: { select: { id: true, nombre: true, avatarUrl: true, puesto: true } },
+          toUser: { select: { id: true, nombre: true, avatarUrl: true, puesto: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 200,
+      });
+      const items: WorkflowBucketItem[] = rechazos.map((r) => ({
+        id: r.id,
+        activityId: r.activityId,
+        anNumber: null,
+        titulo: r.title,
+        estatus: 'Rechazada',
+        persona: r.toUser
+          ? { id: r.toUser.id, nombre: r.toUser.nombre, avatarUrl: r.toUser.avatarUrl, puesto: r.toUser.puesto }
+          : null,
+        fecha: r.updatedAt,
+        detalle: `De ${r.fromUser?.nombre ?? '—'} a ${r.toUser?.nombre ?? '—'}${r.rejectReason ? ` · ${r.rejectReason}` : ''}`,
+      }));
+      return { ...base, items };
+    }
+
+    const personas = new Map(scoped.map((u) => [u.id, u]));
+    const rows = await this.prisma.activityAssignee.findMany({
+      where: {
+        userId: { in: userIds },
+        retiradoAt: null,
+        ...(companyId != null ? { companyId } : {}),
+        activity: { deletedAt: null, cancelledAt: null },
+      },
+      select: {
+        userId: true,
+        inicioRealAt: true,
+        activity: {
+          select: {
+            id: true,
+            anNumber: true,
+            titulo: true,
+            estatus: true,
+            fechaFinalizacion: true,
+            fechaMaxima: true,
+            periodoFin: true,
+            fechaAsignacion: true,
+            cancelledAt: true,
+            activityEvidences: { select: { userId: true, status: true } },
+          },
+        },
+      },
+      take: 2000,
+    });
+
+    const items: WorkflowBucketItem[] = [];
+    for (const row of rows) {
+      const a = row.activity;
+      if (!a) continue;
+      const enRangoAct =
+        enRango(
+          [a.fechaAsignacion, row.inicioRealAt, a.fechaFinalizacion, a.fechaMaxima],
+          rangoFinal.desde,
+          rangoFinal.hasta,
+        ) || enRango([a.periodoFin], rangoFinal.desde, rangoFinal.hasta);
+      if (!enRangoAct) continue;
+      const ev = a.activityEvidences.find((e) => e.userId === row.userId)?.status ?? null;
+      const clasif = clasificarActividad(
+        {
+          estatus: a.estatus,
+          inicioRealAt: row.inicioRealAt,
+          fechaFinalizacion: a.fechaFinalizacion,
+          fechaMaxima: a.fechaMaxima,
+          periodoFin: a.periodoFin,
+          evidenceStatus: ev,
+          cancelada: Boolean(a.cancelledAt),
+        },
+        now,
+      );
+      if (!clasif[bucket]) continue;
+      const persona = personas.get(row.userId);
+      items.push({
+        id: a.id,
+        activityId: a.id,
+        anNumber: a.anNumber,
+        titulo: a.titulo,
+        estatus: a.estatus,
+        persona: persona
+          ? { id: persona.id, nombre: persona.nombre, avatarUrl: persona.avatarUrl, puesto: persona.puesto }
+          : null,
+        fecha: a.fechaFinalizacion ?? a.fechaAsignacion,
+        detalle: null,
+      });
+    }
+    items.sort((x, y) => y.fecha.getTime() - x.fecha.getTime());
+    return { ...base, items: items.slice(0, 200) };
   }
 
   private async buildWorkflowPipeline(

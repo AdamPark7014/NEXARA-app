@@ -24,19 +24,20 @@ export default function FlujoKpiStrip({
         ) : null}
       </div>
       <StatRow cols={6}>
-        <Stat label="Asignadas" value={workflow.assigned} />
-        <Stat label="Iniciadas" value={workflow.started} />
-        <Stat label="Con evidencias" value={workflow.evidence} />
-        <Stat label="Cerradas" value={workflow.closed} tone="brand" />
+        <Stat label="Asignadas" value={workflow.assigned} href="/erp/pizarra/flujo/assigned" />
+        <Stat label="Iniciadas" value={workflow.started} href="/erp/pizarra/flujo/started" />
+        <Stat label="Con evidencias" value={workflow.evidence} href="/erp/pizarra/flujo/evidence" />
+        <Stat label="Cerradas" value={workflow.closed} tone="brand" href="/erp/pizarra/flujo/closed" />
         <Stat
           label="Rechazadas entre compañeros"
           value={workflow.peerRejected}
           tone={workflow.peerRejected > 0 ? "warning" : "default"}
+          href="/erp/pizarra/flujo/peerRejected"
         />
         <Stat
           label="A tiempo"
           value={formatPct(workflow.slaPct)}
-          title={`${workflow.slaOnTime} a tiempo · ${workflow.slaLate} tarde`}
+          title={`${workflow.slaOnTime} a tiempo · ${workflow.slaLate} tarde — ver detalle para la lista`}
           tone={workflow.slaLate > 0 ? "danger" : "default"}
         />
       </StatRow>

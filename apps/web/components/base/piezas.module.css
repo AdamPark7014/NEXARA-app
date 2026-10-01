@@ -101,6 +101,17 @@
   border-left: none;
 }
 
+.statLink {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.statLink:hover,
+.statLink:focus-visible {
+  background: var(--ui-hover);
+}
+
 .statLabel {
   display: inline-flex;
   align-items: center;
