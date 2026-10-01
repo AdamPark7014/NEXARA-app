@@ -6,7 +6,7 @@
  *
  * Encargados de área (+ comercial): Christian, David, Luis, Antonio, Daniela, Mónica.
  * Campo David (Joan/Israel/Juan): solo reciben tarea/proyecto/obra.
- * Soporte Antonio (Carolina/Alejandro): solo reciben tarea/proyecto/servicio.
+ * Soporte Antonio (Carolina/Alejandro/Roberto): solo reciben tarea/proyecto/servicio.
  * Josué Encargado de Obra: todo menos servicio
  */
 import { ROLES, type RoleKey } from '@/lib/rbac/roles';
@@ -170,8 +170,7 @@ const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   // Soporte de Antonio
   [ORG_EMAILS.carolina]: ['tarea', 'proyecto', 'servicio'],
   [ORG_EMAILS.alejandro]: ['tarea', 'proyecto', 'servicio'],
-  // Roberto: solo atiende servicios.
-  [ORG_EMAILS.roberto]: ['servicio'],
+  [ORG_EMAILS.roberto]: ['tarea', 'proyecto', 'servicio'],
   // Comercial / admin
   [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
   [ORG_EMAILS.monica]: ['tarea', 'comercial'],
@@ -429,7 +428,7 @@ export function kindsForTarget(email?: string | null): ActivityKind[] {
  *
  * Encargados de área (+ comercial): Christian, David, Luis, Antonio, Daniela, Mónica.
  * Campo David (Joan/Israel/Juan): solo reciben tarea/proyecto/obra.
- * Soporte Antonio (Carolina/Alejandro): solo reciben tarea/proyecto/servicio.
+ * Soporte Antonio (Carolina/Alejandro/Roberto): solo reciben tarea/proyecto/servicio.
  * Josué Encargado de Obra: todo menos servicio
  */
 export function kindsForAssignment(opts: {
