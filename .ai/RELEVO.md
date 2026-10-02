@@ -2,6 +2,20 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-02
+- **Hecho (cotizaciones: la partida escrita en «Nueva partida» ya no se pierde si no das Enter):**
+  Adam mandó dos capturas de NEX-CE00002201-0005 (cotización 18): en una computadora la 2.ª partida
+  tenía nombre y precio 220 pero el subtotal/total seguían en $9,379.45 y el PDF mostraba una sola
+  partida. En producción (`cotizacion_items`) solo estaba la partida 1: la otra nunca se agregó. Causa:
+  la última fila de `TablaPartidas` (`FilaNueva`) es un borrador con estado local y solo pasa a ser
+  partida con Enter o el botón «↵» — pero se ve idéntica a una real (incluso enseña su total), así que
+  quien no daba Enter creía tenerla. Ahora `FilaNueva` se agrega sola al salir de la fila (`onBlur` de
+  la fila + `setTimeout` que revisa dónde quedó el foco: moverse entre sus celdas, el botón ↵, el
+  catálogo o cambiar de ventana no la agregan a medias) y **sin robar el foco**
+  (`alAgregar(p, { conFoco: false })`); Enter sigue igual. El «↵» se resalta mientras hay algo por
+  agregar. `TablaPartidas.spec.tsx` nuevo (5 tests; el principal falla sin el arreglo — verificado
+  quitando el `onBlur`), 64/64 en `cotizaciones`+`lib/cotizacion*`, `tsc` 0. **La partida 2 de la
+  cotización 18 no está en la base: hay que volver a capturarla** (cualquier cotización donde pase
+  lo mismo igual).
 - **Hecho (Perfiles: Christian activa y desactiva perfiles desde su propio menú):** Adam pidió poder
   desactivar a alguien que se fue (sin credenciales ni asignación, historial intacto, reactivable).
   `/erp/users` ya hacía eso (`isActive` corta login/sesiones en `auth.service`/`jwt.strategy`, saca

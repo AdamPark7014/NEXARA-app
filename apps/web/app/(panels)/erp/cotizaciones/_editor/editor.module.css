@@ -1371,6 +1371,13 @@ select.celda {
   cursor: default;
 }
 
+/* Hay algo escrito en la fila nueva que todavía no es partida: el ↵ lo avisa. */
+.menuFilaBtn.menuFilaPendiente:not(:disabled) {
+  opacity: 1;
+  color: var(--doc-acento-texto);
+  border-color: var(--doc-acento-texto);
+}
+
 .menuFilaLista {
   position: absolute;
   z-index: 45;
