@@ -2,6 +2,33 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-02
+- **⚠ EN CURSO, SIN COMMITEAR (02-10, ~13:25): paquete grande de Adam repartido en agentes.** El árbol
+  de trabajo trae cambios de 6 agentes de Claude Code que NO se han revisado, probado juntos, commiteado
+  ni desplegado (la sesión se quedó sin cuota a media revisión). **No los pises ni los «restaures»: son
+  trabajo válido en curso.** Antes de commitear: revisar cada diff, `tsc` de API y web, jest completo y
+  vitest completo, compilar Android, y desplegar con `--with-migrate` (hay migraciones nuevas).
+  Por área (cada agente tenía prohibido commitear y tocar `.ai/`):
+  1. **Cotizaciones — TERMINADO por su agente, falta mi revisión:** el PDF ya toma `depositPercent`/`note`
+     del editor (antes `paymentTerms`→`PAGO_DEFAULT`, por eso el 50 % no se quitaba); datos fiscales del
+     emisor (`EMISOR`) arriba del título en la hoja 1; `GET cotizaciones/partidas-frecuentes` + «Usadas
+     antes» en `FilaNueva` (margen vacío). 412 tests de `src/cotizaciones` en verde según el agente.
+     Muestra: `scratchpad/cotizacion-encabezado.png` — **mirarla antes de publicar**. Ojo: el pie del
+     membrete trae otra dirección/teléfono que los datos fiscales.
+  2. **Actividades (en curso):** comercial para Paulina (`finanzas@nexara.com.mx`) en web/Android/iOS;
+     «Inicio/Conclusión de actividad» en comercial; geocerca 500 m por tipo (servicio, proyecto, obra y
+     tarea salvo recolección/entrega/compra; nunca comercial); auditoría de que la evidencia no se pierda.
+  3. **Sesiones de tiempo (en curso, dueño del esquema):** tabla `activity_work_sessions` (migración
+     `20261002130000_activity_work_sessions`), tope 12 h, cierre al checar salida, pausa por jefe/CEO,
+     KPIs desde sesiones.
+  4. **Clientes + proyectos (en curso):** Clientes de vuelta al menú para quien lleva comercial, base única
+     con el alta rápida, proyectos por cliente (posible migración `20261002140000_*`).
+  5. **Organigrama radial + quitar Organigrama de Android/iOS (en curso).** Dejó `tsc` web con 2 errores
+     (`eyebrow` en `erp/organigrama/page.tsx` y `erp/hr/orgchart/page.tsx`) al momento del corte.
+  6. **Códigos de barras (en curso):** lector USB y UPC en almacén, Code 128 propio y etiquetas de
+     herramientas (posible migración `20261002150000_*`).
+  **Chat:** solo maquetas (`scratchpad/chat/direccion-a.png`, `direccion-b.png`, `auditoria.md`, `plan.md`);
+  Adam debe elegir A o B antes de construir. **Sin empezar:** guardias de fin de semana, sugerencia de
+  nómina (horas productivas vs laboradas) y las pantallas nuevas en las apps (pausar, escáner con cámara).
 - **Hecho (Chat: «Crear canal» no se podía usar y se veía horrible):** Adam mandó captura: sin botón
   «Crear», casilla gigante y «Canal privado» lejos. Dos causas en `WorkspaceChat`: (1) los tokens
   `--nx-*` (`--nx-send`, `--nx-line`, `--nx-accent`…) vivían solo en `.shell`, pero **todos los modales
