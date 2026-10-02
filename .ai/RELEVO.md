@@ -2,6 +2,20 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-10-02
+- **Hecho (Chat: «Crear canal» no se podía usar y se veía horrible):** Adam mandó captura: sin botón
+  «Crear», casilla gigante y «Canal privado» lejos. Dos causas en `WorkspaceChat`: (1) los tokens
+  `--nx-*` (`--nx-send`, `--nx-line`, `--nx-accent`…) vivían solo en `.shell`, pero **todos los modales
+  del chat cuelgan fuera de `.shell`** (hermanos de `.fill`): `.sendBtn` quedaba sin fondo con texto
+  blanco → «Crear» invisible, y los bordes (`--nx-line`) desaparecían; (2) el estilo global
+  `:where(input…)` de `utilities.scss` da `width:100%` y alto de campo a cualquier input, también a la
+  casilla. Fix: los tokens ahora son `.shell, .modalBackdrop {…}` (arregla también DM, invitar, selector
+  de entidades, cambiador de canales y lectores, que compartían el problema); casilla en una tarjeta
+  `.optionRow` con tamaño propio y descripción; texto de ayuda; **los errores van dentro del modal**
+  (antes `setError` salía detrás del fondo, p. ej. «Ya existe un canal con ese nombre» parecía «no
+  pasa nada»); Enter crea; botón «Crear canal» deshabilitado sin nombre y «Creando…» mientras guarda.
+  Backend sin cambios (`POST chat/channels` no pide permiso extra). Verificado con una réplica estática
+  del modal en Chrome headless (no con el chat real: no hay sesión ni entorno local); web 696/696,
+  `tsc` 0. **Pendiente: que Adam lo pruebe.**
 - **Hecho (cotizaciones: la partida escrita en «Nueva partida» ya no se pierde si no das Enter):**
   Adam mandó dos capturas de NEX-CE00002201-0005 (cotización 18): en una computadora la 2.ª partida
   tenía nombre y precio 220 pero el subtotal/total seguían en $9,379.45 y el PDF mostraba una sola
