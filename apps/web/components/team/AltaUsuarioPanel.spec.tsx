@@ -140,6 +140,62 @@ describe("AltaUsuarioPanel", () => {
     expect(cuerpo.get("telefono")).toBe("5511112222");
   });
 
+  describe("activar y desactivar perfiles (solo dirección)", () => {
+    const persona = (over: Record<string, unknown> = {}) => ({
+      id: 57, nombre: "Persona Que Se Fue", avatarUrl: null, telefono: null,
+      roleKey: "ing_campo", departmentId: 30, managerId: 1, employeeNumber: null, ...over,
+    });
+    const contexto = (formulario: "completo" | "basico", equipo: unknown[]) => ({
+      formulario, tipos: [SOPORTE], rolAutomatico: formulario === "basico", jefeAutomatico: formulario === "basico",
+      telefonoObligatorio: formulario === "basico", puede: true, departamentos: [], jefes: [], equipo,
+    });
+    const servidor = (ctx: unknown) =>
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (String(url).includes("users/delegated/contexto")) return { ok: true, json: async () => ctx };
+        if (String(url).includes("/activo") && init?.method === "PATCH") return { ok: true, json: async () => ({ id: 57, nombre: "x", activo: false }) };
+        return { ok: false, json: async () => ({}) };
+      });
+
+    it("dirección desactiva con confirmación y el API recibe activo:false", async () => {
+      const f = servidor(contexto("completo", [persona()]));
+      vi.stubGlobal("fetch", f);
+      render(<AltaUsuarioPanel />);
+      await userEvent.click(await screen.findByRole("button", { name: "Desactivar" }));
+      const dialogo = await screen.findByRole("alertdialog");
+      expect(within(dialogo).getByText(/historial se conserva/)).toBeTruthy();
+      await userEvent.click(within(dialogo).getByRole("button", { name: "Desactivar" }));
+      await waitFor(() => {
+        const patch = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([u]) => String(u).includes("/activo"));
+        expect(patch).toBeTruthy();
+        expect(String(patch![0])).toContain("users/delegated/57/activo");
+        expect(JSON.parse(String(patch![1].body))).toEqual({ activo: false });
+      });
+    });
+
+    it("quien ya está desactivado se ve con su etiqueta, sin «Editar», y se puede reactivar", async () => {
+      const f = servidor(contexto("completo", [persona({ activo: false })]));
+      vi.stubGlobal("fetch", f);
+      render(<AltaUsuarioPanel />);
+      expect(await screen.findByText("Desactivado")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Activar" }));
+      const dialogo = await screen.findByRole("alertdialog");
+      await userEvent.click(within(dialogo).getByRole("button", { name: "Activar" }));
+      await waitFor(() => {
+        const patch = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([u]) => String(u).includes("/activo"));
+        expect(JSON.parse(String(patch![1].body))).toEqual({ activo: true });
+      });
+    });
+
+    it("un encargado (formulario básico) no ve Desactivar ni Activar", async () => {
+      vi.stubGlobal("fetch", servidor(contexto("basico", [persona()])));
+      render(<AltaUsuarioPanel />);
+      expect(await screen.findByRole("button", { name: "Editar" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Desactivar" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Activar" })).toBeNull();
+    });
+  });
+
   it("si el API rechaza el alta, muestra el motivo y deja corregir", async () => {
     vi.stubGlobal("fetch", respuestas([SOPORTE], () => ({ ok: false, cuerpo: { message: "El correo ya está registrado (Otra Persona)." } })));
     render(<AltaUsuarioPanel />);

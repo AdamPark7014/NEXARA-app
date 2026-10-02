@@ -14,11 +14,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { useUser } from "@/components/UserContext";
 import FotoPerfilCampo from "@/components/team/FotoPerfilCampo";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import {
+  cambiarActivoPersona,
   cargarContextoAlta,
   contrasenaAceptable,
   crearUsuarioDelegado,
@@ -75,6 +77,8 @@ export default function AltaUsuarioPanel() {
   const [errorEquipo, setErrorEquipo] = useState<string | null>(null);
   const [guardandoFoto, setGuardandoFoto] = useState(false);
   const [recarga, setRecarga] = useState(0);
+  const [confirmActivo, setConfirmActivo] = useState<ConfirmState | null>(null);
+  const [avisoActivo, setAvisoActivo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -184,6 +188,29 @@ export default function AltaUsuarioPanel() {
     }
   };
 
+  // Solo dirección ve el formulario completo, y solo ella activa o desactiva perfiles.
+  const puedeActivar = completo;
+  const alternarActivo = (p: (typeof ctx.equipo)[number]) => {
+    const activo = p.activo !== false;
+    setAvisoActivo(null);
+    setConfirmActivo({
+      title: activo ? "Desactivar perfil" : "Activar perfil",
+      message: activo
+        ? `${p.nombre} ya no podrá entrar al sistema ni se le podrá asignar nada. Todo su historial se conserva y puedes reactivarlo cuando quieras.`
+        : `${p.nombre} volverá a poder entrar con sus mismos accesos y a recibir asignaciones.`,
+      confirmLabel: activo ? "Desactivar" : "Activar",
+      danger: activo,
+      fn: async () => {
+        try {
+          await cambiarActivoPersona(token, p.id, !activo);
+          setRecarga((n) => n + 1);
+        } catch (err) {
+          setAvisoActivo(err instanceof Error ? err.message : "No se pudo cambiar el estado del perfil.");
+        }
+      },
+    });
+  };
+
   const etiquetaTipos = ctx.tipos.map((t) => t.etiqueta).join(", ");
 
   return (
@@ -205,20 +232,27 @@ export default function AltaUsuarioPanel() {
       {ctx.equipo.length > 0 ? (
         <div style={{ display: "grid", gap: 8, padding: "0 0 16px" }}>
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Perfiles de tu equipo. Edita foto, nombre y teléfono; la foto es la fija, la misma que se ve en actividades y en el celular.
+            Perfiles de tu equipo. Edita foto, nombre y teléfono; la foto es la fija, la misma que se ve en actividades y en el celular.{puedeActivar ? " Desactivar a alguien corta su acceso y su asignación sin borrar su historial; lo puedes reactivar." : ""}
           </span>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {ctx.equipo.map((p) => {
               const src = resolveUserAvatarUrl(p.avatarUrl);
+              const activo = p.activo !== false;
               return (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                  <span style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "var(--surface-2)", flex: "0 0 auto" }}>
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, opacity: activo ? 1 : 0.6 }}>
+                  <span style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "var(--surface-2)", flex: "0 0 auto", filter: activo ? undefined : "grayscale(1)" }}>
                     {src ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : null}
                   </span>
                   <span style={{ fontSize: 13 }}>{p.nombre}</span>
+                  {!activo ? (
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: "var(--surface-2)", color: "var(--text-secondary)" }}>
+                      Desactivado
+                    </span>
+                  ) : null}
+                  {activo ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -237,12 +271,21 @@ export default function AltaUsuarioPanel() {
                   >
                     Editar
                   </Button>
+                  ) : null}
+                  {puedeActivar ? (
+                    <Button type="button" variant="ghost" onClick={() => alternarActivo(p)}>
+                      {activo ? "Desactivar" : "Activar"}
+                    </Button>
+                  ) : null}
                 </div>
               );
             })}
           </div>
         </div>
       ) : null}
+
+      {avisoActivo ? <InlineAlert variant="danger" message={avisoActivo} /> : null}
+      <ConfirmDialog state={confirmActivo} onClose={() => setConfirmActivo(null)} />
 
       <Modal open={abierto} onClose={() => setAbierto(false)} title={creado ? "Usuario creado" : "Dar de alta a alguien"}>
         {creado ? (

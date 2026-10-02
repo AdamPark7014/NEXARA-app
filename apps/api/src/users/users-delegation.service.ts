@@ -46,6 +46,8 @@ export type PersonaEquipo = {
   departmentId: number | null;
   managerId: number | null;
   employeeNumber: string | null;
+  /** Dirección ve también a quien ya está desactivado, para poder reactivarlo. */
+  activo: boolean;
 };
 
 type PersonaEquipoFila = {
@@ -56,6 +58,7 @@ type PersonaEquipoFila = {
   departmentId?: number | null;
   managerId?: number | null;
   employeeNumber?: string | null;
+  isActive?: boolean | null;
   perfil?: { telefono: string | null } | null;
 };
 
@@ -179,6 +182,7 @@ export class UsersDelegationService {
       departmentId: f.departmentId ?? null,
       managerId: f.managerId ?? null,
       employeeNumber: f.employeeNumber ?? null,
+      activo: true,
     }));
   }
 
@@ -187,13 +191,13 @@ export class UsersDelegationService {
     const filas = await this.prisma.user.findMany({
       where: {
         id: { not: actorId },
-        isActive: true,
         companyMemberships: { some: { companyId } },
       },
       select: {
         id: true,
         nombre: true,
         email: true,
+        isActive: true,
         avatarUrl: true,
         roleKey: true,
         departmentId: true,
@@ -201,7 +205,7 @@ export class UsersDelegationService {
         employeeNumber: true,
         perfil: { select: { telefono: true } },
       },
-      orderBy: { nombre: 'asc' },
+      orderBy: [{ isActive: 'desc' }, { nombre: 'asc' }],
     });
     return filas
       .filter((f: { email: string }) => !isPlatformOwnerEmail(f.email) && !isDeveloperSuperAdminEmail(f.email))
@@ -214,6 +218,7 @@ export class UsersDelegationService {
         departmentId: f.departmentId ?? null,
         managerId: f.managerId ?? null,
         employeeNumber: f.employeeNumber ?? null,
+        activo: f.isActive !== false,
       }));
   }
 
@@ -531,5 +536,43 @@ export class UsersDelegationService {
       managerId: (actualizado.managerId as number | null | undefined) ?? null,
       employeeNumber: (actualizado.employeeNumber as string | null | undefined) ?? null,
     };
+  }
+
+  /**
+   * Activa o desactiva el perfil de alguien — solo dirección (Christian). Desactivar corta el
+   * acceso al instante (login y sesiones abiertas), lo saca del chat y del control de acceso, y ya
+   * no aparece para asignarle trabajo; no borra nada: su historial queda y se puede reactivar.
+   * Reusa `UsersService.updateHrFields`, que es lo que ya hace la pantalla de Usuarios.
+   */
+  async cambiarActivo(sesion: UsuarioSesion, userId: number, activo: boolean, companyId: number) {
+    const actor = await this.actor(sesion);
+    if (!esDireccion(actor, PLATFORM_OWNER_EMAIL)) {
+      throw new ForbiddenException('Solo dirección activa o desactiva perfiles.');
+    }
+    if (userId === actor.id) throw new BadRequestException('No puedes desactivar tu propia cuenta.');
+    const destino = await this.prisma.user.findFirst({
+      where: { id: userId, companyMemberships: { some: { companyId } } },
+      select: { id: true, nombre: true, email: true, isActive: true },
+    });
+    if (!destino) throw new BadRequestException('No encontramos a esa persona.');
+    if (isPlatformOwnerEmail(destino.email) || isDeveloperSuperAdminEmail(destino.email)) {
+      throw new ForbiddenException('Esa cuenta no se activa ni desactiva desde aquí.');
+    }
+    if ((destino.isActive !== false) === activo) return { id: destino.id, nombre: destino.nombre, activo };
+
+    await this.users.updateHrFields(destino.id, { isActive: activo }, companyId);
+    await this.audit
+      .log(
+        {
+          entityType: 'User',
+          entityId: destino.id,
+          action: activo ? 'USER_REACTIVATED' : 'USER_DEACTIVATED',
+          changes: { cambiadoPor: actor.id },
+          companyId,
+        },
+        actor.id,
+      )
+      .catch(() => undefined);
+    return { id: destino.id, nombre: destino.nombre, activo };
   }
 }

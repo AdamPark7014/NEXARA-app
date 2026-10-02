@@ -20,6 +20,8 @@ export type PersonaEquipo = {
   departmentId: number | null;
   managerId: number | null;
   employeeNumber: string | null;
+  /** Dirección ve también a quien está desactivado. Sin el dato (API vieja) cuenta como activo. */
+  activo?: boolean;
 };
 
 export type ContextoAlta = {
@@ -211,6 +213,18 @@ export async function editarPersonaEquipo(token: string, userId: number, cambio:
   });
   if (!res.ok) throw new Error(await mensajeDeError(res, "No se pudo guardar el cambio."));
   return (await res.json()) as PersonaEditada;
+}
+
+/** Activa o desactiva un perfil (solo dirección). Desactivar no borra nada: se puede reactivar. */
+export async function cambiarActivoPersona(token: string, userId: number, activo: boolean): Promise<{ id: number; nombre: string; activo: boolean }> {
+  const res = await fetch(buildApiUrl(`users/delegated/${userId}/activo`), {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ activo }),
+  });
+  if (!res.ok) throw new Error(await mensajeDeError(res, "No se pudo cambiar el estado del perfil."));
+  return (await res.json()) as { id: number; nombre: string; activo: boolean };
 }
 
 // Sin 0/O, 1/l/I: se lee y se dicta sin confusiones.
