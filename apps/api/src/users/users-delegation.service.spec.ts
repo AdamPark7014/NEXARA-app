@@ -37,6 +37,7 @@ function crear(opts: { grants?: string | null; sinRol?: string; sinSubordinados?
     employeeNumber: data.employeeNumber,
   }));
   const log = jest.fn(async () => ({}));
+  const updateHrFields = jest.fn(async () => ({}));
   const prisma: any = {
     systemSetting: { findMany: jest.fn(async () => (opts.grants === null ? [] : [{ companyId: 7, value: opts.grants ?? GRANTS }])) },
     user: {
@@ -53,7 +54,7 @@ function crear(opts: { grants?: string | null; sinRol?: string; sinSubordinados?
     userProfile: { upsert: jest.fn(async (args: any) => args) },
     role: { findFirst: jest.fn(async ({ where }: any) => (where.orgRoleKey === opts.sinRol ? null : ROLES[where.orgRoleKey] ?? null)) },
   };
-  return { servicio: new UsersDelegationService(prisma, { create, update } as any, { log } as any), create, update, log, prisma };
+  return { servicio: new UsersDelegationService(prisma, { create, update, updateHrFields } as any, { log } as any), create, update, updateHrFields, log, prisma };
 }
 
 const alta = (roleKey: string, extra: Record<string, unknown> = {}) => ({
@@ -310,13 +311,65 @@ describe('UsersDelegationService.crear', () => {
 
     const christian = await servicio.contexto({ id: 1 }, 7);
     expect(christian.equipo).toEqual([
-      { id: 2, nombre: 'Antonio', avatarUrl: '/uploads/users/a.jpg', telefono: '5511111111', roleKey: 'ing_soporte', departmentId: 20, managerId: 1, employeeNumber: 'NX-2' },
-      { id: 3, nombre: 'David', avatarUrl: null, telefono: null, roleKey: 'coord_operaciones', departmentId: 30, managerId: 1, employeeNumber: null },
+      { id: 2, nombre: 'Antonio', avatarUrl: '/uploads/users/a.jpg', telefono: '5511111111', roleKey: 'ing_soporte', departmentId: 20, managerId: 1, employeeNumber: 'NX-2', activo: true },
+      { id: 3, nombre: 'David', avatarUrl: null, telefono: null, roleKey: 'coord_operaciones', departmentId: 30, managerId: 1, employeeNumber: null, activo: true },
     ]);
 
     const antonio = await servicio.contexto({ id: 2 }, 7);
     expect(antonio.equipo).toEqual([
-      { id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, telefono: null, roleKey: 'ing_soporte', departmentId: 20, managerId: 2, employeeNumber: null },
+      { id: 60, nombre: 'Reporta a Antonio', avatarUrl: null, telefono: null, roleKey: 'ing_soporte', departmentId: 20, managerId: 2, employeeNumber: null, activo: true },
     ]);
+  });
+});
+
+describe('UsersDelegationService.cambiarActivo', () => {
+  const destino = { id: 5, nombre: 'Carolina', email: 'carolina@nexara.com.mx', isActive: true };
+
+  it('dirección desactiva a alguien: usa updateHrFields (login, chat y acceso) y deja rastro', async () => {
+    const { servicio, prisma, updateHrFields, log } = crear();
+    prisma.user.findFirst.mockResolvedValue(destino);
+    const r = await servicio.cambiarActivo({ id: 1 }, 5, false, 7);
+    expect(updateHrFields).toHaveBeenCalledWith(5, { isActive: false }, 7);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_DEACTIVATED', entityId: 5 }), 1);
+    expect(r).toEqual({ id: 5, nombre: 'Carolina', activo: false });
+  });
+
+  it('dirección reactiva a quien estaba desactivado', async () => {
+    const { servicio, prisma, updateHrFields, log } = crear();
+    prisma.user.findFirst.mockResolvedValue({ ...destino, id: 6, isActive: false });
+    await servicio.cambiarActivo({ id: 1 }, 6, true, 7);
+    expect(updateHrFields).toHaveBeenCalledWith(6, { isActive: true }, 7);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_REACTIVATED' }), 1);
+  });
+
+  it('si ya está en ese estado no toca nada', async () => {
+    const { servicio, prisma, updateHrFields } = crear();
+    prisma.user.findFirst.mockResolvedValue(destino);
+    await servicio.cambiarActivo({ id: 1 }, 5, true, 7);
+    expect(updateHrFields).not.toHaveBeenCalled();
+  });
+
+  it('un encargado (Antonio) no puede: solo dirección', async () => {
+    const { servicio, updateHrFields } = crear();
+    await expect(servicio.cambiarActivo({ id: 2 }, 5, false, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(updateHrFields).not.toHaveBeenCalled();
+  });
+
+  it('nadie se desactiva a sí mismo', async () => {
+    const { servicio } = crear();
+    await expect(servicio.cambiarActivo({ id: 1 }, 1, false, 7)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('las cuentas del dueño y del developer no se tocan', async () => {
+    const { servicio, prisma, updateHrFields } = crear();
+    prisma.user.findFirst.mockResolvedValue({ id: 9, nombre: 'Dev', email: PLATFORM_DEVELOPER_EMAIL, isActive: true });
+    await expect(servicio.cambiarActivo({ id: 1 }, 9, false, 7)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(updateHrFields).not.toHaveBeenCalled();
+  });
+
+  it('alguien de otra empresa no existe para dirección', async () => {
+    const { servicio, prisma } = crear();
+    prisma.user.findFirst.mockResolvedValue(null);
+    await expect(servicio.cambiarActivo({ id: 1 }, 99, false, 7)).rejects.toBeInstanceOf(BadRequestException);
   });
 });

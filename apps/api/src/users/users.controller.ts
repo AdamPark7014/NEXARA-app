@@ -217,6 +217,24 @@ export class UsersController {
     };
   }
 
+  /**
+   * Activa o desactiva un perfil desde «Perfiles» — solo dirección. `{ activo: false }` corta el acceso
+   * (login y sesiones abiertas) y la asignación de trabajo sin borrar el historial; `{ activo: true }`
+   * lo regresa todo igual.
+   */
+  @Patch('delegated/:id/activo')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  async setDelegatedActivo(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { activo?: unknown },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    if (companyId == null) throw new BadRequestException('No se pudo determinar la empresa activa.');
+    if (typeof body?.activo !== 'boolean') throw new BadRequestException('Indica si el perfil queda activo o no.');
+    return this.delegation.cambiarActivo(user, id, body.activo, companyId);
+  }
+
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
