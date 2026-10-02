@@ -11,8 +11,10 @@
   align-self: stretch;
 }
 
-.shell {
-  /* Map chat chrome to ERP / AppShell tokens */
+/* Tokens del chat. Los modales (`.modalBackdrop`) cuelgan fuera de `.shell`: sin estos tokens el botón
+   «Crear» quedaba blanco sobre blanco (el fondo usa --nx-send) y los bordes desaparecían. */
+.shell,
+.modalBackdrop {
   --nx-accent: var(--panel-accent, var(--primary, #2563EB));
   --nx-accent-soft: color-mix(in srgb, var(--panel-accent, var(--primary, #2563EB)) 12%, transparent);
   --nx-send: var(--panel-accent, var(--primary, #2563EB));
@@ -25,7 +27,9 @@
   --nx-radius: var(--nx-panel-radius-sm, 12px);
   --nx-font: var(--nx-font-ui, "Inter Tight", "Manrope", ui-sans-serif, system-ui, sans-serif);
   --nx-font-body: var(--nx-font-body, "Manrope", ui-sans-serif, system-ui, sans-serif);
+}
 
+.shell {
   display: grid;
   grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
   /* Una fila del alto disponible: sin esto la fila crece con el contenido, las listas nunca hacen
@@ -1582,6 +1586,8 @@
   justify-content: center;
   padding: 12vh 16px 16px;
   animation: fadeIn 0.15s ease;
+  font-family: var(--nx-font);
+  color: var(--text-primary, #0f1c2e);
 }
 
 @keyframes fadeIn {
@@ -1794,6 +1800,64 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 4px;
+}
+
+.modalHint {
+  margin: -4px 0 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary, #667085);
+}
+
+.modalError {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--nx-danger);
+  background: color-mix(in srgb, var(--nx-danger) 10%, transparent);
+}
+
+/* Opción con casilla: la casilla es un control chico a la izquierda, no un input de ancho completo
+   (el estilo global de `input` le daba width:100% y alto de campo). */
+.optionRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--nx-line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.optionRow:hover {
+  background: var(--surface-2, #f4f6f8);
+}
+
+.optionRow input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--nx-accent);
+}
+
+.optionText {
+  display: grid;
+  gap: 2px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.optionText small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary, #667085);
 }
 
 .loadingLine {

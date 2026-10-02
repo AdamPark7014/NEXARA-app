@@ -460,6 +460,9 @@ export default function WorkspaceChat({
   const [showMembers, setShowMembers] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelPrivate, setNewChannelPrivate] = useState(false);
+  /** Errores del alta de canal van dentro del modal: antes salían detrás del fondo y parecía que no pasaba nada. */
+  const [newChannelError, setNewChannelError] = useState<string | null>(null);
+  const [creatingChannel, setCreatingChannel] = useState(false);
   const [colleagueQ, setColleagueQ] = useState("");
   const [colleagues, setColleagues] = useState<ChatUser[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState("");
@@ -1539,7 +1542,9 @@ export default function WorkspaceChat({
   };
 
   const createChannel = async () => {
-    if (!newChannelName.trim()) return;
+    if (!newChannelName.trim() || creatingChannel) return;
+    setCreatingChannel(true);
+    setNewChannelError(null);
     try {
       const ch = await apiFetch("chat/channels", token, {
         method: "POST",
@@ -1554,7 +1559,9 @@ export default function WorkspaceChat({
       await loadChannels();
       if (ch?.id) selectChannel(ch.id);
     } catch (e) {
-      setError(formatApiError(e, "No se pudo crear el canal"));
+      setNewChannelError(formatApiError(e, "No se pudo crear el canal"));
+    } finally {
+      setCreatingChannel(false);
     }
   };
 
@@ -2271,7 +2278,10 @@ export default function WorkspaceChat({
             )}
             <div className={styles.sectionLabel}>
               <span>Canales</span>
-              <button type="button" className={styles.sectionAction} title="Nuevo canal" aria-label="Crear canal" onClick={() => setShowNewChannel(true)}>
+              <button type="button" className={styles.sectionAction} title="Nuevo canal" aria-label="Crear canal" onClick={() => {
+                setNewChannelError(null);
+                setShowNewChannel(true);
+              }}>
                 +
               </button>
             </div>
@@ -3047,27 +3057,54 @@ export default function WorkspaceChat({
             <div className={styles.modalTitle} id="chat-modal-new-channel">
               Crear canal
             </div>
+            <p className={styles.modalHint}>
+              Un canal reúne a un equipo o a un tema. Los públicos los ve toda la empresa; los privados, solo quien
+              invites.
+            </p>
             <input
               className={styles.modalInput}
-              placeholder="nombre-del-canal"
+              placeholder="Nombre del canal, por ejemplo: operaciones"
+              aria-label="Nombre del canal"
               value={newChannelName}
-              onChange={(e) => setNewChannelName(e.target.value)}
+              onChange={(e) => {
+                setNewChannelName(e.target.value);
+                setNewChannelError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void createChannel();
+                }
+              }}
               autoFocus
             />
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 12 }}>
+            <label className={styles.optionRow}>
               <input
                 type="checkbox"
                 checked={newChannelPrivate}
                 onChange={(e) => setNewChannelPrivate(e.target.checked)}
               />
-              Canal privado
+              <span className={styles.optionText}>
+                Canal privado
+                <small>Solo lo ven y entran quienes invites.</small>
+              </span>
             </label>
+            {newChannelError ? (
+              <p className={styles.modalError} role="alert">
+                {newChannelError}
+              </p>
+            ) : null}
             <div className={styles.modalActions}>
               <button type="button" className={styles.actionBtn} onClick={() => setShowNewChannel(false)}>
                 Cancelar
               </button>
-              <button type="button" className={styles.sendBtn} onClick={() => void createChannel()}>
-                Crear
+              <button
+                type="button"
+                className={styles.sendBtn}
+                onClick={() => void createChannel()}
+                disabled={!newChannelName.trim() || creatingChannel}
+              >
+                {creatingChannel ? "Creando…" : "Crear canal"}
               </button>
             </div>
           </div>
