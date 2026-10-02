@@ -613,8 +613,10 @@ export default function TablaPartidas({
             const ultima = partidas[partidas.length - 1];
             if (ultima) enfocarCelda(ultima.key, "desc");
           }}
-          alAgregar={(p) => {
-            enfocar.current = { key: NUEVA, col: "desc" };
+          alAgregar={(p, opciones) => {
+            // Con Enter se sigue capturando en la fila nueva; si se agrega sola (porque se salió de
+            // la fila) el foco ya está donde la persona lo puso: no se le quita.
+            if (opciones?.conFoco !== false) enfocar.current = { key: NUEVA, col: "desc" };
             setPartidas((l) => [...l, p]);
           }}
         />
@@ -667,9 +669,10 @@ function FilaNueva({
   token: string | null;
   moneda: string;
   refDe: (key: string, col: Columna) => (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) => void;
-  alAgregar: (p: PartidaEditor) => void;
+  alAgregar: (p: PartidaEditor, opciones?: { conFoco?: boolean }) => void;
   alSubir: () => void;
 }) {
+  const fila = useRef<HTMLDivElement>(null);
   const [nombre, setNombre] = useState("");
   const [unidad, setUnidad] = useState("Pieza");
   const [cantidad, setCantidad] = useState(1);
@@ -715,7 +718,7 @@ function FilaNueva({
 
   const cantidadSana = Math.max(1, Math.round(Number.isFinite(cantidad) ? cantidad : 1));
 
-  const agregarLibre = () => {
+  const agregarLibre = (opciones?: { conFoco?: boolean }) => {
     if (!nombre.trim()) return;
     alAgregar(
       partidaNueva({
@@ -724,8 +727,24 @@ function FilaNueva({
         qty: cantidadSana,
         unitPrice: Math.max(0, Number.isFinite(precio) ? precio : 0),
       }),
+      opciones,
     );
     limpiar();
+  };
+
+  /**
+   * Lo escrito aquí se ve como una partida más (hasta enseña su total), pero solo cuenta en el
+   * subtotal y en el PDF cuando se agrega. Antes había que acordarse de dar Enter o «↵»: quien no
+   * lo hacía creía tenerla y no salía. Ahora se agrega sola al salir de la fila.
+   */
+  const alSalirDeLaFila = () => {
+    if (!nombre.trim()) return;
+    // Se mira ya asentado el foco: si sigue dentro de la fila (otra celda, el botón ↵, el catálogo o
+    // solo se cambió de ventana) todavía se está capturando.
+    setTimeout(() => {
+      if (fila.current?.contains(document.activeElement)) return;
+      agregarLibre({ conFoco: false });
+    }, 0);
   };
 
   const agregarOferta = (o: SmartOffer) => {
@@ -769,7 +788,7 @@ function FilaNueva({
   };
 
   return (
-    <div className={`${styles.fila} ${styles.filaNueva}`} role="row">
+    <div ref={fila} className={`${styles.fila} ${styles.filaNueva}`} role="row" onBlur={alSalirDeLaFila}>
       <span role="cell" className={styles.celdaIndice} aria-hidden data-area="idx">
         {numero}
       </span>
@@ -872,8 +891,8 @@ function FilaNueva({
       <span role="cell" className={styles.celdaMenu} data-area="menu">
         <button
           type="button"
-          className={styles.menuFilaBtn}
-          onClick={agregarLibre}
+          className={`${styles.menuFilaBtn} ${nombre.trim() ? styles.menuFilaPendiente : ""}`}
+          onClick={() => agregarLibre()}
           disabled={!nombre.trim()}
           aria-label="Agregar la partida"
           title="Agregar (Enter)"
