@@ -1,8 +1,37 @@
 # RELEVO
 
-- **Último turno:** cursor
-- **Fecha:** 2026-10-02
-- **Hecho y DESPLEGADO (HEAD `00babcee`, migración `20261003010000_guardias` aplicada):**
+- **Último turno:** claude-code
+- **Fecha:** 2026-10-02 (noche)
+- **Revisé el turno de Cursor:** reglas respetadas (solo `main`, trailer, árbol limpio, RELEVO al día,
+  `tsc` 0, producción en el commit declarado). Única desviación: eligió la dirección A del chat sin
+  esperar a Adam; Adam ya lo vio y siguió, se queda. En el servidor quedó un cambio sin commitear de
+  Cursor en `deploy/docker/Dockerfile.web` (CACHEBUST fijo) y archivos sueltos (`" 2"`, `*.bak-recordarme-*`):
+  **no los toqué**.
+- **Hecho (este turno, desplegado sin migraciones):** los 8 hallazgos de seguridad que quedaron abiertos
+  del paquete de 6 agentes:
+  - `7ca4ff7a` fotos de evidencia por campos: subir/quitar exige asignado vigente, responsable o
+    EVIDENCES_REVIEW; la congelación la decide la evidencia de **quien subió** la foto. Pausar acota el
+    padrón a la empresa; `tenant()` de sesiones falla cerrado; abrir/terminar reciben companyId; el cron
+    de alertas lee sesiones por empresa.
+  - `c5b457e2` códigos de barras: actividad ligada a un movimiento debe ser del tenant; DTOs reales con
+    class-validator; el inventario/escáner de herramientas **ya no escribe en GET** — los códigos
+    pendientes se completan con `POST tool-requests/inventory/codigos/completar` (TOOLS_MANAGE). En
+    producción hay 3 herramientas y 1 sin código.
+  - `acd5ff8e` clientes/proyectos: reutilizar un cliente por nombre en el alta rápida exige poder abrir
+    su ficha (si no, 403 «Ya existe un cliente con ese nombre… pide a coordinación…»); sumar tipos o
+    rellenar datos exige gestionar el padrón. Proyectos: alta rápida exige ver al cliente y, si no es
+    PROYECTO, las reglas de `addClientSector`. Regla única en `ventas/client-access.ts`. Con los roles
+    reales solo puede frenar a José Antonio (`enc_soporte`) con un prospecto comercial ajeno.
+  - `fdbca24a` **Etapa 4 del rediseño**: `ModulePage`, `FormPage`, `RecordPage` en `components/base`,
+    `DataTable` con `rowActions`, selección y celdas `PersonCell/ProgressCell/StatusCell/WhenCell`
+    (API previa intacta). Aún no las usa ninguna página.
+  - Pruebas: API 271 suites / 3,364 (la única falla en corrida completa es el tope de 5 s de
+    `propuesta-vista-previa.spec.ts`; sola pasa 8/8); web 107 / 941; `tsc` API y web 0.
+- **EN CURSO (sin commitear, agentes):** Etapa 5 por módulo en web (pizarra/mis actividades; detalle y
+  alta de actividad; cotizaciones; almacén+herramientas; asistencias; clientes+proyectos) y Etapa 6 en
+  apps (Android a medias por un agente que se cortó; iOS sin empezar). Si entras y ves esos archivos
+  sucios, son de esos agentes: `relevo.ps1 salvar` y no los reescribas.
+- **Turno anterior (cursor) — Hecho y DESPLEGADO (HEAD `00babcee`, migración `20261003010000_guardias` aplicada):**
   - `f3d33c8c` **Sugerencia de nómina** (pestaña en Pagos a empleados, `GET employee-payments/sugerencia-nomina`,
     solo lectura). Divisor = horario de cada persona (40 h oficina; 48 h sin horario fijo): **Adam lo aprobó así**.
   - `93f6d593` **Guardias de fin de semana**: sáb/dom solo checa entrada quien tiene guardia (422 +
