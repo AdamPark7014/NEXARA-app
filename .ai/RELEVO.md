@@ -1,5 +1,16 @@
 # RELEVO
 
+- **03-10 ~10:00 (claude-code):** `50e9b8cc` («Recordarme») **desplegado y verificado** (API/web sanas).
+  **Chat purgado en producción a pedido de Adam** («como si nunca hubiéramos mandado ningún mensaje»):
+  borrados 63 mensajes (y sus 312 lecturas), 157 notificaciones del chat (`category='chat'` o
+  `entityType='chat_message'`) y 16 conversaciones directas (se vuelven a crear solas al escribir);
+  los 6 canales restantes (#general, #anuncios, #operaciones, «Actividades» y 2 de la empresa 2) quedan
+  sin último mensaje ni marcas de leído. Adjuntos de `uploads/chat` (5) movidos al respaldo.
+  **Respaldo verificado fila por fila** en el servidor: `/root/respaldos/chat-purga-20261003/`
+  (`chat-tablas.sql` data-only —restaurar con `--disable-triggers` por la FK circular de hilos—,
+  `notificaciones-chat.csv`, `uploads-chat/`). Ojo al scriptar por SSH: `docker exec -i … psql` dentro
+  de `bash -s <<EOF` se come el resto del script por stdin (usar `</dev/null`).
+
 - **03-10 09:45 (claude-code):** el deploy del rediseño (`c85edb8b`) **sí quedó en producción** (web y API
   reiniciadas, mapa de cobertura nuevo responde 200). Después:
   - **«Recordarme» no duraba**: el login sí pedía y recibía la sesión de 30 días, pero al recargar,
