@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// Almacén (`/erp/almacen`) en iPhone, **solo consulta**.
+/// Almacén (`/erp/almacen`) en iPhone: consulta de existencias y, arriba, el escáner de
+/// códigos de barras (`EscanerDeAlmacen`) para buscar un producto y registrar entradas o
+/// salidas con permiso de inventario.
 ///
 /// La tabla de la web tiene nueve columnas: producto, SKU, almacén, ubicación,
 /// cantidad, reservado, disponible, punto de reorden y costo. En un teléfono eso
@@ -66,6 +68,8 @@ struct AlmacenView: View {
 
     var body: some View {
         List {
+            EscanerDeAlmacen(onMovimiento: { Task { await cargar() } })
+
             Section {
                 Picker("Vista", selection: $vista) {
                     ForEach(Vista.allCases) { Text($0.rawValue).tag($0) }
@@ -114,7 +118,8 @@ struct AlmacenView: View {
 
             Section {
                 CoreExtrasNotaDeAlcance(
-                    texto: "Consulta. Entradas, salidas y traspasos de inventario se hacen desde la computadora."
+                    texto: "Con el escáner se consultan productos y se registran entradas y salidas (si tu usuario "
+                        + "puede mover inventario). Traspasos, ajustes y costos se hacen desde la computadora."
                 )
             }
         }

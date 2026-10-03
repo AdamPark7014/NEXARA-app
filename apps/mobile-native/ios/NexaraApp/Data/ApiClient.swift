@@ -190,6 +190,20 @@ final class ApiClient {
             || path.hasPrefix("auth/")
             || path.hasPrefix("portal/login")
             || path.hasPrefix("devices/push-token")
+            || isOnlineOnly(path: path)
+    }
+
+    /// Mutaciones que solo valen en el momento (paridad con `SOLO_EN_LINEA` de Android):
+    /// pausar o reanudar el reloj, y lo que se registra con el escáner. Reenviadas horas
+    /// después cambiarían la hora real o moverían inventario sobre un estado que ya no existe.
+    private static func isOnlineOnly(path: String) -> Bool {
+        if path.hasSuffix("/pausar") || path.hasSuffix("/reanudar") || path.hasSuffix("/por-codigo") {
+            return true
+        }
+        if path.hasPrefix("tool-requests/") {
+            return path.hasSuffix("/deliver") || path.hasSuffix("/return")
+        }
+        return false
     }
 
     /// Ruta de la petición sin el prefijo del API (`/api`), en minúsculas y sin barras en los bordes.

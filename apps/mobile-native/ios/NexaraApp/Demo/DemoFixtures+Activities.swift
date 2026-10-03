@@ -241,6 +241,7 @@ extension DemoStore {
             "fechaInicio": iso(a.startMin),
         ])
         if let state { json["evidenceStatus"] = state.status }
+        json.merge(sesionJSON(a)) { _, sesion in sesion }
         return json
     }
 
@@ -280,6 +281,8 @@ extension DemoStore {
             "openActivities": openJSON,
             "enEsperaAprobacion": waiting,
             "enCorreccion": fixing,
+            // La cuenta demo es la dirección: puede pausarle el reloj a cualquiera menos a sí misma.
+            "puedePausar": p.id != DemoMode.meId,
         ])
         if let clockInDate {
             json["clockInAt"] = DemoClock.iso(clockInDate)
@@ -403,6 +406,7 @@ extension DemoStore {
             json["ordenActualizadoAt"] = iso(-1)
         }
         if let fin = a.finMin { json["fechaFinalizacion"] = iso(fin) }
+        json.merge(sesionJSON(a)) { _, sesion in sesion }
         return json
     }
 
@@ -457,13 +461,15 @@ extension DemoStore {
                 "indicaciones": a.indicaciones,
             ]))
         }
-        assignees.append(dj([
+        var filaEjecutor = dj([
             "userId": owner.id,
             "user": dj(["id": owner.id, "nombre": owner.nombre]),
             "rol": "EJECUTOR",
             "asignadoPorId": isDispatch ? responsable.id : creator.id,
             "indicaciones": a.indicaciones,
-        ]))
+        ])
+        filaEjecutor.merge(sesionJSON(a)) { _, sesion in sesion }
+        assignees.append(filaEjecutor)
         var json = dj([
             "id": a.id,
             "anNumber": a.folio,

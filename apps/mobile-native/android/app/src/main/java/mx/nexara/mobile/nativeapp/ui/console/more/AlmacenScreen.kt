@@ -33,7 +33,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.fg
 
 /**
- * Almacén (`/erp/almacen`) en el teléfono, **solo consulta**.
+ * Almacén (`/erp/almacen`) en el teléfono: consulta y, arriba, el escáner de
+ * códigos ([EscanerDeAlmacen]) para buscar un producto y registrar entradas y salidas.
  *
  * La tabla de la web tiene nueve columnas: producto, SKU, almacén, ubicación,
  * cantidad, reservado, disponible, punto de reorden y costo. En un teléfono eso
@@ -71,6 +72,8 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            item(key = "escaner") { EscanerDeAlmacen(onMovimiento = vm::refrescar) }
+
             item(key = "vistas") {
                 MoreFilaDePastillas(
                     AlmacenRules.Vista.entries.map { opcion ->

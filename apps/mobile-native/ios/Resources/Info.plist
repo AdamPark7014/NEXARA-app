@@ -40,7 +40,7 @@
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Mientras tu jornada esté abierta, NEXARA comparte tu ubicación con tu encargado, aunque la app esté cerrada. Se detiene al marcar tu salida.</string>
     <key>NSCameraUsageDescription</key>
-    <string>NEXARA usa la cámara para tomar las fotos de evidencia de tu trabajo (entrada, salida y actividades) y adjuntarlas a tu jornada.</string>
+    <string>NEXARA usa la cámara para tomar las fotos de evidencia de tu trabajo (entrada, salida y actividades) y adjuntarlas a tu jornada, y para leer códigos de barras de productos y herramientas en el almacén.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>NEXARA accede a tus fotos solo para que elijas las imágenes que adjuntas como evidencia del trabajo (actividades, tickets y comprobantes).</string>
     <key>NSPhotoLibraryAddUsageDescription</key>

@@ -338,6 +338,6 @@ object HerramientasRules {
 
     /** Lo que esta pantalla no hace, dicho al pie sin mandar a nadie al navegador. */
     const val LIMITE: String =
-        "Consulta y prórrogas. Pedir una herramienta prestada, aprobar, entregar y recibir se " +
-            "hacen desde almacén: el servidor solo se lo permite a quien lleva el inventario."
+        "Consulta, prórrogas y escáner de etiquetas. Entregar y recibir con el escáner solo lo " +
+            "puede quien lleva el inventario; pedir una herramienta prestada y aprobar se hacen desde almacén."
 }

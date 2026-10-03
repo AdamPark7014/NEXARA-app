@@ -108,6 +108,8 @@ fun HerramientasScreen(vm: HerramientasViewModel = viewModel()) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            item(key = "escaner") { EscanerDeHerramientas(onMovimiento = vm::refrescar) }
+
             item(key = "vistas") {
                 MoreFilaDePastillas(
                     HerramientasRules.Vista.entries.map { opcion ->

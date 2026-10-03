@@ -30,6 +30,18 @@ enum ChecadaRechazo {
             || t.contains("ubicación vieja") || t.contains("ubicacion vieja")
             || t.contains("distancia imposible")
             || t.contains("app nexara")
+            || esFinDeSemanaSinGuardia(t)
+    }
+
+    /// Para rechazos que la app todavía no conoce: no se culpa al GPS sin saberlo.
+    static let ayudaGenerica =
+        "Tu checada no se registró. Lee el motivo de arriba; si crees que es un error, "
+        + "avisa a tu jefe para que la revise."
+
+    /// Sábado y domingo el servidor solo deja checar a quien tiene guardia; la app no
+    /// bloquea el día por su cuenta, manda la checada y explica el 422.
+    private static func esFinDeSemanaSinGuardia(_ t: String) -> Bool {
+        t.contains("fin de semana") || t.contains("guardia")
     }
 
     /// Qué tiene que hacer para poder checar, según el motivo.
@@ -47,6 +59,13 @@ enum ChecadaRechazo {
             return "Las checadas solo se registran desde esta app. Si no puedes usar tu teléfono, "
                 + "tu jefe puede registrarla por ti."
         }
-        return mockAyuda
+        if esFinDeSemanaSinGuardia(t) {
+            return "Sábado y domingo solo checa quien tiene guardia ese día. Si hoy te toca trabajar, "
+                + "pídele a tu encargado que te programe la guardia y vuelve a intentarlo."
+        }
+        if t.isEmpty || t.contains("simulada") || t.contains("gps falso") {
+            return mockAyuda
+        }
+        return ayudaGenerica
     }
 }

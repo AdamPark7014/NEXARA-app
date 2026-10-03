@@ -32,4 +32,21 @@ class OfflineQueueRulesTest {
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/aceptar", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/rechazar", "POST"))
     }
+
+    @Test
+    fun `pausar y reanudar el reloj solo en linea`() {
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/pausar", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/reanudar", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/board/4/activities/9/pausar", "POST"))
+    }
+
+    @Test
+    fun `escaner de almacen y herramientas solo en linea`() {
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/stock/movements/por-codigo", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/stock/products/por-codigo", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/tool-requests/7/deliver", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/tool-requests/7/return", "POST"))
+        // La prórroga del propio préstamo sí se encola.
+        assertTrue(OfflineHttpInterceptor.isQueueable("$base/tool-requests/7/renewal-request", "POST"))
+    }
 }

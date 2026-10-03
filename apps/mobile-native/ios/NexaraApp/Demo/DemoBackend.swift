@@ -87,6 +87,7 @@ extension DemoStore {
         case "activities":
             return routeActivities(method: method, parts: parts, json: json)
         case "activity-evidence":
+            if !isGet, let id = intAt(parts, 1) { reanudarPorEvidencia(id, now: now) }
             return routeEvidence(method: method, parts: parts, json: json, now: now)
         case "attendance":
             return routeAttendance(method: method, parts: parts, query: query, json: json, now: now)
@@ -114,7 +115,15 @@ extension DemoStore {
         case "stock":
             if isGet, parts.count >= 2, parts[1] == "levels" { return reply(fxStockLevels()) }
             if isGet, parts.count >= 3, parts[1] == "alerts" { return reply(fxLowStock()) }
+            if let escaneo = routeStockEscaneo(method: method, parts: parts, query: query, json: json) {
+                return reply(escaneo.payload, status: escaneo.status)
+            }
             return isGet ? reply([DemoJSON]()) : empty()
+        case "warehouse":
+            return isGet ? reply(fxAlmacenes()) : empty()
+        case "tool-requests":
+            let respuesta = routeHerramientas(method: method, parts: parts, query: query, json: json)
+            return reply(respuesta.payload, status: respuesta.status)
         case "users":
             return routeUsers(method: method, parts: parts, json: json)
         case "integra":
@@ -140,6 +149,12 @@ extension DemoStore {
         case "board":
             if let id = intAt(parts, 2) {
                 if parts.count >= 4, parts[3] == "history" { return reply(fxBoardHistory(personId: id)) }
+                // me/board/:userId/activities/:id/pausar
+                if method == "POST", parts.count >= 6, parts[3] == "activities", parts[5] == "pausar",
+                   let activityId = intAt(parts, 4) {
+                    let respuesta = routePausaDeEquipo(activityId: activityId, json: json, now: now)
+                    return reply(respuesta.payload, status: respuesta.status)
+                }
                 return reply(boardUserJSON(DemoData.person(id), now: now))
             }
             return reply(fxBoard(now: now))
@@ -179,6 +194,9 @@ extension DemoStore {
         case "iniciar":
             startedAt[id] = now
             return reply(dj(["ok": true, "inicioRealAt": DemoClock.iso(now)]))
+        case "pausar", "reanudar":
+            let respuesta = routeSesionPropia(action: action, activityId: id, json: json, now: now)
+            return reply(respuesta.payload, status: respuesta.status)
         case "herramientas":
             return reply(dj([
                 "activityId": id, "requisitos": [DemoJSON](), "total": 0, "listos": 0,

@@ -24,7 +24,9 @@ struct CoreExtraDestination: View {
             AlmacenView()
         case .viaticos:
             ViaticosView()
-        case .executive, .cotizaciones, .herramientas, .gastos, .aprobaciones, .pagosEmpleados, .documentos:
+        case .herramientas:
+            HerramientasView()
+        case .executive, .cotizaciones, .gastos, .aprobaciones, .pagosEmpleados, .documentos:
             // Sin pantalla propia todavía; van en otra ola.
             CoreModulePlaceholderView(module: module)
         }
@@ -34,9 +36,9 @@ struct CoreExtraDestination: View {
     /// antes de que se toque, de cuáles siguen sacando al navegador.
     static func tienePantallaNativa(_ module: CoreExtraModule) -> Bool {
         switch module {
-        case .vehiculos, .kpisEquipo, .proyectos, .almacen, .viaticos:
+        case .vehiculos, .kpisEquipo, .proyectos, .almacen, .viaticos, .herramientas:
             return true
-        case .executive, .cotizaciones, .herramientas, .gastos, .aprobaciones, .pagosEmpleados, .documentos:
+        case .executive, .cotizaciones, .gastos, .aprobaciones, .pagosEmpleados, .documentos:
             return false
         }
     }
