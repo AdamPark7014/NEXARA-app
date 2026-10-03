@@ -2,6 +2,26 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import TrafficOutlinedIcon from "@mui/icons-material/TrafficOutlined";
+import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  DateInput,
+  Field,
+  FieldGrid,
+  Input,
+  RecordSection,
+  Select,
+  Stat,
+  StatRow,
+  Textarea,
+  type Semaforo,
+} from "@/components/base";
 import { listarCotizaciones, type CotizacionRow } from "@/lib/cotizaciones-api";
 import {
   SALUD_TONO,
@@ -15,9 +35,9 @@ import { leerImporte } from "@/lib/proyecto-alta";
 import { SERVICE_PROJECT_TYPE_OPTIONS, getServiceProjectTypeLabel } from "@/lib/service-project-types";
 import { guardarCabecera } from "./acciones";
 import { PersonaSelect } from "./personas";
-import { claseTono } from "./tono";
+import { toneDe } from "./tono";
 import type { SeccionProps } from "./tipos";
-import styles from "../proyectos.module.css";
+import styles from "./secciones.module.css";
 
 type FormCabecera = {
   title: string;
@@ -98,6 +118,14 @@ function cambiosDe(p: ProyectoDetalle, f: FormCabecera): { cambios: ActualizarPr
   return { cambios, errores };
 }
 
+/** El tono del semáforo del proyecto en el foquito de la cifra. */
+function semaforoDe(tono: ReturnType<typeof toneDe>): Semaforo {
+  if (tono === "success") return "verde";
+  if (tono === "warning") return "ambar";
+  if (tono === "danger") return "rojo";
+  return "gris";
+}
+
 function diferencia(plan?: string | null, real?: string | null, verbo = "llegó"): string {
   const d = diasEntre(plan, real);
   if (d === null) return "";
@@ -166,87 +194,70 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
         ? `Faltan ${r.diasRestantes} día${r.diasRestantes === 1 ? "" : "s"}`
         : "";
 
+  const tonoSalud = toneDe(SALUD_TONO[r.salud]);
+
   return (
-    <div className={styles.gantt} style={{ gap: 12 }}>
-      <div className={styles.cards}>
-        <section className={styles.panel} aria-labelledby="res-avance">
-          <h3 id="res-avance" className={styles.panelTitle}>
-            Avance
-          </h3>
-          <span className={styles.bigNumber}>{avance.porcentaje === null ? "—" : `${avance.porcentaje} %`}</span>
-          <div
-            className={styles.progress}
-            role="progressbar"
-            aria-label="Avance del proyecto"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={avance.porcentaje ?? undefined}
-            aria-valuetext={avance.porcentaje === null ? "Sin datos" : `${avance.porcentaje} %`}
-          >
-            <div className={styles.progressFill} style={{ width: `${avance.porcentaje ?? 0}%` }} />
-          </div>
-          <span className={styles.rowWrap}>{textoAvance}</span>
-        </section>
-
-        <section className={styles.panel} aria-labelledby="res-salud">
-          <h3 id="res-salud" className={styles.panelTitle}>
-            Semáforo
-          </h3>
-          <span className={claseTono(SALUD_TONO[r.salud] ?? "neutral")} style={{ alignSelf: "flex-start" }}>
-            {r.etiqueta}
-          </span>
-          <p className={styles.texto}>{r.motivo}</p>
-          {r.hitosVencidos > 0 ? (
-            <span className={`${styles.rowWrap} ${styles.vencido}`}>
-              {r.hitosVencidos} etapa{r.hitosVencidos === 1 ? "" : "s"} con la fecha vencida
-            </span>
-          ) : null}
-        </section>
-
-        <section className={styles.panel} aria-labelledby="res-req">
-          <h3 id="res-req" className={styles.panelTitle}>
-            Requerimientos
-          </h3>
-          <span className={styles.bigNumber}>
-            {r.requerimientos.total ? `${r.requerimientos.cumplidos} / ${r.requerimientos.total}` : "—"}
-          </span>
-          <span className={styles.rowWrap}>
-            {r.requerimientos.total
+    <div className={styles.pila}>
+      <StatRow cols={4} variant="strip" ariaLabel="Cómo va el proyecto">
+        <Stat
+          label="Avance"
+          value={avance.porcentaje === null ? "—" : avance.porcentaje}
+          suffix={avance.porcentaje === null ? undefined : "%"}
+          hint={textoAvance}
+          icon={<TrendingUpRoundedIcon />}
+          meter={avance.porcentaje === null ? undefined : [{ value: avance.porcentaje, tone: avance.porcentaje >= 100 ? "success" : "brand" }]}
+          meterMax={100}
+        />
+        <Stat
+          label="Semáforo"
+          value={r.etiqueta}
+          hint={r.hitosVencidos > 0 ? `${r.hitosVencidos} etapa${r.hitosVencidos === 1 ? "" : "s"} con la fecha vencida` : r.motivo}
+          icon={<TrafficOutlinedIcon />}
+          iconTone={tonoSalud}
+          semaforo={semaforoDe(tonoSalud)}
+          title={r.motivo}
+        />
+        <Stat
+          label="Requerimientos"
+          value={r.requerimientos.total ? `${r.requerimientos.cumplidos} / ${r.requerimientos.total}` : "—"}
+          hint={
+            r.requerimientos.total
               ? r.requerimientos.pendientes
                 ? `Faltan ${r.requerimientos.pendientes} para poder entregar sin pendientes`
                 : "Todo listo"
-              : "Sin requerimientos capturados"}
-          </span>
-        </section>
+              : "Sin requerimientos capturados"
+          }
+          icon={<ChecklistRoundedIcon />}
+          tone={r.requerimientos.pendientes ? "warning" : "default"}
+        />
+        <Stat
+          label="Presupuesto"
+          value={p.budgetAmount == null ? "Sin capturar" : formatoMoneda(p.budgetAmount, p.currency ?? "MXN")}
+          hint={
+            p.cotizacion ? (
+              <>
+                Cotización{" "}
+                <Link className={styles.enlace} href={`/erp/cotizaciones/${p.cotizacion.id}`}>
+                  {p.cotizacion.folioEnviado || p.cotizacion.quoteNumber}
+                </Link>
+                {p.cotizacion.total != null ? ` · ${formatoMoneda(p.cotizacion.total, p.cotizacion.currency ?? "MXN")}` : ""}
+              </>
+            ) : (
+              "Sin cotización ligada"
+            )
+          }
+          icon={<PaymentsOutlinedIcon />}
+        />
+      </StatRow>
 
-        <section className={styles.panel} aria-labelledby="res-dinero">
-          <h3 id="res-dinero" className={styles.panelTitle}>
-            Presupuesto
-          </h3>
-          <span className={styles.bigNumber} style={{ fontSize: "1.25rem" }}>
-            {p.budgetAmount == null ? "Sin capturar" : formatoMoneda(p.budgetAmount, p.currency ?? "MXN")}
-          </span>
-          {p.cotizacion ? (
-            <span className={styles.rowWrap}>
-              Cotización{" "}
-              <Link href={`/erp/cotizaciones/${p.cotizacion.id}`}>{p.cotizacion.folioEnviado || p.cotizacion.quoteNumber}</Link>
-              {p.cotizacion.total != null ? ` · ${formatoMoneda(p.cotizacion.total, p.cotizacion.currency ?? "MXN")}` : ""}
-            </span>
-          ) : (
-            <span className={styles.rowWrap}>Sin cotización ligada</span>
-          )}
-        </section>
-      </div>
-
-      <section className={styles.panel} aria-labelledby="res-fechas">
-        <h3 id="res-fechas" className={styles.panelTitle}>
-          Fechas: plan contra realidad
-        </h3>
-        <div style={{ overflowX: "auto" }}>
-          <table className={styles.fechas}>
+      <RecordSection title="Fechas: plan contra realidad">
+        <div className={styles.tablaMarco}>
+          <table className={styles.tablaFechas}>
             <thead>
               <tr>
-                <th scope="col"> </th>
+                <th scope="col">
+                  <span className="ui-sr-only">Fecha</span>
+                </th>
                 <th scope="col">Planeado</th>
                 <th scope="col">Real</th>
                 <th scope="col">Cómo va</th>
@@ -268,123 +279,110 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
             </tbody>
           </table>
         </div>
-      </section>
+      </RecordSection>
 
       {p.status === "CANCELLED" && p.cancelReason ? (
-        <section className={styles.errorBox} aria-label="Motivo de cancelación">
-          <strong>Cancelado:</strong> {p.cancelReason}
+        <section aria-label="Motivo de cancelación">
+          <Alert tone="neutral" title="Cancelado:">
+            {" "}
+            {p.cancelReason}
+          </Alert>
         </section>
       ) : null}
 
       {!editando ? (
-        <section className={styles.panel} aria-labelledby="res-datos">
-          <div className={styles.panelHead}>
-            <h3 id="res-datos" className={styles.panelTitle}>
-              Datos del proyecto
-            </h3>
-            <button type="button" className={styles.smallBtn} onClick={() => setEditando(true)} disabled={ocupado}>
+        <RecordSection
+          title="Datos del proyecto"
+          end={
+            <Button size="sm" onClick={() => setEditando(true)} disabled={ocupado} iconStart={<EditOutlinedIcon />}>
               Editar datos
-            </button>
-          </div>
-          <div className={styles.cards}>
-            <div className={styles.itemMain}>
-              <span className={styles.fieldLabel}>Cliente</span>
-              <span className={styles.itemTitle}>{p.client?.name ?? "—"}</span>
-              {p.client?.contactEmail || p.client?.contactPhone ? (
-                <span className={styles.rowWrap}>
-                  {[p.client.contactEmail, p.client.contactPhone].filter(Boolean).join(" · ")}
-                </span>
+            </Button>
+          }
+        >
+          <div className={styles.pila}>
+            <dl className={styles.datos}>
+              <div className={styles.dato}>
+                <dt>Cliente</dt>
+                <dd>
+                  {p.client?.name ?? "—"}
+                  {p.client?.contactEmail || p.client?.contactPhone ? (
+                    <span className={styles.datoSub}>{[p.client.contactEmail, p.client.contactPhone].filter(Boolean).join(" · ")}</span>
+                  ) : null}
+                </dd>
+              </div>
+              <div className={styles.dato}>
+                <dt>Tipo y sitios</dt>
+                <dd>
+                  {getServiceProjectTypeLabel(p.projectType)}
+                  <span className={styles.datoSub}>
+                    {p.siteCount != null ? `${p.siteCount} sitio${p.siteCount === 1 ? "" : "s"}` : "Sitios sin capturar"}
+                  </span>
+                </dd>
+              </div>
+              <div className={styles.dato}>
+                <dt>Responsable</dt>
+                <dd>
+                  {p.responsable?.nombre ?? "Sin asignar"}
+                  {p.vendor ? <span className={styles.datoSub}>Lo vendió: {p.vendor.nombre}</span> : null}
+                </dd>
+              </div>
+              {p.salesProject ? (
+                <div className={styles.dato}>
+                  <dt>Proyecto comercial</dt>
+                  <dd>{p.salesProject.name}</dd>
+                </div>
               ) : null}
-            </div>
-            <div className={styles.itemMain}>
-              <span className={styles.fieldLabel}>Tipo y sitios</span>
-              <span className={styles.itemTitle}>{getServiceProjectTypeLabel(p.projectType)}</span>
-              <span className={styles.rowWrap}>
-                {p.siteCount != null ? `${p.siteCount} sitio${p.siteCount === 1 ? "" : "s"}` : "Sitios sin capturar"}
-              </span>
-            </div>
-            <div className={styles.itemMain}>
-              <span className={styles.fieldLabel}>Responsable</span>
-              <span className={styles.itemTitle}>{p.responsable?.nombre ?? "Sin asignar"}</span>
-              {p.vendor ? <span className={styles.rowWrap}>Lo vendió: {p.vendor.nombre}</span> : null}
-            </div>
-            {p.salesProject ? (
-              <div className={styles.itemMain}>
-                <span className={styles.fieldLabel}>Proyecto comercial</span>
-                <span className={styles.itemTitle}>{p.salesProject.name}</span>
+            </dl>
+            {p.objective ? (
+              <div className={styles.bloque}>
+                <span className={styles.bloqueEtiqueta}>Objetivo</span>
+                <p className={styles.texto}>{p.objective}</p>
               </div>
             ) : null}
+            {p.description ? (
+              <div className={styles.bloque}>
+                <span className={styles.bloqueEtiqueta}>Descripción</span>
+                <p className={styles.texto}>{p.description}</p>
+              </div>
+            ) : null}
+            {p.scopeSummary ? (
+              <div className={styles.bloque}>
+                <span className={styles.bloqueEtiqueta}>El alcance en una frase</span>
+                <p className={styles.texto}>{p.scopeSummary}</p>
+              </div>
+            ) : null}
+            {!p.objective && !p.description ? (
+              <p className={styles.ayuda}>
+                <Badge tone="warning" size="sm">
+                  Pendiente
+                </Badge>{" "}
+                Falta el objetivo y la descripción: con «Editar datos» los agregas.
+              </p>
+            ) : null}
           </div>
-          {p.objective ? (
-            <div>
-              <span className={styles.fieldLabel}>Objetivo</span>
-              <p className={styles.texto}>{p.objective}</p>
-            </div>
-          ) : null}
-          {p.description ? (
-            <div>
-              <span className={styles.fieldLabel}>Descripción</span>
-              <p className={styles.texto}>{p.description}</p>
-            </div>
-          ) : null}
-          {p.scopeSummary ? (
-            <div>
-              <span className={styles.fieldLabel}>El alcance en una frase</span>
-              <p className={styles.texto}>{p.scopeSummary}</p>
-            </div>
-          ) : null}
-          {!p.objective && !p.description ? (
-            <p className={styles.hint}>Falta el objetivo y la descripción: con «Editar datos» los agregas.</p>
-          ) : null}
-        </section>
+        </RecordSection>
       ) : (
-        <form className={styles.panel} onSubmit={guardar} aria-labelledby="res-editar" noValidate>
-          <h3 id="res-editar" className={styles.panelTitle}>
+        <form className={styles.alta} onSubmit={guardar} aria-labelledby="res-editar" noValidate>
+          <h3 id="res-editar" className={styles.altaTitulo}>
             Editar datos del proyecto
           </h3>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="ed-titulo">
-              Nombre del proyecto
-            </label>
-            <input
-              id="ed-titulo"
-              className={styles.input}
-              value={f.title}
-              maxLength={220}
-              onChange={(e) => cambiar("title", e.target.value)}
-            />
-          </div>
-          <div className={styles.grid3}>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-tipo">
-                Tipo de proyecto
-              </label>
-              <select id="ed-tipo" className={styles.select} value={f.projectType} onChange={(e) => cambiar("projectType", e.target.value)}>
+          <FieldGrid columns={3}>
+            <Field label="Nombre del proyecto" fullWidth>
+              <Input id="ed-titulo" value={f.title} maxLength={220} onChange={(e) => cambiar("title", e.target.value)} />
+            </Field>
+            <Field label="Tipo de proyecto">
+              <Select id="ed-tipo" value={f.projectType} onChange={(e) => cambiar("projectType", e.target.value)}>
                 {SERVICE_PROJECT_TYPE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-sitios">
-                Sitios
-              </label>
-              <input
-                id="ed-sitios"
-                className={styles.input}
-                type="number"
-                min={0}
-                step={1}
-                value={f.siteCount}
-                onChange={(e) => cambiar("siteCount", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-resp">
-                Responsable
-              </label>
+              </Select>
+            </Field>
+            <Field label="Sitios">
+              <Input id="ed-sitios" type="number" min={0} step={1} value={f.siteCount} onChange={(e) => cambiar("siteCount", e.target.value)} />
+            </Field>
+            <Field label="Responsable">
               <PersonaSelect
                 id="ed-resp"
                 value={f.responsableId}
@@ -392,56 +390,34 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
                 personas={personas}
                 vacio={f.responsableId ? null : "Sin asignar"}
               />
-            </div>
-          </div>
-          <div className={styles.grid2}>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-inicio">
-                Inicio planeado
-              </label>
-              <input id="ed-inicio" className={styles.input} type="date" value={f.startDate} onChange={(e) => cambiar("startDate", e.target.value)} />
-            </div>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-fin">
-                Fin planeado
-              </label>
-              <input id="ed-fin" className={styles.input} type="date" value={f.endDate} min={f.startDate || undefined} onChange={(e) => cambiar("endDate", e.target.value)} />
-            </div>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-inicio-real">
-                Inicio real
-              </label>
-              <input id="ed-inicio-real" className={styles.input} type="date" value={f.actualStartDate} onChange={(e) => cambiar("actualStartDate", e.target.value)} />
-            </div>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-fin-real">
-                Entrega real
-              </label>
-              <input id="ed-fin-real" className={styles.input} type="date" value={f.actualEndDate} onChange={(e) => cambiar("actualEndDate", e.target.value)} />
-              <p className={styles.hint}>Con fecha de entrega real, el semáforo lo da por terminado.</p>
-            </div>
-          </div>
-          <div className={styles.grid3}>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-presupuesto">
-                Presupuesto
-              </label>
-              <input id="ed-presupuesto" className={styles.input} inputMode="decimal" value={f.budget} onChange={(e) => cambiar("budget", e.target.value)} />
-            </div>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-moneda">
-                Moneda
-              </label>
-              <select id="ed-moneda" className={styles.select} value={f.currency} onChange={(e) => cambiar("currency", e.target.value)}>
+            </Field>
+          </FieldGrid>
+          <FieldGrid>
+            <Field label="Inicio planeado">
+              <DateInput id="ed-inicio" value={f.startDate} onChange={(e) => cambiar("startDate", e.target.value)} />
+            </Field>
+            <Field label="Fin planeado">
+              <DateInput id="ed-fin" value={f.endDate} min={f.startDate || undefined} onChange={(e) => cambiar("endDate", e.target.value)} />
+            </Field>
+            <Field label="Inicio real">
+              <DateInput id="ed-inicio-real" value={f.actualStartDate} onChange={(e) => cambiar("actualStartDate", e.target.value)} />
+            </Field>
+            <Field label="Entrega real" hint="Con fecha de entrega real, el semáforo lo da por terminado.">
+              <DateInput id="ed-fin-real" value={f.actualEndDate} onChange={(e) => cambiar("actualEndDate", e.target.value)} />
+            </Field>
+          </FieldGrid>
+          <FieldGrid columns={3}>
+            <Field label="Presupuesto">
+              <Input id="ed-presupuesto" inputMode="decimal" value={f.budget} onChange={(e) => cambiar("budget", e.target.value)} />
+            </Field>
+            <Field label="Moneda">
+              <Select id="ed-moneda" value={f.currency} onChange={(e) => cambiar("currency", e.target.value)}>
                 <option value="MXN">Pesos mexicanos (MXN)</option>
                 <option value="USD">Dólares (USD)</option>
-              </select>
-            </div>
-            <div>
-              <label className={styles.fieldLabel} htmlFor="ed-cotizacion">
-                Cotización
-              </label>
-              <select id="ed-cotizacion" className={styles.select} value={f.cotizacionId} onChange={(e) => cambiar("cotizacionId", e.target.value)}>
+              </Select>
+            </Field>
+            <Field label="Cotización" hint={cotizaciones === null ? "Cargando cotizaciones…" : "Las de tu empresa"}>
+              <Select id="ed-cotizacion" value={f.cotizacionId} onChange={(e) => cambiar("cotizacionId", e.target.value)}>
                 <option value="">Sin cotización</option>
                 {p.cotizacion && !(cotizaciones ?? []).some((c) => c.id === p.cotizacion?.id) ? (
                   <option value={String(p.cotizacion.id)}>{p.cotizacion.quoteNumber}</option>
@@ -451,44 +427,32 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
                     {c.folio} · {c.clienteNombre || c.clienteEmpresa || "Sin cliente"}
                   </option>
                 ))}
-              </select>
-              {cotizaciones === null ? <p className={styles.hint}>Cargando cotizaciones…</p> : null}
-            </div>
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="ed-objetivo">
-              Objetivo
-            </label>
-            <textarea id="ed-objetivo" className={styles.textarea} value={f.objective} onChange={(e) => cambiar("objective", e.target.value)} />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="ed-descripcion">
-              Descripción
-            </label>
-            <textarea id="ed-descripcion" className={styles.textarea} value={f.description} onChange={(e) => cambiar("description", e.target.value)} />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="ed-alcance">
-              El alcance en una frase
-            </label>
-            <input id="ed-alcance" className={styles.input} value={f.scopeSummary} onChange={(e) => cambiar("scopeSummary", e.target.value)} />
-          </div>
+              </Select>
+            </Field>
+          </FieldGrid>
+          <FieldGrid columns={1}>
+            <Field label="Objetivo">
+              <Textarea id="ed-objetivo" rows={3} value={f.objective} onChange={(e) => cambiar("objective", e.target.value)} />
+            </Field>
+            <Field label="Descripción">
+              <Textarea id="ed-descripcion" rows={3} value={f.description} onChange={(e) => cambiar("description", e.target.value)} />
+            </Field>
+            <Field label="El alcance en una frase">
+              <Input id="ed-alcance" value={f.scopeSummary} onChange={(e) => cambiar("scopeSummary", e.target.value)} />
+            </Field>
+          </FieldGrid>
           {errores.length ? (
-            <div className={styles.errorBox} role="alert">
-              <ul>
+            <Alert tone="danger" role="alert" srLabel="Error">
+              <ul className={styles.texto}>
                 {errores.map((t) => (
                   <li key={t}>{t}</li>
                 ))}
               </ul>
-            </div>
+            </Alert>
           ) : null}
-          <div className={styles.acciones}>
-            <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
-              {ocupado ? "Guardando…" : "Guardar cambios"}
-            </button>
-            <button
-              type="button"
-              className={styles.secondaryBtn}
+          <div className={styles.botonera}>
+            <Button
+              variant="tertiary"
               onClick={() => {
                 setErrores([]);
                 setEditando(false);
@@ -496,7 +460,10 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
               disabled={ocupado}
             >
               Cancelar
-            </button>
+            </Button>
+            <Button type="submit" variant="tonal" loading={ocupado}>
+              Guardar cambios
+            </Button>
           </div>
         </form>
       )}

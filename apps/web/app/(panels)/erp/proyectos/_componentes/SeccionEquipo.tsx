@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
+import { Alert, Badge, Button, Field, Input, PersonCell, RecordSection, Select } from "@/components/base";
 import {
   ROLES_EQUIPO,
   ROL_EQUIPO_LABEL,
@@ -12,7 +14,7 @@ import {
 import { guardarCabecera } from "./acciones";
 import { PersonaSelect } from "./personas";
 import type { SeccionProps } from "./tipos";
-import styles from "../proyectos.module.css";
+import styles from "./secciones.module.css";
 
 /** Papeles que se eligen en la lista; «Responsable» se asigna con su propio botón. */
 const PAPELES = ROLES_EQUIPO.filter((r) => r !== "RESPONSABLE");
@@ -56,55 +58,55 @@ export default function SeccionEquipo({ proyecto: p, token, ocupado, personas, m
   }
 
   return (
-    <div className={styles.gantt} style={{ gap: 12 }}>
-      <section className={styles.panel} aria-labelledby="eq-lista">
-        <h3 id="eq-lista" className={styles.panelTitle}>
-          Equipo del proyecto ({p.members.length})
-        </h3>
+    <div className={styles.pila}>
+      <RecordSection
+        title={
+          <>
+            Equipo del proyecto<span className={styles.conteo}>{p.members.length}</span>
+          </>
+        }
+        subtitle="Para quitar al responsable, primero haz responsable a otra persona. Solo puedes sumar a gente de tu equipo."
+      >
         {miembros.length === 0 ? (
-          <div className={styles.empty}>Nadie en el equipo todavía.</div>
+          <p className={styles.vacio}>Nadie en el equipo todavía.</p>
         ) : (
-          <ul className={styles.items}>
+          <ul className={styles.lista}>
             {miembros.map((m) => {
               const esResponsable = m.userId === p.responsableId;
+              const detalle = [m.user.puesto, m.user.email].filter(Boolean).join(" · ") || "—";
               return (
-                <li key={m.id} className={styles.item}>
-                  <div className={styles.itemMain}>
-                    <span className={styles.itemTitle}>{m.user.nombre}</span>
-                    <span className={styles.rowWrap}>
-                      {[m.user.puesto, m.user.email].filter(Boolean).join(" · ") || "—"}
-                    </span>
-                    {m.notas ? <span className={styles.rowWrap}>Notas: {m.notas}</span> : null}
+                <li key={m.id} className={styles.fila}>
+                  <div className={styles.principal}>
+                    <PersonCell name={m.user.nombre} subtitle={detalle} size={32} />
+                    {m.notas ? <span className={styles.meta}>Notas: {m.notas}</span> : null}
                   </div>
-                  <div className={styles.itemActions}>
+                  <div className={styles.acciones}>
                     {esResponsable ? (
-                      <span className={styles.badge}>Responsable</span>
+                      <Badge tone="brand">Responsable</Badge>
                     ) : (
                       <>
-                        <label className={styles.filters}>
-                          <span className={styles.filtersLabel}>Papel</span>
-                          <select
-                            className={styles.select}
-                            style={{ width: "auto" }}
-                            value={m.role === "RESPONSABLE" ? "COORDINADOR" : m.role}
-                            disabled={ocupado}
-                            onChange={(e) =>
-                              void mutar(
-                                () => actualizarMiembro(token, p.id, m.userId, { role: e.target.value as RolEquipo }),
-                                `Papel de ${m.user.nombre} actualizado.`,
-                              )
-                            }
-                          >
-                            {PAPELES.map((r) => (
-                              <option key={r} value={r}>
-                                {ROL_EQUIPO_LABEL[r]}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          className={styles.smallBtn}
+                        <Select
+                          aria-label={`Papel de ${m.user.nombre}`}
+                          controlSize="sm"
+                          wrapperClassName={styles.selectCompacto}
+                          value={m.role === "RESPONSABLE" ? "COORDINADOR" : m.role}
+                          disabled={ocupado}
+                          onChange={(e) =>
+                            void mutar(
+                              () => actualizarMiembro(token, p.id, m.userId, { role: e.target.value as RolEquipo }),
+                              `Papel de ${m.user.nombre} actualizado.`,
+                            )
+                          }
+                        >
+                          {PAPELES.map((r) => (
+                            <option key={r} value={r}>
+                              {ROL_EQUIPO_LABEL[r]}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           disabled={ocupado}
                           onClick={() =>
                             confirmar({
@@ -124,10 +126,10 @@ export default function SeccionEquipo({ proyecto: p, token, ocupado, personas, m
                           }
                         >
                           Hacer responsable
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.smallDangerBtn}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger-ghost"
                           disabled={ocupado}
                           onClick={() =>
                             confirmar({
@@ -141,7 +143,7 @@ export default function SeccionEquipo({ proyecto: p, token, ocupado, personas, m
                           }
                         >
                           Quitar
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>
@@ -150,20 +152,14 @@ export default function SeccionEquipo({ proyecto: p, token, ocupado, personas, m
             })}
           </ul>
         )}
-        <p className={styles.hint}>
-          Para quitar al responsable, primero haz responsable a otra persona. Solo puedes sumar a gente de tu equipo.
-        </p>
-      </section>
+      </RecordSection>
 
-      <form className={styles.panel} onSubmit={agregar} aria-labelledby="eq-nuevo" noValidate>
-        <h3 id="eq-nuevo" className={styles.panelTitle}>
+      <form className={styles.alta} onSubmit={agregar} aria-labelledby="eq-nuevo" noValidate>
+        <h3 id="eq-nuevo" className={styles.altaTitulo}>
           Sumar al equipo
         </h3>
-        <div className={styles.inlineForm}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="eq-persona">
-              Persona
-            </label>
+        <div className={styles.campos}>
+          <Field label="Persona">
             <PersonaSelect
               id="eq-persona"
               value={nuevo.userId}
@@ -172,45 +168,33 @@ export default function SeccionEquipo({ proyecto: p, token, ocupado, personas, m
               vacio="Elige a alguien"
               excluir={enEquipo}
             />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="eq-papel">
-              Papel
-            </label>
-            <select
-              id="eq-papel"
-              className={styles.select}
-              value={nuevo.role}
-              onChange={(e) => setNuevo({ ...nuevo, role: e.target.value as RolEquipo })}
-            >
+          </Field>
+          <Field label="Papel">
+            <Select id="eq-papel" value={nuevo.role} onChange={(e) => setNuevo({ ...nuevo, role: e.target.value as RolEquipo })}>
               {PAPELES.map((r) => (
                 <option key={r} value={r}>
                   {ROL_EQUIPO_LABEL[r]}
                 </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="eq-notas">
-              Notas
-            </label>
-            <input
+            </Select>
+          </Field>
+          <Field label="Notas">
+            <Input
               id="eq-notas"
-              className={styles.input}
               value={nuevo.notas}
               maxLength={300}
               onChange={(e) => setNuevo({ ...nuevo, notas: e.target.value })}
               placeholder="Ej. Apoya solo en la instalación"
             />
-          </div>
-          <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
+          </Field>
+          <Button type="submit" variant="tonal" disabled={ocupado} iconStart={<PersonAddAltOutlinedIcon />}>
             Sumar
-          </button>
+          </Button>
         </div>
         {errorNuevo ? (
-          <p className={styles.error} role="alert">
+          <Alert tone="danger" role="alert" dense>
             {errorNuevo}
-          </p>
+          </Alert>
         ) : null}
       </form>
     </div>

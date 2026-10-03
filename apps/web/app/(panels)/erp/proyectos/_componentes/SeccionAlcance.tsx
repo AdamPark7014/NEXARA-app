@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import { Alert, Badge, Button, Field, Input, RecordSection, Select, Textarea } from "@/components/base";
 import {
   TIPOS_ALCANCE,
   TIPO_ALCANCE_AYUDA,
@@ -13,7 +16,7 @@ import {
   type TipoAlcance,
 } from "@/lib/proyectos-api";
 import type { SeccionProps } from "./tipos";
-import styles from "../proyectos.module.css";
+import styles from "./secciones.module.css";
 
 type Edicion = { kind: TipoAlcance; titulo: string; detalle: string };
 
@@ -65,65 +68,60 @@ export default function SeccionAlcance({ proyecto: p, token, ocupado, mutar, con
   const folio = p.cotizacion ? p.cotizacion.folioEnviado || p.cotizacion.quoteNumber : null;
 
   return (
-    <div className={styles.gantt} style={{ gap: 12 }}>
+    <div className={styles.pila}>
       {p.scopeSummary ? (
-        <section className={styles.panel} aria-label="El alcance en una frase">
-          <span className={styles.fieldLabel}>El alcance en una frase</span>
+        <section aria-label="El alcance en una frase" className={styles.bloque}>
+          <span className={styles.bloqueEtiqueta}>El alcance en una frase</span>
           <p className={styles.texto}>{p.scopeSummary}</p>
         </section>
       ) : null}
 
       {p.cotizacion ? (
-        <section className={styles.panel} aria-labelledby="alc-cotizacion">
-          <div className={styles.panelHead}>
-            <div>
-              <h3 id="alc-cotizacion" className={styles.panelTitle}>
-                Alcance de la cotización {folio}
-              </h3>
-              <p className={styles.hint}>
-                Copia los bloques de alcance de la cotización como entregables. Si ya los trajiste, no se duplican.
-              </p>
-            </div>
-            <button
-              type="button"
-              className={styles.smallBtn}
+        <Alert
+          tone="info"
+          title={`Alcance de la cotización ${folio}`}
+          action={
+            <Button
+              size="sm"
+              variant="tonal"
               disabled={ocupado}
+              iconStart={<DownloadRoundedIcon />}
               onClick={() => void mutar(() => importarAlcanceDeCotizacion(token, p.id), "Alcance de la cotización al día.")}
             >
               Traer alcance de la cotización
-            </button>
-          </div>
-        </section>
+            </Button>
+          }
+        >
+          {" "}
+          Copia los bloques de alcance de la cotización como entregables. Si ya los trajiste, no se duplican.
+        </Alert>
       ) : null}
 
       {TIPOS_ALCANCE.map((kind) => {
         const renglones = p.scopeItems.filter((s) => s.kind === kind);
         return (
-          <section key={kind} className={styles.panel} aria-labelledby={`alc-${kind}`}>
-            <div>
-              <h3 id={`alc-${kind}`} className={styles.panelTitle}>
-                {TIPO_ALCANCE_LABEL[kind]} ({renglones.length})
-              </h3>
-              <p className={styles.hint}>{TIPO_ALCANCE_AYUDA[kind]}</p>
-            </div>
+          <RecordSection
+            key={kind}
+            title={
+              <>
+                {TIPO_ALCANCE_LABEL[kind]}
+                <span className={styles.conteo}>{renglones.length}</span>
+              </>
+            }
+            subtitle={TIPO_ALCANCE_AYUDA[kind]}
+          >
             {renglones.length === 0 ? (
-              <p className={styles.sub} style={{ margin: 0 }}>
-                Nada capturado todavía.
-              </p>
+              <p className={styles.vacio}>Nada capturado todavía.</p>
             ) : (
-              <ul className={styles.items}>
+              <ul className={styles.lista}>
                 {renglones.map((s) =>
                   editandoId === s.id && edicion ? (
-                    <li key={s.id} className={styles.item} style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
-                      <form onSubmit={(e) => void guardar(e, s)} className={styles.gantt} noValidate aria-label={`Editar «${s.titulo}»`}>
-                        <div className={styles.inlineForm3}>
-                          <div>
-                            <label className={styles.fieldLabel} htmlFor={`s-k-${s.id}`}>
-                              Tipo
-                            </label>
-                            <select
+                    <li key={s.id} className={`${styles.fila} ${styles.filaEdicion}`}>
+                      <form onSubmit={(e) => void guardar(e, s)} className={styles.edicion} noValidate aria-label={`Editar «${s.titulo}»`}>
+                        <div className={styles.campos} data-cols="2">
+                          <Field label="Tipo">
+                            <Select
                               id={`s-k-${s.id}`}
-                              className={styles.select}
                               value={edicion.kind}
                               onChange={(e) => setEdicion({ ...edicion, kind: e.target.value as TipoAlcance })}
                             >
@@ -132,58 +130,47 @@ export default function SeccionAlcance({ proyecto: p, token, ocupado, mutar, con
                                   {TIPO_ALCANCE_LABEL[k]}
                                 </option>
                               ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className={styles.fieldLabel} htmlFor={`s-t-${s.id}`}>
-                              Qué
-                            </label>
-                            <input
-                              id={`s-t-${s.id}`}
-                              className={styles.input}
-                              value={edicion.titulo}
-                              maxLength={240}
-                              onChange={(e) => setEdicion({ ...edicion, titulo: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`s-d-${s.id}`}>
-                            Detalle
-                          </label>
-                          <textarea
-                            id={`s-d-${s.id}`}
-                            className={styles.textarea}
-                            value={edicion.detalle}
-                            onChange={(e) => setEdicion({ ...edicion, detalle: e.target.value })}
-                          />
+                            </Select>
+                          </Field>
+                          <Field label="Qué">
+                            <Input id={`s-t-${s.id}`} value={edicion.titulo} maxLength={240} onChange={(e) => setEdicion({ ...edicion, titulo: e.target.value })} />
+                          </Field>
+                          <Field label="Detalle" fullWidth>
+                            <Textarea id={`s-d-${s.id}`} rows={3} value={edicion.detalle} onChange={(e) => setEdicion({ ...edicion, detalle: e.target.value })} />
+                          </Field>
                         </div>
                         {errorEdicion ? (
-                          <p className={styles.error} role="alert">
+                          <Alert tone="danger" role="alert" dense>
                             {errorEdicion}
-                          </p>
+                          </Alert>
                         ) : null}
-                        <div className={styles.acciones}>
-                          <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
-                            Guardar
-                          </button>
-                          <button type="button" className={styles.secondaryBtn} onClick={() => setEditandoId(null)} disabled={ocupado}>
+                        <div className={styles.botonera}>
+                          <Button variant="tertiary" onClick={() => setEditandoId(null)} disabled={ocupado}>
                             Cancelar
-                          </button>
+                          </Button>
+                          <Button type="submit" variant="tonal" loading={ocupado}>
+                            Guardar
+                          </Button>
                         </div>
                       </form>
                     </li>
                   ) : (
-                    <li key={s.id} className={styles.item}>
-                      <div className={styles.itemMain}>
-                        <span className={styles.itemTitle}>{s.titulo}</span>
-                        {s.detalle ? <span className={styles.rowWrap}>{s.detalle}</span> : null}
-                        {s.origenClave ? <span className={styles.rowSub}>Viene de la cotización</span> : null}
+                    <li key={s.id} className={styles.fila}>
+                      <div className={styles.principal}>
+                        <span className={styles.tituloFila}>
+                          {s.titulo}
+                          {s.origenClave ? (
+                            <Badge tone="info" size="sm">
+                              Viene de la cotización
+                            </Badge>
+                          ) : null}
+                        </span>
+                        {s.detalle ? <span className={styles.meta}>{s.detalle}</span> : null}
                       </div>
-                      <div className={styles.itemActions}>
-                        <button
-                          type="button"
-                          className={styles.smallBtn}
+                      <div className={styles.acciones}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           disabled={ocupado}
                           onClick={() => {
                             setEditandoId(s.id);
@@ -192,10 +179,10 @@ export default function SeccionAlcance({ proyecto: p, token, ocupado, mutar, con
                           }}
                         >
                           Editar
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.smallDangerBtn}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger-ghost"
                           disabled={ocupado}
                           onClick={() =>
                             confirmar({
@@ -209,71 +196,51 @@ export default function SeccionAlcance({ proyecto: p, token, ocupado, mutar, con
                           }
                         >
                           Quitar
-                        </button>
+                        </Button>
                       </div>
                     </li>
                   ),
                 )}
               </ul>
             )}
-          </section>
+          </RecordSection>
         );
       })}
 
-      <form className={styles.panel} onSubmit={agregar} aria-labelledby="alc-nuevo" noValidate>
-        <h3 id="alc-nuevo" className={styles.panelTitle}>
+      <form className={styles.alta} onSubmit={agregar} aria-labelledby="alc-nuevo" noValidate>
+        <h3 id="alc-nuevo" className={styles.altaTitulo}>
           Agregar al alcance
         </h3>
-        <div className={styles.inlineForm}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="s-nuevo-t">
-              Qué
-            </label>
-            <input
+        <div className={styles.campos}>
+          <Field label="Qué">
+            <Input
               id="s-nuevo-t"
-              className={styles.input}
               value={nuevo.titulo}
               maxLength={240}
               onChange={(e) => setNuevo({ ...nuevo, titulo: e.target.value })}
               placeholder="Ej. Memoria técnica con planos finales"
             />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="s-nuevo-k">
-              Tipo
-            </label>
-            <select
-              id="s-nuevo-k"
-              className={styles.select}
-              value={nuevo.kind}
-              onChange={(e) => setNuevo({ ...nuevo, kind: e.target.value as TipoAlcance })}
-            >
+          </Field>
+          <Field label="Tipo">
+            <Select id="s-nuevo-k" value={nuevo.kind} onChange={(e) => setNuevo({ ...nuevo, kind: e.target.value as TipoAlcance })}>
               {TIPOS_ALCANCE.map((k) => (
                 <option key={k} value={k}>
                   {TIPO_ALCANCE_LABEL[k]}
                 </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="s-nuevo-d">
-              Detalle (opcional)
-            </label>
-            <input
-              id="s-nuevo-d"
-              className={styles.input}
-              value={nuevo.detalle}
-              onChange={(e) => setNuevo({ ...nuevo, detalle: e.target.value })}
-            />
-          </div>
-          <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
+            </Select>
+          </Field>
+          <Field label="Detalle (opcional)">
+            <Input id="s-nuevo-d" value={nuevo.detalle} onChange={(e) => setNuevo({ ...nuevo, detalle: e.target.value })} />
+          </Field>
+          <Button type="submit" variant="tonal" disabled={ocupado} iconStart={<AddRoundedIcon />}>
             Agregar
-          </button>
+          </Button>
         </div>
         {errorNuevo ? (
-          <p className={styles.error} role="alert">
+          <Alert tone="danger" role="alert" dense>
             {errorNuevo}
-          </p>
+          </Alert>
         ) : null}
       </form>
     </div>

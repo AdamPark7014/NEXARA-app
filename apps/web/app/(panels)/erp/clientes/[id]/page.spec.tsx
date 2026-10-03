@@ -162,7 +162,7 @@ describe("ficha del cliente · proyectos", () => {
     render(<ClienteDetallePage />);
 
     await screen.findByText("Sin proyectos todavía");
-    await user.type(screen.getByLabelText("Nuevo proyecto"), "Red de sucursales");
+    await user.type(screen.getByLabelText(/^Nuevo proyecto/), "Red de sucursales");
     await user.click(screen.getByRole("button", { name: /Crear proyecto/ }));
 
     await waitFor(() => expect(llamadas.some((l) => l.url.includes("alta-rapida"))).toBe(true));
@@ -183,7 +183,7 @@ describe("ficha del cliente · proyectos", () => {
 
     expect(await screen.findByRole("heading", { name: "Proyectos" })).toBeInTheDocument();
     expect(screen.getByText("Sin proyectos todavía")).toBeInTheDocument();
-    expect(screen.getByLabelText("Nuevo proyecto")).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Nuevo proyecto/)).toBeInTheDocument();
     // Antes la sección ni aparecía, o avisaba que no se le podían crear proyectos.
     expect(screen.queryByText(/no está enlazado con operaciones/)).not.toBeInTheDocument();
   });

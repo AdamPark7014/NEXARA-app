@@ -129,12 +129,13 @@ describe("detalle del proyecto", () => {
     const fechas = screen.getByRole("table");
     expect(within(fechas).getByRole("rowheader", { name: "Inicio" })).toBeInTheDocument();
     expect(within(fechas).getByText("Arrancó 1 día tarde")).toBeInTheDocument();
-    // Solo las transiciones que la API acepta desde «En curso».
+    // Solo las transiciones que la API acepta desde «En curso», en el orden del sistema:
+    // la de peligro primero y la principal («Dar por terminado») al final.
     const acciones = screen.getByRole("group", { name: "Cambiar estado del proyecto" });
     expect(within(acciones).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Cancelar proyecto",
       "Poner en pausa",
       "Dar por terminado",
-      "Cancelar proyecto",
     ]);
   });
 

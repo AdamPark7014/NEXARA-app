@@ -1,9 +1,32 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
+import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
 import { useUser } from "@/components/UserContext";
+import {
+  Alert,
+  Button,
+  ButtonLink,
+  Checkbox,
+  DateInput,
+  Field,
+  FieldGrid,
+  FormFooter,
+  FormPage,
+  FormSection,
+  Input,
+  LinkButton,
+  SearchInput,
+  Select,
+  Textarea,
+  type PendingItem,
+} from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import { DatosClienteOpcionales } from "@/components/erp/DatosCliente";
 import { clientSectorsForUser } from "@/lib/client-sectors";
@@ -44,7 +67,7 @@ import { hoyISO, repartirFechas } from "@/lib/proyecto-plan";
 import { SERVICE_PROJECT_TYPE_OPTIONS, getServiceProjectTypeLabel } from "@/lib/service-project-types";
 import LineaDeTiempo from "../_componentes/LineaDeTiempo";
 import { PersonaSelect, usePersonasAsignables } from "../_componentes/personas";
-import styles from "../proyectos.module.css";
+import styles from "../alta.module.css";
 
 let secuencia = 0;
 const nuevaClave = () => `r${Date.now().toString(36)}${(secuencia++).toString(36)}`;
@@ -55,6 +78,29 @@ function mover<T>(lista: T[], desde: number, hacia: number): T[] {
   const [item] = copia.splice(desde, 1);
   copia.splice(hacia, 0, item);
   return copia;
+}
+
+/** Qué se decide en cada paso, en una línea bajo su título. */
+const AYUDA_PASO: Record<PasoAlta, string> = {
+  datos: "Qué es el proyecto y de qué cliente del padrón cuelga.",
+  fechas: "Plan de fechas, quién lo lleva y con cuánto dinero se cuenta.",
+  cronograma:
+    "Divide el proyecto en etapas con fecha y responsable. Cada etapa va desde que termina la anterior hasta su fecha. Cuando se cumpla, se marca en el proyecto y el avance se mueve solo.",
+  alcance: "Lo que se entrega, lo que no y lo que se da por hecho.",
+  requerimientos:
+    "Lo que hace falta para poder entregar: papeles, permisos, anticipos, información del cliente. En el proyecto se palomean conforme se consiguen.",
+  equipo:
+    "Quiénes trabajan en el proyecto y con qué papel. Solo puedes sumar a gente de tu equipo; si alguien queda fuera, el sistema te lo dirá al crear.",
+  revisar: "Todo en un solo paso al final. Lo que no tengas ahora lo puedes agregar después.",
+};
+
+/** Botón cuadrado de renglón (subir, bajar, quitar). */
+function BotonRenglon({ etiqueta, titulo, onClick, disabled, children }: { etiqueta: string; titulo: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
+  return (
+    <Button variant="ghost" size="sm" icon aria-label={etiqueta} title={titulo} onClick={onClick} disabled={disabled}>
+      {children}
+    </Button>
+  );
 }
 
 export default function NuevoProyectoPage() {
@@ -98,7 +144,6 @@ export default function NuevoProyectoPage() {
   const yo = useMemo(() => (user?.id ? { id: user.id, nombre: user.nombre } : null), [user?.id, user?.nombre]);
   const { personas, aviso: avisoPersonas } = usePersonasAsignables(token, yo);
 
-  const tituloPaso = useRef<HTMLHeadingElement>(null);
   const primerRender = useRef(true);
 
   // El usuario puede llegar después del primer render: el responsable por omisión es quien crea.
@@ -165,7 +210,11 @@ export default function NuevoProyectoPage() {
       primerRender.current = false;
       return;
     }
-    tituloPaso.current?.focus();
+    const titulo = document.querySelector<HTMLElement>("#paso-actual h2");
+    if (titulo) {
+      titulo.tabIndex = -1;
+      titulo.focus();
+    }
   }, [paso]);
 
   const cambiar = <K extends keyof BorradorProyecto>(campo: K, valor: BorradorProyecto[K]) =>
@@ -197,6 +246,7 @@ export default function NuevoProyectoPage() {
   const indice = PASOS_ALTA.findIndex((p) => p.id === paso);
   const erroresActuales = erroresDelPaso(paso, b);
   const nombrePersona = (id: string) => personas.find((p) => String(p.id) === id)?.nombre ?? "";
+  const marcarInvalido = mostrarErrores && erroresActuales.length > 0;
 
   function irA(destino: PasoAlta) {
     setMostrarErrores(false);
@@ -252,6 +302,29 @@ export default function NuevoProyectoPage() {
     }
   }
 
+  /** Alta rápida del cliente desde el asistente: el 403 del padrón se enseña tal cual. */
+  function crearClienteRapido() {
+    if (!token) return;
+    setAltaGuardando(true);
+    setErrorAlta(null);
+    createSalesClient(
+      token,
+      puedeAgregarCliente && clientSectorsForUser(user).includes("PROYECTO")
+        ? { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", sectors: ["PROYECTO"] }
+        : { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", altaProyecto: true },
+    )
+      .then((creado) => {
+        setClientes((prev) =>
+          [...prev.filter((c) => c.id !== creado.id), creado].sort((x, y) => x.name.localeCompare(y.name, "es")),
+        );
+        cambiar("clienteId", String(creado.id));
+        setAltaNombre("");
+        setAltaAbierta(false);
+      })
+      .catch((e) => setErrorAlta(formatApiError(e, "No se pudo dar de alta el cliente")))
+      .finally(() => setAltaGuardando(false));
+  }
+
   // --- Renglones -----------------------------------------------------------
 
   const agregarEtapa = (name = "", plannedDate = "") =>
@@ -285,32 +358,28 @@ export default function NuevoProyectoPage() {
   // --- Pasos ---------------------------------------------------------------
 
   function pasoDatos() {
+    const errorTitulo = marcarInvalido && b.title.trim().length < 3;
+    const errorCliente = marcarInvalido && !b.clienteId;
     return (
       <>
-        <div>
-          <label className={styles.fieldLabel} htmlFor="titulo">
-            Nombre del proyecto *
-          </label>
-          <input
+        <Field label="Nombre del proyecto" required fullWidth>
+          <Input
             id="titulo"
-            className={styles.input}
             value={b.title}
             onChange={(e) => cambiar("title", e.target.value)}
             placeholder="Ej. Videovigilancia Plaza Norte, etapa 2"
             maxLength={220}
-            required
+            invalid={errorTitulo}
           />
-        </div>
+        </Field>
 
-        <div>
-          <label className={styles.fieldLabel} htmlFor="buscarCliente">
-            Cliente *
+        <div className={styles.bloqueCliente}>
+          <label className={styles.etiqueta} htmlFor="cliente">
+            Cliente <span className={styles.obligatorio} aria-hidden="true">*</span>
           </label>
-          <div className={styles.grid2}>
-            <input
+          <div className={styles.clienteFila}>
+            <SearchInput
               id="buscarCliente"
-              className={styles.input}
-              type="search"
               value={buscarCliente}
               onChange={(e) => setBuscarCliente(e.target.value)}
               // Enter aquí es «buscar», no «siguiente paso».
@@ -318,13 +387,13 @@ export default function NuevoProyectoPage() {
               placeholder="Buscar por nombre, razón social o RFC"
               aria-label="Buscar cliente"
             />
-            <select
+            <Select
               id="cliente"
-              className={styles.select}
               value={b.clienteId}
               onChange={(e) => cambiar("clienteId", e.target.value)}
               aria-label="Cliente"
               required
+              invalid={errorCliente}
             >
               <option value="">
                 {cargandoClientes ? "Cargando clientes…" : `Elige un cliente (${clientesVisibles.length})`}
@@ -335,70 +404,64 @@ export default function NuevoProyectoPage() {
                   {c.legalName && c.legalName !== c.name ? ` — ${c.legalName}` : ""}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
-          {errorClientes ? <p className={styles.error}>{errorClientes}</p> : null}
+          {errorClientes ? (
+            <Alert tone="danger" dense>
+              {errorClientes}
+            </Alert>
+          ) : null}
           {clienteElegido && !clienteElegido.serviceClientId ? (
-            <p className={styles.hint}>
-              Este cliente todavía no está activo en operación: se activará al crear el proyecto.
-            </p>
+            <p className={styles.ayuda}>Este cliente todavía no está activo en operación: se activará al crear el proyecto.</p>
           ) : null}
           {!cargandoClientes && !clientes.length && !errorClientes ? (
-            <p className={styles.hint}>No tienes clientes a la vista. Da de alta uno aquí y sigue con el proyecto.</p>
+            <p className={styles.ayuda}>No tienes clientes a la vista. Da de alta uno aquí y sigue con el proyecto.</p>
           ) : null}
           {/* Quien puede crear el proyecto puede dar de alta a su cliente: con sus datos si
               administra el padrón de proyecto; si no, solo con el nombre (alta rápida) y los
               datos se completan después en Clientes. */}
           {token ? (
-            <div className={styles.hint}>
-              {altaAbierta ? (
-                <div className={styles.grid2}>
-                  <input
-                    className={styles.input}
+            altaAbierta ? (
+              <div className={styles.altaRapida} role="group" aria-label="Alta rápida de cliente">
+                <div className={styles.altaFila}>
+                  <Input
                     value={altaNombre}
-                    onChange={(e) => setAltaNombre(e.target.value)}
+                    onChange={(e) => {
+                      setAltaNombre(e.target.value);
+                      if (errorAlta) setErrorAlta(null);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
                     placeholder="Nombre del cliente nuevo"
                     aria-label="Nombre del cliente nuevo"
                     maxLength={160}
+                    autoFocus
                   />
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    disabled={altaGuardando || altaNombre.trim().length < 2}
-                    onClick={() => {
-                      if (!token) return;
-                      setAltaGuardando(true);
-                      setErrorAlta(null);
-                      createSalesClient(
-                        token,
-                        puedeAgregarCliente && clientSectorsForUser(user).includes("PROYECTO")
-                          ? { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", sectors: ["PROYECTO"] }
-                          : { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", altaProyecto: true },
-                      )
-                        .then((creado) => {
-                          setClientes((prev) =>
-                            [...prev.filter((c) => c.id !== creado.id), creado].sort((x, y) =>
-                              x.name.localeCompare(y.name, "es"),
-                            ),
-                          );
-                          cambiar("clienteId", String(creado.id));
-                          setAltaNombre("");
-                          setAltaAbierta(false);
-                        })
-                        .catch((e) => setErrorAlta(formatApiError(e, "No se pudo dar de alta el cliente")))
-                        .finally(() => setAltaGuardando(false));
-                    }}
+                  <Button variant="tertiary" disabled={altaGuardando} onClick={() => setAltaAbierta(false)}>
+                    Cerrar
+                  </Button>
+                  <Button
+                    variant="tonal"
+                    loading={altaGuardando}
+                    disabled={altaNombre.trim().length < 2}
+                    onClick={crearClienteRapido}
                   >
-                    {altaGuardando ? "Guardando…" : "Crear y usar"}
-                  </button>
+                    Crear y usar
+                  </Button>
                 </div>
-              ) : (
-                <button type="button" className={styles.secondaryBtn} onClick={() => setAltaAbierta(true)}>
+                <p className={styles.ayuda}>Solo con el nombre: sus datos fiscales se completan después en Clientes.</p>
+                {errorAlta ? (
+                  <Alert tone="danger" role="alert" srLabel="Error">
+                    {errorAlta}
+                  </Alert>
+                ) : null}
+              </div>
+            ) : (
+              <div>
+                <Button variant="tertiary" size="sm" iconStart={<PersonAddAltOutlinedIcon />} onClick={() => setAltaAbierta(true)}>
                   Dar de alta un cliente
-                </button>
-              )}
-              {errorAlta ? <p className={styles.error}>{errorAlta}</p> : null}
-            </div>
+                </Button>
+              </div>
+            )
           ) : null}
           <DatosClienteOpcionales
             token={token}
@@ -407,34 +470,19 @@ export default function NuevoProyectoPage() {
           />
         </div>
 
-        <div className={styles.grid2}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="tipo">
-              Tipo de proyecto
-            </label>
-            <select
-              id="tipo"
-              className={styles.select}
-              value={b.projectType}
-              onChange={(e) => cambiar("projectType", e.target.value)}
-            >
+        <FieldGrid>
+          <Field label="Tipo de proyecto" hint={SERVICE_PROJECT_TYPE_OPTIONS.find((o) => o.value === b.projectType)?.description ?? "Elige el que más se parezca."}>
+            <Select id="tipo" value={b.projectType} onChange={(e) => cambiar("projectType", e.target.value)}>
               {SERVICE_PROJECT_TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
-            </select>
-            <p className={styles.hint}>
-              {SERVICE_PROJECT_TYPE_OPTIONS.find((o) => o.value === b.projectType)?.description}
-            </p>
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="sitios">
-              Número de sitios
-            </label>
-            <input
+            </Select>
+          </Field>
+          <Field label="Número de sitios">
+            <Input
               id="sitios"
-              className={styles.input}
               type="number"
               min={0}
               step={1}
@@ -443,34 +491,26 @@ export default function NuevoProyectoPage() {
               onChange={(e) => cambiar("siteCount", e.target.value)}
               placeholder="Ej. 3 sucursales"
             />
-          </div>
-        </div>
-
-        <div>
-          <label className={styles.fieldLabel} htmlFor="descripcion">
-            Descripción
-          </label>
-          <textarea
-            id="descripcion"
-            className={styles.textarea}
-            value={b.description}
-            onChange={(e) => cambiar("description", e.target.value)}
-            placeholder="Qué se va a hacer, en pocas palabras."
-          />
-        </div>
-
-        <div>
-          <label className={styles.fieldLabel} htmlFor="objetivo">
-            Objetivo
-          </label>
-          <textarea
-            id="objetivo"
-            className={styles.textarea}
-            value={b.objective}
-            onChange={(e) => cambiar("objective", e.target.value)}
-            placeholder="Para qué lo quiere el cliente, en sus palabras. Ej. «Ver todas las entradas desde la oficina central»."
-          />
-        </div>
+          </Field>
+          <Field label="Descripción" fullWidth>
+            <Textarea
+              id="descripcion"
+              rows={3}
+              value={b.description}
+              onChange={(e) => cambiar("description", e.target.value)}
+              placeholder="Qué se va a hacer, en pocas palabras."
+            />
+          </Field>
+          <Field label="Objetivo" fullWidth>
+            <Textarea
+              id="objetivo"
+              rows={3}
+              value={b.objective}
+              onChange={(e) => cambiar("objective", e.target.value)}
+              placeholder="Para qué lo quiere el cliente, en sus palabras. Ej. «Ver todas las entradas desde la oficina central»."
+            />
+          </Field>
+        </FieldGrid>
       </>
     );
   }
@@ -478,41 +518,23 @@ export default function NuevoProyectoPage() {
   function pasoFechas() {
     const importe = leerImporte(b.budget);
     return (
-      <>
-        <div className={styles.grid2}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="inicio">
-              Inicio planeado
-            </label>
-            <input
-              id="inicio"
-              className={styles.input}
-              type="date"
-              value={b.startDate}
-              onChange={(e) => cambiar("startDate", e.target.value)}
-            />
-            <p className={styles.hint}>Opcional. Se puede anotar después, en el proyecto.</p>
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="fin">
-              Fin planeado
-            </label>
-            <input
-              id="fin"
-              className={styles.input}
-              type="date"
-              value={b.endDate}
-              min={b.startDate || undefined}
-              onChange={(e) => cambiar("endDate", e.target.value)}
-            />
-            <p className={styles.hint}>Sin fin planeado no se puede saber si el proyecto va a tiempo.</p>
-          </div>
-        </div>
-
-        <div>
-          <label className={styles.fieldLabel} htmlFor="responsable">
-            Responsable del proyecto
-          </label>
+      <FieldGrid>
+        <Field label="Inicio planeado" hint="Opcional. Se puede anotar después, en el proyecto.">
+          <DateInput id="inicio" value={b.startDate} onChange={(e) => cambiar("startDate", e.target.value)} />
+        </Field>
+        <Field label="Fin planeado" hint="Sin fin planeado no se puede saber si el proyecto va a tiempo.">
+          <DateInput id="fin" value={b.endDate} min={b.startDate || undefined} onChange={(e) => cambiar("endDate", e.target.value)} />
+        </Field>
+        <Field
+          label="Responsable del proyecto"
+          fullWidth
+          hint={
+            <>
+              Opcional. Si lo dejas vacío, el proyecto queda a nombre de quien lo crea.
+              {avisoPersonas ? <span className={styles.avisoLinea}>{avisoPersonas}</span> : null}
+            </>
+          }
+        >
           <PersonaSelect
             id="responsable"
             value={b.responsableId}
@@ -520,189 +542,129 @@ export default function NuevoProyectoPage() {
             personas={personas}
             vacio="Sin responsable (queda quien lo crea)"
           />
-          <p className={styles.hint}>Opcional. Si lo dejas vacío, el proyecto queda a nombre de quien lo crea.</p>
-          {avisoPersonas ? <p className={styles.hint}>{avisoPersonas}</p> : null}
-        </div>
-
-        <div className={styles.grid2}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="presupuesto">
-              Presupuesto autorizado
-            </label>
-            <input
-              id="presupuesto"
-              className={styles.input}
-              inputMode="decimal"
-              value={b.budget}
-              onChange={(e) => cambiar("budget", e.target.value)}
-              placeholder="Ej. 250,000"
-            />
-            {importe !== null && Number.isFinite(importe) ? (
-              <p className={styles.hint}>{formatoMoneda(importe, b.currency)}</p>
-            ) : null}
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="moneda">
-              Moneda
-            </label>
-            <select
-              id="moneda"
-              className={styles.select}
-              value={b.currency}
-              onChange={(e) => cambiar("currency", e.target.value)}
-            >
-              <option value="MXN">Pesos mexicanos (MXN)</option>
-              <option value="USD">Dólares (USD)</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className={styles.fieldLabel} htmlFor="cotizacion">
-            Cotización de origen (opcional)
-          </label>
-          <select
-            id="cotizacion"
-            className={styles.select}
-            value={b.cotizacionId}
-            onChange={(e) => cambiar("cotizacionId", e.target.value)}
-          >
+        </Field>
+        {/* La pista siempre está (cambia de texto): si apareciera y desapareciera, el campo se remontaría a media captura. */}
+        <Field
+          label="Presupuesto autorizado"
+          hint={importe !== null && Number.isFinite(importe) ? formatoMoneda(importe, b.currency) : "Con o sin comas, por ejemplo 250,000."}
+        >
+          <Input id="presupuesto" inputMode="decimal" value={b.budget} onChange={(e) => cambiar("budget", e.target.value)} placeholder="Ej. 250,000" />
+        </Field>
+        <Field label="Moneda">
+          <Select id="moneda" value={b.currency} onChange={(e) => cambiar("currency", e.target.value)}>
+            <option value="MXN">Pesos mexicanos (MXN)</option>
+            <option value="USD">Dólares (USD)</option>
+          </Select>
+        </Field>
+        <Field label="Cotización de origen (opcional)" fullWidth hint={errorCotizaciones ?? "Las del cliente elegido salen primero."}>
+          <Select id="cotizacion" value={b.cotizacionId} onChange={(e) => cambiar("cotizacionId", e.target.value)}>
             <option value="">Sin cotización</option>
             {cotizacionesOrdenadas.map((c) => (
               <option key={c.id} value={String(c.id)}>
                 {c.folio} · {c.clienteNombre || c.clienteEmpresa || "Sin cliente"} · {c.estadoEtiqueta}
               </option>
             ))}
-          </select>
-          {errorCotizaciones ? <p className={styles.hint}>{errorCotizaciones}</p> : null}
-          <label className={styles.check} style={{ marginTop: 8 }}>
-            <input
-              type="checkbox"
-              checked={b.importarAlcance}
-              disabled={!b.cotizacionId}
-              onChange={(e) => cambiar("importarAlcance", e.target.checked)}
-            />
-            Traer el alcance de la cotización como entregables
-          </label>
-          {b.cotizacionId && b.importarAlcance ? (
-            <p className={styles.hint}>
-              Al crear el proyecto se copian los bloques de alcance de la cotización. Así lo que se cotizó y lo
-              que se entrega dicen lo mismo.
-            </p>
-          ) : null}
+          </Select>
+        </Field>
+        <div className={styles.completo}>
+          <Checkbox
+            checked={b.importarAlcance}
+            disabled={!b.cotizacionId}
+            onChange={(e) => cambiar("importarAlcance", e.target.checked)}
+            label="Traer el alcance de la cotización como entregables"
+            description={
+              b.cotizacionId && b.importarAlcance
+                ? "Al crear el proyecto se copian los bloques de alcance de la cotización. Así lo que se cotizó y lo que se entrega dicen lo mismo."
+                : undefined
+            }
+          />
         </div>
-      </>
+      </FieldGrid>
     );
   }
 
   function pasoCronograma() {
     return (
       <>
-        <p className={styles.sub} style={{ margin: 0 }}>
-          Divide el proyecto en etapas con fecha y responsable. Cada etapa va desde que termina la anterior
-          hasta su fecha. Cuando se cumpla, se marca en el proyecto y el avance se mueve solo.
-        </p>
-        <div className={styles.acciones}>
-          <button type="button" className={styles.secondaryBtn} onClick={() => agregarEtapa()}>
+        <div className={styles.barra}>
+          <Button size="sm" iconStart={<AddRoundedIcon />} onClick={() => agregarEtapa()}>
             Agregar etapa
-          </button>
+          </Button>
           {b.etapas.length === 0 ? (
-            <button type="button" className={styles.secondaryBtn} onClick={usarEtapasTipicas}>
+            <Button size="sm" variant="tonal" iconStart={<AutoAwesomeOutlinedIcon />} onClick={usarEtapasTipicas}>
               Usar etapas típicas
-            </button>
+            </Button>
           ) : null}
         </div>
 
         {b.etapas.length ? (
-          <ol className={styles.editor}>
+          <ol className={styles.renglones}>
             {b.etapas.map((e, i) => (
-              <li key={e.clave} className={styles.editorRow}>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`etapa-${e.clave}`}>
-                    Etapa {i + 1}
-                  </label>
-                  <input
-                    id={`etapa-${e.clave}`}
-                    className={styles.input}
-                    value={e.name}
-                    onChange={(ev) =>
-                      cambiar("etapas", b.etapas.map((x) => (x.clave === e.clave ? { ...x, name: ev.target.value } : x)))
-                    }
-                    placeholder="Ej. Instalación de cámaras"
-                    maxLength={200}
-                  />
+              <li key={e.clave} className={styles.renglon}>
+                <span className={styles.numero} aria-hidden="true">
+                  {i + 1}
+                </span>
+                <div className={styles.renglonCampos} data-cols="3">
+                  <Field label={`Etapa ${i + 1}`}>
+                    <Input
+                      id={`etapa-${e.clave}`}
+                      value={e.name}
+                      onChange={(ev) =>
+                        cambiar("etapas", b.etapas.map((x) => (x.clave === e.clave ? { ...x, name: ev.target.value } : x)))
+                      }
+                      placeholder="Ej. Instalación de cámaras"
+                      maxLength={200}
+                    />
+                  </Field>
+                  <Field label="Fecha planeada">
+                    <DateInput
+                      id={`etapa-fecha-${e.clave}`}
+                      value={e.plannedDate}
+                      onChange={(ev) =>
+                        cambiar(
+                          "etapas",
+                          b.etapas.map((x) => (x.clave === e.clave ? { ...x, plannedDate: ev.target.value } : x)),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Responsable">
+                    <PersonaSelect
+                      id={`etapa-resp-${e.clave}`}
+                      value={e.responsableId}
+                      onChange={(v) =>
+                        cambiar("etapas", b.etapas.map((x) => (x.clave === e.clave ? { ...x, responsableId: v } : x)))
+                      }
+                      personas={personas}
+                    />
+                  </Field>
                 </div>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`etapa-fecha-${e.clave}`}>
-                    Fecha planeada
-                  </label>
-                  <input
-                    id={`etapa-fecha-${e.clave}`}
-                    className={styles.input}
-                    type="date"
-                    value={e.plannedDate}
-                    onChange={(ev) =>
-                      cambiar(
-                        "etapas",
-                        b.etapas.map((x) => (x.clave === e.clave ? { ...x, plannedDate: ev.target.value } : x)),
-                      )
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`etapa-resp-${e.clave}`}>
-                    Responsable
-                  </label>
-                  <PersonaSelect
-                    id={`etapa-resp-${e.clave}`}
-                    value={e.responsableId}
-                    onChange={(v) =>
-                      cambiar("etapas", b.etapas.map((x) => (x.clave === e.clave ? { ...x, responsableId: v } : x)))
-                    }
-                    personas={personas}
-                  />
-                </div>
-                <div className={styles.editorActions}>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
-                    onClick={() => cambiar("etapas", mover(b.etapas, i, i - 1))}
-                    disabled={i === 0}
-                    aria-label={`Subir la etapa ${i + 1}`}
-                    title="Subir"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
-                    onClick={() => cambiar("etapas", mover(b.etapas, i, i + 1))}
+                <div className={styles.renglonAcciones}>
+                  <BotonRenglon etiqueta={`Subir la etapa ${i + 1}`} titulo="Subir" disabled={i === 0} onClick={() => cambiar("etapas", mover(b.etapas, i, i - 1))}>
+                    <ArrowUpwardRoundedIcon fontSize="small" />
+                  </BotonRenglon>
+                  <BotonRenglon
+                    etiqueta={`Bajar la etapa ${i + 1}`}
+                    titulo="Bajar"
                     disabled={i === b.etapas.length - 1}
-                    aria-label={`Bajar la etapa ${i + 1}`}
-                    title="Bajar"
+                    onClick={() => cambiar("etapas", mover(b.etapas, i, i + 1))}
                   >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
-                    onClick={() => cambiar("etapas", b.etapas.filter((x) => x.clave !== e.clave))}
-                    aria-label={`Quitar la etapa ${i + 1}`}
-                    title="Quitar"
-                  >
-                    ✕
-                  </button>
+                    <ArrowDownwardRoundedIcon fontSize="small" />
+                  </BotonRenglon>
+                  <BotonRenglon etiqueta={`Quitar la etapa ${i + 1}`} titulo="Quitar" onClick={() => cambiar("etapas", b.etapas.filter((x) => x.clave !== e.clave))}>
+                    <CloseRoundedIcon fontSize="small" />
+                  </BotonRenglon>
                 </div>
               </li>
             ))}
           </ol>
         ) : (
-          <div className={styles.empty}>Todavía no hay etapas. Puedes crear el proyecto sin ellas y agregarlas después.</div>
+          <p className={styles.vacio}>Todavía no hay etapas. Puedes crear el proyecto sin ellas y agregarlas después.</p>
         )}
 
         {b.etapas.some((e) => e.plannedDate) ? (
-          <div className={`${styles.panel} ${styles.panelHundido}`}>
-            <h3 className={styles.panelTitle}>Así se ve el cronograma</h3>
+          <div className={styles.hundido}>
+            <h3 className={styles.subtitulo}>Así se ve el cronograma</h3>
             <LineaDeTiempo
               inicio={b.startDate}
               fin={b.endDate || null}
@@ -725,82 +687,70 @@ export default function NuevoProyectoPage() {
   function pasoAlcance() {
     return (
       <>
-        <div>
-          <label className={styles.fieldLabel} htmlFor="resumenAlcance">
-            El alcance en una frase
-          </label>
-          <input
+        <Field label="El alcance en una frase" fullWidth>
+          <Input
             id="resumenAlcance"
-            className={styles.input}
             value={b.scopeSummary}
             onChange={(e) => cambiar("scopeSummary", e.target.value)}
             placeholder="Ej. Suministro e instalación de 32 cámaras IP con grabación centralizada"
           />
-        </div>
+        </Field>
 
         {b.cotizacionId && b.importarAlcance ? (
-          <p className={styles.hint}>
-            También se agregarán los entregables de la cotización {cotizacionElegida?.folio ?? ""} al crear el
-            proyecto.
-          </p>
+          <Alert tone="info" dense>
+            También se agregarán los entregables de la cotización {cotizacionElegida?.folio ?? ""} al crear el proyecto.
+          </Alert>
         ) : null}
 
         {TIPOS_ALCANCE.map((kind) => {
           const renglones = b.alcance.filter((a) => a.kind === kind);
           return (
-            <section key={kind} className={`${styles.panel} ${styles.panelHundido}`} aria-labelledby={`alc-${kind}`}>
-              <div className={styles.panelHead}>
+            <section key={kind} className={styles.hundido} aria-labelledby={`alc-${kind}`}>
+              <div className={styles.hundidoCabeza}>
                 <div>
-                  <h3 id={`alc-${kind}`} className={styles.panelTitle}>
+                  <h3 id={`alc-${kind}`} className={styles.subtitulo}>
                     {TIPO_ALCANCE_LABEL[kind]}
+                    {renglones.length ? <span className={styles.conteo}>{renglones.length}</span> : null}
                   </h3>
-                  <p className={styles.hint}>{TIPO_ALCANCE_AYUDA[kind]}</p>
+                  <p className={styles.ayuda}>{TIPO_ALCANCE_AYUDA[kind]}</p>
                 </div>
-                <button type="button" className={styles.smallBtn} onClick={() => agregarAlcance(kind)}>
+                <Button size="sm" variant="tonal" iconStart={<AddRoundedIcon />} onClick={() => agregarAlcance(kind)} aria-label={`Agregar a ${TIPO_ALCANCE_LABEL[kind]}`}>
                   Agregar
-                </button>
+                </Button>
               </div>
               {renglones.length ? (
-                <ul className={styles.editor}>
+                <ul className={styles.renglones}>
                   {renglones.map((a) => (
-                    <li key={a.clave} className={styles.editorRow2}>
-                      <div>
-                        <label className={styles.fieldLabel} htmlFor={`alc-t-${a.clave}`}>
-                          Qué
-                        </label>
-                        <input
-                          id={`alc-t-${a.clave}`}
-                          className={styles.input}
-                          value={a.titulo}
-                          maxLength={240}
-                          onChange={(ev) =>
-                            cambiar("alcance", b.alcance.map((x) => (x.clave === a.clave ? { ...x, titulo: ev.target.value } : x)))
-                          }
-                        />
+                    <li key={a.clave} className={styles.renglon}>
+                      <div className={styles.renglonCampos} data-cols="2">
+                        <Field label="Qué">
+                          <Input
+                            id={`alc-t-${a.clave}`}
+                            value={a.titulo}
+                            maxLength={240}
+                            onChange={(ev) =>
+                              cambiar("alcance", b.alcance.map((x) => (x.clave === a.clave ? { ...x, titulo: ev.target.value } : x)))
+                            }
+                          />
+                        </Field>
+                        <Field label="Detalle (opcional)">
+                          <Input
+                            id={`alc-d-${a.clave}`}
+                            value={a.detalle}
+                            onChange={(ev) =>
+                              cambiar("alcance", b.alcance.map((x) => (x.clave === a.clave ? { ...x, detalle: ev.target.value } : x)))
+                            }
+                          />
+                        </Field>
                       </div>
-                      <div>
-                        <label className={styles.fieldLabel} htmlFor={`alc-d-${a.clave}`}>
-                          Detalle (opcional)
-                        </label>
-                        <input
-                          id={`alc-d-${a.clave}`}
-                          className={styles.input}
-                          value={a.detalle}
-                          onChange={(ev) =>
-                            cambiar("alcance", b.alcance.map((x) => (x.clave === a.clave ? { ...x, detalle: ev.target.value } : x)))
-                          }
-                        />
-                      </div>
-                      <div className={styles.editorActions}>
-                        <button
-                          type="button"
-                          className={styles.iconBtn}
+                      <div className={styles.renglonAcciones}>
+                        <BotonRenglon
+                          etiqueta={`Quitar «${a.titulo || "renglón vacío"}»`}
+                          titulo="Quitar"
                           onClick={() => cambiar("alcance", b.alcance.filter((x) => x.clave !== a.clave))}
-                          aria-label={`Quitar «${a.titulo || "renglón vacío"}»`}
-                          title="Quitar"
                         >
-                          ✕
-                        </button>
+                          <CloseRoundedIcon fontSize="small" />
+                        </BotonRenglon>
                       </div>
                     </li>
                   ))}
@@ -818,88 +768,76 @@ export default function NuevoProyectoPage() {
     const sugeridos = REQUERIMIENTOS_SUGERIDOS.filter((s) => !existentes.has(s.toLowerCase()));
     return (
       <>
-        <p className={styles.sub} style={{ margin: 0 }}>
-          Lo que hace falta para poder entregar: papeles, permisos, anticipos, información del cliente. En el
-          proyecto se palomean conforme se consiguen.
-        </p>
         {sugeridos.length ? (
-          <div className={styles.chips} role="group" aria-label="Requerimientos frecuentes">
+          <div className={styles.sugeridos} role="group" aria-label="Requerimientos frecuentes">
+            <span className={styles.sugeridosTitulo}>Frecuentes</span>
             {sugeridos.map((s) => (
-              <button key={s} type="button" className={styles.filterBtn} onClick={() => agregarRequerimiento(s)}>
-                + {s}
-              </button>
+              <Button key={s} size="sm" variant="tonal" iconStart={<AddRoundedIcon />} onClick={() => agregarRequerimiento(s)}>
+                {s}
+              </Button>
             ))}
           </div>
         ) : null}
-        <div className={styles.acciones}>
-          <button type="button" className={styles.secondaryBtn} onClick={() => agregarRequerimiento()}>
+        <div className={styles.barra}>
+          <Button size="sm" iconStart={<AddRoundedIcon />} onClick={() => agregarRequerimiento()}>
             Agregar requerimiento
-          </button>
+          </Button>
         </div>
         {b.requerimientos.length ? (
-          <ul className={styles.editor}>
+          <ul className={styles.renglones}>
             {b.requerimientos.map((r, i) => (
-              <li key={r.clave} className={styles.editorRow}>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`req-${r.clave}`}>
-                    Qué hace falta
-                  </label>
-                  <input
-                    id={`req-${r.clave}`}
-                    className={styles.input}
-                    value={r.titulo}
-                    maxLength={240}
-                    onChange={(ev) =>
-                      cambiar(
-                        "requerimientos",
-                        b.requerimientos.map((x) => (x.clave === r.clave ? { ...x, titulo: ev.target.value } : x)),
-                      )
-                    }
-                  />
+              <li key={r.clave} className={styles.renglon}>
+                <span className={styles.numero} aria-hidden="true">
+                  {i + 1}
+                </span>
+                <div className={styles.renglonCampos} data-cols="3">
+                  <Field label="Qué hace falta">
+                    <Input
+                      id={`req-${r.clave}`}
+                      value={r.titulo}
+                      maxLength={240}
+                      onChange={(ev) =>
+                        cambiar(
+                          "requerimientos",
+                          b.requerimientos.map((x) => (x.clave === r.clave ? { ...x, titulo: ev.target.value } : x)),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Fecha límite">
+                    <DateInput
+                      id={`req-f-${r.clave}`}
+                      value={r.dueDate}
+                      onChange={(ev) =>
+                        cambiar(
+                          "requerimientos",
+                          b.requerimientos.map((x) => (x.clave === r.clave ? { ...x, dueDate: ev.target.value } : x)),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Quién lo consigue">
+                    <PersonaSelect
+                      id={`req-r-${r.clave}`}
+                      value={r.responsableId}
+                      onChange={(v) =>
+                        cambiar(
+                          "requerimientos",
+                          b.requerimientos.map((x) => (x.clave === r.clave ? { ...x, responsableId: v } : x)),
+                        )
+                      }
+                      personas={personas}
+                    />
+                  </Field>
                 </div>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`req-f-${r.clave}`}>
-                    Fecha límite
-                  </label>
-                  <input
-                    id={`req-f-${r.clave}`}
-                    className={styles.input}
-                    type="date"
-                    value={r.dueDate}
-                    onChange={(ev) =>
-                      cambiar(
-                        "requerimientos",
-                        b.requerimientos.map((x) => (x.clave === r.clave ? { ...x, dueDate: ev.target.value } : x)),
-                      )
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`req-r-${r.clave}`}>
-                    Quién lo consigue
-                  </label>
-                  <PersonaSelect
-                    id={`req-r-${r.clave}`}
-                    value={r.responsableId}
-                    onChange={(v) =>
-                      cambiar(
-                        "requerimientos",
-                        b.requerimientos.map((x) => (x.clave === r.clave ? { ...x, responsableId: v } : x)),
-                      )
-                    }
-                    personas={personas}
-                  />
-                </div>
-                <div className={styles.editorActions}>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
+                <div className={styles.renglonAcciones}>
+                  <BotonRenglon
+                    etiqueta={`Quitar el requerimiento ${i + 1}`}
+                    titulo="Quitar"
                     onClick={() => cambiar("requerimientos", b.requerimientos.filter((x) => x.clave !== r.clave))}
-                    aria-label={`Quitar el requerimiento ${i + 1}`}
-                    title="Quitar"
                   >
-                    ✕
-                  </button>
+                    <CloseRoundedIcon fontSize="small" />
+                  </BotonRenglon>
                 </div>
               </li>
             ))}
@@ -912,85 +850,66 @@ export default function NuevoProyectoPage() {
   function pasoEquipo() {
     return (
       <>
-        <p className={styles.sub} style={{ margin: 0 }}>
-          Quiénes trabajan en el proyecto y con qué papel. Solo puedes sumar a gente de tu equipo; si alguien
-          queda fuera, el sistema te lo dirá al crear.
-        </p>
-        <ul className={styles.items}>
-          <li className={styles.item}>
-            <div className={styles.itemMain}>
-              <span className={styles.itemTitle}>{nombrePersona(b.responsableId) || "Sin responsable"}</span>
-              <span className={styles.rowSub}>Responsable · se elige en «Fechas y presupuesto»</span>
-            </div>
-          </li>
-        </ul>
-        <div className={styles.acciones}>
-          <button type="button" className={styles.secondaryBtn} onClick={agregarMiembro}>
+        <div className={styles.responsable}>
+          <span className={styles.subtitulo}>{nombrePersona(b.responsableId) || "Sin responsable"}</span>
+          <span className={styles.ayuda}>Responsable · se elige en «Fechas y presupuesto»</span>
+        </div>
+        <div className={styles.barra}>
+          <Button size="sm" iconStart={<AddRoundedIcon />} onClick={agregarMiembro}>
             Agregar persona
-          </button>
+          </Button>
         </div>
         {b.equipo.length ? (
-          <ul className={styles.editor}>
+          <ul className={styles.renglones}>
             {b.equipo.map((m, i) => (
-              <li key={m.clave} className={styles.editorRow}>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`eq-${m.clave}`}>
-                    Persona
-                  </label>
-                  <PersonaSelect
-                    id={`eq-${m.clave}`}
-                    value={m.userId}
-                    onChange={(v) => cambiar("equipo", b.equipo.map((x) => (x.clave === m.clave ? { ...x, userId: v } : x)))}
-                    personas={personas}
-                    vacio="Elige a alguien"
-                    excluir={[responsableNum, ...idsEnEquipo]}
-                  />
+              <li key={m.clave} className={styles.renglon}>
+                <div className={styles.renglonCampos} data-cols="3">
+                  <Field label="Persona">
+                    <PersonaSelect
+                      id={`eq-${m.clave}`}
+                      value={m.userId}
+                      onChange={(v) => cambiar("equipo", b.equipo.map((x) => (x.clave === m.clave ? { ...x, userId: v } : x)))}
+                      personas={personas}
+                      vacio="Elige a alguien"
+                      excluir={[responsableNum, ...idsEnEquipo]}
+                    />
+                  </Field>
+                  <Field label="Papel">
+                    <Select
+                      id={`eq-rol-${m.clave}`}
+                      value={m.role}
+                      onChange={(ev) =>
+                        cambiar(
+                          "equipo",
+                          b.equipo.map((x) => (x.clave === m.clave ? { ...x, role: ev.target.value as RolEquipo } : x)),
+                        )
+                      }
+                    >
+                      {ROLES_EQUIPO.filter((r) => r !== "RESPONSABLE").map((r) => (
+                        <option key={r} value={r}>
+                          {ROL_EQUIPO_LABEL[r]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Notas">
+                    <Input
+                      id={`eq-n-${m.clave}`}
+                      value={m.notas}
+                      maxLength={300}
+                      onChange={(ev) => cambiar("equipo", b.equipo.map((x) => (x.clave === m.clave ? { ...x, notas: ev.target.value } : x)))}
+                      placeholder="Ej. Solo turno nocturno"
+                    />
+                  </Field>
                 </div>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`eq-rol-${m.clave}`}>
-                    Papel
-                  </label>
-                  <select
-                    id={`eq-rol-${m.clave}`}
-                    className={styles.select}
-                    value={m.role}
-                    onChange={(ev) =>
-                      cambiar(
-                        "equipo",
-                        b.equipo.map((x) => (x.clave === m.clave ? { ...x, role: ev.target.value as RolEquipo } : x)),
-                      )
-                    }
-                  >
-                    {ROLES_EQUIPO.filter((r) => r !== "RESPONSABLE").map((r) => (
-                      <option key={r} value={r}>
-                        {ROL_EQUIPO_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`eq-n-${m.clave}`}>
-                    Notas
-                  </label>
-                  <input
-                    id={`eq-n-${m.clave}`}
-                    className={styles.input}
-                    value={m.notas}
-                    maxLength={300}
-                    onChange={(ev) => cambiar("equipo", b.equipo.map((x) => (x.clave === m.clave ? { ...x, notas: ev.target.value } : x)))}
-                    placeholder="Ej. Solo turno nocturno"
-                  />
-                </div>
-                <div className={styles.editorActions}>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
+                <div className={styles.renglonAcciones}>
+                  <BotonRenglon
+                    etiqueta={`Quitar a la persona ${i + 1}`}
+                    titulo="Quitar"
                     onClick={() => cambiar("equipo", b.equipo.filter((x) => x.clave !== m.clave))}
-                    aria-label={`Quitar a la persona ${i + 1}`}
-                    title="Quitar"
                   >
-                    ✕
-                  </button>
+                    <CloseRoundedIcon fontSize="small" />
+                  </BotonRenglon>
                 </div>
               </li>
             ))}
@@ -1007,60 +926,71 @@ export default function NuevoProyectoPage() {
     return (
       <>
         {pendientes.length ? (
-          <div className={styles.errorBox} role="alert">
-            Antes de crear, corrige esto:
-            <ul>
+          <Alert tone="danger" role="alert" title="Antes de crear, corrige esto:">
+            <ul className={styles.lista}>
               {PASOS_ALTA.flatMap((p) =>
                 erroresDelPaso(p.id, b).map((texto) => (
                   <li key={`${p.id}-${texto}`}>
-                    {texto}{" "}
-                    <button type="button" className={styles.linkBtn} onClick={() => irA(p.id)}>
-                      Ir a «{p.titulo}»
-                    </button>
+                    {texto} <LinkButton onClick={() => irA(p.id)}>Ir a «{p.titulo}»</LinkButton>
                   </li>
                 )),
               )}
             </ul>
-          </div>
+          </Alert>
         ) : null}
 
-        <div className={styles.resumenAlta}>
-          <div className={`${styles.panel} ${styles.panelHundido}`}>
-            <h3 className={styles.panelTitle}>{b.title.trim() || "Sin nombre"}</h3>
-            <span className={styles.rowWrap}>Cliente: {clienteElegido?.name ?? "—"}</span>
-            <span className={styles.rowWrap}>Tipo: {getServiceProjectTypeLabel(b.projectType)}</span>
-            {b.siteCount ? <span className={styles.rowWrap}>Sitios: {b.siteCount}</span> : null}
-            <span className={styles.rowWrap}>Responsable: {nombrePersona(b.responsableId) || "—"}</span>
+        <div className={styles.resumen}>
+          <div className={styles.resumenTarjeta}>
+            <h3 className={styles.subtitulo}>{b.title.trim() || "Sin nombre"}</h3>
+            <dl className={styles.resumenDatos}>
+              <dt>Cliente</dt>
+              <dd>{clienteElegido?.name ?? "—"}</dd>
+              <dt>Tipo</dt>
+              <dd>{getServiceProjectTypeLabel(b.projectType)}</dd>
+              {b.siteCount ? (
+                <>
+                  <dt>Sitios</dt>
+                  <dd>{b.siteCount}</dd>
+                </>
+              ) : null}
+              <dt>Responsable</dt>
+              <dd>{nombrePersona(b.responsableId) || "—"}</dd>
+            </dl>
           </div>
-          <div className={`${styles.panel} ${styles.panelHundido}`}>
-            <h3 className={styles.panelTitle}>Fechas y dinero</h3>
-            <span className={styles.rowWrap}>
-              Plan: {b.startDate ? formatoFecha(b.startDate) : "sin inicio planeado"} → {b.endDate ? formatoFecha(b.endDate) : "sin fin planeado"}
-            </span>
-            <span className={styles.rowWrap}>
-              Presupuesto: {importe !== null && Number.isFinite(importe) ? formatoMoneda(importe, b.currency) : "sin capturar"}
-            </span>
-            <span className={styles.rowWrap}>
-              Cotización: {cotizacionElegida ? cotizacionElegida.folio : "ninguna"}
-              {cotizacionElegida && b.importarAlcance ? " (se trae su alcance)" : ""}
-            </span>
+          <div className={styles.resumenTarjeta}>
+            <h3 className={styles.subtitulo}>Fechas y dinero</h3>
+            <dl className={styles.resumenDatos}>
+              <dt>Plan</dt>
+              <dd>
+                {b.startDate ? formatoFecha(b.startDate) : "sin inicio planeado"} → {b.endDate ? formatoFecha(b.endDate) : "sin fin planeado"}
+              </dd>
+              <dt>Presupuesto</dt>
+              <dd>{importe !== null && Number.isFinite(importe) ? formatoMoneda(importe, b.currency) : "sin capturar"}</dd>
+              <dt>Cotización</dt>
+              <dd>
+                {cotizacionElegida ? cotizacionElegida.folio : "ninguna"}
+                {cotizacionElegida && b.importarAlcance ? " (se trae su alcance)" : ""}
+              </dd>
+            </dl>
           </div>
-          <div className={`${styles.panel} ${styles.panelHundido}`}>
-            <h3 className={styles.panelTitle}>Plan de trabajo</h3>
-            <span className={styles.rowWrap}>{b.etapas.filter((e) => e.name.trim()).length} etapas en el cronograma</span>
-            <span className={styles.rowWrap}>
-              Alcance: {conteo("ENTREGABLE")} entregables · {conteo("EXCLUSION")} exclusiones · {conteo("SUPUESTO")} supuestos
-            </span>
-            <span className={styles.rowWrap}>{b.requerimientos.filter((r) => r.titulo.trim()).length} requerimientos</span>
-            <span className={styles.rowWrap}>
-              Equipo: responsable + {b.equipo.filter((m) => m.userId).length} persona(s)
-            </span>
+          <div className={styles.resumenTarjeta}>
+            <h3 className={styles.subtitulo}>Plan de trabajo</h3>
+            <dl className={styles.resumenDatos}>
+              <dt>Cronograma</dt>
+              <dd>{b.etapas.filter((e) => e.name.trim()).length} etapas</dd>
+              <dt>Alcance</dt>
+              <dd>
+                {conteo("ENTREGABLE")} entregables · {conteo("EXCLUSION")} exclusiones · {conteo("SUPUESTO")} supuestos
+              </dd>
+              <dt>Requerimientos</dt>
+              <dd>{b.requerimientos.filter((r) => r.titulo.trim()).length}</dd>
+              <dt>Equipo</dt>
+              <dd>responsable + {b.equipo.filter((m) => m.userId).length} persona(s)</dd>
+            </dl>
           </div>
         </div>
 
-        <p className={styles.hint}>
-          El proyecto nace como «Planeado». Cuando arranque, cámbialo a «En curso» desde su página.
-        </p>
+        <p className={styles.ayuda}>El proyecto nace como «Planeado». Cuando arranque, cámbialo a «En curso» desde su página.</p>
       </>
     );
   }
@@ -1077,100 +1007,99 @@ export default function NuevoProyectoPage() {
 
   const esUltimo = paso === "revisar";
 
+  /** Resumen de cada paso en la columna derecha: también sirve para saltar entre ellos. */
+  const resumenPaso = (id: PasoAlta): string | undefined => {
+    switch (id) {
+      case "datos":
+        return clienteElegido?.name;
+      case "fechas":
+        return b.endDate ? `Fin ${formatoFecha(b.endDate)}` : undefined;
+      case "cronograma":
+        return b.etapas.length ? `${b.etapas.length} etapa${b.etapas.length === 1 ? "" : "s"}` : undefined;
+      case "alcance":
+        return b.alcance.length ? `${b.alcance.length} renglón${b.alcance.length === 1 ? "" : "es"}` : undefined;
+      case "requerimientos":
+        return b.requerimientos.length ? `${b.requerimientos.length} requerimiento${b.requerimientos.length === 1 ? "" : "s"}` : undefined;
+      case "equipo":
+        return b.equipo.length ? `Responsable + ${b.equipo.length}` : undefined;
+      default:
+        return undefined;
+    }
+  };
+  const pasos: PendingItem[] = PASOS_ALTA.map((p, i) => {
+    const conErrores = erroresDelPaso(p.id, b).length > 0;
+    const activo = p.id === paso;
+    return {
+      id: p.id,
+      label: p.titulo,
+      hint: activo ? "Estás aquí" : resumenPaso(p.id),
+      done: i < indice && !conErrores,
+      error: conErrores && (i < indice || (activo && mostrarErrores)),
+      onSelect: () => irA(p.id),
+    };
+  });
+
   return (
-    <div className={styles.wrap}>
-      <div className={styles.top}>
-        <div>
-          <Link className={styles.migas} href="/erp/proyectos">
-            ← Proyectos
-          </Link>
-          <h1 className={styles.title}>Nuevo proyecto</h1>
-          <p className={styles.sub}>
-            Todo en un solo paso al final: datos, fechas, cronograma, alcance, requerimientos y equipo. Lo que no
-            tengas ahora lo puedes agregar después.
-          </p>
-        </div>
-        <Link className={styles.secondaryBtn} href="/erp/proyectos">
-          Cancelar
-        </Link>
-      </div>
-
-      <nav aria-label="Pasos del asistente">
-        <ol className={styles.stepper}>
-          {PASOS_ALTA.map((p, i) => {
-            const activo = p.id === paso;
-            const hecho = i < indice && erroresDelPaso(p.id, b).length === 0;
-            return (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className={`${styles.step} ${activo ? styles.stepOn : ""} ${hecho ? styles.stepDone : ""}`}
-                  aria-current={activo ? "step" : undefined}
-                  onClick={() => irA(p.id)}
-                >
-                  <span className={styles.stepNum} aria-hidden="true">
-                    {hecho ? "✓" : i + 1}
-                  </span>
-                  {p.titulo}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-
-      <form
-        className={styles.panel}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (esUltimo) void crear();
-          else siguiente();
-        }}
-        noValidate
-      >
-        <h2 ref={tituloPaso} tabIndex={-1} className={styles.panelTitle} style={{ outline: "none" }}>
-          Paso {indice + 1} de {PASOS_ALTA.length}: {PASOS_ALTA[indice]?.titulo}
-        </h2>
-
-        {contenido[paso]()}
-
-        {mostrarErrores && erroresActuales.length && !esUltimo ? (
-          <div className={styles.errorBox} role="alert">
-            <ul>
-              {erroresActuales.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {error ? (
-          <p className={styles.errorBox} role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <div className={styles.wizardNav}>
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            onClick={() => indice > 0 && irA(PASOS_ALTA[indice - 1].id)}
-            disabled={indice === 0 || guardando}
-          >
+    <FormPage
+      className={styles.pagina}
+      title="Nuevo proyecto"
+      breadcrumbs={[{ label: "Proyectos", href: "/erp/proyectos" }, { label: "Nuevo proyecto" }]}
+      back={{ href: "/erp/proyectos", label: "Volver a Proyectos" }}
+      description="Todo en un solo paso al final: datos, fechas, cronograma, alcance, requerimientos y equipo. Lo que no tengas ahora lo puedes agregar después."
+      pendingTitle="Pasos"
+      pending={pasos}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (esUltimo) void crear();
+        else siguiente();
+      }}
+      loading={guardando}
+      footer={
+        <FormFooter start={<span className={styles.pie}>Paso {indice + 1} de {PASOS_ALTA.length}</span>}>
+          <ButtonLink href="/erp/proyectos" variant="tertiary">
+            Cancelar
+          </ButtonLink>
+          <span className={styles.divisor} aria-hidden="true" />
+          <Button onClick={() => indice > 0 && irA(PASOS_ALTA[indice - 1].id)} disabled={indice === 0 || guardando}>
             ← Anterior
-          </button>
-          <div className={styles.acciones}>
-            {!esUltimo ? (
-              <button type="button" className={styles.linkBtn} onClick={() => irA("revisar")}>
-                Ir a revisar
-              </button>
-            ) : null}
-            <button type="submit" className={styles.primaryBtn} disabled={guardando || !token}>
-              {esUltimo ? (guardando ? "Creando proyecto…" : "Crear proyecto") : "Siguiente →"}
-            </button>
-          </div>
+          </Button>
+          {!esUltimo ? (
+            <Button variant="tertiary" onClick={() => irA("revisar")}>
+              Ir a revisar
+            </Button>
+          ) : null}
+          <Button type="submit" variant="primary" loading={guardando} disabled={!token}>
+            {esUltimo ? "Crear proyecto" : "Siguiente →"}
+          </Button>
+        </FormFooter>
+      }
+    >
+      <FormSection
+        id="paso-actual"
+        step={indice + 1}
+        title={`Paso ${indice + 1} de ${PASOS_ALTA.length}: ${PASOS_ALTA[indice]?.titulo}`}
+        description={AYUDA_PASO[paso]}
+      >
+        <div className={styles.cuerpo}>
+          {contenido[paso]()}
+
+          {mostrarErrores && erroresActuales.length && !esUltimo ? (
+            <Alert tone="danger" role="alert" srLabel="Error">
+              <ul className={styles.lista}>
+                {erroresActuales.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
+
+          {error ? (
+            <Alert tone="danger" role="alert" srLabel="Error">
+              {error}
+            </Alert>
+          ) : null}
         </div>
-      </form>
-    </div>
+      </FormSection>
+    </FormPage>
   );
 }

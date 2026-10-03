@@ -1,0 +1,375 @@
+/* Pestañas de la ficha de proyecto (resumen, cronograma, alcance…). Solo tokens --ui-*. */
+
+.pila {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s6);
+  min-width: 0;
+}
+
+.ayuda {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-3);
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.vencido {
+  color: var(--ui-danger-text);
+  font-weight: var(--ui-fw-medium);
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-body);
+  color: var(--ui-fg-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.conteo {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  margin-left: var(--ui-s2);
+  padding: 0 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-2);
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+.vacio {
+  margin: 0;
+  padding: var(--ui-s5) var(--ui-s4);
+  border: 1px dashed var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-body);
+  color: var(--ui-fg-3);
+  text-align: center;
+}
+
+/* ─── Listas de renglones ──────────────────────────────────────────────── */
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+}
+
+.fila {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface);
+  transition: background-color var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.fila:last-child {
+  border-bottom: none;
+}
+
+.fila:hover {
+  background: var(--ui-hover);
+}
+
+/* Franja de color a la izquierda (semáforo de la actividad). */
+.fila[data-luz]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--ui-success);
+}
+
+.fila[data-luz="rojo"]::before {
+  background: var(--ui-danger);
+}
+
+.fila[data-luz="amarillo"]::before {
+  background: var(--ui-warning);
+}
+
+.fila[data-luz="azul"]::before {
+  background: var(--ui-info);
+}
+
+.filaEdicion {
+  display: block;
+  background: var(--ui-surface-2);
+}
+
+.filaEdicion:hover {
+  background: var(--ui-surface-2);
+}
+
+.filaApagada {
+  opacity: 0.65;
+}
+
+.principal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tituloFila {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+a.tituloFila {
+  text-decoration: none;
+}
+
+a.tituloFila:hover {
+  color: var(--ui-brand-text);
+}
+
+.hecho {
+  color: var(--ui-fg-3);
+  text-decoration: line-through;
+}
+
+.meta {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-s1);
+}
+
+.selectCompacto {
+  width: auto;
+  min-width: 9.5rem;
+}
+
+@media (max-width: 720px) {
+  .fila {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .acciones {
+    justify-content: flex-start;
+  }
+}
+
+/* ─── Formularios en la pestaña ────────────────────────────────────────── */
+
+/* «Agregar …»: caja punteada al pie de la pestaña. */
+.alta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.altaTitulo {
+  margin: 0;
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--ui-s3);
+  align-items: end;
+}
+
+.campos[data-cols="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.campos[data-cols="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.campoAncho {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .campos[data-cols="2"],
+  .campos[data-cols="3"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.edicion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+}
+
+.botonera {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.chipsTitulo {
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+/* ─── Resumen ──────────────────────────────────────────────────────────── */
+
+.tablaFechas {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ui-fs-body);
+}
+
+.tablaMarco {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+}
+
+.tablaFechas th,
+.tablaFechas td {
+  padding: var(--ui-s2) var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border-subtle);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tablaFechas tr:last-child th,
+.tablaFechas tr:last-child td {
+  border-bottom: none;
+}
+
+.tablaFechas thead th {
+  background: var(--ui-surface-2);
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.tablaFechas tbody th {
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.datos {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--ui-s4) var(--ui-s5);
+}
+
+.dato {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dato dt {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.dato dd {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-medium);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.datoSub {
+  display: block;
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-regular);
+  color: var(--ui-fg-3);
+}
+
+.enlace {
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.enlace:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bloqueEtiqueta {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Documentos ───────────────────────────────────────────────────────── */
+
+.archivo {
+  display: block;
+  width: 100%;
+  min-height: var(--ui-control-h);
+  padding: 6px var(--ui-s2);
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-size: var(--ui-fs-meta);
+}
+
+.archivo:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}

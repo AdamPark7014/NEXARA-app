@@ -6,22 +6,36 @@ import { useRouter } from "next/navigation";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
 import {
   Alert,
   Badge,
   Button,
   ButtonLink,
-  EmptyState,
-  Kbd,
+  DataTable,
+  FilterChip,
+  FilterChips,
   LinkButton,
-  PageHead,
+  ModulePage,
+  ModuleToolbar,
+  PersonCell,
+  ProgressCell,
   SearchInput,
-  SkeletonRows,
+  Select,
   Stat,
   StatRow,
+  StatusBadge,
   Tabs,
-  Toolbar,
-  tabla,
+  WhenCell,
+  type Column,
+  type Tone,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { canAccessClientPadron } from "@/lib/client-sectors";
@@ -39,8 +53,8 @@ import {
 } from "@/lib/proyectos-api";
 import { hitoVencido, hoyISO } from "@/lib/proyecto-plan";
 import { getServiceProjectTypeLabel } from "@/lib/service-project-types";
-import { claseTono } from "./_componentes/tono";
-import styles from "./proyectos.module.css";
+import { toneDe } from "./_componentes/tono";
+import styles from "./lista.module.css";
 
 /** Filtros de salud: «En riesgo» es la bandera calculada (incluye los retrasados). */
 const FILTROS_SALUD = [
@@ -53,6 +67,13 @@ const FILTROS_SALUD = [
 ] as const;
 
 type FiltroSalud = (typeof FILTROS_SALUD)[number]["valor"];
+
+const PUNTO_SALUD: Partial<Record<FiltroSalud, Tone>> = {
+  RIESGO: "warning",
+  RETRASADO: "danger",
+  EN_TIEMPO: "success",
+  PLANEADO: "info",
+};
 
 function cumpleSalud(p: ProyectoFila, filtro: FiltroSalud): boolean {
   if (!filtro) return true;
@@ -67,6 +88,17 @@ function plazo(p: ProyectoFila): string {
   if (r.diasDeRetraso > 0) return `${r.diasDeRetraso} día${r.diasDeRetraso === 1 ? "" : "s"} de retraso`;
   if (r.diasRestantes !== null) return r.diasRestantes === 0 ? "Vence hoy" : `Faltan ${r.diasRestantes} días`;
   return p.endDate ? "" : "Sin fecha de fin";
+}
+
+/** Color del punto de la fecha: rojo si va tarde, ámbar en riesgo, verde a tiempo. */
+function tonoPlazo(p: ProyectoFila): Tone {
+  const r = p.resumen;
+  if (r.salud === "CANCELADO") return "neutral";
+  if (r.salud === "TERMINADO") return r.diasDeRetraso > 0 ? "warning" : "success";
+  if (r.diasDeRetraso > 0) return "danger";
+  if (r.enRiesgo) return "warning";
+  if (r.salud === "EN_TIEMPO") return "success";
+  return "neutral";
 }
 
 /** La lista de proyectos, o los clientes de proyecto con lo que cada uno tiene abierto. */
@@ -205,11 +237,10 @@ export default function ProyectosPage() {
     );
   }, [clientes, qDiferida]);
 
-  const visibles = useMemo(() => {
+  /** Filtro de texto, responsable y cliente: la base de los conteos de los chips. */
+  const porTexto = useMemo(() => {
     const texto = qDiferida.trim().toLowerCase();
     return items.filter((p) => {
-      if (estado ? p.status !== estado : p.status === "CANCELLED") return false;
-      if (!cumpleSalud(p, salud)) return false;
       if (responsable && String(p.responsable?.id ?? "") !== responsable) return false;
       if (cliente && String(p.client?.id ?? p.clientId) !== cliente) return false;
       if (!texto) return true;
@@ -222,19 +253,43 @@ export default function ProyectosPage() {
         p.cotizacion?.quoteNumber,
       ].some((v) => (v ?? "").toLowerCase().includes(texto));
     });
-  }, [items, qDiferida, estado, salud, responsable, cliente]);
+  }, [items, qDiferida, responsable, cliente]);
 
+  const visibles = useMemo(
+    () => porTexto.filter((p) => (estado ? p.status === estado : p.status !== "CANCELLED") && cumpleSalud(p, salud)),
+    [porTexto, estado, salud],
+  );
+
+  const conteos = useMemo(() => {
+    const porEstado: Record<string, number> = { "": 0 };
+    const porSalud: Record<string, number> = {};
+    for (const p of porTexto) {
+      porEstado[p.status] = (porEstado[p.status] ?? 0) + 1;
+      if (p.status !== "CANCELLED") porEstado[""] += 1;
+      const cuenta = estado ? p.status === estado : p.status !== "CANCELLED";
+      if (!cuenta) continue;
+      porSalud[""] = (porSalud[""] ?? 0) + 1;
+      for (const f of FILTROS_SALUD) if (f.valor && cumpleSalud(p, f.valor)) porSalud[f.valor] = (porSalud[f.valor] ?? 0) + 1;
+    }
+    return { porEstado, porSalud };
+  }, [porTexto, estado]);
+
+  /** Cartera completa (sin filtros): lo que se trabaja, lo que falta arrancar, lo atrasado y lo cerrado. */
   const cifras = useMemo(() => {
     let enCurso = 0;
+    let porIniciar = 0;
+    let atrasados = 0;
+    let cerrados = 0;
     let enRiesgo = 0;
-    let retrasados = 0;
-    for (const p of visibles) {
+    for (const p of items) {
       if (p.status === "ACTIVE") enCurso += 1;
-      if (p.resumen.enRiesgo) enRiesgo += 1;
-      if (p.resumen.salud === "RETRASADO") retrasados += 1;
+      if (p.status === "PLANNED") porIniciar += 1;
+      if (p.status === "COMPLETED") cerrados += 1;
+      if (p.resumen.salud === "RETRASADO") atrasados += 1;
+      if (p.resumen.enRiesgo && p.resumen.salud !== "RETRASADO") enRiesgo += 1;
     }
-    return { total: visibles.length, enCurso, enRiesgo, retrasados };
-  }, [visibles]);
+    return { enCurso, porIniciar, atrasados, cerrados, enRiesgo };
+  }, [items]);
 
   const hayFiltros = Boolean(q.trim() || estado || salud || responsable || cliente);
   const quitarFiltros = () => {
@@ -265,72 +320,152 @@ export default function ProyectosPage() {
     router.replace(`/erp/proyectos?cliente=${serviceClientId}`, { scroll: false });
   };
 
-  return (
-    <div className={styles.wrap}>
-      <PageHead
-        title="Proyectos"
-        description="Fechas planeadas y reales, cronograma por etapas, alcance, equipo y documentos. El avance y el semáforo se calculan solos con las actividades y las fechas."
-        actions={
-          sinRegistros && !error ? null : (
-            <ButtonLink variant="primary" href="/erp/proyectos/nuevo">
-              Nuevo proyecto <Kbd>N</Kbd>
-            </ButtonLink>
-          )
-        }
-        tabs={
-          clientes ? (
-            <Tabs
-              ariaLabel="Vista"
-              items={[
-                { id: "proyectos" as const, label: "Proyectos", icon: AccountTreeOutlinedIcon, count: items.length },
-                { id: "clientes" as const, label: "Clientes de proyecto", icon: GroupsOutlinedIcon, count: clientes.length },
-              ]}
-              value={vista}
-              onChange={cambiarVista}
-            />
-          ) : null
-        }
-      />
+  /** Una cifra de la franja también filtra: se vuelve a pulsar para soltarla. */
+  const filtrarEstado = (e: EstadoProyecto) => {
+    setVista("proyectos");
+    setSalud("");
+    setEstado(estado === e ? "" : e);
+  };
 
-      {items.length && vista === "proyectos" ? (
-        <StatRow cols={4}>
-          <Stat
-            label="En la vista"
-            value={cifras.total}
-            hint={hayFiltros ? `de ${items.length} proyectos` : estado ? ESTADO_PROYECTO_LABEL[estado] : "vigentes"}
+  const columnas: Column<ProyectoFila>[] = [
+    {
+      key: "proyecto",
+      label: "Proyecto",
+      render: (p) => (
+        <span className={styles.celdaProyecto}>
+          <Link href={`/erp/proyectos/${p.id}`} className={styles.titulo} onClick={(e) => e.stopPropagation()}>
+            {p.title}
+          </Link>
+          <span className={`${styles.sub} ${styles.soloTelefono}`}>{p.client?.name ?? "Sin cliente"}</span>
+          <span className={styles.sub}>{getServiceProjectTypeLabel(p.projectType)}</span>
+        </span>
+      ),
+    },
+    {
+      key: "cliente",
+      label: "Cliente",
+      render: (p) => (
+        <span className={styles.cliente}>
+          <span className={styles.clienteNombre}>{p.client?.name ?? "Sin cliente"}</span>
+          {p.cotizacion?.quoteNumber ? <span className={styles.sub}>Cotización {p.cotizacion.quoteNumber}</span> : null}
+        </span>
+      ),
+    },
+    {
+      key: "responsable",
+      label: "Responsable",
+      render: (p) =>
+        p.responsable?.nombre ? (
+          <PersonCell name={p.responsable.nombre} size={26} subtitle={`${p.equipoCount} en equipo`} />
+        ) : (
+          <span className={styles.tenue}>Sin asignar</span>
+        ),
+    },
+    {
+      key: "avance",
+      label: "Avance",
+      render: (p) => {
+        const avance = p.resumen.avance.porcentaje;
+        return (
+          <span className={styles.avance}>
+            {avance === null ? (
+              <span className={styles.tenue}>Sin datos de avance</span>
+            ) : (
+              <ProgressCell value={avance} max={100} label={`${avance} %`} width={128} />
+            )}
+            <span className={styles.sub}>{origenAvance(p.resumen.avance.origen)}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "fechas",
+      label: "Fechas",
+      render: (p) => {
+        const textoPlazo = plazo(p);
+        return (
+          <WhenCell
+            time={`${formatoFecha(p.startDate)} → ${p.endDate ? formatoFecha(p.endDate) : "sin fin"}`}
+            hint={textoPlazo || undefined}
+            tone={tonoPlazo(p)}
           />
-          <Stat label="En curso" value={cifras.enCurso} hint="trabajándose hoy" />
-          <Stat
-            label="En riesgo"
-            value={cifras.enRiesgo}
-            hint="incluye a los retrasados"
-            tone={cifras.enRiesgo ? "warning" : "default"}
-          />
-          <Stat
-            label="Retrasados"
-            value={cifras.retrasados}
-            hint="pasaron su fecha de fin"
-            tone={cifras.retrasados ? "danger" : "default"}
-          />
-        </StatRow>
-      ) : null}
+        );
+      },
+    },
+    {
+      key: "estado",
+      label: "Estado",
+      render: (p) => {
+        const siguiente = p.proximoHito;
+        const siguienteVencido = siguiente ? hitoVencido(siguiente, hoy) : false;
+        return (
+          <span className={styles.estado}>
+            <span className={styles.insignias}>
+              <StatusBadge
+                size="sm"
+                label={ESTADO_PROYECTO_LABEL[p.status] ?? "Sin estado"}
+                tone={toneDe(ESTADO_TONO[p.status])}
+              />
+              {/* «Planeado · Planeado» no dice nada: el semáforo solo sale si agrega algo. */}
+              {p.resumen.etiqueta !== ESTADO_PROYECTO_LABEL[p.status] ? (
+                <Badge size="sm" tone={toneDe(SALUD_TONO[p.resumen.salud])} title={p.resumen.motivo}>
+                  {p.resumen.etiqueta}
+                </Badge>
+              ) : null}
+            </span>
+            <span className={`${styles.sub} ${siguienteVencido ? styles.vencido : ""}`}>
+              {siguiente
+                ? `Sigue: ${siguiente.name}${siguiente.plannedDate ? ` · ${formatoFecha(siguiente.plannedDate, false)}` : ""}${siguienteVencido ? " (vencida)" : ""}`
+                : p.hitosCount > 0
+                  ? "Todas las etapas cumplidas"
+                  : "Sin cronograma"}
+            </span>
+          </span>
+        );
+      },
+    },
+  ];
 
-      {error ? (
-        <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
-          {error}
-        </Alert>
-      ) : null}
+  const tabs = clientes ? (
+    <Tabs
+      ariaLabel="Vista"
+      items={[
+        { id: "proyectos" as const, label: "Proyectos", icon: AccountTreeOutlinedIcon, count: items.length },
+        { id: "clientes" as const, label: "Clientes de proyecto", icon: GroupsOutlinedIcon, count: clientes.length },
+      ]}
+      value={vista}
+      onChange={cambiarVista}
+    />
+  ) : null;
 
-      {vista === "clientes" && clientes ? (
-        <div className={tabla.marco}>
-          <div className={tabla.barra}>
-            <Toolbar
-              end={
-                <span className={styles.rowSub}>
-                  {clientesVisibles.length === 1 ? "1 cliente" : `${clientesVisibles.length} clientes`}
-                </span>
-              }
-            >
+  const encabezado = {
+    className: styles.pagina,
+    title: "Proyectos",
+    description:
+      "Fechas planeadas y reales, cronograma por etapas, alcance, equipo y documentos. El avance y el semáforo se calculan solos con las actividades y las fechas.",
+    icon: <AccountTreeOutlinedIcon />,
+    primaryAction:
+      sinRegistros && !error ? null : (
+        <ButtonLink variant="primary" href="/erp/proyectos/nuevo" iconStart={<AddRoundedIcon />} kbd="N">
+          Nuevo proyecto
+        </ButtonLink>
+      ),
+    tabs,
+    before: error ? (
+      <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
+        {error}
+      </Alert>
+    ) : null,
+  };
+
+  if (vista === "clientes" && clientes) {
+    return (
+      <ModulePage
+        {...encabezado}
+        listLabel="Clientes de proyecto"
+        toolbar={
+          <ModuleToolbar
+            search={
               <SearchInput
                 ref={buscador}
                 value={q}
@@ -339,100 +474,163 @@ export default function ProyectosPage() {
                 aria-label="Buscar clientes de proyecto"
                 shortcut="/"
               />
-            </Toolbar>
-          </div>
-          {clientes.length === 0 ? (
-            <EmptyState
-              icon={<GroupsOutlinedIcon />}
-              title="Aún no hay clientes de proyecto"
-              description="Aparecen aquí los que se dan de alta en Clientes como «Proyecto», los del alta rápida de una actividad y cualquier cliente al que se le abra un proyecto."
-              action={
-                <ButtonLink variant="primary" href="/erp/proyectos/nuevo">
-                  Nuevo proyecto
-                </ButtonLink>
+            }
+            end={
+              <span className={styles.tenue}>
+                {clientesVisibles.length === 1 ? "1 cliente" : `${clientesVisibles.length} clientes`}
+              </span>
+            }
+          />
+        }
+        empty={clientesVisibles.length === 0}
+        emptyState={
+          clientes.length === 0
+            ? {
+                icon: <GroupsOutlinedIcon />,
+                title: "Aún no hay clientes de proyecto",
+                description:
+                  "Aparecen aquí los que se dan de alta en Clientes como «Proyecto», los del alta rápida de una actividad y cualquier cliente al que se le abra un proyecto.",
               }
-            />
-          ) : clientesVisibles.length === 0 ? (
-            <EmptyState
-              icon={<FilterAltOffOutlinedIcon />}
-              title="Ningún cliente coincide"
-              action={<Button onClick={() => setQ("")}>Quitar búsqueda</Button>}
-            />
-          ) : (
-            <div aria-label="Clientes de proyecto" role="list">
-              <div className={`${tabla.cabeza} ${styles.rejillaClientes}`} aria-hidden>
-                <span>Cliente</span>
-                <span>Proyectos</span>
-                <span>Lo más reciente</span>
-                <span />
-              </div>
-              {clientesVisibles.map((c) => {
-                const suyos = (c.serviceClientId ? proyectosPorCliente.get(c.serviceClientId) : undefined) ?? [];
-                const vigentes = suyos.filter(esVigente);
-                const reciente = vigentes[0] ?? suyos[0];
-                const sinDatos = !c.legalName?.trim() && !c.taxId?.trim();
-                return (
-                  <div key={c.id} role="listitem" className={`${tabla.fila} ${styles.rejillaClientes}`}>
-                    <span className={tabla.celda}>
-                      <span className={tabla.fuerte}>{c.name}</span>
-                      <span className={tabla.tenue}>
-                        {isInactiveClient(c.status)
-                          ? "Inactivo"
-                          : sinDatos
-                            ? "Alta rápida: faltan sus datos fiscales"
-                            : c.legalName && c.legalName !== c.name
-                              ? c.legalName
-                              : c.taxId || "Sin razón social"}
-                      </span>
+            : {
+                icon: <FilterAltOffOutlinedIcon />,
+                title: "Ningún cliente coincide",
+                action: <Button onClick={() => setQ("")}>Quitar búsqueda</Button>,
+                tone: "neutral",
+              }
+        }
+      >
+        <ul aria-label="Clientes de proyecto" className={styles.clientes}>
+          {clientesVisibles.map((c) => {
+            const suyos = (c.serviceClientId ? proyectosPorCliente.get(c.serviceClientId) : undefined) ?? [];
+            const vigentes = suyos.filter(esVigente);
+            const reciente = vigentes[0] ?? suyos[0];
+            const sinDatos = !c.legalName?.trim() && !c.taxId?.trim();
+            const inactivo = isInactiveClient(c.status);
+            return (
+              <li key={c.id} className={styles.tarjetaCliente}>
+                <div className={styles.tarjetaCabeza}>
+                  <span className={styles.tarjetaIco} aria-hidden="true">
+                    <BusinessOutlinedIcon fontSize="inherit" />
+                  </span>
+                  <span className={styles.tarjetaTexto}>
+                    <span className={styles.tarjetaNombre}>{c.name}</span>
+                    <span className={`${styles.sub} ${!inactivo && sinDatos ? styles.alerta : ""}`}>
+                      {inactivo
+                        ? "Inactivo"
+                        : sinDatos
+                          ? "Alta rápida: faltan sus datos fiscales"
+                          : c.legalName && c.legalName !== c.name
+                            ? c.legalName
+                            : c.taxId || "Sin razón social"}
                     </span>
-                    <span className={tabla.celda}>
-                      {suyos.length ? (
-                        <>
-                          <span className={tabla.fuerte}>
-                            {vigentes.length === 1 ? "1 vigente" : `${vigentes.length} vigentes`}
-                          </span>
-                          <span className={tabla.tenue}>{suyos.length} en total</span>
-                        </>
-                      ) : (
-                        <span className={tabla.tenue}>Sin proyectos todavía</span>
-                      )}
-                    </span>
-                    <span className={tabla.celda}>
-                      {reciente ? (
-                        <>
-                          <Link href={`/erp/proyectos/${reciente.id}`} className={styles.enlaceProyecto}>
-                            {reciente.title}
-                          </Link>
-                          <span className={tabla.tenue}>
-                            {ESTADO_PROYECTO_LABEL[reciente.status] ?? "Sin estado"}
-                            {reciente.endDate ? ` · fin ${formatoFecha(reciente.endDate)}` : ""}
-                          </span>
-                        </>
-                      ) : (
-                        <Badge tone="outline">Por arrancar</Badge>
-                      )}
-                    </span>
-                    <span className={styles.accionesCliente}>
-                      {suyos.length && c.serviceClientId ? (
-                        <LinkButton onClick={() => verProyectosDe(c.serviceClientId!)}>Ver proyectos</LinkButton>
-                      ) : null}
-                      {puedeAbrirFicha ? (
-                        <Link href={`/erp/clientes/${c.id}#proyectos`} className={styles.enlaceProyecto}>
-                          Ficha
-                        </Link>
-                      ) : null}
-                      <ButtonLink href={`/erp/proyectos/nuevo?clienteId=${c.id}`}>Nuevo proyecto</ButtonLink>
+                  </span>
+                </div>
+                <div className={styles.tarjetaCifras}>
+                  {suyos.length ? (
+                    <>
+                      <span className={styles.tarjetaCifra}>{vigentes.length === 1 ? "1 vigente" : `${vigentes.length} vigentes`}</span>
+                      <span>{suyos.length} en total</span>
+                    </>
+                  ) : (
+                    <span>Sin proyectos todavía</span>
+                  )}
+                </div>
+                {reciente ? (
+                  <div className={styles.reciente}>
+                    <span className={styles.recienteEtiqueta}>Lo más reciente</span>
+                    <Link href={`/erp/proyectos/${reciente.id}`} className={styles.recienteEnlace}>
+                      {reciente.title}
+                    </Link>
+                    <span className={styles.sub}>
+                      {ESTADO_PROYECTO_LABEL[reciente.status] ?? "Sin estado"}
+                      {reciente.endDate ? ` · fin ${formatoFecha(reciente.endDate)}` : ""}
                     </span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className={tabla.marco}>
-          <div className={`${tabla.barra} ${styles.barraFiltros}`}>
-            <Toolbar end={hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}>
+                ) : (
+                  <span>
+                    <Badge tone="outline">Por arrancar</Badge>
+                  </span>
+                )}
+                <div className={styles.tarjetaAcciones}>
+                  {suyos.length && c.serviceClientId ? (
+                    <Button size="sm" variant="ghost" onClick={() => verProyectosDe(c.serviceClientId!)}>
+                      Ver proyectos
+                    </Button>
+                  ) : null}
+                  {puedeAbrirFicha ? (
+                    <ButtonLink size="sm" variant="ghost" href={`/erp/clientes/${c.id}#proyectos`}>
+                      Ficha
+                    </ButtonLink>
+                  ) : null}
+                  <ButtonLink size="sm" href={`/erp/proyectos/nuevo?clienteId=${c.id}`} iconStart={<AddRoundedIcon />}>
+                    Nuevo proyecto
+                  </ButtonLink>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </ModulePage>
+    );
+  }
+
+  return (
+    <ModulePage
+      {...encabezado}
+      stats={
+        items.length || primeraCarga ? (
+          <StatRow cols={4} ariaLabel="Cartera de proyectos">
+            <Stat
+              label="En curso"
+              value={cifras.enCurso}
+              hint={cifras.enRiesgo ? `${cifras.enRiesgo} en riesgo` : "trabajándose hoy"}
+              icon={<PlayCircleOutlineRoundedIcon />}
+              tone="brand"
+              onClick={() => filtrarEstado("ACTIVE")}
+              pressed={estado === "ACTIVE"}
+              loading={primeraCarga}
+            />
+            <Stat
+              label="Por iniciar"
+              value={cifras.porIniciar}
+              hint="planeados, sin arrancar"
+              icon={<EventOutlinedIcon />}
+              iconTone="info"
+              onClick={() => filtrarEstado("PLANNED")}
+              pressed={estado === "PLANNED"}
+              loading={primeraCarga}
+            />
+            <Stat
+              label="Atrasados"
+              value={cifras.atrasados}
+              hint="pasaron su fecha de fin"
+              icon={<ReportProblemOutlinedIcon />}
+              tone={cifras.atrasados ? "danger" : "default"}
+              onClick={() => {
+                setEstado("");
+                setSalud(salud === "RETRASADO" ? "" : "RETRASADO");
+              }}
+              pressed={salud === "RETRASADO"}
+              loading={primeraCarga}
+            />
+            <Stat
+              label="Cerrados"
+              value={cifras.cerrados}
+              hint="entregados"
+              icon={<TaskAltRoundedIcon />}
+              tone="success"
+              onClick={() => filtrarEstado("COMPLETED")}
+              pressed={estado === "COMPLETED"}
+              loading={primeraCarga}
+            />
+          </StatRow>
+        ) : null
+      }
+      listLabel="Proyectos"
+      toolbar={
+        <>
+          <ModuleToolbar
+            search={
               <SearchInput
                 ref={buscador}
                 value={q}
@@ -441,197 +639,142 @@ export default function ProyectosPage() {
                 aria-label="Buscar proyectos"
                 shortcut="/"
               />
-              <label className={styles.filters}>
-                <span className={styles.filtersLabel}>Responsable</span>
-                <select
-                  className={`${styles.select} ${styles.selectCorto}`}
-                  value={responsable}
-                  onChange={(e) => setResponsable(e.target.value)}
-                >
-                  <option value="">Todos</option>
-                  {user?.id && responsables.some(([id]) => id === user.id) ? (
-                    <option value={String(user.id)}>Yo</option>
-                  ) : null}
-                  {responsables
-                    .filter(([id]) => id !== user?.id)
-                    .map(([id, nombre]) => (
-                      <option key={id} value={String(id)}>
-                        {nombre}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              {clientesConProyecto.length > 1 || cliente ? (
-                <label className={styles.filters}>
-                  <span className={styles.filtersLabel}>Cliente</span>
-                  <select
-                    className={`${styles.select} ${styles.selectCorto}`}
-                    value={cliente}
-                    onChange={(e) => setCliente(e.target.value)}
+            }
+            chips={
+              <FilterChips ariaLabel="Filtrar por estado">
+                <FilterChip active={estado === ""} count={conteos.porEstado[""] ?? 0} title="Todo menos los cancelados" onClick={() => setEstado("")}>
+                  Vigentes
+                </FilterChip>
+                {ESTADOS_PROYECTO.map((e) => (
+                  <FilterChip
+                    key={e}
+                    active={estado === e}
+                    count={conteos.porEstado[e] ?? 0}
+                    dot={toneDe(ESTADO_TONO[e])}
+                    onClick={() => setEstado(estado === e ? "" : e)}
                   >
-                    <option value="">Todos</option>
-                    {clientesConProyecto.map(([id, nombre]) => (
-                      <option key={id} value={String(id)}>
-                        {nombre}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-            </Toolbar>
-
-            <div className={styles.filters} role="group" aria-label="Filtrar por estado">
-              <span className={styles.filtersLabel}>Estado</span>
-              <button
-                type="button"
-                className={`${styles.filterBtn} ${estado === "" ? styles.filterBtnOn : ""}`}
-                aria-pressed={estado === ""}
-                title="Todo menos los cancelados"
-                onClick={() => setEstado("")}
-              >
-                Vigentes
-              </button>
-              {ESTADOS_PROYECTO.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  className={`${styles.filterBtn} ${estado === e ? styles.filterBtnOn : ""}`}
-                  aria-pressed={estado === e}
-                  onClick={() => setEstado(estado === e ? "" : e)}
-                >
-                  {ESTADO_PROYECTO_LABEL[e]}
-                </button>
-              ))}
-            </div>
-
-            <div className={styles.filters} role="group" aria-label="Filtrar por semáforo">
-              <span className={styles.filtersLabel}>Semáforo</span>
+                    {ESTADO_PROYECTO_LABEL[e]}
+                  </FilterChip>
+                ))}
+              </FilterChips>
+            }
+            end={hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}
+          />
+          <div className={styles.subbarra}>
+            <span className={styles.subbarraEtiqueta} aria-hidden="true">
+              Semáforo
+            </span>
+            <FilterChips ariaLabel="Filtrar por semáforo">
               {FILTROS_SALUD.map((f) => (
-                <button
+                <FilterChip
                   key={f.valor || "todas"}
-                  type="button"
-                  className={`${styles.filterBtn} ${salud === f.valor ? styles.filterBtnOn : ""}`}
-                  aria-pressed={salud === f.valor}
+                  active={salud === f.valor}
+                  count={f.valor ? conteos.porSalud[f.valor] ?? 0 : undefined}
+                  dot={PUNTO_SALUD[f.valor]}
                   title={f.valor === "RIESGO" ? "Incluye a los retrasados" : undefined}
                   onClick={() => setSalud(salud === f.valor ? "" : f.valor)}
                 >
                   {f.etiqueta}
-                </button>
+                </FilterChip>
               ))}
+            </FilterChips>
+            <div className={styles.selects}>
+              <Select
+                aria-label="Responsable"
+                controlSize="sm"
+                wrapperClassName={styles.select}
+                value={responsable}
+                onChange={(e) => setResponsable(e.target.value)}
+              >
+                <option value="">Todos los responsables</option>
+                {user?.id && responsables.some(([id]) => id === user.id) ? <option value={String(user.id)}>Yo</option> : null}
+                {responsables
+                  .filter(([id]) => id !== user?.id)
+                  .map(([id, nombre]) => (
+                    <option key={id} value={String(id)}>
+                      {nombre}
+                    </option>
+                  ))}
+              </Select>
+              {clientesConProyecto.length > 1 || cliente ? (
+                <Select
+                  aria-label="Cliente"
+                  controlSize="sm"
+                  wrapperClassName={styles.select}
+                  value={cliente}
+                  onChange={(e) => setCliente(e.target.value)}
+                >
+                  <option value="">Todos los clientes</option>
+                  {clientesConProyecto.map(([id, nombre]) => (
+                    <option key={id} value={String(id)}>
+                      {nombre}
+                    </option>
+                  ))}
+                </Select>
+              ) : null}
             </div>
           </div>
-
-          {primeraCarga ? (
-            <SkeletonRows rows={5} label="Cargando proyectos" />
-          ) : sinRegistros && !error ? (
-            <EmptyState
-              icon={<AccountTreeOutlinedIcon />}
-              title="Todavía no hay proyectos"
-              description={
-                clientes?.length
+        </>
+      }
+      loading={primeraCarga}
+      empty={!primeraCarga && visibles.length === 0}
+      emptyState={
+        sinRegistros && error
+          ? {
+              icon: <CloudOffOutlinedIcon />,
+              title: "No se pudieron cargar los proyectos",
+              description: "Revisa el aviso de arriba y vuelve a intentarlo.",
+              tone: "danger",
+            }
+          : sinRegistros
+            ? {
+                icon: <AccountTreeOutlinedIcon />,
+                title: "Todavía no hay proyectos",
+                description: clientes?.length
                   ? `Ya hay ${clientes.length === 1 ? "1 cliente de proyecto" : `${clientes.length} clientes de proyecto`} en el padrón. Elige uno para arrancar su primer proyecto, o créalo desde cero.`
-                  : "Un proyecto junta cliente, fechas, etapas, equipo y documentos. Puedes crearlo desde cero o a partir de una cotización aprobada."
-              }
-              action={
-                <span className={styles.acciones}>
-                  <ButtonLink variant="primary" href="/erp/proyectos/nuevo">
+                  : "Un proyecto junta cliente, fechas, etapas, equipo y documentos. Puedes crearlo desde cero o a partir de una cotización aprobada.",
+                action: (
+                  <ButtonLink variant="primary" href="/erp/proyectos/nuevo" iconStart={<AddRoundedIcon />}>
                     Crear el primero
                   </ButtonLink>
-                  {clientes?.length ? <Button onClick={() => cambiarVista("clientes")}>Ver clientes de proyecto</Button> : null}
-                </span>
+                ),
+                secondaryAction: clientes?.length ? (
+                  <Button onClick={() => cambiarVista("clientes")}>Ver clientes de proyecto</Button>
+                ) : undefined,
               }
-            />
-          ) : visibles.length ? (
-            <ul className={`${styles.list} ${styles.listEnMarco}`} aria-label="Proyectos">
-              {visibles.map((p) => {
-                const avance = p.resumen.avance.porcentaje;
-                const siguiente = p.proximoHito;
-                const siguienteVencido = siguiente ? hitoVencido(siguiente, hoy) : false;
-                const textoPlazo = plazo(p);
-                return (
-                  <li key={p.id}>
-                    <Link href={`/erp/proyectos/${p.id}`} className={styles.card}>
-                      <div className={styles.cardCol}>
-                        <span className={styles.cardTitle}>{p.title}</span>
-                        <span className={styles.rowSub}>{p.client?.name ?? "Sin cliente"}</span>
-                        <span className={styles.rowSub}>{getServiceProjectTypeLabel(p.projectType)}</span>
-                      </div>
-
-                      <div className={styles.cardCol}>
-                        <span className={styles.rowSub}>
-                          Responsable: <strong>{p.responsable?.nombre ?? "Sin asignar"}</strong>
-                        </span>
-                        <span className={styles.rowSub}>
-                          {formatoFecha(p.startDate)} → {p.endDate ? formatoFecha(p.endDate) : "sin fin planeado"}
-                        </span>
-                        {textoPlazo ? (
-                          <span
-                            className={`${styles.rowSub} ${p.resumen.diasDeRetraso > 0 && p.resumen.salud !== "TERMINADO" ? styles.vencido : ""}`}
-                          >
-                            {textoPlazo}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className={styles.cardCol}>
-                        <div className={styles.badges}>
-                          <span className={claseTono(ESTADO_TONO[p.status] ?? "neutral")}>
-                            {ESTADO_PROYECTO_LABEL[p.status] ?? "Sin estado"}
-                          </span>
-                          {/* «Planeado · Planeado» no dice nada: el semáforo solo sale si agrega algo. */}
-                          {p.resumen.etiqueta !== ESTADO_PROYECTO_LABEL[p.status] ? (
-                            <span className={claseTono(SALUD_TONO[p.resumen.salud] ?? "neutral")} title={p.resumen.motivo}>
-                              {p.resumen.etiqueta}
-                            </span>
-                          ) : null}
-                        </div>
-                        <span className={`${styles.rowSub} ${siguienteVencido ? styles.vencido : ""}`}>
-                          {siguiente
-                            ? `Sigue: ${siguiente.name}${siguiente.plannedDate ? ` · ${formatoFecha(siguiente.plannedDate, false)}` : ""}${siguienteVencido ? " (vencida)" : ""}`
-                            : p.hitosCount > 0
-                              ? "Todas las etapas cumplidas"
-                              : "Sin cronograma"}
-                        </span>
-                      </div>
-
-                      <div className={styles.cardCol}>
-                        <div
-                          className={styles.progress}
-                          role="progressbar"
-                          aria-label="Avance"
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={avance ?? undefined}
-                          aria-valuetext={avance === null ? "Sin datos de avance" : `${avance} %`}
-                        >
-                          <div className={styles.progressFill} style={{ width: `${avance ?? 0}%` }} />
-                        </div>
-                        <span className={styles.progressLabel}>
-                          {avance === null ? "—" : `${avance} %`} · {origenAvance(p.resumen.avance.origen)}
-                        </span>
-                        <span className={styles.counts}>
-                          <span>
-                            {p.hitosCount} etapa{p.hitosCount === 1 ? "" : "s"}
-                          </span>
-                          <span>{p.equipoCount} en equipo</span>
-                          <span>{p.documentosCount} doc.</span>
-                        </span>
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : items.length ? (
-            <EmptyState
-              icon={<FilterAltOffOutlinedIcon />}
-              title="Ningún proyecto coincide"
-              description={estado === "" ? "«Vigentes» esconde los cancelados; prueba con otro estado o quita los filtros." : undefined}
-              action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
-            />
-          ) : null}
-        </div>
-      )}
-    </div>
+            : {
+                icon: <FilterAltOffOutlinedIcon />,
+                title: "Ningún proyecto coincide",
+                description:
+                  estado === "" ? "«Vigentes» esconde los cancelados; prueba con otro estado o quita los filtros." : undefined,
+                action: <Button onClick={quitarFiltros}>Quitar filtros</Button>,
+                tone: "neutral",
+              }
+      }
+    >
+      <DataTable
+        flush
+        className={styles.tabla}
+        ariaLabel="Proyectos"
+        columns={columnas}
+        rows={visibles}
+        rowKey={(p) => p.id}
+        loading={cargando && !primeraCarga}
+        onRowClick={(p) => router.push(`/erp/proyectos/${p.id}`)}
+        rowActionsLabel="Acciones"
+        rowActions={(p) => (
+          <ButtonLink
+            href={`/erp/proyectos/${p.id}`}
+            variant="ghost"
+            size="sm"
+            icon
+            aria-label={`Abrir el proyecto ${p.title}`}
+            title="Abrir proyecto"
+          >
+            <ChevronRightRoundedIcon fontSize="small" />
+          </ButtonLink>
+        )}
+      />
+    </ModulePage>
   );
 }

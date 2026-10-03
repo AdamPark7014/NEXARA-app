@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import { Alert, Button, Checkbox, DateInput, Field, Input, Progress, RecordSection, Select } from "@/components/base";
 import {
   ESTADOS_REQUERIMIENTO,
   ESTADO_REQUERIMIENTO_LABEL,
@@ -15,7 +17,7 @@ import { aInputFecha, diasEntre, textoPlazo } from "@/lib/proyecto-plan";
 import { REQUERIMIENTOS_SUGERIDOS } from "@/lib/proyecto-alta";
 import { PersonaSelect } from "./personas";
 import type { SeccionProps } from "./tipos";
-import styles from "../proyectos.module.css";
+import styles from "./secciones.module.css";
 
 type Edicion = { titulo: string; responsableId: string; dueDate: string };
 
@@ -76,135 +78,103 @@ export default function SeccionRequerimientos({ proyecto: p, token, hoy, ocupado
     );
 
   return (
-    <div className={styles.gantt} style={{ gap: 12 }}>
-      <section className={styles.panel} aria-labelledby="req-lista">
-        <div className={styles.panelHead}>
-          <h3 id="req-lista" className={styles.panelTitle}>
-            Lo que hace falta para entregar
-          </h3>
-          <span className={styles.progressLabel}>
-            {r.total ? `${r.cumplidos} de ${r.total} listos` : "Sin requerimientos"}
-          </span>
-        </div>
-        {r.total ? (
-          <div
-            className={styles.progress}
-            role="progressbar"
-            aria-label="Requerimientos listos"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={r.porcentaje ?? 0}
-            aria-valuetext={`${r.cumplidos} de ${r.total}`}
-          >
-            <div className={`${styles.progressFill} ${styles.progressFillOk}`} style={{ width: `${r.porcentaje ?? 0}%` }} />
-          </div>
-        ) : null}
-
+    <div className={styles.pila}>
+      <RecordSection
+        title="Lo que hace falta para entregar"
+        subtitle={r.total ? `${r.cumplidos} de ${r.total} listos` : "Sin requerimientos"}
+        end={
+          r.total ? (
+            <Progress
+              value={r.porcentaje ?? 0}
+              max={100}
+              tone="success"
+              label={`${r.porcentaje ?? 0} %`}
+              ariaLabel="Requerimientos listos"
+            />
+          ) : null
+        }
+      >
         {p.requirements.length === 0 ? (
-          <div className={styles.empty}>Sin requerimientos todavía. Agrega los papeles, permisos o datos que hacen falta.</div>
+          <p className={styles.vacio}>Sin requerimientos todavía. Agrega los papeles, permisos o datos que hacen falta.</p>
         ) : (
-          <ul className={styles.items}>
+          <ul className={styles.lista}>
             {p.requirements.map((req) => {
               const listo = req.status === "CUMPLIDO";
               const noAplica = req.status === "NO_APLICA";
               const vencido = !listo && !noAplica && (diasEntre(req.dueDate, hoy) ?? 0) > 0;
               if (editandoId === req.id && edicion) {
                 return (
-                  <li key={req.id} className={styles.item} style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
-                    <form onSubmit={(e) => void guardar(e, req)} className={styles.gantt} noValidate aria-label={`Editar «${req.titulo}»`}>
-                      <div className={styles.grid3}>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`r-t-${req.id}`}>
-                            Qué hace falta
-                          </label>
-                          <input
-                            id={`r-t-${req.id}`}
-                            className={styles.input}
-                            value={edicion.titulo}
-                            maxLength={240}
-                            onChange={(e) => setEdicion({ ...edicion, titulo: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`r-r-${req.id}`}>
-                            Quién lo consigue
-                          </label>
+                  <li key={req.id} className={`${styles.fila} ${styles.filaEdicion}`}>
+                    <form onSubmit={(e) => void guardar(e, req)} className={styles.edicion} noValidate aria-label={`Editar «${req.titulo}»`}>
+                      <div className={styles.campos} data-cols="3">
+                        <Field label="Qué hace falta">
+                          <Input id={`r-t-${req.id}`} value={edicion.titulo} maxLength={240} onChange={(e) => setEdicion({ ...edicion, titulo: e.target.value })} />
+                        </Field>
+                        <Field label="Quién lo consigue">
                           <PersonaSelect
                             id={`r-r-${req.id}`}
                             value={edicion.responsableId}
                             onChange={(v) => setEdicion({ ...edicion, responsableId: v })}
                             personas={personas}
                           />
-                        </div>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`r-f-${req.id}`}>
-                            Fecha límite
-                          </label>
-                          <input
-                            id={`r-f-${req.id}`}
-                            className={styles.input}
-                            type="date"
-                            value={edicion.dueDate}
-                            onChange={(e) => setEdicion({ ...edicion, dueDate: e.target.value })}
-                          />
-                        </div>
+                        </Field>
+                        <Field label="Fecha límite">
+                          <DateInput id={`r-f-${req.id}`} value={edicion.dueDate} onChange={(e) => setEdicion({ ...edicion, dueDate: e.target.value })} />
+                        </Field>
                       </div>
                       {errorEdicion ? (
-                        <p className={styles.error} role="alert">
+                        <Alert tone="danger" role="alert" dense>
                           {errorEdicion}
-                        </p>
+                        </Alert>
                       ) : null}
-                      <div className={styles.acciones}>
-                        <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
-                          Guardar
-                        </button>
-                        <button type="button" className={styles.secondaryBtn} onClick={() => setEditandoId(null)} disabled={ocupado}>
+                      <div className={styles.botonera}>
+                        <Button variant="tertiary" onClick={() => setEditandoId(null)} disabled={ocupado}>
                           Cancelar
-                        </button>
+                        </Button>
+                        <Button type="submit" variant="tonal" loading={ocupado}>
+                          Guardar
+                        </Button>
                       </div>
                     </form>
                   </li>
                 );
               }
               return (
-                <li key={req.id} className={styles.item}>
-                  <div className={styles.itemMain}>
-                    <label className={styles.check}>
-                      <input
-                        type="checkbox"
-                        checked={listo}
-                        disabled={ocupado || noAplica}
-                        onChange={() => cambiarEstado(req, listo ? "PENDIENTE" : "CUMPLIDO")}
-                      />
-                      <span className={`${styles.itemTitle} ${listo || noAplica ? styles.itemDone : ""}`}>{req.titulo}</span>
-                    </label>
-                    <span className={styles.rowWrap}>
-                      {req.responsable ? req.responsable.nombre : "Sin responsable"}
-                      {req.dueDate ? ` · Límite: ${formatoFecha(req.dueDate)}` : ""}
-                      {listo && req.completedAt ? ` · Listo el ${formatoFecha(req.completedAt)}` : ""}
-                    </span>
-                    {vencido ? <span className={`${styles.rowWrap} ${styles.vencido}`}>{textoPlazo(req.dueDate, hoy)}</span> : null}
+                <li key={req.id} className={styles.fila}>
+                  <div className={styles.principal}>
+                    <Checkbox
+                      checked={listo}
+                      disabled={ocupado || noAplica}
+                      onChange={() => cambiarEstado(req, listo ? "PENDIENTE" : "CUMPLIDO")}
+                      label={<span className={listo || noAplica ? styles.hecho : undefined}>{req.titulo}</span>}
+                      description={
+                        <>
+                          {req.responsable ? req.responsable.nombre : "Sin responsable"}
+                          {req.dueDate ? ` · Límite: ${formatoFecha(req.dueDate)}` : ""}
+                          {listo && req.completedAt ? ` · Listo el ${formatoFecha(req.completedAt)}` : ""}
+                          {vencido ? <span className={`${styles.vencido} ${styles.datoSub}`}>{textoPlazo(req.dueDate, hoy)}</span> : null}
+                        </>
+                      }
+                    />
                   </div>
-                  <div className={styles.itemActions}>
-                    <label className={styles.filters}>
-                      <span className={styles.filtersLabel}>Estado</span>
-                      <select
-                        className={styles.select}
-                        style={{ width: "auto" }}
-                        value={req.status}
-                        disabled={ocupado}
-                        onChange={(e) => cambiarEstado(req, e.target.value as EstadoRequerimiento)}
-                      >
-                        {ESTADOS_REQUERIMIENTO.map((s) => (
-                          <option key={s} value={s}>
-                            {ESTADO_REQUERIMIENTO_LABEL[s]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className={styles.smallBtn}
+                  <div className={styles.acciones}>
+                    <Select
+                      aria-label={`Estado de «${req.titulo}»`}
+                      controlSize="sm"
+                      wrapperClassName={styles.selectCompacto}
+                      value={req.status}
+                      disabled={ocupado}
+                      onChange={(e) => cambiarEstado(req, e.target.value as EstadoRequerimiento)}
+                    >
+                      {ESTADOS_REQUERIMIENTO.map((s) => (
+                        <option key={s} value={s}>
+                          {ESTADO_REQUERIMIENTO_LABEL[s]}
+                        </option>
+                      ))}
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       disabled={ocupado}
                       onClick={() => {
                         setEditandoId(req.id);
@@ -217,10 +187,10 @@ export default function SeccionRequerimientos({ proyecto: p, token, hoy, ocupado
                       }}
                     >
                       Editar
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.smallDangerBtn}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger-ghost"
                       disabled={ocupado}
                       onClick={() =>
                         confirmar({
@@ -234,17 +204,17 @@ export default function SeccionRequerimientos({ proyecto: p, token, hoy, ocupado
                       }
                     >
                       Borrar
-                    </button>
+                    </Button>
                   </div>
                 </li>
               );
             })}
           </ul>
         )}
-      </section>
+      </RecordSection>
 
       <form
-        className={styles.panel}
+        className={styles.alta}
         onSubmit={(e) => {
           e.preventDefault();
           void agregar(nuevo.titulo);
@@ -252,69 +222,43 @@ export default function SeccionRequerimientos({ proyecto: p, token, hoy, ocupado
         aria-labelledby="req-nuevo"
         noValidate
       >
-        <h3 id="req-nuevo" className={styles.panelTitle}>
+        <h3 id="req-nuevo" className={styles.altaTitulo}>
           Agregar requerimiento
         </h3>
         {sugeridos.length ? (
           <div className={styles.chips} role="group" aria-label="Requerimientos frecuentes">
+            <span className={styles.chipsTitulo}>Frecuentes</span>
             {sugeridos.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={styles.filterBtn}
-                disabled={ocupado}
-                onClick={() => void agregar(s)}
-              >
-                + {s}
-              </button>
+              <Button key={s} size="sm" variant="tonal" disabled={ocupado} iconStart={<AddRoundedIcon />} onClick={() => void agregar(s)}>
+                {s}
+              </Button>
             ))}
           </div>
         ) : null}
-        <div className={styles.inlineForm}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="r-nuevo-t">
-              Qué hace falta
-            </label>
-            <input
+        <div className={styles.campos}>
+          <Field label="Qué hace falta">
+            <Input
               id="r-nuevo-t"
-              className={styles.input}
               value={nuevo.titulo}
               maxLength={240}
               onChange={(e) => setNuevo({ ...nuevo, titulo: e.target.value })}
               placeholder="Ej. Visto bueno de protección civil"
             />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="r-nuevo-r">
-              Quién lo consigue
-            </label>
-            <PersonaSelect
-              id="r-nuevo-r"
-              value={nuevo.responsableId}
-              onChange={(v) => setNuevo({ ...nuevo, responsableId: v })}
-              personas={personas}
-            />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="r-nuevo-f">
-              Fecha límite
-            </label>
-            <input
-              id="r-nuevo-f"
-              className={styles.input}
-              type="date"
-              value={nuevo.dueDate}
-              onChange={(e) => setNuevo({ ...nuevo, dueDate: e.target.value })}
-            />
-          </div>
-          <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
+          </Field>
+          <Field label="Quién lo consigue">
+            <PersonaSelect id="r-nuevo-r" value={nuevo.responsableId} onChange={(v) => setNuevo({ ...nuevo, responsableId: v })} personas={personas} />
+          </Field>
+          <Field label="Fecha límite">
+            <DateInput id="r-nuevo-f" value={nuevo.dueDate} onChange={(e) => setNuevo({ ...nuevo, dueDate: e.target.value })} />
+          </Field>
+          <Button type="submit" variant="tonal" disabled={ocupado} iconStart={<AddRoundedIcon />}>
             Agregar
-          </button>
+          </Button>
         </div>
         {errorNuevo ? (
-          <p className={styles.error} role="alert">
+          <Alert tone="danger" role="alert" dense>
             {errorNuevo}
-          </p>
+          </Alert>
         ) : null}
       </form>
     </div>

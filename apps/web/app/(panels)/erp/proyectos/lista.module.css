@@ -1,0 +1,272 @@
+/* Proyectos · lista (ModulePage + DataTable) y vista de clientes de proyecto. Solo tokens --ui-*. */
+
+.pagina {
+  min-width: 0;
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.vencido {
+  color: var(--ui-danger-text);
+  font-weight: var(--ui-fw-medium);
+}
+
+/* Segunda franja de la barra: semáforo, responsable y cliente. */
+.subbarra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s3);
+  padding: var(--ui-s2) var(--ui-s4) var(--ui-s3);
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.subbarraEtiqueta {
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  margin-left: auto;
+}
+
+.select {
+  min-width: 11rem;
+  max-width: 16rem;
+}
+
+@media (max-width: 640px) {
+  .selects {
+    margin-left: 0;
+    width: 100%;
+  }
+  .select {
+    flex: 1 1 10rem;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+/* ─── Tabla ────────────────────────────────────────────────────────────── */
+
+.celdaProyecto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 26rem;
+}
+
+.titulo {
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.titulo:hover {
+  color: var(--ui-brand-text);
+}
+
+.titulo:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-xs);
+}
+
+.sub {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}
+
+.soloTelefono {
+  display: none;
+}
+
+.cliente {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 16rem;
+}
+
+.clienteNombre {
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.avance {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 7.5rem;
+}
+
+.estado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ui-s1);
+  min-width: 0;
+}
+
+.insignias {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+}
+
+/* Teléfono: proyecto (con su cliente), avance y estado; la fila abre la ficha. */
+@media (max-width: 640px) {
+  .soloTelefono {
+    display: block;
+  }
+  .tabla th:nth-child(2),
+  .tabla td:nth-child(2),
+  .tabla th:nth-child(3),
+  .tabla td:nth-child(3),
+  .tabla th:nth-child(5),
+  .tabla td:nth-child(5),
+  .tabla th:last-child,
+  .tabla td:last-child {
+    display: none;
+  }
+  .celdaProyecto {
+    max-width: 14rem;
+  }
+}
+
+/* ─── Clientes de proyecto ─────────────────────────────────────────────── */
+
+.clientes {
+  list-style: none;
+  margin: 0;
+  padding: var(--ui-s4);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: var(--ui-s3);
+}
+
+.tarjetaCliente {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  min-width: 0;
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  transition: border-color var(--ui-duration-fast) var(--ui-ease-standard), box-shadow var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.tarjetaCliente:hover {
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-elev-1);
+}
+
+.tarjetaCabeza {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.tarjetaIco {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-size: 20px;
+}
+
+.tarjetaTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tarjetaNombre {
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.alerta {
+  color: var(--ui-warning-text);
+}
+
+.tarjetaCifras {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.tarjetaCifra {
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.reciente {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--ui-s2) var(--ui-s3);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-2);
+  min-width: 0;
+}
+
+.recienteEtiqueta {
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.recienteEnlace {
+  font-weight: var(--ui-fw-medium);
+  color: var(--ui-brand-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.recienteEnlace:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tarjetaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin-top: auto;
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.tarjetaAcciones > :last-child {
+  margin-left: auto;
+}

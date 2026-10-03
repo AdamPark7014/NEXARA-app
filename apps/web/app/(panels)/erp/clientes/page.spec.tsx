@@ -72,13 +72,13 @@ describe("lista de clientes", () => {
     listSalesClients.mockResolvedValue(FILAS);
     render(<ClientesHubPage />);
 
-    const fila = (await screen.findByText("Plaza Norte")).closest("a")!;
+    const fila = (await screen.findByText("Plaza Norte")).closest("tr")!;
     expect(listSalesClients).toHaveBeenCalledWith("jwt", { sector: "PROYECTO" });
-    expect(fila).toHaveAttribute("href", "/erp/clientes/1");
+    expect(within(fila).getByRole("link", { name: "Plaza Norte" })).toHaveAttribute("href", "/erp/clientes/1");
     expect(within(fila).getByText("PNO010101AB1")).toBeInTheDocument();
     expect(within(fila).getByText("Activo")).toBeInTheDocument();
 
-    const otra = screen.getByText("Hotel Centro").closest("a")!;
+    const otra = screen.getByText("Hotel Centro").closest("tr")!;
     expect(within(otra).getByText("Sin RFC")).toBeInTheDocument();
     expect(within(otra).getByText("Inactivo")).toBeInTheDocument();
     expect(within(otra).getByText("Comercial")).toBeInTheDocument();

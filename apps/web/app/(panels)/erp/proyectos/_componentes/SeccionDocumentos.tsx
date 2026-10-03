@@ -1,6 +1,11 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import { Alert, Badge, Button, Field, FilterChip, FilterChips, Input, RecordSection, Select, buttonClass } from "@/components/base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { triggerFileDownload } from "@/lib/file-download";
 import {
@@ -16,7 +21,7 @@ import {
   type TipoDocumento,
 } from "@/lib/proyectos-api";
 import type { SeccionProps } from "./tipos";
-import styles from "../proyectos.module.css";
+import styles from "./secciones.module.css";
 
 /**
  * Documentos del proyecto. Los archivos viven en `/uploads/project-docs`, que la API protege con
@@ -82,133 +87,63 @@ export default function SeccionDocumentos({ proyecto: p, token, ocupado, mutar, 
   const conteo = (k: TipoDocumento) => p.documents.filter((d) => d.kind === k).length;
 
   return (
-    <div className={styles.gantt} style={{ gap: 12 }}>
-      <form className={styles.panel} onSubmit={subir} aria-labelledby="doc-subir" noValidate>
-        <h3 id="doc-subir" className={styles.panelTitle}>
-          Subir documentos
-        </h3>
-        <div className={styles.grid3}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="doc-tipo">
-              Tipo
-            </label>
-            <select id="doc-tipo" className={styles.select} value={tipo} onChange={(e) => setTipo(e.target.value as TipoDocumento)}>
-              {TIPOS_DOCUMENTO.map((k) => (
-                <option key={k} value={k}>
-                  {TIPO_DOCUMENTO_LABEL[k]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="doc-archivos">
-              Archivos (hasta {MAX_ARCHIVOS_POR_SUBIDA}, 25 MB cada uno)
-            </label>
-            <input
-              id="doc-archivos"
-              ref={input}
-              className={styles.fileInput}
-              type="file"
-              multiple
-              onChange={(e) => elegir(e.target.files)}
-            />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="doc-nombre">
-              Nombre para mostrar
-            </label>
-            <input
-              id="doc-nombre"
-              className={styles.input}
-              value={nombre}
-              maxLength={220}
-              disabled={archivos.length > 1}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder={archivos.length > 1 ? "Con varios archivos se usa el nombre de cada uno" : "Ej. Plano de canalización v2"}
-            />
-          </div>
-        </div>
-        {archivos.length ? (
-          <p className={styles.hint}>
-            {archivos.length === 1 ? archivos[0].name : `${archivos.length} archivos`} ·{" "}
-            {formatoTamano(archivos.reduce((t, f) => t + f.size, 0))}
-          </p>
-        ) : null}
-        {errorSubida ? (
-          <p className={styles.error} role="alert">
-            {errorSubida}
-          </p>
-        ) : null}
-        <div className={styles.acciones}>
-          <button type="submit" className={styles.primaryBtn} disabled={ocupado || !archivos.length || Boolean(errorSubida)}>
-            {ocupado ? "Subiendo…" : "Subir"}
-          </button>
-        </div>
-      </form>
-
-      <section className={styles.panel} aria-labelledby="doc-lista">
-        <h3 id="doc-lista" className={styles.panelTitle}>
-          Documentos ({p.documents.length})
-        </h3>
+    <div className={styles.pila}>
+      <RecordSection
+        title={
+          <>
+            Documentos<span className={styles.conteo}>{p.documents.length}</span>
+          </>
+        }
+        subtitle="Planos, actas, contratos y minutas del proyecto."
+      >
         {p.documents.length ? (
-          <div className={styles.filters} role="group" aria-label="Filtrar por tipo">
-            <button
-              type="button"
-              className={`${styles.filterBtn} ${filtro === "" ? styles.filterBtnOn : ""}`}
-              aria-pressed={filtro === ""}
-              onClick={() => setFiltro("")}
-            >
+          <FilterChips ariaLabel="Filtrar por tipo">
+            <FilterChip active={filtro === ""} count={p.documents.length} onClick={() => setFiltro("")}>
               Todos
-            </button>
+            </FilterChip>
             {TIPOS_DOCUMENTO.filter((k) => conteo(k)).map((k) => (
-              <button
-                key={k}
-                type="button"
-                className={`${styles.filterBtn} ${filtro === k ? styles.filterBtnOn : ""}`}
-                aria-pressed={filtro === k}
-                onClick={() => setFiltro(filtro === k ? "" : k)}
-              >
-                {TIPO_DOCUMENTO_LABEL[k]} ({conteo(k)})
-              </button>
+              <FilterChip key={k} active={filtro === k} count={conteo(k)} onClick={() => setFiltro(filtro === k ? "" : k)}>
+                {TIPO_DOCUMENTO_LABEL[k]}
+              </FilterChip>
             ))}
-          </div>
+          </FilterChips>
         ) : null}
         {errorDescarga ? (
-          <p className={styles.error} role="alert">
+          <Alert tone="danger" role="alert" dense onDismiss={() => setErrorDescarga(null)}>
             {errorDescarga}
-          </p>
+          </Alert>
         ) : null}
         {visibles.length === 0 ? (
-          <div className={styles.empty}>Todavía no hay documentos. Sube planos, actas, contratos o minutas.</div>
+          <p className={styles.vacio}>Todavía no hay documentos. Sube planos, actas, contratos o minutas.</p>
         ) : (
-          <ul className={styles.items}>
+          <ul className={styles.lista}>
             {visibles.map((d) => (
-              <li key={d.id} className={styles.item}>
-                <div className={styles.itemMain}>
-                  <span className={styles.itemTitle}>{d.nombre}</span>
-                  <div className={styles.badges}>
-                    <span className={styles.badge}>{TIPO_DOCUMENTO_LABEL[d.kind] ?? "Otro documento"}</span>
-                  </div>
-                  <span className={styles.rowWrap}>
-                    {[
-                      formatoTamano(d.fileSizeBytes),
-                      d.uploadedBy ? `Subió ${d.uploadedBy.nombre}` : null,
-                      formatoFechaHora(d.createdAt),
-                    ]
+              <li key={d.id} className={styles.fila}>
+                <div className={styles.principal}>
+                  <span className={styles.tituloFila}>
+                    <DescriptionOutlinedIcon fontSize="small" aria-hidden="true" />
+                    {d.nombre}
+                    <Badge tone="outline" size="sm">
+                      {TIPO_DOCUMENTO_LABEL[d.kind] ?? "Otro documento"}
+                    </Badge>
+                  </span>
+                  <span className={styles.meta}>
+                    {[formatoTamano(d.fileSizeBytes), d.uploadedBy ? `Subió ${d.uploadedBy.nombre}` : null, formatoFechaHora(d.createdAt)]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
                 </div>
-                <div className={styles.itemActions}>
-                  <a className={styles.smallBtn} href={resolveAssetUrl(d.fileUrl)} target="_blank" rel="noopener noreferrer">
+                <div className={styles.acciones}>
+                  <a className={buttonClass("ghost", { size: "sm" })} href={resolveAssetUrl(d.fileUrl)} target="_blank" rel="noopener noreferrer">
+                    <OpenInNewRoundedIcon fontSize="small" aria-hidden="true" />
                     Abrir
                   </a>
-                  <button type="button" className={styles.smallBtn} onClick={() => void descargar(d)}>
+                  <Button size="sm" variant="ghost" iconStart={<DownloadRoundedIcon />} onClick={() => void descargar(d)}>
                     Descargar
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.smallDangerBtn}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger-ghost"
                     disabled={ocupado}
                     onClick={() =>
                       confirmar({
@@ -222,13 +157,59 @@ export default function SeccionDocumentos({ proyecto: p, token, ocupado, mutar, 
                     }
                   >
                     Borrar
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </RecordSection>
+
+      <form className={styles.alta} onSubmit={subir} aria-labelledby="doc-subir" noValidate>
+        <h3 id="doc-subir" className={styles.altaTitulo}>
+          Subir documentos
+        </h3>
+        <div className={styles.campos}>
+          <Field label="Tipo">
+            <Select id="doc-tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoDocumento)}>
+              {TIPOS_DOCUMENTO.map((k) => (
+                <option key={k} value={k}>
+                  {TIPO_DOCUMENTO_LABEL[k]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={`Archivos (hasta ${MAX_ARCHIVOS_POR_SUBIDA}, 25 MB cada uno)`}>
+            {/* El sistema no trae control de archivo: el nativo con la caja punteada del sistema. */}
+            <input id="doc-archivos" ref={input} className={styles.archivo} type="file" multiple onChange={(e) => elegir(e.target.files)} />
+          </Field>
+          <Field label="Nombre para mostrar">
+            <Input
+              id="doc-nombre"
+              value={nombre}
+              maxLength={220}
+              disabled={archivos.length > 1}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder={archivos.length > 1 ? "Con varios archivos se usa el nombre de cada uno" : "Ej. Plano de canalización v2"}
+            />
+          </Field>
+        </div>
+        {archivos.length ? (
+          <p className={styles.ayuda}>
+            {archivos.length === 1 ? archivos[0].name : `${archivos.length} archivos`} · {formatoTamano(archivos.reduce((t, f) => t + f.size, 0))}
+          </p>
+        ) : null}
+        {errorSubida ? (
+          <Alert tone="danger" role="alert" dense>
+            {errorSubida}
+          </Alert>
+        ) : null}
+        <div className={styles.botonera}>
+          <Button type="submit" variant="tonal" loading={ocupado} disabled={!archivos.length || Boolean(errorSubida)} iconStart={<CloudUploadOutlinedIcon />}>
+            Subir
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

@@ -80,10 +80,11 @@ describe("lista de proyectos", () => {
     expect(screen.getByText("CCTV bodega Cuautlancingo")).toBeInTheDocument();
     expect(screen.queryByText("Red de sucursales Sur")).not.toBeInTheDocument();
     // La fila dice qué sigue y cuánto va.
-    const tarjeta = screen.getByText("Acceso corporativo Torre A").closest("a")!;
-    expect(tarjeta).toHaveAttribute("href", "/erp/proyectos/1");
+    const tarjeta = screen.getByText("Acceso corporativo Torre A").closest("tr")!;
+    expect(within(tarjeta).getByRole("link", { name: "Acceso corporativo Torre A" })).toHaveAttribute("href", "/erp/proyectos/1");
     expect(within(tarjeta).getByText(/Sigue: Instalación/)).toBeInTheDocument();
-    expect(within(tarjeta).getByText(/40 % · según actividades/)).toBeInTheDocument();
+    expect(within(tarjeta).getByText("40 %")).toBeInTheDocument();
+    expect(within(tarjeta).getByText("según actividades")).toBeInTheDocument();
     expect(within(tarjeta).getByRole("progressbar", { name: "Avance" })).toHaveAttribute("aria-valuenow", "40");
   });
 
@@ -93,7 +94,8 @@ describe("lista de proyectos", () => {
     render(<ProyectosPage />);
     await screen.findByText("Acceso corporativo Torre A");
 
-    await user.click(screen.getByRole("button", { name: "En riesgo" }));
+    // Los chips llevan su conteo: «En riesgo 1».
+    await user.click(within(screen.getByRole("group", { name: "Filtrar por semáforo" })).getByRole("button", { name: /^En riesgo/ }));
     expect(screen.queryByText("Acceso corporativo Torre A")).not.toBeInTheDocument();
     expect(screen.getByText("CCTV bodega Cuautlancingo")).toBeInTheDocument();
     expect(screen.getByText("5 días de retraso")).toBeInTheDocument();
@@ -105,7 +107,7 @@ describe("lista de proyectos", () => {
     render(<ProyectosPage />);
     await screen.findByText("Acceso corporativo Torre A");
 
-    await user.click(within(screen.getByRole("group", { name: "Filtrar por estado" })).getByRole("button", { name: "Cancelado" }));
+    await user.click(within(screen.getByRole("group", { name: "Filtrar por estado" })).getByRole("button", { name: /^Cancelado/ }));
     expect(screen.getByText("Red de sucursales Sur")).toBeInTheDocument();
     expect(screen.queryByText("Acceso corporativo Torre A")).not.toBeInTheDocument();
   });
@@ -148,12 +150,12 @@ describe("clientes de proyecto", () => {
     await user.click(screen.getByRole("tab", { name: /Clientes de proyecto/ }));
 
     const lista = screen.getByRole("list", { name: "Clientes de proyecto" });
-    const uno = within(lista).getByText("Cliente 1").closest("[role=listitem]")!;
+    const uno = within(lista).getByText("Cliente 1").closest("li")!;
     expect(within(uno).getByText("1 vigente")).toBeInTheDocument();
     expect(within(uno).getByRole("link", { name: "Acceso corporativo Torre A" })).toHaveAttribute("href", "/erp/proyectos/1");
     expect(within(uno).getByRole("link", { name: "Nuevo proyecto" })).toHaveAttribute("href", "/erp/proyectos/nuevo?clienteId=20");
 
-    const hotel = within(lista).getByText("Hotel Centro").closest("[role=listitem]")!;
+    const hotel = within(lista).getByText("Hotel Centro").closest("li")!;
     expect(within(hotel).getByText("Sin proyectos todavía")).toBeInTheDocument();
     expect(within(hotel).getByText("Alta rápida: faltan sus datos fiscales")).toBeInTheDocument();
     expect(within(hotel).getByRole("link", { name: "Nuevo proyecto" })).toHaveAttribute("href", "/erp/proyectos/nuevo?clienteId=21");
@@ -166,7 +168,7 @@ describe("clientes de proyecto", () => {
     await screen.findByText("Acceso corporativo Torre A");
 
     await user.click(screen.getByRole("tab", { name: /Clientes de proyecto/ }));
-    const uno = screen.getByText("Cliente 1").closest("[role=listitem]")!;
+    const uno = screen.getByText("Cliente 1").closest("li")!;
     await user.click(within(uno).getByRole("button", { name: "Ver proyectos" }));
 
     expect(await screen.findByText("Acceso corporativo Torre A")).toBeInTheDocument();
