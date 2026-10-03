@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -7,6 +8,7 @@ import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import FolderOffOutlinedIcon from "@mui/icons-material/FolderOffOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { useUser } from "@/components/UserContext";
@@ -41,20 +43,20 @@ import {
   isInactiveClient,
   NO_CLIENT_PERMISSIONS,
   reactivateSalesClient,
+  removeSalesClientSector,
   updateSalesClient,
   type ClientPermissions,
   type SalesClient,
 } from "@/lib/sales-api";
 import {
-  createOperationalProject,
   deactivateOperationalProject,
   deleteOperationalProject,
-  formatOperationalProjectStatus,
   isInactiveOperationalProject,
-  listOperationalProjects,
+  quickCreateOperationalProject,
   reactivateOperationalProject,
-  type OperationalProject,
 } from "@/lib/ops-operational-api";
+import { etiquetaEstado, formatoFecha, listarProyectos, type ProyectoFila } from "@/lib/proyectos-api";
+import { canUserAccessPath } from "@/lib/user-access";
 import { nombreSector } from "../sectores";
 import styles from "../clientes-core.module.css";
 
@@ -85,11 +87,22 @@ function avisosEdicion(edit: Edicion): Partial<Record<keyof Edicion, string>> {
   return e;
 }
 
-function fechaCorta(iso?: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+/** Solo lo que hace falta para pedir confirmación y llamar a la API. */
+type ProyectoDelCliente = Pick<ProyectoFila, "id" | "title">;
+
+/** «12 sep 2026 → 30 nov 2026», o lo que haya: un proyecto recién creado puede no tener fechas. */
+function plazoDelProyecto(p: ProyectoFila): string | null {
+  if (!p.startDate && !p.endDate) return null;
+  if (!p.endDate) return `Inicio ${formatoFecha(p.startDate)}`;
+  if (!p.startDate) return `Fin ${formatoFecha(p.endDate)}`;
+  return `${formatoFecha(p.startDate)} → ${formatoFecha(p.endDate)}`;
+}
+
+function tonoDelProyecto(status: string): "neutral" | "info" | "success" | "warning" {
+  if (status === "ACTIVE") return "info";
+  if (status === "COMPLETED") return "success";
+  if (status === "PLANNED") return "warning";
+  return "neutral";
 }
 
 function Dato({ label, children }: { label: string; children: React.ReactNode }) {
@@ -162,7 +175,7 @@ export default function ClienteDetallePage() {
   const id = Number(params?.id);
 
   const [client, setClient] = useState<SalesClient | null>(null);
-  const [projects, setProjects] = useState<OperationalProject[]>([]);
+  const [projects, setProjects] = useState<ProyectoFila[]>([]);
   const [projectsLoadErr, setProjectsLoadErr] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,7 +205,6 @@ export default function ClienteDetallePage() {
     () => (client?.sectors ?? []).map((s) => s.sector as ClientSector),
     [client],
   );
-  const hasProyecto = clientSectors.includes("PROYECTO");
   const addable = useMemo(
     () => ALL_CLIENT_SECTORS.filter((s) => mySectors.includes(s) && !clientSectors.includes(s)),
     [mySectors, clientSectors],
@@ -208,8 +220,8 @@ export default function ClienteDetallePage() {
       setProjectsLoadErr(null);
       if (c.serviceClientId) {
         try {
-          const all = await listOperationalProjects(token);
-          setProjects(all.filter((p) => p.client?.id === c.serviceClientId));
+          // Los proyectos se ligan al cliente de operación; el filtro lo aplica el servidor.
+          setProjects(await listarProyectos(token, { incluirCancelados: true, clientId: c.serviceClientId }));
         } catch (e) {
           setProjects([]);
           setProjectsLoadErr(formatApiError(e, "No se pudieron cargar los proyectos de este cliente"));
@@ -243,9 +255,22 @@ export default function ClienteDetallePage() {
     }
   };
 
+  const removeSector = async (sector: ClientSector) => {
+    if (!token) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setClient(await removeSalesClientSector(token, id, sector));
+    } catch (e) {
+      setError(formatApiError(e, "No se pudo quitar el sector"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onCreateProject = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token || !client?.serviceClientId || !user?.id) return;
+    if (!token || !client) return;
     if (projectTitle.trim().length < 3) {
       setProjectError("El nombre del proyecto necesita al menos 3 letras");
       return;
@@ -254,12 +279,12 @@ export default function ClienteDetallePage() {
     setProjectError(null);
     setError(null);
     try {
-      await createOperationalProject(token, {
+      // Alta mínima: el servidor liga el cliente a operación si faltaba y lo deja como
+      // cliente de proyecto. Fechas, alcance y equipo se completan después en Proyectos.
+      await quickCreateOperationalProject(token, {
         title: projectTitle.trim(),
-        clientId: client.serviceClientId,
-        vendorId: user.id,
-        startDate: projectStart,
-        projectType: "OTRO",
+        salesClientId: client.id,
+        ...(projectStart ? { startDate: projectStart } : {}),
       });
       setProjectTitle("");
       await load();
@@ -356,7 +381,7 @@ export default function ClienteDetallePage() {
   };
 
   // Proyectos: misma regla que el cliente (solo Christian desactiva, reactiva o elimina).
-  const pedirCambioEstatusProyecto = (p: OperationalProject, activar: boolean) => {
+  const pedirCambioEstatusProyecto = (p: ProyectoDelCliente, activar: boolean) => {
     setConfirm({
       title: activar ? "Reactivar proyecto" : "Desactivar proyecto",
       message: activar
@@ -377,7 +402,7 @@ export default function ClienteDetallePage() {
     });
   };
 
-  const pedirEliminarProyecto = (p: OperationalProject) => {
+  const pedirEliminarProyecto = (p: ProyectoDelCliente) => {
     setConfirm({
       title: "Eliminar proyecto",
       message: `¿Eliminar el proyecto «${p.title}»? Esta acción no se puede deshacer. Sus actividades conservan su historial. Si solo está detenido, mejor desactívalo.`,
@@ -430,6 +455,10 @@ export default function ClienteDetallePage() {
   if (!client) return <Cargando />;
 
   const inactivo = isInactiveClient(client.status);
+  // Quien lleva proyectos en su área, o quien administra el padrón, arranca uno desde aquí.
+  const puedeCrearProyecto = mySectors.includes("PROYECTO") || permisos.puedeAgregar;
+  const puedeAbrirProyectos = canUserAccessPath(user, "/erp/proyectos/nuevo");
+  const vigentes = projects.filter((p) => p.status !== "CANCELLED" && p.status !== "COMPLETED").length;
   const errorNombre = intentoGuardar && edit.name.trim().length < 2 ? "Escribe el nombre comercial" : undefined;
   const aria = (campo: keyof Edicion, invalido: boolean) =>
     invalido ? { "aria-invalid": true, "aria-describedby": `edit-${campo}-error` } : {};
@@ -620,16 +649,31 @@ export default function ClienteDetallePage() {
 
         {!editando ? (
           <Card pad>
-            <CardHead title="Sectores" subtitle="Dónde se puede elegir a este cliente." />
+            <CardHead
+              title="Sectores"
+              subtitle="Dónde se puede elegir a este cliente. Puede estar en varios a la vez."
+            />
             <div className={styles.sectorPick}>
               {clientSectors.map((s) => (
                 <span key={s} className={styles.sectorChip}>
                   <ClientSectorIcon icon={CLIENT_SECTOR_META[s].icon} size={15} />
                   {nombreSector(s)}
+                  {permisos.puedeEditar && clientSectors.length > 1 && mySectors.includes(s) ? (
+                    <button
+                      type="button"
+                      className={styles.sectorChipQuitar}
+                      disabled={busy}
+                      onClick={() => void removeSector(s)}
+                      aria-label={`Quitar de ${nombreSector(s)}`}
+                      title={`Quitar de ${nombreSector(s)}`}
+                    >
+                      <CloseRoundedIcon aria-hidden="true" fontSize="inherit" />
+                    </button>
+                  ) : null}
                 </span>
               ))}
             </div>
-            {addable.length > 0 ? (
+            {permisos.puedeEditar && addable.length > 0 ? (
               <>
                 <p className={styles.fieldHint}>Súmalo a otro sector sin duplicarlo:</p>
                 <div className={styles.sectorPick}>
@@ -651,118 +695,125 @@ export default function ClienteDetallePage() {
           </Card>
         ) : null}
 
-        {hasProyecto ? (
-          <Card pad className={styles.span2}>
-            <CardHead
-              title={projects.length ? `Proyectos · ${projects.length}` : "Proyectos"}
-              subtitle="Los proyectos operativos de este cliente."
+        {/* Cualquier cliente puede tener proyectos: al abrirle el primero queda además como cliente de proyecto. */}
+        <Card pad className={styles.span2}>
+          <span id="proyectos" />
+          <CardHead
+            title={projects.length ? `Proyectos · ${projects.length}` : "Proyectos"}
+            subtitle={
+              projects.length
+                ? `${vigentes === 1 ? "1 vigente" : `${vigentes} vigentes`}. Cada uno abre su cronograma, alcance, equipo y documentos.`
+                : "Los proyectos que se le llevan a este cliente."
+            }
+            actions={
+              puedeCrearProyecto && puedeAbrirProyectos ? (
+                <ButtonLink href={`/erp/proyectos/nuevo?clienteId=${client.id}`}>
+                  <AddRoundedIcon aria-hidden="true" />
+                  Nuevo proyecto con plan
+                </ButtonLink>
+              ) : null
+            }
+          />
+          {projectsLoadErr ? (
+            <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void load()}>Reintentar</LinkButton>}>
+              {projectsLoadErr}
+            </Alert>
+          ) : null}
+          {projects.length === 0 ? (
+            <EmptyState
+              icon={<FolderOffOutlinedIcon />}
+              title="Sin proyectos todavía"
+              description={puedeCrearProyecto ? "Crea el primero con el formulario de abajo." : undefined}
             />
-            {!client.serviceClientId ? (
-              <Alert tone="info" role="status">
-                Este cliente todavía no está enlazado con operaciones, así que aún no se le pueden crear proyectos.
-              </Alert>
-            ) : (
-              <>
-                {projectsLoadErr ? (
-                  <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void load()}>Reintentar</LinkButton>}>
-                    {projectsLoadErr}
-                  </Alert>
-                ) : null}
-                {projects.length === 0 ? (
-                  <EmptyState
-                    icon={<FolderOffOutlinedIcon />}
-                    title="Sin proyectos todavía"
-                    description={
-                      mySectors.includes("PROYECTO") ? "Crea el primero con el formulario de abajo." : undefined
-                    }
-                  />
-                ) : (
-                  <ul className={styles.proyectos}>
-                    {projects.map((p) => {
-                      const proyectoInactivo = isInactiveOperationalProject(p.status);
-                      const inicio = fechaCorta(p.startDate);
-                      return (
-                        <li key={p.id} className={styles.proyecto}>
-                          <div className={styles.proyectoTexto}>
-                            <span className={styles.proyectoNombre}>{p.title}</span>
-                            <span className={styles.proyectoSub}>
-                              <Badge tone={proyectoInactivo ? "neutral" : "info"} dot>
-                                {proyectoInactivo ? "Inactivo" : formatOperationalProjectStatus(p.status)}
-                              </Badge>
-                              {inicio ? <span>Inicio {inicio}</span> : null}
-                            </span>
-                          </div>
-                          {permisos.puedeDesactivar || permisos.puedeEliminar ? (
-                            <div className={styles.acciones}>
-                              {permisos.puedeDesactivar ? (
-                                <Button
-                                  variant="ghost"
-                                  disabled={busy}
-                                  onClick={() => pedirCambioEstatusProyecto(p, proyectoInactivo)}
-                                >
-                                  {proyectoInactivo ? (
-                                    <RestartAltOutlinedIcon aria-hidden="true" />
-                                  ) : (
-                                    <BlockOutlinedIcon aria-hidden="true" />
-                                  )}
-                                  {proyectoInactivo ? "Reactivar" : "Desactivar"}
-                                </Button>
-                              ) : null}
-                              {permisos.puedeEliminar ? (
-                                <Button
-                                  variant="ghost"
-                                  icon
-                                  className={styles.peligro}
-                                  disabled={busy}
-                                  onClick={() => pedirEliminarProyecto(p)}
-                                  aria-label={`Eliminar el proyecto ${p.title}`}
-                                  title="Eliminar proyecto"
-                                >
-                                  <DeleteOutlineOutlinedIcon aria-hidden="true" />
-                                </Button>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {mySectors.includes("PROYECTO") ? (
-                  <form className={styles.nuevoProyecto} onSubmit={(e) => void onCreateProject(e)} noValidate>
-                    <Campo id="proyecto-nombre" label="Nuevo proyecto" error={projectError ?? undefined}>
-                      <input
-                        id="proyecto-nombre"
-                        className={`${styles.input} ${projectError ? styles.inputError : ""}`}
-                        value={projectTitle}
-                        onChange={(e) => {
-                          setProjectTitle(e.target.value);
-                          if (projectError) setProjectError(null);
-                        }}
-                        placeholder="Nombre del proyecto"
-                        aria-invalid={projectError ? true : undefined}
-                        aria-describedby={projectError ? "proyecto-nombre-error" : undefined}
-                      />
-                    </Campo>
-                    <Campo id="proyecto-inicio" label="Inicio">
-                      <input
-                        id="proyecto-inicio"
-                        type="date"
-                        className={styles.input}
-                        value={projectStart}
-                        onChange={(e) => setProjectStart(e.target.value)}
-                      />
-                    </Campo>
-                    <Button type="submit" variant="secondary" disabled={busy} className={styles.nuevoProyectoBtn}>
-                      <AddRoundedIcon aria-hidden="true" />
-                      Crear proyecto
-                    </Button>
-                  </form>
-                ) : null}
-              </>
-            )}
-          </Card>
-        ) : null}
+          ) : (
+            <ul className={styles.proyectos}>
+              {projects.map((p) => {
+                const proyectoInactivo = isInactiveOperationalProject(p.status);
+                const plazo = plazoDelProyecto(p);
+                const avance = p.resumen?.avance?.porcentaje;
+                return (
+                  <li key={p.id} className={styles.proyecto}>
+                    <div className={styles.proyectoTexto}>
+                      <Link href={`/erp/proyectos/${p.id}`} className={styles.proyectoNombre}>
+                        {p.title}
+                      </Link>
+                      <span className={styles.proyectoSub}>
+                        <Badge tone={proyectoInactivo ? "neutral" : tonoDelProyecto(p.status)} dot>
+                          {proyectoInactivo ? "Inactivo" : etiquetaEstado(p.status)}
+                        </Badge>
+                        <span>{plazo ?? "Sin fechas"}</span>
+                        {p.responsable?.nombre ? <span>Responsable: {p.responsable.nombre}</span> : null}
+                        {avance != null ? <span>{avance} % de avance</span> : null}
+                      </span>
+                    </div>
+                    {permisos.puedeDesactivar || permisos.puedeEliminar ? (
+                      <div className={styles.acciones}>
+                        {permisos.puedeDesactivar ? (
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => pedirCambioEstatusProyecto(p, proyectoInactivo)}
+                          >
+                            {proyectoInactivo ? (
+                              <RestartAltOutlinedIcon aria-hidden="true" />
+                            ) : (
+                              <BlockOutlinedIcon aria-hidden="true" />
+                            )}
+                            {proyectoInactivo ? "Reactivar" : "Desactivar"}
+                          </Button>
+                        ) : null}
+                        {permisos.puedeEliminar ? (
+                          <Button
+                            variant="ghost"
+                            icon
+                            className={styles.peligro}
+                            disabled={busy}
+                            onClick={() => pedirEliminarProyecto(p)}
+                            aria-label={`Eliminar el proyecto ${p.title}`}
+                            title="Eliminar proyecto"
+                          >
+                            <DeleteOutlineOutlinedIcon aria-hidden="true" />
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {puedeCrearProyecto ? (
+            <form className={styles.nuevoProyecto} onSubmit={(e) => void onCreateProject(e)} noValidate>
+              <Campo id="proyecto-nombre" label="Nuevo proyecto" error={projectError ?? undefined}>
+                <input
+                  id="proyecto-nombre"
+                  className={`${styles.input} ${projectError ? styles.inputError : ""}`}
+                  value={projectTitle}
+                  onChange={(e) => {
+                    setProjectTitle(e.target.value);
+                    if (projectError) setProjectError(null);
+                  }}
+                  placeholder="Nombre del proyecto"
+                  aria-invalid={projectError ? true : undefined}
+                  aria-describedby={projectError ? "proyecto-nombre-error" : undefined}
+                />
+              </Campo>
+              <Campo id="proyecto-inicio" label="Inicio">
+                <input
+                  id="proyecto-inicio"
+                  type="date"
+                  className={styles.input}
+                  value={projectStart}
+                  onChange={(e) => setProjectStart(e.target.value)}
+                />
+              </Campo>
+              <Button type="submit" variant="secondary" disabled={busy} className={styles.nuevoProyectoBtn}>
+                <AddRoundedIcon aria-hidden="true" />
+                Crear proyecto
+              </Button>
+            </form>
+          ) : null}
+        </Card>
       </div>
     </div>
   );

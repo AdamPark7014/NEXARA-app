@@ -7,6 +7,9 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'my-profile',
   // Vista ejecutiva (KPIs) — visible para dirección en Core.
   'executive',
+  // Clientes: el padrón único (proyecto, corporativo y comercial). Quién lo ve en el menú
+  // lo decide `shouldShowModuleInSidebar` (quienes llevan actividades comerciales).
+  'erp-clients',
   // Cotizaciones entra a Core: sin esto el módulo existe pero el sidebar lo esconde.
   'erp-cotizaciones',
   // Proyectos (plan, cronograma, alcance, equipo y documentos), mismo motivo.

@@ -5,6 +5,7 @@ import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatus
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
 import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { canDeleteOrDeactivateClient, type ClientActor } from '../ventas/client-permissions.js';
+import { marcarClienteDeProyectoSinFallar } from './cliente-de-proyecto.js';
 import {
   esEstadoProyecto,
   etiquetaEstadoProyecto,
@@ -226,6 +227,9 @@ export class OperationalProjectsService {
       },
     });
 
+    // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos).
+    await marcarClienteDeProyectoSinFallar(this.prisma, createDto.clientId, userId);
+
     // Si no vino ya enlazado desde CRM, crear espejo comercial automáticamente.
     if (!created.salesProjectId) {
       try {
@@ -240,9 +244,10 @@ export class OperationalProjectsService {
   }
 
   /**
-   * Proyecto mínimo para poder asignar la actividad: nombre y cliente tipo PROYECTO
-   * de la misma empresa. El responsable es quien lo crea. Fechas, alcance y equipo
-   * quedan vacíos y se completan después en Proyectos.
+   * Proyecto mínimo para poder asignar la actividad o arrancarlo desde la ficha del
+   * cliente: nombre y un cliente del padrón de la misma empresa. El responsable es quien
+   * lo crea. Fechas, alcance y equipo quedan vacíos y se completan después en Proyectos.
+   * Si el cliente aún no era de tipo proyecto, `create` se lo suma: no se rechaza.
    */
   async quickCreate(dto: QuickCreateOperationalProjectDto, user: any, companyId?: number | null) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
@@ -253,9 +258,6 @@ export class OperationalProjectsService {
       where: { id: dto.salesClientId, ...companyWhere(tenantId) },
     });
     assertCompanyAccess(sales, tenantId, 'Cliente');
-    if (sales.tipo !== 'PROYECTO') {
-      throw new BadRequestException('El proyecto solo se liga a un cliente de tipo proyecto');
-    }
     const serviceClientId = await this.ensureServiceClientForProject(sales, tenantId);
     return this.create(
       {
@@ -263,6 +265,7 @@ export class OperationalProjectsService {
         clientId: serviceClientId,
         vendorId: Number(user.id),
         projectType: 'OTRO',
+        ...(dto.startDate ? { startDate: dto.startDate } : {}),
       },
       Number(user.id),
     );

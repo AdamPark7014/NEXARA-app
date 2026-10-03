@@ -1238,3 +1238,55 @@
     transition: none;
   }
 }
+
+/* ─── Clientes de proyecto (pestaña de la lista) ──────────────────────────── */
+
+.rejillaClientes {
+  grid-template-columns: minmax(0, 1.6fr) 8.5rem minmax(0, 1.4fr) auto;
+  column-gap: var(--ui-s4);
+}
+
+.rejillaClientes.rejillaClientes {
+  min-height: 52px;
+}
+
+.accionesCliente {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ui-s3);
+  font-size: var(--ui-text-sm);
+}
+
+.enlaceProyecto {
+  color: var(--ui-fg);
+  font-size: var(--ui-text-sm);
+  text-decoration: none;
+}
+
+.enlaceProyecto:hover {
+  text-decoration: underline;
+}
+
+.enlaceProyecto:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+  border-radius: 4px;
+}
+
+/* Teléfono: cada cliente es una tarjeta; la cabecera de columnas sobra. */
+@media (max-width: 760px) {
+  .rejillaClientes {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .rejillaClientes[aria-hidden="true"] {
+    display: none;
+  }
+  .accionesCliente {
+    justify-content: flex-start;
+  }
+}

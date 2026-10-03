@@ -85,3 +85,33 @@ export function isClientSector(value: unknown): value is ClientSectorCode {
 export function needsOpsProvision(sectors: ClientSectorCode[]): boolean {
   return sectors.includes('PROYECTO') || sectors.includes('CORPORATIVO');
 }
+
+/**
+ * Tipos de un cliente: puede ser de proyecto, corporativo y comercial a la vez.
+ * La membresía vive en `sales_client_sectors`; `tipo` es el principal (con el que nació)
+ * y cuenta aunque la fila de membresía falte (altas viejas que no la escribían).
+ */
+export function sectoresDelCliente(
+  client?: { tipo?: string | null; sectors?: Array<{ sector: string }> | null } | null,
+): ClientSectorCode[] {
+  const out: ClientSectorCode[] = [];
+  for (const valor of [client?.tipo, ...(client?.sectors ?? []).map((s) => s.sector)]) {
+    if (isClientSector(valor) && !out.includes(valor)) out.push(valor);
+  }
+  return out;
+}
+
+/**
+ * Filtro de Prisma para «clientes de este tipo»: por membresía o por tipo principal.
+ * Va dentro de `AND` para no chocar con otro `OR` del mismo `where`.
+ */
+export function filtroPorSector(sector: ClientSectorCode) {
+  return { OR: [{ tipo: sector }, { sectors: { some: { sector } } }] };
+}
+
+/** El nombre como se guarda y se compara: sin espacios de más al inicio, al final ni en medio. */
+export function nombreClienteLimpio(nombre?: string | null): string {
+  return String(nombre || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

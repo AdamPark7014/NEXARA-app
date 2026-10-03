@@ -117,3 +117,85 @@ describe("lista de proyectos", () => {
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 });
+
+/** Servidor que distingue proyectos de clientes: la pestaña «Clientes de proyecto» pide el padrón. */
+function servidor(proyectos: unknown[], clientes: unknown[]) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("ventas/clientes")) return json(clientes);
+    return json(proyectos);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+const CLIENTES = [
+  { id: 20, name: "Cliente 1", legalName: "Cliente Uno SA de CV", taxId: "CUN010101AB1", status: "Activo", serviceClientId: 11 },
+  // Alta rápida desde una actividad: solo el nombre, sin datos fiscales y sin proyectos aún.
+  { id: 21, name: "Hotel Centro", legalName: null, taxId: null, status: "Activo", serviceClientId: 14 },
+];
+
+describe("clientes de proyecto", () => {
+  it("pide el padrón de proyecto y lo enseña en su pestaña, con lo que cada cliente tiene abierto", async () => {
+    const fetchMock = servidor(FILAS, CLIENTES);
+    const user = userEvent.setup();
+    render(<ProyectosPage />);
+    await screen.findByText("Acceso corporativo Torre A");
+
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual(
+      expect.arrayContaining([expect.stringContaining("ventas/clientes?sector=PROYECTO")]),
+    );
+    await user.click(screen.getByRole("tab", { name: /Clientes de proyecto/ }));
+
+    const lista = screen.getByRole("list", { name: "Clientes de proyecto" });
+    const uno = within(lista).getByText("Cliente 1").closest("[role=listitem]")!;
+    expect(within(uno).getByText("1 vigente")).toBeInTheDocument();
+    expect(within(uno).getByRole("link", { name: "Acceso corporativo Torre A" })).toHaveAttribute("href", "/erp/proyectos/1");
+    expect(within(uno).getByRole("link", { name: "Nuevo proyecto" })).toHaveAttribute("href", "/erp/proyectos/nuevo?clienteId=20");
+
+    const hotel = within(lista).getByText("Hotel Centro").closest("[role=listitem]")!;
+    expect(within(hotel).getByText("Sin proyectos todavía")).toBeInTheDocument();
+    expect(within(hotel).getByText("Alta rápida: faltan sus datos fiscales")).toBeInTheDocument();
+    expect(within(hotel).getByRole("link", { name: "Nuevo proyecto" })).toHaveAttribute("href", "/erp/proyectos/nuevo?clienteId=21");
+  });
+
+  it("«Ver proyectos» de un cliente deja la lista filtrada por él", async () => {
+    servidor(FILAS, CLIENTES);
+    const user = userEvent.setup();
+    render(<ProyectosPage />);
+    await screen.findByText("Acceso corporativo Torre A");
+
+    await user.click(screen.getByRole("tab", { name: /Clientes de proyecto/ }));
+    const uno = screen.getByText("Cliente 1").closest("[role=listitem]")!;
+    await user.click(within(uno).getByRole("button", { name: "Ver proyectos" }));
+
+    expect(await screen.findByText("Acceso corporativo Torre A")).toBeInTheDocument();
+    expect(screen.queryByText("CCTV bodega Cuautlancingo")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quitar filtros" })).toBeInTheDocument();
+  });
+
+  it("sin proyectos pero con clientes de proyecto, el vacío lleva a ellos", async () => {
+    servidor([], CLIENTES);
+    const user = userEvent.setup();
+    render(<ProyectosPage />);
+
+    expect(await screen.findByText("Todavía no hay proyectos")).toBeInTheDocument();
+    expect(screen.getByText(/Ya hay 2 clientes de proyecto en el padrón/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ver clientes de proyecto" }));
+    expect(screen.getByRole("list", { name: "Clientes de proyecto" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Nuevo proyecto" })).toHaveLength(2);
+  });
+
+  it("si el padrón no se puede listar, la pantalla es la lista de siempre", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes("ventas/clientes") ? json({ message: "sin acceso" }, 403) : json(FILAS),
+      ),
+    );
+    render(<ProyectosPage />);
+    await screen.findByText("Acceso corporativo Torre A");
+    expect(screen.queryByRole("tab", { name: /Clientes de proyecto/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});

@@ -235,6 +235,38 @@
   background: var(--ui-surface-2);
 }
 
+/* La «×» que quita un tipo: vive dentro del chip, sin borde propio. */
+.sectorChipQuitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: -6px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ui-fg-3);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sectorChipQuitar:hover:not(:disabled) {
+  background: var(--ui-border);
+  color: var(--ui-fg);
+}
+
+.sectorChipQuitar:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.sectorChipQuitar:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .sectorPickBtn {
   cursor: pointer;
   color: var(--ui-fg-2);
@@ -297,6 +329,21 @@
   font-size: var(--ui-text-sm);
   color: var(--ui-fg);
   overflow-wrap: anywhere;
+}
+
+/* El nombre abre el proyecto: mismo texto, subrayado solo al pasar. */
+a.proyectoNombre {
+  text-decoration: none;
+}
+
+a.proyectoNombre:hover {
+  text-decoration: underline;
+}
+
+a.proyectoNombre:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+  border-radius: 4px;
 }
 
 .proyectoSub {

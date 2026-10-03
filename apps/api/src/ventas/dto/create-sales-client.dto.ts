@@ -59,9 +59,9 @@ export class CreateSalesClientDto {
   serviceClientId?: number;
 
   /**
-   * Tipo único del cliente. Si no viene, se usa el sector del body o el del área
-   * de quien lo crea (si tiene varios, COMERCIAL). Los datos fiscales no son obligatorios:
-   * basta el nombre; RFC, razón social y el resto se completan después.
+   * Tipo principal del cliente (con el que nace). Si no viene, se usa el sector del body
+   * o el del área de quien lo crea (si tiene varios, COMERCIAL). Los datos fiscales no son
+   * obligatorios: basta el nombre; RFC, razón social y el resto se completan después.
    */
   @IsOptional()
   @IsIn(SECTORS)
@@ -85,7 +85,10 @@ export class CreateSalesClientDto {
   @IsBoolean()
   altaProyecto?: boolean;
 
-  /** Sector legado. Si viene más de uno, queda un solo tipo (COMERCIAL si está en la lista). */
+  /**
+   * Tipos del cliente: puede ser de proyecto, corporativo y comercial a la vez. Se guardan
+   * todos; el principal es `tipo` (sin `tipo`, COMERCIAL si está en la lista o el primero).
+   */
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)

@@ -396,9 +396,13 @@ function json(method: string, body?: unknown): RequestInit {
   return body === undefined ? { method } : { method, body: JSON.stringify(body) };
 }
 
-export function listarProyectos(token: string, filtros?: { incluirCancelados?: boolean }) {
-  const qs = filtros?.incluirCancelados ? "?incluirCancelados=1" : "";
-  return pedir<ProyectoFila[]>(`proyectos${qs}`, token);
+/** `clientId` es el del cliente de operación (`SalesClient.serviceClientId`): los proyectos de un cliente. */
+export function listarProyectos(token: string, filtros?: { incluirCancelados?: boolean; clientId?: number }) {
+  const qs = new URLSearchParams();
+  if (filtros?.incluirCancelados) qs.set("incluirCancelados", "1");
+  if (filtros?.clientId) qs.set("clientId", String(filtros.clientId));
+  const query = qs.toString();
+  return pedir<ProyectoFila[]>(`proyectos${query ? `?${query}` : ""}`, token);
 }
 
 export function obtenerProyecto(token: string, id: number) {

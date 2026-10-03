@@ -28,7 +28,7 @@ function json(body: unknown, status = 200): Response {
 
 type Llamada = { url: string; method: string; body: unknown };
 
-function servidor() {
+function servidor(permisos: Record<string, boolean> = { puedeAgregar: false, puedeEditar: false }) {
   const llamadas: Llamada[] = [];
   vi.stubGlobal(
     "fetch",
@@ -41,6 +41,14 @@ function servidor() {
       llamadas.push(l);
       if (l.url.includes("ventas/clientes/21/provision-service-client")) {
         return json({ salesClient: { id: 21 }, serviceClient: { id: 321, name: "Hotel Centro" }, created: true });
+      }
+      if (l.url.includes("ventas/clientes/permisos")) return json(permisos);
+      // Un cliente que no es de proyecto (llegó por ?clienteId= desde su ficha).
+      if (/ventas\/clientes\/33$/.test(l.url)) {
+        return json({ id: 33, name: "Farmacias del Sur", tipo: "COMERCIAL", serviceClientId: 333 });
+      }
+      if (l.method === "POST" && /ventas\/clientes$/.test(l.url)) {
+        return json({ id: 40, name: l.body.name, tipo: "PROYECTO", serviceClientId: 340 });
       }
       if (l.url.includes("ventas/clientes")) {
         return json([
@@ -111,5 +119,53 @@ describe("asistente de nuevo proyecto", () => {
       currency: "MXN",
     });
     expect((cuerpo.milestones as unknown[]).length).toBe(5);
+  });
+});
+
+describe("el cliente del proyecto sale del padrón único", () => {
+  beforeEach(() => {
+    reemplazar.mockReset();
+    window.history.replaceState({}, "", "/erp/proyectos/nuevo");
+  });
+
+  it("quien no administra el padrón da de alta al cliente solo con el nombre (alta rápida de proyecto)", async () => {
+    const llamadas = servidor();
+    const user = userEvent.setup();
+    render(<NuevoProyectoPage />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Hotel Centro" })).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Dar de alta un cliente" }));
+    await user.type(screen.getByLabelText("Nombre del cliente nuevo"), "Clínica Norte");
+    await user.click(screen.getByRole("button", { name: "Crear y usar" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Cliente")).toHaveValue("40"));
+    const alta = llamadas.find((l) => l.method === "POST" && /ventas\/clientes$/.test(l.url))!;
+    expect(alta.body).toEqual({ name: "Clínica Norte", status: "Activo", tipo: "PROYECTO", altaProyecto: true });
+  });
+
+  it("con permiso de agregar pero sin el sector Proyecto en su área, también va por el alta rápida", async () => {
+    const llamadas = servidor({ puedeAgregar: true, puedeEditar: true });
+    const user = userEvent.setup();
+    render(<NuevoProyectoPage />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Hotel Centro" })).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Dar de alta un cliente" }));
+    await user.type(screen.getByLabelText("Nombre del cliente nuevo"), "Clínica Norte");
+    await user.click(screen.getByRole("button", { name: "Crear y usar" }));
+
+    await waitFor(() => expect(llamadas.some((l) => l.method === "POST" && /ventas\/clientes$/.test(l.url))).toBe(true));
+    const alta = llamadas.find((l) => l.method === "POST" && /ventas\/clientes$/.test(l.url))!;
+    // Ada no está en la matriz de sectores ni tiene rol de padrón: solo el nombre.
+    expect(alta.body.altaProyecto).toBe(true);
+  });
+
+  it("desde la ficha de un cliente que aún no es de proyecto, llega ya elegido", async () => {
+    window.history.replaceState({}, "", "/erp/proyectos/nuevo?clienteId=33");
+    const llamadas = servidor();
+    render(<NuevoProyectoPage />);
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Farmacias del Sur" })).toBeInTheDocument());
+    expect(screen.getByLabelText("Cliente")).toHaveValue("33");
+    expect(llamadas.some((l) => /ventas\/clientes\/33$/.test(l.url))).toBe(true);
   });
 });

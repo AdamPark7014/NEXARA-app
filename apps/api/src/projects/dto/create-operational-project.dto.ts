@@ -120,7 +120,10 @@ export class RemoveProjectEngineerDto {
   engineerId!: number;
 }
 
-/** Alta desde el formulario de actividad: solo nombre y cliente de tipo proyecto. */
+/**
+ * Alta mínima: nombre y cliente del padrón. La usan el formulario de actividad y la ficha
+ * del cliente, que además manda el inicio planeado.
+ */
 export class QuickCreateOperationalProjectDto {
   @IsString()
   @MinLength(3)
@@ -128,4 +131,8 @@ export class QuickCreateOperationalProjectDto {
 
   @IsInt()
   salesClientId!: number;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
 }

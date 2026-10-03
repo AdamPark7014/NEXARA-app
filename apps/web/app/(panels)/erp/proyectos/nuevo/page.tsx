@@ -7,7 +7,14 @@ import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { DatosClienteOpcionales } from "@/components/erp/DatosCliente";
 import { clientSectorsForUser } from "@/lib/client-sectors";
-import { createSalesClient, getClientPermissions, listSalesClients, provisionSalesServiceClient, type SalesClient } from "@/lib/sales-api";
+import {
+  createSalesClient,
+  getClientPermissions,
+  getSalesClient,
+  listSalesClients,
+  provisionSalesServiceClient,
+  type SalesClient,
+} from "@/lib/sales-api";
 import { listarCotizaciones, type CotizacionRow } from "@/lib/cotizaciones-api";
 import {
   ROLES_EQUIPO,
@@ -129,6 +136,28 @@ export default function NuevoProyectoPage() {
       vivo = false;
     };
   }, [token]);
+
+  // Llegó desde la ficha de un cliente que todavía no es de proyecto (comercial o corporativo):
+  // no viene en la lista de proyecto, pero el proyecto se le abre igual y, al crearlo, el
+  // servidor lo deja además como cliente de proyecto.
+  useEffect(() => {
+    if (!token || cargandoClientes || !b.clienteId) return;
+    const id = Number(b.clienteId);
+    if (!Number.isInteger(id) || id <= 0 || clientes.some((c) => c.id === id)) return;
+    let vivo = true;
+    getSalesClient(token, id)
+      .then((c) => {
+        if (!vivo || !c?.id) return;
+        setClientes((prev) =>
+          prev.some((x) => x.id === c.id) ? prev : [...prev, c].sort((x, y) => x.name.localeCompare(y.name, "es")),
+        );
+      })
+      // Sin acceso a ese cliente (o ya no existe): se vuelve a pedir que elija uno.
+      .catch(() => vivo && setB((prev) => (prev.clienteId === String(id) ? { ...prev, clienteId: "" } : prev)));
+    return () => {
+      vivo = false;
+    };
+  }, [token, cargandoClientes, b.clienteId, clientes]);
 
   // Al cambiar de paso, el foco va al título: quien usa lector de pantalla sabe dónde está.
   useEffect(() => {
@@ -317,7 +346,10 @@ export default function NuevoProyectoPage() {
           {!cargandoClientes && !clientes.length && !errorClientes ? (
             <p className={styles.hint}>No tienes clientes a la vista. Da de alta uno aquí y sigue con el proyecto.</p>
           ) : null}
-          {puedeAgregarCliente && clientSectorsForUser(user).includes("PROYECTO") ? (
+          {/* Quien puede crear el proyecto puede dar de alta a su cliente: con sus datos si
+              administra el padrón de proyecto; si no, solo con el nombre (alta rápida) y los
+              datos se completan después en Clientes. */}
+          {token ? (
             <div className={styles.hint}>
               {altaAbierta ? (
                 <div className={styles.grid2}>
@@ -337,12 +369,12 @@ export default function NuevoProyectoPage() {
                       if (!token) return;
                       setAltaGuardando(true);
                       setErrorAlta(null);
-                      createSalesClient(token, {
-                        name: altaNombre.trim(),
-                        status: "Activo",
-                        tipo: "PROYECTO",
-                        sectors: ["PROYECTO"],
-                      })
+                      createSalesClient(
+                        token,
+                        puedeAgregarCliente && clientSectorsForUser(user).includes("PROYECTO")
+                          ? { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", sectors: ["PROYECTO"] }
+                          : { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", altaProyecto: true },
+                      )
                         .then((creado) => {
                           setClientes((prev) =>
                             [...prev.filter((c) => c.id !== creado.id), creado].sort((x, y) =>
