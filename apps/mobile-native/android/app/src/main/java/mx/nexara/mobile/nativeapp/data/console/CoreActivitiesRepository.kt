@@ -117,6 +117,29 @@ class CoreActivitiesRepository(context: Context) {
         api.iniciarActividad(activityId).close()
     }
 
+    /** Detiene mi reloj en la actividad (sigue «En Proceso»). Solo en línea. */
+    suspend fun pausarActividad(activityId: Long, motivo: String?): mx.nexara.mobile.nativeapp.data.api.EstadoSesionDto =
+        api.pausarActividad(
+            activityId,
+            mx.nexara.mobile.nativeapp.data.api.PausarActividadRequest(motivo?.trim()?.takeIf { it.isNotEmpty() }),
+        )
+
+    /** Mi reloj vuelve a correr. Solo en línea. */
+    suspend fun reanudarActividad(activityId: Long): mx.nexara.mobile.nativeapp.data.api.EstadoSesionDto =
+        api.reanudarActividad(activityId)
+
+    /** Un jefe o el CEO pausa la actividad en curso de alguien de su equipo (motivo ≥ 10). */
+    suspend fun pausarActividadDeEquipo(
+        userId: Long,
+        activityId: Long,
+        motivo: String,
+    ): mx.nexara.mobile.nativeapp.data.api.EstadoSesionDto =
+        api.pausarActividadDeEquipo(
+            userId,
+            activityId,
+            mx.nexara.mobile.nativeapp.data.api.PausarActividadRequest(motivo.trim()),
+        )
+
     /**
      * Checklist de herramientas de la OT: qué hay que llevar y qué ya se palomeó.
      * Solo de quien la tiene asignada (a los demás el API contesta 403).

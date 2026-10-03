@@ -16,7 +16,8 @@ import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
  * Lectura de los tres módulos de consulta de «Más»: KPIs del equipo, proyectos
  * y almacén. (El organigrama se quedó en la web: es una pantalla de escritorio.)
  *
- * Son de solo lectura a propósito: en el teléfono no se mueve inventario. Lo que la app no hace, lo dice la pantalla; no hay ningún
+ * Son de solo lectura a propósito: lo que mueve inventario desde el teléfono (el escáner) vive en
+ * `EscaneoRepository`. Lo que la app no hace, lo dice la pantalla; no hay ningún
  * botón que eche al navegador.
  */
 class CoreExtrasRepository(context: Context) {

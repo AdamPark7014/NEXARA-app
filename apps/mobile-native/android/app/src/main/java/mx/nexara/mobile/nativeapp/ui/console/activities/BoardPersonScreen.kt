@@ -89,6 +89,7 @@ fun BoardPersonScreen(
     var refreshing by remember { mutableStateOf(false) }
     var error by remember(userId) { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
+    var avisoPausa by remember(userId) { mutableStateOf<String?>(null) }
     var expandedId by remember { mutableStateOf<Long?>(null) }
     var visor by remember { mutableStateOf<Pair<List<CoreActivityRules.EvidencePhoto>, Int>?>(null) }
     /** Contrato C: Hoy · Semana · Mes (`me/board?desde&hasta`). */
@@ -254,6 +255,30 @@ fun BoardPersonScreen(
                         }
                     } else {
                         Text("Sin actividad abierta en este momento.", fontSize = 14.sp, color = NxColors.Muted)
+                    }
+                }
+            }
+
+            // Su jefe (o el CEO) le pausa una actividad con el reloj corriendo, con motivo.
+            val conReloj = p.openActivities.orEmpty().filter { it.enCurso == true || it.enPausa == true }
+            if (!isSelf && p.puedePausar == true && (conReloj.isNotEmpty() || avisoPausa != null)) {
+                item(key = "pausar-equipo") {
+                    NxPanelShell {
+                        Text("RELOJ DE SUS ACTIVIDADES", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Muted)
+                        Spacer(Modifier.height(6.dp))
+                        avisoPausa?.let {
+                            Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(CoreActivityRules.VERDE))
+                            Spacer(Modifier.height(6.dp))
+                        }
+                        PausarDeEquipoPanel(
+                            userId = p.id,
+                            nombre = p.nombre,
+                            actividades = conReloj,
+                            onDone = { mensaje ->
+                                avisoPausa = mensaje
+                                reload++
+                            },
+                        )
                     }
                 }
             }

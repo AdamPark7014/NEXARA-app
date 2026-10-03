@@ -35,9 +35,19 @@ object AttendanceCheckIn {
             texto.contains("app nexara") ->
                 "Las checadas solo se registran desde esta app. Si no puedes usar tu teléfono, " +
                     "tu jefe puede registrarla por ti."
-            else -> MOCK_AYUDA
+            texto.contains("fin de semana") || texto.contains("guardia") ->
+                "Sábado y domingo solo checa quien tiene guardia ese día. Si hoy te toca trabajar, " +
+                    "pídele a tu encargado que te programe la guardia y vuelve a intentarlo."
+            texto.isBlank() || texto.contains("simulada") || texto.contains("gps falso") -> MOCK_AYUDA
+            // Un motivo nuevo del servidor: su texto ya dice qué pasó; aquí no se inventa otro.
+            else -> AYUDA_GENERICA
         }
     }
+
+    /** Para rechazos que la app todavía no conoce: no se culpa al GPS sin saberlo. */
+    const val AYUDA_GENERICA =
+        "Tu checada no se registró. Lee el motivo de arriba; si crees que es un error, " +
+            "avisa a tu jefe para que la revise."
 
     /**
      * ¿El error es un rechazo del servidor (422) y no un fallo de red o de datos?

@@ -49,6 +49,24 @@ class ChecadaRechazadaTest {
     }
 
     @Test
+    fun `en fin de semana sin guardia se explica la guardia, no el GPS falso`() {
+        val finDeSemana =
+            "Hoy es fin de semana: solo quien tiene guardia puede checar. Pide a tu encargado que te programe."
+        // La app no bloquea el día: manda la checada y el servidor contesta 422 con su motivo.
+        assertTrue(AttendanceCheckIn.esRechazoDelServidor(422, finDeSemana))
+        val ayuda = AttendanceCheckIn.ayudaDelRechazo(finDeSemana)
+        assertTrue(ayuda.contains("guardia"))
+        assertFalse(ayuda.contains("simulada"))
+    }
+
+    @Test
+    fun `un motivo que la app no conoce no se confunde con GPS falso`() {
+        val ayuda = AttendanceCheckIn.ayudaDelRechazo("Tu horario de hoy ya terminó.")
+        assertTrue(ayuda == AttendanceCheckIn.AYUDA_GENERICA)
+        assertFalse(ayuda.contains("simulada"))
+    }
+
+    @Test
     fun `sin mensaje del servidor se dice lo de siempre en vez de quedarse mudo`() {
         assertTrue(AttendanceCheckIn.ayudaDelRechazo(null).isNotBlank())
         assertTrue(AttendanceCheckIn.ayudaDelRechazo("").isNotBlank())

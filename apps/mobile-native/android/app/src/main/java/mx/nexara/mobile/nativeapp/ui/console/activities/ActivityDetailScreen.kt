@@ -328,6 +328,19 @@ fun ActivityDetailScreen(
                                             error = iniciarError,
                                         )
                                     }
+                                    if (miFila != null && !puedeIniciar) {
+                                        SesionPropiaPanel(
+                                            activityId = detail.id,
+                                            sesion = miFila.sesion(),
+                                            miId = user?.id,
+                                            despachador = detail.assignmentCharge == "despacho" && miFila.rol == "LEAD",
+                                            estatus = detail.estatus,
+                                            onDone = { mensaje ->
+                                                recarga++
+                                                scope.launch { snackbarHostState.showSnackbar(mensaje) }
+                                            },
+                                        )
+                                    }
                                     val luz = ActivitySemaforo.luz(detail.semaforo)
                                     val planReal = ActivitySemaforo.planRealTexto(
                                         detail.minutosPlan,

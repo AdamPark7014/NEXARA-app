@@ -350,6 +350,17 @@ struct TeamMemberDetailView: View {
                     }
                 }
 
+                if !isSelf && member.puedePausar == true {
+                    PausarDeEquipoSection(
+                        userId: userId,
+                        nombre: member.nombre,
+                        actividades: member.openActivities ?? []
+                    ) { message in
+                        notice = message
+                        Task { await load() }
+                    }
+                }
+
                 let pendientes = isSelf ? pendingDispatches(member) : []
                 if !pendientes.isEmpty {
                     Section {
@@ -411,6 +422,9 @@ struct TeamMemberDetailView: View {
                                     Text(activity.anNumber ?? "").font(.caption).foregroundStyle(.secondary)
                                     if activity.reparte == true {
                                         CoreChip(icon: "paperplane", text: "La reparte", color: CorePalette.purple)
+                                    }
+                                    if activity.enPausa == true {
+                                        CoreChip(icon: "pause.circle.fill", text: "En pausa", color: CorePalette.orange)
                                     }
                                 }
                                 if activity.reparte != true {

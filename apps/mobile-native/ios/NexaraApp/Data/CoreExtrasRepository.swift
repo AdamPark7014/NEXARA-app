@@ -454,8 +454,9 @@ struct AlmacenConsulta {
     var bajoMinimo: [StockNivel] = []
 }
 
-/// Lectura de los tres módulos de consulta. Solo lectura a propósito: en el
-/// teléfono no se mueve inventario. (El organigrama se quedó en la web.)
+/// Lectura de los tres módulos de consulta. Solo lectura a propósito: lo que mueve
+/// inventario desde el teléfono (el escáner) vive en `EscaneoRepository`.
+/// (El organigrama se quedó en la web.)
 final class CoreExtrasRepository {
     static let shared = CoreExtrasRepository()
     private let api = ApiClient.shared

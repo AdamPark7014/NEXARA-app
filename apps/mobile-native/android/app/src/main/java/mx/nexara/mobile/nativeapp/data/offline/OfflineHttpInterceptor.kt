@@ -137,7 +137,21 @@ class OfflineHttpInterceptor(
         private val SOLO_EN_LINEA = listOf(
             "/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones",
             "/aceptar", "/rechazar",
+            // El reloj de una actividad: encolado, la pausa caería cuando vuelva la señal.
+            "/pausar", "/reanudar",
+            // Alta y movimientos por código de barras: el API decide si el código existe.
+            "/por-codigo",
         )
+
+        /**
+         * Entregar o recibir una herramienta exige el código de recogida o el estado del
+         * préstamo de ese momento; encolado daría por entregado algo que sigue en el almacén.
+         */
+        private fun esEntregaDeHerramienta(ruta: String): Boolean {
+            if (!ruta.contains("/tool-requests/")) return false
+            val limpia = ruta.trimEnd('/')
+            return limpia.endsWith("/deliver") || limpia.endsWith("/return")
+        }
 
         /** `/iniciar` solo de actividades propias: otras rutas con ese nombre sí se pueden encolar. */
         private fun esIniciarActividad(ruta: String): Boolean =
@@ -166,6 +180,7 @@ class OfflineHttpInterceptor(
             if (SOLO_EN_LINEA.any { ruta.contains(it) }) return false
             if (esIniciarActividad(ruta)) return false
             if (esDecisionDeViatico(ruta)) return false
+            if (esEntregaDeHerramienta(ruta)) return false
             if (method.equals("DELETE", ignoreCase = true) && BORRADO_SOLO_EN_LINEA.any { ruta.contains(it) }) return false
             return true
         }

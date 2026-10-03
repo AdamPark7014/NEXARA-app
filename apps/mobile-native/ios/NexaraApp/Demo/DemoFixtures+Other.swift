@@ -443,7 +443,8 @@ extension DemoStore {
         let warehouse = DemoData.warehouses.first { $0.id == s.warehouseId } ?? DemoData.warehouses[0]
         return dj([
             "id": s.id,
-            "quantity": s.qty,
+            // Con lo que se haya movido con el escáner en esta sesión.
+            "quantity": cantidadDemo(s),
             "reservedQty": s.reserved,
             "reorderPoint": s.reorder,
             "product": dj(["id": 300 + s.id, "name": s.name, "sku": s.sku]),

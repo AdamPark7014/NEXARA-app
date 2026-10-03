@@ -5,7 +5,8 @@ import kotlin.math.roundToInt
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 
 /**
- * Almacén en el teléfono, **solo consulta**: qué hay y qué está por acabarse.
+ * Almacén en el teléfono: qué hay y qué está por acabarse. Mover inventario se hace solo
+ * con el escáner (`EscanerDeAlmacen`, reglas en `EscaneoRules`); esta lista es de consulta.
  *
  * La tabla de la web tiene producto, SKU, almacén, ubicación, cantidad,
  * reservado, disponible, punto de reorden y costo. En un teléfono nueve columnas
@@ -156,5 +157,6 @@ object AlmacenRules {
 
     /** Qué no hace esta pantalla. */
     const val LIMITE =
-        "Consulta. Entradas, salidas y traspasos de inventario se hacen desde la computadora."
+        "Con el escáner se consultan productos y se registran entradas y salidas (si tu usuario " +
+            "puede mover inventario). Traspasos, ajustes y costos se hacen desde la computadora."
 }

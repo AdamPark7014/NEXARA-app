@@ -133,6 +133,15 @@ data class ActivityAssigneeRefDto(
     /** PENDIENTE | ACEPTADA | RECHAZADA */
     val aceptacion: String? = null,
     val inicioRealAt: String? = null,
+    // Sesión de trabajo de esta persona (reloj por sesiones); opcional en APIs viejas.
+    val enCurso: Boolean? = null,
+    val enPausa: Boolean? = null,
+    /** FIN | PAUSA | SALIDA | TOPE_12H | CORTE_DIA */
+    val pausaTipo: String? = null,
+    val pausadaAt: String? = null,
+    val pausadaPor: MyActivityRefDto? = null,
+    val motivoPausa: String? = null,
+    val sesionAbiertaDesde: String? = null,
 )
 
 data class ActivityAssigneeUserDto(

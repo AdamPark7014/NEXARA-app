@@ -166,6 +166,43 @@ final class CoreRepository {
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 
+    // MARK: Sesión de trabajo (pausar / reanudar)
+
+    private struct PausaBody: Encodable {
+        let motivo: String?
+    }
+
+    /// `POST me/activities/:id/pausar`: detiene mi reloj; sigue «En Proceso». Motivo opcional.
+    /// Solo en línea: encolada, la pausa quedaría con la hora de cuando regrese la señal.
+    func pausarActividad(activityId: Int, motivo: String?) async throws {
+        try await CoreRepository.requireOnline()
+        let texto = motivo?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let data = try await api.postJSON(
+            "me/activities/\(activityId)/pausar",
+            body: PausaBody(motivo: texto.isEmpty ? nil : texto)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `POST me/activities/:id/reanudar`: vuelve a correr mi reloj.
+    func reanudarActividad(activityId: Int) async throws {
+        struct Empty: Encodable {}
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON("me/activities/\(activityId)/reanudar", body: Empty())
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `POST me/board/:userId/activities/:id/pausar`: el jefe (o el CEO) le pausa el reloj
+    /// a alguien de su equipo. Motivo obligatorio (≥ 10); el API vuelve a validarlo.
+    func pausarActividadDeEquipo(userId: Int, activityId: Int, motivo: String) async throws {
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "me/board/\(userId)/activities/\(activityId)/pausar",
+            body: PausaBody(motivo: motivo.trimmingCharacters(in: .whitespacesAndNewlines))
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
     // MARK: Checklist de herramientas
 
     /// `GET me/activities/:id/herramientas`: qué hay que llevar y qué ya se palomeó.

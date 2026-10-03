@@ -121,10 +121,39 @@ data class MyActivityItemDto(
     val justificacionOrden: String? = null,
     /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep». */
     val periodo: ActivityPeriodoDto? = null,
+    // ── Sesión de trabajo (reloj por sesiones); opcional: la API vieja no la manda.
+    /** Su reloj corre ahora mismo. */
+    val enCurso: Boolean? = null,
+    /** Ya la inició, no la ha entregado y su reloj está detenido. */
+    val enPausa: Boolean? = null,
+    /** FIN | PAUSA | SALIDA | TOPE_12H | CORTE_DIA */
+    val pausaTipo: String? = null,
+    val pausadaAt: String? = null,
+    val pausadaPor: MyActivityRefDto? = null,
+    val motivoPausa: String? = null,
+    val sesionAbiertaDesde: String? = null,
 ) {
     /** El contrato dice `asignadoPor`; las respuestas de hoy traen `asignadaPor`. */
     val quienAsigno: MyActivityRefDto? get() = asignadoPor ?: asignadaPor
 }
+
+/** Respuesta de pausar / reanudar: cómo quedó el reloj de esa persona en la actividad. */
+data class EstadoSesionDto(
+    val ok: Boolean? = null,
+    val enCurso: Boolean? = null,
+    val enPausa: Boolean? = null,
+    val pausaTipo: String? = null,
+    val pausadaAt: String? = null,
+    val pausadaPor: MyActivityRefDto? = null,
+    val motivoPausa: String? = null,
+    val sesionAbiertaDesde: String? = null,
+    val minutosReales: Double? = null,
+)
+
+/** Cuerpo de pausar: el motivo es opcional en la propia y obligatorio (≥ 10) para el jefe. */
+data class PausarActividadRequest(
+    val motivo: String? = null,
+)
 
 data class MyActivitiesResponseDto(
     /** Encargados de área: pueden reordenar su cola (con justificación). */
@@ -196,6 +225,14 @@ data class TeamBoardOpenActivityDto(
     val fechaInicio: String? = null,
     /** Actividad de varios días: sigue en la pizarra cada día hasta su fin. */
     val periodo: ActivityPeriodoDto? = null,
+    // ── Sesión de trabajo de esta persona en la actividad (opcional).
+    val enCurso: Boolean? = null,
+    val enPausa: Boolean? = null,
+    val pausaTipo: String? = null,
+    val pausadaAt: String? = null,
+    val pausadaPor: MyActivityRefDto? = null,
+    val motivoPausa: String? = null,
+    val sesionAbiertaDesde: String? = null,
 )
 
 /** Última actividad que la persona terminó hoy (estado `libre`). */
@@ -233,6 +270,8 @@ data class TeamBoardUserDto(
     val enCorreccion: Int? = null,
     /** Contrato C: números del rango que se está viendo; ausente en APIs viejas. */
     val kpis: TeamBoardKpisDto? = null,
+    /** Solo en `me/board/:userId`: quien mira es su jefe (o el CEO) y puede pausarle una actividad. */
+    val puedePausar: Boolean? = null,
 )
 
 /**
@@ -835,6 +874,25 @@ interface CoreActivitiesApi {
      */
     @POST("me/activities/{id}/iniciar")
     suspend fun iniciarActividad(@Path("id") activityId: Long): ResponseBody
+
+    /** Detiene mi reloj en esta actividad; sigue «En Proceso». Motivo opcional. */
+    @POST("me/activities/{id}/pausar")
+    suspend fun pausarActividad(
+        @Path("id") activityId: Long,
+        @Body body: PausarActividadRequest,
+    ): EstadoSesionDto
+
+    /** Mi reloj vuelve a correr en esta actividad. */
+    @POST("me/activities/{id}/reanudar")
+    suspend fun reanudarActividad(@Path("id") activityId: Long): EstadoSesionDto
+
+    /** Un jefe (o el CEO) pausa la actividad en curso de alguien de su equipo. Motivo obligatorio. */
+    @POST("me/board/{userId}/activities/{id}/pausar")
+    suspend fun pausarActividadDeEquipo(
+        @Path("userId") userId: Long,
+        @Path("id") activityId: Long,
+        @Body body: PausarActividadRequest,
+    ): EstadoSesionDto
 
     /**
      * Checklist de herramientas de una OT mía. Solo de quien la tiene asignada:

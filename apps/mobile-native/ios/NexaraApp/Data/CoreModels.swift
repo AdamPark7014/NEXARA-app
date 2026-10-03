@@ -564,6 +564,23 @@ struct MyActivityItem: Decodable, Identifiable, Hashable {
     let inicioRealAt: String?
     /// Actividad de varios días: «Día 3 de 10 · termina vie 25 sep».
     let periodo: ActivityPeriodo?
+    // Sesión de trabajo (reloj real). Opcionales: la API vieja no los manda.
+    let enCurso: Bool?
+    let enPausa: Bool?
+    let pausaTipo: String?
+    let pausadaAt: String?
+    let pausadaPor: MyActivityAssigner?
+    let motivoPausa: String?
+    let sesionAbiertaDesde: String?
+
+    /// Estado del reloj de esta actividad para quien la tiene.
+    var sesion: SesionActividad {
+        SesionActividad(
+            enCurso: enCurso ?? false, enPausa: enPausa ?? false, pausaTipo: pausaTipo,
+            pausadaAt: pausadaAt, pausadaPor: pausadaPor, motivoPausa: motivoPausa,
+            sesionAbiertaDesde: sesionAbiertaDesde
+        )
+    }
 
     /// Única acción de quien recibe una actividad (regla del dueño, 18-09).
     static let accionIniciar = "Iniciar actividad"
@@ -639,6 +656,22 @@ struct TeamBoardOpenActivity: Decodable, Identifiable, Hashable {
     let fechaInicio: String?
     /// Actividad de varios días: sigue en la pizarra cada día hasta su fin.
     let periodo: ActivityPeriodo?
+    // Sesión de trabajo de esa persona en esta actividad. Opcionales en la API vieja.
+    let enCurso: Bool?
+    let enPausa: Bool?
+    let pausaTipo: String?
+    let pausadaAt: String?
+    let pausadaPor: MyActivityAssigner?
+    let motivoPausa: String?
+    let sesionAbiertaDesde: String?
+
+    var sesion: SesionActividad {
+        SesionActividad(
+            enCurso: enCurso ?? false, enPausa: enPausa ?? false, pausaTipo: pausaTipo,
+            pausadaAt: pausadaAt, pausadaPor: pausadaPor, motivoPausa: motivoPausa,
+            sesionAbiertaDesde: sesionAbiertaDesde
+        )
+    }
 }
 
 struct TeamBoardUser: Decodable, Identifiable, Hashable {
@@ -664,6 +697,8 @@ struct TeamBoardUser: Decodable, Identifiable, Hashable {
     let enEsperaAprobacion: Int?
     /// Con evidencia devuelta que está corrigiendo.
     let enCorreccion: Int?
+    /// Solo en `me/board/:userId`: quien consulta puede pausarle el reloj (jefe o CEO).
+    let puedePausar: Bool?
 }
 
 /// `lastFinished` del tablero. `lateMinutes` nulo = la actividad no tenía fecha máxima.

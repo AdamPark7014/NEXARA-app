@@ -26,6 +26,10 @@ import retrofit2.http.Path
  * que esas dos personas tampoco pueden leer sin `tools.manage`—. Mientras el
  * servidor no abra esa puerta, la app no finge tenerla.
  *
+ * La excepción es el escáner de etiquetas (`EscaneoApi`): buscar por código lo
+ * deja pasar `tools.view`, y entregar/recibir se ofrecen porque es justo lo que
+ * hace almacén con la herramienta en la mano; a los demás el 403 se les explica.
+ *
  * Todo campo llega anulable con valor por omisión: un registro raro deja la
  * tarjeta incompleta, nunca tumba la pantalla.
  */

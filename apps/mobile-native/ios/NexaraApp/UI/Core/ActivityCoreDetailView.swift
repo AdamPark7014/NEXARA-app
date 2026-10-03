@@ -260,6 +260,20 @@ struct ActivityCoreDetailView: View {
                 }
             }
 
+            if let mine = myAssigneeRow, !isCeo {
+                SesionPropiaSection(
+                    activityId: activityId,
+                    sesion: SesionActividad(fila: mine),
+                    miId: myId,
+                    despachador: splits,
+                    estatus: text("estatus")
+                ) { message in
+                    notice = message
+                    teamRefresh += 1
+                    Task { await load() }
+                }
+            }
+
             if let acciones, acciones.hayAlgo, !isClosed {
                 Section {
                     if acciones.puedePasar {

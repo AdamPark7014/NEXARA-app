@@ -70,6 +70,14 @@ final class DemoStore: @unchecked Sendable {
     var reviews: [String: DemoReview] = [:]
     var extraActivities: [DemoActivity] = []
     var nextActivityId = 5200
+    /// Reloj por sesiones: pausas abiertas y desde cuándo corre cada reloj reanudado.
+    var pausas: [Int: DemoPausa] = [:]
+    var sesionDesde: [Int: Date] = [:]
+
+    // Escáner de almacén y herramientas
+    var stockAjustes: [Int: Double] = [:]
+    var stockAltas: [String: DemoJSON] = [:]
+    var prestamosHerramienta: [Int: String] = [:]
 
     // Chat
     var messageDates: [Int: Date] = [:]
@@ -132,6 +140,11 @@ final class DemoStore: @unchecked Sendable {
         reviews = [:]
         extraActivities = []
         nextActivityId = 5200
+        pausas = [:]
+        sesionDesde = [:]
+        stockAjustes = [:]
+        stockAltas = [:]
+        prestamosHerramienta = [:]
         messages = [:]
         channelUnread = [:]
         channelTopic = [:]
