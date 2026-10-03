@@ -1,0 +1,211 @@
+/* NEXARA · Plantilla de formulario (v2): secciones a la izquierda, lista de pendientes a la derecha, pie fijo.
+   Solo tokens --ui-*; claro y oscuro (body.dark) salen de los tokens. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.error {
+  margin-bottom: var(--ui-s4);
+}
+
+.wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--ui-s5);
+  align-items: start;
+}
+
+.wrap[data-aside="false"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.main {
+  min-width: 0;
+}
+
+.main > * + * {
+  margin-top: var(--ui-s4);
+}
+
+.aside {
+  position: sticky;
+  top: calc(var(--ui-sticky-top, 0px) + var(--ui-s4));
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+/* Los avisos traen margen inferior propio; en la rejilla ya hay separación. */
+.aside > *,
+.error > * {
+  margin-bottom: 0;
+}
+
+/* ─── Lista de pendientes ──────────────────────────────────────────────── */
+
+.pending {
+  padding: 16px 18px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+}
+
+.pendingHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  margin-bottom: 8px;
+}
+
+.pendingTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ui-fg);
+}
+
+.pendingList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pendingItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 4px;
+  margin: 0 -4px;
+  border: none;
+  border-radius: var(--ui-radius);
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-family: var(--ui-font);
+  font-size: var(--ui-text-sm);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ui-duration-fast) ease, color var(--ui-duration-fast) ease;
+}
+
+.pendingItem:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  transform: none;
+  box-shadow: none;
+}
+
+.pendingItem:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
+}
+
+.pendingItem[data-state="todo"] {
+  color: var(--ui-fg);
+  font-weight: 500;
+}
+
+.pendingItem[data-state="error"] {
+  color: var(--ui-danger-text);
+  font-weight: 500;
+}
+
+.pendingItem[data-state="done"] {
+  color: var(--ui-fg-2);
+}
+
+.pendingItem:disabled {
+  cursor: default;
+}
+
+.tick {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.tick[data-state="done"] {
+  background: var(--ui-success);
+  color: var(--ui-success-fg);
+}
+
+.tick[data-state="todo"] {
+  border: 1.5px dashed var(--ui-border-strong);
+  color: transparent;
+}
+
+.tick[data-state="error"] {
+  background: var(--ui-danger);
+  color: var(--ui-danger-fg);
+}
+
+.pendingLabel {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.pendingHint {
+  display: block;
+  font-size: var(--ui-text-xs);
+  font-weight: 400;
+  color: var(--ui-fg-3);
+  margin-top: 1px;
+}
+
+.req {
+  color: var(--ui-danger);
+  font-weight: 700;
+}
+
+/* ─── Pie ──────────────────────────────────────────────────────────────── */
+
+.footerDivider {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--ui-border);
+}
+
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.saved svg {
+  color: var(--ui-success);
+}
+
+/* ─── Teléfono y tableta ───────────────────────────────────────────────── */
+
+@media (max-width: 960px) {
+  .wrap {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ui-s4);
+  }
+  .aside {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .footerDivider {
+    display: none;
+  }
+  .pending {
+    padding: 14px;
+  }
+}

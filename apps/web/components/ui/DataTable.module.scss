@@ -155,3 +155,253 @@
     padding-bottom: max(var(--dt-pad-y), 12px);
   }
 }
+
+/* ─── v2: sin marco (dentro de la tarjeta de ModulePage) ─────────────── */
+
+.wrap[data-flush="true"] {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ─── v2: selección ─────────────────────────────────────────────────── */
+
+/* Envoltorio cuando hay selección: aloja la barra flotante bajo la tabla. */
+.outer {
+  position: relative;
+  min-width: 0;
+}
+
+.selCell {
+  width: 36px;
+  padding-right: 0 !important;
+  vertical-align: middle;
+  line-height: 0;
+
+  input {
+    vertical-align: middle;
+  }
+}
+
+.table thead .selCell {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.row[data-selected="true"],
+.row[data-selected="true"]:hover {
+  background: color-mix(in srgb, var(--ui-brand-soft) 55%, var(--ui-surface));
+}
+
+.table[data-zebra="true"] tbody .row[data-selected="true"] {
+  background: color-mix(in srgb, var(--ui-brand-soft) 55%, var(--ui-surface));
+}
+
+/* Barra flotante: superficie elevada (ni tinta oscura en claro ni blanco puro en oscuro). */
+/* Anfitrión de alto 0: la barra se alinea a su borde inferior y crece hacia arriba, así
+   flota sobre el último renglón y, al desplazar, se queda pegada a 12 px del borde. */
+.selBarHost {
+  position: sticky;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 0;
+  margin-top: -12px;
+  pointer-events: none;
+}
+
+.selBar {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 6px 6px 6px 16px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-3);
+  color: var(--ui-fg);
+  box-shadow: var(--ui-elev-3);
+  font-size: var(--ui-text-sm);
+  pointer-events: auto;
+  animation: ui-fade-in var(--ui-duration-base) ease;
+}
+
+.selCount {
+  font-weight: 650;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.selSep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--ui-border);
+}
+
+.selActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.selX {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-fg-3);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+    transform: none;
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 1px;
+  }
+}
+
+@media (max-width: 640px) {
+  .selBarHost {
+    bottom: 8px;
+  }
+  .selBar {
+    flex-wrap: wrap;
+    max-width: calc(100% - 16px);
+    padding-left: 12px;
+  }
+}
+
+/* ─── v2: acciones por fila ─────────────────────────────────────────── */
+
+.actionsCell {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-height: 32px;
+  opacity: 0;
+  transition: opacity var(--ui-duration-fast) ease;
+}
+
+.row:hover .rowActions,
+.row:focus-within .rowActions,
+.row[data-selected="true"] .rowActions {
+  opacity: 1;
+}
+
+/* Sin mouse no hay «pasar por encima»: las acciones se ven siempre. */
+@media (pointer: coarse), (hover: none) {
+  .rowActions {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowActions,
+  .selBar {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ─── v2: celdas auxiliares ─────────────────────────────────────────── */
+
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.personText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.personName {
+  font-weight: 500;
+  color: var(--ui-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.personSub {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progress {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+
+  > * {
+    width: 100%;
+  }
+}
+
+.when {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.whenDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent);
+}
+
+.whenText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.whenT {
+  font-weight: 500;
+  color: var(--ui-fg);
+  white-space: nowrap;
+}
+
+.whenS {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

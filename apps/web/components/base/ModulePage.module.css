@@ -1,0 +1,347 @@
+/* NEXARA · Plantilla de página de módulo (v2): tarjeta de lista, barra de herramientas, chips, pie y paginador.
+   Solo tokens --ui-*; claro y oscuro (body.dark) salen de los tokens. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.before {
+  margin-bottom: var(--ui-page-gap, 24px);
+}
+
+.before > * {
+  margin-bottom: 0;
+}
+
+/* ─── Tarjeta de lista ─────────────────────────────────────────────────── */
+
+.list {
+  position: relative;
+  min-width: 0;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+  overflow: clip;
+}
+
+.content {
+  position: relative;
+  min-width: 0;
+}
+
+/* La tabla de datos dentro de la tarjeta va sin su propio marco: el marco es la tarjeta. */
+.content > :global(.nx-table-wrap),
+.content > * > :global(.nx-table-wrap) {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ─── Barra de herramientas ────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ui-border-subtle);
+  min-width: 0;
+}
+
+.toolbarSearch {
+  flex: 0 1 240px;
+  min-width: 180px;
+  display: flex;
+}
+
+.toolbarSearch > * {
+  flex: 1 1 auto;
+  max-width: none;
+}
+
+.toolbarEnd {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+/* ─── Chips de filtro ──────────────────────────────────────────────────── */
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-family: var(--ui-font);
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--ui-duration-fast) ease,
+    border-color var(--ui-duration-fast) ease,
+    color var(--ui-duration-fast) ease;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  transform: none;
+  box-shadow: none;
+}
+
+.chip:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Chip activo: marca sólida en claro; en oscuro, marca suave con texto de marca (nada de blanco puro). */
+.chip[aria-pressed="true"] {
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+  color: var(--ui-brand-fg);
+}
+
+:global(body.dark) .chip[aria-pressed="true"] {
+  background: var(--ui-brand-soft-2);
+  border-color: transparent;
+  color: var(--ui-brand-text);
+}
+
+.chip svg {
+  font-size: 15px !important;
+  flex: 0 0 auto;
+}
+
+.chipDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.chipN {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip[aria-pressed="true"] .chipN {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.chipDashed {
+  border-style: dashed;
+  color: var(--ui-fg-3);
+}
+
+.chipDashed .chipN {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+/* Filtro aplicado («Responsable: José A. ×»): texto + botón de quitar. */
+.chipFilter {
+  cursor: default;
+  padding-right: 6px;
+}
+
+.chipFilter b {
+  color: var(--ui-fg);
+  font-weight: 600;
+}
+
+.chipX {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ui-fg-3);
+  cursor: pointer;
+}
+
+.chipX:hover:not(:disabled) {
+  background: var(--ui-active);
+  color: var(--ui-fg);
+  transform: none;
+  box-shadow: none;
+}
+
+.chipX:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+}
+
+/* ─── Selector de vista ────────────────────────────────────────────────── */
+
+.view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── Pie de lista ─────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.footerEnd {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pg {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.pg:hover:not(:disabled):not([aria-current="page"]) {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  transform: none;
+  box-shadow: none;
+}
+
+.pg:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+}
+
+.pg[aria-current="page"] {
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg);
+  font-weight: 600;
+  cursor: default;
+}
+
+:global(body.dark) .pg[aria-current="page"] {
+  background: var(--ui-brand-soft-2);
+  color: var(--ui-brand-text);
+}
+
+.pg:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pgGap {
+  min-width: 22px;
+  color: var(--ui-fg-4);
+  cursor: default;
+}
+
+/* ─── Táctil y teléfono ────────────────────────────────────────────────── */
+
+@media (pointer: coarse) {
+  .chip {
+    height: 40px;
+    padding: 0 14px;
+  }
+  .chipX {
+    width: 28px;
+    height: 28px;
+  }
+  .pg {
+    min-width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    padding: 12px;
+  }
+  .toolbarSearch {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .toolbarEnd {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    margin: 0 -12px;
+    padding: 0 12px;
+    max-width: calc(100% + 24px);
+  }
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+  .footer {
+    padding: 10px 12px;
+  }
+}
