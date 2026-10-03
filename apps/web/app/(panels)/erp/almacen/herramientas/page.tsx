@@ -10,9 +10,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
-import PanelTabs from "@/components/ui/PanelTabs";
-import InlineAlert from "@/components/ui/InlineAlert";
+import HandymanOutlined from "@mui/icons-material/HandymanOutlined";
+import { Alert, PageHead, Tabs } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { isCoreMount } from "@/lib/recursos-core";
@@ -23,6 +22,7 @@ import ToolRequestsTable from "@/components/ToolRequestsTable";
 import ToolRenewalsTable from "@/components/ToolRenewalsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 import HerramientasPorEtiquetaPanel from "@/components/almacen/HerramientasPorEtiquetaPanel";
+import s from "../almacen-portada.module.css";
 
 type ManagerTab = "inventory" | "kits" | "requests" | "renewals" | "approvals";
 type LoanTab = "mykit" | "myrequests";
@@ -119,48 +119,48 @@ export default function ToolsPage() {
 
   return (
     <>
-      <PageHeader
+      <PageHead
         eyebrow={enCore ? "Core · Recursos" : "OPS · Campo"}
         title={cfg.title}
-        subtitle={cfg.subtitle}
-        density="ops"
+        description={cfg.subtitle}
+        icon={<HandymanOutlined />}
+        tabs={
+          tabs.length > 0 ? (
+            <Tabs
+              ariaLabel="Secciones de herramientas"
+              value={tabActiva}
+              onChange={cambiarTab}
+              items={tabs.map((t) => ({ id: t.key, label: t.label }))}
+            />
+          ) : undefined
+        }
       />
 
-      {highlightId && (
-        <div style={{ marginBottom: 12 }}>
-          <InlineAlert
-            variant="info"
-            message="Vienes de un aviso: la solicitud está resaltada en la lista."
-          />
-        </div>
-      )}
+      <div className={s.cuerpo}>
+        {highlightId && (
+          <Alert tone="info" role="status">
+            Vienes de un aviso: la solicitud está resaltada en la lista.
+          </Alert>
+        )}
 
-      {tabs.length > 0 ? (
-        <PanelTabs
-          ariaLabel="Secciones de herramientas"
-          value={tabActiva}
-          onChange={cambiarTab}
-          tabs={tabs}
-        />
-      ) : null}
-
-      {showManagePane && managerTab === "approvals" && (
-        <ToolRequestsTable highlightId={highlightId} />
-      )}
-      {showManagePane && managerTab === "inventory" && <ToolInventoryPanel />}
-      {showManagePane && managerTab === "kits" && <ToolUserKitPanel />}
-      {showManagePane && managerTab === "requests" && (
-        // Entregar y recibir con la etiqueta; la tabla de abajo se recarga sola por socket.
-        <div style={{ display: "grid", gap: 16 }}>
-          <HerramientasPorEtiquetaPanel />
+        {showManagePane && managerTab === "approvals" && (
           <ToolRequestsTable highlightId={highlightId} />
-        </div>
-      )}
-      {showManagePane && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
+        )}
+        {showManagePane && managerTab === "inventory" && <ToolInventoryPanel />}
+        {showManagePane && managerTab === "kits" && <ToolUserKitPanel />}
+        {showManagePane && managerTab === "requests" && (
+          // Entregar y recibir con la etiqueta; la tabla de abajo se recarga sola por socket.
+          <div className={s.pila}>
+            <HerramientasPorEtiquetaPanel />
+            <ToolRequestsTable highlightId={highlightId} />
+          </div>
+        )}
+        {showManagePane && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
 
-      {showLoanPane && loanTab === "mykit" && <ToolMyKitPanel />}
-      {showLoanPane && loanTab === "myrequests" && <ToolRequestForm />}
-      {!canManage && !canRequest && <ToolMyKitPanel />}
+        {showLoanPane && loanTab === "mykit" && <ToolMyKitPanel />}
+        {showLoanPane && loanTab === "myrequests" && <ToolRequestForm />}
+        {!canManage && !canRequest && <ToolMyKitPanel />}
+      </div>
     </>
   );
 }

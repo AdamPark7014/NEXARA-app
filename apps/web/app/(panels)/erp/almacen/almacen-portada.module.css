@@ -1,0 +1,13 @@
+/* Portada de almacén (`/erp/almacen`): el cuerpo de cada pestaña y sus pilas de paneles. */
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-page-gap, var(--ui-s5));
+  min-width: 0;
+}
+
+.pila {
+  display: grid;
+  gap: var(--ui-s5);
+  min-width: 0;
+}

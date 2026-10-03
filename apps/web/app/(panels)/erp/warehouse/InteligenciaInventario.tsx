@@ -1,17 +1,26 @@
 "use client";
 
-import { useMemo } from "react";
-import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
-import { Tag } from "@/components/ui/DataTable";
-import { SkeletonRows } from "@/components/base";
-import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
+import { useMemo, type ReactNode } from "react";
+import PaidOutlined from "@mui/icons-material/PaidOutlined";
+import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
+import AutorenewOutlined from "@mui/icons-material/AutorenewOutlined";
+import TrendingDownOutlined from "@mui/icons-material/TrendingDownOutlined";
+import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
+import HourglassEmptyOutlined from "@mui/icons-material/HourglassEmptyOutlined";
+import { Alert, Badge, Button, Card, CardHead, EmptyState, SkeletonRows, Stat, StatRow } from "@/components/base";
 import type { InventoryInsights } from "@/lib/stock-api";
 import { cantidad, pesos } from "@/lib/recursos-ui";
+import s from "./almacen.module.css";
 
-const listaScroll = { display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" } as const;
-const tenue = { fontSize: 11, color: "var(--text-tertiary)" } as const;
+/** Tarjeta del resumen: título, una línea de contexto y su contenido. */
+function Bloque({ titulo, subtitulo, children }: { titulo: string; subtitulo: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHead title={titulo} subtitle={subtitulo} />
+      <div className={s.cuerpoTarjeta}>{children}</div>
+    </Card>
+  );
+}
 
 /** Resumen del inventario: valor, rotación, qué pedir y qué no se mueve. */
 export default function InteligenciaInventario({
@@ -36,173 +45,186 @@ export default function InteligenciaInventario({
 
   if (!insights) {
     return (
-      <EmptyState
-        title="Aún no hay resumen del inventario"
-        description="Aparece en cuanto haya existencias y movimientos registrados."
-        action={
-          <Button size="sm" variant="secondary" onClick={onRetry}>
-            Reintentar
-          </Button>
-        }
-      />
+      <Card>
+        <EmptyState
+          icon={<Inventory2Outlined />}
+          title="Aún no hay resumen del inventario"
+          description="Aparece en cuanto haya existencias y movimientos registrados."
+          action={
+            <Button size="sm" variant="secondary" onClick={onRetry}>
+              Reintentar
+            </Button>
+          }
+        />
+      </Card>
     );
   }
 
   const { kpis } = insights;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }} aria-busy={loading}>
-      <StatStrip
-        stats={[
-          { label: "Valor del inventario", value: pesos(kpis.totalValue, { enteros: true }), big: true },
-          { label: "Productos por almacén", value: kpis.skuLocations, sub: `${kpis.fillHealthyPct}% con stock sano` },
-          {
-            label: "Rotación anual",
-            value: `${kpis.turnoverAnnualProxy}×`,
-            sub: "Estimada con las salidas de 30 días",
-            tone: "accent",
-          },
-          { label: "Bajo mínimo", value: kpis.lowStock, tone: kpis.lowStock ? "warning" : "positive" },
-          { label: "Agotados", value: kpis.zeroStock, tone: kpis.zeroStock ? "danger" : "default" },
-          {
-            label: "Sin movimiento",
-            value: kpis.deadStock,
-            sub: pesos(kpis.deadStockValue, { enteros: true }),
-            tone: kpis.deadStock ? "warning" : "default",
-          },
-        ]}
-      />
+    <div className={s.resumen} aria-busy={loading}>
+      <StatRow ariaLabel="Indicadores del inventario" cols={3}>
+        <Stat label="Valor del inventario" value={pesos(kpis.totalValue, { enteros: true })} tone="brand" icon={<PaidOutlined />} />
+        <Stat
+          label="Productos por almacén"
+          value={kpis.skuLocations}
+          hint={`${kpis.fillHealthyPct}% con stock sano`}
+          icon={<Inventory2Outlined />}
+          iconTone="neutral"
+        />
+        <Stat
+          label="Rotación anual"
+          value={`${kpis.turnoverAnnualProxy}×`}
+          hint="Estimada con las salidas de 30 días"
+          icon={<AutorenewOutlined />}
+          iconTone="info"
+        />
+        <Stat
+          label="Bajo mínimo"
+          value={kpis.lowStock}
+          tone={kpis.lowStock ? "warning" : "success"}
+          icon={<TrendingDownOutlined />}
+          iconTone={kpis.lowStock ? "warning" : "success"}
+          semaforo={kpis.lowStock ? "ambar" : "verde"}
+        />
+        <Stat
+          label="Agotados"
+          value={kpis.zeroStock}
+          tone={kpis.zeroStock ? "danger" : "default"}
+          icon={<ReportProblemOutlined />}
+          iconTone={kpis.zeroStock ? "danger" : "neutral"}
+          semaforo={kpis.zeroStock ? "rojo" : "verde"}
+        />
+        <Stat
+          label="Sin movimiento"
+          value={kpis.deadStock}
+          hint={pesos(kpis.deadStockValue, { enteros: true })}
+          tone={kpis.deadStock ? "warning" : "default"}
+          icon={<HourglassEmptyOutlined />}
+          iconTone={kpis.deadStock ? "warning" : "neutral"}
+        />
+      </StatRow>
 
       {insights.alerts.map((a) => (
-        <InlineAlert key={a.message} variant={a.severity === "danger" ? "danger" : "warning"} message={a.message} />
+        <Alert key={a.message} tone={a.severity === "danger" ? "danger" : "warning"}>
+          {a.message}
+        </Alert>
       ))}
 
-      <DashGrid>
-        <DashCol span={6}>
-          <DashPanel title="Entradas y salidas" subtitle="Unidades, últimos 14 días">
-            <div
-              style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80 }}
-              role="img"
-              aria-label="Gráfica de entradas y salidas de los últimos 14 días"
-            >
-              {insights.trends.outflow14d.map((p, i) => {
-                const entradas = insights.trends.inflow14d[i]?.qty ?? 0;
-                return (
-                  <div
-                    key={p.date}
-                    style={{ flex: 1, display: "flex", gap: 1, alignItems: "flex-end" }}
-                    title={`${p.date}: entraron ${cantidad(entradas)}, salieron ${cantidad(p.qty)}`}
-                  >
-                    <div style={{ flex: 1, height: `${Math.max(2, (entradas / maxFlujo) * 70)}px`, background: "var(--success)", borderRadius: 2, opacity: 0.85 }} />
-                    <div style={{ flex: 1, height: `${Math.max(2, (p.qty / maxFlujo) * 70)}px`, background: "var(--primary)", borderRadius: 2 }} />
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: 10, display: "flex", gap: 12, ...tenue }}>
-              <span><span aria-hidden style={{ color: "var(--success)" }}>■</span> Entradas</span>
-              <span><span aria-hidden style={{ color: "var(--primary)" }}>■</span> Salidas</span>
-            </div>
-          </DashPanel>
-        </DashCol>
-
-        <DashCol span={6}>
-          <DashPanel title="Último movimiento" subtitle="Productos según los días que llevan sin moverse">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {[
-                { label: "0 a 30 días", value: insights.aging.d0_30 },
-                { label: "30 a 60 días", value: insights.aging.d30_60 },
-                { label: "60 a 90 días", value: insights.aging.d60_90 },
-                { label: "Más de 90 días", value: insights.aging.d90_plus },
-              ].map((b) => (
-                <div key={b.label} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                  <div style={tenue}>{b.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{b.value}</div>
+      <div className={s.rejillaResumen}>
+        <Bloque titulo="Entradas y salidas" subtitulo="Unidades, últimos 14 días">
+          <div className={s.grafica} role="img" aria-label="Gráfica de entradas y salidas de los últimos 14 días">
+            {insights.trends.outflow14d.map((p, i) => {
+              const entradas = insights.trends.inflow14d[i]?.qty ?? 0;
+              return (
+                <div key={p.date} className={s.graficaDia} title={`${p.date}: entraron ${cantidad(entradas)}, salieron ${cantidad(p.qty)}`}>
+                  {/* La altura es el dato: es lo único que se calcula en línea. */}
+                  <div className={s.barraEntrada} style={{ height: `${(entradas / maxFlujo) * 100}%` }} />
+                  <div className={s.barraSalida} style={{ height: `${(p.qty / maxFlujo) * 100}%` }} />
                 </div>
-              ))}
-            </div>
-            <div
-              style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}
-              title="Clase A: los que más valor mueven; C: los que menos"
-            >
-              <DashPill tone="accent">Clase A: {kpis.abcA}</DashPill>
-              <DashPill tone="neutral">Clase B: {kpis.abcB}</DashPill>
-              <DashPill tone="warning">Clase C: {kpis.abcC}</DashPill>
-            </div>
-          </DashPanel>
-        </DashCol>
+              );
+            })}
+          </div>
+          <div className={s.leyenda}>
+            <span><span aria-hidden="true" className={s.leyendaEntrada} />Entradas</span>
+            <span><span aria-hidden="true" className={s.leyendaSalida} />Salidas</span>
+          </div>
+        </Bloque>
 
-        <DashCol span={6}>
-          <DashPanel title="Los que más salen" subtitle="Despachos de los últimos 30 días">
-            <div style={listaScroll}>
+        <Bloque titulo="Último movimiento" subtitulo="Productos según los días que llevan sin moverse">
+          <div className={s.antiguedad}>
+            {[
+              { label: "0 a 30 días", value: insights.aging.d0_30 },
+              { label: "30 a 60 días", value: insights.aging.d30_60 },
+              { label: "60 a 90 días", value: insights.aging.d60_90 },
+              { label: "Más de 90 días", value: insights.aging.d90_plus },
+            ].map((b) => (
+              <div key={b.label} className={s.cubeta}>
+                <div className={s.tenue}>{b.label}</div>
+                <div className={s.cubetaValor}>{b.value}</div>
+              </div>
+            ))}
+          </div>
+          <div className={s.insignias} title="Clase A: los que más valor mueven; C: los que menos">
+            <Badge tone="brand">Clase A: {kpis.abcA}</Badge>
+            <Badge tone="neutral">Clase B: {kpis.abcB}</Badge>
+            <Badge tone="warning">Clase C: {kpis.abcC}</Badge>
+          </div>
+        </Bloque>
+
+        <Bloque titulo="Los que más salen" subtitulo="Despachos de los últimos 30 días">
+          {insights.topMovers.length ? (
+            <ul className={s.lista}>
               {insights.topMovers.map((m) => (
-                <div key={m.productId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <strong>{m.name}</strong>
-                    <div style={tenue}>{m.sku}</div>
-                  </div>
-                  <div style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    <div style={{ fontWeight: 700 }}>{cantidad(m.dispatched30d)}</div>
-                    <div style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>
-                      {m.daysOfCover != null ? `alcanza ${m.daysOfCover} días` : "sin consumo"}
-                    </div>
-                  </div>
-                </div>
+                <li key={m.productId} className={s.listaFila}>
+                  <span className={s.doble}>
+                    <span className={s.fuerte}>{m.name}</span>
+                    <span className={s.tenue}>{m.sku}</span>
+                  </span>
+                  <span className={`${s.doble} ${s.derecha}`}>
+                    <span className={s.cifra}>{cantidad(m.dispatched30d)}</span>
+                    <span className={s.tenue}>{m.daysOfCover != null ? `alcanza ${m.daysOfCover} días` : "sin consumo"}</span>
+                  </span>
+                </li>
               ))}
-              {!insights.topMovers.length && <span style={tenue}>Nada salió en los últimos 30 días.</span>}
-            </div>
-          </DashPanel>
-        </DashCol>
+            </ul>
+          ) : (
+            <p className={s.textoVacio}>Nada salió en los últimos 30 días.</p>
+          )}
+        </Bloque>
 
-        <DashCol span={6}>
-          <DashPanel title="Qué conviene pedir" subtitle="Según el mínimo y el máximo de cada producto">
-            <div style={listaScroll}>
+        <Bloque titulo="Qué conviene pedir" subtitulo="Según el mínimo y el máximo de cada producto">
+          {insights.reorderSuggestions.length ? (
+            <ul className={s.lista}>
               {insights.reorderSuggestions.map((r) => (
-                <div key={`${r.productId}-${r.warehouse}`} style={{ fontSize: 12.5, borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <strong>{r.name}</strong>
-                    <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>+{cantidad(r.suggestedQty)}</span>
-                  </div>
-                  <div style={tenue}>
-                    {r.warehouse} · hay {cantidad(r.onHand)} · aprox. {pesos(r.estimatedCost, { enteros: true })}
-                  </div>
-                </div>
+                <li key={`${r.productId}-${r.warehouse}`} className={s.listaFila}>
+                  <span className={s.doble}>
+                    <span className={s.fuerte}>{r.name}</span>
+                    <span className={s.tenue}>
+                      {r.warehouse} · hay {cantidad(r.onHand)} · aprox. {pesos(r.estimatedCost, { enteros: true })}
+                    </span>
+                  </span>
+                  <span className={s.cifra}>+{cantidad(r.suggestedQty)}</span>
+                </li>
               ))}
-              {!insights.reorderSuggestions.length && <span style={tenue}>Nada que pedir: el stock está sano.</span>}
-            </div>
-          </DashPanel>
-        </DashCol>
+            </ul>
+          ) : (
+            <p className={s.textoVacio}>Nada que pedir: el stock está sano.</p>
+          )}
+        </Bloque>
 
-        <DashCol span={6}>
-          <DashPanel title="Productos quietos" subtitle="Los que más tiempo llevan sin moverse">
-            <div style={{ ...listaScroll, maxHeight: 180 }}>
+        <Bloque titulo="Productos quietos" subtitulo="Los que más tiempo llevan sin moverse">
+          {insights.slowMovers.length ? (
+            <ul className={s.lista}>
               {insights.slowMovers.map((m) => (
-                <div key={m.productId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5 }}>
-                  <span>{m.name}</span>
-                  <span style={{ color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                <li key={m.productId} className={s.listaFila}>
+                  <span className={s.fuerte}>{m.name}</span>
+                  <span className={s.tenueNum}>
                     {m.idleDays != null ? `${m.idleDays} días` : "nunca se ha movido"} · {pesos(m.value, { enteros: true })}
                   </span>
-                </div>
+                </li>
               ))}
-              {!insights.slowMovers.length && <span style={tenue}>Todo se ha movido recientemente.</span>}
-            </div>
-          </DashPanel>
-        </DashCol>
+            </ul>
+          ) : (
+            <p className={s.textoVacio}>Todo se ha movido recientemente.</p>
+          )}
+        </Bloque>
 
-        <DashCol span={6}>
-          <DashPanel title="Por almacén" subtitle="Valor y productos bajo mínimo">
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {insights.byWarehouse.map((w) => (
-                <div key={w.name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, fontSize: 12.5, alignItems: "center" }}>
-                  <span>{w.name}</span>
-                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{pesos(w.value, { enteros: true })}</span>
-                  <Tag variant={w.low ? "warning" : "positive"}>{w.low ? `${w.low} bajo mínimo` : "Sin alertas"}</Tag>
-                </div>
-              ))}
-            </div>
-          </DashPanel>
-        </DashCol>
-      </DashGrid>
+        <Bloque titulo="Por almacén" subtitulo="Valor y productos bajo mínimo">
+          <div className={s.existencias}>
+            {insights.byWarehouse.map((w) => (
+              <div key={w.name} className={s.almacenFila}>
+                <span className={s.fuerte}>{w.name}</span>
+                <span className={s.num}>{pesos(w.value, { enteros: true })}</span>
+                <Badge tone={w.low ? "warning" : "success"} size="sm" dot>
+                  {w.low ? `${w.low} bajo mínimo` : "Sin alertas"}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Bloque>
+      </div>
     </div>
   );
 }

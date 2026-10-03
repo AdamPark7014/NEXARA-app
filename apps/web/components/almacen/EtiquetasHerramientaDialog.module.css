@@ -1,0 +1,15 @@
+/* Diálogo de etiquetas: vista previa a tamaño real. Solo tokens `--ui-*`. */
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s4);
+}
+
+/* El papel de la etiqueta es blanco en los dos temas; el fondo es la «mesa». */
+.vista {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-sunken, var(--ui-bg-2));
+}

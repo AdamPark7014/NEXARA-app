@@ -2,8 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
-import PanelTabs from "@/components/ui/PanelTabs";
+import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
+import SwapHorizOutlined from "@mui/icons-material/SwapHorizOutlined";
+import QrCodeScannerOutlined from "@mui/icons-material/QrCodeScannerOutlined";
+import ShoppingCartOutlined from "@mui/icons-material/ShoppingCartOutlined";
+import HandymanOutlined from "@mui/icons-material/HandymanOutlined";
+import BackpackOutlined from "@mui/icons-material/BackpackOutlined";
+import WarehouseOutlined from "@mui/icons-material/WarehouseOutlined";
+import { PageHead, Tabs, type TabItem } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig, getOpsTeamSectionConfig } from "@/lib/section-views";
 import { VistaAlmacen } from "../warehouse/VistaAlmacen";
@@ -17,6 +23,7 @@ import ToolRequestForm from "@/components/ToolRequestForm";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
 import ToolMyKitPanel from "@/components/ToolMyKitPanel";
 import ToolInventoryPanel from "@/components/ToolInventoryPanel";
+import s from "./almacen-portada.module.css";
 
 /**
  * Almacén de Core (`/erp/almacen`): la casa de todo lo que entra, sale y se presta.
@@ -30,15 +37,17 @@ import ToolInventoryPanel from "@/components/ToolInventoryPanel";
  */
 
 const PESTANAS = [
-  { key: "inventario", label: "Inventario" },
-  { key: "movimientos", label: "Movimientos" },
-  { key: "scanner", label: "Escáner" },
-  { key: "reabastecimiento", label: "Reabastecimiento" },
-  { key: "herramientas", label: "Herramientas" },
-  { key: "kits", label: "Kits" },
+  { key: "inventario", label: "Inventario", icon: Inventory2Outlined },
+  { key: "movimientos", label: "Movimientos", icon: SwapHorizOutlined },
+  { key: "scanner", label: "Escáner", icon: QrCodeScannerOutlined },
+  { key: "reabastecimiento", label: "Reabastecimiento", icon: ShoppingCartOutlined },
+  { key: "herramientas", label: "Herramientas", icon: HandymanOutlined },
+  { key: "kits", label: "Kits", icon: BackpackOutlined },
 ] as const;
 
 type Pestana = (typeof PESTANAS)[number]["key"];
+
+const ITEMS_PESTANAS: ReadonlyArray<TabItem<Pestana>> = PESTANAS.map((p) => ({ id: p.key, label: p.label, icon: p.icon }));
 
 function pestanaValida(valor: string | null): Pestana | null {
   return PESTANAS.some((p) => p.key === valor) ? (valor as Pestana) : null;
@@ -83,61 +92,58 @@ export default function AlmacenPage() {
 
   return (
     <>
-      <PageHeader
+      <PageHead
         eyebrow="Core · Almacén"
         title="Almacén"
-        subtitle={cfg.subtitle}
-        density="ops"
+        description={cfg.subtitle}
+        icon={<WarehouseOutlined />}
+        tabs={<Tabs ariaLabel="Secciones de almacén" value={tab} onChange={cambiarTab} items={ITEMS_PESTANAS} />}
       />
 
-      <PanelTabs
-        ariaLabel="Secciones de almacén"
-        value={tab}
-        onChange={cambiarTab}
-        tabs={PESTANAS.map((p) => ({ key: p.key, label: p.label }))}
-      />
+      <div className={s.cuerpo}>
 
-      {/* Inventario y sus vistas hermanas: la pantalla de almacén, sin su encabezado. */}
-      {tab === "inventario" && (
-        <VistaAlmacen
-          embedded={{ views: ["inventario", "dashboard", "lotes", "valuacion", "conteos"] }}
-        />
-      )}
+        {/* Inventario y sus vistas hermanas: la pantalla de almacén, sin su encabezado. */}
+        {tab === "inventario" && (
+          <VistaAlmacen
+            embedded={{ views: ["inventario", "dashboard", "lotes", "valuacion", "conteos"] }}
+          />
+        )}
 
-      {tab === "movimientos" && <VistaAlmacen embedded={{ views: ["movimientos"] }} />}
+        {tab === "movimientos" && <VistaAlmacen embedded={{ views: ["movimientos"] }} />}
 
-      {tab === "scanner" && <ScannerAlmacenPanel />}
+        {tab === "scanner" && <ScannerAlmacenPanel />}
 
-      {tab === "reabastecimiento" && <ReabastecimientoPanel />}
+        {tab === "reabastecimiento" && <ReabastecimientoPanel />}
 
-      {tab === "herramientas" && (
-        <div style={{ display: "grid", gap: 16 }}>
-          {gestionaHerramientas && (
-            <>
-              <HerramientasPorEtiquetaPanel
-                onCambio={() => setMovimientosPorEtiqueta((n) => n + 1)}
-              />
-              <RecoleccionAlmacenPanel key={movimientosPorEtiqueta} />
-              <ToolInventoryPanel />
-              <ToolRequestsTable highlightId={highlightId} />
-            </>
-          )}
-          {puedePedirHerramientas && <ToolRequestForm />}
-          {!gestionaHerramientas && !puedePedirHerramientas && <ToolMyKitPanel />}
-        </div>
-      )}
-
-      {tab === "kits" &&
-        (gestionaHerramientas ? (
-          // Sin banner de ayuda: los títulos de cada bloque ya dicen qué es cada
-          // cosa, y el recuadro solo añadía un rectángulo más a la pantalla.
-          <div style={{ display: "grid", gap: 16 }}>
-            <KitInspeccionesPanel />
-            <ToolUserKitPanel />
+        {tab === "herramientas" && (
+          <div className={s.pila}>
+            {gestionaHerramientas && (
+              <>
+                <HerramientasPorEtiquetaPanel
+                  onCambio={() => setMovimientosPorEtiqueta((n) => n + 1)}
+                />
+                <RecoleccionAlmacenPanel key={movimientosPorEtiqueta} />
+                <ToolInventoryPanel />
+                <ToolRequestsTable highlightId={highlightId} />
+              </>
+            )}
+            {puedePedirHerramientas && <ToolRequestForm />}
+            {!gestionaHerramientas && !puedePedirHerramientas && <ToolMyKitPanel />}
           </div>
-        ) : (
-          <ToolMyKitPanel />
-        ))}
+        )}
+
+        {tab === "kits" &&
+          (gestionaHerramientas ? (
+            // Sin banner de ayuda: los títulos de cada bloque ya dicen qué es cada
+            // cosa, y el recuadro solo añadía un rectángulo más a la pantalla.
+            <div className={s.pila}>
+              <KitInspeccionesPanel />
+              <ToolUserKitPanel />
+            </div>
+          ) : (
+            <ToolMyKitPanel />
+          ))}
+      </div>
     </>
   );
 }

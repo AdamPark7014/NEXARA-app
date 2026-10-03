@@ -141,7 +141,15 @@ export class WarehouseService {
 
     const levels = await this.prisma.stockLevel.findMany({
       where,
-      include: { product: { select: { id: true, name: true, sku: true } }, warehouse: { select: { id: true, code: true, name: true, companyId: true } }, location: true },
+      // Foto, categoría, unidad y precio de lista: la tabla de existencias los muestra y el
+      // valor del inventario sale del costo promedio de cada existencia (`unitCost`).
+      include: {
+        product: {
+          select: { id: true, name: true, sku: true, category: true, price: true, imageUrl: true, unitName: true },
+        },
+        warehouse: { select: { id: true, code: true, name: true, companyId: true } },
+        location: true,
+      },
       orderBy: { product: { name: 'asc' } },
     });
 

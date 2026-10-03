@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import InlineAlert from "@/components/ui/InlineAlert";
+import { Alert, Button, Card, CardHead, Field, Input, StatusBadge, type Tone } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -15,25 +12,15 @@ import {
   type HallazgoDeHerramienta,
 } from "@/lib/almacen-api";
 import { ATRIBUTO_CAMPO_LECTOR, useLectorDeCodigos } from "@/lib/lector-codigos";
+import { CampoEscaneo, TarjetaHallazgo, claseMono } from "./PiezasAlmacen";
+import s from "./HerramientasPorEtiquetaPanel.module.css";
 
-const ESTADO: Record<string, { etiqueta: string; tono: StatusTone }> = {
-  AVAILABLE: { etiqueta: "En almacén", tono: "neutral" },
-  ASSIGNED: { etiqueta: "Fuera del almacén", tono: "neutral" },
+/** Dónde está la herramienta. El tono dice el estado, nunca pide acción por sí solo. */
+const ESTADO: Record<string, { etiqueta: string; tono: Tone }> = {
+  AVAILABLE: { etiqueta: "En almacén", tono: "success" },
+  ASSIGNED: { etiqueta: "Fuera del almacén", tono: "info" },
   IN_REPAIR: { etiqueta: "En reparación", tono: "warning" },
   RETIRED: { etiqueta: "Retirada", tono: "neutral" },
-};
-
-const inp: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "9px 12px",
-  minHeight: 44,
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  font: "inherit",
-  fontSize: 16,
 };
 
 type Props = {
@@ -138,136 +125,125 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
   const item = hallazgo?.item;
   const prestamo = hallazgo?.prestamo ?? null;
   const kit = hallazgo?.kit ?? null;
-  const estado = item ? (ESTADO[item.status] ?? { etiqueta: item.status, tono: "neutral" as StatusTone }) : null;
+  const estado = item ? (ESTADO[item.status] ?? { etiqueta: item.status, tono: "neutral" as Tone }) : null;
   const paraQue = prestamo?.activity
     ? `${prestamo.activity.anNumber} ${prestamo.activity.titulo}`
     : "préstamo suelto";
 
   return (
-    <Section
-      title="Entrada y salida con etiqueta"
-      subtitle="Escanea la etiqueta de la herramienta. Aquí aparece quién la tiene y qué toca: entregarla o recibirla."
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void buscar(codigo);
-        }}
-        style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}
-      >
-        <input
+    <Card aria-label="Entrada y salida con etiqueta">
+      <CardHead
+        title="Entrada y salida con etiqueta"
+        subtitle="Escanea la etiqueta de la herramienta. Aquí aparece quién la tiene y qué toca: entregarla o recibirla."
+      />
+      <div className={s.cuerpo}>
+        <CampoEscaneo
           ref={campoRef}
           {...{ [ATRIBUTO_CAMPO_LECTOR]: "" }}
+          mono
           value={codigo}
           onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+          onBuscar={() => void buscar(codigo)}
           placeholder="MUL-12345"
           aria-label="Código de la etiqueta de la herramienta"
-          autoComplete="off"
           maxLength={64}
-          style={{
-            ...inp,
-            width: 240,
-            fontFamily: "ui-monospace, monospace",
-            letterSpacing: "0.06em",
-          }}
+          buscando={buscando}
+          botonDeshabilitado={codigo.trim().length < 3}
+          botonVariante={hallazgo ? "secondary" : "primary"}
+          lectorActivo={activo}
+          pista="Dispara el lector sobre la etiqueta: no hace falta hacer clic en el campo."
         />
-        <Button
-          type="submit"
-          variant={hallazgo ? "secondary" : "primary"}
-          size="lg"
-          loading={buscando}
-          disabled={codigo.trim().length < 3}
-        >
-          Buscar
-        </Button>
-      </form>
 
-      {aviso && (
-        <div style={{ marginTop: 10 }}>
-          <InlineAlert variant="danger" message={aviso} onDismiss={() => setAviso(null)} />
-        </div>
-      )}
+        {aviso && (
+          <Alert tone="danger" role="alert" onDismiss={() => setAviso(null)}>
+            {aviso}
+          </Alert>
+        )}
 
-      {item && estado && (
-        <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
-            <strong style={{ fontSize: 15 }}>{item.toolName}</strong>
-            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              {item.model} · Serie {item.serialNumber} · Código {hallazgo?.codigo}
-            </span>
-            <StatusDot tone={estado.tono} label={estado.etiqueta} />
-          </div>
-
-          {prestamo?.status === "APPROVED" && (
-            <>
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                Aprobada para {prestamo.usuario?.nombre ?? "—"} · {paraQue}
-              </div>
-              {prestamo.vencido ? (
-                <InlineAlert
-                  variant="danger"
-                  message="El código de recolección de esta solicitud caducó. Hay que volver a aprobarla antes de entregar."
-                />
-              ) : (
-                <div>
-                  <Button variant="primary" size="lg" loading={guardando} onClick={() => void entregar()}>
-                    Entregar a {prestamo.usuario?.nombre ?? "quien la pidió"}
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-
-          {prestamo?.status === "IN_USE" && (
-            <>
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                La tiene {prestamo.usuario?.nombre ?? "—"} · {paraQue}
-              </div>
-              {/* Sin <form>: el Enter de un lector con el foco aquí no debe registrar la devolución. */}
-              <label style={{ display: "grid", gap: 4, fontSize: 12.5, maxWidth: 520 }}>
-                <span>¿Llegó dañada? Describe el daño (si está bien, déjalo vacío)</span>
-                <input
-                  value={dano}
-                  onChange={(e) => setDano(e.target.value)}
-                  style={inp}
-                  maxLength={500}
-                />
-              </label>
-              <div>
-                <Button variant="primary" size="lg" loading={guardando} onClick={() => void recibir()}>
+        {item && estado && (
+          <TarjetaHallazgo
+            tipo="herramienta"
+            ariaLabel="Herramienta escaneada"
+            foto={item.panoramicPhotoUrl}
+            tono={prestamo?.status === "APPROVED" && prestamo.vencido ? "danger" : undefined}
+            eyebrow="Herramienta"
+            titulo={item.toolName}
+            meta={
+              <>
+                {item.model} · Serie {item.serialNumber} · Código <code className={claseMono}>{hallazgo?.codigo}</code>
+              </>
+            }
+            insignias={<StatusBadge label={estado.etiqueta} tone={estado.tono} dot />}
+            acciones={
+              prestamo?.status === "APPROVED" && !prestamo.vencido ? (
+                <Button variant="primary" size="lg" loading={guardando} onClick={() => void entregar()}>
+                  Entregar a {prestamo.usuario?.nombre ?? "quien la pidió"}
+                </Button>
+              ) : prestamo?.status === "IN_USE" ? (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  loading={guardando}
+                  onClick={() => void recibir()}
+                >
                   {dano.trim() ? "Recibir y mandar a reparación" : "Recibir devolución"}
                 </Button>
-              </div>
-            </>
-          )}
+              ) : undefined
+            }
+          >
+            {prestamo?.status === "APPROVED" && (
+              <>
+                <p className={s.linea}>
+                  Aprobada para {prestamo.usuario?.nombre ?? "—"} · {paraQue}
+                </p>
+                {prestamo.vencido ? (
+                  <Alert tone="danger">
+                    El código de recolección de esta solicitud caducó. Hay que volver a aprobarla antes de entregar.
+                  </Alert>
+                ) : null}
+              </>
+            )}
 
-          {prestamo?.status === "PENDING" && (
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-              {prestamo.usuario?.nombre ?? "Alguien"} la pidió ({paraQue}) y la solicitud sigue sin
-              aprobar. Apruébala en la lista de abajo para poder entregarla.
-            </div>
-          )}
+            {prestamo?.status === "IN_USE" && (
+              <>
+                <p className={s.linea}>
+                  La tiene {prestamo.usuario?.nombre ?? "—"} · {paraQue}
+                </p>
+                {/* Sin <form>: el Enter de un lector con el foco aquí no debe registrar la devolución. */}
+                <Field label="¿Llegó dañada? Describe el daño (si está bien, déjalo vacío)" className={s.campoDano}>
+                  <Input controlSize="lg" value={dano} onChange={(e) => setDano(e.target.value)} maxLength={500} />
+                </Field>
+              </>
+            )}
 
-          {kit && (
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-              {kit.assignmentType === "KIT" ? "Es del kit de" : "Está prestada a"}{" "}
-              {kit.user?.nombre ?? "—"}.
-            </div>
-          )}
+            {prestamo?.status === "PENDING" && (
+              <p className={s.linea}>
+                {prestamo.usuario?.nombre ?? "Alguien"} la pidió ({paraQue}) y la solicitud sigue sin
+                aprobar. Apruébala en la lista de abajo para poder entregarla.
+              </p>
+            )}
 
-          {!prestamo && !kit && (
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-              {item.status === "AVAILABLE"
-                ? "Está en almacén y nadie la tiene pedida. Para que salga, primero hay que solicitarla o asignarla a un kit."
-                : item.status === "IN_REPAIR"
-                  ? "Está en reparación. Cuando vuelva, márcala como disponible en el inventario."
-                  : item.status === "RETIRED"
-                    ? "Está retirada del inventario."
-                    : "No tiene préstamo ni kit activo: revisa su estado en el inventario."}
-            </div>
-          )}
-        </div>
-      )}
-    </Section>
+            {kit && (
+              <p className={s.linea}>
+                {kit.assignmentType === "KIT" ? "Es del kit de" : "Está prestada a"}{" "}
+                {kit.user?.nombre ?? "—"}.
+              </p>
+            )}
+
+            {!prestamo && !kit && (
+              <p className={s.linea}>
+                {item.status === "AVAILABLE"
+                  ? "Está en almacén y nadie la tiene pedida. Para que salga, primero hay que solicitarla o asignarla a un kit."
+                  : item.status === "IN_REPAIR"
+                    ? "Está en reparación. Cuando vuelva, márcala como disponible en el inventario."
+                    : item.status === "RETIRED"
+                      ? "Está retirada del inventario."
+                      : "No tiene préstamo ni kit activo: revisa su estado en el inventario."}
+              </p>
+            )}
+          </TarjetaHallazgo>
+        )}
+      </div>
+    </Card>
   );
 }

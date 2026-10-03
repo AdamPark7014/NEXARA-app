@@ -1,0 +1,65 @@
+/* Revisión periódica de kits. Solo tokens `--ui-*`: claro y oscuro. */
+
+.aviso {
+  padding: var(--ui-s3) var(--ui-s5) 0;
+}
+
+.carga {
+  padding: var(--ui-s3) var(--ui-s5) var(--ui-s4);
+}
+
+.doble {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fuerte {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tenue {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.ultima {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+.dialogo {
+  display: grid;
+  gap: var(--ui-s4);
+}
+
+.archivo {
+  padding-top: 6px;
+  font-size: var(--ui-fs-meta);
+}
+
+.historial {
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.rotulo {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 640px) {
+  .aviso {
+    padding: var(--ui-s3) var(--ui-s4) 0;
+  }
+}

@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import HandymanOutlined from "@mui/icons-material/HandymanOutlined";
+import HourglassBottomOutlined from "@mui/icons-material/HourglassBottomOutlined";
+import PersonOutlineOutlined from "@mui/icons-material/PersonOutlineOutlined";
+import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
+import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
 import { getSocketBaseUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
@@ -17,13 +22,28 @@ import {
   type ToolRequestRow,
 } from "@/lib/tool-requests-api";
 import FinesTable from "./FinesTable";
-import FilterToolbar from "./FilterToolbar";
-import Button from "./ui/Button";
-import KpiCard from "./ui/KpiCard";
-import Section from "./ui/Section";
-import DataTable, { Tag, type Column } from "./ui/DataTable";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  FilterChip,
+  FilterChips,
+  ListFooter,
+  ModuleToolbar,
+  PersonCell,
+  SearchInput,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  StatusBadge,
+  type Column,
+} from "./base";
+import { tonoDeVariante } from "./almacen/PiezasAlmacen";
 import { useUser } from "./UserContext";
 import ToolLoanTimeline from "./ToolLoanTimeline";
+import s from "./ToolRequestsTable.module.css";
 
 const STATUS_OPTIONS = [
   { value: "PENDING", label: "Pendiente" },
@@ -103,26 +123,41 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     }
   };
 
+  const rechazar = (r: ToolRequestRow) => {
+    const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
+    if (!adminNotes?.trim()) return;
+    void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes.trim()));
+  };
+
+  const recibir = (r: ToolRequestRow) => {
+    const damageDescription =
+      window.prompt("Descripción de daño (opcional, vacío si está en buen estado):") ?? "";
+    void runAction(r.id, () => returnToolRequest(token, r.id, damageDescription));
+  };
+
+  /** Lo que queda tras la búsqueda: sobre esto cuentan los chips de estado. */
+  const buscadas = useMemo(() => {
+    if (!searchQ.trim()) return items;
+    const q = searchQ.toLowerCase();
+    return items.filter(
+      (r) =>
+        r.toolName.toLowerCase().includes(q) ||
+        r.requestedByName.toLowerCase().includes(q) ||
+        r.model.toLowerCase().includes(q) ||
+        r.serialNumber.toLowerCase().includes(q) ||
+        r.reason.toLowerCase().includes(q),
+    );
+  }, [items, searchQ]);
+
   const visibleItems = useMemo(() => {
-    let rows = items;
+    let rows = buscadas;
     if (filterStatus) rows = rows.filter((r) => r.status === filterStatus);
-    if (searchQ.trim()) {
-      const q = searchQ.toLowerCase();
-      rows = rows.filter(
-        (r) =>
-          r.toolName.toLowerCase().includes(q) ||
-          r.requestedByName.toLowerCase().includes(q) ||
-          r.model.toLowerCase().includes(q) ||
-          r.serialNumber.toLowerCase().includes(q) ||
-          r.reason.toLowerCase().includes(q),
-      );
-    }
     if (highlightId) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return rows;
-  }, [items, filterStatus, searchQ, highlightId]);
+  }, [buscadas, filterStatus, highlightId]);
 
   const now = Date.now();
   const counts = {
@@ -136,123 +171,97 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
         new Date(t.expectedReturnDate).getTime() < now,
     ).length,
   };
+  const alternarEstado = (valor: string) => setFilterStatus((f) => (f === valor ? "" : valor));
 
   const columns: Column<ToolRequestRow>[] = [
     {
       key: "user",
       label: "Usuario",
-      render: (r) => (
-        <div>
-          <div>{r.requestedByName}</div>
-          {r.requestedByEmail && (
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.requestedByEmail}</div>
-          )}
-        </div>
-      ),
-      width: 160,
+      render: (r) => <PersonCell name={r.requestedByName} subtitle={r.requestedByEmail || undefined} size={28} />,
+      width: 200,
     },
     {
       key: "tool",
       label: "Herramienta",
       render: (r) => (
-        <div>
-          <div style={{ fontWeight: 600 }}>{r.toolName}</div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+        <span className={s.doble}>
+          <span className={s.fuerte}>{r.toolName}</span>
+          <span className={s.tenue}>
+            {r.model} / {r.serialNumber.slice(0, 20)}
+          </span>
+          <span className={s.tenue} title={r.reason}>
             {r.reason.length > 48 ? `${r.reason.slice(0, 48)}…` : r.reason}
-          </div>
-        </div>
+          </span>
+        </span>
       ),
-    },
-    {
-      key: "model",
-      label: "Modelo / Serie",
-      accessor: (r) => `${r.model} / ${r.serialNumber.slice(0, 20)}`,
-      width: 140,
     },
     {
       key: "status",
       label: "Estado / timeline",
-      render: (r) => (
-        <div style={{ minWidth: 220 }}>
-          <Tag variant={toolRequestStatusVariant(r.status)}>{toolRequestStatusLabel(r.status)}</Tag>
-          <ToolLoanTimeline
-            status={r.status}
-            requestDate={r.requestDate}
-            approvalDate={r.approvalDate}
-            pickedUpAt={r.pickedUpAt}
-            deliveryDate={r.deliveryDate}
-            returnDate={r.returnDate}
-          />
-        </div>
-      ),
-      width: 240,
+      render: (r) => {
+        const vencida =
+          r.status === "IN_USE" && r.expectedReturnDate && new Date(r.expectedReturnDate).getTime() < now;
+        return (
+          <div className={s.estado}>
+            <span className={s.insignias}>
+              <StatusBadge label={toolRequestStatusLabel(r.status)} tone={tonoDeVariante(toolRequestStatusVariant(r.status))} size="sm" dot />
+              {vencida ? <StatusBadge label="Vencida" tone="danger" size="sm" /> : null}
+            </span>
+            <ToolLoanTimeline
+              status={r.status}
+              requestDate={r.requestDate}
+              approvalDate={r.approvalDate}
+              pickedUpAt={r.pickedUpAt}
+              deliveryDate={r.deliveryDate}
+              returnDate={r.returnDate}
+            />
+          </div>
+        );
+      },
+      width: 260,
     },
-    { key: "requestDate", label: "Solicitado", accessor: (r) => fmtDate(r.requestDate), width: 110 },
+    { key: "requestDate", label: "Solicitado", render: (r) => <span className={s.fecha}>{fmtDate(r.requestDate)}</span>, width: 116 },
     {
       key: "expectedReturnDate",
       label: "Devolución",
-      accessor: (r) => fmtDate(r.expectedReturnDate),
-      width: 110,
+      render: (r) => <span className={s.fecha}>{fmtDate(r.expectedReturnDate)}</span>,
+      width: 116,
     },
     {
       key: "approvedBy",
       label: "Aprobado por",
       accessor: (r) => r.approvedByName ?? "—",
-      width: 120,
+      width: 130,
     },
   ];
 
-  if (canManage) {
-    columns.push({
-      key: "actions",
-      label: "Acciones",
-      width: 200,
-      render: (r) => {
-        const busy = busyId === r.id;
-        return (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {r.status === "PENDING" && (
-              <>
-                <Button size="sm" disabled={busy} onClick={() => runAction(r.id, () => approveToolRequest(token, r.id))}>
-                  Aprobar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
-                    if (!adminNotes?.trim()) return;
-                    void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes.trim()));
-                  }}
-                >
-                  Rechazar
-                </Button>
-              </>
-            )}
-            {r.status === "APPROVED" && (
-              <Button size="sm" disabled={busy} onClick={() => runAction(r.id, () => deliverToolRequest(token, r.id))}>
-                Entregar
-              </Button>
-            )}
-            {r.status === "IN_USE" && (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() => {
-                  const damageDescription =
-                    window.prompt("Descripción de daño (opcional, vacío si está en buen estado):") ?? "";
-                  void runAction(r.id, () => returnToolRequest(token, r.id, damageDescription));
-                }}
-              >
-                Devolución
-              </Button>
-            )}
-          </div>
-        );
-      },
-    });
-  }
+  const acciones = (r: ToolRequestRow) => {
+    const busy = busyId === r.id;
+    return (
+      <>
+        {r.status === "PENDING" && (
+          <>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => rechazar(r)}>
+              Rechazar
+            </Button>
+            <Button size="sm" variant="tonal" loading={busy} onClick={() => runAction(r.id, () => approveToolRequest(token, r.id))}>
+              Aprobar
+            </Button>
+          </>
+        )}
+        {r.status === "APPROVED" && (
+          <Button size="sm" variant="tonal" loading={busy} onClick={() => runAction(r.id, () => deliverToolRequest(token, r.id))}>
+            Entregar
+          </Button>
+        )}
+        {r.status === "IN_USE" && (
+          <Button size="sm" variant="tonal" loading={busy} onClick={() => recibir(r)}>
+            Devolución
+          </Button>
+        )}
+      </>
+    );
+  };
 
   const pendingQueue = useMemo(
     () => items.filter((t) => t.status === "PENDING"),
@@ -260,54 +269,50 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
   );
 
   return (
-    <div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <KpiCard label="Total" value={counts.total} icon="🧰" />
-        <KpiCard
-          label="Pendientes"
-          value={counts.pending}
-          icon="⏳"
-          variant={counts.pending > 0 ? "warning" : "default"}
-        />
-        <KpiCard label="En uso" value={counts.inUse} icon="👤" variant="accent" />
-        <KpiCard
-          label="Vencidas"
-          value={counts.overdue}
-          icon="⚠️"
-          variant={counts.overdue > 0 ? "danger" : "positive"}
-        />
-      </div>
+    <div className={s.pila}>
+      {!loading || items.length > 0 ? (
+        <StatRow ariaLabel="Resumen de solicitudes" cols={4}>
+          <Stat label="Total" value={counts.total} icon={<HandymanOutlined />} iconTone="neutral" onClick={() => setFilterStatus("")} pressed={filterStatus === ""} />
+          <Stat
+            label="Pendientes"
+            value={counts.pending}
+            hint="esperan aprobación"
+            tone={counts.pending > 0 ? "warning" : "default"}
+            icon={<HourglassBottomOutlined />}
+            iconTone={counts.pending > 0 ? "warning" : "neutral"}
+            onClick={() => alternarEstado("PENDING")}
+            pressed={filterStatus === "PENDING"}
+          />
+          <Stat
+            label="En uso"
+            value={counts.inUse}
+            hint="fuera del almacén"
+            tone="brand"
+            icon={<PersonOutlineOutlined />}
+            onClick={() => alternarEstado("IN_USE")}
+            pressed={filterStatus === "IN_USE"}
+          />
+          <Stat
+            label="Vencidas"
+            value={counts.overdue}
+            hint="pasaron su fecha de devolución"
+            tone={counts.overdue > 0 ? "danger" : "success"}
+            icon={<ReportProblemOutlined />}
+            iconTone={counts.overdue > 0 ? "danger" : "success"}
+            semaforo={counts.overdue > 0 ? "rojo" : "verde"}
+          />
+        </StatRow>
+      ) : null}
 
       {canManage && pendingQueue.length > 0 && (
-        <Section title={`Cola de aprobación (${pendingQueue.length})`}>
-          <div style={{ display: "grid", gap: 10, marginBottom: 8 }}>
+        <Card aria-label="Cola de aprobación">
+          <CardHead title={`Cola de aprobación (${pendingQueue.length})`} subtitle="Lo que espera tu visto bueno para poder entregarse." />
+          <ul className={s.cola}>
             {pendingQueue.map((r) => (
-              <div
-                key={r.id}
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 12,
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  border: "1px solid color-mix(in srgb, var(--warning) 40%, var(--border))",
-                  background: "color-mix(in srgb, var(--warning) 8%, var(--surface))",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700 }}>{r.toolName}</div>
-                  <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                    {r.requestedByName} · {r.model} / {r.serialNumber}
-                  </div>
+              <li key={r.id} className={s.colaFila}>
+                <div className={s.colaTexto}>
+                  <span className={s.fuerte}>{r.toolName}</span>
+                  <PersonCell name={r.requestedByName} subtitle={`${r.model} / ${r.serialNumber}`} size={28} />
                   <ToolLoanTimeline
                     status={r.status}
                     requestDate={r.requestDate}
@@ -317,61 +322,78 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
                     returnDate={r.returnDate}
                   />
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className={s.colaAcciones}>
+                  <Button variant="ghost" disabled={busyId === r.id} onClick={() => rechazar(r)}>
+                    Rechazar
+                  </Button>
                   <Button
-                    size="md"
-                    disabled={busyId === r.id}
+                    variant="tonal"
+                    loading={busyId === r.id}
                     onClick={() => runAction(r.id, () => approveToolRequest(token, r.id))}
                   >
                     Aprobar
                   </Button>
-                  <Button
-                    size="md"
-                    variant="ghost"
-                    disabled={busyId === r.id}
-                    onClick={() => {
-                      const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
-                      if (!adminNotes?.trim()) return;
-                      void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes.trim()));
-                    }}
-                  >
-                    Rechazar
-                  </Button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
-        </Section>
+          </ul>
+        </Card>
       )}
 
-      <Section title="Solicitudes de herramientas">
-        {error && (
-          <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>
-        )}
-        {actionError && (
-          <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{actionError}</div>
+      <Card aria-label="Solicitudes de herramientas">
+        <CardHead title="Solicitudes de herramientas" subtitle="Quién pidió qué, en qué va cada préstamo y cuándo vuelve." />
+        {(error || actionError) && (
+          <div className={s.avisos}>
+            {error && (
+              <Alert tone="danger" role="alert" action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}>
+                {error}
+              </Alert>
+            )}
+            {actionError && (
+              <Alert tone="danger" role="alert" onDismiss={() => setActionError(null)}>
+                {actionError}
+              </Alert>
+            )}
+          </div>
         )}
 
-        <FilterToolbar
-          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar herramienta, usuario, serie…" }}
-          selects={[
-            {
-              label: "Estado",
-              value: filterStatus,
-              onChange: setFilterStatus,
-              options: STATUS_OPTIONS,
-              allowAll: true,
-            },
-          ]}
-          onClear={() => {
-            setSearchQ("");
-            setFilterStatus("");
-          }}
-          resultCount={loading ? null : visibleItems.length}
-          rightActions={
+        <ModuleToolbar
+          search={
+            <SearchInput
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Buscar herramienta, usuario, serie…"
+              aria-label="Buscar solicitudes"
+            />
+          }
+          chips={
+            <FilterChips ariaLabel="Estado de la solicitud">
+              <FilterChip active={filterStatus === ""} count={loading ? undefined : buscadas.length} onClick={() => setFilterStatus("")}>
+                Todas
+              </FilterChip>
+              {STATUS_OPTIONS.map((o) => {
+                const n = buscadas.filter((r) => r.status === o.value).length;
+                // Un estado sin solicitudes no se ofrece, salvo el que está puesto.
+                if (n === 0 && filterStatus !== o.value) return null;
+                return (
+                  <FilterChip
+                    key={o.value}
+                    active={filterStatus === o.value}
+                    count={n}
+                    dot={tonoDeVariante(toolRequestStatusVariant(o.value))}
+                    onClick={() => alternarEstado(o.value)}
+                  >
+                    {o.label}
+                  </FilterChip>
+                );
+              })}
+            </FilterChips>
+          }
+          end={
             <Button
               size="sm"
               variant="ghost"
+              iconStart={<FileDownloadOutlined fontSize="small" />}
               onClick={() =>
                 exportToExcel(
                   visibleItems,
@@ -397,16 +419,39 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
           }
         />
 
-        <DataTable<ToolRequestRow>
-          columns={columns}
-          rows={loading ? [] : visibleItems}
-          rowKey={(r) => r.id}
-          emptyTitle={loading ? "Cargando…" : "Sin solicitudes"}
-          emptyDescription={
-            loading ? "Obteniendo solicitudes de herramientas" : "No hay solicitudes con los filtros actuales"
-          }
-        />
-      </Section>
+        {loading && items.length === 0 ? (
+          <div className={s.carga}>
+            <SkeletonRows rows={5} label="Obteniendo solicitudes de herramientas" />
+          </div>
+        ) : (
+          <DataTable<ToolRequestRow>
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(r) => r.id}
+            flush
+            ariaLabel="Solicitudes de herramientas"
+            rowActions={canManage ? acciones : undefined}
+            rowActionsLabel="Acciones"
+            emptyTitle="Sin solicitudes"
+            emptyDescription="No hay solicitudes con los filtros actuales"
+            emptyAction={
+              searchQ || filterStatus ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setSearchQ("");
+                    setFilterStatus("");
+                  }}
+                >
+                  Quitar filtros
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+        {!loading && visibleItems.length > 0 ? <ListFooter total={visibleItems.length} unit="solicitudes" /> : null}
+      </Card>
 
       <FinesTable tipo="herramienta" showUser={true} />
     </div>

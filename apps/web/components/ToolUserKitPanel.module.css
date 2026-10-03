@@ -1,1 +1,236 @@
-.root {  display: grid;  gap: 16px;}.formCard,.listCard {  display: grid;}.formCard {  gap: 10px;}.listCard {  gap: 12px;}.title {  color: var(--primary);  margin-bottom: 0;}.formGrid {  display: grid;  grid-template-columns: 2fr 2fr 1fr auto;  gap: 8px;}.formGridMobile {  grid-template-columns: 1fr;}.searchWrap {  display: grid;  gap: 6px;}.suggestionBox {  border: 1px solid var(--muted);  border-radius: 8px;  max-height: 160px;  overflow: auto;}.suggestionItem {  width: 100%;  text-align: left;  border: none;  border-bottom: 1px solid var(--muted);  background: transparent;  padding: 8px 10px;  cursor: pointer;}.filterRow {  display: flex;  gap: 8px;  flex-wrap: wrap;}.error {  color: var(--danger);}.loading,.empty {  text-align: center;}.loading {  padding: 16px;}.empty {  color: var(--text-secondary);  padding: 20px;}.userGroup {  border: 1px solid var(--muted);  border-radius: 10px;  padding: 10px;  display: grid;  gap: 8px;}.userName {  font-weight: 600;}.userEmail,.rowMeta,.eventMeta {  color: var(--text-secondary);  font-size: 12px;}.rowsList,.eventsList,.resolveWrap,.resolveForm {  display: grid;  gap: 6px;}.rowCard {  background: var(--surface-light);  border: 1px solid var(--muted);  border-radius: 8px;  padding: 8px;}.rowTitle {  font-size: 13px;}.eventsList {  margin-top: 8px;}.eventCard {  border: 1px solid var(--muted);  border-radius: 6px;  padding: 6px;  background: var(--surface);}.eventDesc {  font-size: 12px;}.smallBtn,.smallBtnSecondary {  font-size: 11px;}.smallBtn {  padding: 4px 8px;  justify-self: start;}.resolveForm {  gap: 8px;  border: 1px solid var(--muted);  border-radius: 8px;  padding: 8px;}.notes {  min-height: 70px;  resize: vertical;}.resolveActions {  display: flex;  gap: 8px;  flex-wrap: wrap;}.smallBtnSecondary {  padding: 4px 10px;}.photoGrid {  display: grid;  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));  gap: 8px;  margin-top: 6px;}.photoBlock {  display: grid;  gap: 3px;}.photoLabel {  font-size: 10px;  color: var(--text-secondary);}.photoImage {  width: 100%;  height: 72px;  object-fit: cover;  border-radius: 6px;  border: 1px solid var(--muted);  background: var(--surface);}@media (max-width: 900px) {  .formGrid {    grid-template-columns: 1fr;  }}
+/* Kits por persona (sistema visual v2). Solo tokens `--ui-*`: claro y oscuro. */
+
+.root {
+  display: grid;
+  gap: var(--ui-s5);
+  min-width: 0;
+}
+
+/* ─── Asignar ──────────────────────────────────────────────────────────── */
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto auto;
+  gap: var(--ui-s3);
+  align-items: start;
+}
+
+.searchWrap {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.suggestionBox {
+  list-style: none;
+  margin: 0;
+  padding: var(--ui-s1);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-2);
+  max-height: 200px;
+  overflow: auto;
+}
+
+/* Dos clases: le gana al centrado del botón base. */
+.suggestionBox .suggestionItem {
+  justify-content: flex-start;
+  text-align: left;
+  font-weight: var(--ui-fw-medium);
+  white-space: normal;
+}
+
+.asignar {
+  align-self: end;
+}
+
+.avisoLector {
+  margin-top: var(--ui-s3);
+}
+
+.filtroUsuario {
+  min-width: 200px;
+}
+
+/* ─── Lista ────────────────────────────────────────────────────────────── */
+
+.aviso {
+  padding: var(--ui-s3) var(--ui-s5) 0;
+}
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s5);
+}
+
+.userGroup {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.userHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  flex-wrap: wrap;
+}
+
+.userHeadEnd {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+.rowsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.rowCard {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-sunken, var(--ui-bg-2));
+}
+
+.rowCard[data-cerrada="true"] {
+  opacity: 0.7;
+}
+
+.rowTop {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.rowTexto {
+  display: grid;
+  gap: var(--ui-s1);
+  min-width: 0;
+  flex: 1;
+}
+
+.rowTitle {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.fotoSerie {
+  flex: none;
+}
+
+.eventsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.eventCard {
+  display: grid;
+  gap: var(--ui-s1);
+  padding: var(--ui-s2) var(--ui-s3);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+}
+
+.eventCard[data-pendiente="true"] {
+  border-left: 3px solid var(--ui-warning);
+}
+
+.eventMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.eventDesc {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.resolveWrap {
+  display: grid;
+  justify-items: start;
+  gap: var(--ui-s2);
+}
+
+.resolveForm {
+  display: grid;
+  gap: var(--ui-s3);
+  width: 100%;
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-sunken, var(--ui-bg-2));
+}
+
+.resolveActions {
+  display: flex;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .asignar > * {
+    width: 100%;
+    min-height: var(--ui-control-h-touch, 44px);
+  }
+}
+
+@media (max-width: 640px) {
+  .cuerpo {
+    padding: var(--ui-s3);
+  }
+
+  .aviso {
+    padding: var(--ui-s3) var(--ui-s3) 0;
+  }
+
+  .userGroup {
+    padding: var(--ui-s3);
+  }
+
+  .filtroUsuario {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .fotoSerie {
+    display: none;
+  }
+}

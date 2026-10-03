@@ -1,14 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
+import FactCheckOutlined from "@mui/icons-material/FactCheckOutlined";
 import Modal from "@/components/ui/Modal";
-import DataTable, { type Column } from "@/components/ui/DataTable";
-import StatusDot from "@/components/ui/StatusDot";
-import InlineAlert from "@/components/ui/InlineAlert";
-import { SkeletonRows } from "@/components/base";
-import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHead,
+  Checkbox,
+  DataTable,
+  Field,
+  FieldGrid,
+  Input,
+  PersonCell,
+  Select,
+  SkeletonRows,
+  StatusBadge,
+  Textarea,
+  Timeline,
+  TimelineItem,
+  type Column,
+  type TimelineState,
+  type Tone,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -22,6 +37,7 @@ import {
   type KitPorInspeccionar,
 } from "@/lib/almacen-api";
 import InfoBreve from "./InfoBreve";
+import s from "./KitInspeccionesPanel.module.css";
 
 const INFO =
   "Cada kit asignado puede tener un ritmo de revisión en días. Al registrar una revisión la próxima se recorre sola; si el kit queda observado o dañado, se adelanta. Los vencidos se avisan cada mañana.";
@@ -37,37 +53,31 @@ const CADENCIAS = [0, 30, 60, 90, 180] as const;
 /** El error de las notas lo referencia el propio textarea. */
 const NOTAS_ERROR_ID = "revision-kit-notas-error";
 
-const inp: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "9px 12px",
-  minHeight: 44,
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  font: "inherit",
-  fontSize: 16,
+const TONO_ESTADO: Record<EstadoInspeccion, { etiqueta: string; tono: Tone; linea: TimelineState }> = {
+  OK: { etiqueta: "En orden", tono: "success", linea: "done" },
+  OBSERVADO: { etiqueta: "Con observaciones", tono: "warning", linea: "current" },
+  DANADO: { etiqueta: "Dañado", tono: "danger", linea: "danger" },
 };
 
 function tagEstado(estado: EstadoInspeccion) {
-  if (estado === "DANADO") return <StatusDot tone="danger" label="Dañado" />;
-  if (estado === "OBSERVADO") return <StatusDot tone="warning" label="Con observaciones" />;
-  return <StatusDot tone="success" label="En orden" />;
+  const e = TONO_ESTADO[estado] ?? TONO_ESTADO.OK;
+  return <StatusBadge label={e.etiqueta} tone={e.tono} size="sm" dot />;
 }
 
 function tagProgramacion(k: KitPorInspeccionar) {
   if (k.vencida) {
     return (
-      <StatusDot
+      <StatusBadge
         tone="danger"
+        size="sm"
+        dot
         label={k.diasDeAtraso === 0 ? "Toca hoy" : `${k.diasDeAtraso} d de atraso`}
       />
     );
   }
-  if (k.porVencer) return <StatusDot tone="warning" label={`En ${k.diasParaLaProxima} d`} />;
-  if (k.diasParaLaProxima == null) return <StatusDot label="Sin programar" />;
-  return <StatusDot label={`En ${k.diasParaLaProxima} d`} />;
+  if (k.porVencer) return <StatusBadge tone="warning" size="sm" dot label={`En ${k.diasParaLaProxima} d`} />;
+  if (k.diasParaLaProxima == null) return <StatusBadge tone="neutral" size="sm" label="Sin programar" />;
+  return <StatusBadge tone="neutral" size="sm" dot label={`En ${k.diasParaLaProxima} d`} />;
 }
 
 /** «Revisar kit»: lo que toca revisar hoy, y el registro de cada revisión. */
@@ -163,68 +173,58 @@ export default function KitInspeccionesPanel() {
       label: "Kit",
       width: 230,
       render: (k) => (
-        <div style={{ display: "grid", gap: 1, minWidth: 0 }}>
-          <strong style={{ fontSize: 12.5 }}>{k.inventoryItem?.toolName ?? "—"}</strong>
-          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+        <span className={s.doble}>
+          <span className={s.fuerte}>{k.inventoryItem?.toolName ?? "—"}</span>
+          <span className={s.tenue}>
             {k.inventoryItem?.model} · {k.inventoryItem?.serialNumber}
           </span>
-        </div>
+        </span>
       ),
     },
-    { key: "quien", label: "Asignado a", width: 160, accessor: (k) => k.user?.nombre ?? "—" },
-    { key: "cuando", label: "Toca revisar", width: 130, render: (k) => tagProgramacion(k) },
+    {
+      key: "quien",
+      label: "Asignado a",
+      width: 180,
+      render: (k) => (k.user?.nombre ? <PersonCell name={k.user.nombre} size={28} /> : <span className={s.tenue}>—</span>),
+    },
+    { key: "cuando", label: "Toca revisar", width: 140, render: (k) => tagProgramacion(k) },
     {
       key: "cadencia",
       label: "Cada cuánto",
-      width: 118,
+      width: 140,
       render: (k) => (
-        <select
+        <Select
+          controlSize="sm"
           value={String(k.inspeccionCadaDias ?? 0)}
           onChange={(e) => void cambiarCadencia(k, Number(e.target.value))}
           aria-label={`Cada cuánto se revisa ${k.inventoryItem?.toolName ?? "el kit"}`}
-          style={{ ...inp, minHeight: 36, padding: "4px 8px", fontSize: 13 }}
         >
           {CADENCIAS.map((d) => (
             <option key={d} value={d}>
               {d === 0 ? "Sin revisión" : `${d} días`}
             </option>
           ))}
-        </select>
+        </Select>
       ),
     },
     {
       key: "ultima",
       label: "Última revisión",
-      width: 160,
+      width: 180,
       render: (k) =>
         k.ultimaInspeccion ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <span className={s.ultima}>
             {tagEstado(k.ultimaInspeccion.estado)}
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            <span className={s.tenue}>
               {new Date(k.ultimaInspeccion.fecha).toLocaleDateString("es-MX", {
                 day: "2-digit",
                 month: "short",
               })}
             </span>
-          </div>
+          </span>
         ) : (
-          <span style={{ color: "var(--text-tertiary)" }}>Nunca</span>
+          <span className={s.tenue}>Nunca</span>
         ),
-    },
-    {
-      key: "acciones",
-      label: "",
-      width: 96,
-      render: (k) => (
-        <Button
-          size="sm"
-          variant="secondary"
-          aria-label={`Revisar ${k.inventoryItem?.toolName ?? "kit"} de ${k.user?.nombre ?? "sin asignar"}`}
-          onClick={() => void abrirRevision(k)}
-        >
-          Revisar
-        </Button>
-      ),
     },
   ];
 
@@ -232,52 +232,64 @@ export default function KitInspeccionesPanel() {
 
   return (
     <>
-      <Section
-        title="Kits por revisar"
-        subtitle={
-          kits.length > 0
-            ? `${kits.length} kit${kits.length === 1 ? "" : "s"}${atrasados > 0 ? `, ${atrasados} con la revisión atrasada` : ""}`
-            : undefined
-        }
-        actions={
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <label
-              style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: 12.5, minHeight: 36, cursor: "pointer" }}
-            >
-              <input
-                type="checkbox"
+      <Card aria-label="Kits por revisar">
+        <CardHead
+          title="Kits por revisar"
+          subtitle={
+            kits.length > 0
+              ? `${kits.length} kit${kits.length === 1 ? "" : "s"}${atrasados > 0 ? `, ${atrasados} con la revisión atrasada` : ""}`
+              : undefined
+          }
+          actions={
+            <>
+              <Checkbox
+                label="Incluir la próxima semana"
                 checked={porVencer}
                 onChange={(e) => setPorVencer(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: "var(--primary)" }}
               />
-              Incluir la próxima semana
-            </label>
-            <InfoBreve etiqueta="Cómo funciona la revisión periódica" texto={INFO} />
-          </div>
-        }
-        flush
-      >
+              <InfoBreve etiqueta="Cómo funciona la revisión periódica" texto={INFO} />
+            </>
+          }
+        />
         {error && (
-          <div style={{ marginBottom: 12 }}>
-            <InlineAlert
-              variant={kits.length > 0 ? "warning" : "danger"}
-              message={kits.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+          <div className={s.aviso}>
+            <Alert
+              tone={kits.length > 0 ? "warning" : "danger"}
+              role="alert"
               action={
                 <Button size="sm" variant="secondary" onClick={() => void cargar()}>
                   Reintentar
                 </Button>
               }
-            />
+            >
+              {kits.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+            </Alert>
           </div>
         )}
         {cargando && kits.length === 0 ? (
-          <SkeletonRows rows={4} label="Cargando kits por revisar" />
+          <div className={s.carga}>
+            <SkeletonRows rows={4} label="Cargando kits por revisar" />
+          </div>
         ) : error && kits.length === 0 ? null : (
           <DataTable
             columns={columnas}
             rows={kits}
             rowKey={(k) => k.id}
             density="compact"
+            flush
+            ariaLabel="Kits por revisar"
+            rowActionsLabel="Revisar"
+            rowActions={(k) => (
+              <Button
+                size="sm"
+                variant="tonal"
+                iconStart={<FactCheckOutlined fontSize="small" />}
+                aria-label={`Revisar ${k.inventoryItem?.toolName ?? "kit"} de ${k.user?.nombre ?? "sin asignar"}`}
+                onClick={() => void abrirRevision(k)}
+              >
+                Revisar
+              </Button>
+            )}
             emptyTitle={porVencer ? "Ningún kit pide revisión" : "Nada vencido"}
             emptyDescription={
               porVencer
@@ -286,7 +298,7 @@ export default function KitInspeccionesPanel() {
             }
           />
         )}
-      </Section>
+      </Card>
 
       {revisando && (
         <Modal
@@ -305,44 +317,43 @@ export default function KitInspeccionesPanel() {
             </>
           }
         >
-          <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              {revisando.user?.nombre} · {revisando.inventoryItem?.serialNumber}
-            </div>
+          <div className={s.dialogo}>
+            {revisando.user?.nombre ? (
+              <PersonCell name={revisando.user.nombre} subtitle={`Serie ${revisando.inventoryItem?.serialNumber ?? "—"}`} size={32} />
+            ) : (
+              <p className={s.tenue}>{revisando.inventoryItem?.serialNumber}</p>
+            )}
 
-            <FinanceFormGrid>
-              <FinanceField label="Cómo quedó el kit">
-                <select
-                  value={estado}
-                  onChange={(e) => setEstado(e.target.value as EstadoInspeccion)}
-                  style={inp}
-                >
+            <FieldGrid>
+              <Field label="Cómo quedó el kit" required>
+                <Select controlSize="lg" value={estado} onChange={(e) => setEstado(e.target.value as EstadoInspeccion)}>
                   {ESTADOS.map((e) => (
                     <option key={e.valor} value={e.valor}>
                       {e.etiqueta}
                     </option>
                   ))}
-                </select>
-              </FinanceField>
+                </Select>
+              </Field>
 
-              <FinanceField
+              <Field
                 label="Fotos"
                 optional
                 hint={fotos.length > 0 ? `${fotos.length} elegidas, máximo 8` : "Hasta 8 imágenes"}
               >
-                <input
+                <Input
                   type="file"
                   accept="image/*"
                   multiple
+                  className={s.archivo}
                   onChange={(e) => setFotos(Array.from(e.target.files ?? []).slice(0, 8))}
-                  style={{ ...inp, padding: "7px 10px", minHeight: 36, fontSize: 12.5 }}
                 />
-              </FinanceField>
+              </Field>
 
-              <FinanceField
+              <Field
                 label="Qué observaste"
                 fullWidth
                 optional={estado === "OK"}
+                required={estado !== "OK"}
                 error={errorNotas}
                 describedById={NOTAS_ERROR_ID}
                 hint={
@@ -351,52 +362,38 @@ export default function KitInspeccionesPanel() {
                     : "Obligatorio cuando el kit no queda en orden."
                 }
               >
-                <textarea
+                <Textarea
                   value={notas}
                   onChange={(e) => {
                     setNotas(e.target.value);
                     if (errorNotas) setErrorNotas(null);
                   }}
                   rows={3}
-                  aria-invalid={errorNotas ? true : undefined}
-                  aria-describedby={errorNotas ? NOTAS_ERROR_ID : undefined}
+                  invalid={Boolean(errorNotas)}
                   placeholder="Qué falta, qué está dañado, qué hay que reponer…"
-                  style={{ ...inp, minHeight: 78, resize: "vertical" }}
                 />
-              </FinanceField>
-            </FinanceFormGrid>
+              </Field>
+            </FieldGrid>
 
             {historial.length > 0 && (
-              <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                  Revisiones anteriores
-                </span>
-                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
+              <section className={s.historial} aria-label="Revisiones anteriores">
+                <p className={s.rotulo}>Revisiones anteriores</p>
+                <Timeline ariaLabel="Revisiones anteriores">
                   {historial.slice(0, 5).map((h) => (
-                    <li
+                    <TimelineItem
                       key={h.id}
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "baseline",
-                        flexWrap: "wrap",
-                        fontSize: 12,
-                      }}
-                    >
-                      {tagEstado(h.estado)}
-                      <span style={{ color: "var(--text-tertiary)" }}>
-                        {new Date(h.fecha).toLocaleDateString("es-MX", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}{" "}
-                        · {h.inspector?.nombre ?? "—"}
-                      </span>
-                      {h.notas && <span style={{ color: "var(--text-secondary)" }}>{h.notas}</span>}
-                    </li>
+                      state={(TONO_ESTADO[h.estado] ?? TONO_ESTADO.OK).linea}
+                      title={tagEstado(h.estado)}
+                      meta={`${new Date(h.fecha).toLocaleDateString("es-MX", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })} · ${h.inspector?.nombre ?? "—"}`}
+                      note={h.notas || undefined}
+                    />
                   ))}
-                </ul>
-              </div>
+                </Timeline>
+              </section>
             )}
           </div>
         </Modal>

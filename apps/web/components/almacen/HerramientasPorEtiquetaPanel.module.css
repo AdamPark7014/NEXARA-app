@@ -1,0 +1,28 @@
+/* Mostrador de herramientas por etiqueta. Controles de 44 px; solo tokens `--ui-*`. */
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s4);
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s5);
+  min-width: 0;
+}
+
+.linea {
+  margin: 0;
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-2);
+}
+
+.campoDano {
+  max-width: 520px;
+}
+
+@media (max-width: 640px) {
+  .cuerpo {
+    padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
+  }
+
+  .campoDano {
+    max-width: none;
+  }
+}

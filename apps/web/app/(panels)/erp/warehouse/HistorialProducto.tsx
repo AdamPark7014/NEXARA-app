@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import Button from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DataTable";
-import { SkeletonRows } from "@/components/base";
+import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
+import PictureAsPdfOutlined from "@mui/icons-material/PictureAsPdfOutlined";
+import { Badge, Button, SkeletonRows, Timeline, TimelineItem, type TimelineState } from "@/components/base";
+import { claseMono } from "@/components/almacen/PiezasAlmacen";
 import { exportToExcel } from "@/lib/export-excel";
 import { cantidad, fechaHoraCorta, pesos } from "@/lib/recursos-ui";
 import { stockMovementDocumentLabel, type mapStockLevelToRow, type StockMovementRow } from "@/lib/stock-api";
-import { etiquetaMovimiento, varianteMovimiento } from "./almacen-etiquetas";
+import { TONO_DE_VARIANTE, etiquetaMovimiento, varianteMovimiento } from "./almacen-etiquetas";
+import s from "./almacen.module.css";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
@@ -19,14 +21,13 @@ export type TrazaProducto = {
   movements: StockMovementRow[];
 };
 
-const subtitulo = {
-  margin: "0 0 10px",
-  fontSize: 11.5,
-  fontWeight: 700,
-  color: "var(--text-secondary)",
-  textTransform: "uppercase",
-  letterSpacing: 0.3,
-} as const;
+/** Entradas en verde, mermas en rojo, el resto neutro: el color de la línea de tiempo. */
+function estadoDelMovimiento(tipo: string): TimelineState {
+  const variante = varianteMovimiento(tipo);
+  if (variante === "positive") return "done";
+  if (variante === "danger") return "danger";
+  return "default";
+}
 
 /** Panel lateral: existencia por almacén y línea de tiempo de un producto. */
 export default function HistorialProducto({
@@ -95,43 +96,23 @@ export default function HistorialProducto({
       role="dialog"
       aria-modal="true"
       aria-labelledby={tituloId}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0, 0, 0, 0.45)",
-        zIndex: 80,
-        display: "flex",
-        justifyContent: "flex-end",
-      }}
+      className={s.capa}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <aside
-        style={{
-          width: "min(560px, 100%)",
-          height: "100%",
-          background: "var(--surface)",
-          borderLeft: "1px solid var(--border)",
-          boxShadow: "var(--nx-panel-elev-2, -8px 0 32px rgba(0,0,0,.12))",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        <header style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 600 }}>
-              Historial del producto
-            </div>
-            <h2 id={tituloId} style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 750 }}>{traza.name}</h2>
-            <code style={{ fontSize: 12, color: "var(--text-secondary)" }}>{traza.sku}</code>
+      <aside className={s.cajon}>
+        <header className={s.cajonCabeza}>
+          <div className={s.cajonTexto}>
+            <p className={s.rotulo}>Historial del producto</p>
+            <h2 id={tituloId} className={s.cajonTitulo}>{traza.name}</h2>
+            <code className={claseMono}>{traza.sku}</code>
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <Button variant="ghost" size="sm" onClick={onPdf} disabled={exportingPdf || loading}>
+          <div className={s.cajonAcciones}>
+            <Button variant="ghost" size="sm" iconStart={<PictureAsPdfOutlined fontSize="small" />} onClick={onPdf} disabled={exportingPdf || loading}>
               {exportingPdf ? "Generando…" : "PDF"}
             </Button>
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportar} disabled={loading || traza.movements.length === 0}>
+            <Button variant="ghost" size="sm" iconStart={<FileDownloadOutlined fontSize="small" />} onClick={exportar} disabled={loading || traza.movements.length === 0}>
               Excel
             </Button>
             <Button ref={cerrarRef} variant="secondary" size="sm" onClick={onClose}>
@@ -139,60 +120,68 @@ export default function HistorialProducto({
             </Button>
           </div>
         </header>
-        <div style={{ padding: 16, overflow: "auto", flex: 1 }}>
+        <div className={s.cajonCuerpo}>
           {loading ? (
             <SkeletonRows rows={6} label="Cargando historial" />
           ) : (
             <>
-              <p style={subtitulo}>Existencia por almacén</p>
-              {traza.levels.length === 0 ? (
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 16 }}>
-                  Este producto aún no tiene existencia en ningún almacén.
-                </p>
-              ) : (
-                <div style={{ display: "grid", gap: 8, marginBottom: 20 }}>
-                  {traza.levels.map((lv) => (
-                    <div key={lv.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13 }}>
-                      <span>{lv.ubicacion}</span>
-                      <strong style={{ fontVariantNumeric: "tabular-nums" }}>{cantidad(lv.existencia)}</strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p style={subtitulo}>Movimientos ({traza.movements.length})</p>
-              {traza.movements.length === 0 ? (
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Aún no hay movimientos de este producto.</p>
-              ) : (
-                <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
-                  {traza.movements.map((m) => (
-                    <li key={m.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", background: "var(--surface)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                          <code style={{ fontSize: 11 }}>{m.movementNumber}</code>
-                          <Tag variant={varianteMovimiento(m.type)}>{etiquetaMovimiento(m.type)}</Tag>
+              <section>
+                <p className={s.rotulo}>Existencia por almacén</p>
+                {traza.levels.length === 0 ? (
+                  <p className={s.textoVacio}>Este producto aún no tiene existencia en ningún almacén.</p>
+                ) : (
+                  <ul className={s.existencias}>
+                    {traza.levels.map((lv) => (
+                      <li key={lv.id} className={s.existencia}>
+                        <span>{lv.ubicacion}</span>
+                        <strong className={s.cifra}>{cantidad(lv.existencia)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              <section>
+                <p className={s.rotulo}>Movimientos ({traza.movements.length})</p>
+                {traza.movements.length === 0 ? (
+                  <p className={s.textoVacio}>Aún no hay movimientos de este producto.</p>
+                ) : (
+                  <Timeline ariaLabel="Movimientos del producto">
+                    {traza.movements.map((m) => (
+                      <TimelineItem
+                        key={m.id}
+                        state={estadoDelMovimiento(m.type)}
+                        title={
+                          <>
+                            <Badge tone={TONO_DE_VARIANTE[varianteMovimiento(m.type)]} size="sm">
+                              {etiquetaMovimiento(m.type)}
+                            </Badge>{" "}
+                            <strong className={s.cifra}>{cantidad(m.quantity)}</strong>
+                            {" · "}
+                            {m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}
+                          </>
+                        }
+                        meta={
+                          <>
+                            <code className={claseMono}>{m.movementNumber}</code>
+                            {" · "}
+                            <time dateTime={m.createdAt}>{fechaHoraCorta(m.createdAt)}</time>
+                          </>
+                        }
+                      >
+                        <div className={s.detalle}>
+                          {m.fromQtyBefore != null && <span>Origen: {Number(m.fromQtyBefore)} → {Number(m.fromQtyAfter)}</span>}
+                          {m.toQtyBefore != null && <span>Destino: {Number(m.toQtyBefore)} → {Number(m.toQtyAfter)}</span>}
+                          <span>Documento: {stockMovementDocumentLabel(m)}</span>
+                          <span>Registró: {m.createdBy?.nombre ?? "—"}</span>
+                          {m.notes ? <span>Notas: {m.notes}</span> : null}
+                          {m.lot ? <span>Lote: {m.lot.lotNumber}</span> : null}
+                          {Number(m.totalCost ?? 0) > 0 ? <span>Costo total: {pesos(m.totalCost)}</span> : null}
                         </div>
-                        <time dateTime={m.createdAt} style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                          {fechaHoraCorta(m.createdAt)}
-                        </time>
-                      </div>
-                      <div style={{ fontSize: 13, marginBottom: 4 }}>
-                        <strong style={{ fontVariantNumeric: "tabular-nums" }}>{cantidad(m.quantity)}</strong>
-                        {" · "}
-                        {m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "grid", gap: 2, fontVariantNumeric: "tabular-nums" }}>
-                        {m.fromQtyBefore != null && <span>Origen: {Number(m.fromQtyBefore)} → {Number(m.fromQtyAfter)}</span>}
-                        {m.toQtyBefore != null && <span>Destino: {Number(m.toQtyBefore)} → {Number(m.toQtyAfter)}</span>}
-                        <span>Documento: {stockMovementDocumentLabel(m)}</span>
-                        <span>Registró: {m.createdBy?.nombre ?? "—"}</span>
-                        {m.notes ? <span>Notas: {m.notes}</span> : null}
-                        {m.lot ? <span>Lote: {m.lot.lotNumber}</span> : null}
-                        {Number(m.totalCost ?? 0) > 0 ? <span>Costo total: {pesos(m.totalCost)}</span> : null}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
+                      </TimelineItem>
+                    ))}
+                  </Timeline>
+                )}
+              </section>
             </>
           )}
         </div>
