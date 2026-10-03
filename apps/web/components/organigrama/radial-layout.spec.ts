@@ -190,7 +190,7 @@ describe("radial-layout · la plantilla de 17", () => {
 });
 
 describe("radial-layout · colocación lateral", () => {
-  it("el lateral va en el anillo de su ancla, unido a ella con puente punteado, sin línea del jefe", () => {
+  it("el lateral va en el anillo de su ancla, unido a ella con puente punteado, y conserva la línea de su jefe", () => {
     const roots = plantilla17();
     const luis = roots[0].children.find((c) => c.id === 6)!;
     luis.lateralDeId = 4; // al lado de José Antonio
@@ -200,8 +200,11 @@ describe("radial-layout · colocación lateral", () => {
     const nodoAntonio = diseno.nodos.find((n) => n.id === 4)!;
     expect(nodoLuis.nivel).toBe(nodoAntonio.nivel);
     expect(nodoLuis).toMatchObject({ enlazaCon: 4, tipoEnlace: "lateral" });
-    expect(diseno.enlaces.filter((e) => e.a === 6)).toHaveLength(1);
-    expect(diseno.enlaces.find((e) => e.a === 6)!.tipo).toBe("lateral");
+    const deLuis = diseno.enlaces.filter((e) => e.a === 6);
+    expect(deLuis.map((e) => [e.de, e.tipo])).toEqual([
+      [4, "lateral"],
+      [1, "mando"],
+    ]);
     // Sigue en el dibujo con su gente debajo: Iván cuelga de él, un anillo más afuera.
     expect(diseno.nodos.find((n) => n.id === 61)).toMatchObject({
       nivel: nodoLuis.nivel + 1,
