@@ -1,0 +1,163 @@
+/* Tarjetas y pastillas seleccionables (asignar / auto-asignarse). Tokens --ui-*. */
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: var(--ui-s3);
+}
+
+.rejilla[data-min="220"] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+}
+
+.tarjeta {
+  position: relative;
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 6px;
+  min-height: 112px;
+  padding: var(--ui-s4) var(--ui-s3) var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--ui-duration-fast) var(--ui-ease-standard),
+    background var(--ui-duration-fast) var(--ui-ease-standard),
+    box-shadow var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.tarjeta:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.tarjeta:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.tarjeta[data-selected="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  box-shadow: 0 0 0 1px var(--ui-brand) inset;
+}
+
+.tarjeta:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.icono {
+  display: inline-flex;
+  margin-bottom: 2px;
+}
+
+.titulo {
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-label);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.ayuda {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+}
+
+.marca {
+  position: absolute;
+  top: var(--ui-s2);
+  right: var(--ui-s2);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ui-brand);
+  color: var(--ui-fg-on-brand);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--ui-duration-fast) var(--ui-ease-standard),
+    transform var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.marca svg {
+  font-size: 15px !important;
+  width: 15px;
+  height: 15px;
+}
+
+.tarjeta[data-selected="true"] .marca {
+  opacity: 1;
+  transform: none;
+}
+
+/* ─── Persona ────────────────────────────────────────────────────────── */
+
+.persona {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-height: var(--ui-control-h-touch, 44px);
+  max-width: 100%;
+  padding: 4px var(--ui-s3) 4px 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill, 999px);
+  background: var(--ui-surface);
+  color: inherit;
+  font: inherit;
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--ui-duration-fast) var(--ui-ease-standard),
+    background var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.persona:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.persona:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.persona[data-selected="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.personaNombre {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personaMarca {
+  display: none;
+}
+
+.persona[data-selected="true"] .personaMarca {
+  display: inline-flex;
+}
+
+.personaMarca svg {
+  font-size: 16px !important;
+  width: 16px;
+  height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta,
+  .marca,
+  .persona {
+    transition: none;
+  }
+}

@@ -1,0 +1,35 @@
+/* Auto-asignarme una actividad (FormSection + tarjetas de tipo). Tokens --ui-*. */
+
+.pagina {
+  max-width: 860px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.pasos {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.pasos.pasos > * {
+  margin: 0;
+}
+
+.titulo {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.siguiente {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-2);
+  text-align: center;
+}

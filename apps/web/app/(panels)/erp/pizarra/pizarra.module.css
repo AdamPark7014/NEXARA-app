@@ -1,26 +1,23 @@
-/* Actividades · pizarra del equipo («Minimalista», tokens --ui-*).
+/* Actividades · pizarra del equipo (sistema visual v2, tokens --ui-*).
    La tarjeta de persona y la rejilla viven en `EquipoPersonaCard.module.css`;
    aquí solo queda el armazón de la página. */
 
 .pagina {
-  max-width: 1120px;
+  max-width: var(--ui-content-max, 1280px);
   margin: 0 auto;
   min-width: 0;
 }
 
-.filtros {
-  margin-bottom: var(--ui-s4);
-}
-
-.aviso {
-  margin-bottom: var(--ui-s3);
+/* Contenido de la tarjeta de lista con aire propio (rejilla de gente, avisos). */
+.relleno {
+  padding: var(--ui-s4);
 }
 
 .actualizado {
   align-self: center;
   font-size: var(--ui-fs-caption);
   line-height: var(--ui-lh-caption);
-  color: var(--ui-fg-2);
+  color: var(--ui-fg-3);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -35,17 +32,18 @@
   }
 }
 
-/* Con dedo, los botones de la cabecera y de los avisos llegan a 44px
-   (min-height gana a la altura fija del botón base). */
-@media (pointer: coarse) {
-  .tap {
-    min-height: 44px;
-  }
-}
-
 /* El centro operativo es para la pantalla de la oficina: en el teléfono no aporta. */
 @media (max-width: 720px) {
   .pagina .soloEscritorio {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .relleno {
+    padding: var(--ui-s3);
+  }
+  .actualizado {
     display: none;
   }
 }

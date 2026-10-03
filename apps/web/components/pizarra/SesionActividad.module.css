@@ -1,0 +1,70 @@
+/* Reloj de la actividad: pausar, reanudar y pausa del jefe (tokens --ui-*). */
+
+.texto {
+  display: block;
+}
+
+.ayuda {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+}
+
+.corriendo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 600;
+  color: var(--ui-success-text);
+}
+
+/* El punto late suave: el reloj está vivo. */
+.punto {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ui-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-success) 22%, transparent);
+  animation: latido 1.8s var(--ui-ease-in-out, ease-in-out) infinite;
+}
+
+@keyframes latido {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--ui-success) 8%, transparent);
+  }
+}
+
+.campo {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-label);
+  line-height: var(--ui-lh-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg-label, var(--ui-fg));
+}
+
+.req {
+  color: var(--ui-danger-text);
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .punto {
+    animation: none;
+  }
+}

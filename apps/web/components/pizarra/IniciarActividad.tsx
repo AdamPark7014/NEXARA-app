@@ -1,26 +1,22 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import { Button, type ButtonVariant } from "@/components/base";
 import { iniciarMiActividad } from "@/lib/my-activities-api";
 import { formatApiError } from "@/lib/erp-api";
 import { ACCION_INICIAR } from "@/lib/actividad-tiempos";
+import c from "./comun.module.css";
 
 type Props = {
   token: string;
   activityId: number;
   onDone?: () => void;
-};
-
-const btnOk: CSSProperties = {
-  border: "none",
-  background: "#16a34a",
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: 13,
-  padding: "8px 14px",
-  borderRadius: 10,
-  cursor: "pointer",
-  fontFamily: "inherit",
+  /**
+   * Jerarquía del botón. Por defecto es la acción principal (ficha de la actividad);
+   * en una lista solo la primera va en `primary` y las demás en `tonal`.
+   */
+  variant?: ButtonVariant;
 };
 
 /**
@@ -31,7 +27,7 @@ const btnOk: CSSProperties = {
  * la persona no puede hacerla, lo habla con su jefe, que es quien la reasigna.
  * Quién lo ve lo decide `puedeIniciar()`.
  */
-export default function IniciarActividad({ token, activityId, onDone }: Props) {
+export default function IniciarActividad({ token, activityId, onDone, variant = "primary" }: Props) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,21 +46,24 @@ export default function IniciarActividad({ token, activityId, onDone }: Props) {
   };
 
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <button
-          type="button"
-          style={{ ...btnOk, opacity: guardando ? 0.7 : 1 }}
+    <div className={c.pila}>
+      <div className={c.fila}>
+        <Button
+          variant={variant}
+          className={c.tap}
+          iconStart={<PlayArrowRoundedIcon />}
+          loading={guardando}
           onClick={() => void iniciar()}
-          disabled={guardando}
         >
           {guardando ? "Iniciando…" : ACCION_INICIAR}
-        </button>
-        <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-          Queda registrada tu hora real de inicio.
-        </span>
+        </Button>
+        <span className={c.pista}>Queda registrada tu hora real de inicio.</span>
       </div>
-      {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 12.5 }}>{error}</p> : null}
+      {error ? (
+        <p className={c.error} role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

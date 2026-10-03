@@ -1,0 +1,100 @@
+/* Actividades · semáforo, KPI de persona y selector de rango (tokens --ui-*). */
+
+.dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: var(--dot, 9px);
+  height: var(--dot, 9px);
+  border-radius: 50%;
+  background: var(--ui-fg-3);
+}
+
+.dotRojo { background: var(--ui-danger); }
+.dotAmarillo { background: var(--ui-warning); }
+.dotVerde { background: var(--ui-success); }
+
+/* ─── KPI de una persona ─────────────────────────────────────────────── */
+
+.kpis {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.medidor {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.medidorCabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+}
+
+.medidorEtiqueta {
+  font-size: var(--ui-fs-label);
+  line-height: var(--ui-lh-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg-2);
+}
+
+.medidorCifra {
+  font-size: var(--ui-fs-section);
+  line-height: var(--ui-lh-section);
+  font-weight: 700;
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.medidorPista {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+}
+
+.compacta .medidorPista {
+  display: none;
+}
+
+.conteos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ─── Rango ──────────────────────────────────────────────────────────── */
+
+.rango {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rango > * {
+  max-width: 100%;
+}
+
+.fechas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fechas > * {
+  flex: 1 1 132px;
+  min-width: 0;
+}
+
+.fechas > .a {
+  flex: 0 0 auto;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}

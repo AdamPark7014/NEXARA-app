@@ -1,0 +1,28 @@
+/* Flujo del periodo bajo la gente (tokens --ui-*). */
+
+.flujo {
+  display: grid;
+  gap: var(--ui-s3);
+  margin-top: var(--ui-page-gap, var(--ui-s5));
+  min-width: 0;
+}
+
+.flujo > :last-child {
+  margin-bottom: 0;
+}
+
+.cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  line-height: var(--ui-lh-section);
+  font-weight: var(--ui-fw-section);
+  color: var(--ui-fg);
+}

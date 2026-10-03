@@ -1,0 +1,157 @@
+/* Actividades · piezas comunes de la pizarra (sistema visual v2, solo tokens --ui-*).
+   Claro y oscuro salen de los tokens: aquí no hay hex. */
+
+/* Columna de bloques con aire uniforme. */
+.pila {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.pilaHolgada {
+  display: grid;
+  gap: var(--ui-page-gap, var(--ui-s5));
+  min-width: 0;
+}
+
+/* Renglón que se acomoda solo: botones, insignias o datos cortos. */
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.filaEntre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-s2) var(--ui-s3);
+  min-width: 0;
+}
+
+/* Datos con icono separados por aire, no por puntos. */
+.datos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--ui-s4);
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-2);
+  min-width: 0;
+}
+
+.dato {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dato svg {
+  font-size: 16px !important;
+  width: 16px;
+  height: 16px;
+  color: var(--ui-fg-3);
+  flex: 0 0 auto;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  line-height: var(--ui-lh-section);
+  font-weight: var(--ui-fw-section);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tituloFila {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-label);
+  font-weight: 600;
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.folio {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 600;
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.tenue {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-2);
+}
+
+.pista {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 600;
+  color: var(--ui-danger-text);
+}
+
+.ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 600;
+  color: var(--ui-success-text);
+}
+
+.ok svg {
+  font-size: 16px !important;
+  width: 16px;
+  height: 16px;
+}
+
+/* Recuadro de captura en línea (motivo, nueva fecha). */
+.panel {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-sunken, var(--ui-bg-2));
+  min-width: 0;
+}
+
+/* Texto libre que alguien dejó (indicaciones, motivo). */
+.cita {
+  margin: 0;
+  padding: var(--ui-s2) var(--ui-s3);
+  border-left: 3px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-sunken, var(--ui-bg-2));
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-2);
+  overflow-wrap: anywhere;
+}
+
+/* Con dedo, los botones llegan a 44 px (el botón base se queda en 40). */
+@media (pointer: coarse) {
+  .tap {
+    min-height: var(--ui-control-h-touch, 44px);
+  }
+}

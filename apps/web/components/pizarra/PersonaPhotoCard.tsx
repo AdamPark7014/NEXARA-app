@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { AvatarAro } from "@/components/pizarra/EquipoPersonaCard";
-import { PrioridadChip, SemaforoDot } from "@/components/pizarra/PizarraKpi";
+import { PrioridadChip, SemaforoBadge } from "@/components/pizarra/PizarraKpi";
 import type { Prioridad, Semaforo } from "@/lib/team-board-api";
-import { colorBordeActividad } from "@/lib/actividad-tiempos";
+import s from "./PersonaPhotoCard.module.css";
 
 export type PersonaPhotoCardProps = {
   href?: string;
@@ -23,22 +23,19 @@ export type PersonaPhotoCardProps = {
   children?: ReactNode;
 };
 
-/** Dos renglones completos: lo que importa ya no se corta a media palabra. */
-const DOS_RENGLONES: CSSProperties = {
-  display: "-webkit-box",
-  WebkitLineClamp: 2,
-  WebkitBoxOrient: "vertical",
-  overflow: "hidden",
-  overflowWrap: "anywhere",
+const CLASE_SEMAFORO: Record<Semaforo, string> = {
+  rojo: s.semRojo,
+  amarillo: s.semAmarillo,
+  verde: s.semVerde,
 };
 
 /**
- * Tarjeta con foto para «Asignadas por mí» y «Solicitudes de equipo».
+ * Tarjeta con foto para «Solicitudes de equipo» y el detalle del flujo.
  *
  * Mismo lenguaje que «Mi equipo» (foto redonda, textos centrados, nada
  * cortado), pero sin aro de estado: aquí la persona no es el sujeto del
- * estado — lo es la actividad o la solicitud, que ya traen su semáforo.
- * «Mis actividades» conserva su propio layout.
+ * estado — lo es la actividad o la solicitud, que ya traen su semáforo
+ * (franja superior e insignia).
  */
 export default function PersonaPhotoCard({
   href,
@@ -56,101 +53,41 @@ export default function PersonaPhotoCard({
 }: PersonaPhotoCardProps) {
   const size = Math.min(120, Math.max(56, Math.round(photoSize)));
 
-  const shell: CSSProperties = {
-    display: "grid",
-    gap: 8,
-    padding: "var(--ui-s3)",
-    borderRadius: "var(--ui-radius-lg)",
-    border: "1px solid var(--ui-border)",
-    boxShadow: semaforo ? `inset 4px 0 0 ${colorBordeActividad(semaforo)}` : undefined,
-    background: "var(--ui-surface)",
-    color: "inherit",
-    textDecoration: "none",
-    minWidth: 0,
-  };
-
   const body = (
     <>
-      <div style={{ display: "grid", justifyItems: "center", gap: 2, minWidth: 0 }}>
+      <div className={s.persona}>
         <AvatarAro nombre={nombre} avatarUrl={avatarUrl} size={size} />
-        <div
-          style={{
-            fontWeight: 600,
-            fontSize: "var(--ui-fs-body)",
-            lineHeight: "var(--ui-lh-label)",
-            maxWidth: "100%",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {nombre}
-        </div>
-        {puesto ? (
-          <div
-            style={{
-              fontSize: "var(--ui-fs-caption)",
-              lineHeight: "var(--ui-lh-caption)",
-              color: "var(--ui-fg-2)",
-              maxWidth: "100%",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {puesto}
-          </div>
-        ) : null}
+        <div className={s.nombre}>{nombre}</div>
+        {puesto ? <div className={s.puesto}>{puesto}</div> : null}
       </div>
 
       {semaforo || prioridad ? (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <SemaforoDot semaforo={semaforo} />
+        <div className={s.insignias}>
+          <SemaforoBadge semaforo={semaforo} />
           <PrioridadChip prioridad={prioridad} />
         </div>
       ) : null}
 
-      <div
-        style={{
-          ...DOS_RENGLONES,
-          fontWeight: 600,
-          fontSize: "var(--ui-fs-meta)",
-          lineHeight: "var(--ui-lh-meta)",
-          textAlign: "center",
-        }}
-        title={title}
-      >
+      <div className={s.titulo} title={title}>
         {title}
       </div>
 
-      {subtitle ? (
-        <div
-          style={{
-            ...DOS_RENGLONES,
-            fontSize: "var(--ui-fs-caption)",
-            lineHeight: "var(--ui-lh-caption)",
-            color: "var(--ui-fg-2)",
-            textAlign: "center",
-          }}
-        >
-          {subtitle}
-        </div>
-      ) : null}
+      {subtitle ? <div className={s.subtitulo}>{subtitle}</div> : null}
       {meta}
       {children}
     </>
   );
 
   return (
-    <div style={shell}>
+    <div className={[s.tarjeta, semaforo ? CLASE_SEMAFORO[semaforo] : ""].filter(Boolean).join(" ")}>
       {href ? (
-        <Link href={href} style={{ color: "inherit", textDecoration: "none", display: "grid", gap: 8 }}>
+        <Link href={href} className={s.enlace}>
           {body}
         </Link>
       ) : (
-        body
+        <div className={s.cuerpo}>{body}</div>
       )}
-      {actions ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{actions}</div> : null}
+      {actions ? <div className={s.acciones}>{actions}</div> : null}
     </div>
   );
 }

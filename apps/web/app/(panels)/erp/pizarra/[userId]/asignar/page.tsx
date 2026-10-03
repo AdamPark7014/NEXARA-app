@@ -1,8 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -25,28 +24,41 @@ import {
   type AssignmentCharge,
 } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
-import { resolveAssetUrl } from "@/lib/evidence-display";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import { DurationWheelPicker } from "@/components/ui/DurationWheelPicker";
-import { Skeleton } from "@/components/base";
-import { CHARGE_LABEL, initials, shortName } from "@/lib/activity-labels";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  ButtonLink,
+  Field,
+  FormSection,
+  Input,
+  PageHead,
+  PendingList,
+  RequiredMark,
+  Skeleton,
+  SkeletonRows,
+  Textarea,
+  type PendingItem,
+} from "@/components/base";
+import { OpcionPersona, OpcionTarjeta, RejillaOpciones } from "@/components/pizarra/Opciones";
+import c from "@/components/pizarra/comun.module.css";
+import { CHARGE_LABEL, shortName } from "@/lib/activity-labels";
 import {
   fetchTeamBoard,
   fetchTeamBoardUser,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
 import { sumarPendientes, type PasoEquipo } from "@/lib/asignar-equipo";
+import a from "./asignar.module.css";
 
 const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), {
   ssr: false,
-  loading: () => (
-    <div aria-busy="true" aria-label="Cargando formulario" style={{ display: "grid", gap: 10 }}>
-      <Skeleton height={44} radius={10} />
-      <Skeleton height={44} radius={10} />
-      <Skeleton height={88} radius={10} />
-    </div>
-  ),
+  loading: () => <SkeletonRows rows={3} label="Cargando formulario" />,
 });
 
 /** Ayuda de cada encargo en palabras de campo (el título se queda igual). */
@@ -57,78 +69,13 @@ const CHARGE_HELP: Record<AssignmentCharge, string> = {
 
 type PasoId = "tipo" | "encargo" | "tiempo" | "equipo" | "datos";
 
-const stepTitle: CSSProperties = {
-  margin: 0,
-  fontSize: 14,
-  fontWeight: 750,
-  color: "var(--text-secondary)",
+const ID_PASO: Record<PasoId, string> = {
+  tipo: "asignar-tipo",
+  encargo: "asignar-encargo",
+  tiempo: "asignar-tiempo",
+  equipo: "asignar-equipo",
+  datos: "asignar-datos",
 };
-
-const fieldLabel: CSSProperties = { fontSize: 13, fontWeight: 650, color: "var(--text-secondary)" };
-
-const textareaStyle: CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  fontFamily: "inherit",
-  fontSize: 16,
-  lineHeight: 1.4,
-  resize: "vertical",
-  background: "var(--surface)",
-  color: "inherit",
-  boxSizing: "border-box",
-};
-
-const numberStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 44,
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  font: "inherit",
-  fontSize: 16,
-  fontWeight: 700,
-  background: "var(--surface)",
-  color: "inherit",
-  boxSizing: "border-box",
-};
-
-const primaryButton: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  minHeight: 44,
-  padding: "10px 16px",
-  border: "none",
-  borderRadius: 12,
-  background: "var(--primary)",
-  color: "#fff",
-  fontWeight: 750,
-  fontSize: 14,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
-const secondaryButton: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  justifySelf: "start",
-  minHeight: 44,
-  padding: "8px 14px",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  background: "var(--surface)",
-  color: "inherit",
-  fontWeight: 650,
-  fontSize: 14,
-  textDecoration: "none",
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
-const nextHint: CSSProperties = { fontSize: 14, color: "var(--text-secondary)", margin: 0 };
 
 /** La actividad ya existe: mientras se suma al equipo (o si falló) el formulario no se muestra. */
 function EquipoPendienteBox({
@@ -144,63 +91,31 @@ function EquipoPendienteBox({
 }) {
   if (sumando || !error) {
     return (
-      <div role="status" aria-busy={sumando} style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-        Actividad creada. Sumando al equipo…
+      <div role="status" aria-busy={sumando} className={a.sumando}>
+        <SkeletonRows rows={1} label="Sumando al equipo" />
+        <span className={c.tenue}>Actividad creada. Sumando al equipo…</span>
       </div>
     );
   }
   return (
-    <div
+    <Alert
+      tone="warning"
       role="alert"
-      style={{
-        padding: "12px 14px",
-        borderRadius: 14,
-        border: "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
-        background: "color-mix(in srgb, #d97706 9%, var(--surface))",
-        display: "grid",
-        gap: 8,
-        fontSize: 13.5,
-        lineHeight: 1.45,
-      }}
+      title="La actividad ya se creó"
+      action={
+        <span className={c.fila}>
+          <Button variant="primary" size="sm" className={c.tap} onClick={onRetry}>
+            Reintentar
+          </Button>
+          <ButtonLink href={`/erp/actividades/${activityId}`} size="sm" className={c.tap} iconEnd={<ArrowForwardIcon />}>
+            Abrir la actividad
+          </ButtonLink>
+        </span>
+      }
     >
-      <span>
-        <strong>La actividad ya se creó</strong>, pero no se pudo sumar a todo el equipo: {error}
-      </span>
-      <span style={{ color: "var(--text-secondary)" }}>
-        «Reintentar» solo suma a quien faltó; no crea otra actividad.
-      </span>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <button type="button" onClick={onRetry} style={primaryButton}>
-          Reintentar
-        </button>
-        <Link href={`/erp/actividades/${activityId}`} style={secondaryButton}>
-          Abrir la actividad →
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function StepBadge({ n }: { n: number }) {
-  return (
-    <span
-      aria-hidden
-      style={{
-        display: "inline-grid",
-        placeItems: "center",
-        width: 24,
-        height: 24,
-        marginRight: 8,
-        borderRadius: "50%",
-        background: "var(--primary)",
-        color: "#fff",
-        fontSize: 12.5,
-        fontWeight: 800,
-        verticalAlign: "middle",
-      }}
-    >
-      {n}
-    </span>
+      , pero no se pudo sumar a todo el equipo: {error}
+      <span className={a.nota}>«Reintentar» solo suma a quien faltó; no crea otra actividad.</span>
+    </Alert>
   );
 }
 
@@ -493,13 +408,14 @@ export default function AsignarActividadPage() {
 
   if (!Number.isFinite(userId)) {
     return (
-      <p role="alert" style={{ color: "var(--danger)", fontSize: 14 }}>
-        No encontramos a esta persona.
-      </p>
+      <div className={a.pagina}>
+        <Alert tone="danger" role="alert">
+          No encontramos a esta persona.
+        </Alert>
+      </div>
     );
   }
 
-  const avatarSrc = person?.avatarUrl ? resolveAssetUrl(person.avatarUrl) : null;
   const displayName = person?.nombre ?? "Cargando…";
   const nombreCorto = person ? shortName(person.nombre) : "esta persona";
 
@@ -518,586 +434,428 @@ export default function AsignarActividadPage() {
   ];
   const paso = (id: PasoId) => pasos.indexOf(id) + 1;
 
-  return (
-    <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
-      <button
-        type="button"
-        onClick={() => router.push(`/erp/pizarra/${userId}`)}
-        style={{
-          alignSelf: "flex-start",
-          minHeight: 44,
-          border: "none",
-          background: "transparent",
-          color: "var(--text-secondary)",
-          fontWeight: 650,
-          fontSize: 14,
-          cursor: "pointer",
-          padding: "8px 0",
-          fontFamily: "inherit",
-        }}
-      >
-        ← Volver al perfil
-      </button>
+  // Lista de la derecha: qué ya quedó y qué falta, en el mismo orden que los pasos.
+  const tiempoTexto = planValido
+    ? [planHoras > 0 ? `${planHoras} h` : "", planMinutos > 0 ? `${planMinutos} min` : ""].filter(Boolean).join(" ")
+    : "falta el tiempo estimado";
+  const pendientes: PendingItem[] = [
+    {
+      id: "tipo",
+      label: "Tipo de actividad",
+      hint: kindMeta ? kindMeta.title : "elige uno",
+      done: Boolean(kind),
+      fieldId: ID_PASO.tipo,
+    },
+    ...(verEncargo
+      ? [
+          {
+            id: "encargo",
+            label: "Encargo",
+            hint: effectiveCharge ? CHARGE_LABEL[effectiveCharge] : "la hace o la reparte",
+            done: chargeReady,
+            fieldId: ID_PASO.encargo,
+          },
+        ]
+      : []),
+    ...(verTiempo
+      ? [
+          {
+            id: "tiempo",
+            label: "Tiempo estimado",
+            hint: tiempoTexto,
+            done: planValido,
+            error: !planValido,
+            fieldId: ID_PASO.tiempo,
+          },
+        ]
+      : []),
+    ...(verEquipo
+      ? [
+          {
+            id: "equipo",
+            label: "Equipo",
+            hint: extraIds.length ? `${nombreCorto} y ${extraIds.length} más` : `${nombreCorto} (sumar más es opcional)`,
+            done: true,
+            fieldId: ID_PASO.equipo,
+          },
+        ]
+      : []),
+    ...(verTiempo && planValido
+      ? [
+          {
+            id: "datos",
+            label: "Datos de la actividad",
+            hint: "título, lugar y fecha",
+            done: Boolean(pendiente),
+            fieldId: ID_PASO.datos,
+          },
+        ]
+      : []),
+  ];
 
-      <header
-        style={{
-          display: "flex",
-          gap: 14,
-          alignItems: "center",
-          padding: 16,
-          borderRadius: 18,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        {avatarSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={avatarSrc}
-            alt=""
-            width={64}
-            height={64}
-            style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover" }}
-          />
-        ) : (
-          <div
-            aria-hidden
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              fontSize: 18,
-              fontWeight: 800,
-              color: "var(--primary)",
-              background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
-            }}
-          >
-            {person ? initials(person.nombre) : ""}
-          </div>
-        )}
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--text-tertiary)",
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-            }}
-          >
-            Asignar actividad a
-          </div>
-          <h1 style={{ margin: "2px 0 0", fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            {displayName}
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            {person?.puesto || "Elige el tipo y completa los datos"}
-          </p>
-        </div>
-      </header>
+  return (
+    <div className={a.pagina}>
+      <PageHead
+        breadcrumbs={[
+          { label: "Actividades", href: "/erp/pizarra" },
+          { label: person ? shortName(person.nombre) : "Persona", href: `/erp/pizarra/${userId}` },
+          { label: "Asignar" },
+        ]}
+        back={{ href: `/erp/pizarra/${userId}`, label: "Volver al perfil" }}
+        eyebrow="Asignar actividad a"
+        icon={<Avatar name={person?.nombre ?? "?"} avatarUrl={person?.avatarUrl} size={40} />}
+        title={displayName}
+        description={person?.puesto || "Elige el tipo y completa los datos"}
+      />
 
       {loadError ? (
-        <div
+        <Alert
+          tone="danger"
           role="alert"
-          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 14, color: "var(--danger)" }}
+          className={a.aviso}
+          action={
+            <Button size="sm" className={c.tap} onClick={() => void load()}>
+              Reintentar
+            </Button>
+          }
         >
-          <span>{loadError}</span>
-          <button type="button" onClick={() => void load()} style={secondaryButton}>
-            Reintentar
-          </button>
-        </div>
+          {loadError}
+        </Alert>
       ) : null}
 
-      <section>
-        <h2 style={{ ...stepTitle, marginBottom: 10 }}>
-          <StepBadge n={paso("tipo")} />
-          Tipo de actividad
-        </h2>
-        {!person && !loadError ? (
-          <div
-            aria-busy="true"
-            aria-label="Cargando tipos"
-            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}
+      <div className={a.disposicion}>
+        <div className={a.pasos}>
+          <FormSection
+            id={ID_PASO.tipo}
+            step={paso("tipo")}
+            done={Boolean(kind)}
+            title="Tipo de actividad"
+            description={person ? `Solo ves los tipos que ${nombreCorto} puede recibir.` : undefined}
           >
-            <Skeleton height={112} radius={16} />
-            <Skeleton height={112} radius={16} />
-            <Skeleton height={112} radius={16} />
-          </div>
-        ) : null}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-            gap: 10,
-          }}
-        >
-          {allowedKinds.map((id) => {
-            const opt = ACTIVITY_KINDS[id];
-            const selected = kind === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setKind(id)}
-                aria-pressed={selected}
-                style={{
-                  textAlign: "left",
-                  padding: "14px 12px",
-                  borderRadius: 16,
-                  border: selected ? "2px solid var(--primary)" : "1px solid var(--border)",
-                  background: selected
-                    ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
-                    : "var(--surface)",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  color: "inherit",
-                  minHeight: 112,
-                }}
-              >
-                <ActivityKindIcon kind={opt.icon} variant="badge" size={36} />
-                <div style={{ marginTop: 8, fontWeight: 800, fontSize: 14 }}>{opt.title}</div>
-                <div style={{ marginTop: 4, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.35 }}>
-                  {opt.help}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        {person ? (
-          <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-            Solo ves los tipos que {nombreCorto} puede recibir.
-          </p>
-        ) : null}
-      </section>
-
-      {kind && despachoOnly && !bridgeNeeded ? (
-        <section
-          style={{
-            padding: 14,
-            borderRadius: 16,
-            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
-            background: "color-mix(in srgb, var(--primary) 8%, var(--surface))",
-            display: "grid",
-            gap: 12,
-          }}
-        >
-          <div>
-            <h2 style={stepTitle}>
-              <StepBadge n={paso("encargo")} />
-              Encargo a {nombreCorto}
-            </h2>
-            <p style={{ margin: "8px 0 0", fontSize: 15, fontWeight: 800 }}>Despacho a equipo</p>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              {isServicioBridgeEmail(person?.email)
-                ? `Se la dejas a ${nombreCorto}. Él elige al ingeniero de su equipo. Tú no eliges quién la ejecuta.`
-                : "La reparte a su gente. En servicios le dejas la actividad y cuántas personas ocupas; él se la manda a Antonio y Antonio elige al soporte."}
-            </p>
-          </div>
-          <label style={{ display: "grid", gap: 4, maxWidth: 220 }}>
-            <span style={fieldLabel}>Personas que se ocupan *</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={50}
-              value={headcount}
-              onChange={(e) => setHeadcount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-              style={numberStyle}
-            />
-          </label>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={fieldLabel}>Indicaciones para {nombreCorto} (opcional)</span>
-            <textarea
-              value={leadNotes}
-              onChange={(e) => setLeadNotes(e.target.value)}
-              rows={2}
-              placeholder="Qué debe coordinar, contexto…"
-              style={textareaStyle}
-            />
-          </label>
-        </section>
-      ) : null}
-
-      {kind && ejecucionOnly && !bridgeNeeded ? (
-        <section
-          style={{
-            padding: 14,
-            borderRadius: 16,
-            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
-            background: "color-mix(in srgb, var(--primary) 8%, var(--surface))",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <div>
-            <h2 style={stepTitle}>
-              <StepBadge n={paso("encargo")} />
-              Encargo a {nombreCorto}
-            </h2>
-            <p style={{ margin: "8px 0 0", fontSize: 15, fontWeight: 800 }}>Ejecución directa</p>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              {CHARGE_LABEL.ejecucion}, sin repartirla a nadie más.
-            </p>
-          </div>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={fieldLabel}>Indicaciones (opcional)</span>
-            <textarea
-              value={leadNotes}
-              onChange={(e) => setLeadNotes(e.target.value)}
-              rows={2}
-              placeholder="Qué debe hacer…"
-              style={textareaStyle}
-            />
-          </label>
-        </section>
-      ) : null}
-
-      {kind && offerCharge && !bridgeNeeded ? (
-        <section>
-          <h2 style={{ ...stepTitle, marginBottom: 10 }}>
-            <StepBadge n={paso("encargo")} />
-            Encargo a {nombreCorto}
-          </h2>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: 10,
-            }}
-          >
-            {(Object.keys(ASSIGNMENT_CHARGES) as AssignmentCharge[]).map((id) => {
-              const opt = ASSIGNMENT_CHARGES[id];
-              const selected = charge === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setCharge(id)}
-                  aria-pressed={selected}
-                  style={{
-                    textAlign: "left",
-                    padding: "14px 14px",
-                    borderRadius: 16,
-                    border: selected ? "2px solid var(--primary)" : "1px solid var(--border)",
-                    background: selected
-                      ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
-                      : "var(--surface)",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    color: "inherit",
-                    minHeight: 96,
-                  }}
-                >
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>{opt.title}</div>
-                  <div style={{ marginTop: 6, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                    {CHARGE_HELP[id]}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {bridgeNeeded && (
-        <div
-          role="status"
-          style={{
-            padding: "12px 14px",
-            borderRadius: 14,
-            border: "1px solid color-mix(in srgb, #d97706 40%, var(--border))",
-            background: "color-mix(in srgb, #d97706 10%, var(--surface))",
-            fontSize: 13,
-            lineHeight: 1.45,
-          }}
-        >
-          <strong>Los servicios van primero a Antonio.</strong> Él agenda el día y la hora con Carolina o
-          Alejandro.
-          {antonioOnBoard ? (
-            <div style={{ marginTop: 10 }}>
-              <button
-                type="button"
-                onClick={() => router.push(`/erp/pizarra/${antonioOnBoard.id}/asignar`)}
-                style={primaryButton}
-              >
-                Ir a asignar a {shortName(antonioOnBoard.nombre)} →
-              </button>
-            </div>
-          ) : (
-            <p style={{ margin: "8px 0 0", fontSize: 13 }}>
-              No encontramos a Antonio en el tablero. Avísale a dirección.
-            </p>
-          )}
-        </div>
-      )}
-
-      {kindMeta && !bridgeNeeded && chargeReady ? (
-        <section
-          style={{
-            padding: 14,
-            borderRadius: 16,
-            border: planValido
-              ? "1px solid var(--border)"
-              : "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
-            background: "var(--surface)",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <div>
-            <h2 style={stepTitle}>
-              <StepBadge n={paso("tiempo")} />
-              ¿Cuánto tiempo toma? *
-            </h2>
-            <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              Cuánto debería tomarle. Gira las ruedas de horas y minutos — no hace falta hacer la cuenta mental.
-            </p>
-          </div>
-          <DurationWheelPicker
-            horas={planHoras}
-            minutos={planMinutos}
-            onChange={({ horas, minutos }) => {
-              setPlanHoras(horas);
-              setPlanMinutos(minutos);
-            }}
-            // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
-            maxHoras={12}
-            topeMinutos={720}
-            minuteStep={5}
-            hint={
-              !planValido
-                ? "Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede."
-                : "Máximo 12 h. Si lleva más días, se reanuda cada día."
-            }
-          />
-          {!planValido ? (
-            <p style={{ margin: 0, fontSize: 13, color: "#b45309" }}>
-              Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-
-      {kindMeta && !bridgeNeeded && chargeReady && planValido ? (
-        <>
-          {!despachoOnly && !ejecucionOnly ? (
-          <section
-            style={{
-              padding: 14,
-              borderRadius: 16,
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-            }}
-          >
-            <h2 style={{ ...stepTitle, marginBottom: 6 }}>
-              <StepBadge n={paso("equipo")} />
-              {effectiveCharge === "despacho" ? "¿Quién la hace?" : "¿Alguien más ayuda? (opcional)"}
-            </h2>
-            <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              {effectiveCharge === "despacho"
-                ? kind === "proyecto"
-                  ? `Puedes sumar instaladores y soporte. Si mezclas a los dos equipos, también se avisa al otro encargado (por ejemplo Antonio), además de ${nombreCorto}.`
-                  : `Suma a quien la hará con ${nombreCorto}. Si no eliges a nadie, ${nombreCorto} la reparte después.`
-                : kind === "servicio" && isServicioBridgeEmail(person?.email)
-                ? "Suma a Carolina o Alejandro (el día y la hora van en el formulario)."
-                : kind === "servicio"
-                  ? "Solo soporte (Antonio, Carolina, Alejandro)."
-                  : kind === "obra"
-                    ? "Solo instaladores de campo (Joan, Israel, Juan José)."
-                    : kind === "proyecto"
-                      ? "Soporte e instaladores pueden colaborar. Si hay gente de los dos lados, se avisa a los dos encargados."
-                      : effectiveCharge === "ejecucion"
-                        ? `${nombreCorto} la hace. Si quieres, suma a alguien de apoyo.`
-                        : `${nombreCorto} queda como responsable. Si quieres, suma a alguien de apoyo.`}
-            </p>
-            {autoPeerCoordinators.length > 0 ? (
-              <div
-                role="status"
-                style={{
-                  marginBottom: 10,
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
-                  background: "color-mix(in srgb, var(--primary) 10%, var(--surface))",
-                  fontSize: 12.5,
-                  lineHeight: 1.45,
-                }}
-              >
-                <strong>Se suman encargados:</strong> además de {nombreCorto}, también se avisará a{" "}
-                {autoPeerCoordinators.map((u) => shortName(u.nombre)).join(", ")} para coordinar (hay gente de
-                instalación y de soporte).
+            {!person && !loadError ? (
+              <div className={a.esqueletos} aria-busy="true" aria-label="Cargando tipos">
+                <Skeleton height={112} radius={16} />
+                <Skeleton height={112} radius={16} />
+                <Skeleton height={112} radius={16} />
               </div>
             ) : null}
-            {teamForExtras.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
-                No hay más personas disponibles para sumar ahora.
-              </p>
-            ) : (
-              <>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {teamForExtras.map((u) => {
-                  const on = extraIds.includes(u.id);
-                  const src = u.avatarUrl ? resolveAssetUrl(u.avatarUrl) : null;
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => toggleExtra(u.id)}
-                      title={u.nombre}
-                      aria-pressed={on}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        minHeight: 44,
-                        padding: "6px 12px 6px 6px",
-                        borderRadius: 999,
-                        border: on ? "1.5px solid var(--primary)" : "1px solid var(--border)",
-                        background: on
-                          ? "color-mix(in srgb, var(--primary) 12%, var(--surface))"
-                          : "var(--surface)",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        color: "inherit",
-                        fontSize: 13,
-                        fontWeight: 650,
-                      }}
-                    >
-                      {on ? (
-                        <span aria-hidden style={{ color: "var(--primary)", fontWeight: 800 }}>
-                          ✓
-                        </span>
-                      ) : null}
-                      {src ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={src}
-                          alt=""
-                          width={28}
-                          height={28}
-                          style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }}
-                        />
-                      ) : (
-                        <span
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: "50%",
-                            display: "grid",
-                            placeItems: "center",
-                            fontSize: 10,
-                            fontWeight: 800,
-                            background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
-                            color: "var(--primary)",
-                          }}
-                        >
-                          {initials(u.nombre)}
-                        </span>
-                      )}
-                      <span
-                        style={{
-                          maxWidth: 110,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {shortName(u.nombre)}
-                      </span>
-                    </button>
-                  );
-                })}
+            <RejillaOpciones ariaLabel="Tipo de actividad">
+              {allowedKinds.map((id) => {
+                const opt = ACTIVITY_KINDS[id];
+                return (
+                  <OpcionTarjeta
+                    key={id}
+                    selected={kind === id}
+                    onClick={() => setKind(id)}
+                    icon={<ActivityKindIcon kind={opt.icon} variant="badge" size={36} />}
+                    title={opt.title}
+                    help={opt.help}
+                  />
+                );
+              })}
+            </RejillaOpciones>
+          </FormSection>
+
+          {kind && despachoOnly && !bridgeNeeded ? (
+            <FormSection
+              id={ID_PASO.encargo}
+              step={paso("encargo")}
+              done
+              title={`Encargo a ${nombreCorto}`}
+              description={
+                isServicioBridgeEmail(person?.email)
+                  ? `Se la dejas a ${nombreCorto}. Él elige al ingeniero de su equipo. Tú no eliges quién la ejecuta.`
+                  : "La reparte a su gente. En servicios le dejas la actividad y cuántas personas ocupas; él se la manda a Antonio y Antonio elige al soporte."
+              }
+              actions={
+                <Badge tone="brand" dot>
+                  Despacho a equipo
+                </Badge>
+              }
+            >
+              <div className={a.campos}>
+                <Field label="Personas que se ocupan" required className={a.campoCorto}>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={50}
+                    value={headcount}
+                    onChange={(e) => setHeadcount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+                  />
+                </Field>
+                <Field label={`Indicaciones para ${nombreCorto}`} optional fullWidth>
+                  <Textarea
+                    value={leadNotes}
+                    onChange={(e) => setLeadNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Qué debe coordinar, contexto…"
+                  />
+                </Field>
               </div>
-              {extraIds.length > 0 ? (
-                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={{ display: "grid", gap: 4 }}>
-                    <span style={fieldLabel}>Indicaciones para {nombreCorto} (responsable, opcional)</span>
-                    <textarea
-                      value={leadNotes}
-                      onChange={(e) => setLeadNotes(e.target.value)}
-                      rows={2}
-                      style={textareaStyle}
-                      placeholder={`Qué debe hacer ${nombreCorto}…`}
-                    />
-                  </label>
-                  {extraIds.map((id) => {
-                    const u = teamForExtras.find((x) => x.id === id);
-                    if (!u) return null;
-                    return (
-                      <label key={id} style={{ display: "grid", gap: 4 }}>
-                        <span style={fieldLabel}>Indicaciones para {shortName(u.nombre)} (opcional)</span>
-                        <textarea
-                          value={extraNotes[id] ?? ""}
-                          onChange={(e) =>
-                            setExtraNotes((prev) => ({ ...prev, [id]: e.target.value }))
-                          }
-                          rows={2}
-                          style={textareaStyle}
-                          placeholder="Qué debe hacer esta persona…"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              ) : null}
-              </>
-            )}
-          </section>
+            </FormSection>
           ) : null}
 
-          <section
-            style={{
-              padding: 16,
-              borderRadius: 16,
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-            }}
-          >
-            <h2 style={{ ...stepTitle, marginBottom: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
-              <StepBadge n={paso("datos")} />
-              <ActivityKindIcon kind={kindMeta.icon} size={16} />
-              <span>
-                {kindMeta.title}
-                {effectiveCharge ? ` · ${CHARGE_LABEL[effectiveCharge]}` : ""}
-                {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
-              </span>
-            </h2>
-            {pendiente ? (
-              <EquipoPendienteBox
-                activityId={pendiente.activityId}
-                sumando={sumando}
-                error={teamError}
-                onRetry={reintentarEquipo}
+          {kind && ejecucionOnly && !bridgeNeeded ? (
+            <FormSection
+              id={ID_PASO.encargo}
+              step={paso("encargo")}
+              done
+              title={`Encargo a ${nombreCorto}`}
+              description={`${CHARGE_LABEL.ejecucion}, sin repartirla a nadie más.`}
+              actions={
+                <Badge tone="brand" dot>
+                  Ejecución directa
+                </Badge>
+              }
+            >
+              <Field label="Indicaciones" optional fullWidth>
+                <Textarea
+                  value={leadNotes}
+                  onChange={(e) => setLeadNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Qué debe hacer…"
+                />
+              </Field>
+            </FormSection>
+          ) : null}
+
+          {kind && offerCharge && !bridgeNeeded ? (
+            <FormSection
+              id={ID_PASO.encargo}
+              step={paso("encargo")}
+              done={charge != null}
+              title={`Encargo a ${nombreCorto}`}
+              description="¿La hace en persona o la reparte a su gente?"
+            >
+              <RejillaOpciones min={220} ariaLabel={`Encargo a ${nombreCorto}`}>
+                {(Object.keys(ASSIGNMENT_CHARGES) as AssignmentCharge[]).map((id) => {
+                  const opt = ASSIGNMENT_CHARGES[id];
+                  return (
+                    <OpcionTarjeta
+                      key={id}
+                      selected={charge === id}
+                      onClick={() => setCharge(id)}
+                      title={opt.title}
+                      help={CHARGE_HELP[id]}
+                    />
+                  );
+                })}
+              </RejillaOpciones>
+            </FormSection>
+          ) : null}
+
+          {bridgeNeeded && (
+            <Alert
+              tone="warning"
+              role="status"
+              title="Los servicios van primero a Antonio."
+              action={
+                antonioOnBoard ? (
+                  <Button
+                    variant="primary"
+                    className={c.tap}
+                    iconEnd={<ArrowForwardIcon />}
+                    onClick={() => router.push(`/erp/pizarra/${antonioOnBoard.id}/asignar`)}
+                  >
+                    Ir a asignar a {shortName(antonioOnBoard.nombre)}
+                  </Button>
+                ) : undefined
+              }
+            >
+              {" "}
+              Él agenda el día y la hora con Carolina o Alejandro.
+              {antonioOnBoard ? null : (
+                <span className={a.nota}>No encontramos a Antonio en el tablero. Avísale a dirección.</span>
+              )}
+            </Alert>
+          )}
+
+          {kindMeta && !bridgeNeeded && chargeReady ? (
+            <FormSection
+              id={ID_PASO.tiempo}
+              step={paso("tiempo")}
+              done={planValido}
+              title={
+                <>
+                  ¿Cuánto tiempo toma? <RequiredMark />
+                </>
+              }
+              description="Cuánto debería tomarle. Gira las ruedas de horas y minutos — no hace falta hacer la cuenta mental."
+              className={planValido ? undefined : a.seccionAviso}
+            >
+              <DurationWheelPicker
+                horas={planHoras}
+                minutos={planMinutos}
+                onChange={({ horas, minutos }) => {
+                  setPlanHoras(horas);
+                  setPlanMinutos(minutos);
+                }}
+                // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
+                maxHoras={12}
+                topeMinutos={720}
+                minuteStep={5}
+                hint={
+                  !planValido
+                    ? "Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede."
+                    : "Máximo 12 h. Si lleva más días, se reanuda cada día."
+                }
               />
-            ) : (
-            <OpsActivityForm
-              key={`${kind}-${effectiveCharge ?? "none"}-${despachoOnly ? headcount : "x"}`}
-              tone="core"
-              coreKind={kind ?? undefined}
-              assignmentCharge={effectiveCharge ?? undefined}
-              initialResponsableId={userId}
-              extraTeamIds={extraIds}
-              hideResponsableSelect
-              forcedProjectMode={kindMeta.projectMode}
-              hideProjectModePicker
-              forcedTicketType={kindMeta.ticketType}
-              forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
-              requireSchedule={Boolean(kindMeta.requiresSchedule)}
-              onCancel={() => router.push(`/erp/pizarra/${userId}`)}
-              onSuccess={handleSuccess}
-            />
-            )}
-          </section>
-        </>
-      ) : bridgeNeeded ? null : kindMeta && chargeReady && !planValido ? (
-        <p style={nextHint}>Indica el tiempo estimado para continuar.</p>
-      ) : kindMeta && offerCharge && !charge ? (
-        <p style={nextHint}>Elige si la hace {nombreCorto} o si la reparte a su equipo para continuar.</p>
-      ) : person ? (
-        <p style={nextHint}>Elige un tipo para continuar.</p>
-      ) : null}
+              {!planValido ? (
+                <p className={a.faltaTiempo} role="status">
+                  Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede.
+                </p>
+              ) : null}
+            </FormSection>
+          ) : null}
+
+          {kindMeta && !bridgeNeeded && chargeReady && planValido ? (
+            <>
+              {!despachoOnly && !ejecucionOnly ? (
+                <FormSection
+                  id={ID_PASO.equipo}
+                  step={paso("equipo")}
+                  done={extraIds.length > 0}
+                  title={effectiveCharge === "despacho" ? "¿Quién la hace?" : "¿Alguien más ayuda?"}
+                  description={
+                    effectiveCharge === "despacho"
+                      ? kind === "proyecto"
+                        ? `Puedes sumar instaladores y soporte. Si mezclas a los dos equipos, también se avisa al otro encargado (por ejemplo Antonio), además de ${nombreCorto}.`
+                        : `Suma a quien la hará con ${nombreCorto}. Si no eliges a nadie, ${nombreCorto} la reparte después.`
+                      : kind === "servicio" && isServicioBridgeEmail(person?.email)
+                        ? "Suma a Carolina o Alejandro (el día y la hora van en el formulario)."
+                        : kind === "servicio"
+                          ? "Solo soporte (Antonio, Carolina, Alejandro)."
+                          : kind === "obra"
+                            ? "Solo instaladores de campo (Joan, Israel, Juan José)."
+                            : kind === "proyecto"
+                              ? "Soporte e instaladores pueden colaborar. Si hay gente de los dos lados, se avisa a los dos encargados."
+                              : effectiveCharge === "ejecucion"
+                                ? `${nombreCorto} la hace. Si quieres, suma a alguien de apoyo.`
+                                : `${nombreCorto} queda como responsable. Si quieres, suma a alguien de apoyo.`
+                  }
+                  actions={
+                    effectiveCharge === "despacho" ? undefined : (
+                      <Badge tone="outline" size="sm">
+                        Opcional
+                      </Badge>
+                    )
+                  }
+                >
+                  <div className={c.pila}>
+                    {autoPeerCoordinators.length > 0 ? (
+                      <Alert tone="info" role="status" title="Se suman encargados:">
+                        {" "}
+                        además de {nombreCorto}, también se avisará a{" "}
+                        {autoPeerCoordinators.map((u) => shortName(u.nombre)).join(", ")} para coordinar (hay gente de
+                        instalación y de soporte).
+                      </Alert>
+                    ) : null}
+                    {teamForExtras.length === 0 ? (
+                      <p className={c.pista}>No hay más personas disponibles para sumar ahora.</p>
+                    ) : (
+                      <>
+                        <div className={a.personas} role="group" aria-label="Personas para sumar">
+                          {teamForExtras.map((u) => (
+                            <OpcionPersona
+                              key={u.id}
+                              selected={extraIds.includes(u.id)}
+                              onClick={() => toggleExtra(u.id)}
+                              nombre={u.nombre}
+                              nombreCorto={shortName(u.nombre)}
+                              avatarUrl={u.avatarUrl}
+                            />
+                          ))}
+                        </div>
+                        {extraIds.length > 0 ? (
+                          <div className={a.indicaciones}>
+                            <Field label={`Indicaciones para ${nombreCorto} (responsable)`} optional fullWidth>
+                              <Textarea
+                                value={leadNotes}
+                                onChange={(e) => setLeadNotes(e.target.value)}
+                                rows={2}
+                                placeholder={`Qué debe hacer ${nombreCorto}…`}
+                              />
+                            </Field>
+                            {extraIds.map((id) => {
+                              const u = teamForExtras.find((x) => x.id === id);
+                              if (!u) return null;
+                              return (
+                                <Field key={id} label={`Indicaciones para ${shortName(u.nombre)}`} optional fullWidth>
+                                  <Textarea
+                                    value={extraNotes[id] ?? ""}
+                                    onChange={(e) =>
+                                      setExtraNotes((prev) => ({ ...prev, [id]: e.target.value }))
+                                    }
+                                    rows={2}
+                                    placeholder="Qué debe hacer esta persona…"
+                                  />
+                                </Field>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </FormSection>
+              ) : null}
+
+              <FormSection
+                id={ID_PASO.datos}
+                step={paso("datos")}
+                title={
+                  <span className={a.tituloDatos}>
+                    <ActivityKindIcon kind={kindMeta.icon} size={18} />
+                    <span>
+                      {kindMeta.title}
+                      {effectiveCharge ? ` · ${CHARGE_LABEL[effectiveCharge]}` : ""}
+                      {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
+                    </span>
+                  </span>
+                }
+                description="Título, lugar, día y hora. Al guardar, se suma al equipo y vuelves a su ficha."
+              >
+                {pendiente ? (
+                  <EquipoPendienteBox
+                    activityId={pendiente.activityId}
+                    sumando={sumando}
+                    error={teamError}
+                    onRetry={reintentarEquipo}
+                  />
+                ) : (
+                  <OpsActivityForm
+                    key={`${kind}-${effectiveCharge ?? "none"}-${despachoOnly ? headcount : "x"}`}
+                    tone="core"
+                    coreKind={kind ?? undefined}
+                    assignmentCharge={effectiveCharge ?? undefined}
+                    initialResponsableId={userId}
+                    extraTeamIds={extraIds}
+                    hideResponsableSelect
+                    forcedProjectMode={kindMeta.projectMode}
+                    hideProjectModePicker
+                    forcedTicketType={kindMeta.ticketType}
+                    forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
+                    requireSchedule={Boolean(kindMeta.requiresSchedule)}
+                    onCancel={() => router.push(`/erp/pizarra/${userId}`)}
+                    onSuccess={handleSuccess}
+                  />
+                )}
+              </FormSection>
+            </>
+          ) : bridgeNeeded ? null : kindMeta && chargeReady && !planValido ? (
+            <p className={a.siguiente}>Indica el tiempo estimado para continuar.</p>
+          ) : kindMeta && offerCharge && !charge ? (
+            <p className={a.siguiente}>Elige si la hace {nombreCorto} o si la reparte a su equipo para continuar.</p>
+          ) : person ? (
+            <p className={a.siguiente}>Elige un tipo para continuar.</p>
+          ) : null}
+        </div>
+
+        <aside className={a.lateral} aria-label="Avance de la asignación">
+          <PendingList items={pendientes} title="Para asignar" allDoneLabel="Lista para guardar" />
+        </aside>
+      </div>
     </div>
   );
 }

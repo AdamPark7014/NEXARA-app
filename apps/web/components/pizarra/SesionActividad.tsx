@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useId, useState } from "react";
 import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import CheckIcon from "@mui/icons-material/Check";
+import { Alert, Button, Textarea } from "@/components/base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { formatApiError } from "@/lib/erp-api";
 import {
@@ -18,50 +19,8 @@ import {
   textoPausa,
   type SesionActividad,
 } from "@/lib/sesion-actividad";
-
-const btn: CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  fontWeight: 650,
-  fontSize: 13,
-  padding: "8px 12px",
-  minHeight: 40,
-  borderRadius: 10,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-};
-
-const btnOk: CSSProperties = {
-  ...btn,
-  border: "none",
-  background: "#16a34a",
-  color: "#fff",
-  fontWeight: 700,
-};
-
-const btnPrimary: CSSProperties = {
-  ...btn,
-  border: "none",
-  background: "var(--primary)",
-  color: "#fff",
-  fontWeight: 750,
-};
-
-const input: CSSProperties = {
-  padding: "10px 12px",
-  minHeight: 64,
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  fontSize: 16,
-  fontFamily: "inherit",
-  background: "var(--surface)",
-  color: "inherit",
-  resize: "vertical",
-};
+import c from "./comun.module.css";
+import s from "./SesionActividad.module.css";
 
 function hora(iso?: string | null): string | null {
   if (!iso) return null;
@@ -110,39 +69,33 @@ export function SesionPropia({
 
   if (puedeReanudar(actividad)) {
     return (
-      <div
-        role="note"
-        style={{
-          display: "grid",
-          gap: 8,
-          padding: "10px 14px",
-          borderRadius: 12,
-          border: "1px solid color-mix(in srgb, #d97706 35%, var(--border))",
-          background: "color-mix(in srgb, #d97706 8%, var(--surface))",
-        }}
-      >
-        <div style={{ fontSize: 13, lineHeight: 1.45 }}>
-          <strong style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <PauseCircleOutlineIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-            En pausa
-          </strong>{" "}
-          {textoPausa(actividad, { miId, propia: true })}
-        </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            type="button"
-            style={{ ...btnOk, opacity: guardando ? 0.7 : 1 }}
-            disabled={guardando}
-            onClick={() => void correr(() => reanudarMiActividad(token, activityId), "No se pudo reanudar la actividad")}
-          >
-            <PlayCircleOutlineIcon aria-hidden="true" sx={{ fontSize: 17 }} />
-            {guardando ? "Reanudando…" : "Reanudar actividad"}
-          </button>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+      <div className={c.pila}>
+        <Alert
+          tone="warning"
+          icon={<PauseCircleOutlineIcon />}
+          title="En pausa"
+          action={
+            <Button
+              variant="primary"
+              className={c.tap}
+              iconStart={<PlayCircleOutlineIcon />}
+              loading={guardando}
+              onClick={() => void correr(() => reanudarMiActividad(token, activityId), "No se pudo reanudar la actividad")}
+            >
+              {guardando ? "Reanudando…" : "Reanudar actividad"}
+            </Button>
+          }
+        >
+          <span className={s.texto}>{textoPausa(actividad, { miId, propia: true })}</span>
+          <span className={s.ayuda}>
             Tu reloj vuelve a correr. Se detiene al pausar, al checar salida, a las 12 h o al terminar el día.
           </span>
-        </div>
-        {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 12.5 }}>{error}</p> : null}
+        </Alert>
+        {error ? (
+          <p className={c.error} role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -151,12 +104,12 @@ export function SesionPropia({
 
   const desde = hora(actividad.sesionAbiertaDesde);
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <button
-          type="button"
-          style={{ ...btn, opacity: guardando ? 0.7 : 1 }}
-          disabled={guardando}
+    <div className={c.pila}>
+      <div className={c.fila}>
+        <Button
+          className={c.tap}
+          iconStart={<PauseCircleOutlineIcon />}
+          loading={guardando}
           onClick={() =>
             setConfirm({
               title: "Pausar actividad",
@@ -168,14 +121,18 @@ export function SesionPropia({
             })
           }
         >
-          <PauseCircleOutlineIcon aria-hidden="true" sx={{ fontSize: 17 }} />
           {guardando ? "Pausando…" : "Pausar"}
-        </button>
-        <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+        </Button>
+        <span className={s.corriendo}>
+          <span className={s.punto} aria-hidden="true" />
           {desde ? `Reloj corriendo desde las ${desde}.` : "Reloj corriendo."}
         </span>
       </div>
-      {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 12.5 }}>{error}</p> : null}
+      {error ? (
+        <p className={c.error} role="alert">
+          {error}
+        </p>
+      ) : null}
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} danger={false} />
     </div>
   );
@@ -205,6 +162,8 @@ export function PausarDeEquipo({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const campoId = useId();
+  const ayudaId = useId();
 
   const guardar = async () => {
     const invalido = errorMotivoPausa(motivo);
@@ -228,72 +187,64 @@ export function PausarDeEquipo({
   };
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <div className={c.pila}>
       {!open ? (
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            type="button"
-            style={btn}
+        <div className={c.fila}>
+          <Button
+            className={c.tap}
+            iconStart={<PauseCircleOutlineIcon />}
             onClick={() => {
               setOpen(true);
               setOk(null);
               setError(null);
             }}
           >
-            <PauseCircleOutlineIcon aria-hidden="true" sx={{ fontSize: 17 }} />
             Pausar
-          </button>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-            Detiene su reloj para que atienda otra cosa; la actividad sigue abierta.
-          </span>
+          </Button>
+          <span className={c.pista}>Detiene su reloj para que atienda otra cosa; la actividad sigue abierta.</span>
         </div>
       ) : null}
       {ok && !open ? (
-        <div style={{ fontSize: 12.5, color: "#15803d", display: "flex", alignItems: "center", gap: 5 }}>
-          <CheckIcon aria-hidden="true" sx={{ fontSize: 15 }} />
+        <p className={c.ok} role="status">
+          <CheckIcon aria-hidden="true" />
           <span>{ok}</span>
-        </div>
+        </p>
       ) : null}
       {open ? (
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            padding: 12,
-            borderRadius: 12,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-          <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-            ¿Por qué la pausas? *
-            <textarea
+        <div className={c.panel}>
+          <div className={s.campo}>
+            <label className={s.etiqueta} htmlFor={campoId}>
+              ¿Por qué la pausas? <span className={s.req}>*</span>
+            </label>
+            <Textarea
+              id={campoId}
               autoFocus
               rows={2}
               maxLength={MOTIVO_PAUSA_MAX}
               value={motivo}
+              invalid={Boolean(error)}
+              aria-describedby={ayudaId}
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Ej. Salió una falla urgente en el cliente; que la atienda primero."
-              style={input}
             />
-            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontWeight: 500 }}>
-              {Math.min(motivo.trim().length, MOTIVO_PAUSA_MIN)}/{MOTIVO_PAUSA_MIN} caracteres mínimo · la persona lo
-              ve en su aviso.
-            </span>
-          </label>
-          {error ? <div style={{ fontSize: 12.5, color: "#b91c1c" }}>{error}</div> : null}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => void guardar()}
-              disabled={saving}
-              style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}
-            >
-              {saving ? "Pausando…" : "Pausar actividad"}
-            </button>
-            <button type="button" onClick={() => setOpen(false)} disabled={saving} style={btn}>
+            {error ? (
+              <span id={ayudaId} className={c.error} role="alert">
+                {error}
+              </span>
+            ) : (
+              <span id={ayudaId} className={c.pista}>
+                {Math.min(motivo.trim().length, MOTIVO_PAUSA_MIN)}/{MOTIVO_PAUSA_MIN} caracteres mínimo · la persona lo
+                ve en su aviso.
+              </span>
+            )}
+          </div>
+          <div className={s.botones}>
+            <Button variant="ghost" className={c.tap} onClick={() => setOpen(false)} disabled={saving}>
               Cancelar
-            </button>
+            </Button>
+            <Button variant="primary" className={c.tap} loading={saving} onClick={() => void guardar()}>
+              {saving ? "Pausando…" : "Pausar actividad"}
+            </Button>
           </div>
         </div>
       ) : null}

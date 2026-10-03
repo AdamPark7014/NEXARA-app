@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
+import { FormSection, PageHead, SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import {
   ACTIVITY_KINDS,
@@ -11,11 +13,14 @@ import {
   type ActivityKind,
 } from "@/lib/activity-kinds";
 import { resolveV2RoleKey } from "@/lib/user-access";
-import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
-import { IconLabel } from "@/components/ui/IconBadge";
+import { OpcionTarjeta, RejillaOpciones } from "@/components/pizarra/Opciones";
+import s from "./nueva.module.css";
 
-const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), { ssr: false });
+const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), {
+  ssr: false,
+  loading: () => <SkeletonRows rows={3} label="Cargando formulario" />,
+});
 
 /** Cualquier persona del equipo: auto-asignarse una actividad (solo a sí misma, ejecución directa). */
 export default function AutoAsignarmePage() {
@@ -43,113 +48,80 @@ export default function AutoAsignarmePage() {
   const back = () => router.push("/erp/pizarra?vista=mias");
 
   if (!user) {
-    return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
+    return (
+      <div className={s.pagina}>
+        <SkeletonRows rows={4} label="Cargando" />
+      </div>
+    );
   }
 
   const kindMeta = kind ? metaForKind(kind) : null;
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
-      <button
-        type="button"
-        onClick={back}
-        style={{
-          alignSelf: "flex-start",
-          border: "none",
-          background: "transparent",
-          color: "var(--text-secondary)",
-          fontWeight: 650,
-          fontSize: 13,
-          cursor: "pointer",
-          padding: 0,
-          fontFamily: "inherit",
-        }}
-      >
-        ← Volver a Mis actividades
-      </button>
+    <div className={s.pagina}>
+      <PageHead
+        breadcrumbs={[
+          { label: "Actividades", href: "/erp/pizarra" },
+          { label: "Mis actividades", href: "/erp/pizarra?vista=mias" },
+          { label: "Auto-asignarme" },
+        ]}
+        back={{ href: "/erp/pizarra?vista=mias", label: "Volver a Mis actividades" }}
+        icon={<PanToolOutlinedIcon />}
+        title="Auto-asignarme una actividad"
+        description="Queda solo a tu nombre, como ejecución directa. Ponle día, hora y cuánto te va a tomar; después la acomodas en tu cola."
+      />
 
-      <header
-        style={{
-          padding: 18,
-          borderRadius: 20,
-          border: "1px solid var(--border)",
-          background: "color-mix(in srgb, var(--primary) 6%, var(--surface))",
-        }}
-      >
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
-          <IconLabel icon={PanToolOutlinedIcon} size={22} gap={8} iconColor="var(--primary)">
-            Auto-asignarme una actividad
-          </IconLabel>
-        </h1>
-        <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-          Queda solo a tu nombre, como ejecución directa. Ponle día, hora y cuánto te va a tomar; después la acomodas
-          en tu cola.
-        </p>
-      </header>
+      <div className={s.pasos}>
+        <FormSection step={1} done={Boolean(kind)} title="¿Qué tipo de actividad es?">
+          <RejillaOpciones ariaLabel="Tipo de actividad">
+            {allowedKinds.map((id) => {
+              const opt = ACTIVITY_KINDS[id];
+              return (
+                <OpcionTarjeta
+                  key={id}
+                  selected={kind === id}
+                  onClick={() => setKind(id)}
+                  icon={<ActivityKindIcon kind={opt.icon} variant="badge" size={36} />}
+                  title={opt.title}
+                  help={opt.help}
+                />
+              );
+            })}
+          </RejillaOpciones>
+        </FormSection>
 
-      <section>
-        <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-          1 · ¿Qué tipo de actividad es?
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-          {allowedKinds.map((id) => {
-            const opt = ACTIVITY_KINDS[id];
-            const selected = kind === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setKind(id)}
-                style={{
-                  textAlign: "left",
-                  padding: "14px 12px",
-                  borderRadius: 16,
-                  border: selected ? "2px solid var(--primary)" : "1px solid var(--border)",
-                  background: selected ? "color-mix(in srgb, var(--primary) 10%, var(--surface))" : "var(--surface)",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  color: "inherit",
-                  minHeight: 100,
-                }}
-              >
-                <ActivityKindIcon kind={opt.icon} variant="badge" size={36} />
-                <div style={{ marginTop: 8, fontWeight: 800, fontSize: 14 }}>{opt.title}</div>
-                <div style={{ marginTop: 4, fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.35 }}>
-                  {opt.help}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {kindMeta && kind ? (
-        <section
-          style={{ padding: 16, borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface)" }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 12, color: "var(--text-secondary)" }}>
-            2 · <ActivityKindIcon kind={kindMeta.icon} size={16} /> {kindMeta.title} · para ti
-          </div>
-          <OpsActivityForm
-            key={kind}
-            tone="core"
-            coreKind={kind}
-            assignmentCharge="ejecucion"
-            selfAssign
-            initialResponsableId={Number(user.id)}
-            hideResponsableSelect
-            forcedProjectMode={kindMeta.projectMode}
-            hideProjectModePicker
-            forcedTicketType={kindMeta.ticketType}
-            forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
-            requireSchedule={Boolean(kindMeta.requiresSchedule)}
-            onCancel={back}
-            onSuccess={(id) => router.push(`/erp/pizarra?vista=mias&nueva=${id}`)}
-          />
-        </section>
-      ) : (
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>Elige un tipo para continuar.</p>
-      )}
+        {kindMeta && kind ? (
+          <FormSection
+            step={2}
+            title={
+              <span className={s.titulo}>
+                <ActivityKindIcon kind={kindMeta.icon} size={18} />
+                <span>{kindMeta.title} · para ti</span>
+              </span>
+            }
+            description="Título, lugar, día y hora. Al guardar vuelves a tu cola con la actividad resaltada."
+          >
+            <OpsActivityForm
+              key={kind}
+              tone="core"
+              coreKind={kind}
+              assignmentCharge="ejecucion"
+              selfAssign
+              initialResponsableId={Number(user.id)}
+              hideResponsableSelect
+              forcedProjectMode={kindMeta.projectMode}
+              hideProjectModePicker
+              forcedTicketType={kindMeta.ticketType}
+              forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
+              requireSchedule={Boolean(kindMeta.requiresSchedule)}
+              onCancel={back}
+              onSuccess={(id) => router.push(`/erp/pizarra?vista=mias&nueva=${id}`)}
+            />
+          </FormSection>
+        ) : (
+          <p className={s.siguiente}>Elige un tipo para continuar.</p>
+        )}
+      </div>
     </div>
   );
 }

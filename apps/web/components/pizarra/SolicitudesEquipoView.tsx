@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
-import { Alert, Button, EmptyState, SkeletonRows } from "@/components/base";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import CheckIcon from "@mui/icons-material/Check";
+import { Alert, Button, EmptyState, Input, Select, SkeletonRows, StatusBadge, Textarea, type Tone } from "@/components/base";
 import PersonaPhotoCard from "@/components/pizarra/PersonaPhotoCard";
 import { formatApiError } from "@/lib/erp-api";
 import {
@@ -28,7 +29,7 @@ function estadoLabel(estado: PeerRequestItem["status"]): string {
  * acción o algo salió mal. Una solicitud que yo envié y sigue pendiente no me
  * pide nada; una que me llegó, sí.
  */
-function estadoTono(estado: PeerRequestItem["status"], lado: "recibida" | "enviada"): StatusTone {
+function estadoTono(estado: PeerRequestItem["status"], lado: "recibida" | "enviada"): Tone {
   if (estado === "ACCEPTED") return "success";
   if (estado === "REJECTED") return "danger";
   return lado === "recibida" ? "warning" : "neutral";
@@ -172,7 +173,7 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
 
   const meta = (r: PeerRequestItem, lado: "recibida" | "enviada") => (
     <div className={s.bloqueMeta}>
-      <StatusDot label={estadoLabel(r.status)} tone={estadoTono(r.status, lado)} />
+      <StatusBadge size="sm" label={estadoLabel(r.status)} tone={estadoTono(r.status, lado)} />
       <span className={s.pista}>
         {lado === "recibida" ? "Te la pidieron" : "La enviaste"} el {fechaCorta(r.createdAt)}
         {r.activity ? ` · ${r.activity.anNumber}` : ""}
@@ -186,7 +187,7 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
     if (rechazando !== r.id) {
       return (
         <>
-          <Button onClick={() => void onAccept(r.id)} disabled={busyId === r.id}>
+          <Button variant="tonal" iconStart={<CheckIcon />} onClick={() => void onAccept(r.id)} disabled={busyId === r.id}>
             Aceptar
           </Button>
           <Button
@@ -208,10 +209,10 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
         <label className={s.etiqueta} htmlFor={`motivo-${r.id}`}>
           Motivo del rechazo
         </label>
-        <input
+        <Input
           id={`motivo-${r.id}`}
-          className={s.control}
           autoFocus
+          invalid={corto}
           value={rejectDraft[r.id] ?? ""}
           onChange={(e) => setRejectDraft((d) => ({ ...d, [r.id]: e.target.value }))}
           aria-describedby={corto ? `motivo-msg-${r.id}` : undefined}
@@ -272,10 +273,10 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
               <label className={s.etiqueta} htmlFor="solicitud-para">
                 Para quién
               </label>
-              <select
+              <Select
                 id="solicitud-para"
                 ref={paraQuienRef}
-                className={s.control}
+                invalid={Boolean(errPersona)}
                 value={toUserId}
                 onChange={(e) => setToUserId(e.target.value)}
                 disabled={!token || cargandoCompaneros}
@@ -288,7 +289,7 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
                     {p.puesto ? ` · ${p.puesto}` : ""}
                   </option>
                 ))}
-              </select>
+              </Select>
               <span
                 id="solicitud-para-msg"
                 className={errPersona ? s.error : s.pista}
@@ -302,10 +303,10 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
               <label className={s.etiqueta} htmlFor="solicitud-titulo">
                 ¿Qué actividad le pides?
               </label>
-              <input
+              <Input
                 id="solicitud-titulo"
                 ref={tituloRef}
-                className={s.control}
+                invalid={Boolean(errTitulo)}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Apoyo en instalación de cámara"
@@ -323,9 +324,8 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
                 Detalle
                 <span className={s.opcional}> · opcional</span>
               </label>
-              <textarea
+              <Textarea
                 id="solicitud-detalle"
-                className={s.control}
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -346,7 +346,13 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
                 {formMsg.text}
               </span>
             ) : null}
-            <Button variant="primary" onClick={() => void onCreate()} disabled={!token || enviando}>
+            <Button
+              variant="primary"
+              iconStart={<SendOutlinedIcon />}
+              loading={enviando}
+              onClick={() => void onCreate()}
+              disabled={!token}
+            >
               {enviando ? "Enviando…" : "Enviar solicitud"}
             </Button>
           </div>

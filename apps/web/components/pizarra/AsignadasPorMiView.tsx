@@ -1,11 +1,40 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
-import PersonaPhotoCard from "@/components/pizarra/PersonaPhotoCard";
-import { formatApiError } from "@/lib/erp-api";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+import TimerOffOutlinedIcon from "@mui/icons-material/TimerOffOutlined";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import CloseIcon from "@mui/icons-material/Close";
 import {
-  SEMAFORO_COLORS,
+  Alert,
+  Button,
+  ButtonLink,
+  Card,
+  DataTable,
+  EmptyState,
+  FilterChip,
+  FilterChips,
+  ListFooter,
+  ModuleToolbar,
+  PersonCell,
+  ProgressCell,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  StatusBadge,
+  WhenCell,
+  type Column,
+} from "@/components/base";
+import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
+import { PrioridadChip, SemaforoBadge } from "@/components/pizarra/PizarraKpi";
+import { formatApiError } from "@/lib/erp-api";
+import { kindIcon, kindLabel } from "@/lib/activity-labels";
+import {
   SEMAFORO_LABELS,
   fetchAsignadasPorMi,
   formatMinutes,
@@ -13,6 +42,9 @@ import {
   type BoardRange,
   type Semaforo,
 } from "@/lib/team-board-api";
+import { SEMAFORO_TONE } from "./tonos";
+import c from "./comun.module.css";
+import s from "./AsignadasPorMiView.module.css";
 
 function fecha(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -24,27 +56,7 @@ function fecha(iso: string | null | undefined): string {
 type SemaforoFilter = "todos" | Semaforo;
 type TriFilter = "todos" | "si" | "no";
 
-const chipBase: CSSProperties = {
-  minHeight: 36,
-  padding: "6px 12px",
-  borderRadius: 999,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "var(--text-secondary)",
-  fontSize: 13,
-  fontWeight: 650,
-  cursor: "pointer",
-};
-
-function chipOn(active: boolean, accent?: string): CSSProperties {
-  if (!active) return chipBase;
-  return {
-    ...chipBase,
-    borderColor: accent || "var(--primary)",
-    color: accent || "var(--primary)",
-    background: `color-mix(in srgb, ${accent || "var(--primary)"} 12%, var(--surface))`,
-  };
-}
+const SEMAFOROS: Semaforo[] = ["rojo", "amarillo", "verde"];
 
 /** Filtra en cliente con campos que ya trae cada ítem (sin round-trip). */
 export function filtrarAsignadasPorMi(
@@ -67,21 +79,35 @@ export function filtrarAsignadasPorMi(
   });
 }
 
-/** Contrato C: lo que repartió quien mira, con foto grande unificada. */
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/** Contrato C: lo que repartió quien mira, en tabla con foto, avance y semáforo. */
 export default function AsignadasPorMiView({
   token,
   rango,
+  toolbarEnd,
 }: {
   token: string | null;
   rango: BoardRange;
+  /** Al final de la barra de la lista (p. ej. el selector de rango de la pizarra). */
+  toolbarEnd?: ReactNode;
 }) {
+  const router = useRouter();
   const [items, setItems] = useState<AsignadaPorMiItem[]>([]);
+  const [cargado, setCargado] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [semaforo, setSemaforo] = useState<SemaforoFilter>("todos");
   const [excedida, setExcedida] = useState<TriFilter>("todos");
   const [terminada, setTerminada] = useState<TriFilter>("todos");
   const [personaId, setPersonaId] = useState<number | null>(null);
+  const [busqueda, setBusqueda] = useState("");
   const desde = rango.desde ?? null;
   const hasta = rango.hasta ?? null;
 
@@ -96,9 +122,10 @@ export default function AsignadasPorMiView({
     try {
       const res = await fetchAsignadasPorMi(token, { desde, hasta });
       setItems(Array.isArray(res?.items) ? res.items : []);
+      setCargado(true);
     } catch (e) {
+      // Un fallo al refrescar no borra lo que ya se veía: solo se avisa.
       setError(formatApiError(e, "No se pudo cargar lo que asignaste"));
-      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -118,139 +145,321 @@ export default function AsignadasPorMiView({
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }, [items]);
 
-  const filtered = useMemo(
-    () => filtrarAsignadasPorMi(items, { semaforo, excedida, terminada, personaId }),
-    [items, semaforo, excedida, terminada, personaId],
+  const filtered = useMemo(() => {
+    const base = filtrarAsignadasPorMi(items, { semaforo, excedida, terminada, personaId });
+    const q = normalizar(busqueda);
+    if (!q) return base;
+    return base.filter((a) => normalizar(`${a.anNumber} ${a.titulo} ${a.persona.nombre}`).includes(q));
+  }, [items, semaforo, excedida, terminada, personaId, busqueda]);
+
+  const cuenta = useMemo(() => {
+    const porSemaforo: Record<Semaforo, number> = { rojo: 0, amarillo: 0, verde: 0 };
+    let excedidas = 0;
+    let terminadas = 0;
+    for (const a of items) {
+      if (a.semaforo in porSemaforo) porSemaforo[a.semaforo] += 1;
+      if (a.excedida) excedidas += 1;
+      if (a.terminada) terminadas += 1;
+    }
+    return { porSemaforo, excedidas, terminadas };
+  }, [items]);
+
+  const hayFiltro =
+    semaforo !== "todos" || excedida !== "todos" || terminada !== "todos" || personaId != null || busqueda.trim() !== "";
+  const quitarFiltros = () => {
+    setSemaforo("todos");
+    setExcedida("todos");
+    setTerminada("todos");
+    setPersonaId(null);
+    setBusqueda("");
+  };
+
+  const columnas: Column<AsignadaPorMiItem>[] = [
+    {
+      key: "actividad",
+      label: "Actividad",
+      render: (a) => (
+        <span className={s.actividad}>
+          <span className={s.tipo} aria-hidden="true">
+            <ActivityKindIcon kind={kindIcon(a)} size={18} />
+          </span>
+          <span className={s.actividadTexto}>
+            <span className={s.titulo}>{a.titulo}</span>
+            <span className={s.sub}>
+              <span className={c.folio}>{a.anNumber}</span> · {kindLabel(a)}
+            </span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "persona",
+      label: "Responsable",
+      width: 200,
+      render: (a) => (
+        <PersonCell
+          name={a.persona.nombre}
+          avatarUrl={a.persona.avatarUrl}
+          subtitle={a.retirado ? "Ya no está en el equipo" : a.persona.puesto ?? undefined}
+        />
+      ),
+    },
+    {
+      key: "cuando",
+      label: "Cuándo",
+      width: 150,
+      render: (a) => (
+        <WhenCell
+          time={`Asignada ${fecha(a.fechaAsignacion)}`}
+          hint={a.periodo?.etiqueta ?? (a.fechaMaxima ? `Vence ${fecha(a.fechaMaxima)}` : undefined)}
+          tone={SEMAFORO_TONE[a.semaforo] ?? "neutral"}
+        />
+      ),
+    },
+    {
+      key: "tiempo",
+      label: "Plan vs. real",
+      width: 170,
+      render: (a) =>
+        a.minutosPlan && a.minutosPlan > 0 ? (
+          <ProgressCell
+            value={Math.min(a.minutosReales ?? 0, a.minutosPlan)}
+            max={a.minutosPlan}
+            tone={a.excedida ? "danger" : a.terminada ? "success" : "brand"}
+            label={`${formatMinutes(a.minutosReales ?? 0)} / ${formatMinutes(a.minutosPlan)}`}
+            ariaLabel={`Real ${formatMinutes(a.minutosReales)} de ${formatMinutes(a.minutosPlan)} planeados`}
+            width={150}
+          />
+        ) : (
+          <span className={c.pista}>Sin plan</span>
+        ),
+    },
+    {
+      key: "estado",
+      label: "Estado",
+      width: 190,
+      render: (a) => (
+        <span className={s.estado}>
+          <StatusBadge size="sm" status={a.estatus} />
+          {a.terminada ? null : <SemaforoBadge semaforo={a.semaforo} />}
+          <PrioridadChip prioridad={a.prioridad} />
+          {a.excedida ? (
+            <StatusBadge size="sm" tone="danger" label="Excedida" dot={false} />
+          ) : null}
+        </span>
+      ),
+    },
+  ];
+
+  const total = items.length;
+  const verde = cuenta.porSemaforo.verde;
+  const amarillo = cuenta.porSemaforo.amarillo;
+  const rojo = cuenta.porSemaforo.rojo;
+
+  const barra = (
+    <ModuleToolbar
+      search={
+        <SearchInput
+          placeholder="Buscar folio, actividad o persona"
+          aria-label="Buscar folio, actividad o persona"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+      }
+      chips={
+        <FilterChips ariaLabel="Filtros de asignadas">
+          <FilterChip active={semaforo === "todos"} count={total} onClick={() => setSemaforo("todos")}>
+            Todas
+          </FilterChip>
+          {SEMAFOROS.map((sem) => (
+            <FilterChip
+              key={sem}
+              active={semaforo === sem}
+              count={cuenta.porSemaforo[sem]}
+              dot={SEMAFORO_TONE[sem]}
+              onClick={() => setSemaforo(semaforo === sem ? "todos" : sem)}
+            >
+              {SEMAFORO_LABELS[sem]}
+            </FilterChip>
+          ))}
+          <FilterChip
+            active={excedida === "si"}
+            count={cuenta.excedidas}
+            onClick={() => setExcedida((v) => (v === "si" ? "todos" : "si"))}
+          >
+            Excedida
+          </FilterChip>
+          <FilterChip
+            active={terminada === "si"}
+            count={cuenta.terminadas}
+            onClick={() => setTerminada((v) => (v === "si" ? "todos" : "si"))}
+          >
+            Terminada
+          </FilterChip>
+        </FilterChips>
+      }
+      end={
+        <>
+          {personas.length > 1 ? (
+            <Select
+              aria-label="Persona"
+              controlSize="sm"
+              iconStart={<PersonOutlineIcon />}
+              value={personaId ?? ""}
+              onChange={(e) => setPersonaId(e.target.value ? Number(e.target.value) : null)}
+              wrapperClassName={s.persona}
+            >
+              <option value="">Todas las personas</option>
+              {personas.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </Select>
+          ) : null}
+          {toolbarEnd}
+        </>
+      }
+    />
   );
 
-  if (loading && items.length === 0) {
-    return <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>Cargando…</p>;
-  }
-  if (error) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <p style={{ color: "#dc2626", fontSize: 14, margin: 0 }}>{error}</p>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          style={{
-            minHeight: 32,
-            padding: "4px 12px",
-            borderRadius: 8,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            color: "var(--text-secondary)",
-            fontSize: 13,
-            fontWeight: 650,
-            cursor: loading ? "default" : "pointer",
-          }}
-        >
-          {loading ? "Reintentando…" : "Reintentar"}
-        </button>
+  let contenido: ReactNode;
+  if (loading && !cargado) {
+    contenido = (
+      <div className={s.relleno}>
+        <SkeletonRows rows={5} label="Cargando lo que asignaste" />
       </div>
     );
-  }
-  if (items.length === 0) {
-    return (
-      <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
-        No asignaste actividades en este rango.
-      </p>
+  } else if (error && !cargado) {
+    contenido = (
+      <div className={s.relleno}>
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" className={c.tap} onClick={() => void load()} loading={loading}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      </div>
+    );
+  } else if (total === 0) {
+    contenido = (
+      <EmptyState
+        icon={<OutboxOutlinedIcon />}
+        tone="neutral"
+        titleAs="h2"
+        title="No asignaste actividades en este rango"
+        description="Cuando le asignes algo a tu equipo, aquí ves cómo va cada persona. Prueba con otro rango de fechas."
+      />
+    );
+  } else {
+    contenido = (
+      <DataTable
+        columns={columnas}
+        rows={filtered}
+        rowKey={(a) => `${a.id}-${a.persona.id}`}
+        onRowClick={(a) => router.push(`/erp/actividades/${a.id}`)}
+        rowActions={(a) => (
+          <ButtonLink
+            href={`/erp/pizarra/${a.persona.id}`}
+            size="sm"
+            variant="ghost"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Ver la ficha de ${a.persona.nombre}`}
+          >
+            Ver ficha
+          </ButtonLink>
+        )}
+        rowActionsLabel="Acciones"
+        flush
+        ariaLabel="Actividades que asignaste"
+        emptyTitle="Ninguna asignación coincide con estos filtros"
+        emptyAction={
+          hayFiltro ? (
+            <Button size="sm" iconStart={<CloseIcon />} onClick={quitarFiltros}>
+              Quitar filtros
+            </Button>
+          ) : undefined
+        }
+      />
     );
   }
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <div
-        role="toolbar"
-        aria-label="Filtros de asignadas"
-        style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}
-      >
-        <button type="button" style={chipOn(semaforo === "todos")} onClick={() => setSemaforo("todos")}>
-          Todos
-        </button>
-        {(Object.keys(SEMAFORO_LABELS) as Semaforo[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            style={chipOn(semaforo === s, SEMAFORO_COLORS[s])}
-            onClick={() => setSemaforo(s)}
-          >
-            {SEMAFORO_LABELS[s]}
-          </button>
-        ))}
-        <span style={{ width: 1, height: 22, background: "var(--border)", margin: "0 2px" }} aria-hidden />
-        <button
-          type="button"
-          style={chipOn(excedida === "si", "var(--danger)")}
-          onClick={() => setExcedida((v) => (v === "si" ? "todos" : "si"))}
-        >
-          Excedida
-        </button>
-        <button
-          type="button"
-          style={chipOn(terminada === "si", "var(--success)")}
-          onClick={() => setTerminada((v) => (v === "si" ? "todos" : "si"))}
-        >
-          Terminada
-        </button>
-        {personas.length > 1 ? (
-          <>
-            <span style={{ width: 1, height: 22, background: "var(--border)", margin: "0 2px" }} aria-hidden />
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              <span style={{ color: "var(--text-secondary)" }}>Persona</span>
-              <select
-                value={personaId ?? ""}
-                onChange={(e) => setPersonaId(e.target.value ? Number(e.target.value) : null)}
-                style={{ minHeight: 36, fontSize: 14, borderRadius: 10, border: "1px solid var(--border)", padding: "4px 8px" }}
-              >
-                <option value="">Todas</option>
-                {personas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
-        ) : null}
-        <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginLeft: "auto" }}>
-          {filtered.length} de {items.length}
-        </span>
-      </div>
+    <div className={s.vista}>
+      {total > 0 ? (
+        <StatRow cols={4} ariaLabel="Resumen de lo que asignaste">
+          <Stat
+            label="Asignadas"
+            value={total}
+            icon={<OutboxOutlinedIcon />}
+            meter={[
+              { value: verde, tone: "success", label: `${verde} en tiempo` },
+              { value: amarillo, tone: "warning", label: `${amarillo} por vencer` },
+              { value: rojo, tone: "danger", label: `${rojo} atrasadas` },
+            ]}
+            meterMax={total}
+          />
+          <Stat
+            label="Atrasadas"
+            value={rojo}
+            tone={rojo > 0 ? "danger" : "default"}
+            hint={amarillo > 0 ? `${amarillo} por vencer` : "ninguna por vencer"}
+            icon={<ReportProblemOutlinedIcon />}
+            iconTone={rojo > 0 ? "danger" : "neutral"}
+            semaforo={rojo > 0 ? "rojo" : amarillo > 0 ? "ambar" : "verde"}
+            onClick={() => setSemaforo(semaforo === "rojo" ? "todos" : "rojo")}
+            pressed={semaforo === "rojo"}
+          />
+          <Stat
+            label="Excedidas"
+            value={cuenta.excedidas}
+            tone={cuenta.excedidas > 0 ? "warning" : "default"}
+            hint="tardaron más que su plan"
+            icon={<TimerOffOutlinedIcon />}
+            iconTone={cuenta.excedidas > 0 ? "warning" : "neutral"}
+            onClick={() => setExcedida((v) => (v === "si" ? "todos" : "si"))}
+            pressed={excedida === "si"}
+          />
+          <Stat
+            label="Terminadas"
+            value={cuenta.terminadas}
+            suffix={`/ ${total}`}
+            tone={cuenta.terminadas > 0 ? "brand" : "default"}
+            hint="del rango elegido"
+            icon={<TaskAltIcon />}
+            iconTone="success"
+          />
+        </StatRow>
+      ) : null}
 
-      {filtered.length === 0 ? (
-        <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
-          Ninguna asignación coincide con estos filtros.
-        </p>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
-          {filtered.map((a) => (
-            <PersonaPhotoCard
-              key={`${a.id}-${a.persona.id}`}
-              href={`/erp/actividades/${a.id}`}
-              nombre={a.persona.nombre}
-              puesto={a.persona.puesto}
-              avatarUrl={a.persona.avatarUrl}
-              photoSize={88}
-              title={`${a.anNumber} · ${a.titulo}`}
-              subtitle={`${a.estatus} · Asignada ${fecha(a.fechaAsignacion)}`}
-              prioridad={a.prioridad}
-              semaforo={a.semaforo}
-              meta={
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span>Plan {formatMinutes(a.minutosPlan)}</span>
-                  <span>Real {formatMinutes(a.minutosReales)}</span>
-                  {a.excedida ? <span style={{ color: "var(--danger)" }}>Excedida</span> : null}
-                  <Link href={`/erp/pizarra/${a.persona.id}`} style={{ color: "inherit" }}>
-                    Ver ficha
-                  </Link>
-                </div>
-              }
-            />
-          ))}
-        </div>
-      )}
+      {error && cargado ? (
+        <Alert
+          tone="warning"
+          role="status"
+          action={
+            <Button size="sm" className={c.tap} onClick={() => void load()} loading={loading}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error}. Se muestra lo último que cargó.
+        </Alert>
+      ) : null}
+
+      <Card pad={false} className={s.lista}>
+        {barra}
+        {contenido}
+        {total > 0 ? (
+          <ListFooter>
+            {hayFiltro ? `${filtered.length} de ${total} asignaciones` : `${total} asignaci${total === 1 ? "ón" : "ones"}`}
+          </ListFooter>
+        ) : null}
+      </Card>
     </div>
   );
 }
