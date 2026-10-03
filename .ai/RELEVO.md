@@ -1,5 +1,16 @@
 # RELEVO
 
+- **03-10 09:45 (claude-code):** el deploy del rediseño (`c85edb8b`) **sí quedó en producción** (web y API
+  reiniciadas, mapa de cobertura nuevo responde 200). Después:
+  - **«Recordarme» no duraba**: el login sí pedía y recibía la sesión de 30 días, pero al recargar,
+    `syncProfile` (`UserContext.tsx`) rehacía al usuario con `auth/profile`, que no trae `remember` ni
+    `expiresAt`; la sesión quedaba como no recordada y `safePersistUser` borraba la copia de
+    localStorage (y bajaba `nx_session` a 1 día). Ahora conserva ambos de la sesión guardada. Prueba
+    `UserContext.remember.spec.tsx` (falla con el código anterior). Quien entró antes del arreglo debe
+    volver a entrar con la casilla marcada.
+  - **Organigrama**: Mónica García (id 5) no tenía jefe (`managerId` NULL → «Sin jefe», línea punteada).
+    En producción `managerId = 1` (Christian), igual que Daniela. Cambio solo de datos.
+
 - **Turno 03-10 (mañana, claude-code — rediseño v2, en paralelo con la sesión de dependencias):**
   **Etapas 5 y 6 terminadas** (commits locales; push y deploy al cierre de este turno):
   - `ba6b4cf9` primer tramo (préstamos/kits de herramientas, reabasto, recolección, recorrido, prioridad).

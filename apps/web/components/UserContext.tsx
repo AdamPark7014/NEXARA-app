@@ -400,10 +400,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				const profile = await response.json();
 				if (cancelled) return;
 
+				// El perfil trae a la persona, no a la sesión: «Recordarme» y la caducidad se
+				// conservan de la sesión guardada. Sin esto, la primera recarga dejaba la sesión
+				// como no recordada, `safePersistUser` borraba su copia de localStorage y al
+				// cerrar el navegador había que volver a entrar.
 				const normalizedProfile = normalizeUser({
 					...profile,
 					token: storedUser.token,
 					loginDevice: storedUser.loginDevice,
+					remember: storedUser.remember,
+					expiresAt: storedUser.expiresAt ?? null,
 				});
 
 				if (normalizedProfile) {
