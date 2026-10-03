@@ -73,7 +73,16 @@ export class ProyectosProfesionalController {
   }
 
   private actor(user: any) {
-    return { id: Number(user?.id), isSuperAdmin: Boolean(user?.isSuperAdmin) };
+    return {
+      id: Number(user?.id),
+      isSuperAdmin: Boolean(user?.isSuperAdmin),
+      // Lo que mira el padrón (`client-access.ts`) para decidir si al cliente se le suma «Proyecto».
+      email: user?.email ?? null,
+      roleKey: user?.roleKey ?? null,
+      orgRoleKey: user?.orgRoleKey ?? null,
+      role: user?.role ?? null,
+      permissions: Array.isArray(user?.permissions) ? user.permissions : [],
+    };
   }
 
   // ---------------------------------------------------------------------------

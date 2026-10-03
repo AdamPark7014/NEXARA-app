@@ -5,6 +5,8 @@ import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatus
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
 import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { canDeleteOrDeactivateClient, type ClientActor } from '../ventas/client-permissions.js';
+import { assertPuedeVerCliente, porQueNoSumaTipo, type ActorDelPadron } from '../ventas/client-access.js';
+import { sectoresDelCliente } from '../ventas/client-sectors.js';
 import { marcarClienteDeProyectoSinFallar } from './cliente-de-proyecto.js';
 import {
   esEstadoProyecto,
@@ -164,7 +166,11 @@ export class OperationalProjectsService {
     return { linked: results.length, results };
   }
 
-  async create(createDto: CreateOperationalProjectDto, userId: number) {
+  /**
+   * `actor` es `req.user` de quien crea: con él se decide si al cliente del padrón se le
+   * suma «Proyecto» (misma regla que la ficha). Sin actor, solo el id: no se le suma a nadie.
+   */
+  async create(createDto: CreateOperationalProjectDto, userId: number, actor?: ActorDelPadron) {
     // Si no eligen vendedor, el proyecto queda a nombre de quien lo crea.
     const vendor = await this.prisma.user.findUnique({
       where: { id: createDto.vendorId ?? userId },
@@ -227,8 +233,9 @@ export class OperationalProjectsService {
       },
     });
 
-    // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos).
-    await marcarClienteDeProyectoSinFallar(this.prisma, createDto.clientId, userId);
+    // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos),
+    // si quien crea puede sumarle el tipo; si no, lo suma coordinación desde la ficha.
+    await marcarClienteDeProyectoSinFallar(this.prisma, createDto.clientId, actor ?? { id: userId });
 
     // Si no vino ya enlazado desde CRM, crear espejo comercial automáticamente.
     if (!created.salesProjectId) {
@@ -247,7 +254,13 @@ export class OperationalProjectsService {
    * Proyecto mínimo para poder asignar la actividad o arrancarlo desde la ficha del
    * cliente: nombre y un cliente del padrón de la misma empresa. El responsable es quien
    * lo crea. Fechas, alcance y equipo quedan vacíos y se completan después en Proyectos.
-   * Si el cliente aún no era de tipo proyecto, `create` se lo suma: no se rechaza.
+   *
+   * El cliente se elige por su id del padrón, así que aplica la puerta de la ficha
+   * (`getClient`): un comercial ajeno no sirve de asidero. Si el cliente ya es de proyecto,
+   * no hace falta nada más. Si aún no lo es, abrirle un proyecto le suma el tipo y lo vuelve
+   * visible para toda la empresa: pide lo mismo que `addClientSector` (administrar el padrón
+   * y llevar el sector); si no puede, se rechaza en vez de dejar un proyecto sobre un cliente
+   * que no es de proyecto.
    */
   async quickCreate(dto: QuickCreateOperationalProjectDto, user: any, companyId?: number | null) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
@@ -256,8 +269,16 @@ export class OperationalProjectsService {
     const tenantId = requireCompanyId(companyId);
     const sales = await this.prisma.salesClient.findFirst({
       where: { id: dto.salesClientId, ...companyWhere(tenantId) },
+      include: { sectors: { select: { sector: true } } },
     });
     assertCompanyAccess(sales, tenantId, 'Cliente');
+    assertPuedeVerCliente(sales, user);
+    if (!sectoresDelCliente(sales).includes('PROYECTO')) {
+      const motivo = await porQueNoSumaTipo(this.prisma, sales, user, 'PROYECTO');
+      if (motivo) {
+        throw new ForbiddenException(`Este cliente aún no es cliente de proyecto. ${motivo}`);
+      }
+    }
     const serviceClientId = await this.ensureServiceClientForProject(sales, tenantId);
     return this.create(
       {
@@ -268,6 +289,7 @@ export class OperationalProjectsService {
         ...(dto.startDate ? { startDate: dto.startDate } : {}),
       },
       Number(user.id),
+      user,
     );
   }
 

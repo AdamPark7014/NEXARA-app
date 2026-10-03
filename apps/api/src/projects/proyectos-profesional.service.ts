@@ -378,8 +378,9 @@ export class ProyectosProfesionalService {
       include: detalleInclude,
     });
 
-    // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos).
-    await marcarClienteDeProyectoSinFallar(this.prisma, dto.clientId, actor.id);
+    // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos),
+    // si quien crea puede sumarle el tipo (misma regla que la ficha); si no, coordinación lo suma.
+    await marcarClienteDeProyectoSinFallar(this.prisma, dto.clientId, actor);
 
     return this.detalle(creado.id, tenantId);
   }

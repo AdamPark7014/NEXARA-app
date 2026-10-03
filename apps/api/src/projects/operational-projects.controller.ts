@@ -35,7 +35,7 @@ export class OperationalProjectsController {
   @Post()
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   create(@Body() createDto: CreateOperationalProjectDto, @CurrentUser() user: any) {
-    return this.operationalProjectsService.create(createDto, user.id);
+    return this.operationalProjectsService.create(createDto, user.id, user);
   }
 
   /**

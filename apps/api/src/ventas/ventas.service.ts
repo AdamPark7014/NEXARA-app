@@ -29,9 +29,7 @@ import { appUrls } from '../common/app-urls.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import {
-  canSeeClientesModule,
   clientSectorsForActor,
-  clientSectorsForEmail,
   filtroPorSector,
   isClientSector,
   nombreClienteLimpio,
@@ -50,6 +48,18 @@ import {
   isInactiveClientStatus,
   type ClientPermissions,
 } from './client-permissions.js';
+import {
+  assertPuedeUsarSectores,
+  assertPuedeVerCliente,
+  CLIENT_REUSE_FORBIDDEN,
+  esGerenteDeVentas,
+  esSuperAdmin,
+  gestionaElPadron,
+  puedeAbrirDelDueno,
+  puedeVerCliente,
+  tienePersonalACargo,
+  vePadronDeLaEmpresa as vePadronDe,
+} from './client-access.js';
 
 @Injectable()
 export class VentasService {
@@ -65,7 +75,7 @@ export class VentasService {
   ) {}
 
   private isSuperAdminUser(user?: any) {
-    return Boolean(user?.isSuperAdmin);
+    return esSuperAdmin(user);
   }
 
   private isConsoleAdminUser(user?: any) {
@@ -78,27 +88,14 @@ export class VentasService {
    * - SuperAdmin / Console admin / Sales team lead → team view
    * - v2 tier >= 70 (coord_ventas, coordinadores, directores, CEO) → team view
    * - Resto (vendedor, etc.) → solo sus propios registros
+   * La regla vive en `client-access.ts` (la comparte Proyectos).
    */
   private isSalesTeamManager(user?: any): boolean {
-    if (!user) return false;
-    if (this.isSuperAdminUser(user)) return true;
-    if (this.isConsoleAdminUser(user)) return true;
-    // v2 role check: coord_ventas y cualquier rol de tier >= 70
-    const V2_MANAGER_ROLES = new Set([
-      'ceo', 'dir_admin', 'dir_operaciones', 'arquitecto',
-      'coord_ventas', 'coord_operaciones', 'coord_admin',
-    ]);
-    if (user.roleKey && V2_MANAGER_ROLES.has(user.roleKey)) return true;
-    return false;
+    return esGerenteDeVentas(user);
   }
 
   private canAccessOwner(user: any, ownerId?: number | null) {
-    if (!ownerId) return true;
-    if (this.isSuperAdminUser(user)) return true;
-    if (this.isConsoleAdminUser(user)) return true;
-    if (this.isSalesTeamManager(user)) return true;
-    if (canSeeClientesModule(user?.email)) return true;
-    return user?.id === ownerId;
+    return puedeAbrirDelDueno(user, ownerId);
   }
 
   private clientInclude() {
@@ -112,26 +109,7 @@ export class VentasService {
   }
 
   private assertCanUseSectors(user: any, sectors: ClientSectorCode[]) {
-    if (this.isSuperAdminUser(user)) return;
-    const byEmail = clientSectorsForEmail(user?.email);
-    if (byEmail.length) {
-      for (const s of sectors) {
-        if (!byEmail.includes(s)) {
-          throw new ForbiddenException(`No puedes usar el sector ${s}`);
-        }
-      }
-      return;
-    }
-    if (this.isSalesTeamManager(user)) return;
-    const allowed = clientSectorsForActor(user);
-    if (!allowed.length) {
-      throw new ForbiddenException('No tienes acceso al módulo de clientes');
-    }
-    for (const s of sectors) {
-      if (!allowed.includes(s)) {
-        throw new ForbiddenException(`No puedes usar el sector ${s}`);
-      }
-    }
+    assertPuedeUsarSectores(user, sectors);
   }
 
   /** Sin sector en el body: el del área de quien da de alta (correo, si no el rol). */
@@ -142,8 +120,7 @@ export class VentasService {
 
   /** Coordinación y gerencia ven el padrón de su empresa, no solo los clientes que ellos crearon. */
   private vePadronDeLaEmpresa(user?: any): boolean {
-    if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user) || this.isSalesTeamManager(user)) return true;
-    return canManageClients({ id: user?.id, email: user?.email, roleKey: user?.roleKey }, false);
+    return vePadronDe(user);
   }
 
   /**
@@ -493,10 +470,7 @@ export class VentasService {
 
   /** Tiene personal a su cargo: alguien activo lo tiene como jefe directo (`managerId`). */
   private async hasDirectReports(userId?: number | null): Promise<boolean> {
-    const id = Number(userId);
-    if (!Number.isInteger(id) || id <= 0) return false;
-    const count = await this.prisma.user.count({ where: { managerId: id, isActive: true } });
-    return count > 0;
+    return tienePersonalACargo(this.prisma, userId);
   }
 
   /** Qué puede hacer el usuario con el padrón de clientes (web y apps esconden lo que no aplica). */
@@ -508,10 +482,7 @@ export class VentasService {
   }
 
   private async assertCanManageClients(user?: any) {
-    const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
-    if (canManageClients(actor, false)) return;
-    const reports = await this.hasDirectReports(user?.id);
-    if (!canManageClients(actor, reports)) {
+    if (!(await gestionaElPadron(this.prisma, user))) {
       throw new ForbiddenException(CLIENT_MANAGE_FORBIDDEN);
     }
   }
@@ -630,6 +601,12 @@ export class VentasService {
    * El alta pidió un cliente que ya está en el padrón: se le suman los tipos que falten y
    * se completan solo los datos que estaban vacíos. Lo ya capturado no se pisa: para
    * corregirlo está la ficha del cliente.
+   *
+   * Pasa por la misma puerta que la ficha (`getClient`): quien no puede abrir a ese cliente
+   * no se lo lleva (con documentos, oportunidades y dueño) ni le suma un tipo que lo
+   * volvería visible para toda la empresa. Y sumar tipos o completar datos es editar el
+   * padrón: lo mismo que pide `addClientSector`. Quien no lo edita (operativo, vendedor)
+   * reutiliza al cliente tal cual.
    */
   private async reutilizarCliente(
     existente: NonNullable<Awaited<ReturnType<VentasService['clienteVigenteConEseNombre']>>>,
@@ -638,6 +615,9 @@ export class VentasService {
     alta: { rapida: boolean; altaProyecto: boolean },
     user?: any,
   ) {
+    if (!puedeVerCliente(existente, user)) {
+      throw new ForbiddenException(CLIENT_REUSE_FORBIDDEN);
+    }
     const yaTiene = sectoresDelCliente(existente);
     const faltan = sectores.filter((s) => !yaTiene.includes(s));
     const actual = existente as unknown as Record<string, unknown>;
@@ -662,7 +642,10 @@ export class VentasService {
     }
 
     let cliente = existente;
-    if (faltan.length || Object.keys(relleno).length) {
+    const hayQueEditar = faltan.length > 0 || Object.keys(relleno).length > 0;
+    if (hayQueEditar && (await gestionaElPadron(this.prisma, user))) {
+      // Un tipo que no lleva (p. ej. CORPORATIVO sin estar en corporativo) se rechaza, como en la ficha.
+      if (faltan.length) this.assertCanUseSectors(user, faltan);
       cliente = await this.prisma.salesClient.update({
         where: { id: existente.id },
         data: {
@@ -745,19 +728,11 @@ export class VentasService {
       include: this.clientInclude(),
     });
     assertCompanyAccess(client, tenantId, 'Cliente');
-    const tipos = sectoresDelCliente(client);
-    // Corporativo y proyecto se eligen en la actividad: son de la empresa, no del sector ni del dueño.
-    if (!tipos.includes('CORPORATIVO') && !tipos.includes('PROYECTO')) {
-      // Quien administra el padrón abre cualquier cliente de su empresa, no solo los que dio
-      // de alta: la lista ya se los enseñaba y la ficha se los negaba.
-      if (!this.vePadronDeLaEmpresa(user)) this.assertOwnerAccess(client!.ownerId, user, 'cliente');
-      const allowedSectors = clientSectorsForActor(user);
-      if (allowedSectors.length && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user) && tipos.length) {
-        if (!tipos.some((s) => allowedSectors.includes(s))) {
-          throw new ForbiddenException('No tienes acceso a este cliente');
-        }
-      }
-    }
+    // Corporativo y proyecto se eligen en la actividad: son de la empresa, no del sector ni del
+    // dueño. Un comercial lo abre su dueño, quien administra el padrón (la lista ya se los
+    // enseñaba y la ficha se los negaba) y quien lleva su sector. La regla está en
+    // `client-access.ts`: es la misma que aplica el alta que reutiliza y Proyectos.
+    assertPuedeVerCliente(client, user);
     return client!;
   }
 
