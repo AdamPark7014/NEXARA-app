@@ -7,7 +7,7 @@ import styles from "./page.module.css";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
-import EditorialImage from "../../components/EditorialImage";
+import CoverageMap from "../../components/CoverageMap";
 
 export const revalidate = 1800;
 
@@ -139,18 +139,17 @@ export default function CoberturaPage() {
         </div>
       </section>
 
-      {/* Banda de mapa full‑bleed con caption corta */}
+      {/* Mapa de cobertura completo (versión clara u oscura según el tema) */}
       <section className={shared.sectionTight} data-reveal="up" aria-label="Mapa de operaciones">
         <div className={shared.inner}>
-          <EditorialImage
-            desktopUrl="/fotos/mapa-cobertura-nexara.jpg"
-            alt="Mapa de cobertura NEXARA: 32 estados y más de 200 puntos de presencia en México"
-            kicker="Geografía"
-            title="Operamos donde importa"
-            caption="32 estados y más de 200 puntos de presencia; base en Puebla y CDMX."
-            compose="caption-bar"
-            layout="bleed_landscape"
-            objectPosition="center"
+          <CoverageMap
+            sizes="(max-width: 1280px) 100vw, 1240px"
+            caption={
+              <>
+                <span>Operamos donde importa · 32 estados y más de 200 puntos de presencia</span>
+                <span>Base en Puebla y CDMX</span>
+              </>
+            }
           />
         </div>
       </section>

@@ -4,6 +4,7 @@ import shared from "../_shared/public.module.css";
 import styles from "./home-sections.module.css";
 import HomeHero, { type HomeHeroBootstrap } from "../../components/HomeHero";
 import LogoStrip from "../../components/LogoStrip";
+import CoverageMap from "../../components/CoverageMap";
 import PublicIcon, { type PublicIconName } from "../../components/PublicIcon";
 import {
   fetchPageSection,
@@ -526,23 +527,15 @@ export default async function NexaraPage() {
                   </Link>
                 </p>
               </div>
-              <figure className={styles.mapPanel}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/fotos/mapa-cobertura-nexara.webp"
-                  srcSet="/fotos/mapa-cobertura-nexara-1200.webp 1200w, /fotos/mapa-cobertura-nexara-1600.webp 1600w, /fotos/mapa-cobertura-nexara.webp 2000w"
-                  sizes="(max-width: 980px) 100vw, 720px"
-                  width={2000}
-                  height={1414}
-                  alt="Mapa de cobertura NEXARA — 32 estados y +200 puntos de presencia en México; base en Puebla y CDMX"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <figcaption className={styles.mapCaption}>
-                  <span>32 estados · +200 puntos de presencia · Base en Puebla y CDMX</span>
-                  <Link href="/cobertura">Ver ciudades</Link>
-                </figcaption>
-              </figure>
+              <CoverageMap
+                sizes="(max-width: 980px) 100vw, 720px"
+                caption={
+                  <>
+                    <span>32 estados · +200 puntos de presencia · Base en Puebla y CDMX</span>
+                    <Link href="/cobertura">Ver ciudades</Link>
+                  </>
+                }
+              />
             </div>
             <div className={styles.interlink}>
               <SeoInterlinkHub
