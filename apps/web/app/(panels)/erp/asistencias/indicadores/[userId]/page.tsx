@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
-import { Alert, Avatar, Badge, Card, CardHead, EmptyState, InfoPopover, PageHead, SkeletonRows, tabla } from "@/components/base";
+import { Alert, Avatar, Badge, Button, Card, CardHead, EmptyState, InfoPopover, PageHead, SkeletonRows, tabla } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import DiasEnLinea from "@/components/kpis/DiasEnLinea";
@@ -15,13 +15,8 @@ import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-boa
 import { KPIS_PATH, fechaCorta, fetchKpisPersona, formatPctKpi, horaMx, rangoDesdeUrl, type KpisPersonaResponse } from "@/lib/kpis-equipo";
 import { actividadesDelRango, horasEnPalabras, porQueCuenta, resumenEnPalabras, tonoProductividad } from "@/lib/kpis-lectura";
 import s from "@/components/kpis/kpis.module.css";
+import st from "./indicadores.module.css";
 
-const COLOR_PCT = {
-  ok: "var(--ui-brand-text)",
-  atencion: "var(--ui-warning-text)",
-  critico: "var(--ui-danger-text)",
-  sin_datos: "var(--ui-fg-3)",
-} as const;
 
 export default function KpisPersonaPage() {
   const { user } = useUser();
@@ -50,7 +45,7 @@ export default function KpisPersonaPage() {
     try {
       setData(await fetchKpisPersona(token, userId, rango));
     } catch (e) {
-      setData(null);
+      // Si ya se veía un rango, se queda a la vista; solo se avisa.
       setError(formatApiError(e, "No se pudo cargar el detalle"));
     } finally {
       setCargando(false);
@@ -73,7 +68,7 @@ export default function KpisPersonaPage() {
   const t = data?.totales;
 
   return (
-    <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+    <div className={st.pagina}>
       <PageHead
         back={{ href: `${KPIS_PATH}${qs}`, label: "KPIs del equipo" }}
         title={data?.persona.nombre ?? "Detalle"}
@@ -102,7 +97,15 @@ export default function KpisPersonaPage() {
       />
 
       {error ? (
-        <Alert tone="danger" role="alert">
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" onClick={() => void cargar()} loading={cargando}>
+              Reintentar
+            </Button>
+          }
+        >
           {error}
         </Alert>
       ) : null}
@@ -114,32 +117,23 @@ export default function KpisPersonaPage() {
       ) : null}
 
       {data && t ? (
-        <div style={{ display: "grid", gap: 24, opacity: cargando ? 0.6 : 1, transition: "opacity 120ms" }}>
+        <div className={st.cuerpo} data-cargando={cargando ? "true" : undefined} aria-busy={cargando || undefined}>
           <Card pad>
-            <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 180 }}>
+            <div className={st.resumen}>
+              <div className={st.cifra}>
                 <Avatar url={data.persona.avatarUrl} name={data.persona.nombre} size={48} />
                 <div>
-                  <div
-                    style={{
-                      fontSize: 40,
-                      fontWeight: 600,
-                      letterSpacing: "-0.03em",
-                      lineHeight: 1,
-                      fontVariantNumeric: "tabular-nums",
-                      color: COLOR_PCT[tonoProductividad(t.productividadPct)],
-                    }}
-                  >
+                  <div className={st.pct} data-tono={tonoProductividad(t.productividadPct)}>
                     {formatPctKpi(t.productividadPct)}
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--ui-fg-3)", marginTop: 4 }}>productividad</div>
+                  <div className={st.pctEtiqueta}>productividad</div>
                 </div>
               </div>
-              <div style={{ flex: "1 1 360px", minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: "var(--ui-fg)" }}>
+              <div className={st.lectura}>
+                <p className={st.lecturaTexto}>
                   {resumenEnPalabras(t, { conHorario: data.horario.entrada != null })}
                 </p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 10, fontSize: 12, color: "var(--ui-fg-3)" }}>
+                <div className={st.datos}>
                   <span>{t.diasConJornada} días con jornada</span>
                   <span title="Horas en jornada sin ninguna actividad abierta">Sin actividad {horasEnPalabras(t.minutosInactivos)}</span>
                   {t.minutosExtra ? <span title="Arriba de 8 h netas entre semana, o todo lo del fin de semana">Extra {horasEnPalabras(t.minutosExtra)}</span> : null}
@@ -162,7 +156,7 @@ export default function KpisPersonaPage() {
             {data.dias.length ? (
               <DiasEnLinea dias={data.dias} />
             ) : (
-              <EmptyState icon={<EventBusyOutlinedIcon />} title="Sin jornadas en estas fechas" />
+              <EmptyState icon={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin jornadas en estas fechas" />
             )}
           </Card>
 
@@ -171,9 +165,9 @@ export default function KpisPersonaPage() {
               title="Actividades"
               actions={
                 <InfoPopover label="Cómo se cuentan las actividades" title="Cómo se cuentan">
-                  <p style={{ margin: 0 }}>
-                    <strong style={{ color: "var(--ui-fg)" }}>Duración</strong> es el tiempo real: de «Iniciar» (o la foto
-                    de entrada) al fin. <strong style={{ color: "var(--ui-fg)" }}>Cuenta</strong> es la parte que cayó
+                  <p className={st.popParrafo}>
+                    <strong className={st.fuerte}>Duración</strong> es el tiempo real: de «Iniciar» (o la foto
+                    de entrada) al fin. <strong className={st.fuerte}>Cuenta</strong> es la parte que cayó
                     dentro de sus horas laboradas; lo que pasa en la comida o fuera de la jornada no suma. Una actividad
                     empezada sin checar entrada no cuenta.
                   </p>
@@ -209,7 +203,7 @@ export default function KpisPersonaPage() {
                           {a.titulo ?? "Actividad"}
                         </span>
                       </span>
-                      <span role="cell" className={tabla.tenue} style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <span role="cell" className={`${tabla.tenue} ${st.num}`}>
                         {horaMx(a.inicio)}–{a.enCurso ? "ahora" : horaMx(a.fin)}
                       </span>
                       <span role="cell" className={tabla.num}>{horasEnPalabras(a.minutosReales)}</span>
@@ -221,7 +215,7 @@ export default function KpisPersonaPage() {
                 {diasFuera.map((d) => (
                   <div key={`fuera-${d.fecha}`} className={`${tabla.fila} ${s.actFila}`} role="row">
                     <span role="cell" className={tabla.tenue}>{fechaCorta(d.fecha)}</span>
-                    <span role="cell" style={{ color: "var(--ui-fg-2)" }}>
+                    <span role="cell" className={st.segundo}>
                       {d.actividadesFueraDeJornada === 1 ? "1 actividad" : `${d.actividadesFueraDeJornada} actividades`} sin checar entrada
                     </span>
                     <span role="cell" className={tabla.tenue}>—</span>
@@ -243,7 +237,7 @@ export default function KpisPersonaPage() {
           {data.justificaciones.length ? (
             <Card>
               <CardHead title="Faltas justificadas" />
-              <ul style={{ margin: 0, padding: "12px 16px 12px 32px", fontSize: 13, display: "grid", gap: 4 }}>
+              <ul className={st.faltas}>
                 {data.justificaciones.map((j) => (
                   <li key={j.fecha}>
                     <strong>{fechaCorta(j.fecha)}</strong> · {j.motivo}

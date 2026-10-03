@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
-import { Alert, Badge, Card, CardHead, EmptyState, InfoPopover, Segmented, SkeletonRows, tabla } from "@/components/base";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import { Alert, Badge, Button, Card, CardHead, EmptyState, InfoPopover, Segmented, SkeletonRows, tabla } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import {
   MOTIVO_RECHAZO_ETIQUETA,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/asistencia-confiable-api";
 import { googleMapsPointUrl } from "@/lib/gps-map-links";
 import estilo from "./asistencia-confiable.module.css";
+import rec from "./recorrido.module.css";
 
 /**
  * Quién intentó checar y no pudo.
@@ -88,33 +90,35 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
         title="Intentos rechazados"
         actions={
           <>
-            <Segmented
-              items={MOTIVOS.map((m) => ({ id: m.id, label: m.label }))}
-              value={motivo}
-              onChange={setMotivo}
-              ariaLabel="Filtrar por motivo"
-            />
+            <span className={estilo.desliza}>
+              <Segmented
+                items={MOTIVOS.map((m) => ({ id: m.id, label: m.label }))}
+                value={motivo}
+                onChange={setMotivo}
+                ariaLabel="Filtrar por motivo"
+              />
+            </span>
             <InfoPopover label="¿Qué es esto?" title="Intentos rechazados">
-              <p style={{ margin: "0 0 8px" }}>
-                Checadas que el servidor <strong style={{ color: "var(--ui-fg)" }}>no</strong> registró. No cuentan
+              <p className={estilo.popParrafo}>
+                Checadas que el servidor <strong className={estilo.fuerte}>no</strong> registró. No cuentan
                 como jornada ni llegan a nómina; quedan aquí para que se pueda ver quién intentó checar, desde
                 dónde y con qué teléfono.
               </p>
-              <ul>
+              <ul className={estilo.popLista}>
                 <li>
-                  <strong style={{ color: "var(--ui-fg)" }}>Ubicación simulada</strong>: el teléfono avisó que el
+                  <strong className={estilo.fuerte}>Ubicación simulada</strong>: el teléfono avisó que el
                   punto lo produjo una app de GPS falso. Sus jefes reciben el aviso.
                 </li>
                 <li>
-                  <strong style={{ color: "var(--ui-fg)" }}>Viaje imposible</strong>: la distancia desde su checada
+                  <strong className={estilo.fuerte}>Viaje imposible</strong>: la distancia desde su checada
                   anterior no se puede recorrer en ese tiempo.
                 </li>
                 <li>
-                  <strong style={{ color: "var(--ui-fg)" }}>Ubicación guardada</strong>: el teléfono mandó una
+                  <strong className={estilo.fuerte}>Ubicación guardada</strong>: el teléfono mandó una
                   posición de hace más de media hora en vez de medir una nueva.
                 </li>
                 <li>
-                  <strong style={{ color: "var(--ui-fg)" }}>Desde el navegador</strong>: alguien abrió la web para
+                  <strong className={estilo.fuerte}>Desde el navegador</strong>: alguien abrió la web para
                   checar. Solo se checa desde la app; si no puede usar su teléfono, su jefe registra la checada.
                 </li>
               </ul>
@@ -123,16 +127,28 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
         }
       />
 
-      {error ? (
-        <Alert tone="danger" role="alert">
-          {error}
-        </Alert>
-      ) : null}
-
-      {porGpsFalso > 0 ? (
-        <Alert tone="warning">
-          {porGpsFalso} intento(s) con ubicación simulada en estas fechas. Sus jefes ya recibieron el aviso.
-        </Alert>
+      {error || porGpsFalso > 0 ? (
+        <div className={estilo.avisos}>
+          {error ? (
+            <Alert
+              tone="danger"
+              role="alert"
+              action={
+                <Button size="sm" onClick={() => void cargar()}>
+                  Reintentar
+                </Button>
+              }
+            >
+              {error}
+            </Alert>
+          ) : null}
+          {porGpsFalso > 0 ? (
+            <Alert tone="warning">
+              {porGpsFalso === 1 ? "1 intento" : `${porGpsFalso} intentos`} con ubicación simulada en estas fechas. Sus
+              jefes ya recibieron el aviso.
+            </Alert>
+          ) : null}
+        </div>
       ) : null}
 
       {cargando && !items ? (
@@ -173,9 +189,10 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
                     href={googleMapsPointUrl(r.lat, r.lng)}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ fontFamily: "monospace", fontSize: 11.5 }}
+                    className={rec.lugar}
                   >
-                    {r.lat.toFixed(5)}, {r.lng.toFixed(5)}
+                    <PlaceOutlinedIcon aria-hidden="true" />
+                    Ver en mapa
                   </a>
                 ) : (
                   <span className={tabla.tenue}>Sin ubicación</span>
@@ -186,13 +203,13 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
         </div>
       ) : items?.length && motivo ? (
         <EmptyState
-          icon={<BlockOutlinedIcon />}
+          icon={<BlockOutlinedIcon fontSize="inherit" aria-hidden="true" />}
           title="Ninguno de ese tipo"
           description="Hubo otros intentos rechazados en estas fechas: quita el filtro para verlos."
         />
       ) : items ? (
         <EmptyState
-          icon={<BlockOutlinedIcon />}
+          icon={<BlockOutlinedIcon fontSize="inherit" aria-hidden="true" />}
           title="Ningún intento rechazado"
           description="Nadie intentó checar de una forma que el servidor no pudiera comprobar."
         />

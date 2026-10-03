@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Modal from "@/components/ui/Modal";
-import InlineAlert from "@/components/ui/InlineAlert";
-import Button from "@/components/ui/Button";
-import { erpInputStyle, formatApiError } from "@/lib/erp-api";
+import { Alert, Button, DateInput, Field, Segmented, Textarea } from "@/components/base";
+import { formatApiError } from "@/lib/erp-api";
 import { MOTIVO_REGISTRO_MINIMO, registrarChecadaAsistida } from "@/lib/asistencia-confiable-api";
+import estilo from "./asistencia-confiable.module.css";
 
 /**
  * Un jefe registra la checada de alguien de su equipo.
@@ -64,54 +64,58 @@ export default function RegistroAsistido({
   };
 
   return (
-    <Modal open onClose={onClose} title={`Registrar checada de ${persona.nombre}`} maxWidth={460}>
-      <div style={{ display: "grid", gap: 12 }}>
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)" }}>
+    <Modal
+      open
+      onClose={onClose}
+      title={`Registrar checada de ${persona.nombre}`}
+      maxWidth={460}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={guardando}>
+            Cancelar
+          </Button>
+          <Button variant="primary" disabled={motivoCorto || guardando} loading={guardando} onClick={() => void guardar()}>
+            {guardando ? "Registrando…" : "Registrar"}
+          </Button>
+        </>
+      }
+    >
+      <div className={estilo.cuerpo}>
+        <p className={estilo.nota}>
           Úsalo solo cuando la persona no pudo checar desde su teléfono. Queda registrado con tu nombre y el
           motivo, y la checada sale marcada para revisión: nadie midió su ubicación.
         </p>
 
-        <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600 }}>
-          Qué registrar
-          <select
+        <Field label="Qué registrar">
+          <Segmented
+            ariaLabel="Qué registrar"
             value={tipo}
-            onChange={(e) => setTipo(e.target.value === "salida" ? "salida" : "entrada")}
-            style={erpInputStyle}
-          >
-            <option value="entrada">Entrada</option>
-            <option value="salida">Salida</option>
-          </select>
-        </label>
+            onChange={setTipo}
+            items={[
+              { id: "entrada", label: "Entrada" },
+              { id: "salida", label: "Salida" },
+            ]}
+          />
+        </Field>
 
-        <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600 }}>
-          Hora <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>(vacío = ahora)</span>
-          <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} style={erpInputStyle} />
-        </label>
+        <Field label="Hora" hint="Vacío = ahora">
+          <DateInput type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+        </Field>
 
-        <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600 }}>
-          Motivo
-          <textarea
+        <Field label="Motivo" required hint={`Al menos ${MOTIVO_REGISTRO_MINIMO} caracteres.`}>
+          <Textarea
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             rows={3}
             placeholder="Se le descompuso el teléfono en la obra"
-            style={{ ...erpInputStyle, resize: "vertical" }}
           />
-          <span style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            Al menos {MOTIVO_REGISTRO_MINIMO} caracteres.
-          </span>
-        </label>
+        </Field>
 
-        {error ? <InlineAlert variant="danger" message={error} /> : null}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button variant="primary" size="sm" disabled={motivoCorto || guardando} onClick={() => void guardar()}>
-            {guardando ? "Registrando…" : "Registrar"}
-          </Button>
-        </div>
+        {error ? (
+          <Alert tone="danger" role="alert">
+            {error}
+          </Alert>
+        ) : null}
       </div>
     </Modal>
   );

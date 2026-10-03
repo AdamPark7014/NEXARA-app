@@ -2,38 +2,66 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import PageHeader from "@/components/ui/PageHeader";
-import PanelTabs from "@/components/ui/PanelTabs";
-import Section from "@/components/ui/Section";
-import KpiCard, { type KpiVariant } from "@/components/ui/KpiCard";
-import EmptyState from "@/components/ui/EmptyState";
-import Button from "@/components/ui/Button";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import GpsTrajectoryPreview from "@/components/GpsTrajectoryPreview";
 import SessionImage from "@/components/SessionImage";
 import ComidasPanel from "@/components/asistencias/ComidasPanel";
+import ChecarEnWeb from "@/components/asistencias/ChecarEnWeb";
+import { duracionCorta, horaCorta, transcurrido } from "@/components/asistencias/formato";
+import rec from "@/components/asistencias/recorrido.module.css";
 import UniformeControl from "@/components/kpis/UniformeControl";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  EmptyState,
+  Field,
+  FilterChip,
+  FilterChips,
+  InfoPopover,
+  ListFooter,
+  ModulePage,
+  ModuleToolbar,
+  PersonCell,
+  SearchInput,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  StatusBadge,
+  Tabs,
+  Textarea,
+  ViewSwitch,
+  WhenCell,
+  type Column,
+  type ModuleEmpty,
+  type TabItem,
+  type Tone,
+  type ViewId,
+} from "@/components/base";
 import { KPIS_PATH } from "@/lib/kpis-equipo";
 import { useUser } from "@/components/UserContext";
 import { getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
-import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import { attendanceMapUrl, googleMapsPointUrl, toCoord } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
-import { erpFetch } from "@/lib/erp-api";
+import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
-import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-import Modal from "@/components/ui/Modal";
-import InlineAlert from "@/components/ui/InlineAlert";
-import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import { erpInputStyle, formatApiError } from "@/lib/erp-api";
 import {
   checadaDelTipo,
   insigniasChecada,
   MOTIVO_CORRECCION_MINIMO,
   type ChecadaValidable,
+  type InsigniaChecada,
 } from "@/lib/attendance-validacion";
 import {
   faltaDelDia,
@@ -42,22 +70,27 @@ import {
   quitarFaltaJustificada,
   type FaltaJustificada,
 } from "@/lib/attendance-justifications";
-import { InfoPopover } from "@/components/base";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import HourglassTopIcon from "@mui/icons-material/HourglassTop";
-import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
+import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import PersonOffOutlinedIcon from "@mui/icons-material/PersonOffOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import styles from "./asistencias.module.css";
 
-// Tres pantallas pesadas que solo ve quien tiene equipo: se cargan cuando se abren
-// su pestaña, no en cada visita a Asistencias.
+// Pantallas pesadas que solo se ven al abrir su pestaña: se cargan entonces, no en cada visita.
 const ChecadasRechazadas = dynamic(() => import("@/components/asistencias/ChecadasRechazadas"), { ssr: false });
 const HorariosEquipo = dynamic(() => import("@/components/asistencias/HorariosEquipo"), { ssr: false });
 const RegistroAsistido = dynamic(() => import("@/components/asistencias/RegistroAsistido"), { ssr: false });
 const GuardiasPanel = dynamic(() => import("@/components/asistencias/GuardiasPanel"), { ssr: false });
-import ChecarEnWeb from "@/components/asistencias/ChecarEnWeb";
-type TabId = "equipo" | "comidas" | "trayectoria" | "rechazos" | "horarios";
+
+type TabId = "equipo" | "comidas" | "trayectoria" | "rechazos" | "horarios" | "guardias";
 type Estado = "PRESENTE" | "COMPLETO" | "JUSTIFICADA" | "AUSENTE";
 type FilterEstado = "TODOS" | Estado;
 
@@ -84,16 +117,6 @@ interface ApiAttendanceUser {
   justificaciones?: FaltaJustificada[];
 }
 
-interface LunchBreak {
-  id: number;
-  checkinTime: string;
-  checkoutTime?: string | null;
-  status: "IN_PROGRESS" | "COMPLETED";
-  isCheckinLate?: boolean;
-  isCheckoutLate?: boolean;
-  user?: { id: number; nombre: string; department?: { nombre: string } | null };
-}
-
 interface LocationRecord {
   id: number;
   usuarioId: number;
@@ -114,99 +137,100 @@ interface TrajectoryPoint {
   ultimaActualizacion?: string;
 }
 
-const ESTADO_META: Record<Estado, { label: string; color: string }> = {
-  PRESENTE: { label: "En jornada", color: "#16a34a" },
-  COMPLETO: { label: "Ya salió", color: "#2563eb" },
-  JUSTIFICADA: { label: "Falta justificada", color: "#7c3aed" },
-  AUSENTE: { label: "Sin checada", color: "#94a3b8" },
+type Fila = ApiAttendanceUser & {
+  checkIn?: string;
+  checkOut?: string;
+  estado: Estado;
+  falta: ReturnType<typeof faltaDelDia>;
+  entryMapUrl: string | null;
+  exitMapUrl: string | null;
+  totalMinutes: number;
+  nombre: string;
+};
+
+/** Un solo mapa estado → texto y tono (los mismos tonos que el resto del sistema). */
+const ESTADO_META: Record<Estado, { label: string; tone: Tone }> = {
+  PRESENTE: { label: "En jornada", tone: "success" },
+  COMPLETO: { label: "Ya salió", tone: "info" },
+  JUSTIFICADA: { label: "Falta justificada", tone: "violet" },
+  AUSENTE: { label: "Sin checada", tone: "neutral" },
 };
 
 const ESTADO_ORDER: Record<Estado, number> = { PRESENTE: 0, COMPLETO: 1, JUSTIFICADA: 2, AUSENTE: 3 };
+
+/** Marcas del servidor en una checada, con el tono de su gravedad. */
+const TONO_INSIGNIA: Record<InsigniaChecada["clave"], Tone> = {
+  offline: "info",
+  revisar: "warning",
+  "fuera-sitio": "danger",
+  cierre: "violet",
+  corregida: "info",
+};
 
 function todayIso() {
   return new Date().toLocaleDateString("sv-SE");
 }
 
-function fmtTime(iso?: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function pad2(n: number) {
-  return String(Math.max(0, Math.floor(n))).padStart(2, "0");
-}
-
-/** Duración legible con segundos: 0:00:00 · 1:05:09 · 12:03:44 */
-function fmtHms(totalMs: number): string {
-  if (!Number.isFinite(totalMs) || totalMs < 0) return "0:00:00";
-  const totalSec = Math.floor(totalMs / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${h}:${pad2(m)}:${pad2(s)}`;
-}
-
-function elapsedMs(
-  checkIn?: string | null,
-  checkOut?: string | null,
-  nowMs: number = Date.now(),
-): number {
-  if (!checkIn) return 0;
-  const start = new Date(checkIn).getTime();
-  if (!Number.isFinite(start)) return 0;
-  const end = checkOut ? new Date(checkOut).getTime() : nowMs;
-  if (!Number.isFinite(end)) return 0;
-  return Math.max(0, end - start);
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0] ?? "")
-    .join("")
-    .toUpperCase();
-}
-
-function latestByType(
-  list: ApiAttendanceUser["attendances"],
-  type: "entrada" | "salida",
-): string | undefined {
+function latestByType(list: ApiAttendanceUser["attendances"], type: "entrada" | "salida"): string | undefined {
   const filtered = (list ?? []).filter((a) => a.type === type);
   if (!filtered.length) return undefined;
   return filtered.reduce((max, a) => (a.timestamp > max.timestamp ? a : max)).timestamp;
 }
 
-/** Reloj que avanza solo mientras la jornada sigue abierta; el resto de la página no se vuelve a pintar. */
+function normalizar(texto: string) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+function puestoDe(m: Pick<Fila, "roleName" | "department">) {
+  return [m.roleName, m.department].filter(Boolean).join(" · ") || "Equipo NEXARA";
+}
+
+/** Reloj que avanza solo mientras la jornada sigue abierta; sin segundos, basta cada 30 s. */
 function useAhora(activo: boolean): number {
   const [ahora, setAhora] = useState(() => Date.now());
   useEffect(() => {
     if (!activo) return;
     setAhora(Date.now());
-    const id = window.setInterval(() => setAhora(Date.now()), 1000);
+    const id = window.setInterval(() => setAhora(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, [activo]);
   return ahora;
 }
 
+/** ¿Pantalla de teléfono? Ahí la lista va en tarjetas (sin desplazamiento lateral). */
+function useAngosto(): boolean {
+  const [angosto, setAngosto] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 720px)");
+    const sync = () => setAngosto(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return angosto;
+}
+
 function LiveTimer({ since, until }: { since?: string | null; until?: string | null }) {
   const ahora = useAhora(Boolean(since) && !until);
-  return <>{fmtHms(elapsedMs(since, until, ahora))}</>;
+  return <>{duracionCorta(transcurrido(since, until, ahora))}</>;
 }
 
 type Jornada = { checkIn?: string; checkOut?: string; abierta: boolean };
 
 function LiveTotal({ jornadas }: { jornadas: Jornada[] }) {
   const ahora = useAhora(jornadas.some((j) => j.abierta && j.checkIn));
-  const total = jornadas.reduce(
-    (sum, j) => sum + elapsedMs(j.checkIn, j.abierta ? null : j.checkOut, ahora),
-    0,
+  const total = jornadas.reduce((sum, j) => sum + transcurrido(j.checkIn, j.abierta ? null : j.checkOut, ahora), 0);
+  return <>{duracionCorta(total)}</>;
+}
+
+/** Tiempo de la jornada de una persona: en vivo si sigue abierta, «—» si no checó. */
+function TiempoJornada({ m }: { m: Fila }) {
+  if (m.estado === "AUSENTE" || !m.checkIn) return <span className={styles.tiempoVacio}>—</span>;
+  return (
+    <span className={styles.tiempo} data-estado={m.estado}>
+      <LiveTimer since={m.checkIn} until={m.estado === "PRESENTE" ? null : m.checkOut} />
+    </span>
   );
-  return <>{fmtHms(total)}</>;
 }
 
 /** Marcas del servidor en una checada: sin conexión, revisar, fuera de sitio, cierre, corregida. */
@@ -214,53 +238,27 @@ function InsigniasChecada({ checada }: { checada?: ChecadaValidable }) {
   const insignias = insigniasChecada(checada);
   if (!insignias.length) return null;
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+    <span className={styles.insignias}>
       {insignias.map((i) => (
-        <span
-          key={i.clave}
-          title={i.detalle}
-          style={{
-            display: "inline-block",
-            maxWidth: "100%",
-            fontSize: 11,
-            fontWeight: 700,
-            lineHeight: 1.4,
-            color: i.color,
-            background: `color-mix(in srgb, ${i.color} 12%, var(--surface))`,
-            border: `1px solid color-mix(in srgb, ${i.color} 35%, transparent)`,
-            padding: "2px 7px",
-            borderRadius: 8,
-          }}
-        >
+        <Badge key={i.clave} tone={TONO_INSIGNIA[i.clave]} size="sm" title={i.detalle}>
           {i.texto}
-        </span>
+        </Badge>
       ))}
-    </div>
+    </span>
   );
 }
 
-/** Solo dirección y RH: mover una hora deja rastro (antes, después, motivo y quién). */
-function BotonCorregir({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        marginTop: 2,
-        minHeight: 40,
-        background: "none",
-        border: "none",
-        padding: "0 8px 0 0",
-        cursor: "pointer",
-        fontSize: 12.5,
-        fontWeight: 650,
-        fontFamily: "inherit",
-        color: "var(--primary)",
-      }}
-    >
-      Corregir hora
-    </button>
-  );
+/** Punto de la hora: rojo si quedó fuera de sitio, ámbar si hay que revisarla. */
+function tonoChecada(hora: string | undefined, checada: ChecadaValidable | undefined, base: Tone): Tone {
+  if (!hora) return "neutral";
+  const claves = insigniasChecada(checada).map((i) => i.clave);
+  if (claves.includes("fuera-sitio")) return "danger";
+  if (claves.includes("revisar")) return "warning";
+  return base;
+}
+
+function ultimaFoto(m: Fila, tipo: "entrada" | "salida") {
+  return [...(m.attendances ?? [])].filter((a) => a.type === tipo && a.photoUrl).pop();
 }
 
 export default function ErpAsistenciasPage() {
@@ -274,20 +272,26 @@ export default function ErpAsistenciasPage() {
   // su gente, con su punto y su distancia al sitio, no el rastro del día.
   const canLiveGps = isCeoEquivalentEmail(user?.email);
   const canSeeOwnTrajectory = canLiveGps;
+  const angosto = useAngosto();
 
   const [tab, setTab] = useState<TabId>("equipo");
-  const [verGuardias, setVerGuardias] = useState(false);
   // Los avisos de comida abren /erp/asistencias?tab=comidas.
   useEffect(() => {
     const inicial = new URLSearchParams(window.location.search).get("tab");
-    if (inicial === "comidas" || inicial === "equipo") setTab(inicial);
+    if (inicial === "comidas" || inicial === "equipo" || inicial === "guardias") setTab(inicial);
     else if ((inicial === "rechazos" || inicial === "horarios") && isManager) setTab(inicial);
     else if (inicial === "trayectoria" && canLiveGps) setTab(inicial);
   }, [canLiveGps, isManager]);
   const [dateFilter, setDateFilter] = useState(todayIso());
   const [filterEstado, setFilterEstado] = useState<FilterEstado>("TODOS");
+  const [busqueda, setBusqueda] = useState("");
+  const [vista, setVista] = useState<ViewId>("lista");
+  const vistaEfectiva: ViewId = angosto ? "tablero" : vista;
 
   const [members, setMembers] = useState<ApiAttendanceUser[]>([]);
+  /** Día al que corresponden los datos que se ven: un fallo no borra lo de ese mismo día. */
+  const [cargadoPara, setCargadoPara] = useState<string | null>(null);
+  const cargadoParaRef = useRef<string | null>(null);
   const [teamGps, setTeamGps] = useState<LocationRecord[]>([]);
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
   const [dayAttendances, setDayAttendances] = useState<
@@ -300,9 +304,11 @@ export default function ErpAsistenciasPage() {
   const [actualizadoEn, setActualizadoEn] = useState<Date | null>(null);
   // Salida de emergencia: a quién le está registrando la checada un jefe.
   const [registrandoPara, setRegistrandoPara] = useState<{ id: number; nombre: string } | null>(null);
+  // Ficha del día de una persona (fotos, uniforme, mapas y correcciones).
+  const [detalleId, setDetalleId] = useState<number | null>(null);
 
-  // CEO / plataforma (Christian, Claudia equivalente, Adam): company-wide (sin scope=subtree).
-  // Encargados: árbol managerId.
+  // CEO / plataforma (Christian, Claudia equivalente, Adam): toda la empresa.
+  // Encargados: solo su gente (árbol de managerId).
   const companyWideViewer = Boolean(
     user?.isSuperAdmin ||
       user?.roleKey === "ceo" ||
@@ -332,15 +338,19 @@ export default function ErpAsistenciasPage() {
         // Christian/Adam/Claudia/cuenta demo no son empleados: no deben verse como "sin checada".
         const equipo = list.filter((u) => !isNonEmployeeEmail(u.email));
         setMembers(equipo);
+        cargadoParaRef.current = dateFilter;
+        setCargadoPara(dateFilter);
         setRefreshError(null);
         setActualizadoEn(new Date());
       } catch (e) {
         const texto = formatApiError(e, "No se pudo cargar la asistencia de tu equipo.");
-        // Un refresco silencioso que falla no borra la lista: solo avisa.
-        if (quiet) {
+        // Un refresco que falla no borra la lista del mismo día: solo avisa.
+        if (quiet || cargadoParaRef.current === dateFilter) {
           setRefreshError(texto);
         } else {
           setMembers([]);
+          cargadoParaRef.current = null;
+          setCargadoPara(null);
           setError(texto);
         }
       } finally {
@@ -377,7 +387,7 @@ export default function ErpAsistenciasPage() {
   }, [token, dateFilter, canLiveGps, canSeeOwnTrajectory]);
 
   useEffect(() => {
-    // Comidas carga lo suyo en ComidasPanel.
+    // Comidas, rechazos, horarios y guardias cargan lo suyo.
     setError(null);
     if (tab === "equipo") void loadEquipo();
     else if (tab === "trayectoria") void loadTrayectoria();
@@ -415,7 +425,7 @@ export default function ErpAsistenciasPage() {
     };
   }, [isManager, token, tab, loadEquipo]);
 
-  const mapped = useMemo(() => {
+  const mapped = useMemo<Fila[]>(() => {
     const meId = user?.id;
     return members
       .map((raw) => {
@@ -503,12 +513,9 @@ export default function ErpAsistenciasPage() {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
   };
 
-  const abrirCorreccion = (
-    checada: ChecadaValidable | undefined,
-    nombre: string,
-    tipo: "entrada" | "salida",
-  ) => {
+  const abrirCorreccion = (checada: ChecadaValidable | undefined, nombre: string, tipo: "entrada" | "salida") => {
     if (!checada?.id || !checada.timestamp) return;
+    setDetalleId(null);
     setErrorCorreccion(null);
     setMotivoCorreccion("");
     setHoraCorreccion(paraInputLocal(checada.timestamp));
@@ -555,9 +562,15 @@ export default function ErpAsistenciasPage() {
   };
 
   const abrirJustificar = (userId: number, nombre: string) => {
+    setDetalleId(null);
     setMotivoFalta("");
     setErrorFalta(null);
     setJustificando({ userId, nombre });
+  };
+
+  const abrirRegistro = (id: number, nombre: string) => {
+    setDetalleId(null);
+    setRegistrandoPara({ id, nombre });
   };
 
   const guardarJustificacion = async () => {
@@ -576,6 +589,7 @@ export default function ErpAsistenciasPage() {
   };
 
   const pedirQuitarFalta = (falta: FaltaJustificada, nombre: string) => {
+    setDetalleId(null);
     setConfirmFalta({
       title: "Quitar falta justificada",
       message: `El ${dateFilter} de ${nombre} volverá a mostrarse como «Sin checada».`,
@@ -592,703 +606,718 @@ export default function ErpAsistenciasPage() {
     });
   };
 
-  const kpis: { key: FilterEstado; label: string; value: number; variant: KpiVariant }[] = [
-    { key: "TODOS", label: "Todo el equipo", value: mapped.length, variant: "default" },
-    { key: "PRESENTE", label: "En jornada", value: presentes, variant: presentes > 0 ? "accent" : "default" },
-    { key: "COMPLETO", label: "Ya salieron", value: completos, variant: completos > 0 ? "positive" : "default" },
-    ...(justificadas > 0 || puedeJustificar
-      ? [{ key: "JUSTIFICADA" as const, label: "Falta justificada", value: justificadas, variant: "default" as const }]
-      : []),
-    { key: "AUSENTE", label: "Sin checada", value: ausentes, variant: ausentes > 0 ? "danger" : "positive" },
-  ];
+  const elegirEstado = (key: FilterEstado) => setFilterEstado((prev) => (prev === key && key !== "TODOS" ? "TODOS" : key));
 
-  const filtered = useMemo(
-    () => (filterEstado === "TODOS" ? mapped : mapped.filter((m) => m.estado === filterEstado)),
-    [mapped, filterEstado],
+  const filtered = useMemo(() => {
+    const q = normalizar(busqueda.trim());
+    return mapped.filter(
+      (m) =>
+        (filterEstado === "TODOS" || m.estado === filterEstado) &&
+        (!q || normalizar(`${m.nombre} ${m.roleName ?? ""} ${m.department ?? ""}`).includes(q)),
+    );
+  }, [mapped, filterEstado, busqueda]);
+
+  const detalle = detalleId == null ? null : (mapped.find((m) => m.userId === detalleId) ?? null);
+  const esOtro = (m: Fila) => isManager && m.userId !== user?.id;
+  const horaActualizado = actualizadoEn ? horaCorta(actualizadoEn.toISOString()) : null;
+
+  /* ─── Piezas de la pestaña Equipo ─────────────────────────────────────── */
+
+  const fechaControl = (
+    <DateInput
+      aria-label="Día"
+      value={dateFilter}
+      max={todayIso()}
+      onChange={(e) => setDateFilter(e.target.value)}
+      className={styles.fecha}
+    />
   );
 
-  const sectionTitle =
-    filterEstado === "TODOS"
-      ? `Equipo del día (${filtered.length})`
-      : `${kpis.find((k) => k.key === filterEstado)?.label ?? ESTADO_META[filterEstado].label} (${filtered.length})`;
+  const accionesDePersona = (m: Fila, size: "sm" | "md" = "sm") => (
+    <>
+      {m.estado === "AUSENTE" && puedeJustificar ? (
+        <Button
+          size={size}
+          variant="ghost"
+          iconStart={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+          onClick={() => abrirJustificar(m.userId, m.nombre)}
+        >
+          Justificar falta
+        </Button>
+      ) : null}
+      {/* Teléfono roto, sin batería u olvidado: que su falta no la pague en la nómina. */}
+      {esOtro(m) ? (
+        <Button
+          size={size}
+          variant="ghost"
+          iconStart={<HowToRegOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+          onClick={() => abrirRegistro(m.userId, m.nombre)}
+        >
+          Registrar checada
+        </Button>
+      ) : null}
+    </>
+  );
+
+  const columnas: Column<Fila>[] = [
+    {
+      key: "persona",
+      label: "Persona",
+      render: (m) => (
+        <Link
+          href={`/erp/pizarra/${m.userId}`}
+          className={styles.personaLink}
+          aria-label={`${m.nombre}: ver qué está haciendo`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <PersonCell name={m.nombre} avatarUrl={m.avatarUrl} subtitle={puestoDe(m)} size={32} />
+        </Link>
+      ),
+    },
+    {
+      key: "entrada",
+      label: "Entrada",
+      render: (m) => {
+        const c = checadaDelTipo(m.attendances, "entrada");
+        return (
+          <WhenCell
+            time={horaCorta(m.checkIn)}
+            tone={tonoChecada(m.checkIn, c, "success")}
+            hint={insigniasChecada(c).length ? <InsigniasChecada checada={c} /> : undefined}
+          />
+        );
+      },
+    },
+    {
+      key: "salida",
+      label: "Salida",
+      render: (m) => {
+        const c = checadaDelTipo(m.attendances, "salida");
+        return (
+          <WhenCell
+            time={horaCorta(m.checkOut)}
+            tone={tonoChecada(m.checkOut, c, "info")}
+            hint={insigniasChecada(c).length ? <InsigniasChecada checada={c} /> : undefined}
+          />
+        );
+      },
+    },
+    { key: "tiempo", label: "Tiempo", numeric: true, render: (m) => <TiempoJornada m={m} /> },
+    {
+      key: "estado",
+      label: "Estado",
+      render: (m) => (
+        <StatusBadge
+          label={ESTADO_META[m.estado].label}
+          tone={ESTADO_META[m.estado].tone}
+          size="sm"
+          title={m.falta ? `Falta justificada · ${m.falta.motivo}` : undefined}
+        />
+      ),
+    },
+  ];
+
+  const tablaEquipo = (
+    <DataTable
+      flush
+      columns={columnas}
+      rows={filtered}
+      rowKey={(m) => m.userId}
+      onRowClick={(m) => setDetalleId(m.userId)}
+      ariaLabel="Asistencia del equipo"
+      rowActionsLabel="Acciones"
+      rowActions={(m) => (
+        <>
+          {accionesDePersona(m)}
+          <Button
+            size="sm"
+            variant="ghost"
+            icon
+            aria-label={`Ver el día de ${m.nombre}`}
+            title="Ver el día"
+            onClick={() => setDetalleId(m.userId)}
+          >
+            <ChevronRightIcon fontSize="small" aria-hidden="true" />
+          </Button>
+        </>
+      )}
+    />
+  );
+
+  const tarjetasEquipo = (
+    <ul className={styles.tarjetas} aria-label="Asistencia del equipo">
+      {filtered.map((m) => {
+        const cEntrada = checadaDelTipo(m.attendances, "entrada");
+        const cSalida = checadaDelTipo(m.attendances, "salida");
+        return (
+          <li key={m.userId} className={styles.tarjeta} data-estado={m.estado}>
+            <div className={styles.tarjetaHead}>
+              <Avatar name={m.nombre} avatarUrl={m.avatarUrl} size={44} />
+              <div className={styles.tarjetaQuien}>
+                <Link href={`/erp/pizarra/${m.userId}`} className={styles.tarjetaNombre} aria-label={`${m.nombre}: ver qué está haciendo`}>
+                  {m.nombre}
+                </Link>
+                <span className={styles.tarjetaPuesto}>{puestoDe(m)}</span>
+              </div>
+              <StatusBadge label={ESTADO_META[m.estado].label} tone={ESTADO_META[m.estado].tone} size="sm" />
+            </div>
+            <dl className={styles.horas}>
+              <div>
+                <dt>Entrada</dt>
+                <dd>
+                  <span className={styles.hora}>{horaCorta(m.checkIn)}</span>
+                  <InsigniasChecada checada={cEntrada} />
+                </dd>
+              </div>
+              <div>
+                <dt>Salida</dt>
+                <dd>
+                  <span className={styles.hora}>{horaCorta(m.checkOut)}</span>
+                  <InsigniasChecada checada={cSalida} />
+                </dd>
+              </div>
+              <div className={styles.horasTiempo}>
+                <dt>{m.estado === "PRESENTE" ? "En vivo" : "Tiempo"}</dt>
+                <dd>
+                  <TiempoJornada m={m} />
+                </dd>
+              </div>
+            </dl>
+            {m.falta ? <p className={styles.faltaLinea}>Falta justificada · {m.falta.motivo}</p> : null}
+            <div className={styles.tarjetaAcciones}>
+              {accionesDePersona(m)}
+              <Button size="sm" variant="tertiary" iconEnd={<ChevronRightIcon fontSize="inherit" aria-hidden="true" />} onClick={() => setDetalleId(m.userId)}>
+                Ver el día
+              </Button>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const miJornada = canRegister ? (
+    <Card aria-label="Mi jornada">
+      <CardHead
+        title="Mi jornada"
+        subtitle="Se checa desde la app NEXARA"
+        actions={
+          <InfoPopover label="¿Por qué ya no puedo checar aquí?" title="Se checa desde la app">
+            <p className={styles.popParrafo}>
+              Un navegador puede decir que está donde quiera —la ubicación de una pestaña se cambia desde la
+              consola en dos líneas— y de estas checadas sale la nómina. Por eso ahora solo se checa desde la
+              app, que sabe si el GPS es simulado y de cuándo es la medición.
+            </p>
+            <p className={styles.popParrafo}>
+              ¿Teléfono roto, sin batería u olvidado en casa? Tu jefe puede registrar tu checada desde esta
+              misma pantalla, con el motivo; queda a su nombre y marcada para revisión.
+            </p>
+          </InfoPopover>
+        }
+      />
+      <div className={styles.cardBody}>
+        {/* Solo con la excepción temporal que abre dirección aparece el formulario; si no, «usa la app». */}
+        <ChecarEnWeb token={token} />
+      </div>
+    </Card>
+  ) : null;
+
+  const barraFecha = (
+    <div className={styles.barra}>
+      <label className={styles.barraEtiqueta}>
+        <span>Día</span>
+        {fechaControl}
+      </label>
+    </div>
+  );
+
+  /* ─── Lo que va en la plantilla según la pestaña ──────────────────────── */
+
+  const enEquipo = tab === "equipo" && isManager;
+  const cargandoEquipo = enEquipo && loading && cargadoPara !== dateFilter;
+  let stats: ReactNode = null;
+  let before: ReactNode = null;
+  let toolbar: ReactNode = null;
+  let contenido: ReactNode = null;
+  let footer: ReactNode = null;
+  let vacio = false;
+  let vacioState: ModuleEmpty | undefined;
+
+  if (enEquipo) {
+    stats = (
+      <StatRow ariaLabel="Resumen del día">
+        <Stat
+          label="En jornada"
+          value={presentes}
+          suffix={mapped.length ? `/ ${mapped.length}` : undefined}
+          tone={presentes > 0 ? "success" : "default"}
+          icon={<LoginOutlinedIcon aria-hidden="true" />}
+          iconTone="success"
+          hint="Con la jornada abierta"
+          onClick={() => elegirEstado("PRESENTE")}
+          pressed={filterEstado === "PRESENTE"}
+          loading={cargandoEquipo}
+        />
+        <Stat
+          label="Ya salieron"
+          value={completos}
+          icon={<LogoutOutlinedIcon aria-hidden="true" />}
+          iconTone="info"
+          hint="Entrada y salida registradas"
+          onClick={() => elegirEstado("COMPLETO")}
+          pressed={filterEstado === "COMPLETO"}
+          loading={cargandoEquipo}
+        />
+        <Stat
+          label="Sin checada"
+          value={ausentes}
+          tone={ausentes > 0 ? "danger" : "default"}
+          icon={<PersonOffOutlinedIcon aria-hidden="true" />}
+          iconTone={ausentes > 0 ? "danger" : "neutral"}
+          hint={justificadas > 0 ? `${justificadas} con falta justificada` : "Sin entrada registrada"}
+          onClick={() => elegirEstado("AUSENTE")}
+          pressed={filterEstado === "AUSENTE"}
+          loading={cargandoEquipo}
+        />
+        <Stat
+          label="Horas trabajadas"
+          value={<LiveTotal jornadas={jornadas} />}
+          icon={<ScheduleOutlinedIcon aria-hidden="true" />}
+          hint="Todo tu equipo junto, en vivo"
+          loading={cargandoEquipo}
+        />
+      </StatRow>
+    );
+    before =
+      miJornada || refreshError || (error && mapped.length > 0) ? (
+        <div className={styles.pila}>
+          {refreshError ? (
+            <Alert
+              tone="warning"
+              action={
+                <Button size="sm" onClick={() => void refrescar()} disabled={refrescando}>
+                  Reintentar
+                </Button>
+              }
+            >
+              No se pudo actualizar; ves los datos de las {horaActualizado ?? "última carga"}. {refreshError}
+            </Alert>
+          ) : null}
+          {error && mapped.length > 0 ? (
+            <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
+              {error}
+            </Alert>
+          ) : null}
+          {miJornada}
+        </div>
+      ) : null;
+    const chips: { key: FilterEstado; label: string; n: number; dot?: Tone }[] = [
+      { key: "TODOS", label: "Todos", n: mapped.length },
+      { key: "PRESENTE", label: "En jornada", n: presentes, dot: "success" },
+      { key: "COMPLETO", label: "Ya salieron", n: completos, dot: "info" },
+      ...(justificadas > 0 || puedeJustificar
+        ? [{ key: "JUSTIFICADA" as const, label: "Falta justificada", n: justificadas, dot: "violet" as const }]
+        : []),
+      { key: "AUSENTE", label: "Sin checada", n: ausentes, dot: "neutral" },
+    ];
+    toolbar = (
+      <ModuleToolbar
+        search={
+          <SearchInput
+            placeholder="Buscar persona"
+            aria-label="Buscar persona"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        }
+        chips={
+          <FilterChips ariaLabel="Filtrar por estado">
+            {chips.map((c) => (
+              <FilterChip key={c.key} active={filterEstado === c.key} count={c.n} dot={c.dot} onClick={() => setFilterEstado(c.key)}>
+                {c.label}
+              </FilterChip>
+            ))}
+          </FilterChips>
+        }
+        end={
+          <>
+            {fechaControl}
+            <Button
+              size="sm"
+              variant="ghost"
+              iconStart={<RefreshOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+              loading={refrescando}
+              disabled={loading}
+              onClick={() => void refrescar()}
+            >
+              Actualizar
+            </Button>
+            <span className={styles.vistaSwitch}>
+              <ViewSwitch value={vista} onChange={setVista} views={["lista", "tablero"]} ariaLabel="Ver como" />
+            </span>
+          </>
+        }
+      />
+    );
+    contenido = vistaEfectiva === "lista" ? tablaEquipo : tarjetasEquipo;
+    footer = (
+      <ListFooter total={filtered.length} unit={filtered.length === 1 ? "persona" : "personas"}>
+        {horaActualizado ? <span className={styles.actualizado}>Actualizado a las {horaActualizado}</span> : null}
+      </ListFooter>
+    );
+    vacio = !cargandoEquipo && filtered.length === 0;
+    vacioState =
+      error && mapped.length === 0
+        ? {
+            tone: "danger",
+            title: "No se pudo cargar la asistencia",
+            description: error,
+            action: (
+              <Button variant="primary" onClick={() => void loadEquipo()}>
+                Reintentar
+              </Button>
+            ),
+          }
+        : mapped.length === 0
+          ? {
+              icon: <GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />,
+              title: "Nadie en tu equipo este día",
+              description: "Cuando alguien de tu equipo registre su entrada, aparece aquí.",
+            }
+          : {
+              icon: <GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />,
+              tone: "neutral",
+              title: "Nadie en este grupo",
+              description: busqueda.trim() ? "Nadie coincide con la búsqueda." : "Toca «Todos» para ver a todo el equipo.",
+              action: (
+                <Button
+                  onClick={() => {
+                    setFilterEstado("TODOS");
+                    setBusqueda("");
+                  }}
+                >
+                  Ver todo el equipo
+                </Button>
+              ),
+            };
+  } else if (tab === "equipo") {
+    contenido = miJornada ?? (
+      <EmptyState
+        icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+        title="Vista de equipo"
+        description="Aquí aparece la asistencia de tu equipo cuando tienes personas a tu cargo."
+      />
+    );
+  } else if (tab === "comidas") {
+    before = barraFecha;
+    contenido = <ComidasPanel fecha={dateFilter} />;
+  } else if (tab === "rechazos" && isManager) {
+    before = barraFecha;
+    contenido = <ChecadasRechazadas token={token} desde={dateFilter} hasta={dateFilter} />;
+  } else if (tab === "horarios" && isManager) {
+    contenido = (
+      <HorariosEquipo
+        token={token}
+        personas={mapped.map((m) => ({ id: m.userId, nombre: m.nombre, puesto: m.roleName ?? m.department }))}
+      />
+    );
+  } else if (tab === "guardias") {
+    contenido = <GuardiasPanel token={token} />;
+  } else if (tab === "trayectoria" && canLiveGps) {
+    before = (
+      <div className={styles.pila}>
+        {barraFecha}
+        {error ? (
+          <Alert
+            tone="danger"
+            role="alert"
+            action={
+              <Button size="sm" onClick={() => void loadTrayectoria()}>
+                Reintentar
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        ) : null}
+      </div>
+    );
+    contenido = (
+      <div className={styles.columna}>
+        <Card aria-label="Dónde está tu equipo">
+          <CardHead title="Dónde está tu equipo" subtitle="Personas con jornada abierta que comparten su ubicación." />
+          <div className={styles.cardBody}>
+            {loading ? (
+              <SkeletonRows rows={3} label="Buscando la ubicación de tu equipo" />
+            ) : teamGps.length === 0 ? (
+              error ? null : (
+                <EmptyState
+                  icon={<SatelliteAltOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+                  title="Sin ubicaciones"
+                  description="Nadie está compartiendo su ubicación ahora."
+                  tone="neutral"
+                />
+              )
+            ) : (
+              <ul className={styles.ubicaciones}>
+                {teamGps.map((item) => {
+                  const lat = toCoord(item.latitud);
+                  const lng = toCoord(item.longitud);
+                  const puesto = item.usuario?.role?.nombre ?? item.usuario?.department?.nombre ?? "";
+                  const cuando = item.ultimaActualizacion ? `a las ${horaCorta(item.ultimaActualizacion)}` : "";
+                  return (
+                    <li key={item.id} className={styles.ubicacion} data-activo={item.estaActivo ? "true" : undefined}>
+                      <PersonCell
+                        name={item.usuario?.nombre ?? "Sin nombre"}
+                        subtitle={[puesto, cuando].filter(Boolean).join(" · ") || undefined}
+                        size={36}
+                      />
+                      {lat != null && lng != null ? (
+                        <a href={googleMapsPointUrl(lat, lng)} target="_blank" rel="noopener noreferrer" className={rec.lugar}>
+                          <PlaceOutlinedIcon aria-hidden="true" />
+                          Ver en mapa
+                        </a>
+                      ) : (
+                        <span className={`${rec.vacio} ${rec.sinLugar}`}>Sin ubicación por ahora</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </Card>
+        {canSeeOwnTrajectory ? (
+          <Card aria-label="Mi recorrido del día">
+            <CardHead title="Mi recorrido del día" subtitle="Tu entrada, por dónde pasaste y tu salida." />
+            <div className={styles.cardBody}>
+              {loading ? (
+                <SkeletonRows rows={3} label="Cargando recorrido" />
+              ) : (
+                <GpsTrajectoryPreview trajectory={trajectory} attendances={dayAttendances} />
+              )}
+            </div>
+          </Card>
+        ) : (
+          <EmptyState
+            icon={<PlaceOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+            title="Tu recorrido no se muestra aquí"
+            description="El recorrido de cada persona de tu equipo está en su ficha, en «Equipo del día»."
+          />
+        )}
+      </div>
+    );
+  }
+
+  const pestanas: TabItem<TabId>[] = [
+    {
+      id: "equipo",
+      label: isManager ? "Equipo del día" : "Mi jornada",
+      count: isManager && cargadoPara === dateFilter ? mapped.length : undefined,
+    },
+    { id: "comidas", label: "Comidas" },
+    // Quién intentó checar y no pudo, y el horario de cada quien: quien tiene equipo.
+    ...(isManager
+      ? [
+          { id: "rechazos" as const, label: "Checadas rechazadas" },
+          { id: "horarios" as const, label: "Horarios" },
+        ]
+      : []),
+    // Mapa del equipo y recorridos: solo dirección.
+    ...(canLiveGps ? [{ id: "trayectoria" as const, label: "Recorrido del día" }] : []),
+    { id: "guardias", label: "Guardias" },
+  ];
+
+  const descripcion =
+    tab === "equipo"
+      ? isManager
+        ? "Quién llegó, a qué hora y cuánto lleva trabajando tu equipo."
+        : "Tu jornada del día. La entrada y la salida se registran desde la app NEXARA."
+      : tab === "comidas"
+        ? isManager
+          ? "Tus comidas y las de tu equipo."
+          : "Tus comidas del día."
+        : tab === "rechazos"
+          ? "Quién intentó checar y no pudo, y por qué."
+          : tab === "horarios"
+            ? "El horario de cada persona de tu equipo."
+            : tab === "guardias"
+              ? "Quién trabaja cada sábado y domingo de las próximas semanas."
+              : "Dónde está tu equipo ahora y tu propio recorrido del día.";
+
+  /* ─── Ficha del día de una persona ────────────────────────────────────── */
+
+  const fichaDetalle = detalle
+    ? (() => {
+        const m = detalle;
+        const checadaEntrada = checadaDelTipo(m.attendances, "entrada");
+        const mapasPropios = m.userId === user?.id && !canSeeOwnTrajectory && (m.entryMapUrl || m.exitMapUrl);
+        return (
+          <div className={styles.ficha}>
+            <div className={styles.fichaHead}>
+              <Avatar name={m.nombre} avatarUrl={m.avatarUrl} size={52} />
+              <div className={styles.fichaResumen}>
+                <StatusBadge label={ESTADO_META[m.estado].label} tone={ESTADO_META[m.estado].tone} />
+                <span className={styles.fichaTiempo}>
+                  <TiempoJornada m={m} />
+                  {m.estado === "PRESENTE" ? <span className={styles.fichaPista}>trabajando, en vivo</span> : null}
+                </span>
+              </div>
+              <ButtonLink href={`/erp/pizarra/${m.userId}`} size="sm" variant="secondary">
+                Ver qué está haciendo
+              </ButtonLink>
+            </div>
+
+            <div className={styles.fichaChecadas}>
+              {(["entrada", "salida"] as const).map((tipo) => {
+                const checada = checadaDelTipo(m.attendances, tipo);
+                const hora = tipo === "entrada" ? m.checkIn : m.checkOut;
+                const foto = ultimaFoto(m, tipo);
+                const titulo = tipo === "entrada" ? "Entrada" : "Salida";
+                return (
+                  <section key={tipo} className={styles.checada} aria-label={titulo}>
+                    <div className={styles.checadaTexto}>
+                      <span className={styles.etiqueta}>{titulo}</span>
+                      <span className={styles.checadaHora}>{horaCorta(hora)}</span>
+                      <InsigniasChecada checada={checada} />
+                      {puedeCorregir && checada?.id ? (
+                        <Button size="sm" variant="tertiary" onClick={() => abrirCorreccion(checada, m.nombre, tipo)}>
+                          Corregir hora
+                        </Button>
+                      ) : null}
+                    </div>
+                    {foto?.photoUrl ? (
+                      <SessionImage src={resolveAssetUrl(foto.photoUrl)} alt={titulo} className={styles.checadaFoto} />
+                    ) : null}
+                  </section>
+                );
+              })}
+            </div>
+
+            {/* KPI «cumplimiento con uniforme»: el jefe lo marca viendo la foto de entrada. */}
+            {checadaEntrada?.id ? (
+              <div className={styles.uniforme}>
+                <span className={styles.etiqueta}>Uniforme</span>
+                <UniformeControl
+                  attendanceId={checadaEntrada.id}
+                  uniformeOk={checadaEntrada.uniformeOk}
+                  revisadoAt={checadaEntrada.uniformeRevisadoAt}
+                  editable={m.userId !== user?.id}
+                  token={token}
+                  onCambio={(ok, at) => actualizarUniforme(m.userId, checadaEntrada.id!, ok, at)}
+                />
+              </div>
+            ) : null}
+
+            {m.falta ? (
+              <Alert
+                tone="info"
+                icon={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+                title={`Falta justificada · ${m.falta.motivo}`}
+                action={
+                  puedeJustificar ? (
+                    <Button size="sm" variant="ghost" onClick={() => pedirQuitarFalta(m.falta!, m.nombre)}>
+                      Quitar
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {m.falta.justificadaPor?.nombre ? `Justificó ${m.falta.justificadaPor.nombre}` : "Justificada"}
+                {" · "}
+                {new Date(m.falta.justificadaAt).toLocaleString("es-MX", {
+                  day: "numeric",
+                  month: "short",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </Alert>
+            ) : null}
+
+            {/* AttendanceGpsDayPanel no se pinta en tu propia ficha sin recorrido: ahí los mapas van aparte. */}
+            {mapasPropios ? (
+              <div className={styles.mapas}>
+                {m.entryMapUrl ? (
+                  <a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer" className={rec.lugar}>
+                    <PlaceOutlinedIcon aria-hidden="true" />
+                    Entrada en mapa
+                  </a>
+                ) : null}
+                {m.exitMapUrl ? (
+                  <a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer" className={rec.lugar}>
+                    <PlaceOutlinedIcon aria-hidden="true" />
+                    Salida en mapa
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+
+            {m.estado === "PRESENTE" || m.estado === "COMPLETO" ? (
+              <AttendanceGpsDayPanel
+                token={token}
+                userId={m.userId}
+                date={dateFilter}
+                attendances={m.attendances}
+                hasCheckIn={Boolean(m.checkIn)}
+                viewerUserId={user?.id}
+                canViewOwnTrajectory={canSeeOwnTrajectory}
+                canViewTrajectory={canLiveGps}
+              />
+            ) : null}
+          </div>
+        );
+      })()
+    : null;
+
+  const accionesDetalle =
+    detalle && ((detalle.estado === "AUSENTE" && puedeJustificar) || esOtro(detalle)) ? (
+      <>
+        {detalle.estado === "AUSENTE" && puedeJustificar ? (
+          <Button onClick={() => abrirJustificar(detalle.userId, detalle.nombre)}>Justificar falta</Button>
+        ) : null}
+        {esOtro(detalle) ? (
+          <Button variant="primary" onClick={() => abrirRegistro(detalle.userId, detalle.nombre)}>
+            Registrar checada
+          </Button>
+        ) : null}
+      </>
+    ) : undefined;
 
   return (
     <>
-      <PageHeader
-        eyebrow="Asistencias"
+      <ModulePage
         title="Asistencia del día"
-        subtitle={
-          isManager
-            ? "Quién llegó, a qué hora y cuánto lleva trabajando tu equipo."
-            : "Tu jornada y tus comidas del día."
+        description={descripcion}
+        breadcrumbs={[{ label: "Hoy", href: "/erp" }, { label: "Asistencias" }]}
+        secondaryActions={
+          isManager ? (
+            <ButtonLink href={KPIS_PATH} iconStart={<InsightsOutlinedIcon fontSize="inherit" aria-hidden="true" />}>
+              KPIs del equipo
+            </ButtonLink>
+          ) : undefined
         }
-        actions={
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-            {isManager ? (
-              <Link
-                href={KPIS_PATH}
-                className={styles.control}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "7px 12px",
-                  borderRadius: 8,
-                  border: "1px solid var(--nx-panel-hairline)",
-                  background: "var(--nx-panel-surface-overlay)",
-                  color: "var(--primary)",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                KPIs del equipo
-              </Link>
-            ) : null}
-            <Button size="sm" variant="secondary" onClick={() => setVerGuardias(true)}>
-              Guardias
-            </Button>
-            <input
-              type="date"
-              aria-label="Día"
-              value={dateFilter}
-              max={todayIso()}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className={`${styles.control} ${styles.dateInput}`}
-              style={{
-                padding: "7px 10px",
-                border: "1px solid var(--nx-panel-hairline)",
-                borderRadius: 8,
-                background: "var(--nx-panel-surface-overlay)",
-                color: "var(--text-primary)",
-                fontSize: 14,
-                fontFamily: "inherit",
-              }}
-            />
-          </div>
-        }
-      />
+        tabs={<Tabs items={pestanas} value={tab} onChange={setTab} ariaLabel="Secciones de asistencia" />}
+        stats={stats}
+        before={before}
+        toolbar={toolbar}
+        footer={enEquipo && !vacio ? footer : undefined}
+        loading={cargandoEquipo}
+        empty={vacio}
+        emptyState={vacioState}
+        card={enEquipo}
+        listLabel={enEquipo ? "Equipo del día" : undefined}
+      >
+        {contenido}
+      </ModulePage>
 
-      <div className={styles.tabs}>
-        <PanelTabs
-          ariaLabel="Secciones de asistencia"
-          value={tab}
-          onChange={setTab}
-          tabs={[
-            { key: "equipo", label: isManager ? "Equipo del día" : "Mi jornada" },
-            { key: "comidas", label: "Comidas" },
-            // Quién intentó checar y no pudo, y el horario de cada quien: quien tiene equipo.
-            ...(isManager
-              ? [
-                  { key: "rechazos" as const, label: "Checadas rechazadas" },
-                  { key: "horarios" as const, label: "Horarios" },
-                ]
-              : []),
-            // Mapa del equipo y recorridos: solo dirección.
-            ...(canLiveGps ? [{ key: "trayectoria" as const, label: "Recorrido del día" }] : []),
-          ]}
-        />
-      </div>
-
-      <p className={styles.tabHint}>
-        {tab === "equipo"
-          ? isManager
-            ? "Aquí ves la entrada, la salida y el tiempo trabajado de tu equipo. Toca una tarjeta para ver qué está haciendo cada quien."
-            : "Aquí ves tu jornada. La entrada y la salida se registran desde la app NEXARA."
-          : tab === "comidas"
-            ? isManager
-              ? "Aquí ves tus comidas y las de tu equipo."
-              : "Aquí ves tus comidas del día."
-            : tab === "rechazos"
-              ? "Aquí ves quién intentó checar y no pudo, y por qué."
-              : tab === "horarios"
-                ? "Aquí ves el horario de cada persona de tu equipo."
-                : "Aquí ves dónde está tu equipo ahora y tu propio recorrido del día."}
-      </p>
-
-      {error ? (
-        <div style={{ marginBottom: 12 }}>
-          <InlineAlert
-            variant="danger"
-            message={error}
-            action={
-              tab === "equipo" || tab === "trayectoria" ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void (tab === "equipo" ? loadEquipo() : loadTrayectoria())}
-                >
-                  Reintentar
-                </Button>
-              ) : undefined
-            }
-          />
-        </div>
-      ) : null}
-
-      {tab === "equipo" && (
-        <>
-          {canRegister ? (
-            <Section
-              dense
-              tone="accent"
-              title="Mi jornada"
-              subtitle="Se checa desde la app NEXARA"
-              actions={
-                <InfoPopover label="¿Por qué ya no puedo checar aquí?" title="Se checa desde la app">
-                  <p style={{ margin: "0 0 8px" }}>
-                    Un navegador puede decir que está donde quiera —la ubicación de una pestaña se cambia desde la
-                    consola en dos líneas— y de estas checadas sale la nómina. Por eso ahora solo se checa desde la
-                    app, que sabe si el GPS es simulado y de cuándo es la medición.
-                  </p>
-                  <p style={{ margin: 0 }}>
-                    ¿Teléfono roto, sin batería u olvidado en casa? Tu jefe puede registrar tu checada desde esta
-                    misma pantalla, con el motivo; queda a su nombre y marcada para revisión.
-                  </p>
-                </InfoPopover>
-              }
-            >
-              {/* Solo con la excepción temporal que abre dirección aparece el formulario; si no, «usa la app». */}
-              <ChecarEnWeb token={token} />
-            </Section>
-          ) : null}
-
-          {!isManager ? (
-            canRegister ? null : (
-              <EmptyState
-                icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-                title="Vista de equipo"
-                description="Aquí aparece la asistencia de tu equipo cuando tienes personas a tu cargo."
-              />
-            )
-          ) : (
-            <>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  marginTop: canRegister ? 16 : 0,
-                  marginBottom: 10,
-                }}
-              >
-                {actualizadoEn ? (
-                  <span className={styles.actualizado}>
-                    Actualizado {actualizadoEn.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                ) : null}
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className={styles.control}
-                  onClick={() => void refrescar()}
-                  disabled={refrescando || loading}
-                >
-                  <span className={refrescando ? styles.girando : undefined} aria-hidden>
-                    ↻
-                  </span>{" "}
-                  Actualizar
-                </Button>
-              </div>
-
-              {refreshError ? (
-                <div style={{ marginBottom: 12 }}>
-                  <InlineAlert
-                    variant="warning"
-                    message={`No se pudo actualizar; ves los datos de las ${
-                      actualizadoEn
-                        ? actualizadoEn.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
-                        : "última carga"
-                    }. ${refreshError}`}
-                    action={
-                      <Button size="sm" variant="secondary" onClick={() => void refrescar()} disabled={refrescando}>
-                        Reintentar
-                      </Button>
-                    }
-                  />
-                </div>
-              ) : null}
-
-              <div className={styles.kpis} role="group" aria-label="Filtrar por estado">
-                {kpis.map((k) => {
-                  const activo = filterEstado === k.key;
-                  const elegir = () => setFilterEstado(activo && k.key !== "TODOS" ? "TODOS" : k.key);
-                  return (
-                    <div
-                      key={k.key}
-                      className={`${styles.kpi} ${activo ? styles.kpiActivo : ""}`}
-                      aria-current={activo ? "true" : undefined}
-                      onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          elegir();
-                        }
-                      }}
-                    >
-                      <KpiCard label={k.label} value={k.value} variant={k.variant} onClick={elegir} />
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  marginBottom: 12,
-                  padding: "12px 16px",
-                  borderRadius: 14,
-                  border: "1px solid color-mix(in srgb, #16a34a 28%, var(--border))",
-                  background: "color-mix(in srgb, #16a34a 8%, var(--surface))",
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    Horas trabajadas hoy
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>
-                    Todo tu equipo junto, en vivo
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontSize: 28,
-                    fontWeight: 800,
-                    fontVariantNumeric: "tabular-nums",
-                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-                    color: "#16a34a",
-                    letterSpacing: "-0.02em",
-                  }}
-                >
-                  <LiveTotal jornadas={jornadas} />
-                </div>
-              </div>
-
-              <Section title={sectionTitle} subtitle="Toca una tarjeta para ver qué está haciendo cada quien.">
-                {loading && (
-                  <EmptyState
-                    icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />}
-                    title="Cargando…"
-                    description="Consultando la asistencia de tu equipo."
-                  />
-                )}
-                {!loading && !error && filtered.length === 0 && (
-                  <EmptyState
-                    icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-                    title={mapped.length === 0 ? "Nadie en tu equipo este día" : "Nadie en este grupo"}
-                    description={
-                      mapped.length === 0
-                        ? "Cuando alguien de tu equipo registre su entrada, aparece aquí."
-                        : "Toca «Todo el equipo» arriba para ver a todos."
-                    }
-                    action={
-                      mapped.length > 0 ? (
-                        <Button size="sm" variant="secondary" onClick={() => setFilterEstado("TODOS")}>
-                          Ver todo el equipo
-                        </Button>
-                      ) : undefined
-                    }
-                  />
-                )}
-                {!loading && filtered.length > 0 && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                      gap: 12,
-                    }}
-                  >
-                    {filtered.map((m) => {
-                      const meta = ESTADO_META[m.estado];
-                      const entryPhoto = [...(m.attendances ?? [])]
-                        .filter((a) => a.type === "entrada" && a.photoUrl)
-                        .pop();
-                      const exitPhoto = [...(m.attendances ?? [])]
-                        .filter((a) => a.type === "salida" && a.photoUrl)
-                        .pop();
-                      // Lo que el servidor dejó dicho de cada checada (contrato A).
-                      const checadaEntrada = checadaDelTipo(m.attendances, "entrada");
-                      const checadaSalida = checadaDelTipo(m.attendances, "salida");
-                      return (
-                        <article
-                          key={m.userId}
-                          className={styles.card}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 12,
-                            background: "var(--surface)",
-                            border: "1px solid var(--border)",
-                            borderLeft: `3px solid ${meta.color}`,
-                            borderRadius: 16,
-                            padding: "14px 16px",
-                            boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
-                            opacity: m.estado === "AUSENTE" ? 0.88 : 1,
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <div style={{ position: "relative", flexShrink: 0 }}>
-                              <div
-                                aria-hidden
-                                style={{
-                                  width: 48,
-                                  height: 48,
-                                  borderRadius: "50%",
-                                  overflow: "hidden",
-                                  display: "grid",
-                                  placeItems: "center",
-                                  fontSize: 14,
-                                  fontWeight: 700,
-                                  color: "var(--primary)",
-                                  background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
-                                }}
-                              >
-                                {resolveUserAvatarUrl(m.avatarUrl) ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={resolveUserAvatarUrl(m.avatarUrl)}
-                                    alt=""
-                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                                  />
-                                ) : (
-                                  initials(m.nombre)
-                                )}
-                              </div>
-                              <span
-                                title={meta.label}
-                                style={{
-                                  position: "absolute",
-                                  right: 0,
-                                  bottom: 0,
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: "50%",
-                                  background: meta.color,
-                                  border: "2px solid var(--surface)",
-                                  boxShadow: `0 0 0 2px color-mix(in srgb, ${meta.color} 25%, transparent)`,
-                                }}
-                              />
-                            </div>
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <Link
-                                href={`/erp/pizarra/${m.userId}`}
-                                className={styles.cardLink}
-                                aria-label={`${m.nombre}: ver qué está haciendo`}
-                                style={{
-                                  fontWeight: 750,
-                                  fontSize: 15,
-                                  color: "inherit",
-                                  textDecoration: "none",
-                                  display: "block",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {m.nombre}
-                              </Link>
-                              <div
-                                style={{
-                                  fontSize: 12,
-                                  color: "var(--text-tertiary)",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {[m.roleName, m.department].filter(Boolean).join(" · ") || "Equipo NEXARA"}
-                              </div>
-                            </div>
-                            <span
-                              style={{
-                                flexShrink: 0,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: meta.color,
-                                background: `color-mix(in srgb, ${meta.color} 12%, var(--surface))`,
-                                padding: "4px 8px",
-                                borderRadius: 999,
-                              }}
-                            >
-                              {meta.label}
-                            </span>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "1fr 1fr auto",
-                              gap: 10,
-                              padding: "10px 12px",
-                              borderRadius: 12,
-                              background: "var(--surface-2, color-mix(in srgb, var(--border) 35%, var(--surface)))",
-                            }}
-                          >
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: 650,
-                                  color: "var(--text-tertiary)",
-                                  letterSpacing: "0.04em",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                Entrada
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 16,
-                                  fontWeight: 750,
-                                  fontVariantNumeric: "tabular-nums",
-                                  marginTop: 2,
-                                }}
-                              >
-                                {fmtTime(m.checkIn)}
-                              </div>
-                              <InsigniasChecada checada={checadaEntrada} />
-                              {puedeCorregir && checadaEntrada?.id ? (
-                                <BotonCorregir
-                                  onClick={() =>
-                                    abrirCorreccion(checadaEntrada, m.nombre, "entrada")
-                                  }
-                                />
-                              ) : null}
-                            </div>
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: 650,
-                                  color: "var(--text-tertiary)",
-                                  letterSpacing: "0.04em",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                Salida
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 16,
-                                  fontWeight: 750,
-                                  fontVariantNumeric: "tabular-nums",
-                                  marginTop: 2,
-                                }}
-                              >
-                                {fmtTime(m.checkOut)}
-                              </div>
-                              <InsigniasChecada checada={checadaSalida} />
-                              {puedeCorregir && checadaSalida?.id ? (
-                                <BotonCorregir
-                                  onClick={() => abrirCorreccion(checadaSalida, m.nombre, "salida")}
-                                />
-                              ) : null}
-                            </div>
-                            <div style={{ textAlign: "right", alignSelf: "center", minWidth: 88 }}>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: 650,
-                                  color: "var(--text-tertiary)",
-                                  textTransform: "uppercase",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 5,
-                                  justifyContent: "flex-end",
-                                }}
-                              >
-                                {m.estado === "PRESENTE" ? (
-                                  <>
-                                    <span
-                                      aria-hidden
-                                      style={{
-                                        width: 6,
-                                        height: 6,
-                                        borderRadius: "50%",
-                                        background: "#16a34a",
-                                        boxShadow: "0 0 0 3px color-mix(in srgb, #16a34a 30%, transparent)",
-                                      }}
-                                    />
-                                    En vivo
-                                  </>
-                                ) : m.estado === "COMPLETO" ? (
-                                  "Jornada"
-                                ) : (
-                                  "Tiempo"
-                                )}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: m.estado === "AUSENTE" ? 15 : 18,
-                                  fontWeight: 800,
-                                  fontVariantNumeric: "tabular-nums",
-                                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-                                  marginTop: 2,
-                                  color:
-                                    m.estado === "PRESENTE"
-                                      ? "#16a34a"
-                                      : m.estado === "COMPLETO"
-                                        ? "#2563eb"
-                                        : "var(--text-tertiary)",
-                                  letterSpacing: "-0.02em",
-                                }}
-                              >
-                                {m.estado === "AUSENTE" || !m.checkIn ? (
-                                  "—"
-                                ) : (
-                                  <LiveTimer
-                                    since={m.checkIn}
-                                    until={m.estado === "PRESENTE" ? null : m.checkOut}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {(entryPhoto?.photoUrl || exitPhoto?.photoUrl || checadaEntrada?.id) && (
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                              {entryPhoto?.photoUrl && (
-                                <SessionImage
-                                  src={resolveAssetUrl(entryPhoto.photoUrl)}
-                                  alt="Entrada"
-                                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10 }}
-                                />
-                              )}
-                              {exitPhoto?.photoUrl && (
-                                <SessionImage
-                                  src={resolveAssetUrl(exitPhoto.photoUrl)}
-                                  alt="Salida"
-                                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10 }}
-                                />
-                              )}
-                              {/* KPI «cumplimiento con uniforme»: el jefe lo marca viendo la foto de entrada. */}
-                              {checadaEntrada?.id ? (
-                                <UniformeControl
-                                  attendanceId={checadaEntrada.id}
-                                  uniformeOk={checadaEntrada.uniformeOk}
-                                  revisadoAt={checadaEntrada.uniformeRevisadoAt}
-                                  editable={m.userId !== user?.id}
-                                  token={token}
-                                  onCambio={(ok, at) => actualizarUniforme(m.userId, checadaEntrada.id!, ok, at)}
-                                />
-                              ) : null}
-                            </div>
-                          )}
-
-                          {m.falta ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 8,
-                                alignItems: "flex-start",
-                                padding: "10px 12px",
-                                borderRadius: 12,
-                                background: `color-mix(in srgb, ${ESTADO_META.JUSTIFICADA.color} 8%, var(--surface))`,
-                                fontSize: 12.5,
-                                lineHeight: 1.45,
-                              }}
-                            >
-                              <EventBusyOutlinedIcon aria-hidden="true" sx={{ fontSize: 18, color: ESTADO_META.JUSTIFICADA.color, mt: "1px" }} />
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 700 }}>Falta justificada · {m.falta.motivo}</div>
-                                <div style={{ color: "var(--text-tertiary)", fontSize: 11.5 }}>
-                                  {m.falta.justificadaPor?.nombre ? `Justificó ${m.falta.justificadaPor.nombre}` : "Justificada"}
-                                  {" · "}
-                                  {new Date(m.falta.justificadaAt).toLocaleString("es-MX", {
-                                    day: "numeric",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </div>
-                              </div>
-                              {puedeJustificar ? (
-                                <Button size="sm" variant="ghost" onClick={() => pedirQuitarFalta(m.falta!, m.nombre)}>
-                                  Quitar
-                                </Button>
-                              ) : null}
-                            </div>
-                          ) : null}
-
-                          {(m.estado === "AUSENTE" && puedeJustificar) ||
-                          (isManager && m.userId !== user?.id) ? (
-                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-                              {/* Teléfono roto, sin batería u olvidado: que su falta no la pague en la nómina. */}
-                              {isManager && m.userId !== user?.id ? (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => setRegistrandoPara({ id: m.userId, nombre: m.nombre })}
-                                >
-                                  Registrar checada
-                                </Button>
-                              ) : null}
-                              {m.estado === "AUSENTE" && puedeJustificar ? (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => abrirJustificar(m.userId, m.nombre)}
-                                  iconLeft={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-                                >
-                                  Justificar falta
-                                </Button>
-                              ) : null}
-                            </div>
-                          ) : null}
-
-                          {/* AttendanceGpsDayPanel no se pinta en tu propia tarjeta sin recorrido: ahí los mapas van aparte. */}
-                          {m.userId === user?.id && !canSeeOwnTrajectory && (m.entryMapUrl || m.exitMapUrl) ? (
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              {m.entryMapUrl ? (
-                                <a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer" className={styles.mapButton} style={{ marginTop: 0 }}>
-                                  📍 Entrada en mapa
-                                </a>
-                              ) : null}
-                              {m.exitMapUrl ? (
-                                <a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer" className={styles.mapButton} style={{ marginTop: 0 }}>
-                                  📍 Salida en mapa
-                                </a>
-                              ) : null}
-                            </div>
-                          ) : null}
-
-                          {(m.estado === "PRESENTE" || m.estado === "COMPLETO") && (
-                            <AttendanceGpsDayPanel
-                              token={token}
-                              userId={m.userId}
-                              date={dateFilter}
-                              attendances={m.attendances}
-                              hasCheckIn={Boolean(m.checkIn)}
-                              viewerUserId={user?.id}
-                              canViewOwnTrajectory={canSeeOwnTrajectory}
-                              canViewTrajectory={canLiveGps}
-                            />
-                          )}
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </Section>
-            </>
-          )}
-        </>
-      )}
-
-      <Modal open={verGuardias} onClose={() => setVerGuardias(false)} title="Guardias de fin de semana" size="lg">
-        {verGuardias ? <GuardiasPanel token={token} /> : null}
+      <Modal
+        open={detalle != null}
+        onClose={() => setDetalleId(null)}
+        title={detalle?.nombre ?? ""}
+        description={detalle ? puestoDe(detalle) : undefined}
+        size="lg"
+        footer={accionesDetalle}
+      >
+        {fichaDetalle}
       </Modal>
 
       <Modal
@@ -1311,33 +1340,28 @@ export default function ErpAsistenciasPage() {
           </>
         }
       >
-        <div style={{ display: "grid", gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <div className={styles.modalCuerpo}>
+          <p className={styles.modalTexto}>
             {justificando?.nombre} · {dateFilter}. El día quedará como «Falta justificada» con tu motivo; no se crea
             ninguna checada. Se avisa a la persona y a sus jefes.
           </p>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo *</span>
-            <textarea
+          <Field label="Motivo" required hint={`${motivoFalta.trim().length}/${MOTIVO_FALTA_MINIMO} caracteres mínimo`}>
+            <Textarea
               value={motivoFalta}
               onChange={(e) => setMotivoFalta(e.target.value)}
               rows={4}
               maxLength={1000}
               placeholder="Ej. Cita médica con comprobante del IMSS."
-              style={{ ...erpInputStyle, resize: "vertical", fontFamily: "inherit" }}
             />
-            <span
-              style={{
-                fontSize: 11,
-                color: motivoFalta.trim().length >= MOTIVO_FALTA_MINIMO ? "var(--text-tertiary)" : "var(--danger)",
-              }}
-            >
-              {motivoFalta.trim().length}/{MOTIVO_FALTA_MINIMO} caracteres mínimo
-            </span>
-          </label>
-          {errorFalta ? <InlineAlert variant="danger" message={errorFalta} /> : null}
+          </Field>
+          {errorFalta ? (
+            <Alert tone="danger" role="alert">
+              {errorFalta}
+            </Alert>
+          ) : null}
         </div>
       </Modal>
+
       <Modal
         open={corrigiendo != null}
         onClose={() => !guardandoCorreccion && setCorrigiendo(null)}
@@ -1358,61 +1382,37 @@ export default function ErpAsistenciasPage() {
           </>
         }
       >
-        <div style={{ display: "grid", gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <div className={styles.modalCuerpo}>
+          <p className={styles.modalTexto}>
             {corrigiendo?.nombre} · {corrigiendo?.tipo === "entrada" ? "Entrada" : "Salida"} de las{" "}
-            {corrigiendo ? fmtTime(corrigiendo.timestamp) : ""}. La checada original no se borra:
-            queda el antes, el después, tu motivo y tu nombre. Se avisa a la persona y a sus jefes.
+            {corrigiendo ? horaCorta(corrigiendo.timestamp) : ""}. La checada original no se borra: queda el antes, el
+            después, tu motivo y tu nombre. Se avisa a la persona y a sus jefes.
           </p>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Hora correcta *</span>
-            <input
-              type="datetime-local"
-              value={horaCorreccion}
-              onChange={(e) => setHoraCorreccion(e.target.value)}
-              style={erpInputStyle}
-            />
-          </label>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo *</span>
-            <textarea
+          <Field label="Hora correcta" required>
+            <DateInput type="datetime-local" value={horaCorreccion} onChange={(e) => setHoraCorreccion(e.target.value)} />
+          </Field>
+          <Field
+            label="Motivo"
+            required
+            hint={`${motivoCorreccion.trim().length}/${MOTIVO_CORRECCION_MINIMO} caracteres mínimo`}
+          >
+            <Textarea
               value={motivoCorreccion}
               onChange={(e) => setMotivoCorreccion(e.target.value)}
               rows={4}
               maxLength={1000}
               placeholder="Ej. Entró a la planta a las 8:05 y el teléfono no tenía señal."
-              style={{ ...erpInputStyle, resize: "vertical", fontFamily: "inherit" }}
             />
-            <span
-              style={{
-                fontSize: 11,
-                color:
-                  motivoCorreccion.trim().length >= MOTIVO_CORRECCION_MINIMO
-                    ? "var(--text-tertiary)"
-                    : "var(--danger)",
-              }}
-            >
-              {motivoCorreccion.trim().length}/{MOTIVO_CORRECCION_MINIMO} caracteres mínimo
-            </span>
-          </label>
-          {errorCorreccion ? <InlineAlert variant="danger" message={errorCorreccion} /> : null}
+          </Field>
+          {errorCorreccion ? (
+            <Alert tone="danger" role="alert">
+              {errorCorreccion}
+            </Alert>
+          ) : null}
         </div>
       </Modal>
 
       <ConfirmDialog state={confirmFalta} onClose={() => setConfirmFalta(null)} />
-
-      {tab === "comidas" && <ComidasPanel fecha={dateFilter} />}
-
-      {tab === "rechazos" && isManager && (
-        <ChecadasRechazadas token={token} desde={dateFilter} hasta={dateFilter} />
-      )}
-
-      {tab === "horarios" && isManager && (
-        <HorariosEquipo
-          token={token}
-          personas={mapped.map((m) => ({ id: m.userId, nombre: m.nombre, puesto: m.roleName ?? m.department }))}
-        />
-      )}
 
       {registrandoPara ? (
         <RegistroAsistido
@@ -1423,81 +1423,6 @@ export default function ErpAsistenciasPage() {
           onRegistrada={() => void loadEquipo()}
         />
       ) : null}
-
-      {tab === "trayectoria" && canLiveGps && (
-        <>
-          {canLiveGps && (
-            <Section title="Dónde está tu equipo" subtitle="Personas con jornada abierta que comparten su ubicación.">
-              {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando…" description="Buscando la ubicación de tu equipo." />}
-              {!loading && !error && teamGps.length === 0 && (
-                <EmptyState icon={<SatelliteAltOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin ubicaciones" description="Nadie está compartiendo su ubicación ahora." />
-              )}
-              {!loading && teamGps.length > 0 && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                    gap: 12,
-                    marginBottom: 16,
-                  }}
-                >
-                  {teamGps.map((item) => {
-                    const lat = toCoord(item.latitud);
-                    const lng = toCoord(item.longitud);
-                    return (
-                      <article
-                        key={item.id}
-                        style={{
-                          background: "var(--surface)",
-                          border: `1.5px solid ${item.estaActivo ? "#3b82f6" : "var(--border)"}`,
-                          borderRadius: 16,
-                          padding: 14,
-                          boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
-                        }}
-                      >
-                        <div style={{ fontWeight: 750, fontSize: 14 }}>{item.usuario?.nombre ?? "Sin nombre"}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                          {item.usuario?.role?.nombre ?? item.usuario?.department?.nombre ?? ""}
-                          {item.ultimaActualizacion ? ` · a las ${fmtTime(item.ultimaActualizacion)}` : ""}
-                        </div>
-                        {lat != null && lng != null ? (
-                          <a
-                            href={googleMapsPointUrl(lat, lng)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.mapButton}
-                          >
-                            📍 Ver en mapa
-                          </a>
-                        ) : (
-                          <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 10 }}>
-                            Sin ubicación por ahora
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </Section>
-          )}
-          {canSeeOwnTrajectory ? (
-            <Section title="Mi recorrido del día" subtitle="Tu entrada, por dónde pasaste y tu salida.">
-              {loading ? (
-                <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando recorrido…" description="" />
-              ) : (
-                <GpsTrajectoryPreview trajectory={trajectory} attendances={dayAttendances} />
-              )}
-            </Section>
-          ) : (
-            <EmptyState
-              icon={<PlaceOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-              title="Tu recorrido no se muestra aquí"
-              description="El recorrido de cada persona de tu equipo está en su tarjeta, en «Equipo del día»."
-            />
-          )}
-        </>
-      )}
     </>
   );
 }

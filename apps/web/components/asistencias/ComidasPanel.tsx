@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { SvgIconComponent } from "@mui/icons-material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
@@ -16,12 +15,29 @@ import RestaurantOutlinedIcon from "@mui/icons-material/RestaurantOutlined";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import UndoIcon from "@mui/icons-material/Undo";
 import SessionImage from "@/components/SessionImage";
-import { IconBadge, IconLabel } from "@/components/ui/IconBadge";
+import Modal from "@/components/ui/Modal";
 import { useUser } from "@/components/UserContext";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  Field,
+  FilterChip,
+  FilterChips,
+  Segmented,
+  SkeletonRows,
+  Textarea,
+  type Tone,
+} from "@/components/base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
+import { horaCorta, minutosCortos } from "./formato";
+import s from "./comidas.module.css";
 
-/** Fila de lunch-breaks tal como la devuelve la API (mi-dia / equipo / revision). */
+/** Registro de comida tal como lo devuelve la API (mi día / equipo / revisión). */
 type Registro = {
   id: number;
   userId: number;
@@ -70,29 +86,11 @@ type Equipo = {
 
 type Filtro = "todos" | "pendientes" | "destiempo" | "comiendo" | "sin";
 
-const VERDE = "#16a34a";
-const NARANJA = "#d97706";
-const ROJO = "#dc2626";
-const AZUL = "#2563eb";
-
-function hora(iso?: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
-}
+/** «3:02 p.m.» (sin segundos). */
+const hora = (iso?: string | null) => horaCorta(iso);
 
 function corto(nombre?: string | null) {
   return (nombre || "").split(/\s+/).slice(0, 2).join(" ");
-}
-
-function iniciales(nombre: string) {
-  return nombre
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0] ?? "")
-    .join("")
-    .toUpperCase();
 }
 
 function hoyIso() {
@@ -100,96 +98,32 @@ function hoyIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const tarjeta: CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 18,
-  padding: 16,
-  display: "grid",
-  gap: 12,
-};
-
-const btn: CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  fontWeight: 650,
-  fontSize: 14,
-  padding: "10px 16px",
-  minHeight: 44,
-  borderRadius: 12,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-};
-
-const btnLleno = (color: string): CSSProperties => ({ ...btn, border: 0, color: "#fff", background: color });
-
-function Chip({ children, color, icon: Icon }: { children: ReactNode; color?: string; icon?: SvgIconComponent }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "3px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 650,
-        whiteSpace: "nowrap",
-        border: `1px solid ${color ? `color-mix(in srgb, ${color} 35%, var(--border))` : "var(--border)"}`,
-        background: color ? `color-mix(in srgb, ${color} 10%, var(--surface))` : "var(--surface)",
-        color: color ?? "var(--text-secondary)",
-      }}
-    >
-      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto" }} /> : null}
-      {children}
-    </span>
-  );
-}
-
 /** Línea de texto con icono alineado a la primera línea (textos que pueden partirse). */
-function ConIcono({ icon: Icon, color, children }: { icon: SvgIconComponent; color?: string; children: ReactNode }) {
+function ConIcono({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-      <Icon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto", mt: "2px", color: color ?? "var(--text-secondary)" }} />
-      <span style={{ minWidth: 0 }}>{children}</span>
+    <div className={s.conIcono}>
+      {icon}
+      <span>{children}</span>
     </div>
   );
 }
 
-function estadoRevision(r: Registro | null): { label: string; color: string; icon: SvgIconComponent } | null {
+function estadoRevision(r: Registro | null): { label: string; tone: Tone; icon: ReactNode } | null {
   if (!r?.revisionEstado) return null;
-  if (r.revisionEstado === "APROBADA") return { label: "Justificación aprobada", color: VERDE, icon: TaskAltIcon };
-  if (r.revisionEstado === "RECHAZADA") return { label: "Justificación rechazada", color: ROJO, icon: CancelOutlinedIcon };
-  return { label: "Por aprobar", color: NARANJA, icon: HourglassTopIcon };
+  if (r.revisionEstado === "APROBADA")
+    return { label: "Justificación aprobada", tone: "success", icon: <TaskAltIcon fontSize="inherit" aria-hidden="true" /> };
+  if (r.revisionEstado === "RECHAZADA")
+    return { label: "Justificación rechazada", tone: "danger", icon: <CancelOutlinedIcon fontSize="inherit" aria-hidden="true" /> };
+  return { label: "Por aprobar", tone: "warning", icon: <HourglassTopIcon fontSize="inherit" aria-hidden="true" /> };
 }
 
 /** Foto de comida (protegida) con visor grande al tocarla. */
 function FotoComida({ url, titulo, onOpen }: { url: string | null; titulo: string; onOpen: (url: string, titulo: string) => void }) {
   if (!url) return null;
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(url, titulo)}
-      aria-label={`Ver ${titulo}`}
-      style={{
-        padding: 0,
-        width: 72,
-        height: 72,
-        borderRadius: 12,
-        overflow: "hidden",
-        border: "1px solid var(--border)",
-        background: "color-mix(in srgb, var(--text-secondary) 8%, var(--surface))",
-        cursor: "zoom-in",
-        flex: "0 0 auto",
-      }}
-    >
-      <SessionImage src={resolveAssetUrl(url)} alt={titulo} style={{ width: 72, height: 72, objectFit: "cover", display: "block" }} />
-    </button>
+    <Button variant="ghost" icon className={s.foto} onClick={() => onOpen(url, titulo)} aria-label={`Ver ${titulo}`} title={`Ver ${titulo}`}>
+      <SessionImage src={resolveAssetUrl(url)} alt={titulo} className={s.fotoImg} />
+    </Button>
   );
 }
 
@@ -201,30 +135,15 @@ function Visor({ foto, onClose }: { foto: { url: string; titulo: string }; onClo
   }, [onClose]);
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={foto.titulo}
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(2,6,23,0.9)", display: "grid", placeItems: "center", padding: 16 }}
-    >
-      <div onClick={(e) => e.stopPropagation()} style={{ display: "grid", gap: 10, maxWidth: "min(96vw, 900px)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", color: "#fff", gap: 10, alignItems: "center" }}>
+    <div role="dialog" aria-modal="true" aria-label={foto.titulo} onClick={onClose} className={s.visor}>
+      <div onClick={(e) => e.stopPropagation()} className={s.visorCaja}>
+        <div className={s.visorHead}>
           <strong>{foto.titulo}</strong>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            style={{ ...btn, background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)" }}
-          >
-            <CloseIcon aria-hidden="true" sx={{ fontSize: 20 }} />
-          </button>
+          <Button variant="secondary" icon aria-label="Cerrar" title="Cerrar" onClick={onClose}>
+            <CloseIcon fontSize="small" aria-hidden="true" />
+          </Button>
         </div>
-        <SessionImage
-          src={resolveAssetUrl(foto.url)}
-          alt={foto.titulo}
-          style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: 12 }}
-        />
+        <SessionImage src={resolveAssetUrl(foto.url)} alt={foto.titulo} className={s.visorImg} />
       </div>
     </div>,
     document.body,
@@ -286,12 +205,6 @@ function RegistroModal({
     };
   }, [facing, foto]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !enviando && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, enviando]);
-
   const tomar = () => {
     const v = videoRef.current;
     if (!v || !v.videoWidth) return;
@@ -346,163 +259,105 @@ function RegistroModal({
     }
   };
 
-  if (typeof document === "undefined") return null;
   const titulo = momento === "salida" ? "Foto de salida a comer" : "Foto de regreso de comer";
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={titulo}
-      onClick={() => !enviando && onClose()}
-      style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(2,6,23,0.6)", display: "grid", placeItems: "center", padding: 16 }}
+  return (
+    <Modal
+      open
+      onClose={() => !enviando && onClose()}
+      title={titulo}
+      description={
+        momento === "salida"
+          ? "Acomódate y toma la foto: se guarda con la hora en que sales."
+          : "Toma la foto al volver a tu lugar: se guarda con la hora en que regresas."
+      }
+      maxWidth={520}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={enviando}>
+            Cancelar
+          </Button>
+          {foto ? (
+            <>
+              <Button iconStart={<CameraswitchIcon fontSize="inherit" aria-hidden="true" />} onClick={() => setFoto(null)} disabled={enviando}>
+                Tomar otra
+              </Button>
+              <Button
+                variant="primary"
+                iconStart={<CheckIcon fontSize="inherit" aria-hidden="true" />}
+                onClick={() => void registrar()}
+                disabled={enviando}
+                loading={enviando}
+              >
+                {enviando ? "Registrando…" : momento === "salida" ? "Registrar salida" : "Registrar regreso"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                iconStart={<CameraswitchIcon fontSize="inherit" aria-hidden="true" />}
+                onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
+              >
+                {facing === "user" ? "Usar trasera" : "Usar frontal"}
+              </Button>
+              <Button
+                variant="primary"
+                iconStart={<PhotoCameraOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+                onClick={tomar}
+                disabled={!lista}
+              >
+                Tomar foto
+              </Button>
+            </>
+          )}
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          maxHeight: "calc(100dvh - 32px)",
-          overflowY: "auto",
-          background: "var(--surface)",
-          borderRadius: 20,
-          border: "1px solid var(--border)",
-          boxShadow: "0 24px 60px rgba(2,6,23,0.35)",
-          padding: 18,
-          display: "grid",
-          gap: 14,
-        }}
-      >
-        <header>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>
-            <IconLabel icon={PhotoCameraOutlinedIcon} size={20} gap={8} iconColor="var(--primary)">
-              {titulo}
-            </IconLabel>
-          </h3>
-          <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            {momento === "salida"
-              ? "Acomódate y toma la foto: se guarda con la hora en que sales."
-              : "Toma la foto al volver a tu lugar: se guarda con la hora en que regresas."}
-          </p>
-        </header>
-
-        <div
-          style={{
-            position: "relative",
-            borderRadius: 16,
-            overflow: "hidden",
-            background: "#0f172a",
-            aspectRatio: "4 / 3",
-            display: "grid",
-            placeItems: "center",
-          }}
-        >
+      <div className={s.cuerpo}>
+        <div className={s.camara}>
           {foto ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={foto} alt="Tu foto" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src={foto} alt="Tu foto" className={s.camaraMedio} />
           ) : (
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              style={{ width: "100%", height: "100%", objectFit: "cover", transform: facing === "user" ? "scaleX(-1)" : undefined }}
+              className={`${s.camaraMedio} ${facing === "user" ? s.camaraEspejo : ""}`}
             />
           )}
-          {!foto && !lista && !error ? (
-            <span style={{ position: "absolute", color: "#fff", fontSize: 13 }}>Abriendo cámara…</span>
-          ) : null}
+          {!foto && !lista && !error ? <span className={s.camaraAviso}>Abriendo cámara…</span> : null}
         </div>
 
         {foto && pideMotivo ? (
-          <label style={{ display: "grid", gap: 6 }}>
-            <span
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "flex-start",
-                fontSize: 13,
-                lineHeight: 1.45,
-                padding: "8px 12px",
-                borderRadius: 10,
-                background: `color-mix(in srgb, ${NARANJA} 10%, var(--surface))`,
-                border: `1px solid color-mix(in srgb, ${NARANJA} 35%, var(--border))`,
-              }}
-            >
-              <AccessTimeIcon aria-hidden="true" sx={{ fontSize: 18, flex: "0 0 auto", color: NARANJA }} />
-              <span>
-                Estás fuera del horario de comida ({ventanaTexto}). Escribe por qué; tu jefe lo aprobará o rechazará y queda en
-                el registro.
-              </span>
-            </span>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              rows={3}
-              maxLength={1000}
-              placeholder={
-                momento === "salida"
-                  ? "Ej. Estaba en sitio con el cliente de 2 a 4 y salí a comer al terminar."
-                  : "Ej. La fila del comedor tardó; regresé en cuanto pude."
-              }
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-                padding: "10px 12px",
-                font: "inherit",
-                fontSize: 14.5,
-                background: "var(--surface)",
-                color: "inherit",
-                resize: "vertical",
-              }}
-            />
-          </label>
+          <>
+            <Alert tone="warning" icon={<AccessTimeIcon fontSize="inherit" aria-hidden="true" />}>
+              Estás fuera del horario de comida ({ventanaTexto}). Escribe por qué; tu jefe lo aprobará o rechazará y queda en
+              el registro.
+            </Alert>
+            <Field label="¿Por qué?" required>
+              <Textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={3}
+                maxLength={1000}
+                placeholder={
+                  momento === "salida"
+                    ? "Ej. Estaba en sitio con el cliente de 2 a 4 y salí a comer al terminar."
+                    : "Ej. La fila del comedor tardó; regresé en cuanto pude."
+                }
+              />
+            </Field>
+          </>
         ) : null}
 
         {error ? (
-          <p role="alert" style={{ margin: 0, fontSize: 13.5, color: "#b91c1c" }}>
+          <Alert tone="danger" role="alert">
             {error}
-          </p>
+          </Alert>
         ) : null}
-
-        <footer style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" style={btn} onClick={onClose} disabled={enviando}>
-            Cancelar
-          </button>
-          {foto ? (
-            <>
-              <button type="button" style={btn} onClick={() => setFoto(null)} disabled={enviando}>
-                <CameraswitchIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                Tomar otra
-              </button>
-              <button type="button" style={btnLleno(pideMotivo ? NARANJA : VERDE)} onClick={() => void registrar()} disabled={enviando}>
-                {enviando ? (
-                  "Registrando…"
-                ) : (
-                  <>
-                    <CheckIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    {momento === "salida" ? "Registrar salida" : "Registrar regreso"}
-                  </>
-                )}
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" style={btn} onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}>
-                <CameraswitchIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                {facing === "user" ? "Usar trasera" : "Usar frontal"}
-              </button>
-              <button type="button" style={btnLleno(AZUL)} onClick={tomar} disabled={!lista}>
-                <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                Tomar foto
-              </button>
-            </>
-          )}
-        </footer>
       </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }
 
@@ -549,131 +404,82 @@ function RevisionModal({
     }
   };
 
-  if (typeof document === "undefined" || !r) return null;
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Revisar comida de ${fila.nombre}`}
-      onClick={() => !enviando && onClose()}
-      style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(2,6,23,0.55)", display: "grid", placeItems: "center", padding: 16 }}
+  if (!r) return null;
+  return (
+    <Modal
+      open
+      onClose={() => !enviando && onClose()}
+      title={`Comida a destiempo de ${corto(fila.nombre)}`}
+      maxWidth={500}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={enviando}>
+            Cancelar
+          </Button>
+          <Button
+            variant={decision === "aprobar" ? "primary" : "danger"}
+            iconStart={
+              decision === "aprobar" ? (
+                <TaskAltIcon fontSize="inherit" aria-hidden="true" />
+              ) : (
+                <CancelOutlinedIcon fontSize="inherit" aria-hidden="true" />
+              )
+            }
+            onClick={() => void guardar()}
+            disabled={enviando}
+            loading={enviando}
+          >
+            {enviando ? "Guardando…" : decision === "aprobar" ? "Aprobar" : "Rechazar"}
+          </Button>
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 500,
-          background: "var(--surface)",
-          borderRadius: 20,
-          border: "1px solid var(--border)",
-          boxShadow: "0 24px 60px rgba(2,6,23,0.35)",
-          padding: 18,
-          display: "grid",
-          gap: 14,
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Comida a destiempo de {corto(fila.nombre)}</h3>
-        <div style={{ display: "grid", gap: 8, fontSize: 13.5, lineHeight: 1.45 }}>
-          <ConIcono icon={RestaurantOutlinedIcon}>
+      <div className={s.cuerpo}>
+        <div className={s.resumenRevision}>
+          <ConIcono icon={<RestaurantOutlinedIcon fontSize="inherit" aria-hidden="true" />}>
             Salió <strong>{hora(r.checkinTime)}</strong>
             {r.checkoutTime ? (
               <>
                 {" "}
                 · regresó <strong>{hora(r.checkoutTime)}</strong>
-                {r.minutos != null ? ` (${r.minutos} min)` : ""}
+                {r.minutos != null ? ` (${minutosCortos(r.minutos)})` : ""}
               </>
             ) : (
               " · sigue en comida"
             )}
           </ConIcono>
-          {r.checkinJustificacion ? <ConIcono icon={ChatBubbleOutlineIcon}>Salida: «{r.checkinJustificacion}»</ConIcono> : null}
-          {r.checkoutJustificacion ? <ConIcono icon={ChatBubbleOutlineIcon}>Regreso: «{r.checkoutJustificacion}»</ConIcono> : null}
+          {r.checkinJustificacion ? (
+            <ConIcono icon={<ChatBubbleOutlineIcon fontSize="inherit" aria-hidden="true" />}>Salida: «{r.checkinJustificacion}»</ConIcono>
+          ) : null}
+          {r.checkoutJustificacion ? (
+            <ConIcono icon={<ChatBubbleOutlineIcon fontSize="inherit" aria-hidden="true" />}>Regreso: «{r.checkoutJustificacion}»</ConIcono>
+          ) : null}
         </div>
-        <div role="radiogroup" aria-label="Decisión" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {(["aprobar", "rechazar"] as const).map((d) => {
-            const on = decision === d;
-            const color = d === "aprobar" ? VERDE : ROJO;
-            return (
-              <button
-                key={d}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => setDecision(d)}
-                style={{
-                  ...btn,
-                  minHeight: 48,
-                  border: `2px solid ${on ? color : "var(--border)"}`,
-                  background: on ? `color-mix(in srgb, ${color} 12%, var(--surface))` : "var(--surface)",
-                  color: on ? color : "inherit",
-                }}
-              >
-                {d === "aprobar" ? (
-                  <>
-                    <TaskAltIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    Aprobar
-                  </>
-                ) : (
-                  <>
-                    <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    Rechazar
-                  </>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 750 }}>
-            {decision === "aprobar" ? "Comentario (opcional)" : "¿Por qué la rechazas?"}
-          </span>
-          <textarea
-            value={notas}
-            onChange={(e) => setNotas(e.target.value)}
-            rows={3}
-            maxLength={1000}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              borderRadius: 12,
-              border: "1px solid var(--border)",
-              padding: "10px 12px",
-              font: "inherit",
-              fontSize: 14.5,
-              background: "var(--surface)",
-              color: "inherit",
-              resize: "vertical",
-            }}
+        <Field label="Decisión">
+          <Segmented
+            ariaLabel="Decisión"
+            value={decision}
+            onChange={setDecision}
+            items={[
+              { id: "aprobar", label: "Aprobar" },
+              { id: "rechazar", label: "Rechazar" },
+            ]}
           />
-        </label>
+        </Field>
+        <Field
+          label={decision === "aprobar" ? "Comentario" : "¿Por qué la rechazas?"}
+          optional={decision === "aprobar"}
+          required={decision === "rechazar"}
+        >
+          <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} maxLength={1000} />
+        </Field>
         {error ? (
-          <p role="alert" style={{ margin: 0, fontSize: 13.5, color: "#b91c1c" }}>
+          <Alert tone="danger" role="alert">
             {error}
-          </p>
+          </Alert>
         ) : null}
-        <footer style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button type="button" style={btn} onClick={onClose} disabled={enviando}>
-            Cancelar
-          </button>
-          <button type="button" style={btnLleno(decision === "aprobar" ? VERDE : ROJO)} onClick={() => void guardar()} disabled={enviando}>
-            {enviando ? (
-              "Guardando…"
-            ) : decision === "aprobar" ? (
-              <>
-                <TaskAltIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                Aprobar
-              </>
-            ) : (
-              <>
-                <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                Rechazar
-              </>
-            )}
-          </button>
-        </footer>
       </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }
 
@@ -703,31 +509,34 @@ function MiComida({
   if (mi.siguiente === "salida") {
     const destiempo = ahora < inicio || ahora > fin;
     return (
-      <article style={{ ...tarjeta, borderLeft: `4px solid ${destiempo ? NARANJA : VERDE}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <IconBadge icon={RestaurantOutlinedIcon} size={32} />
+      <Card className={`${s.mia} ${destiempo ? s.tonoWarning : ""}`} aria-label="Tu comida">
+        <div className={s.miaHead}>
+          <div className={s.miaQuien}>
+            <span className={s.icono} aria-hidden="true">
+              <RestaurantOutlinedIcon />
+            </span>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 800 }}>Tu hora de comida</div>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-                Horario: {mi.ventana.texto} · registra tu salida y tu regreso con foto.
-              </div>
+              <h2 className={s.miaTitulo}>Tu hora de comida</h2>
+              <p className={s.miaSub}>Horario: {mi.ventana.texto} · registra tu salida y tu regreso con foto.</p>
             </div>
           </div>
-          <Chip color={destiempo ? NARANJA : VERDE} icon={destiempo ? AccessTimeIcon : CheckIcon}>
+          <Badge tone={destiempo ? "warning" : "success"} dot>
             {destiempo ? "Fuera de horario" : "Es tu horario"}
-          </Chip>
+          </Badge>
         </div>
         {destiempo ? (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "var(--text-secondary)" }}>
-            Si sales a comer ahora tendrás que escribir por qué; tu jefe lo aprobará o rechazará.
-          </p>
+          <p className={s.nota}>Si sales a comer ahora tendrás que escribir por qué; tu jefe lo aprobará o rechazará.</p>
         ) : null}
-        <button type="button" style={{ ...btnLleno(destiempo ? NARANJA : VERDE), justifySelf: "start" }} onClick={() => onRegistrar("salida", destiempo)}>
-          <RestaurantOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+        <Button
+          size="lg"
+          variant="primary"
+          className={s.accion}
+          iconStart={<RestaurantOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+          onClick={() => onRegistrar("salida", destiempo)}
+        >
           Salir a comer
-        </button>
-      </article>
+        </Button>
+      </Card>
     );
   }
 
@@ -735,75 +544,76 @@ function MiComida({
     const destiempo = ahora > limite;
     const minutos = Math.max(0, Math.round((ahora - new Date(r.checkinTime).getTime()) / 60_000));
     return (
-      <article style={{ ...tarjeta, borderLeft: `4px solid ${destiempo ? NARANJA : AZUL}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <Card className={`${s.mia} ${destiempo ? s.tonoWarning : s.tonoInfo}`} aria-label="Tu comida">
+        <div className={s.miaHead}>
+          <div className={s.miaQuien}>
             <FotoComida url={r.checkinPhotoUrl} titulo="Tu foto de salida" onOpen={onVerFoto} />
-            <IconBadge icon={RestaurantOutlinedIcon} size={32} />
+            <span className={s.icono} aria-hidden="true">
+              <RestaurantOutlinedIcon />
+            </span>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 800 }}>Estás en tu hora de comida</div>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-                Saliste a las {hora(r.checkinTime)} · llevas {minutos} min
-              </div>
+              <h2 className={s.miaTitulo}>Estás en tu hora de comida</h2>
+              <p className={s.miaSub}>
+                Saliste a las {hora(r.checkinTime)} · llevas {minutosCortos(minutos)}
+              </p>
             </div>
           </div>
           {revision ? (
-            <Chip color={revision.color} icon={revision.icon}>
+            <Badge tone={revision.tone} icon={revision.icon}>
               {revision.label}
-            </Chip>
+            </Badge>
           ) : null}
         </div>
         {destiempo ? (
-          <p
-            style={{
-              margin: 0,
-              fontSize: 13,
-              lineHeight: 1.45,
-              color: "var(--text-secondary)",
-              display: "flex",
-              gap: 6,
-              alignItems: "flex-start",
-            }}
-          >
-            <AccessTimeIcon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto", mt: "1px", color: NARANJA }} />
-            <span>Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.</span>
-          </p>
+          <Alert tone="warning" dense icon={<AccessTimeIcon fontSize="inherit" aria-hidden="true" />}>
+            Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.
+          </Alert>
         ) : null}
-        <button type="button" style={{ ...btnLleno(destiempo ? NARANJA : AZUL), justifySelf: "start" }} onClick={() => onRegistrar("regreso", destiempo)}>
-          <UndoIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+        <Button
+          size="lg"
+          variant="primary"
+          className={s.accion}
+          iconStart={<UndoIcon fontSize="inherit" aria-hidden="true" />}
+          onClick={() => onRegistrar("regreso", destiempo)}
+        >
           Ya regresé
-        </button>
-      </article>
+        </Button>
+      </Card>
     );
   }
 
   if (mi.siguiente === "listo" && r) {
+    const tono = r.revisionEstado === "RECHAZADA" ? s.tonoDanger : r.revisionEstado === "PENDIENTE" ? s.tonoWarning : "";
     return (
-      <article style={{ ...tarjeta, borderLeft: `4px solid ${r.revisionEstado === "RECHAZADA" ? ROJO : r.revisionEstado === "PENDIENTE" ? NARANJA : VERDE}` }}>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <FotoComida url={r.checkinPhotoUrl} titulo="Tu foto de salida" onOpen={onVerFoto} />
-          <FotoComida url={r.checkoutPhotoUrl} titulo="Tu foto de regreso" onOpen={onVerFoto} />
-          <div style={{ flex: "1 1 200px", display: "flex", gap: 12, alignItems: "center" }}>
-            <IconBadge icon={TaskAltIcon} size={32} />
+      <Card className={`${s.mia} ${tono}`} aria-label="Tu comida">
+        <div className={s.miaHead}>
+          <div className={s.miaQuien}>
+            <span className={s.fotos}>
+              <FotoComida url={r.checkinPhotoUrl} titulo="Tu foto de salida" onOpen={onVerFoto} />
+              <FotoComida url={r.checkoutPhotoUrl} titulo="Tu foto de regreso" onOpen={onVerFoto} />
+            </span>
+            <span className={s.icono} aria-hidden="true">
+              <TaskAltIcon />
+            </span>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>Comida registrada</div>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+              <h2 className={s.miaTitulo}>Comida registrada</h2>
+              <p className={s.miaSub}>
                 {hora(r.checkinTime)} → {hora(r.checkoutTime)}
-                {r.minutos != null ? ` · ${r.minutos} min` : ""}
-              </div>
+                {r.minutos != null ? ` · ${minutosCortos(r.minutos)}` : ""}
+              </p>
             </div>
           </div>
-          <Chip color={revision ? revision.color : VERDE} icon={revision?.icon}>
+          <Badge tone={revision ? revision.tone : "success"} icon={revision?.icon} dot={!revision}>
             {revision ? revision.label : "A tiempo"}
-          </Chip>
+          </Badge>
         </div>
         {r.revisionEstado && r.revisionEstado !== "PENDIENTE" ? (
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+          <p className={s.nota}>
             {corto(r.revisadoPor) || "Tu jefe"} {r.revisionEstado === "APROBADA" ? "la aprobó" : "la rechazó"}
             {r.revisionNotas ? `: «${r.revisionNotas}»` : "."}
           </p>
         ) : null}
-      </article>
+      </Card>
     );
   }
 
@@ -821,86 +631,63 @@ function FilaPersona({
 }) {
   const r = fila.registro;
   const revision = estadoRevision(r);
-  const estado: { label: string; color: string | undefined; icon?: SvgIconComponent } = !r
-    ? { label: "Sin registrar", color: undefined }
+  const estado: { label: string; tone: Tone } = !r
+    ? { label: "Sin registrar", tone: "neutral" }
     : !r.checkoutTime
-      ? { label: "En comida", color: AZUL, icon: RestaurantOutlinedIcon }
-      : { label: "Completa", color: VERDE, icon: TaskAltIcon };
-  const color = revision?.color ?? (r ? (r.checkoutTime ? VERDE : AZUL) : "var(--border)");
+      ? { label: "En comida", tone: "info" }
+      : { label: "Completa", tone: "success" };
 
   return (
-    <article style={{ ...tarjeta, borderLeft: `4px solid ${color}`, gap: 10 }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <div
-          aria-hidden
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            display: "grid",
-            placeItems: "center",
-            fontWeight: 800,
-            fontSize: 14,
-            color: "var(--primary)",
-            background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
-            flex: "0 0 auto",
-          }}
-        >
-          {iniciales(fila.nombre)}
+    <li className={s.fila} data-pendiente={r?.revisionEstado === "PENDIENTE" ? "true" : undefined}>
+      <div className={s.filaHead}>
+        <Avatar name={fila.nombre} avatarUrl={fila.avatarUrl} size={40} />
+        <div className={s.filaQuien}>
+          <span className={s.filaNombre}>{fila.nombre}</span>
+          {fila.puesto ? <span className={s.filaPuesto}>{fila.puesto}</span> : null}
         </div>
-        <div style={{ minWidth: 0, flex: "1 1 160px" }}>
-          <div style={{ fontWeight: 750, fontSize: 14.5 }}>{fila.nombre}</div>
-          {fila.puesto ? <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{fila.puesto}</div> : null}
-        </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <Chip color={estado.color} icon={estado.icon}>
+        <span className={s.insignias}>
+          <Badge tone={estado.tone} size="sm" dot>
             {estado.label}
-          </Chip>
+          </Badge>
           {revision ? (
-            <Chip color={revision.color} icon={revision.icon}>
+            <Badge tone={revision.tone} size="sm" icon={revision.icon}>
               {revision.label}
-            </Chip>
+            </Badge>
           ) : null}
-        </div>
+        </span>
       </div>
 
       {r ? (
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <FotoComida url={r.checkinPhotoUrl} titulo={`${corto(fila.nombre)} · salida`} onOpen={onVerFoto} />
-          <FotoComida url={r.checkoutPhotoUrl} titulo={`${corto(fila.nombre)} · regreso`} onOpen={onVerFoto} />
-          <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-            <span style={{ color: r.isCheckinLate ? NARANJA : "inherit" }}>{hora(r.checkinTime)}</span>
-            <span style={{ opacity: 0.45, margin: "0 6px" }}>→</span>
-            <span style={{ color: r.isCheckoutLate ? NARANJA : "inherit" }}>{r.checkoutTime ? hora(r.checkoutTime) : "en comida"}</span>
-            {r.minutos != null ? <span style={{ fontWeight: 500, color: "var(--text-secondary)" }}> · {r.minutos} min</span> : null}
-          </div>
+        <div className={s.horario}>
+          <span className={s.fotos}>
+            <FotoComida url={r.checkinPhotoUrl} titulo={`${corto(fila.nombre)} · salida`} onOpen={onVerFoto} />
+            <FotoComida url={r.checkoutPhotoUrl} titulo={`${corto(fila.nombre)} · regreso`} onOpen={onVerFoto} />
+          </span>
+          <span className={s.horas}>
+            <span className={r.isCheckinLate ? s.tarde : undefined}>{hora(r.checkinTime)}</span>
+            <span className={s.flecha} aria-hidden="true">
+              →
+            </span>
+            <span className={r.isCheckoutLate ? s.tarde : undefined}>{r.checkoutTime ? hora(r.checkoutTime) : "en comida"}</span>
+            {r.minutos != null ? <span className={s.minutos}> · {minutosCortos(r.minutos)}</span> : null}
+          </span>
         </div>
       ) : null}
 
       {r?.checkinJustificacion || r?.checkoutJustificacion ? (
-        <div
-          style={{
-            display: "grid",
-            gap: 4,
-            fontSize: 13,
-            lineHeight: 1.45,
-            padding: "8px 12px",
-            borderRadius: 10,
-            background: "color-mix(in srgb, var(--text-secondary) 6%, var(--surface))",
-          }}
-        >
+        <div className={s.porque}>
           {r.checkinJustificacion ? (
-            <ConIcono icon={ChatBubbleOutlineIcon}>
+            <ConIcono icon={<ChatBubbleOutlineIcon fontSize="inherit" aria-hidden="true" />}>
               Salida a las {hora(r.checkinTime)}: «{r.checkinJustificacion}»
             </ConIcono>
           ) : null}
           {r.checkoutJustificacion ? (
-            <ConIcono icon={ChatBubbleOutlineIcon}>
+            <ConIcono icon={<ChatBubbleOutlineIcon fontSize="inherit" aria-hidden="true" />}>
               Regreso a las {hora(r.checkoutTime)}: «{r.checkoutJustificacion}»
             </ConIcono>
           ) : null}
           {r.revisionEstado && r.revisionEstado !== "PENDIENTE" ? (
-            <div style={{ color: "var(--text-secondary)" }}>
+            <div className={s.tenue}>
               {corto(r.revisadoPor) || "—"} {r.revisionEstado === "APROBADA" ? "aprobó" : "rechazó"}
               {r.revisionNotas ? `: «${r.revisionNotas}»` : ""}
             </div>
@@ -909,30 +696,29 @@ function FilaPersona({
       ) : null}
 
       {fila.puedoRevisar && r ? (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className={s.acciones}>
           {r.revisionEstado === "PENDIENTE" ? (
             <>
-              <button type="button" style={btnLleno(VERDE)} onClick={() => onRevisar(fila, "aprobar")}>
-                <TaskAltIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+              <Button size="sm" variant="primary" iconStart={<TaskAltIcon fontSize="inherit" aria-hidden="true" />} onClick={() => onRevisar(fila, "aprobar")}>
                 Aprobar
-              </button>
-              <button type="button" style={btnLleno(ROJO)} onClick={() => onRevisar(fila, "rechazar")}>
-                <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+              </Button>
+              <Button
+                size="sm"
+                variant="danger-ghost"
+                iconStart={<CancelOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+                onClick={() => onRevisar(fila, "rechazar")}
+              >
                 Rechazar
-              </button>
+              </Button>
             </>
           ) : (
-            <button
-              type="button"
-              style={{ ...btn, minHeight: 36, fontSize: 13 }}
-              onClick={() => onRevisar(fila, r.revisionEstado === "APROBADA" ? "rechazar" : "aprobar")}
-            >
+            <Button size="sm" variant="tertiary" onClick={() => onRevisar(fila, r.revisionEstado === "APROBADA" ? "rechazar" : "aprobar")}>
               Cambiar decisión
-            </button>
+            </Button>
           )}
         </div>
       ) : null}
-    </article>
+    </li>
   );
 }
 
@@ -968,6 +754,7 @@ export default function ComidasPanel({ fecha }: { fecha: string }) {
       setEquipo(eq);
       setError(null);
     } catch (e) {
+      // Lo que ya se veía se queda: solo se avisa.
       setError(formatApiError(e, "No se pudieron cargar las comidas"));
     } finally {
       setCargando(false);
@@ -1007,136 +794,100 @@ export default function ComidasPanel({ fecha }: { fecha: string }) {
 
   const resumen = equipo?.resumen;
   const tieneEquipo = Boolean(equipo && equipo.alcance !== "propio");
-  const filtros: Array<{ key: Filtro; label: string; n?: number }> = [
+  const filtros: Array<{ key: Filtro; label: string; n?: number; dot?: Tone }> = [
     { key: "todos", label: "Todos", n: resumen?.total },
-    { key: "pendientes", label: "Por aprobar", n: resumen?.pendientes },
-    { key: "destiempo", label: "A destiempo", n: resumen?.aDestiempo },
-    { key: "comiendo", label: "En comida", n: resumen?.enComida },
-    { key: "sin", label: "Sin registrar", n: resumen ? resumen.total - resumen.registraron : undefined },
+    { key: "pendientes", label: "Por aprobar", n: resumen?.pendientes, dot: "warning" },
+    { key: "destiempo", label: "A destiempo", n: resumen?.aDestiempo, dot: "danger" },
+    { key: "comiendo", label: "En comida", n: resumen?.enComida, dot: "info" },
+    { key: "sin", label: "Sin registrar", n: resumen ? resumen.total - resumen.registraron : undefined, dot: "neutral" },
   ];
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className={s.panel}>
       {error ? (
-        <p role="alert" style={{ margin: 0, fontSize: 13.5, color: "#b91c1c" }}>
-          {error}{" "}
-          <button type="button" style={{ ...btn, minHeight: 32, padding: "4px 10px", fontSize: 12.5 }} onClick={() => void cargar()}>
-            Reintentar
-          </button>
-        </p>
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" onClick={() => void cargar()} loading={cargando}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
       ) : null}
 
       {aviso ? (
-        <p
-          role="status"
-          style={{
-            margin: 0,
-            padding: "10px 12px",
-            borderRadius: 12,
-            fontSize: 13.5,
-            fontWeight: 650,
-            background: `color-mix(in srgb, ${VERDE} 10%, var(--surface))`,
-            border: `1px solid color-mix(in srgb, ${VERDE} 35%, var(--border))`,
-          }}
-        >
+        <Alert tone="success" role="status" onDismiss={() => setAviso(null)}>
           {aviso}
-        </p>
+        </Alert>
       ) : null}
 
-      {cargando && !mi && !equipo ? (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Cargando comidas…</p>
-      ) : null}
+      {cargando && !mi && !equipo ? <SkeletonRows rows={4} label="Cargando comidas" /> : null}
 
       {esHoy && mi?.debeRegistrar ? (
         <MiComida mi={mi} offsetMs={offsetMs} onRegistrar={(momento, aDestiempo) => setRegistrando({ momento, aDestiempo })} onVerFoto={verFoto} />
       ) : null}
 
       {tieneEquipo && equipo ? (
-        <section style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Comidas de tu equipo</h2>
-              <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-                {equipo.alcance === "todo" ? "Toda la empresa." : "Tu gente por organigrama."} Horario 3:00 a 4:00 p.m.; lo que
-                sea fuera de esa hora trae justificación y lo apruebas o rechazas.
-              </p>
-            </div>
-            <button type="button" style={{ ...btn, minHeight: 38, fontSize: 13 }} onClick={() => void cargar()} disabled={cargando}>
-              {cargando ? (
-                "Actualizando…"
-              ) : (
-                <>
-                  <RefreshIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-                  Actualizar
-                </>
-              )}
-            </button>
-          </div>
-
-          {resumen?.pendientes ? (
-            <p
-              style={{
-                margin: 0,
-                padding: "10px 12px",
-                borderRadius: 12,
-                fontSize: 13.5,
-                fontWeight: 650,
-                background: `color-mix(in srgb, ${NARANJA} 10%, var(--surface))`,
-                border: `1px solid color-mix(in srgb, ${NARANJA} 35%, var(--border))`,
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-              }}
-            >
-              <HourglassTopIcon aria-hidden="true" sx={{ fontSize: 18, flex: "0 0 auto", color: NARANJA }} />
-              <span>
+        <Card aria-label="Comidas de tu equipo">
+          <CardHead
+            title="Comidas de tu equipo"
+            subtitle={`${equipo.alcance === "todo" ? "Toda la empresa." : "Tu gente por organigrama."} Horario 3:00 a 4:00 p.m.; lo que sea fuera de esa hora trae justificación y lo apruebas o rechazas.`}
+            actions={
+              <Button
+                size="sm"
+                variant="ghost"
+                iconStart={<RefreshIcon fontSize="inherit" aria-hidden="true" />}
+                onClick={() => void cargar()}
+                disabled={cargando}
+                loading={cargando}
+              >
+                {cargando ? "Actualizando…" : "Actualizar"}
+              </Button>
+            }
+          />
+          <div className={s.equipoBody}>
+            {resumen?.pendientes ? (
+              <Alert
+                tone="warning"
+                icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />}
+                action={
+                  filtro !== "pendientes" ? (
+                    <Button size="sm" onClick={() => setFiltro("pendientes")}>
+                      Ver por aprobar
+                    </Button>
+                  ) : undefined
+                }
+              >
                 Tienes {resumen.pendientes} comida{resumen.pendientes === 1 ? "" : "s"} a destiempo por aprobar.
-              </span>
-            </p>
-          ) : null}
+              </Alert>
+            ) : null}
 
-          <div role="tablist" aria-label="Filtrar comidas" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {filtros.map((f) => {
-              const on = filtro === f.key;
-              return (
-                <button
-                  key={f.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => setFiltro(f.key)}
-                  style={{
-                    ...btn,
-                    minHeight: 36,
-                    padding: "6px 12px",
-                    fontSize: 13,
-                    borderRadius: 999,
-                    border: `1px solid ${on ? "var(--primary)" : "var(--border)"}`,
-                    background: on ? "color-mix(in srgb, var(--primary) 12%, var(--surface))" : "var(--surface)",
-                    color: on ? "var(--primary)" : "inherit",
-                  }}
-                >
+            <FilterChips ariaLabel="Filtrar comidas">
+              {filtros.map((f) => (
+                <FilterChip key={f.key} active={filtro === f.key} count={f.n} dot={f.dot} onClick={() => setFiltro(f.key)}>
                   {f.label}
-                  {f.n != null ? <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{f.n}</span> : null}
-                </button>
-              );
-            })}
-          </div>
-
-          {filas.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Nadie en este filtro.</p>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: 12 }}>
-              {filas.map((fila) => (
-                <FilaPersona key={fila.userId} fila={fila} onRevisar={(f, decision) => setRevisando({ fila: f, decision })} onVerFoto={verFoto} />
+                </FilterChip>
               ))}
-            </div>
-          )}
-        </section>
+            </FilterChips>
+
+            {filas.length === 0 ? (
+              <p className={s.vacio}>Nadie en este filtro.</p>
+            ) : (
+              <ul className={s.filas}>
+                {filas.map((fila) => (
+                  <FilaPersona key={fila.userId} fila={fila} onRevisar={(f, decision) => setRevisando({ fila: f, decision })} onVerFoto={verFoto} />
+                ))}
+              </ul>
+            )}
+          </div>
+        </Card>
       ) : null}
 
       {!cargando && !tieneEquipo && !(esHoy && mi?.debeRegistrar) ? (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+        <p className={s.vacio}>
           {esHoy ? "No tienes comidas que registrar ni gente a tu cargo." : "Tu comida de ese día no se puede cambiar."}
         </p>
       ) : null}

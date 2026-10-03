@@ -1,25 +1,115 @@
+/* NEXARA · Registro de entrada / salida (v2). Solo tokens --ui-*; claro y oscuro salen de los tokens. */
+
 .root {
 	display: grid;
-	gap: 1rem;
+	gap: var(--ui-s4);
 }
 
 .card {
 	width: min(760px, 100%);
+	display: grid;
+	gap: var(--ui-s3);
+	padding: var(--ui-card-pad, 20px);
+	background: var(--ui-surface);
+	border: 1px solid var(--ui-border);
+	border-radius: var(--ui-card-radius, 16px);
+	box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+}
+
+.cardCompact {
+	width: 100%;
+	display: grid;
+	gap: var(--ui-s3);
 }
 
 .title {
-	margin: 0 0 0.5rem;
-	color: var(--text-primary);
+	margin: 0;
+	font-size: var(--ui-text-lg);
+	font-weight: 650;
+	color: var(--ui-fg);
 }
 
+/* ─── Estado de hoy: «En jornada desde 8:02 · 6 h 41» ─────────────────── */
+
+.statusBar {
+	display: flex;
+	align-items: center;
+	gap: var(--ui-s3);
+	padding: var(--ui-s3) var(--ui-s4);
+	border-radius: var(--ui-radius-lg);
+	border: 1px solid var(--ui-border);
+	background: var(--ui-bg-2);
+	min-width: 0;
+}
+
+.statusBar[data-tone="live"] {
+	border-color: var(--ui-success-border);
+	background: var(--ui-success-bg);
+}
+
+.statusBar[data-tone="ok"] {
+	border-color: var(--ui-info-border);
+	background: var(--ui-info-bg);
+}
+
+.statusDot {
+	flex: 0 0 auto;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--ui-fg-4);
+}
+
+.statusBar[data-tone="live"] .statusDot {
+	background: var(--ui-success);
+	box-shadow: 0 0 0 4px var(--ui-success-border);
+}
+
+.statusBar[data-tone="ok"] .statusDot {
+	background: var(--ui-info);
+}
+
+.statusText {
+	display: grid;
+	gap: 2px;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.statusEyebrow {
+	font-size: var(--ui-text-2xs);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--ui-fg-3);
+}
+
+.statusValue {
+	font-size: var(--ui-text-lg);
+	font-weight: 650;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.3;
+	color: var(--ui-fg);
+}
+
+.totalDay {
+	font-size: var(--ui-text-xs);
+	font-variant-numeric: tabular-nums;
+	color: var(--ui-fg-2);
+}
+
+/* ─── Campos ──────────────────────────────────────────────────────────── */
+
 .fieldBlock {
-	margin-bottom: 0.9rem;
+	display: grid;
+	gap: var(--ui-s1);
 }
 
 .label,
 .sectionLabel {
-	font-size: 0.82rem;
-	color: var(--text-secondary);
+	font-size: var(--ui-text-xs);
+	font-weight: 600;
+	color: var(--ui-fg-2);
 }
 
 .dateInput,
@@ -27,61 +117,69 @@
 	width: 100%;
 }
 
-.dateInputDisabled {
-	opacity: 0.7;
-}
+/* ─── Acción principal: grande y al alcance del pulgar ────────────────── */
 
 .actionsRow {
-	display: flex;
-	gap: 0.7rem;
-	margin-bottom: 0.9rem;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--ui-s2);
 }
 
 .actionsRowMobile {
-	flex-direction: column;
+	grid-template-columns: 1fr;
 }
 
-.flexGrow {
-	flex: 1;
+.actionsRow .accion {
+	width: 100%;
+	height: 48px;
+	font-size: var(--ui-text-base);
 }
 
-.btnDisabledVisual {
-	opacity: 0.6;
+@media (pointer: coarse), (max-width: 720px) {
+	.actionsRow .accion {
+		height: 52px;
+		font-size: var(--ui-text-lg);
+	}
 }
 
-.elapsed,
-.totalDay {
-	font-weight: 600;
-	color: var(--text-primary);
-	margin-bottom: 0.6rem;
+.hintLine {
+	margin: 0;
+	font-size: var(--ui-text-xs);
+	color: var(--ui-fg-3);
+	line-height: 1.4;
 }
 
-.infoAlert,
-.successAlert {
-	border-radius: 10px;
-	padding: 0.6rem 0.8rem;
-	margin-bottom: 0.55rem;
+.mapas {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--ui-s3);
 }
 
-.infoAlert {
-	background: color-mix(in srgb, var(--warning) 16%, transparent);
+.avisos {
+	display: grid;
+	gap: var(--ui-s2);
 }
 
-.successAlert {
-	background: color-mix(in srgb, var(--success) 16%, transparent);
+.avisos:empty {
+	display: none;
 }
 
-.historySection,
-.rangeSection {
-	margin-top: 0.8rem;
-	border-top: 1px solid var(--border);
-	padding-top: 0.8rem;
+/* ─── Checadas de hoy ─────────────────────────────────────────────────── */
+
+.historySection {
+	display: grid;
+	gap: var(--ui-s2);
+	padding-top: var(--ui-s3);
+	border-top: 1px solid var(--ui-border-subtle);
 }
 
 .historyList,
 .rangeDaysList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
 	display: grid;
-	gap: 0.5rem;
+	gap: var(--ui-s2);
 }
 
 .historyItem,
@@ -89,92 +187,132 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.6rem;
+	gap: var(--ui-s2);
 	flex-wrap: wrap;
+	font-size: var(--ui-text-sm);
+	color: var(--ui-fg);
 }
 
 .historyType {
 	text-transform: capitalize;
-	font-weight: 700;
+	font-weight: 600;
 }
 
-.deviceInfo,
 .mutedText {
-	color: var(--text-secondary);
-	font-size: 0.8rem;
+	color: var(--ui-fg-3);
+	font-size: var(--ui-text-xs);
+	font-variant-numeric: tabular-nums;
 }
 
 .historyPhoto {
 	width: 44px;
 	height: 44px;
 	object-fit: cover;
-	border-radius: 10px;
-	border: 1px solid var(--border);
+	border-radius: var(--ui-radius);
+	border: 1px solid var(--ui-border);
+}
+
+/* ─── Resumen semana / mes ────────────────────────────────────────────── */
+
+.rangeDetails {
+	border-top: 1px solid var(--ui-border-subtle);
+	padding-top: var(--ui-s1);
+}
+
+.rangeSummary {
+	display: flex;
+	align-items: center;
+	min-height: var(--ui-control-h);
+	cursor: pointer;
+	font-size: var(--ui-text-sm);
+	font-weight: 600;
+	color: var(--ui-fg-2);
+	list-style: none;
+	border-radius: var(--ui-radius-sm);
+}
+
+.rangeSummary::-webkit-details-marker {
+	display: none;
+}
+
+.rangeSummary::before {
+	content: "›";
+	display: inline-block;
+	width: 16px;
+	color: var(--ui-fg-3);
+	transition: transform var(--ui-duration-fast) ease;
+}
+
+.rangeDetails[open] .rangeSummary::before {
+	transform: rotate(90deg);
+}
+
+.rangeSummary:focus-visible {
+	outline: var(--ui-focus-outline);
+	outline-offset: 2px;
+}
+
+.rangeSectionInner {
+	display: grid;
+	gap: var(--ui-s3);
+	padding: var(--ui-s2) 0 var(--ui-s1);
 }
 
 .quickRangeButtons {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.55rem;
-	margin-bottom: 0.7rem;
+	gap: var(--ui-s2);
 }
 
 .rangeGrid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	gap: 0.65rem;
-	margin-bottom: 0.6rem;
+	gap: var(--ui-s2);
 }
 
 .rangeGridMobile {
 	grid-template-columns: 1fr;
 }
 
-.statusText {
-	color: var(--primary);
-	font-weight: 700;
-}
-
-.errorText {
-	color: var(--danger);
-	font-weight: 700;
-}
+/* ─── Cámara (pantalla completa, oscura en ambos temas) ───────────────── */
 
 .modalOverlay {
 	position: fixed;
 	inset: 0;
 	z-index: 3000;
-	background: rgba(2, 10, 18, 0.88);
+	background: var(--ui-scrim, rgba(2, 10, 18, 0.88));
+	backdrop-filter: blur(2px);
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
-	padding: 0.7rem;
+	padding: var(--ui-s3);
 }
 
 .modalHeader {
 	text-align: center;
-	margin-bottom: 0.6rem;
+	margin-bottom: var(--ui-s3);
 }
 
 .modalTitle {
 	margin: 0;
-	color: #f8fbff;
+	color: #e8eef5;
 	font-size: clamp(1rem, 2.8vw, 1.25rem);
-	font-weight: 800;
+	font-weight: 700;
 }
 
 .modalSubtitle {
-	margin: 0.3rem 0 0;
-	color: rgba(233, 246, 255, 0.78);
+	margin: var(--ui-s1) 0 0;
+	color: rgba(232, 238, 245, 0.78);
+	font-size: var(--ui-text-sm);
 }
 
 .videoWrap {
 	width: min(900px, 100%);
 	height: min(66vh, 600px);
-	border-radius: 16px;
+	border-radius: var(--ui-radius-xl);
 	overflow: hidden;
-	border: 1px solid rgba(255, 255, 255, 0.22);
+	border: 1px solid rgba(232, 238, 245, 0.22);
 	background: #000;
 }
 
@@ -190,19 +328,19 @@
 
 .cameraActions {
 	width: min(900px, 100%);
-	margin-top: 0.7rem;
+	margin-top: var(--ui-s3);
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 0.6rem;
+	gap: var(--ui-s2);
 }
 
-.cameraButton {
-	min-height: 48px;
-	font-weight: 700;
+.cameraActions .cameraButton {
+	width: 100%;
+	height: 52px;
 }
 
 .captureButton {
-	box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow) 66%, transparent);
+	box-shadow: var(--ui-elev-2);
 }
 
 @media (max-width: 720px) {
@@ -215,141 +353,8 @@
 	}
 }
 
-/* ── Compact (Core /erp/asistencias) ─────────────────────────── */
+/* ─── Compacto (dentro de «Mi jornada» en Asistencias) ────────────────── */
 
 .rootCompact {
 	gap: 0;
 }
-
-.cardCompact {
-	width: 100%;
-	padding: 0;
-	background: transparent;
-	border: none;
-	box-shadow: none;
-}
-
-.statusBar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	padding: 10px 12px;
-	margin-bottom: 10px;
-	border-radius: 12px;
-	border: 1px solid var(--border);
-	background: var(--surface-2, color-mix(in srgb, var(--surface) 92%, var(--border)));
-}
-
-.statusBar[data-tone="live"] {
-	border-color: color-mix(in srgb, #16a34a 40%, var(--border));
-	background: color-mix(in srgb, #16a34a 8%, var(--surface));
-}
-
-.statusBar[data-tone="ok"] {
-	border-color: color-mix(in srgb, #2563eb 40%, var(--border));
-	background: color-mix(in srgb, #2563eb 8%, var(--surface));
-}
-
-.statusBar[data-tone="idle"] {
-	border-color: var(--border);
-}
-
-.statusEyebrow {
-	font-size: 10px;
-	font-weight: 700;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--text-tertiary);
-}
-
-.statusValue {
-	margin-top: 2px;
-	font-size: 15px;
-	font-weight: 750;
-	color: var(--text-primary);
-}
-
-.statusMeta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-	justify-content: flex-end;
-}
-
-.timerChip,
-.gpsChip {
-	display: inline-flex;
-	align-items: center;
-	padding: 4px 8px;
-	border-radius: 999px;
-	font-size: 11px;
-	font-weight: 700;
-	font-variant-numeric: tabular-nums;
-	border: 1px solid var(--border);
-	background: var(--surface);
-	color: var(--text-secondary);
-}
-
-.timerChip {
-	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-	color: var(--text-primary);
-}
-
-.hintLine {
-	margin: 0 0 8px;
-	font-size: 12px;
-	color: var(--text-secondary);
-	line-height: 1.35;
-}
-
-.rangeDetails {
-	margin-top: 10px;
-	border-top: 1px solid var(--border);
-	padding-top: 6px;
-}
-
-.rangeSummary {
-	cursor: pointer;
-	font-size: 12px;
-	font-weight: 650;
-	color: var(--text-secondary);
-	list-style: none;
-	padding: 6px 0;
-}
-
-.rangeSummary::-webkit-details-marker {
-	display: none;
-}
-
-.rangeSectionInner {
-	padding: 4px 0 2px;
-}
-
-.rootCompact .actionsRow {
-	margin-bottom: 6px;
-	gap: 8px;
-}
-
-.rootCompact .actionsRow button {
-	min-height: 44px;
-	font-weight: 750;
-}
-
-.rootCompact .infoAlert,
-.rootCompact .successAlert {
-	margin-bottom: 8px;
-	padding: 8px 10px;
-	font-size: 12.5px;
-}
-
-.rootCompact .historySection {
-	margin-top: 8px;
-	padding-top: 8px;
-}
-
-.rootCompact .totalDay {
-	margin-bottom: 4px;
-	font-size: 13px;
-}
-

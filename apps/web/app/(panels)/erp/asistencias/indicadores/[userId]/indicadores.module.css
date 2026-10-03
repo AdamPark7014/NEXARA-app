@@ -1,0 +1,111 @@
+/* NEXARA · Asistencias → detalle de una persona (KPIs). Solo tokens --ui-*. */
+
+.pagina {
+  max-width: 1120px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-page-gap, var(--ui-s5));
+  transition: opacity var(--ui-duration-fast) ease;
+}
+
+/* Recalculando: lo de antes se queda a la vista, apagado. */
+.cuerpo[data-cargando="true"] {
+  opacity: 0.6;
+}
+
+.resumen {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-s5);
+}
+
+.cifra {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s4);
+  min-width: 180px;
+}
+
+.pct {
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg-3);
+}
+
+.pct[data-tono="ok"] {
+  color: var(--ui-brand-text);
+}
+
+.pct[data-tono="atencion"] {
+  color: var(--ui-warning-text);
+}
+
+.pct[data-tono="critico"] {
+  color: var(--ui-danger-text);
+}
+
+.pctEtiqueta {
+  margin-top: var(--ui-s1);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.lectura {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.lecturaTexto {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ui-fg);
+}
+
+.datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1) var(--ui-s4);
+  margin-top: 10px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.popParrafo {
+  margin: 0;
+}
+
+.fuerte {
+  color: var(--ui-fg);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.segundo {
+  color: var(--ui-fg-2);
+}
+
+.faltas {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s4) var(--ui-s3) var(--ui-s6);
+  display: grid;
+  gap: var(--ui-s1);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+}
+
+@media (max-width: 720px) {
+  .lectura {
+    flex-basis: 100%;
+  }
+}

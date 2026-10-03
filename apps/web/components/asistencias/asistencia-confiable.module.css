@@ -49,30 +49,16 @@
   gap: 3px;
 }
 
-.dia {
-  min-width: 1.75rem;
-  padding: 2px 0;
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-r1, 6px);
-  background: transparent;
-  color: var(--ui-fg-3);
-  font: inherit;
+.dias .dia {
+  min-width: 2rem;
+  height: 28px;
+  padding: 0 6px;
   font-size: var(--ui-text-xs);
-  font-weight: 600;
-  line-height: 1.4;
-  text-align: center;
-  cursor: pointer;
 }
 
-.dia[aria-pressed="true"] {
-  border-color: var(--ui-accent, var(--primary));
-  background: var(--ui-accent-soft, rgba(31, 158, 132, 0.12));
-  color: var(--ui-fg);
-}
-
-.dia:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+.dias .dia[aria-pressed="false"] {
+  border-color: var(--ui-border);
+  color: var(--ui-fg-3);
 }
 
 /* Acciones al final de una fila, pegadas a la derecha. */
@@ -97,4 +83,81 @@
   .acciones {
     justify-content: flex-start;
   }
+}
+
+/* ─── «Mi jornada»: dónde se checa ───────────────────────────────────── */
+
+.checar {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.usaLaApp {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+.usaLaApp svg {
+  flex: 0 0 auto;
+  font-size: 18px !important;
+  color: var(--ui-brand-text);
+}
+
+/* Barra de un panel: título corto a la izquierda y acciones a la derecha. */
+.cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ui-s2) var(--ui-s3);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg-3);
+}
+
+/* Cuerpo de un diálogo: campos uno bajo otro. */
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+/* Ventanita de ayuda: párrafos y lista con el mismo ritmo. */
+.popParrafo {
+  margin: 0 0 var(--ui-s2);
+}
+
+.popLista {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: var(--ui-s1);
+}
+
+.fuerte {
+  color: var(--ui-fg);
+  font-weight: 650;
+}
+
+/* Avisos dentro de una tarjeta, con el mismo margen que su cabecera. */
+.avisos {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3) 20px 0;
+}
+
+/* Un control segmentado largo se desliza dentro de su caja en vez de empujar la página. */
+.desliza {
+  display: inline-flex;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
