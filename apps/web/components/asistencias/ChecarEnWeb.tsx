@@ -5,11 +5,14 @@
  *
  * Por decisión del dueño se checa desde la app NEXARA (el navegador puede falsear su ubicación). Cuando
  * dirección abre la excepción temporal de la empresa (`attendance.web_checkin_until`), aquí aparece el
- * formulario de entrada/salida con cámara y se avisa hasta cuándo dura. Al vencer, se cierra sola.
+ * formulario de entrada/salida con cámara y se avisa hasta cuándo dura. Al vencer, se cierra sola y lo dice.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import PhoneIphoneOutlinedIcon from "@mui/icons-material/PhoneIphoneOutlined";
+import { Alert } from "@/components/base";
 import { buildApiUrl } from "@/lib/api-base";
+import s from "./asistencia-confiable.module.css";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
@@ -31,17 +34,30 @@ export async function fetchVentanaWeb(token: string): Promise<VentanaWeb> {
 }
 
 const formatoHasta = (iso: string) =>
-  new Date(iso).toLocaleString("es-MX", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+  new Date(iso).toLocaleString("es-MX", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
+
+/** `setTimeout` no aguanta más de ~24 días; más allá basta con la consulta periódica. */
+const MAX_ESPERA_MS = 2_000_000_000;
 
 export default function ChecarEnWeb({ token }: { token: string | null | undefined }) {
   const [ventana, setVentana] = useState<VentanaWeb | null>(null);
+  // Si estaba abierta y se cerró con la pantalla abierta, se avisa en lugar de desaparecer sin más.
+  const [vencida, setVencida] = useState(false);
+  const abiertaRef = useRef(false);
+
+  const aplicar = useCallback((v: VentanaWeb) => {
+    if (abiertaRef.current && !v.abierta) setVencida(true);
+    if (v.abierta) setVencida(false);
+    abiertaRef.current = v.abierta;
+    setVentana(v);
+  }, []);
 
   useEffect(() => {
     if (!token) return;
     let cancelado = false;
     const consultar = () =>
       void fetchVentanaWeb(token).then((v) => {
-        if (!cancelado) setVentana(v);
+        if (!cancelado) aplicar(v);
       });
     consultar();
     // Si la ventana se cierra mientras la pantalla está abierta, se entera sola.
@@ -50,33 +66,50 @@ export default function ChecarEnWeb({ token }: { token: string | null | undefine
       cancelado = true;
       window.clearInterval(id);
     };
-  }, [token]);
+  }, [token, aplicar]);
+
+  // Y justo a la hora en que vence, vuelve a preguntar (sin esperar los 5 minutos).
+  useEffect(() => {
+    if (!token || !ventana?.abierta || !ventana.hasta) return;
+    const falta = new Date(ventana.hasta).getTime() - Date.now();
+    if (!Number.isFinite(falta) || falta > MAX_ESPERA_MS) return;
+    let cancelado = false;
+    const id = window.setTimeout(
+      () =>
+        void fetchVentanaWeb(token).then((v) => {
+          if (!cancelado) aplicar(v);
+        }),
+      Math.max(0, falta) + 1_000,
+    );
+    return () => {
+      cancelado = true;
+      window.clearTimeout(id);
+    };
+  }, [token, ventana, aplicar]);
 
   if (ventana?.abierta) {
     return (
-      <div style={{ display: "grid", gap: 12 }}>
-        <div
-          role="status"
-          style={{
-            padding: "10px 12px",
-            borderRadius: 12,
-            background: "var(--state-warning-bg)",
-            color: "var(--state-warning-text)",
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}
-        >
-          <strong>Checar desde la web está habilitado temporalmente</strong>
-          {ventana.hasta ? ` (hasta el ${formatoHasta(ventana.hasta)})` : ""}. Tu checada queda marcada como hecha desde el
+      <div className={s.checar}>
+        <Alert tone="warning" role="status" title="Checar desde la web está habilitado temporalmente">
+          {ventana.hasta ? `Abierto hasta el ${formatoHasta(ventana.hasta)}. ` : ""}Tu checada queda marcada como hecha desde el
           navegador. Permite la cámara y la ubicación cuando el navegador te lo pida; si puedes, usa la app NEXARA.
-        </div>
+        </Alert>
         <AttendanceForm compact />
       </div>
     );
   }
 
+  if (vencida) {
+    return (
+      <Alert tone="info" title="Terminó el permiso para checar desde la web">
+        Abre la app NEXARA en tu teléfono para registrar tu entrada o tu salida.
+      </Alert>
+    );
+  }
+
   return (
-    <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+    <p className={s.usaLaApp}>
+      <PhoneIphoneOutlinedIcon fontSize="inherit" aria-hidden="true" />
       Abre la app NEXARA en tu teléfono para registrar tu entrada o tu salida.
     </p>
   );

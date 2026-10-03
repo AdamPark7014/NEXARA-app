@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import InlineAlert from "@/components/ui/InlineAlert";
+import { Alert } from "@/components/base";
 import { diaCorto, esFinDeSemanaISO, fetchCoberturaGuardias } from "@/lib/guardias-api";
 
 /**
@@ -48,10 +48,8 @@ export default function AvisoGuardia({
   const quien = sinGuardia.length === 1 ? sinGuardia[0] : sinGuardia.join(", ");
   const verbo = sinGuardia.length === 1 ? "no tiene" : "no tienen";
   return (
-    <InlineAlert
-      variant="warning"
-      title="Fin de semana sin guardia"
-      message={`El ${diaCorto(fecha)} es fin de semana y ${quien} ${verbo} guardia: sin guardia no se puede checar ese día. Prográmala en Asistencias → Guardias.`}
-    />
+    <Alert tone="warning" title="Fin de semana sin guardia">
+      {`El ${diaCorto(fecha)} es fin de semana y ${quien} ${verbo} guardia: sin guardia no se puede checar ese día. Prográmala en Asistencias → Guardias.`}
+    </Alert>
   );
 }

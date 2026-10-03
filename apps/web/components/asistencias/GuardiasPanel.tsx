@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
-import Button from "@/components/ui/Button";
-import InlineAlert from "@/components/ui/InlineAlert";
-import EmptyState from "@/components/ui/EmptyState";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import { erpInputStyle, formatApiError } from "@/lib/erp-api";
+import { Alert, Avatar, Badge, Button, Card, CardHead, EmptyState, Field, Input, Select, SkeletonRows } from "@/components/base";
+import { formatApiError } from "@/lib/erp-api";
 import {
   NOTA_GUARDIA_MAX,
   diaCorto,
@@ -17,6 +16,7 @@ import {
   type Guardia,
   type GuardiasRango,
 } from "@/lib/guardias-api";
+import s from "./guardias.module.css";
 
 /**
  * Guardias de fin de semana: quién trabaja cada sábado y domingo de las próximas semanas.
@@ -35,6 +35,7 @@ export default function GuardiasPanel({ token }: { token: string }) {
   const [guardando, setGuardando] = useState(false);
   const [errorForm, setErrorForm] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<ConfirmState | null>(null);
+  const personaRef = useRef<HTMLSelectElement>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -43,6 +44,7 @@ export default function GuardiasPanel({ token }: { token: string }) {
     try {
       setDatos(await fetchGuardias(token));
     } catch (e) {
+      // Si ya había calendario, se queda a la vista; solo se avisa.
       setError(formatApiError(e, "No se pudieron cargar las guardias"));
     } finally {
       setCargando(false);
@@ -80,6 +82,14 @@ export default function GuardiasPanel({ token }: { token: string }) {
     }
   };
 
+  /** Desde el calendario: deja el día elegido y lleva el foco a «Persona». */
+  const programarEn = (d: string) => {
+    setFecha(d);
+    setErrorForm(null);
+    personaRef.current?.focus();
+    personaRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  };
+
   const pedirQuitar = (g: Guardia) => {
     setConfirmar({
       title: "Quitar guardia",
@@ -98,20 +108,22 @@ export default function GuardiasPanel({ token }: { token: string }) {
   };
 
   if (cargando && !datos) {
-    return <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>Cargando guardias…</p>;
+    return <SkeletonRows rows={4} label="Cargando guardias" />;
   }
 
   if (error && !datos) {
     return (
-      <InlineAlert
-        variant="danger"
-        message={error}
+      <Alert
+        tone="danger"
+        role="alert"
         action={
-          <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+          <Button size="sm" onClick={() => void cargar()}>
             Reintentar
           </Button>
         }
-      />
+      >
+        {error}
+      </Alert>
     );
   }
   if (!datos) return null;
@@ -119,132 +131,156 @@ export default function GuardiasPanel({ token }: { token: string }) {
   const sinNada = !datos.puedeProgramar && datos.items.length === 0;
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)" }}>
+    <div className={s.panel}>
+      <p className={s.nota}>
         El sábado y el domingo solo checa quien tiene guardia. Su entrada se registra sola al iniciar su primer
         servicio o tarea del día, con la ubicación de ese inicio.
       </p>
 
-      {error ? <InlineAlert variant="danger" message={error} onDismiss={() => setError(null)} /> : null}
+      {error ? (
+        <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
+          {error}
+        </Alert>
+      ) : null}
 
       {datos.puedeProgramar ? (
-        <section
-          aria-label="Programar guardia"
-          style={{ display: "grid", gap: 10, padding: 12, borderRadius: 12, border: "1px solid var(--border)" }}
-        >
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-            <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600 }}>
-              Persona
-              <select value={persona} onChange={(e) => setPersona(e.target.value)} style={erpInputStyle}>
-                <option value="">Elige a quién</option>
-                {datos.personas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                    {p.puesto ? ` · ${p.puesto}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600 }}>
-              Día
-              <select value={fecha} onChange={(e) => setFecha(e.target.value)} style={erpInputStyle}>
-                <option value="">Sábado o domingo</option>
-                {dias.map((d) => (
-                  <option key={d} value={d}>
-                    {diaCorto(d)}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <Card aria-label="Programar guardia">
+          <CardHead title="Programar guardia" subtitle="Elige a la persona y el sábado o domingo que le toca." />
+          <div className={s.form}>
+            <div className={s.campos}>
+              <Field label="Persona" required>
+                <Select ref={personaRef} value={persona} onChange={(e) => setPersona(e.target.value)}>
+                  <option value="">Elige a quién</option>
+                  {datos.personas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                      {p.puesto ? ` · ${p.puesto}` : ""}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Día" required>
+                <Select value={fecha} onChange={(e) => setFecha(e.target.value)}>
+                  <option value="">Sábado o domingo</option>
+                  {dias.map((d) => (
+                    <option key={d} value={d}>
+                      {diaCorto(d)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Nota" optional className={s.campoNota}>
+                <Input
+                  value={nota}
+                  maxLength={NOTA_GUARDIA_MAX}
+                  onChange={(e) => setNota(e.target.value)}
+                  placeholder="Cubre emergencias de CCTV"
+                />
+              </Field>
+            </div>
+            {errorForm ? (
+              <Alert tone="danger" role="alert">
+                {errorForm}
+              </Alert>
+            ) : null}
+            <div className={s.pie}>
+              <Button
+                variant="primary"
+                iconStart={<EventAvailableOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+                disabled={!persona || !fecha || guardando}
+                loading={guardando}
+                onClick={() => void programar()}
+              >
+                Programar guardia
+              </Button>
+            </div>
           </div>
-          <label style={{ display: "grid", gap: 4, fontSize: 12.5, fontWeight: 600 }}>
-            Nota <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>(opcional)</span>
-            <input
-              value={nota}
-              maxLength={NOTA_GUARDIA_MAX}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="Cubre emergencias de CCTV"
-              style={erpInputStyle}
-            />
-          </label>
-          {errorForm ? <InlineAlert variant="danger" message={errorForm} /> : null}
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <Button size="sm" variant="primary" disabled={!persona || !fecha || guardando} onClick={() => void programar()}>
-              {guardando ? "Programando…" : "Programar guardia"}
-            </Button>
-          </div>
-        </section>
+        </Card>
       ) : null}
 
       {sinNada ? (
         <EmptyState
-          variant="compact"
-          icon={<EventAvailableOutlinedIcon />}
+          icon={<EventAvailableOutlinedIcon fontSize="inherit" aria-hidden="true" />}
           title="No tienes guardias programadas"
           description="Si te toca trabajar un fin de semana, tu encargado te programa aquí."
+          tone="neutral"
         />
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {fines.map((f) => (
-            <section
-              key={f.sabado ?? f.domingo}
-              aria-label={`Fin de semana del ${diaCorto((f.sabado ?? f.domingo) as string)}`}
-              style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}
-            >
-              {[f.sabado, f.domingo]
-                .filter((d): d is string => Boolean(d))
-                .map((d) => {
-                  const lista = porDia.get(d) ?? [];
-                  return (
-                    <div
-                      key={d}
-                      style={{
-                        display: "grid",
-                        gap: 6,
-                        alignContent: "start",
-                        padding: 10,
-                        borderRadius: 10,
-                        border: "1px solid var(--border)",
-                        background: d === datos.hoy ? "var(--nx-panel-surface-overlay)" : "var(--surface)",
-                      }}
-                    >
-                      <strong style={{ fontSize: 13, textTransform: "capitalize" }}>
-                        {diaCorto(d)}
-                        {d === datos.hoy ? " · hoy" : ""}
-                      </strong>
-                      {lista.length === 0 ? (
-                        <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Nadie de guardia</span>
-                      ) : (
-                        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
-                          {lista.map((g) => (
-                            <li key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                              <span style={{ flex: 1, minWidth: 0 }}>
-                                {g.persona?.nombre ?? `Persona #${g.userId}`}
-                                {g.nota ? (
-                                  <span style={{ display: "block", fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                                    {g.nota}
+        <div className={s.fines}>
+          {fines.map((f) => {
+            const primero = (f.sabado ?? f.domingo) as string;
+            const diasDelFin = [f.sabado, f.domingo].filter((d): d is string => Boolean(d));
+            const total = diasDelFin.reduce((n, d) => n + (porDia.get(d)?.length ?? 0), 0);
+            return (
+              <section key={primero} className={s.fin} aria-label={`Fin de semana del ${diaCorto(primero)}`}>
+                <header className={s.finHead}>
+                  <h3 className={s.finTitulo}>Fin de semana del {diaCorto(primero)}</h3>
+                  <Badge size="sm" tone={total > 0 ? "brand" : "neutral"}>
+                    {total === 0 ? "Sin guardias" : total === 1 ? "1 de guardia" : `${total} de guardia`}
+                  </Badge>
+                </header>
+                <div className={s.dias}>
+                  {diasDelFin.map((d) => {
+                    const lista = porDia.get(d) ?? [];
+                    const esHoy = d === datos.hoy;
+                    return (
+                      <div key={d} className={s.dia} data-hoy={esHoy ? "true" : undefined}>
+                        <div className={s.diaHead}>
+                          <strong className={s.diaNombre}>{diaCorto(d)}</strong>
+                          {esHoy ? (
+                            <Badge size="sm" tone="success" dot>
+                              Hoy
+                            </Badge>
+                          ) : null}
+                          {datos.puedeProgramar ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              icon
+                              className={s.diaMas}
+                              aria-label={`Programar guardia el ${diaCorto(d)}`}
+                              title="Programar guardia este día"
+                              onClick={() => programarEn(d)}
+                            >
+                              <AddOutlinedIcon fontSize="small" aria-hidden="true" />
+                            </Button>
+                          ) : null}
+                        </div>
+                        {lista.length === 0 ? (
+                          <span className={s.nadie}>Nadie de guardia</span>
+                        ) : (
+                          <ul className={s.personas}>
+                            {lista.map((g) => {
+                              const nombre = g.persona?.nombre ?? `Persona #${g.userId}`;
+                              return (
+                                <li key={g.id} className={s.persona}>
+                                  <Avatar name={nombre} avatarUrl={g.persona?.avatarUrl} size={32} />
+                                  <span className={s.personaTexto}>
+                                    <span className={s.personaNombre}>{nombre}</span>
+                                    {g.nota ? <span className={s.personaNota}>{g.nota}</span> : null}
                                   </span>
-                                ) : null}
-                              </span>
-                              {g.puedeQuitar ? (
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  aria-label={`Quitar guardia de ${g.persona?.nombre ?? "esta persona"} el ${diaCorto(g.fecha)}`}
-                                  onClick={() => pedirQuitar(g)}
-                                >
-                                  Quitar
-                                </Button>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })}
-            </section>
-          ))}
+                                  {g.puedeQuitar ? (
+                                    <Button
+                                      size="sm"
+                                      variant="danger-ghost"
+                                      aria-label={`Quitar guardia de ${g.persona?.nombre ?? "esta persona"} el ${diaCorto(g.fecha)}`}
+                                      onClick={() => pedirQuitar(g)}
+                                    >
+                                      Quitar
+                                    </Button>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 

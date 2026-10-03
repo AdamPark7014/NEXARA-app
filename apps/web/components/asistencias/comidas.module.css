@@ -1,0 +1,341 @@
+/* NEXARA · Comidas (v2): tu salida y regreso con foto, y las comidas de tu equipo. Solo tokens --ui-*. */
+
+.panel {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+/* ─── Tu comida ───────────────────────────────────────────────────────── */
+
+.mia {
+  position: relative;
+  display: grid;
+  gap: var(--ui-s3);
+  padding: 20px;
+  overflow: hidden;
+}
+
+/* Franja de estado a la izquierda: verde a tiempo, ámbar a destiempo, azul en comida, rojo rechazada. */
+.mia::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--ui-success);
+}
+
+.tonoWarning::before {
+  background: var(--ui-warning);
+}
+
+.tonoInfo::before {
+  background: var(--ui-info);
+}
+
+.tonoDanger::before {
+  background: var(--ui-danger);
+}
+
+.miaHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ui-s3);
+}
+
+.miaQuien {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.icono {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.icono svg {
+  font-size: 22px !important;
+}
+
+.miaTitulo {
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 650;
+  color: var(--ui-fg);
+}
+
+.miaSub {
+  margin: 2px 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.accion {
+  justify-self: start;
+  min-width: 200px;
+}
+
+@media (max-width: 720px) {
+  .accion {
+    justify-self: stretch;
+    min-width: 0;
+    height: 52px;
+  }
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+/* ─── Fotos ───────────────────────────────────────────────────────────── */
+
+.fotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+/* Miniatura que abre el visor: botón del sistema sin relleno (doble clase para ganarle al tamaño base). */
+.foto.foto {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-bg-2);
+  cursor: zoom-in;
+}
+
+.fotoImg {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+}
+
+/* ─── Comidas del equipo ──────────────────────────────────────────────── */
+
+.equipoBody {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) 20px 20px;
+}
+
+.filas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--ui-s3);
+}
+
+.fila {
+  display: grid;
+  gap: var(--ui-s3);
+  align-content: start;
+  min-width: 0;
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.fila[data-pendiente="true"] {
+  border-color: var(--ui-warning-border);
+}
+
+.filaHead {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.filaQuien {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filaNombre {
+  font-size: var(--ui-text-base);
+  font-weight: 650;
+  color: var(--ui-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filaPuesto {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+  justify-content: flex-end;
+}
+
+.horario {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-s3);
+}
+
+.horas {
+  font-size: var(--ui-text-base);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.tarde {
+  color: var(--ui-warning-text);
+}
+
+.flecha {
+  margin: 0 6px;
+  color: var(--ui-fg-4);
+}
+
+.minutos {
+  font-weight: 500;
+  color: var(--ui-fg-3);
+}
+
+.porque {
+  display: grid;
+  gap: var(--ui-s1);
+  padding: var(--ui-s2) var(--ui-s3);
+  border-radius: var(--ui-radius);
+  background: var(--ui-bg-2);
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg);
+}
+
+.conIcono {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.conIcono svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  font-size: 16px !important;
+  color: var(--ui-fg-3);
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.vacio {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Diálogos ────────────────────────────────────────────────────────── */
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.camara {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--ui-radius-xl);
+  background: #0b1220;
+}
+
+.camaraMedio {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camaraEspejo {
+  transform: scaleX(-1);
+}
+
+.camaraAviso {
+  position: absolute;
+  color: #e8eef5;
+  font-size: var(--ui-text-sm);
+}
+
+.resumenRevision {
+  display: grid;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg);
+}
+
+/* ─── Visor de foto (pantalla completa, oscuro en ambos temas) ───────── */
+
+.visor {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: var(--ui-s4);
+  background: rgba(2, 6, 23, 0.9);
+}
+
+.visorCaja {
+  display: grid;
+  gap: var(--ui-s2);
+  max-width: min(96vw, 900px);
+}
+
+.visorHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  color: #e8eef5;
+}
+
+.visorImg {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: var(--ui-radius-lg);
+}

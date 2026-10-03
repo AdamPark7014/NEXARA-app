@@ -7,7 +7,30 @@ import styles from './AttendanceForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import type { FaltaJustificada } from '@/lib/attendance-justifications';
+import { checadaDelTipo, type ChecadaValidable } from '@/lib/attendance-validacion';
+import { attendanceMapUrl } from '@/lib/gps-map-links';
+import { esFinDeSemanaISO, fetchGuardias } from '@/lib/guardias-api';
+import { Alert, Badge, Button, DateInput } from '@/components/base';
+import { duracionCorta, horaCorta, minutosCortos } from '@/components/asistencias/formato';
+import rec from '@/components/asistencias/recorrido.module.css';
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 
+/** Lo que trae `attendance/history` de cada checada: hora, foto, punto y marcas del servidor. */
+type ChecadaDelDia = ChecadaValidable & {
+  type: string;
+  timestamp: string;
+  photoUrl?: string;
+  deviceInfo?: string | null;
+  entryLatitude?: unknown;
+  entryLongitude?: unknown;
+  exitLatitude?: unknown;
+  exitLongitude?: unknown;
+};
+
+/** Mismo texto que manda el servidor al rechazar una entrada de fin de semana sin guardia. */
+const AVISO_FIN_DE_SEMANA = 'Hoy es fin de semana: solo quien tiene guardia puede checar. Pide a tu encargado que te programe.';
 
 const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
   const { user } = useUser();
@@ -38,7 +61,9 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
   const [elapsed, setElapsed] = useState<number>(0);
   const [totalMinutes, setTotalMinutes] = useState<number>(0);
   const [openSession, setOpenSession] = useState<{ lastEntryAt: string } | null>(null);
-  const [history, setHistory] = useState<{ type: string; timestamp: string; photoUrl?: string; deviceInfo?: string | null }[]>([]);
+  const [history, setHistory] = useState<ChecadaDelDia[]>([]);
+  /** Sábado o domingo: ¿tengo guardia hoy? `null` = no aplica o no se pudo saber. */
+  const [sinGuardiaHoy, setSinGuardiaHoy] = useState<boolean | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalDateInput(new Date()));
   const [rangeFrom, setRangeFrom] = useState<string>(() => getWeekRange().from);
   const [rangeTo, setRangeTo] = useState<string>(() => getWeekRange().to);
@@ -112,32 +137,21 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
     };
 
     updateElapsed(); // Actualizar inmediatamente
-    const interval = setInterval(updateElapsed, 1000);
+    // Sin segundos en pantalla: basta con avanzar cada 15 s.
+    const interval = setInterval(updateElapsed, 15_000);
 
     return () => clearInterval(interval);
   }, [startTime]);
-  // Formato HH:mm:ss
-  const formatElapsed = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-    const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}`;
-  };
+  // «6 h 41» · «41 min» (sin segundos: el número ya no tiembla).
+  const formatElapsed = (ms: number) => duracionCorta(ms);
 
-  // Formato HH:mm:ss (también para totales en minutos → segundos en :00)
-  const formatTotal = (minutes: number) => {
-    const totalSeconds = Math.max(0, Math.floor(minutes * 60));
-    const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-    const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-    const secs = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${hours}:${mins}:${secs}`;
-  };
+  // Totales que llegan en minutos.
+  const formatTotal = (minutes: number) => minutosCortos(minutes);
 
+  // «8:02 a.m.»
   const formatTime = (iso: string) => {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const hora = horaCorta(iso);
+    return hora === '—' ? '' : hora;
   };
 
   const formatDate = (iso: string) => {
@@ -383,7 +397,7 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
       }
 
       if (historyRes.ok) {
-        const list = await parseResponseJson<{ type: string; timestamp: string }[]>(historyRes);
+        const list = await parseResponseJson<ChecadaDelDia[]>(historyRes);
         if (Array.isArray(list)) setHistory(list);
       }
     } catch {
@@ -451,6 +465,26 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
     };
     fetchRange();
   }, [user, rangeFrom, rangeTo]);
+
+  // Sábado y domingo solo checa quien tiene guardia: avisar antes de intentarlo (el servidor
+  // es quien decide; si la consulta falla no se afirma nada).
+  useEffect(() => {
+    const hoy = new Date().toLocaleDateString('sv-SE');
+    if (!user?.token || !user.id || !esFinDeSemanaISO(hoy)) {
+      setSinGuardiaHoy(null);
+      return;
+    }
+    let vigente = true;
+    fetchGuardias(user.token, { desde: hoy, hasta: hoy })
+      .then((r) => {
+        if (!vigente) return;
+        setSinGuardiaHoy(!(r.items ?? []).some((g) => g.userId === user.id && g.fecha === hoy));
+      })
+      .catch(() => vigente && setSinGuardiaHoy(null));
+    return () => {
+      vigente = false;
+    };
+  }, [user?.token, user?.id]);
 
   // Cleanup GPS tracking en desmontaje
   useEffect(() => () => stopGpsTracking(), []);
@@ -603,11 +637,29 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
       ? 'salida'
       : null;
 
+  // Lo que se lee de un vistazo: «En jornada desde 8:02 · 6 h 41».
+  const elapsedOpen = elapsed || (openSession?.lastEntryAt ? Date.now() - new Date(openSession.lastEntryAt).getTime() : 0);
+  const totalHoyMs = totalMinutes * 60_000 + (startTime ? elapsed : 0);
+  const estadoLinea = jornadaDone
+    ? `Completada · ${formatElapsed(totalHoyMs)}`
+    : openSession
+      ? openSessionFromPriorDay
+        ? `Abierta desde el ${formatDate(openSession.lastEntryAt)} · ${formatTime(openSession.lastEntryAt)}`
+        : `En jornada desde ${formatTime(openSession.lastEntryAt)} · ${formatElapsed(elapsedOpen)}`
+      : 'Sin checada';
+  const mapaEntrada = attendanceMapUrl(history, 'entrada');
+  const mapaSalida = attendanceMapUrl(history, 'salida');
+  // La checada más reciente que el servidor marcó fuera de sitio (geocerca).
+  const fueraDeSitio = [checadaDelTipo(history, 'salida'), checadaDelTipo(history, 'entrada')]
+    .filter((c): c is ChecadaValidable => Boolean(c?.fueraDeSitio))
+    .sort((a, b) => ((b.timestamp ?? '') > (a.timestamp ?? '') ? 1 : -1))[0];
+  const avisoGuardia = isToday(selectedDate) && sinGuardiaHoy === true && canRegisterEntry;
+
   return (
     <div className={`${styles.root} ${compact ? styles.rootCompact : ''}`}>
       {/* Modal de Cámara */}
       {cameraOpen && typeof window !== 'undefined' && createPortal(
-        <div className={styles.modalOverlay}>
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true" aria-label={`Foto de ${cameraType === 'entrada' ? 'entrada' : 'salida'}`}>
           <div className={styles.modalHeader}>
             <p className={styles.modalTitle}>
               Foto de {cameraType === 'entrada' ? 'entrada' : 'salida'}
@@ -627,83 +679,81 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           </div>
           <canvas ref={canvasRef} className={styles.hiddenCanvas} />
           <div className={styles.cameraActions}>
-            <button
-              className={`button-secondary ${styles.cameraButton}`}
-              onClick={flipCamera}
-            >
+            <Button size="lg" className={styles.cameraButton} onClick={flipCamera}>
               Voltear
-            </button>
-            <button
-              className={`button-primary ${styles.cameraButton} ${styles.captureButton}`}
-              onClick={capturePhoto}
-            >
+            </Button>
+            <Button size="lg" variant="primary" className={`${styles.cameraButton} ${styles.captureButton}`} onClick={capturePhoto}>
               Capturar + GPS
-            </button>
-            <button
-              className={`button-secondary ${styles.cameraButton}`}
-              onClick={closeCamera}
-            >
+            </Button>
+            <Button size="lg" className={styles.cameraButton} onClick={closeCamera}>
               Cancelar
-            </button>
+            </Button>
           </div>
         </div>,
         document.body
       )}
 
-      <div className={`${compact ? styles.cardCompact : `card ${styles.card}`}`}>
+      <div className={compact ? styles.cardCompact : styles.card}>
         {!compact && <h2 className={styles.title}>Registro de Entrada/Salida</h2>}
 
         <div className={styles.statusBar} data-tone={statusTone}>
-          <div>
-            <div className={styles.statusEyebrow}>Estado hoy</div>
-            <div className={styles.statusValue}>{statusLabel}</div>
-          </div>
-          <div className={styles.statusMeta}>
-            {(startTime || openSession) && (
-              <span className={styles.timerChip}>
-                {formatElapsed(elapsed || (openSession?.lastEntryAt
-                  ? Date.now() - new Date(openSession.lastEntryAt).getTime()
-                  : 0))}
-              </span>
+          <span className={styles.statusDot} aria-hidden="true" />
+          <div className={styles.statusText}>
+            <div className={styles.statusEyebrow}>Estado hoy · {statusLabel}</div>
+            <div className={styles.statusValue}>{estadoLinea}</div>
+            {(totalMinutes > 0 || startTime) && !jornadaDone && (
+              <div className={styles.totalDay}>Total hoy: {formatElapsed(totalHoyMs)}</div>
             )}
-            <span className={styles.gpsChip}>Foto + GPS</span>
           </div>
+          <Badge size="sm" tone="neutral">Foto + GPS</Badge>
         </div>
 
         {!compact && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>Día</label>
-            <input
-              type="date"
+            <label className={styles.label} htmlFor="asistencia-dia">Día</label>
+            <DateInput
+              id="asistencia-dia"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               disabled={isToday(selectedDate)}
               max={toLocalDateInput(new Date())}
-              className={`${styles.dateInput} ${isToday(selectedDate) ? styles.dateInputDisabled : ''}`}
+              className={styles.dateInput}
               title={isToday(selectedDate) ? 'No puedes cambiar la fecha de hoy' : ''}
             />
           </div>
         )}
 
+        {avisoGuardia ? (
+          <Alert tone="warning" title="Fin de semana sin guardia">
+            {AVISO_FIN_DE_SEMANA}
+          </Alert>
+        ) : null}
+
         <div className={`${styles.actionsRow} ${isMobile ? styles.actionsRowMobile : ''}`}>
-          <button
-            type="button"
-            className={`${primaryAction === 'entrada' ? 'button-primary' : 'button-secondary'} ${styles.flexGrow} ${(loading || !canRegisterEntry) ? styles.btnDisabledVisual : ''}`}
+          <Button
+            size="lg"
+            variant={primaryAction === 'entrada' ? 'primary' : 'secondary'}
+            className={styles.accion}
+            iconStart={<LoginOutlinedIcon fontSize="inherit" aria-hidden="true" />}
             onClick={() => openCamera('entrada')}
             disabled={loading || !canRegisterEntry}
+            loading={loading && primaryAction === 'entrada'}
             title={hasEntryToday ? 'Ya registraste entrada hoy' : (openSession ? 'Cierra la jornada abierta primero' : 'Abre cámara y captura GPS')}
           >
             {loading && primaryAction === 'entrada' ? 'Preparando…' : 'Entrada'}
-          </button>
-          <button
-            type="button"
-            className={`${primaryAction === 'salida' ? 'button-primary' : 'button-secondary'} ${styles.flexGrow} ${(loading || !canRegisterExit) ? styles.btnDisabledVisual : ''}`}
+          </Button>
+          <Button
+            size="lg"
+            variant={primaryAction === 'salida' ? 'primary' : 'secondary'}
+            className={styles.accion}
+            iconStart={<LogoutOutlinedIcon fontSize="inherit" aria-hidden="true" />}
             onClick={() => openCamera('salida')}
             disabled={loading || !canRegisterExit}
+            loading={loading && primaryAction === 'salida'}
             title={!openSession ? 'Primero registra entrada' : 'Cierra jornada con foto + GPS'}
           >
             {loading && primaryAction === 'salida' ? 'Preparando…' : 'Salida'}
-          </button>
+          </Button>
         </div>
 
         {compact && primaryAction && (
@@ -714,47 +764,73 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           </p>
         )}
 
-        {isToday(selectedDate) && openSession && (
-          <div className={styles.infoAlert}>
-            {openSessionFromPriorDay ? (
-              <>Jornada abierta desde ayer — registra <strong>Salida</strong> para cerrarla.</>
-            ) : (
-              <>En jornada desde {formatTime(openSession.lastEntryAt)}.</>
-            )}
+        {(mapaEntrada || mapaSalida) && (
+          <div className={styles.mapas}>
+            {mapaEntrada ? (
+              <a href={mapaEntrada} target="_blank" rel="noopener noreferrer" className={rec.lugar}>
+                <PlaceOutlinedIcon aria-hidden="true" />
+                Ver entrada en mapa
+              </a>
+            ) : null}
+            {mapaSalida ? (
+              <a href={mapaSalida} target="_blank" rel="noopener noreferrer" className={rec.lugar}>
+                <PlaceOutlinedIcon aria-hidden="true" />
+                Ver salida en mapa
+              </a>
+            ) : null}
           </div>
         )}
-        {jornadaDone && (
-          <div className={styles.successAlert}>
-            Jornada completada. Entrada y salida registradas.
-          </div>
-        )}
-        {(totalMinutes > 0 || startTime) && (
-          <div className={styles.totalDay}>
-            Total hoy:{' '}
-            {formatElapsed(totalMinutes * 60_000 + (startTime ? elapsed : 0))}
-          </div>
-        )}
-        {status && <p className={styles.statusText}>{status}</p>}
-        {error && <p className={styles.errorText}>{error}</p>}
+
+        <div className={styles.avisos}>
+          {isToday(selectedDate) && openSession && openSessionFromPriorDay && (
+            <Alert tone="warning">
+              Jornada abierta desde ayer — registra <strong>Salida</strong> para cerrarla.
+            </Alert>
+          )}
+          {jornadaDone && (
+            <Alert tone="success">
+              Jornada completada. Entrada y salida registradas.
+            </Alert>
+          )}
+          {fueraDeSitio && (
+            <Alert tone="warning" title="Checada fuera de sitio">
+              Tu {fueraDeSitio.type === 'salida' ? 'salida' : 'entrada'}
+              {fueraDeSitio.timestamp ? ` de las ${formatTime(fueraDeSitio.timestamp)}` : ''} quedó
+              {fueraDeSitio.distanciaSitioM != null ? ` a ${fueraDeSitio.distanciaSitioM} m` : ' lejos'}
+              {fueraDeSitio.sitioNombre ? ` de ${fueraDeSitio.sitioNombre}` : ' del sitio asignado'}. Tu jefe la verá marcada como «Fuera de sitio».
+            </Alert>
+          )}
+          {status && (
+            <Alert tone="success" role="status">
+              {status}
+            </Alert>
+          )}
+          {error && (
+            <Alert tone="danger" role="alert" title={error === AVISO_FIN_DE_SEMANA ? 'Fin de semana sin guardia' : undefined}>
+              {error}
+            </Alert>
+          )}
+        </div>
 
         {history.length > 0 && (
           <div className={styles.historySection}>
-            <div className={styles.sectionLabel}><strong>Hoy</strong></div>
-            <div className={styles.historyList}>
+            <div className={styles.sectionLabel}>Hoy</div>
+            <ul className={styles.historyList}>
               {history.map((item, index) => (
-                <div key={`${item.type}-${item.timestamp}-${index}`} className={styles.historyItem}>
+                <li key={`${item.type}-${item.timestamp}-${index}`} className={styles.historyItem}>
                   <span className={styles.historyType}>{item.type}</span>
                   <span className={styles.mutedText}>{formatTime(item.timestamp)}</span>
                   {item.photoUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={item.photoUrl}
                       alt=""
                       className={styles.historyPhoto}
                     />
                   )}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         )}
 
@@ -764,45 +840,45 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           </summary>
           <div className={styles.rangeSectionInner}>
             <div className={styles.quickRangeButtons}>
-              <button className="button-secondary" type="button" onClick={() => { const r = getWeekRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Semana</button>
-              <button className="button-secondary" type="button" onClick={() => { const r = getMonthRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Mes</button>
+              <Button size="sm" onClick={() => { const r = getWeekRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Semana</Button>
+              <Button size="sm" onClick={() => { const r = getMonthRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Mes</Button>
             </div>
             <div className={`${styles.rangeGrid} ${isMobile ? styles.rangeGridMobile : ''}`}>
-              <input
-                type="date"
+              <DateInput
+                aria-label="Desde"
                 value={rangeFrom}
                 onChange={(e) => setRangeFrom(e.target.value)}
                 className={styles.rangeInput}
               />
-              <input
-                type="date"
+              <DateInput
+                aria-label="Hasta"
                 value={rangeTo}
                 onChange={(e) => setRangeTo(e.target.value)}
                 className={styles.rangeInput}
               />
             </div>
             {rangeDays.length > 0 && (
-              <div className={styles.rangeDaysList}>
+              <ul className={styles.rangeDaysList}>
                 {rangeDays.map((day) => (
-                  <div key={day.date} className={styles.rangeDayItem}>
+                  <li key={day.date} className={styles.rangeDayItem}>
                     <span>{formatDate(day.date)}</span>
                     <span className={styles.mutedText}>{formatTotal(day.totalMinutes)}</span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
             {rangeFaltas.length > 0 && (
-              <div className={styles.rangeDaysList}>
+              <ul className={styles.rangeDaysList}>
                 {rangeFaltas.map((falta) => (
-                  <div key={`falta-${falta.id}`} className={styles.rangeDayItem}>
+                  <li key={`falta-${falta.id}`} className={styles.rangeDayItem}>
                     <span>{formatDate(`${falta.fecha}T12:00:00`)}</span>
                     <span className={styles.mutedText}>
                       Falta justificada · {falta.motivo}
                       {falta.justificadaPor?.nombre ? ` (${falta.justificadaPor.nombre})` : ''}
                     </span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         </details>
