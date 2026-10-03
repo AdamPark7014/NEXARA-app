@@ -88,7 +88,6 @@ fun SesionPropiaPanel(
     var guardando by remember(activityId) { mutableStateOf(false) }
     var error by remember(activityId) { mutableStateOf<String?>(null) }
     var pidiendoMotivo by remember(activityId) { mutableStateOf(false) }
-    var motivo by remember(activityId) { mutableStateOf("") }
 
     val tono = if (reanudable) Color(CoreActivityRules.NARANJA) else Color(CoreActivityRules.VERDE)
     Column(
@@ -137,7 +136,7 @@ fun SesionPropiaPanel(
             )
             error?.let { Text(it, fontSize = 12.5.sp, color = Color(CoreActivityRules.ROJO)) }
             OutlinedButton(
-                onClick = { error = null; motivo = ""; pidiendoMotivo = true },
+                onClick = { error = null; pidiendoMotivo = true },
                 enabled = !guardando,
                 modifier = Modifier.heightIn(min = 48.dp),
             ) {
@@ -147,50 +146,76 @@ fun SesionPropiaPanel(
     }
 
     if (pidiendoMotivo) {
-        val errorMotivo = SesionActividadRules.errorMotivoPropio(motivo)
-        AlertDialog(
-            onDismissRequest = { if (!guardando) pidiendoMotivo = false },
-            title = { Text(SesionActividadRules.TITULO_PAUSA_PROPIA) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(SesionActividadRules.TEXTO_PAUSA_PROPIA, fontSize = 13.sp)
-                    OutlinedTextField(
-                        value = motivo,
-                        onValueChange = { motivo = it.take(SesionActividadRules.MOTIVO_PAUSA_MAX + 20) },
-                        label = { Text("Motivo (opcional)") },
-                        isError = errorMotivo != null,
-                        supportingText = errorMotivo?.let { { Text(it) } },
-                        minLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    error?.let { Text(it, fontSize = 12.5.sp, color = Color(CoreActivityRules.ROJO)) }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !guardando && errorMotivo == null,
-                    onClick = {
-                        scope.launch {
-                            guardando = true
-                            error = null
-                            try {
-                                withContext(Dispatchers.IO) { repo.pausarActividad(activityId, motivo) }
-                                pidiendoMotivo = false
-                                onDone("Actividad en pausa")
-                            } catch (e: Exception) {
-                                error = e.toUserMessage("No se pudo pausar la actividad")
-                            } finally {
-                                guardando = false
-                            }
-                        }
-                    },
-                ) { Text(if (guardando) "Pausando…" else "Pausar") }
-            },
-            dismissButton = {
-                TextButton(enabled = !guardando, onClick = { pidiendoMotivo = false }) { Text("Cancelar") }
+        PausarPropiaDialog(
+            activityId = activityId,
+            onDismiss = { pidiendoMotivo = false },
+            onDone = { mensaje ->
+                pidiendoMotivo = false
+                onDone(mensaje)
             },
         )
     }
+}
+
+/**
+ * Diálogo de «Pausar actividad» (motivo opcional) con la llamada a
+ * `me/activities/:id/pausar`. Lo comparten el panel del detalle, el dock del
+ * detalle y la tarjeta «Ahora» de Inicio: una sola implementación.
+ */
+@Composable
+fun PausarPropiaDialog(
+    activityId: Long,
+    onDismiss: () -> Unit,
+    onDone: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val repo = remember(context) { CoreActivitiesRepository(context) }
+    val scope = rememberCoroutineScope()
+    var guardando by remember(activityId) { mutableStateOf(false) }
+    var error by remember(activityId) { mutableStateOf<String?>(null) }
+    var motivo by remember(activityId) { mutableStateOf("") }
+    val errorMotivo = SesionActividadRules.errorMotivoPropio(motivo)
+    AlertDialog(
+        onDismissRequest = { if (!guardando) onDismiss() },
+        title = { Text(SesionActividadRules.TITULO_PAUSA_PROPIA) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(SesionActividadRules.TEXTO_PAUSA_PROPIA, fontSize = 13.sp)
+                OutlinedTextField(
+                    value = motivo,
+                    onValueChange = { motivo = it.take(SesionActividadRules.MOTIVO_PAUSA_MAX + 20) },
+                    label = { Text("Motivo (opcional)") },
+                    isError = errorMotivo != null,
+                    supportingText = errorMotivo?.let { { Text(it) } },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                error?.let { Text(it, fontSize = 12.5.sp, color = Color(CoreActivityRules.ROJO)) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !guardando && errorMotivo == null,
+                onClick = {
+                    scope.launch {
+                        guardando = true
+                        error = null
+                        try {
+                            withContext(Dispatchers.IO) { repo.pausarActividad(activityId, motivo) }
+                            onDone("Actividad en pausa")
+                        } catch (e: Exception) {
+                            error = e.toUserMessage("No se pudo pausar la actividad")
+                        } finally {
+                            guardando = false
+                        }
+                    }
+                },
+            ) { Text(if (guardando) "Pausando…" else "Pausar") }
+        },
+        dismissButton = {
+            TextButton(enabled = !guardando, onClick = onDismiss) { Text("Cancelar") }
+        },
+    )
 }
 
 /**

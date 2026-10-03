@@ -181,7 +181,7 @@ private fun fmtHora(iso: String?): String =
     parseInstante(iso)?.atZone(ZoneId.systemDefault())?.toLocalTime()?.format(HORA_FMT) ?: "—"
 
 /** `08:15` — la que va en la fila de la lista, donde los segundos solo estorban. */
-private fun fmtHoraCorta(iso: String?): String =
+internal fun fmtHoraCorta(iso: String?): String =
     parseInstante(iso)?.atZone(ZoneId.systemDefault())?.toLocalTime()?.format(HORA_CORTA_FMT) ?: "—"
 
 private fun pad2(n: Long): String = n.coerceAtLeast(0).toString().padStart(2, '0')
@@ -193,7 +193,7 @@ internal fun fmtHms(totalMs: Long): String {
     return "${s / 3600}:${pad2((s % 3600) / 60)}:${pad2(s % 60)}"
 }
 
-private fun transcurridoMs(inicioIso: String?, finIso: String?, ahoraMs: Long): Long {
+internal fun transcurridoMs(inicioIso: String?, finIso: String?, ahoraMs: Long): Long {
     val inicio = parseInstante(inicioIso)?.toEpochMilli() ?: return 0
     val fin = parseInstante(finIso)?.toEpochMilli() ?: ahoraMs
     return (fin - inicio).coerceAtLeast(0)
@@ -641,7 +641,7 @@ fun ConsoleAttendanceScreen(
  * que no es lo mismo en los cuatro casos.
  */
 @Composable
-private fun ChecadaRechazadaDialog(mensaje: String, onDismiss: () -> Unit) {
+internal fun ChecadaRechazadaDialog(mensaje: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {

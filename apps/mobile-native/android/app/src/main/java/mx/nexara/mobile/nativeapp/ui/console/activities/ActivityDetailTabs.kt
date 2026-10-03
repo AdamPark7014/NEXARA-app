@@ -67,18 +67,26 @@ fun ActivityInfoTab(
     extraContent: (@Composable () -> Unit)? = null,
     /** Bloque arriba de todo (comenzar la actividad, semáforo: contrato B). */
     topContent: (@Composable () -> Unit)? = null,
+    /** La cabecera v2 ya pinta el estado: aquí solo queda «Editar». */
+    showStatusChip: Boolean = true,
 ) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (topContent != null) {
             item { topContent() }
         }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.clip(RoundedCornerShape(20.dp)).background(statusColor.copy(alpha = 0.13f)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    Text(a.estatus.ifBlank { "Sin estado" }, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
-                if (canEdit && !editing) {
-                    OutlinedButton(onClick = onStartEdit) { Text("Editar") }
+        if (showStatusChip || (canEdit && !editing)) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    if (showStatusChip) {
+                        Box(Modifier.clip(RoundedCornerShape(20.dp)).background(statusColor.copy(alpha = 0.13f)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                            Text(a.estatus.ifBlank { "Sin estado" }, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    } else {
+                        Text("Datos de la actividad", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    }
+                    if (canEdit && !editing) {
+                        OutlinedButton(onClick = onStartEdit) { Text("Editar") }
+                    }
                 }
             }
         }

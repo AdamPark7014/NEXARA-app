@@ -74,18 +74,30 @@ import androidx.compose.ui.unit.sp
  * Design system Enterprise compartido — KPIs, alertas, tendencias, estados vacíos.
  * Uso: dashboards y pantallas de decisión (no CRUD genérico).
  */
+/**
+ * Tokens claros de la marca (rediseño v2, `.ai/ui-maquetas/PLAN.md` §2): el
+ * teal `#1F9E84` que ya usa la web, con su escala. Las pantallas nuevas leen
+ * [LocalNxColors] (que cambia con el tema); este objeto queda como la tabla
+ * fija en claro para lo que todavía no se ha migrado.
+ */
 object NxColors {
-    /** Azul de marca: botones, encabezados, pestañas, chips, enlaces, progreso, FAB. */
-    val Brand = Color(0xFF2563EB)
-    /** Azul profundo: fondos fuertes (mosaicos del logo, que trae letras blancas). */
-    val BrandDark = Color(0xFF1E40AF)
-    val BrandSoft = Color(0xFFDBEAFE)
+    /** Teal de marca: botones, pestañas activas, chips, enlaces, progreso, FAB. */
+    val Brand = Color(0xFF1F9E84)
+    /** Teal de texto (`#12715E`): texto de marca sobre fondo claro y suave. */
+    val BrandDark = Color(0xFF12715E)
+    /** Teal profundo para superficies fuertes con letras blancas (tarjeta de jornada). */
+    val BrandDeep = Color(0xFF0F5F4F)
+    /** Suave `#E7F5F1`: fondo de chips, iconos y pastilla de la barra inferior. */
+    val BrandSoft = Color(0xFFE7F5F1)
+    /** Suave 2 `#CFECE4`: pastilla activa, bordes de marca. */
+    val BrandSoft2 = Color(0xFFCFECE4)
     /** Tinte de superficie (degradados suaves, tarjetas destacadas). */
-    val BrandTint = Color(0xFFEFF6FF)
-    /** Acento para gráficas e insignias. */
-    val Accent = Color(0xFF3B82F6)
+    val BrandTint = Color(0xFFF2FAF8)
+    /** Acento claro de la marca para gráficas, insignias y el modo oscuro. */
+    val Accent = Color(0xFF2BBD9D)
     val Slate = Color(0xFF0F172A)
-    val Muted = Color(0xFF64748B)
+    /** `--ui-fg-3` v2: #6B7889 (≈4.6:1 sobre blanco; el #94a3b8 de antes no llegaba). */
+    val Muted = Color(0xFF6B7889)
     val Success = Color(0xFF10B981)
     val SuccessSoft = Color(0xFFD1FAE5)
     val Warning = Color(0xFFF59E0B)
@@ -96,11 +108,31 @@ object NxColors {
     val InfoSoft = Color(0xFFDBEAFE)
     val Surface = Color(0xFFF8FAFC)
     val Card = Color.White
+
+    // ── Acentos de categoría (del logotipo). Son color de TIPO, nunca de estado. ──
+    /** Cielo: Redes. */
+    val CategorySky = Color(0xFF3AA9CC)
+    /** Magenta: Acceso. */
+    val CategoryMagenta = Color(0xFFA64CA6)
+    /** Naranja: Obra. */
+    val CategoryOrange = Color(0xFFEE8A2A)
+    /** CCTV va en el teal de marca. */
+    val CategoryCctv = Brand
 }
 
+/** Radios 12 / 16 / 20 (controles · tarjetas · hojas) y la altura del botón principal. */
 object NxDimens {
-    val PanelRadius = 12.dp
+    /** Tarjetas y paneles. */
+    val PanelRadius = 16.dp
+    /** Controles: botones, campos, chips grandes. */
+    val ControlRadius = 12.dp
+    /** Hojas, tarjetas hero y diálogos. */
+    val SheetRadius = 20.dp
     val PanelElevation = 2.dp
+    /** Acción principal en el teléfono: se toca con el pulgar y con guantes. */
+    val PrimaryButtonHeight = 52.dp
+    /** Acción principal del dock de detalle (al alcance del pulgar). */
+    val DockButtonHeight = 56.dp
 }
 
 enum class NxTone { Neutral, Success, Warning, Danger, Info, Brand }

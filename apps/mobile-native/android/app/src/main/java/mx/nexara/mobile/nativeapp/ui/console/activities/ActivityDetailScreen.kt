@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -28,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,14 +39,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceFlowDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
+import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 /** Pestañas del detalle en Core (/erp/actividades/:id). */
 const val ACTIVITY_TAB_DETALLE = 0
@@ -58,6 +64,12 @@ private val ACTIVITY_TABS = listOf("Detalle", "Evidencias", "Historial")
  * Detalle de actividad de Core: Detalle · Evidencias · Historial, igual que
  * ActivityDetailShell en la web con `core`. Operación, viáticos, equipo,
  * materiales, incidencias y aprobaciones ya no son pestañas de Core.
+ *
+ * Rediseño v2 (`.ai/ui-maquetas/movil-actividad.html`): cabecera con tipo,
+ * estado y folio; tarjeta del sitio y tira de datos; lista de pasos de evidencia
+ * (hecho · actual · pendiente) y un dock inferior fijo con la acción principal
+ * grande al alcance del pulgar. Toda la lógica de captura sigue en
+ * `EvidenceCaptureFlow`; el dock solo lleva ahí o repite su botón.
  */
 @Composable
 fun ActivityDetailScreen(
@@ -68,6 +80,7 @@ fun ActivityDetailScreen(
     @Suppress("UNUSED_PARAMETER") onOpenGps: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val c = NxTheme.colors
     val authRepo = remember(context) { AuthRepository(context) }
     val user = remember { authRepo.loadSession() }
     val repo = remember(context) { ConsoleRepository(context) }
@@ -147,18 +160,32 @@ fun ActivityDetailScreen(
     var recarga by remember(activity.id) { mutableIntStateOf(0) }
 
     // Regla del 18-09: quien la recibe no la acepta ni la rechaza, únicamente la inicia.
-    // Aquí cae el push de «actividad nueva», así que el botón también vive en el detalle.
+    // Aquí cae el push de «actividad nueva», así que el botón también vive en el detalle (en el dock).
     val coreRepo = remember(context) { CoreActivitiesRepository(context) }
     var iniciando by remember(activity.id) { mutableStateOf(false) }
     var iniciarError by remember(activity.id) { mutableStateOf<String?>(null) }
+    var reanudando by remember(activity.id) { mutableStateOf(false) }
+    var pausando by remember(activity.id) { mutableStateOf(false) }
     val miFila = detail.assignees?.firstOrNull { it.user?.id == user?.id && it.retiradoAt.isNullOrBlank() }
+    val despachador = detail.assignmentCharge == "despacho" && miFila?.rol == "LEAD"
     val puedeIniciar = miFila != null && ActivitySemaforo.puedeIniciar(
         aceptacion = miFila.aceptacion,
         inicioRealAt = miFila.inicioRealAt,
         // El LEAD de un despacho solo reparte: no la ejecuta.
-        despachador = detail.assignmentCharge == "despacho" && miFila.rol == "LEAD",
+        despachador = despachador,
         estatus = detail.estatus,
     )
+    val sesion = miFila?.sesion()
+    val role = CoreActivityRules.captureRole(
+        viewerId = user?.id,
+        viewerEmail = user?.email,
+        assignmentCharge = detail.assignmentCharge,
+        responsableId = detail.responsable?.id ?: detail.responsableId,
+        myActiveRol = miFila?.rol,
+        hasActiveRow = miFila != null,
+    )
+    val captura = role == CoreActivityRules.CaptureRole.CAPTURA
+    val photoRequired = (detail.evidencePhotoRequired ?: 4).coerceAtLeast(1)
 
     LaunchedEffect(activity.id, recarga) {
         loadingDetail = true
@@ -184,34 +211,148 @@ fun ActivityDetailScreen(
         loadingDetail = false
     }
 
+    // Pasos de evidencia para la lista del detalle y el dock: solo de quien captura.
+    // El 404 del API es «todavía no hay foto de entrada» (null), no un error.
+    var flow by remember(activity.id) { mutableStateOf<EvidenceFlowDto?>(null) }
+    var flowTick by remember(activity.id) { mutableIntStateOf(0) }
+    LaunchedEffect(activity.id, recarga, flowTick, captura, selectedTab) {
+        if (!captura) return@LaunchedEffect
+        flow = runCatching { withContext(Dispatchers.IO) { coreRepo.evidenceFlowOrNull(activity.id) } }
+            .getOrElse { flow }
+    }
+
+    /** Lo que publica el flujo de captura mientras la pestaña Evidencias está en pantalla. */
+    var dockEvidencias by remember(activity.id) { mutableStateOf<EvidenceDockAction?>(null) }
+    val dockHost: (EvidenceDockAction?) -> Unit = remember(activity.id) {
+        { accion -> if (accion == null || !accion.sameLook(dockEvidencias)) dockEvidencias = accion }
+    }
+
+    fun iniciar() {
+        scope.launch {
+            iniciando = true
+            iniciarError = null
+            try {
+                withContext(Dispatchers.IO) { coreRepo.iniciarActividad(detail.id) }
+                recarga++
+                // Lo siguiente es la foto de entrada.
+                selectedTab = ACTIVITY_TAB_EVIDENCIAS
+                snackbarHostState.showSnackbar("Actividad iniciada")
+            } catch (e: Exception) {
+                iniciarError = e.toUserMessage("No se pudo iniciar la actividad")
+            } finally {
+                iniciando = false
+            }
+        }
+    }
+
+    fun reanudar() {
+        scope.launch {
+            reanudando = true
+            iniciarError = null
+            try {
+                withContext(Dispatchers.IO) { coreRepo.reanudarActividad(detail.id) }
+                recarga++
+                snackbarHostState.showSnackbar("Tu reloj volvió a correr")
+            } catch (e: Exception) {
+                iniciarError = e.toUserMessage("No se pudo reanudar la actividad")
+            } finally {
+                reanudando = false
+            }
+        }
+    }
+
+    val dockDetalle = ActivityDockRules.principal(
+        puedeIniciar = puedeIniciar,
+        sesion = sesion,
+        despachador = despachador,
+        estatus = detail.estatus,
+        captura = captura,
+        flow = flow,
+        coreKind = detail.coreKind,
+        fotosRequeridas = photoRequired,
+    )
+    val pausable = sesion != null && !despachador && SesionActividadRules.puedePausar(sesion, detail.estatus)
+    val pausar = DockSecondary(label = "Pausar", icon = Icons.Outlined.Pause, onClick = { pausando = true })
+
     Scaffold(
         snackbarHost = { NxSnackbarHost(snackbarHostState) },
+        containerColor = c.surface,
+        bottomBar = {
+            // «Iniciar» y «Reanudar» mandan también en Evidencias: sin ellos el reloj
+            // no corre. La captura del paso queda a mano como secundaria.
+            val dockSesion = dockDetalle?.takeIf {
+                it.kind == ActivityDockRules.Kind.INICIAR || it.kind == ActivityDockRules.Kind.REANUDAR
+            }
+            if (selectedTab == ACTIVITY_TAB_EVIDENCIAS && dockSesion == null) {
+                dockEvidencias?.let { d ->
+                    ActivityDock(
+                        label = d.label,
+                        enabled = d.enabled,
+                        icon = d.icon,
+                        hint = d.hint,
+                        onPrimary = d.onPrimary,
+                        secondary = buildList {
+                            val sec = d.onSecondary
+                            if (d.secondaryLabel != null && sec != null) {
+                                add(DockSecondary(label = d.secondaryLabel, icon = d.secondaryIcon, onClick = sec))
+                            }
+                            if (pausable) add(pausar)
+                        },
+                    )
+                }
+            } else {
+                dockDetalle?.let { d ->
+                    ActivityDock(
+                        label = d.label,
+                        loading = iniciando || reanudando,
+                        hint = d.hint,
+                        error = iniciarError,
+                        icon = when (d.kind) {
+                            ActivityDockRules.Kind.INICIAR -> Icons.Outlined.PlayArrow
+                            ActivityDockRules.Kind.REANUDAR -> Icons.Outlined.PlayArrow
+                            ActivityDockRules.Kind.EVIDENCIAS -> NxGlyph.PHOTO.icon
+                            ActivityDockRules.Kind.VER -> null
+                        },
+                        onPrimary = {
+                            when (d.kind) {
+                                ActivityDockRules.Kind.INICIAR -> iniciar()
+                                ActivityDockRules.Kind.REANUDAR -> reanudar()
+                                ActivityDockRules.Kind.EVIDENCIAS, ActivityDockRules.Kind.VER -> selectedTab = ACTIVITY_TAB_EVIDENCIAS
+                            }
+                        },
+                        secondary = buildList {
+                            if (d.pausable) add(pausar)
+                            val captura = dockEvidencias
+                            if (selectedTab == ACTIVITY_TAB_EVIDENCIAS && captura != null && captura.enabled) {
+                                add(DockSecondary(label = captura.label, icon = captura.icon, onClick = captura.onPrimary))
+                            }
+                        },
+                    )
+                } ?: run {
+                    // Con el reloj corriendo pero sin captura propia (p. ej. dirección con fila
+                    // activa): el panel viejo ofrecía «Pausar»; el dock lo conserva.
+                    if (pausable) {
+                        ActivityDock(
+                            label = "Pausar actividad",
+                            icon = Icons.Outlined.Pause,
+                            hint = SesionActividadRules.textoCorriendo(
+                                sesion?.sesionAbiertaDesde?.let { CoreActivityRules.formatClock(it) }?.takeIf { it != "—" },
+                            ),
+                            onPrimary = { pausando = true },
+                        )
+                    }
+                }
+            }
+        },
         modifier = Modifier.fillMaxSize(),
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             // Sin «← Volver» propio: la barra superior de Core ya trae la flecha.
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        detail.titulo?.takeIf { it.isNotBlank() }
-                            ?: detail.anNumber?.takeIf { it.isNotBlank() }
-                            ?: "Actividad #${detail.id}",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 2,
-                    )
-                    val meta = listOfNotNull(
-                        detail.anNumber?.takeIf { it.isNotBlank() }?.let { "Folio $it" },
-                        detail.coreKind?.let { CoreActivityRules.kindLabel(it, detail.ticketTypeCustom) },
-                    ).joinToString(" · ")
-                    if (meta.isNotBlank()) {
-                        Text(meta, fontSize = 12.sp, color = NxColors.Muted, maxLines = 1)
-                    }
-                }
-            }
+            ActivityHeaderV2(
+                detail = detail,
+                sesion = sesion,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            )
 
             // Cancelada por un superior: quién y por qué, visible en las tres pestañas.
             ActivitySuperiorRules.avisoCancelada(detail)?.let { aviso ->
@@ -219,17 +360,17 @@ fun ActivityDetailScreen(
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(NxColors.DangerSoft)
+                        .clip(RoundedCornerShape(NxDimens.ControlRadius))
+                        .background(c.dangerSoft)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(Icons.Outlined.Block, contentDescription = null, tint = NxColors.Danger, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Block, contentDescription = null, tint = c.danger, modifier = Modifier.size(18.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(aviso, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF991B1B))
+                        Text(aviso, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.dangerText)
                         CoreActivityRules.formatWhen(detail.cancelledAt)?.let {
-                            Text(it, fontSize = 11.5.sp, color = NxColors.Muted)
+                            Text(it, fontSize = 11.5.sp, color = c.muted)
                         }
                     }
                 }
@@ -245,12 +386,24 @@ fun ActivityDetailScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
 
-            TabRow(selectedTabIndex = selectedTab) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = c.surface,
+                contentColor = c.brand,
+            ) {
                 ACTIVITY_TABS.forEachIndexed { i, label ->
                     Tab(
                         selected = selectedTab == i,
                         onClick = { selectedTab = i },
-                        text = { Text(label, fontSize = 13.sp) },
+                        text = {
+                            Text(
+                                label,
+                                fontSize = 13.5.sp,
+                                fontWeight = if (selectedTab == i) FontWeight.Bold else FontWeight.Medium,
+                            )
+                        },
+                        selectedContentColor = c.brand,
+                        unselectedContentColor = c.fg2,
                     )
                 }
             }
@@ -275,6 +428,7 @@ fun ActivityDetailScreen(
                             editFechaEntrega = editFechaEntrega,
                             editFechaFin = editFechaFin,
                             showManagerFields = canManage,
+                            showStatusChip = false,
                             onStartEdit = {
                                 editEstatus = detail.estatus
                                 editPrioridad = detail.prioridad ?: ""
@@ -296,65 +450,28 @@ fun ActivityDetailScreen(
                             onFechaFinChange = { editFechaFin = it },
                             onSave = { saveActivityEdits() },
                             topContent = {
-                                // «Iniciar actividad»: la única acción de quien la recibe (aquí cae el push).
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    ActivityPlaceCard(detail = detail, onOpenMap = { url -> openExternalUrl(context, url) })
+                                    ActivityFactsStrip(detail = detail, sesion = sesion)
+                                    // «Iniciar actividad» vive en el dock; aquí solo se explica (regla del 18-09).
+                                    if (puedeIniciar) {
+                                        SoftNote(
+                                            title = "Te asignaron esta actividad",
+                                            text = "Iníciala cuando empieces: queda registrada tu hora real de inicio. " +
+                                                "Si no puedes hacerla, habla con tu jefe para que la reasigne.",
+                                            color = CoreActivityRules.AZUL,
+                                        )
+                                    }
                                     // El checklist va antes del trabajo: sin palomearlo, `iniciar` da 400.
                                     HerramientasChecklistSection(
                                         activityId = detail.id,
                                         refreshKey = recarga,
                                     )
-                                    if (puedeIniciar) {
-                                        IniciarActividadBanner(
-                                            onIniciar = {
-                                                scope.launch {
-                                                    iniciando = true
-                                                    iniciarError = null
-                                                    try {
-                                                        withContext(Dispatchers.IO) {
-                                                            coreRepo.iniciarActividad(detail.id)
-                                                        }
-                                                        recarga++
-                                                        // Lo siguiente es la foto de entrada.
-                                                        selectedTab = ACTIVITY_TAB_EVIDENCIAS
-                                                        snackbarHostState.showSnackbar("Actividad iniciada")
-                                                    } catch (e: Exception) {
-                                                        iniciarError = e.toUserMessage("No se pudo iniciar la actividad")
-                                                    } finally {
-                                                        iniciando = false
-                                                    }
-                                                }
-                                            },
-                                            guardando = iniciando,
-                                            error = iniciarError,
+                                    if (captura) {
+                                        ActivityStepsCard(
+                                            pasos = ActivityDockRules.pasos(flow, detail.coreKind, photoRequired),
+                                            onOpen = { selectedTab = ACTIVITY_TAB_EVIDENCIAS },
                                         )
-                                    }
-                                    if (miFila != null && !puedeIniciar) {
-                                        SesionPropiaPanel(
-                                            activityId = detail.id,
-                                            sesion = miFila.sesion(),
-                                            miId = user?.id,
-                                            despachador = detail.assignmentCharge == "despacho" && miFila.rol == "LEAD",
-                                            estatus = detail.estatus,
-                                            onDone = { mensaje ->
-                                                recarga++
-                                                scope.launch { snackbarHostState.showSnackbar(mensaje) }
-                                            },
-                                        )
-                                    }
-                                    val luz = ActivitySemaforo.luz(detail.semaforo)
-                                    val planReal = ActivitySemaforo.planRealTexto(
-                                        detail.minutosPlan,
-                                        detail.minutosReales,
-                                    )
-                                    val asignadaPor = ActivitySemaforo.asignadaPorTexto(detail.asignadoPor?.nombre)
-                                    if (luz != null || planReal != null || asignadaPor != null) {
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            luz?.let { ToneChip("● ${it.etiqueta}", it.color) }
-                                            planReal?.let {
-                                                ToneChip(it, ActivitySemaforo.planRealColor(detail.excedida))
-                                            }
-                                            asignadaPor?.let { ToneChip(it) }
-                                        }
                                     }
                                 }
                             },
@@ -363,7 +480,7 @@ fun ActivityDetailScreen(
                                     Text(
                                         "Evidencias del equipo",
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = NxColors.Slate,
+                                        color = c.fg,
                                     )
                                     TeamEvidenceSection(
                                         activityId = detail.id,
@@ -379,11 +496,25 @@ fun ActivityDetailScreen(
                     if (loadingDetail) {
                         NxLoadingBlock("Cargando evidencias…")
                     } else {
-                        ActivityEvidenciasTab(activity = detail)
+                        ActivityEvidenciasTab(activity = detail, dockHost = dockHost)
+                        // Al volver a Detalle, la lista de pasos refleja lo capturado aquí.
+                        LaunchedEffect(dockEvidencias?.label) { flowTick++ }
                     }
                 }
                 else -> ActivityHistorialTab(activity = detail)
             }
         }
+    }
+
+    if (pausando) {
+        PausarPropiaDialog(
+            activityId = detail.id,
+            onDismiss = { pausando = false },
+            onDone = { mensaje ->
+                pausando = false
+                recarga++
+                scope.launch { snackbarHostState.showSnackbar(mensaje) }
+            },
+        )
     }
 }

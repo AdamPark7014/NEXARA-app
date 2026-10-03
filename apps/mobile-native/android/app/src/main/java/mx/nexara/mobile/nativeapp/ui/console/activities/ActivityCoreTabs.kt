@@ -60,7 +60,11 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.icon
  * tiraría al salir de pantalla.
  */
 @Composable
-fun ActivityEvidenciasTab(activity: ActivityDto) {
+fun ActivityEvidenciasTab(
+    activity: ActivityDto,
+    /** Dock inferior del detalle (v2): el flujo publica ahí su botón principal. */
+    dockHost: ((EvidenceDockAction?) -> Unit)? = null,
+) {
     val context = LocalContext.current
     val user = remember(context) { AuthRepository(context).loadSession() }
     val viewerId = user?.id
@@ -101,7 +105,7 @@ fun ActivityEvidenciasTab(activity: ActivityDto) {
             }
         }
         if (role == CoreActivityRules.CaptureRole.CAPTURA) {
-            EvidenceCaptureFlow(activity = activity, onFlowChanged = { refreshKey++ })
+            EvidenceCaptureFlow(activity = activity, onFlowChanged = { refreshKey++ }, dockHost = dockHost)
         }
         NxPanelShell {
             TeamEvidenceSection(activityId = activity.id, refreshKey = refreshKey)

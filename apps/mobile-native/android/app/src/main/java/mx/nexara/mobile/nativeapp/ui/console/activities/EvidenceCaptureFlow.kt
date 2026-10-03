@@ -42,12 +42,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,6 +146,12 @@ private class DraftPhoto(
 fun EvidenceCaptureFlow(
     activity: ActivityDto,
     onFlowChanged: () -> Unit = {},
+    /**
+     * Dock inferior del detalle (v2): si viene, el botón principal de cada paso
+     * se publica ahí con [EvidenceDockAction] y no se repite dentro de la tarjeta.
+     * Sin él, el flujo pinta sus botones como siempre.
+     */
+    dockHost: ((EvidenceDockAction?) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val repo = remember(context) { CoreActivitiesRepository(context) }
@@ -647,6 +656,118 @@ fun EvidenceCaptureFlow(
         imagePicker.launch("image/*")
     }
 
+    // ── Dock inferior (v2): el mismo botón de cada paso, al alcance del pulgar ──
+    if (dockHost != null) {
+        val bloqueoSalida = CoreActivityRules.camposBloqueoSalida(campos)
+        val dockAction: EvidenceDockAction? = when {
+            loading && flow == null -> null
+            loadError != null && flow == null -> null
+            step == STEP_COMPLETED || locked -> null
+            step == STEP_ENTRY -> EvidenceDockAction(
+                label = if (comercial) "Tomar foto de inicio" else "Tomar foto de entrada",
+                enabled = !busy,
+                icon = NxGlyph.PHOTO.icon,
+                hint = if (comercial) "Se guarda con tu ubicación GPS." else "Tómala al llegar al sitio; se guarda con tu ubicación GPS.",
+                onPrimary = {
+                    success = null
+                    error = null
+                    cameraKind = KIND_ENTRY
+                },
+            )
+            step == STEP_PHOTOS && porCampos -> EvidenceDockAction(
+                label = if (busy) "Guardando…" else "Siguiente paso",
+                enabled = !busy,
+                icon = null,
+                hint = bloqueoSalida ?: "Ya documentaste todos los campos.",
+                onPrimary = { savePhotos() },
+            )
+            step == STEP_PHOTOS && drafts.size < photoRequired -> EvidenceDockAction(
+                label = "Tomar foto · ${drafts.size} de $photoRequired",
+                enabled = !busy && drafts.size < MAX_EVIDENCE_PHOTOS,
+                icon = NxGlyph.PHOTO.icon,
+                hint = "Faltan ${photoRequired - drafts.size} foto${if (photoRequired - drafts.size == 1) "" else "s"} para seguir.",
+                onPrimary = {
+                    success = null
+                    error = null
+                    cameraKind = KIND_EVIDENCE
+                },
+                secondaryLabel = "Adjuntar",
+                onSecondary = { abrirAdjunto(KIND_EVIDENCE) },
+            )
+            step == STEP_PHOTOS -> EvidenceDockAction(
+                label = if (busy) "Guardando…" else "Siguiente paso · ${drafts.size} de $photoRequired",
+                enabled = !busy,
+                icon = null,
+                hint = "Ya tienes las fotos. Puedes tomar más antes de seguir.",
+                onPrimary = { savePhotos() },
+                secondaryLabel = "Tomar otra",
+                secondaryIcon = NxGlyph.PHOTO.icon,
+                onSecondary = if (drafts.size < MAX_EVIDENCE_PHOTOS) {
+                    {
+                        success = null
+                        error = null
+                        cameraKind = KIND_EVIDENCE
+                    }
+                } else {
+                    null
+                },
+            )
+            step == STEP_PDF -> EvidenceDockAction(
+                label = if (busy) "Subiendo…" else "Seleccionar PDF",
+                enabled = !busy,
+                icon = if (busy) null else NxGlyph.PROCEDURE.icon,
+                hint = "Carga la hoja de servicio firmada. Solo PDF.",
+                onPrimary = {
+                    success = null
+                    error = null
+                    pdfPicker.launch(arrayOf("application/pdf"))
+                },
+            )
+            step == STEP_DATA -> EvidenceDockAction(
+                label = if (busy) "Guardando…" else "Guardar formulario",
+                enabled = !busy,
+                icon = null,
+                hint = "Completa los datos de esta actividad y guarda.",
+                onPrimary = { saveForm() },
+            )
+            step == STEP_EXIT -> EvidenceDockAction(
+                label = if (comercial) "Tomar foto de conclusión" else "Tomar foto de salida",
+                enabled = !busy && bloqueoSalida == null,
+                icon = NxGlyph.PHOTO.icon,
+                hint = bloqueoSalida ?: "Con esta foto mandas la actividad a revisión.",
+                onPrimary = {
+                    success = null
+                    error = null
+                    cameraKind = KIND_EXIT
+                },
+            )
+            else -> null
+        }
+        // El detalle solo vuelve a pintar el dock cuando cambia lo que se ve
+        // (`sameLook`, para no entrar en un bucle de recomposición). Por eso lo
+        // publicado llama siempre al cierre MÁS NUEVO: nunca a uno con datos viejos.
+        val primarioActual = rememberUpdatedState(dockAction?.onPrimary)
+        val secundarioActual = rememberUpdatedState(dockAction?.onSecondary)
+        val publicada = dockAction?.let { a ->
+            EvidenceDockAction(
+                label = a.label,
+                enabled = a.enabled,
+                icon = a.icon,
+                hint = a.hint,
+                onPrimary = { primarioActual.value?.invoke() },
+                secondaryLabel = a.secondaryLabel,
+                secondaryIcon = a.secondaryIcon,
+                onSecondary = if (a.onSecondary != null) {
+                    { secundarioActual.value?.invoke() }
+                } else {
+                    null
+                },
+            )
+        }
+        SideEffect { dockHost(publicada) }
+        DisposableEffect(dockHost) { onDispose { dockHost(null) } }
+    }
+
     NxPanelShell {
         NxIconText(
             text = "Captura de evidencias",
@@ -755,14 +876,16 @@ fun EvidenceCaptureFlow(
                     },
                     icon = NxGlyph.ENTRY.icon,
                 ) {
-                    PrimaryAction(
-                        if (comercial) "Tomar foto de inicio" else "Tomar foto de entrada",
-                        icon = NxGlyph.PHOTO.icon,
-                        enabled = !busy,
-                    ) {
-                        success = null
-                        error = null
-                        cameraKind = KIND_ENTRY
+                    if (dockHost == null) {
+                        PrimaryAction(
+                            if (comercial) "Tomar foto de inicio" else "Tomar foto de entrada",
+                            icon = NxGlyph.PHOTO.icon,
+                            enabled = !busy,
+                        ) {
+                            success = null
+                            error = null
+                            cameraKind = KIND_ENTRY
+                        }
                     }
                 }
 
@@ -774,8 +897,10 @@ fun EvidenceCaptureFlow(
                         "puedes dejarlas para cuando termines.",
                     icon = NxGlyph.PHOTO.icon,
                 ) {
-                    PrimaryAction(if (busy) "Guardando…" else "Siguiente paso →", enabled = !busy) {
-                        savePhotos()
+                    if (dockHost == null) {
+                        PrimaryAction(if (busy) "Guardando…" else "Siguiente paso →", enabled = !busy) {
+                            savePhotos()
+                        }
                     }
                 }
 
@@ -812,17 +937,19 @@ fun EvidenceCaptureFlow(
                             Text("Adjuntar")
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { savePhotos() },
-                            enabled = !busy && drafts.size >= photoRequired,
-                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        ) {
-                            if (busy) {
-                                Text("Guardando…")
-                            } else {
-                                Text("Siguiente paso →")
+                    if (dockHost == null) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { savePhotos() },
+                                enabled = !busy && drafts.size >= photoRequired,
+                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            ) {
+                                if (busy) {
+                                    Text("Guardando…")
+                                } else {
+                                    Text("Siguiente paso →")
+                                }
                             }
                         }
                     }
@@ -840,14 +967,16 @@ fun EvidenceCaptureFlow(
                     description = "Carga el PDF de la hoja de servicio firmada. Solo PDF.",
                     icon = NxGlyph.PROCEDURE.icon,
                 ) {
-                    PrimaryAction(
-                        if (busy) "Subiendo…" else "Seleccionar PDF",
-                        icon = if (busy) null else NxGlyph.PROCEDURE.icon,
-                        enabled = !busy,
-                    ) {
-                        success = null
-                        error = null
-                        pdfPicker.launch(arrayOf("application/pdf"))
+                    if (dockHost == null) {
+                        PrimaryAction(
+                            if (busy) "Subiendo…" else "Seleccionar PDF",
+                            icon = if (busy) null else NxGlyph.PROCEDURE.icon,
+                            enabled = !busy,
+                        ) {
+                            success = null
+                            error = null
+                            pdfPicker.launch(arrayOf("application/pdf"))
+                        }
                     }
                     flow?.serviceSheetPdfUrl?.takeIf { it.isNotBlank() }?.let { url ->
                         ProtectedPdfButton(url = url, label = "Ver PDF cargado")
@@ -870,8 +999,10 @@ fun EvidenceCaptureFlow(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    PrimaryAction(if (busy) "Guardando…" else "Siguiente paso →", enabled = !busy) {
-                        saveForm()
+                    if (dockHost == null) {
+                        PrimaryAction(if (busy) "Guardando…" else "Siguiente paso →", enabled = !busy) {
+                            saveForm()
+                        }
                     }
                 }
 
@@ -887,14 +1018,16 @@ fun EvidenceCaptureFlow(
                 ) {
                     // Con campos no se cierra hasta que no falte ninguna foto obligatoria.
                     val bloqueoCampos = CoreActivityRules.camposBloqueoSalida(campos)
-                    PrimaryAction(
-                        if (comercial) "Tomar foto de conclusión" else "Tomar foto de salida",
-                        icon = NxGlyph.PHOTO.icon,
-                        enabled = !busy && bloqueoCampos == null,
-                    ) {
-                        success = null
-                        error = null
-                        cameraKind = KIND_EXIT
+                    if (dockHost == null) {
+                        PrimaryAction(
+                            if (comercial) "Tomar foto de conclusión" else "Tomar foto de salida",
+                            icon = NxGlyph.PHOTO.icon,
+                            enabled = !busy && bloqueoCampos == null,
+                        ) {
+                            success = null
+                            error = null
+                            cameraKind = KIND_EXIT
+                        }
                     }
                     bloqueoCampos?.let {
                         SoftNote(
