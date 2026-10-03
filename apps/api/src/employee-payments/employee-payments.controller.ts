@@ -130,6 +130,33 @@ export class EmployeePaymentsController {
     return res.send(buffer);
   }
 
+  /**
+   * Sugerencia de nómina (solo lectura): horas laboradas contra productivas, pago por hora y
+   * monto sugerido por persona. Sin fechas usa el periodo de nómina vigente (`periodo=anterior`
+   * para el que acaba de cerrar). Lleva montos, así que pide lo mismo que la lista de pagos.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
+  @Get('sugerencia-nomina')
+  async sugerenciaNomina(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('periodo') periodo?: string,
+  ) {
+    await this.gate(user, companyId);
+    if (periodo && periodo !== 'vigente' && periodo !== 'anterior') {
+      throw new BadRequestException('periodo debe ser "vigente" o "anterior"');
+    }
+    const rango = desde || hasta ? this.rango(desde, hasta) : null;
+    return this.service.sugerenciaNomina(
+      this.viewer(user),
+      { ...(rango ?? {}), periodo: periodo as 'vigente' | 'anterior' | undefined },
+      companyId,
+    );
+  }
+
   private viewer(user: any) {
     return {
       id: Number(user?.id),

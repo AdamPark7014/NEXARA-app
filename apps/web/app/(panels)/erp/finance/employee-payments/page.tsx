@@ -12,6 +12,7 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import ListExportActions from "@/components/ui/ListExportActions";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
+import SugerenciaNomina from "@/components/finance/SugerenciaNomina";
 import {
   FinanceField,
   FinanceFormGrid,
@@ -334,7 +335,7 @@ function EmployeePaymentsContent() {
   const [error, setError] = useState<string | null>(null);
   /** Fallo de una acción de fila: sobrevive al diálogo que lo provocó. */
   const [actionError, setActionError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"lista" | "analytics">("lista");
+  const [tab, setTab] = useState<"lista" | "analytics" | "sugerencia">("lista");
   const [searchQ, setSearchQ] = useState("");
   const deferredQ = useDeferredValue(searchQ);
   const [filterUser, setFilterUser] = useState("");
@@ -932,11 +933,14 @@ function EmployeePaymentsContent() {
         tabs={[
           { id: "lista", label: "Lista" },
           { id: "analytics", label: "Análisis" },
+          { id: "sugerencia", label: "Sugerencia de nómina" },
         ]}
         activeTab={tab}
-        onTabChange={(id) => setTab(id as "lista" | "analytics")}
+        onTabChange={(id) => setTab(id as "lista" | "analytics" | "sugerencia")}
       >
-        {tab === "analytics" ? (
+        {tab === "sugerencia" ? (
+          <SugerenciaNomina token={token} />
+        ) : tab === "analytics" ? (
           <div style={{ display: "grid", gap: 16 }}>
             {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
             <FilterToolbar
