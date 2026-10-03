@@ -683,6 +683,7 @@ export class ActivityEvidenceService {
         where: { id: activityId },
         select: {
           id: true,
+          companyId: true,
           estatus: true,
           prioridad: true,
           fechaInicio: true,
@@ -720,7 +721,7 @@ export class ActivityEvidenceService {
         });
       }
       // El inicio real abre su sesión de trabajo: de las sesiones sale el tiempo real.
-      await this.sesiones?.abrir({ activityId, userId, at });
+      await this.sesiones?.abrir({ activityId, userId, at, companyId: activity.companyId });
 
       // «Pendiente» → «En Proceso» en cuanto alguien la empieza (el resto de estatus no se toca).
       if (/^pendiente/i.test(activity.estatus || '')) {
@@ -1023,7 +1024,12 @@ export class ActivityEvidenceService {
 
     // La foto de salida cierra el tiempo real de esa persona (y sus horas reales).
     await this.registrarFinReal(activityId, userId, updated.exitPhotoUploadedAt ?? new Date());
-    await this.sesiones?.terminar({ activityId, userId, at: updated.exitPhotoUploadedAt ?? new Date() });
+    await this.sesiones?.terminar({
+      activityId,
+      userId,
+      at: updated.exitPhotoUploadedAt ?? new Date(),
+      companyId: updated.companyId ?? companyId ?? null,
+    });
 
     await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
     void this.notifyEvidenceReadyForReview(activityId, updated.userId);
@@ -2340,7 +2346,12 @@ export class ActivityEvidenceService {
     if (transition.status === 'COMPLETED') {
       // Igual que la foto de salida normal: corregirla también cierra el tiempo real.
       await this.registrarFinReal(activityId, userId, updated.exitPhotoUploadedAt ?? new Date());
-      await this.sesiones?.terminar({ activityId, userId, at: updated.exitPhotoUploadedAt ?? new Date() });
+      await this.sesiones?.terminar({
+        activityId,
+        userId,
+        at: updated.exitPhotoUploadedAt ?? new Date(),
+        companyId: updated.companyId ?? companyId ?? null,
+      });
       await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
       // Corrigió todo lo devuelto: vuelve a «Por revisar» y sus superiores pueden aprobar o devolver otra vez.
       void this.notifyEvidenceReadyForReview(activityId, updated.userId, true);

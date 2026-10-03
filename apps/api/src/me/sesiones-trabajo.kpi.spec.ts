@@ -448,6 +448,13 @@ describe('Mi equipo: la tarjeta con sesiones', () => {
   it('el detalle de la persona dice si quien mira puede pausarle (mismo alcance que asignar)', async () => {
     const service = tablero([{ id: 2, activityId: 5, userId: 13, startedAt: M('17', '11:00'), endedAt: null }]);
     expect((await service.getBoardUser(viewer, 1, 13)).puedePausar).toBe(true);
+    // Y se decide con el padrón de ESTA empresa, no con los usuarios activos de todos los tenants.
+    expect((service as any).prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isActive: true, companyMemberships: { some: { companyId: 1 } } }),
+        select: { id: true, email: true, managerId: true },
+      }),
+    );
     // Uno mismo no se «pausa como jefe».
     expect((await service.getBoardUser({ id: 13, email: CAROLINA.email, roleKey: 'ingeniero' }, 1, 13)).puedePausar).toBe(
       false,

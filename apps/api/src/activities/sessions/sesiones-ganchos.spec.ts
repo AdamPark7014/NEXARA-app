@@ -88,7 +88,14 @@ describe('evidencia → sesiones de trabajo', () => {
   it('la foto de entrada abre la sesión a la hora de la foto', async () => {
     const { service, sesiones, evidence } = evidencia('ENTRY_PHOTO');
     await service.saveEntryPhoto(7, 3, '/activities/entrada.jpg', 19.0414, -98.2063, 1);
-    expect(sesiones.abrir).toHaveBeenCalledWith({ activityId: 7, userId: 3, at: evidence.entryPhotoUploadedAt });
+    // Con la empresa de la actividad: sin ella las consultas de sesiones (y el updateMany de
+    // ActivityAssignee, que el middleware no escopa) corrían sin alcance de tenant.
+    expect(sesiones.abrir).toHaveBeenCalledWith({
+      activityId: 7,
+      userId: 3,
+      at: evidence.entryPhotoUploadedAt,
+      companyId: 1,
+    });
   });
 
   it('cualquier paso de su evidencia reanuda el reloj (las apps publicadas no tienen «Reanudar»)', async () => {
@@ -100,7 +107,12 @@ describe('evidencia → sesiones de trabajo', () => {
   it('la foto de salida cierra la sesión con FIN a la hora de la foto', async () => {
     const { service, sesiones, evidence } = evidencia('EXIT_PHOTO');
     await service.saveExitPhoto(7, 3, '/activities/salida.jpg', 19.0414, -98.2063, 1);
-    expect(sesiones.terminar).toHaveBeenCalledWith({ activityId: 7, userId: 3, at: evidence.exitPhotoUploadedAt });
+    expect(sesiones.terminar).toHaveBeenCalledWith({
+      activityId: 7,
+      userId: 3,
+      at: evidence.exitPhotoUploadedAt,
+      companyId: 1,
+    });
   });
 
   it('sin el servicio de sesiones (pruebas viejas) la evidencia funciona igual', async () => {

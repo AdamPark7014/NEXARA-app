@@ -38,7 +38,14 @@ const cerradaPorEstatus = (estatus?: string | null) =>
 
 const claveSesion = (userId: number, activityId: number) => `${userId}:${activityId}`;
 
-const tenant = (companyId?: number | null) => (companyId != null ? { companyId: Number(companyId) } : {});
+/**
+ * Alcance de empresa de cada consulta de sesiones. Falla cerrado como `requireCompanyId`: sin
+ * companyId lanza, nunca devuelve `{}` (antes lo hacía, y `activityAssignee.updateMany` —que el
+ * middleware no escopa— corría sin alcance cuando la evidencia no pasaba la empresa).
+ */
+export const tenant = (companyId?: number | null): { companyId: number } => ({
+  companyId: requireCompanyId(companyId),
+});
 
 /** ¿Este cliente Prisma conoce la tabla? (pruebas con mock y arranques sin migración). */
 function hayTabla(db: Db): boolean {
@@ -55,7 +62,7 @@ function hayTabla(db: Db): boolean {
  */
 export async function cerrarSesionesVencidas(
   db: Db,
-  filtro: { userIds?: number[]; activityId?: number; companyId?: number | null },
+  filtro: { userIds?: number[]; activityId?: number; companyId: number | null | undefined },
   ahora: Date = new Date(),
 ): Promise<number> {
   if (!hayTabla(db)) return 0;
@@ -106,7 +113,8 @@ export async function leerSesiones(
   filtro: {
     userIds: number[];
     activityIds?: number[];
-    companyId?: number | null;
+    /** Obligatorio: sin empresa la lectura falla cerrada (mapa vacío). */
+    companyId: number | null | undefined;
     /** Solo las que tocan esta ventana (para rangos de KPI). */
     desde?: Date;
     hasta?: Date;
@@ -167,7 +175,7 @@ export function sesionesDe(
  */
 export async function cerrarSesionesDeUsuario(
   db: Db,
-  p: { userId: number; at?: Date; motivo?: MotivoFinSesion; companyId?: number | null },
+  p: { userId: number; at?: Date; motivo?: MotivoFinSesion; companyId: number | null | undefined },
 ): Promise<number> {
   if (!hayTabla(db)) return 0;
   const at = p.at ?? new Date();
@@ -219,7 +227,7 @@ export class ActivitySessionsService {
   }
 
   /** Fila de equipo de la persona (o la actividad, si es el responsable sin fila). */
-  private async contexto(activityId: number, userId: number, companyId?: number | null) {
+  private async contexto(activityId: number, userId: number, companyId: number | null | undefined) {
     const fila = await this.prisma.activityAssignee.findFirst({
       where: { activityId, userId, ...tenant(companyId) },
       select: {
@@ -320,7 +328,7 @@ export class ActivitySessionsService {
     activityId: number;
     userId: number;
     at?: Date;
-    companyId?: number | null;
+    companyId: number | null | undefined;
   }): Promise<{ abierta: boolean }> {
     if (!hayTabla(this.db)) return { abierta: false };
     const at = p.at ?? new Date();
@@ -356,7 +364,7 @@ export class ActivitySessionsService {
     activityId: number;
     userId: number;
     at?: Date;
-    companyId?: number | null;
+    companyId: number | null | undefined;
   }): Promise<{ abierta: boolean }> {
     if (!hayTabla(this.db)) return { abierta: false };
     const at = p.at ?? new Date();
@@ -396,7 +404,7 @@ export class ActivitySessionsService {
     at?: Date;
     endedById?: number | null;
     nota?: string | null;
-    companyId?: number | null;
+    companyId: number | null | undefined;
   }): Promise<number> {
     if (!hayTabla(this.db)) return 0;
     const at = p.at ?? new Date();
@@ -429,7 +437,12 @@ export class ActivitySessionsService {
    * Fin de su parte (foto de salida): cierra la sesión con FIN y deja las horas reales
    * como la suma de sus sesiones, no como «fin menos inicio». Nunca lanza.
    */
-  async terminar(p: { activityId: number; userId: number; at?: Date; companyId?: number | null }): Promise<void> {
+  async terminar(p: {
+    activityId: number;
+    userId: number;
+    at?: Date;
+    companyId: number | null | undefined;
+  }): Promise<void> {
     if (!hayTabla(this.db)) return;
     const at = p.at ?? new Date();
     try {
@@ -450,20 +463,25 @@ export class ActivitySessionsService {
   }
 
   /** Checada de salida: cierra todo lo que tenga corriendo. */
-  cerrarTodasDeUsuario(userId: number, at: Date = new Date(), companyId?: number | null): Promise<number> {
+  cerrarTodasDeUsuario(userId: number, at: Date, companyId: number | null | undefined): Promise<number> {
     return cerrarSesionesDeUsuario(this.db, { userId, at, motivo: 'SALIDA', companyId });
   }
 
   /** Cierre perezoso (ver `cerrarSesionesVencidas`). */
   cerrarVencidas(
-    filtro: { userIds?: number[]; activityId?: number; companyId?: number | null },
+    filtro: { userIds?: number[]; activityId?: number; companyId: number | null | undefined },
     ahora: Date = new Date(),
   ): Promise<number> {
     return cerrarSesionesVencidas(this.db, filtro, ahora);
   }
 
   /** Cómo quedó: corre, en pausa (quién y por qué) y cuántos minutos lleva. */
-  async estado(activityId: number, userId: number, companyId?: number | null, ahora: Date = new Date()): Promise<EstadoSesionDto> {
+  async estado(
+    activityId: number,
+    userId: number,
+    companyId: number | null | undefined,
+    ahora: Date = new Date(),
+  ): Promise<EstadoSesionDto> {
     const ctx = await this.contexto(activityId, userId, companyId);
     const sesiones = ctx ? await this.sesionesDePar(activityId, userId, ctx.companyId) : [];
     const fuente = {
@@ -502,7 +520,7 @@ export class ActivitySessionsService {
           `Escribe por qué la pausas (mínimo ${MOTIVO_PAUSA_MIN} caracteres)`,
         );
       }
-      await this.assertPuedePausarA(p.actor, p.userId);
+      await this.assertPuedePausarA(p.actor, p.userId, tenantId);
     }
 
     const ctx = await this.contexto(p.activityId, p.userId, tenantId);
@@ -560,10 +578,11 @@ export class ActivitySessionsService {
     return this.estado(p.activityId, p.userId, tenantId);
   }
 
-  private async assertPuedePausarA(actor: Actor, userId: number): Promise<void> {
-    // Mismo padrón que `assertPuedeAsignar`: personas activas con correo y jefe.
+  private async assertPuedePausarA(actor: Actor, userId: number, companyId: number): Promise<void> {
+    // Mismo padrón que `resolveScope` / `assertPuedeAsignar`: personas activas de ESTA empresa
+    // (por membresía), con correo y jefe. Sin el filtro se cargaba el organigrama de todos los tenants.
     const users = await this.prisma.user.findMany({
-      where: { isActive: true },
+      where: { isActive: true, companyMemberships: { some: { companyId } } },
       select: { id: true, email: true, managerId: true },
     });
     if (!puedeAsignarA(actor, users, userId)) {

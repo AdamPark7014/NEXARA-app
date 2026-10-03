@@ -5,6 +5,7 @@ import {
   cerrarSesionesVencidas,
   leerSesiones,
   sesionesDe,
+  tenant,
 } from './activity-sessions.service';
 
 /**
@@ -131,7 +132,7 @@ afterEach(() => {
 describe('abrir la sesión', () => {
   it('al iniciar queda una sesión corriendo, de su empresa', async () => {
     const { service, sesiones } = armar({ asignacion: { inicioRealAt: AHORA } });
-    expect(await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA })).toEqual({ abierta: true });
+    expect(await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: EMPRESA })).toEqual({ abierta: true });
     expect(sesiones).toHaveLength(1);
     expect(sesiones[0]).toMatchObject({
       activityId: 10,
@@ -144,8 +145,8 @@ describe('abrir la sesión', () => {
 
   it('es idempotente: tocar «Iniciar» dos veces no abre dos', async () => {
     const { service, sesiones } = armar({ asignacion: { inicioRealAt: AHORA } });
-    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA });
-    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA });
+    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: EMPRESA });
+    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: EMPRESA });
     expect(sesiones).toHaveLength(1);
   });
 
@@ -154,21 +155,21 @@ describe('abrir la sesión', () => {
     const entregada = armar({ asignacion: { finRealAt: M('15', '11:00') } });
     const cerrada = armar({ actividad: { estatus: 'Finalizada' } });
     for (const caso of [reparte, entregada, cerrada]) {
-      expect(await caso.service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA })).toEqual({ abierta: false });
+      expect(await caso.service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: EMPRESA })).toEqual({ abierta: false });
       expect(caso.sesiones).toHaveLength(0);
     }
   });
 
   it('una actividad iniciada hoy antes de la regla sigue como una sola sesión desde su inicio', async () => {
     const { service, sesiones } = armar({ asignacion: { inicioRealAt: M('15', '09:00') } });
-    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA });
+    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: EMPRESA });
     expect(sesiones).toHaveLength(1);
     expect(sesiones[0]).toMatchObject({ startedAt: M('15', '09:00'), endedAt: null });
   });
 
   it('una iniciada hace días guarda su intervalo viejo con tope y abre la de hoy', async () => {
     const { service, sesiones } = armar({ asignacion: { inicioRealAt: M('10', '09:00') } });
-    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA });
+    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: EMPRESA });
     expect(sesiones).toHaveLength(2);
     // Lo de antes no se pierde, pero tampoco cuenta cinco días: 12 horas.
     expect(sesiones[0]).toMatchObject({ startedAt: M('10', '09:00'), endedAt: M('10', '21:00'), endReason: 'TOPE_12H' });
@@ -177,7 +178,7 @@ describe('abrir la sesión', () => {
 
   it('si quedó una abierta desde ayer, primero la corta y luego abre la de hoy', async () => {
     const { service, sesiones } = armar({ sesiones: [{ startedAt: M('14', '17:00') }] });
-    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA });
+    await service.abrir({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: EMPRESA });
     expect(sesiones[0].endReason).toBe('CORTE_DIA');
     expect(sesiones[0].endedAt.getTime()).toBe(M('15', '00:00').getTime() - 1);
     expect(sesiones[1]).toMatchObject({ startedAt: AHORA, endedAt: null });
@@ -208,7 +209,7 @@ describe('checada de salida', () => {
   });
 
   it('un cliente Prisma sin la tabla (pruebas viejas, arranque sin migración) no tumba la checada', async () => {
-    await expect(cerrarSesionesDeUsuario({} as any, { userId: 3, at: AHORA })).resolves.toBe(0);
+    await expect(cerrarSesionesDeUsuario({} as any, { userId: 3, at: AHORA, companyId: EMPRESA })).resolves.toBe(0);
   });
 });
 
@@ -230,7 +231,52 @@ describe('cierre perezoso', () => {
   it('si la escritura falla, la lectura sigue', async () => {
     const { prisma } = armar({ sesiones: [{ startedAt: M('14', '08:00') }] });
     prisma.activityWorkSession.updateMany.mockRejectedValue(new Error('sin conexión'));
-    await expect(cerrarSesionesVencidas(prisma, { userIds: [TECNICO.id] }, AHORA)).resolves.toBe(0);
+    await expect(cerrarSesionesVencidas(prisma, { userIds: [TECNICO.id], companyId: EMPRESA }, AHORA)).resolves.toBe(0);
+  });
+});
+
+describe('alcance de empresa (revisión de seguridad 02-10)', () => {
+  it('tenant() sin empresa lanza como requireCompanyId: nunca devuelve un where vacío', () => {
+    for (const sin of [undefined, null, 0, -1, NaN]) {
+      expect(() => tenant(sin as never)).toThrow(ForbiddenException);
+    }
+    expect(tenant(EMPRESA)).toEqual({ companyId: EMPRESA });
+  });
+
+  it('las funciones sueltas sin empresa fallan cerradas: no leen ni cierran nada', async () => {
+    const { prisma, sesiones } = armar({ sesiones: [{ startedAt: M('14', '08:00') }] });
+    expect((await leerSesiones(prisma, { userIds: [TECNICO.id], companyId: null })).size).toBe(0);
+    expect(await cerrarSesionesVencidas(prisma, { userIds: [TECNICO.id], companyId: undefined }, AHORA)).toBe(0);
+    expect(await cerrarSesionesDeUsuario(prisma, { userId: TECNICO.id, at: AHORA, companyId: null })).toBe(0);
+    expect(sesiones[0].endedAt).toBeNull();
+    expect(prisma.activityWorkSession.findMany).not.toHaveBeenCalled();
+  });
+
+  it('cerrar y terminar sin empresa no tocan ActivityAssignee ni las sesiones', async () => {
+    const { service, prisma, sesiones } = armar({ sesiones: [{ startedAt: M('15', '10:00') }] });
+    await expect(
+      service.cerrar({ activityId: 10, userId: TECNICO.id, motivo: 'FIN', companyId: null }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    // `terminar` nunca lanza (la foto ya quedó guardada), pero tampoco escribe sin alcance.
+    await service.terminar({ activityId: 10, userId: TECNICO.id, at: AHORA, companyId: null });
+    expect(sesiones[0].endedAt).toBeNull();
+    expect(prisma.activityAssignee.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('el jefe que pausa solo se mide contra el organigrama de SU empresa', async () => {
+    const { service, prisma } = armar({ sesiones: [{ startedAt: M('15', '09:00') }] });
+    await service.pausar({
+      actor: JEFE,
+      userId: TECNICO.id,
+      activityId: 10,
+      motivo: 'Atiende la falla urgente',
+      companyId: EMPRESA,
+    });
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isActive: true, companyMemberships: { some: { companyId: EMPRESA } } }),
+      }),
+    );
   });
 });
 
@@ -239,19 +285,19 @@ describe('reanudar sola (apps publicadas, sin botón «Reanudar»)', () => {
 
   it('tocar su evidencia con el reloj detenido abre una sesión nueva', async () => {
     const { service, sesiones } = armar({ sesiones: pausadaAyer });
-    expect(await service.asegurarAbierta({ activityId: 10, userId: TECNICO.id })).toEqual({ abierta: true });
+    expect(await service.asegurarAbierta({ activityId: 10, userId: TECNICO.id, companyId: EMPRESA })).toEqual({ abierta: true });
     expect(sesiones[1]).toMatchObject({ startedAt: AHORA, endedAt: null });
   });
 
   it('después de su salida de hoy ya no: lo que suba se guarda, pero el reloj no vuelve a correr', async () => {
     const { service, sesiones } = armar({ sesiones: pausadaAyer, ultimaChecada: { type: 'salida' } });
-    expect(await service.asegurarAbierta({ activityId: 10, userId: TECNICO.id })).toEqual({ abierta: false });
+    expect(await service.asegurarAbierta({ activityId: 10, userId: TECNICO.id, companyId: EMPRESA })).toEqual({ abierta: false });
     expect(sesiones).toHaveLength(1);
   });
 
   it('sin haberla iniciado no abre nada (eso es de la foto de entrada)', async () => {
     const { service, sesiones } = armar({ asignacion: { inicioRealAt: null } });
-    expect(await service.asegurarAbierta({ activityId: 10, userId: TECNICO.id })).toEqual({ abierta: false });
+    expect(await service.asegurarAbierta({ activityId: 10, userId: TECNICO.id, companyId: EMPRESA })).toEqual({ abierta: false });
     expect(sesiones).toHaveLength(0);
   });
 });
@@ -264,7 +310,7 @@ describe('foto de salida', () => {
         { startedAt: M('15', '10:00') },
       ],
     });
-    await service.terminar({ activityId: 10, userId: TECNICO.id, at: M('15', '11:30') });
+    await service.terminar({ activityId: 10, userId: TECNICO.id, at: M('15', '11:30'), companyId: EMPRESA });
     expect(sesiones[1]).toMatchObject({ endedAt: M('15', '11:30'), endReason: 'FIN' });
     // 3 h + 1.5 h, no «las 26.5 h de corrido».
     expect(prisma.activityAssignee.updateMany).toHaveBeenCalledWith(
@@ -400,6 +446,6 @@ describe('leer sesiones', () => {
   });
 
   it('sin la tabla devuelve vacío: todo se mide como antes', async () => {
-    expect((await leerSesiones({} as any, { userIds: [1] })).size).toBe(0);
+    expect((await leerSesiones({} as any, { userIds: [1], companyId: EMPRESA })).size).toBe(0);
   });
 });

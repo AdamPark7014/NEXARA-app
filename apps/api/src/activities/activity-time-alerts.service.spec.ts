@@ -15,6 +15,7 @@ const fila = (over: Record<string, unknown> = {}) => ({
   id: 1,
   userId: 9,
   activityId: 10,
+  companyId: 1,
   horasPlan: '2',
   inicioRealAt: hace(155),
   activity: { estatus: 'En Proceso' },

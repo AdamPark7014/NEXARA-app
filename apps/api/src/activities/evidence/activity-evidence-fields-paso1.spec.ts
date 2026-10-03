@@ -22,6 +22,8 @@ function build(opts: { entryPhotoUrl?: string | null; campo?: Record<string, unk
       findMany: jest.fn().mockResolvedValue([]),
     },
     activityEvidenceFieldPhoto: { upsert, findFirst: jest.fn().mockResolvedValue(null) },
+    // Antonio está asignado a la actividad: el Paso 1 es lo único que lo frena aquí.
+    activityAssignee: { findFirst: jest.fn().mockResolvedValue({ id: 70 }) },
   };
   const service = new ActivityEvidenceFieldsService(prisma as never);
   return { service, prisma, upsert };
