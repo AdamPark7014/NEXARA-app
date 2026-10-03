@@ -2,7 +2,34 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-10-02
-- **Hecho (paquete grande de 6 agentes: commiteado y DESPLEGADO, `101192ad`, con migraciones):**
+- **Hecho y DESPLEGADO (HEAD `00babcee`, migración `20261003010000_guardias` aplicada):**
+  - `f3d33c8c` **Sugerencia de nómina** (pestaña en Pagos a empleados, `GET employee-payments/sugerencia-nomina`,
+    solo lectura). Divisor = horario de cada persona (40 h oficina; 48 h sin horario fijo): **Adam lo aprobó así**.
+  - `93f6d593` **Guardias de fin de semana**: sáb/dom solo checa entrada quien tiene guardia (422 +
+    rechazo `FIN_DE_SEMANA_SIN_GUARDIA`, sin avisar jefes); con guardia sin geocerca de oficina; entrada
+    automática al subir foto de inicio de servicio/tarea (`attendance/entrada-guardia.ts`); botón
+    «Guardias» en Asistencias; aviso en el formulario de actividad. Regla absoluta (aunque el horario
+    tenga sábado); un encargado no se programa a sí mismo; apps no tienen pantalla de guardias aún.
+  - `b89ae264` **Chat estilo Slack (Dirección A, Etapa 1)** + tarjetas de folio (actividad/cotización).
+    Arreglé yo un hueco: pastilla interna `[x](//otro.com)` o `/\otro.com` ya no genera enlace (prueba en
+    `rich-text.spec.tsx`). Etapa 2 pendiente: hilos, Menciones, Guardados, Archivos; API debería mandar
+    quién fijó y el puesto del autor.
+  - `79cf420a` **Apps**: pausar/reanudar (técnico y jefe desde Pizarra), escáner con cámara en Almacén y
+    Herramientas (Android CameraX+ML Kit; iOS AVFoundation), mensaje correcto del rechazo de fin de semana.
+    Android 677 tests verde. **iOS sin compilar** (Windows). **Falta build/release de tiendas.**
+  - **Rediseño UI aprobado por Adam** (maquetas en `.ai/ui-maquetas/png/`, plan en `.ai/ui-maquetas/PLAN.md`,
+    sidebar CLARO): `2ba59eef` Etapas 1-2 (tokens v2 en `ui-tokens.scss`, `components/base` unificado:
+    Button 7 variantes, Stat con icono/tendencia/semáforo, StatusBadge con `estado-tono.ts`, campos con
+    error/válido, FormSection/FormFooter, Alert, Toast; `components/ui/*` ahora envoltorios del base con
+    la misma API). `00babcee` Etapa 3 (sidebar 264/68 px, grupos Hoy · Clientes y obra · Recursos ·
+    Finanzas · Mi cuenta, iconos SVG, contadores de chat y aprobaciones, `sidebar-presentation.ts`).
+  - Verificación final: API jest 270 suites / 3319; web vitest 103 / 913; `tsc` API y web 0.
+- **SIGUIENTE (rediseño):** Etapa 4 plantillas (`ModulePage`/`FormPage`/`RecordPage`, `DataTable` con
+  acciones por fila y selección) y Etapa 5 módulos: Actividades/pizarra → detalle → alta → Cotizaciones →
+  Almacén → Clientes/Proyectos → Asistencias → Finanzas. Etapa 6 apps nativas (teal `#1F9E84`, pestaña
+  Inicio, barra inferior M3, dock de acción). Etapa 7 regla ESLint. Sin contador en Actividades/Viáticos
+  ni franja «En jornada» en el sidebar: no hay endpoint verificado.
+- **Hecho antes (paquete grande de 6 agentes: commiteado y DESPLEGADO, `101192ad`, con migraciones):**
   `20261002130000_activity_work_sessions`, `20261002140000_clientes_varios_tipos` y
   `20261002150000_producto_codigo_barras` aplicadas en producción (`_prisma_migrations`, sin rollback);
   API sana. Antes: `tsc` API y web 0; jest API completo en verde (las fallas al correr todo junto eran
@@ -28,11 +55,8 @@
 - **Hecho (organigrama, 21:20):** Adam lo aprobó en producción y pidió una «rayita» secundaria de Luis
   a José Antonio. `d47732f9`: un lateral conserva su línea de mando y suma el puente punteado (cuando
   el jefe queda un anillo adentro). Desplegado; en BD `User.id=7` (Luis) `lateralDeId=39` (Antonio).
-- **FALTA del pedido grande de las 12:50 (verificado contra el código):** (1) **guardias de fin de
-  semana** — nada (ni API ni web ni apps); (2) **sugerencia de nómina** (horas laboradas vs productivas
-  × pago por hora en Pagos a empleados) — nada; (3) **chat tipo Slack** — solo maquetas A/B, Adam
-  elige; (4) **apps**: pausar/reanudar y escáner con cámara en Android/iOS — nada (web sí tiene
-  pausar y lector USB); (5) build/release de las apps. Todo lo demás del pedido está en producción.
+- **Del pedido grande de las 12:50 solo falta:** build/release de las apps en tiendas (y compilar iOS en
+  macOS + probar cámara en dispositivos reales). Guardias, nómina, chat y apps ya están (ver arriba).
 - **Contexto del paquete (02-10, ~13:25), por área:**
   1. **Cotizaciones — TERMINADO por su agente, falta mi revisión:** el PDF ya toma `depositPercent`/`note`
      del editor (antes `paymentTerms`→`PAGO_DEFAULT`, por eso el 50 % no se quitaba); datos fiscales del

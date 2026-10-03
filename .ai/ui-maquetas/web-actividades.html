@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>NEXARA · Actividades</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body.vacio .only-full, body:not(.vacio) .only-empty { display: none !important; }
+  .tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--ui-border); margin: -8px 0 20px; }
+  .tab { height: 42px; display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 500; color: var(--ui-fg-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab .i { width: 16px; height: 16px; color: var(--ui-fg-3); }
+  .tab.on { color: var(--ui-fg); font-weight: 600; border-bottom-color: var(--ui-brand); }
+  .tab.on .i { color: var(--ui-brand); }
+  .tab .n { font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--ui-neutral-bg); color: var(--ui-neutral-text); }
+  .tab.on .n { background: var(--ui-brand-soft); color: var(--ui-brand-text); }
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--ui-border-subtle); }
+  .toolbar .ctl { width: 232px; height: 34px; box-shadow: none; }
+  .chips { display: flex; gap: 6px; }
+  .when { display: flex; align-items: center; gap: 8px; }
+  .when-t { font-weight: 500; font-size: 13px; }
+  .when-s { font-size: 12px; color: var(--ui-fg-3); }
+  .tfoot { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--ui-border-subtle); font-size: 13px; color: var(--ui-fg-3); }
+  .pager { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .pager .pg { min-width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; font-weight: 500; color: var(--ui-fg-2); }
+  .pager .pg.on { background: var(--ui-fg); color: var(--ui-surface); }
+  .tbl td { white-space: nowrap; }
+  .tbl td.c-act { width: 100%; max-width: 0; }
+  .c-act .tbl-title, .c-act .tbl-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .act .kind svg { width: 32px; height: 32px; padding: 7px; border-radius: 9px; }
+  .toolbar .ctl .ph-txt { white-space: nowrap; }
+  .tbl .prog { width: 112px; }
+  .toolbar .seg > span { padding: 0 9px; }
+  .act { display: flex; align-items: center; gap: 12px; }
+  .tbl .row-actions .btn { opacity: 0; }
+  .tbl tr.hover .row-actions .btn, .tbl tr.sel .row-actions .btn { opacity: 1; }
+  .tbl tr .row-actions .always { opacity: 1; }
+  .kpi .kpi-val { font-size: 26px; }
+  .bulk {
+    position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
+    padding: 6px 6px 6px 16px; border-radius: 12px; background: #0f1728; color: #fff; box-shadow: var(--e3); font-size: 13px; z-index: 4;
+  }
+  .bulk .btn { color: #dbe3ec; }
+  .bulk .btn:hover { background: rgba(255,255,255,.08); }
+  .bulk .sep { width: 1px; height: 20px; background: rgba(255,255,255,.16); margin: 0 4px; }
+  .listwrap { position: relative; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sb" data-active="pizarra"></aside>
+  <div class="main">
+    <header class="top">
+      <div class="crumbs"><span>Hoy</span><i data-i="right"></i><b>Actividades</b></div>
+      <div class="top-actions">
+        <a class="icon-btn" title="Notificaciones"><i data-i="bell"></i><span class="pip"></span></a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="ph">
+        <div class="ph-text">
+          <div class="ph-title">Actividades</div>
+          <div class="ph-desc">Equipo del día: asigna, sigue el avance y revisa las evidencias.</div>
+        </div>
+        <div class="ph-actions">
+          <a class="btn btn-ghost btn-icon" title="Más opciones"><i data-i="more"></i></a>
+          <a class="btn btn-ghost"><i data-i="download"></i>Exportar</a>
+          <a class="btn btn-secondary"><i data-i="copy"></i>Desde plantilla</a>
+          <a class="btn btn-primary"><i data-i="plus"></i>Nueva actividad<span class="kbd">N</span></a>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <a class="tab"><i data-i="task"></i>Mis actividades<span class="n">4</span></a>
+        <a class="tab on"><i data-i="users"></i>Mi equipo<span class="n">38</span></a>
+        <a class="tab"><i data-i="send"></i>Asignadas por mí<span class="n">12</span></a>
+        <a class="tab"><i data-i="flag"></i>Solicitudes de equipo<span class="n">2</span></a>
+      </div>
+
+      <section class="kpis">
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-brand"><i data-i="calendar"></i></span><span class="kpi-label">Para hoy</span></div>
+          <div class="kpi-val num">38</div>
+          <div class="meter"><span style="width:16%;background:var(--ui-success)"></span><span style="width:37%;background:var(--ui-info)"></span><span style="width:16%;background:var(--ui-violet)"></span><span style="width:8%;background:var(--ui-danger)"></span></div>
+          <div class="legend"><span style="--c:var(--ui-success)">6 listas</span><span style="--c:var(--ui-info)">14 en curso</span><span style="--c:var(--ui-violet)">6 revisión</span></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-danger"><i data-i="timer"></i></span><span class="kpi-label">Atrasadas</span></div>
+          <div class="kpi-val num only-full" style="color:var(--ui-danger-text)">3</div>
+          <div class="kpi-val num only-empty" style="color:var(--ui-success-text)">0</div>
+          <div class="kpi-foot only-full"><span class="trend up"><i data-i="tdown"></i>2</span><span>menos que ayer</span></div>
+          <div class="kpi-foot only-empty"><span class="trend up"><i data-i="tdown"></i>3</span><span>menos que ayer</span></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-violet"><i data-i="eye"></i></span><span class="kpi-label">Esperan tu revisión</span></div>
+          <div class="kpi-val num">6</div>
+          <div class="kpi-foot"><div class="av-stack"><span data-av="Paulina Tlapaltotoli" data-f data-s="22"></span><span data-av="José Antonio Ramírez" data-s="22"></span><span data-av="Fernanda Ortiz" data-f data-s="22"></span></div><span>la más antigua, hace 3 h</span></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-success"><i data-i="camera"></i></span><span class="kpi-label">Evidencia completa</span></div>
+          <div class="kpi-val num">82<small>%</small></div>
+          <div class="kpi-foot"><span class="trend up"><i data-i="tup"></i>6 pts</span><span>vs. semana pasada</span></div>
+          <div class="spark"><span style="height:50%"></span><span style="height:62%"></span><span style="height:58%"></span><span style="height:70%"></span><span style="height:76%"></span><span style="height:88%"></span></div>
+        </div>
+      </section>
+
+      <section class="card listwrap">
+        <div class="toolbar">
+          <div class="ctl"><i data-i="search"></i><span class="ph-txt">Buscar folio o cliente</span><span class="kbd" style="margin-left:auto">/</span></div>
+          <div class="chips">
+            <span class="chip only-full on">Todas <span class="n">38</span></span>
+            <span class="chip only-empty">Todas <span class="n">38</span></span>
+            <span class="chip">Pendientes <span class="n">9</span></span>
+            <span class="chip">En curso <span class="n">14</span></span>
+            <span class="chip">En revisión <span class="n">6</span></span>
+            <span class="chip only-full"><span class="semaf s-rojo" style="width:7px;height:7px"></span>Atrasadas <span class="n">3</span></span>
+            <span class="chip only-empty on"><span class="semaf s-rojo" style="width:7px;height:7px"></span>Atrasadas <span class="n">0</span></span>
+          </div>
+          <span class="chip dashed"><i data-i="plus"></i>Filtro</span>
+          <div class="grow"></div>
+          <div class="seg" title="Vista: lista, tablero o mapa"><span class="on"><i data-i="list"></i>Lista</span><span><i data-i="kanban"></i></span><span><i data-i="map"></i></span></div>
+        </div>
+
+        <table class="tbl only-full">
+          <thead><tr>
+            <th style="width:36px"><span class="check"></span></th>
+            <th>Actividad</th><th>Responsable</th><th>Cuándo</th><th style="width:150px">Evidencia</th><th>Estado</th><th></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="check"></span></td>
+              <td class="c-act"><div class="act"><span class="kind k-cctv"><i data-i="cctv"></i></span><div class="grow"><div class="tbl-title">Mantenimiento preventivo DVR</div><div class="tbl-sub"><span class="folio">AN-0031</span>· Farmacia San Rafael, Centro</div></div></div></td>
+              <td><div class="person"><span data-av="José Antonio Ramírez" data-s="28"></span><span class="person-n">José Antonio R.</span></div></td>
+              <td><div class="when"><span class="semaf s-verde"></span><div><div class="when-t">Hoy 10:00</div><div class="when-s">En sitio desde 10:06</div></div></div></td>
+              <td><div class="prog"><div class="prog-bar"><span style="width:66%"></span></div><span class="prog-n">4/6</span></div></td>
+              <td><span class="badge dot t-info">En curso</span></td>
+              <td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="chat"></i></a><a class="btn btn-ghost btn-sm btn-icon always"><i data-i="morev"></i></a></div></td>
+            </tr>
+            <tr class="hover">
+              <td><span class="check"></span></td>
+              <td class="c-act"><div class="act"><span class="kind k-acceso"><i data-i="key"></i></span><div class="grow"><div class="tbl-title">Alta de huellas, 24 empleados</div><div class="tbl-sub"><span class="folio">AN-0029</span>· Corporativo Plaza Dorada</div></div></div></td>
+              <td><div class="person"><span data-av="Paulina Tlapaltotoli" data-f data-s="28"></span><span class="person-n">Paulina T.</span></div></td>
+              <td><div class="when"><span class="semaf s-verde"></span><div><div class="when-t">Hoy 9:00</div><div class="when-s">Terminó 12:48</div></div></div></td>
+              <td><div class="prog"><div class="prog-bar"><span style="width:100%;background:var(--ui-success)"></span></div><span class="prog-n">3/3</span></div></td>
+              <td><span class="badge dot t-violet">En revisión</span></td>
+              <td><div class="row-actions"><a class="btn btn-tonal btn-sm"><i data-i="check"></i>Aprobar</a><a class="btn btn-ghost btn-sm btn-icon always"><i data-i="morev"></i></a></div></td>
+            </tr>
+            <tr>
+              <td><span class="check"></span></td>
+              <td class="c-act"><div class="act"><span class="kind k-red"><i data-i="wifi"></i></span><div class="grow"><div class="tbl-title">Enlace punto a punto 5 GHz</div><div class="tbl-sub"><span class="folio">AN-0034</span>· Plaza Dorada, torre B</div></div></div></td>
+              <td><div class="person"><span data-av="Luis Joel Aguilar" data-s="28"></span><span class="person-n">Luis Joel A.</span></div></td>
+              <td><div class="when"><span class="semaf s-rojo"></span><div><div class="when-t" style="color:var(--ui-danger-text)">Hoy 11:00</div><div class="when-s">1 h 40 de retraso</div></div></div></td>
+              <td><div class="prog"><div class="prog-bar"><span style="width:25%;background:var(--ui-warning)"></span></div><span class="prog-n">1/4</span></div></td>
+              <td><span class="badge dot t-danger">Atrasada</span></td>
+              <td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="phone"></i></a><a class="btn btn-ghost btn-sm btn-icon always"><i data-i="morev"></i></a></div></td>
+            </tr>
+            <tr class="sel">
+              <td><span class="check on"><i data-i="check"></i></span></td>
+              <td class="c-act"><div class="act"><span class="kind k-cctv"><i data-i="cctv"></i></span><div class="grow"><div class="tbl-title">Instalación de 8 cámaras IP</div><div class="tbl-sub"><span class="folio">AN-0033</span>· Plaza Dorada</div></div></div></td>
+              <td><div class="person"><span data-av="Fernanda Ortiz" data-f data-s="28"></span><span class="person-n">Fernanda O.</span></div></td>
+              <td><div class="when"><span class="semaf s-ambar"></span><div><div class="when-t">Hoy 12:00</div><div class="when-s">Cierre previsto 18:00</div></div></div></td>
+              <td><div class="prog"><div class="prog-bar"><span style="width:50%"></span></div><span class="prog-n">4/8</span></div></td>
+              <td><span class="badge dot t-info">En curso</span></td>
+              <td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="chat"></i></a><a class="btn btn-ghost btn-sm btn-icon always"><i data-i="morev"></i></a></div></td>
+            </tr>
+            <tr>
+              <td><span class="check"></span></td>
+              <td class="c-act"><div class="act"><span class="kind k-obra"><i data-i="hardhat"></i></span><div class="grow"><div class="tbl-title">Canalización y registro eléctrico</div><div class="tbl-sub"><span class="folio">AN-0035</span>· Bodega Atlixco</div></div></div></td>
+              <td><div class="person"><span data-av="Ricardo Hernández" data-s="28"></span><span class="person-n">Ricardo H.</span></div></td>
+              <td><div class="when"><span class="semaf s-gris"></span><div><div class="when-t">Hoy 16:00</div><div class="when-s">En traslado</div></div></div></td>
+              <td><div class="prog"><div class="prog-bar"><span style="width:0"></span></div><span class="prog-n">0/5</span></div></td>
+              <td><span class="badge dot">Pendiente</span></td>
+              <td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="nav"></i></a><a class="btn btn-ghost btn-sm btn-icon always"><i data-i="morev"></i></a></div></td>
+            </tr>
+            <tr>
+              <td><span class="check"></span></td>
+              <td class="c-act"><div class="act"><span class="kind k-cctv"><i data-i="cctv"></i></span><div class="grow"><div class="tbl-title">Revisión de grabación, caja 2</div><div class="tbl-sub"><span class="folio">AN-0027</span>· Farmacia San Rafael, Ánimas</div></div></div></td>
+              <td><div class="person"><span data-av="José Antonio Ramírez" data-s="28"></span><span class="person-n">José Antonio R.</span></div></td>
+              <td><div class="when"><span class="semaf s-verde"></span><div><div class="when-t">Hoy 8:30</div><div class="when-s">Terminó 9:40</div></div></div></td>
+              <td><div class="prog"><div class="prog-bar"><span style="width:100%;background:var(--ui-success)"></span></div><span class="prog-n">2/2</span></div></td>
+              <td><span class="badge dot t-success">Completada</span></td>
+              <td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="eye"></i></a><a class="btn btn-ghost btn-sm btn-icon always"><i data-i="morev"></i></a></div></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tfoot only-full">
+          <span>Mostrando 1 a 6 de 38</span>
+          <div class="pager"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="left"></i></a><span class="pg on">1</span><span class="pg">2</span><span class="pg">3</span><span class="pg">…</span><span class="pg">7</span><a class="btn btn-ghost btn-sm btn-icon"><i data-i="right"></i></a></div>
+        </div>
+        <div class="bulk only-full">
+          <b>1 seleccionada</b><span class="sep"></span>
+          <a class="btn btn-sm"><i data-i="users"></i>Reasignar</a>
+          <a class="btn btn-sm"><i data-i="calendar"></i>Cambiar fecha</a>
+          <a class="btn btn-sm"><i data-i="chat"></i>Avisar</a>
+          <span class="sep"></span>
+          <a class="btn btn-sm btn-icon"><i data-i="x"></i></a>
+        </div>
+
+        <div class="empty only-empty">
+          <div class="empty-art"><i data-i="checkc"></i></div>
+          <div class="empty-t">Todo al día: ninguna actividad atrasada</div>
+          <div class="empty-d">Las 38 actividades de hoy van en tiempo. Cuando alguna pase de su hora sin iniciar o sin evidencia, aparecerá aquí con su semáforo en rojo.</div>
+          <div class="row" style="margin-top:10px">
+            <a class="btn btn-secondary"><i data-i="x"></i>Quitar filtro</a>
+            <a class="btn btn-primary"><i data-i="plus"></i>Nueva actividad</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<script src="maqueta.js"></script>
+</body>
+</html>
