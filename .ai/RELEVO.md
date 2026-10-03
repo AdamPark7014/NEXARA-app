@@ -1,13 +1,31 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Último turno:** cursor
 - **Fecha:** 2026-10-02
-- **⚠ EN CURSO, SIN COMMITEAR (02-10, ~13:25): paquete grande de Adam repartido en agentes.** El árbol
-  de trabajo trae cambios de 6 agentes de Claude Code que NO se han revisado, probado juntos, commiteado
-  ni desplegado (la sesión se quedó sin cuota a media revisión). **No los pises ni los «restaures»: son
-  trabajo válido en curso.** Antes de commitear: revisar cada diff, `tsc` de API y web, jest completo y
-  vitest completo, compilar Android, y desplegar con `--with-migrate` (hay migraciones nuevas).
-  Por área (cada agente tenía prohibido commitear y tocar `.ai/`):
+- **Hecho (paquete grande de 6 agentes: commiteado y DESPLEGADO, `101192ad`, con migraciones):**
+  `20261002130000_activity_work_sessions`, `20261002140000_clientes_varios_tipos` y
+  `20261002150000_producto_codigo_barras` aplicadas en producción (`_prisma_migrations`, sin rollback);
+  API sana. Antes: `tsc` API y web 0; jest API completo en verde (las fallas al correr todo junto eran
+  lentitud: las suites de cotizaciones pasan solas); vitest web en verde; Android
+  `:app:testDebugUnitTest` en verde. iOS no se compila en Windows: revisado a mano. Revisión de
+  seguridad de endpoints nuevos sin hallazgos (cada uno con RBAC; pausar a otro valida alcance; UPC
+  codifica el código hacia proveedor fijo). El `prisma:error` de `WorkflowSeedService` al arrancar es
+  la semilla de siempre (nombre duplicado), no es de esto.
+  - **Organigrama:** el agente murió con 5 pruebas rojas; las 5 eran de las pruebas, no del dibujo
+    (plantilla «de 17» que sumaba 20, `getByTitle` no alcanza `<title>` dentro de `<path>`, jsdom sin
+    `PointerEvent`, nivel esperado mal contado). 35/35. **No lo vi en navegador**: pedir a Adam que
+    abra `/erp/organigrama`.
+  - **iOS:** `CoreModels.swift` (`CoreEvidence.label(_:coreKind:)`) se había quedado fuera del commit
+    de actividades y los archivos ya commiteados lo usan: sin `1931efd1` iOS no compilaba.
+  - **Perfiles desactivados:** el botón Activar/Desactivar de Perfiles (`06c5db82`) ya estaba en
+    producción. Nuevo (`bce4d424`): la API ya no deja asignar a un inactivo (antes solo lo escondía el
+    selector; dirección/mismo departamento pasaban): `ActivitiesService.assertResponsableActivo` en
+    create/update (cubre formulario, proyectos y programación), kit de herramientas y OT de
+    mantenimiento. Reuniones, proyectos y equipo de actividad ya lo validaban.
+  - **Pendiente de Adam:** pie del membrete del PDF de cotización (imagen) trae «Malltertaiment,
+    Explanada Puebla…» y «(22) 01 79 18 71»; si ya no van, que diga cuáles y se edita la imagen.
+    Las apps nativas (sin organigrama, comercial, geocerca 500 m) necesitan su propio build/release.
+- **Contexto del paquete (02-10, ~13:25), por área:**
   1. **Cotizaciones — TERMINADO por su agente, falta mi revisión:** el PDF ya toma `depositPercent`/`note`
      del editor (antes `paymentTerms`→`PAGO_DEFAULT`, por eso el 50 % no se quitaba); datos fiscales del
      emisor (`EMISOR`) arriba del título en la hoja 1; `GET cotizaciones/partidas-frecuentes` + «Usadas
@@ -317,7 +335,7 @@
   `compileDebugKotlin` y `testDebugUnitTest` en verde en tres rondas. **Falta desplegar** (web) y
   **falta compilar + subir build nuevo** (Android — mismo pendiente que evidencia libre y
   autoasignarse, un solo build serviría para las tres cosas).
-- **Fecha:** 2026-09-30
+- **Fecha:** 2026-10-02
 - **Hecho (bug real: «Kit personal» se perdía al asignar — Luis mandó captura por WhatsApp):** Luis
   (`coord_operaciones`) le mandó a Adam una captura: en el flujo de asignar (`/erp/pizarra/[userId]/asignar`,
   José Antonio de destino), marcó «Kit personal» sin tocar el buscador de «Almacén de herramientas» (lo
@@ -361,7 +379,7 @@
   (`Codable` con default `nil`, las sesiones ya guardadas en Keychain siguen bien) y se hidrata en
   login y se refresca en `GET auth/profile`. Mismo pendiente que la evidencia libre: alguien con Mac
   debe compilar antes de generar build.
-- **Fecha:** 2026-09-30
+- **Fecha:** 2026-10-02
 - **Hecho (evidencia libre que se perdía — API, web, Android, iOS):** Luis reportó que tomaba varias
   fotos de evidencia («fotos en sitio», sin campos), salía de la pantalla y volvía, y ya no estaban.
   Causa: esa foto solo se acumulaba en memoria del cliente (React state en web, `remember` de Compose
@@ -414,7 +432,7 @@
   sigue sin acceso, correcto. Prueba nueva en `page-matrix.spec.ts` que cubre los 14 roles + CEO/dir_admin
   (sí) + cliente (no), para que no se vuelva a colar. Sin migración. Verificado: web `tsc` 0, vitest
   78/672 en verde. **Falta desplegar.**
-- **Pedido de Adam en el mismo turno:** en el modal de editar perfil, «Jefe» → «Jefe directo» (creación y
+- **Último turno:** cursor
   edición, `AltaUsuarioPanel.tsx`). Ya aplicado, sin pruebas que lo referenciaran por texto.
 - **Hecho (editar perfiles, no solo la foto):** Adam probó `/erp/perfiles` y solo tenía «Cambiar foto» por persona; pidió poder
   editar de verdad. El botón por persona pasa a «Editar» y abre un modal con foto, nombre y teléfono (los cambia cualquiera con
