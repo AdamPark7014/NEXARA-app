@@ -2,8 +2,9 @@
  * Matriz Core · Clientes por encargado (sidebar + listas + pickers).
  * Alineada a ORG_EMAILS en activity-kinds.ts.
  */
-import { ORG_EMAILS } from "@/lib/activity-kinds";
+import { ORG_EMAILS, kindsForCreator, kindsForTarget } from "@/lib/activity-kinds";
 import { isCeoEquivalentEmail } from "@/lib/platform-accounts";
+import { resolveV2RoleKey, type UserAccessInput } from "@/lib/rbac/role-mapping";
 
 export type ClientSector = "PROYECTO" | "CORPORATIVO" | "COMERCIAL";
 
@@ -22,19 +23,19 @@ export const CLIENT_SECTOR_META: Record<
   PROYECTO: {
     slug: "proyecto",
     title: "Clientes de proyecto",
-    help: "Se crean y se eligen en el módulo de Proyectos. Cada cliente es de un solo tipo.",
+    help: "Los clientes a los que se les lleva un proyecto, incluidos los que se dieron de alta rápido desde una actividad. Aquí se completan sus datos y se ven sus proyectos.",
     icon: "proyecto",
   },
   CORPORATIVO: {
     slug: "corporativo",
     title: "Clientes corporativos",
-    help: "Se eligen o se dan de alta al crear una actividad de servicio.",
+    help: "Los clientes de servicio, incluidos los que se dieron de alta rápido al crear una actividad. Aquí se completan sus datos.",
     icon: "corporativo",
   },
   COMERCIAL: {
     slug: "comercial",
     title: "Clientes comerciales",
-    help: "Se eligen, crean o editan dentro de la cotización. Solo el nombre es obligatorio.",
+    help: "Los clientes de cotizaciones y actividades comerciales. Un mismo cliente puede ser además de proyecto o corporativo.",
     icon: "comercial",
   },
 };
@@ -91,7 +92,38 @@ export function clientSectorsForUser(
 ): ClientSector[] {
   const byEmail = clientSectorsForEmail(user?.email);
   if (byEmail.length) return byEmail;
-  return clientSectorsForRole(user?.roleKey);
+  const byRole = clientSectorsForRole(user?.roleKey);
+  if (byRole.length) return byRole;
+  // Quien lleva actividades comerciales sin estar en la matriz ni tener un rol de padrón
+  // ve al menos a los clientes comerciales: el menú se lo enseña, la página no lo rebota.
+  return tieneActividadesComerciales(user) ? ["COMERCIAL"] : [];
+}
+
+/**
+ * ¿Trabaja con actividades de tipo comercial (las crea o se las asignan)?
+ *
+ * No hay otra lista: se pregunta a `activity-kinds.ts`, que es donde se decide quién crea
+ * y quién recibe cada tipo. Hoy son Christian y su equivalente, la cuenta de desarrollo y
+ * los encargados de área (David, Luis, Antonio, Daniela, Mónica, Josué, Paulina). Quien
+ * se sume allá aparece aquí sin tocar este archivo.
+ */
+export function tieneActividadesComerciales(user?: UserAccessInput | null): boolean {
+  if (!user) return false;
+  const puedeCrear = kindsForCreator({
+    v2Role: resolveV2RoleKey(user),
+    email: user.email,
+    isSuperAdmin: Boolean(user.isSuperAdmin),
+  }).includes("comercial");
+  return puedeCrear || kindsForTarget(user.email).includes("comercial");
+}
+
+/**
+ * «Clientes» en el menú lateral: quienes llevan actividades comerciales, para mantener ahí
+ * los datos de sus clientes recurrentes. La página sigue abierta para quien llegue por un
+ * enlace y tenga padrón (`canAccessClientPadron`).
+ */
+export function puedeVerModuloClientes(user?: UserAccessInput | null): boolean {
+  return tieneActividadesComerciales(user);
 }
 
 export function canSeeClientesModule(email?: string | null): boolean {
@@ -131,7 +163,9 @@ export function clientSectorsForActivityKind(
     return allowed.filter((s) => s === "CORPORATIVO");
   }
   if (kind === "comercial") {
-    return allowed;
+    // Quien puede crear comercial sin estar en la matriz de Clientes (Paulina) usa el padrón
+    // comercial: sin él, el cliente obligatorio salía vacío y no podía guardar la actividad.
+    return allowed.length ? allowed : ["COMERCIAL"];
   }
   return [];
 }

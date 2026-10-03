@@ -425,16 +425,17 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "erp-clients": {
     id: "erp-clients", panel: PANELS.ERP, path: "/clientes",
-    label: "Clientes", description: "Fuera del menú: se administran en cotización, proyecto o servicio",
+    label: "Clientes", description: "Un solo padrón: proyecto, corporativo y comercial",
     icon: "🤝",
-    // Ya no sale en el sidebar (`shouldShowModuleInSidebar` lo apaga). La ruta sigue
-    // para quien tenga el enlace. Crear y editar lo valida el API (`client-permissions`).
+    // En el menú para quien lleva actividades comerciales (`shouldShowModuleInSidebar`,
+    // que le pregunta a `activity-kinds.ts`). La ruta la abre el rol (`PAGE_MATRIX`).
+    // Crear y editar lo valida el API (`client-permissions`).
     allowedRoles: [
       R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
       R.ARQUITECTO, R.COORD_OPERACIONES, R.PROJECT_MANAGER, R.MAINTENANCE_COORDINATOR,
       R.SALES_MANAGER, R.ADMIN_STAFF, R.SALES_REP,
     ],
-    group: "Hoy", visible: false,
+    group: "Hoy", visible: true,
   },
   "erp-cotizaciones": {
     id: "erp-cotizaciones", panel: PANELS.ERP, path: "/cotizaciones",

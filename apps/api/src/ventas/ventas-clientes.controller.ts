@@ -246,9 +246,12 @@ export class VentasClientesController {
     return result;
   }
 
+  // Sumar o quitar un tipo es editar el cliente: mismo guard amplio que el PATCH. Con solo
+  // SALES_MANAGE_ACCESS, la encargada comercial (rol `administrativo`) recibía 403 aquí
+  // aunque sí puede editar. Quién puede de verdad lo decide el servicio.
   @Post(':id/sectors')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
   async addSector(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AddClientSectorDto,
@@ -260,7 +263,7 @@ export class VentasClientesController {
 
   @Delete(':id/sectors/:sector')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
   async removeSector(
     @Param('id', ParseIntPipe) id: number,
     @Param('sector') sectorRaw: string,

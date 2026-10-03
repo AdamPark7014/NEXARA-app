@@ -20,7 +20,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { MODULES, getModuleUrl, type ModuleEntry } from '@/lib/access-matrix';
-import { canUserAccessPath } from '@/lib/user-access';
+import { buildUserSidebar, canUserAccessPath } from '@/lib/user-access';
+import { ORG_EMAILS } from '@/lib/activity-kinds';
 import { shouldShowModuleInSidebar } from '@/lib/section-views';
 import { filterModulesByNavigation, type MeNavigation } from '@/lib/me-navigation';
 import { ADVANCED_ONLY_MODULE_IDS } from '@/lib/nav-mode';
@@ -98,6 +99,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
+    'erp-clients',
     'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
@@ -205,6 +207,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
+    'erp-clients',
     'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
@@ -930,7 +933,8 @@ describe('modulos visibles por rol', () => {
     // `ops-my-*` son bandejas de otro; evidencias y contratos viven como pestana
     // dentro de Actividades y Mantenimiento; el ejecutivo sustituye al dashboard.
     // Tareas/Proyectos/Servicios y «Mis actividades» se consolidaron en la Pizarra;
-    // Clientes ya no es entrada de menú: cada tipo vive en cotización, proyecto o servicio.
+    // Clientes volvió al menú, pero no por rol: lo ve quien lleva actividades comerciales
+    // (`activity-kinds.ts`). Por rol solo le toca a dirección; el resto se prueba por persona abajo.
     // `accounting` (pólizas) ya no es entrada de menú: vive en /erp/contabilidad/polizas.
     const shown = new Set(EXPECTED_MODULES.super_admin);
     expect(ALL_MODULES.filter((m) => !shown.has(m.id)).map((m) => m.id).sort()).toEqual([
@@ -939,7 +943,6 @@ describe('modulos visibles por rol', () => {
       'activities-projects',
       'activities-services',
       'dashboard',
-      'erp-clients',
       'mis-actividades',
       'ops-evidences',
       'ops-maintenance-contracts',
@@ -1230,5 +1233,49 @@ describe('Core · Recursos (almacen, herramientas, vehiculos, organigrama)', () 
   it('pedir herramienta no abre el almacen', () => {
     expect(canOpenPage(ROLES.ING_CAMPO, '/erp/almacen/herramientas?tab=requests')).toBe(true);
     expect(canOpenPage(ROLES.ING_CAMPO, '/erp/almacen')).toBe(false);
+  });
+});
+
+describe('Clientes en el menu: quien lleva actividades comerciales', () => {
+  /** El menu de Core de una persona concreta, tal como lo arma `AppShell`: sidebar y clip del servidor. */
+  function menuDe(email: string, role: RoleKey, extra: Record<string, unknown> = {}): string[] {
+    const user = { email, roleKey: role, ...extra };
+    const items = buildUserSidebar('erp', user).flatMap((g) => g.items);
+    return filterModulesByNavigation(items, navigationFor(role)).map((m) => m.id);
+  }
+
+  // Los mismos que `activity-kinds.ts` deja crear o recibir una actividad comercial,
+  // con la clave de rol que les da `prisma/seed-core-roster.ts`.
+  const COMERCIALES: Array<[string, string, RoleKey]> = [
+    ['David', ORG_EMAILS.david, ROLES.COORD_OPERACIONES],
+    ['Luis', ORG_EMAILS.luis, ROLES.COORD_OPERACIONES],
+    ['Antonio', ORG_EMAILS.antonio, ROLES.ENC_SOPORTE],
+    ['Daniela', ORG_EMAILS.daniela, ROLES.ADMINISTRATIVO],
+    ['Monica', ORG_EMAILS.monica, ROLES.ADMINISTRATIVO],
+    ['Josue', ORG_EMAILS.josue, ROLES.ARQUITECTO],
+    // Paulina no esta en la matriz de sectores: entra por llevar actividades comerciales.
+    ['Paulina', 'finanzas@nexara.com.mx', ROLES.ADMINISTRATIVO],
+  ];
+
+  it.each(COMERCIALES)('%s ve Clientes junto a Cotizaciones y Proyectos', (_nombre, email, role) => {
+    const menu = menuDe(email, role);
+    expect(menu).toContain('erp-clients');
+    expect(canOpenPage(role, '/erp/clientes')).toBe(true);
+    expect(canOpenPage(role, '/erp/clientes/12')).toBe(true);
+  });
+
+  it('Christian y la cuenta de desarrollo tambien', () => {
+    expect(menuDe(ORG_EMAILS.ceo, ROLES.CEO)).toContain('erp-clients');
+    expect(menuDe(ORG_EMAILS.developer, ROLES.SUPER_ADMIN, { isSuperAdmin: true })).toContain('erp-clients');
+  });
+
+  it('quien solo lleva tareas, proyectos o servicios no lo ve, aunque su rol abra la pagina', () => {
+    // Campo y soporte: ni menu ni pagina.
+    expect(menuDe(ORG_EMAILS.joan, ROLES.ING_CAMPO)).not.toContain('erp-clients');
+    expect(menuDe(ORG_EMAILS.carolina, ROLES.ING_SOPORTE)).not.toContain('erp-clients');
+    // Un administrativo que no lleva actividades comerciales: la pagina le abre por enlace
+    // (su rol tiene padron), pero el menu no se la pone.
+    expect(menuDe('otra.persona@nexara.com.mx', ROLES.ADMINISTRATIVO)).not.toContain('erp-clients');
+    expect(canOpenPage(ROLES.ADMINISTRATIVO, '/erp/clientes')).toBe(true);
   });
 });

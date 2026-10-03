@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { OperationalProjectsService } from './operational-projects.service';
 
 describe('OperationalProjectsService: alta rápida desde una actividad', () => {
@@ -69,12 +69,13 @@ describe('OperationalProjectsService: alta rápida desde una actividad', () => {
     expect(prisma.operationalProject.create.mock.calls[0][0].data.clientId).toBe(9);
   });
 
-  it('rechaza otro tipo de cliente, otra empresa y una cuenta de portal', async () => {
+  it('acepta un cliente de otro tipo (queda además como de proyecto) y rechaza otra empresa y una cuenta de portal', async () => {
+    // Un cliente puede ser de varios tipos: al comercial se le abre el proyecto, no se le rechaza.
     const comercial = servicio({ id: 4, name: 'ACME', tipo: 'COMERCIAL', companyId: 7, serviceClientId: 8 });
     await expect(
       comercial.service.quickCreate({ title: 'Obra norte', salesClientId: 4 }, usuario, 7),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(comercial.prisma.operationalProject.create).not.toHaveBeenCalled();
+    ).resolves.toEqual(comercial.creado);
+    expect(comercial.prisma.operationalProject.create.mock.calls[0][0].data.clientId).toBe(8);
 
     const ajeno = servicio(null);
     await expect(ajeno.service.quickCreate({ title: 'Obra norte', salesClientId: 4 }, usuario, 7)).rejects.toBeInstanceOf(

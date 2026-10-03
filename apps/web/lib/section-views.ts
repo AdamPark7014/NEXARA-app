@@ -9,6 +9,7 @@ import { canOpenPage } from '@/lib/rbac/page-matrix';
 import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
 import { isAdvancedOnlyModuleId, isNavAdvanced } from '@/lib/nav-mode';
+import { puedeVerModuloClientes } from '@/lib/client-sectors';
 import { PERMISSIONS } from '@/lib/permissions';
 import { canCreateToolLoan, canManageTools } from '@/lib/tools-access';
 
@@ -244,9 +245,10 @@ export function shouldShowModuleInSidebar(
       // Vive dentro de Actividades (pestaña «Mis actividades»); no va suelto en el menú.
       return false;
     case 'erp-clients':
-      // El padrón ya no es un módulo del menú: cada tipo se administra donde se usa
-      // (cotización, proyecto o actividad de servicio). Las rutas siguen vivas.
-      return false;
+      // De vuelta en el menú para quien lleva actividades comerciales: ahí mantienen los
+      // datos de sus clientes recurrentes, incluidos los que se dieron de alta rápido en
+      // una actividad, una cotización o un proyecto. Quién es lo decide `activity-kinds.ts`.
+      return puedeVerModuloClientes(user);
     case 'ops-activities': {
       const ov = user?.moduleAccess?.['ops-activities'];
       if (ov === 'both') return true;

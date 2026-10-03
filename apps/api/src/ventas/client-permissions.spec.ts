@@ -11,6 +11,7 @@ import {
   isInactiveClientStatus,
 } from './client-permissions.js';
 import { tipoPorUso } from './client-tipo.js';
+import { filtroPorSector } from './client-sectors.js';
 import { VentasService } from './ventas.service.js';
 
 const CHRISTIAN = { id: 1, email: 'gerencia@nexara.com.mx', roleKey: 'ceo', isSuperAdmin: true };
@@ -132,6 +133,8 @@ function buildService(opts: { reportees?: number; client?: Record<string, unknow
     user: { count: jest.fn().mockResolvedValue(opts.reportees ?? 0) },
     salesClient: {
       findFirst: jest.fn().mockResolvedValue(client),
+      // El alta busca primero si el nombre ya está en el padrón; aquí nunca lo está.
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ ...client, ...data })),
       delete: jest.fn().mockResolvedValue(client),
       create: jest.fn(),
@@ -413,7 +416,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     await service.listClients(TECNICO, undefined, { sector: 'CORPORATIVO' } as any, 7);
     const donde = prisma.salesClient.findMany.mock.calls[0][0].where;
     expect(donde.companyId).toBe(7);
-    expect(donde.tipo).toBe('CORPORATIVO');
+    expect(donde.AND).toEqual([filtroPorSector('CORPORATIVO')]);
     expect(donde.ownerId).toBeUndefined();
     await expect(service.listClients(TECNICO, undefined, { sector: 'COMERCIAL' } as any, 7)).rejects.toThrow(
       ForbiddenException,
@@ -426,12 +429,12 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     await service.listClients(LIDER, undefined, { sector: 'CORPORATIVO' } as any, 7);
     const donde = prisma.salesClient.findMany.mock.calls[0][0].where;
     expect(donde.companyId).toBe(7);
-    expect(donde.tipo).toBe('CORPORATIVO');
+    expect(donde.AND).toEqual([filtroPorSector('CORPORATIVO')]);
     expect(donde.ownerId).toBeUndefined();
     await service.listClients(DANIELA, undefined, { sector: 'CORPORATIVO' } as any, 7);
     const deDaniela = prisma.salesClient.findMany.mock.calls[1][0].where;
     expect(deDaniela.companyId).toBe(7);
-    expect(deDaniela.tipo).toBe('CORPORATIVO');
+    expect(deDaniela.AND).toEqual([filtroPorSector('CORPORATIVO')]);
     expect(deDaniela.ownerId).toBeUndefined();
     await expect(service.listClients(LIDER, undefined, { sector: 'COMERCIAL' } as any, 7)).rejects.toThrow(
       ForbiddenException,
@@ -444,7 +447,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
     await service.listClients(TECNICO, undefined, { sector: 'PROYECTO' } as any, 7);
     const donde = prisma.salesClient.findMany.mock.calls[0][0].where;
     expect(donde.companyId).toBe(7);
-    expect(donde.tipo).toBe('PROYECTO');
+    expect(donde.AND).toEqual([filtroPorSector('PROYECTO')]);
     expect(donde.ownerId).toBeUndefined();
   });
 });

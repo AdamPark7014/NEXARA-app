@@ -91,9 +91,14 @@ export default function NuevoClientePage() {
     );
   }
 
+  // Varios a la vez: el mismo cliente puede ser comercial, de proyecto y corporativo.
+  // Siempre queda al menos uno; el primero que se eligió es el principal.
   const toggleSector = (s: ClientSector) => {
     sectoresTocados.current = true;
-    setSectors([s]);
+    setSectors((prev) => {
+      if (!prev.includes(s)) return [...prev, s];
+      return prev.length > 1 ? prev.filter((x) => x !== s) : prev;
+    });
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -116,7 +121,7 @@ export default function NuevoClientePage() {
         ...form,
         taxId: form.taxId.toUpperCase(),
         tipo: sectors[0],
-        sectors: sectors.slice(0, 1),
+        sectors,
         status: "Activo",
       });
       router.push(`/erp/clientes/${created.id}`);
@@ -143,7 +148,10 @@ export default function NuevoClientePage() {
           <div className={styles.cardPad}>
             <fieldset className={styles.fieldset}>
               <legend className={styles.legend}>Sectores</legend>
-              <p className={styles.fieldHint}>Cada cliente es de un solo tipo: comercial, de proyecto o corporativo.</p>
+              <p className={styles.fieldHint}>
+                Elige uno o varios: el mismo cliente puede ser comercial, de proyecto y corporativo a la vez. Si ya
+                existe con ese nombre, no se duplica: se le suman los sectores que elijas.
+              </p>
               <div className={styles.sectorPick} role="group" aria-label="Sectores del cliente">
                 {ALL_CLIENT_SECTORS.filter((s) => allowedSectors.includes(s)).map((s) => {
                   const on = sectors.includes(s);

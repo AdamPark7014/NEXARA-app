@@ -32,8 +32,10 @@ import {
   canSeeClientesModule,
   clientSectorsForActor,
   clientSectorsForEmail,
+  filtroPorSector,
   isClientSector,
-  needsOpsProvision,
+  nombreClienteLimpio,
+  sectoresDelCliente,
   type ClientSectorCode,
 } from './client-sectors.js';
 import {
@@ -145,8 +147,9 @@ export class VentasService {
   }
 
   /**
-   * Un solo tipo. `tipo` gana. El alta rápida de servicio es CORPORATIVO
-   * aunque el sector del padrón de quien asigna sea otro.
+   * Tipo principal: con el que nace el cliente (después puede sumar los otros).
+   * `tipo` gana. El alta rápida de servicio es CORPORATIVO aunque el sector del padrón
+   * de quien asigna sea otro.
    * Sin nada explícito: el único sector de su área, o COMERCIAL si tiene varios o ninguno.
    */
   private resolveTipo(dto: CreateSalesClientDto, user: any): ClientSectorCode {
@@ -180,6 +183,17 @@ export class VentasService {
     const defaults = this.defaultSectorsFor(user);
     if (defaults.length === 1) return defaults[0];
     return defaults.includes('COMERCIAL') ? 'COMERCIAL' : defaults[0];
+  }
+
+  /**
+   * Todos los tipos que pide el alta: un cliente puede ser de proyecto, corporativo y
+   * comercial a la vez. El principal siempre va, y va primero. Las altas rápidas
+   * (servicio o proyecto) solo dan el suyo.
+   */
+  private resolveSectores(dto: CreateSalesClientDto, tipo: ClientSectorCode, minima: boolean): ClientSectorCode[] {
+    if (minima || !dto.sectors?.length) return [tipo];
+    const pedidos = this.normalizeIncomingSectors(dto.sectors);
+    return [tipo, ...pedidos.filter((s) => s !== tipo)];
   }
 
   /** Alta de proyecto desde una actividad: únicamente el nombre. */
@@ -512,6 +526,8 @@ export class VentasService {
     const tipo = this.resolveTipo(dto, user);
     const altaProyecto = Boolean(dto.altaProyecto);
     const rapida = !altaProyecto && Boolean(dto.altaRapida) && tipo === 'CORPORATIVO';
+    const minima = rapida || altaProyecto;
+    const sectores = this.resolveSectores(dto, tipo, minima);
     if (altaProyecto) {
       this.assertAltaProyecto(dto);
     } else if (rapida) {
@@ -523,15 +539,22 @@ export class VentasService {
       await this.assertCanManageClients(user);
       // Dar de alta un cliente ya inactivo equivale a desactivarlo.
       if (isInactiveClientStatus(dto.status)) this.assertCanDeactivateClient(user);
-      this.assertCanUseSectors(user, [tipo]);
+      this.assertCanUseSectors(user, sectores);
     }
-    const minima = rapida || altaProyecto;
     const ownerId = this.resolveOwnerForWrite(minima ? undefined : dto.ownerId, user);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
+    const nombre = nombreClienteLimpio(dto.name) || dto.name;
+
+    // Un solo padrón: si el cliente ya existe (lo dio de alta otra área, una cotización o
+    // una actividad), no se duplica. Se le suma el tipo que pide esta alta y se usa ese.
+    const existente = await this.clienteVigenteConEseNombre(nombre, resolvedCompanyId);
+    if (existente) {
+      return this.reutilizarCliente(existente, dto, sectores, { rapida, altaProyecto }, user);
+    }
 
     const created = await this.prisma.salesClient.create({
       data: {
-        name: dto.name,
+        name: nombre,
         legalName: minima ? null : dto.legalName || null,
         taxId: altaProyecto ? null : dto.taxId?.trim() || null,
         fiscalAddress: minima ? null : dto.fiscalAddress || null,
@@ -548,7 +571,7 @@ export class VentasService {
         companyId: resolvedCompanyId,
         tipo,
         sectors: {
-          create: [{ sector: tipo, companyId: resolvedCompanyId }],
+          create: sectores.map((sector) => ({ sector, companyId: resolvedCompanyId })),
         },
       },
       include: this.clientInclude(),
@@ -570,23 +593,102 @@ export class VentasService {
         status: created.status,
         ownerId: created.ownerId,
         serviceClientId: created.serviceClientId,
-        sectors: [tipo],
+        sectors: sectores,
         tipo,
       },
     });
 
-    // Proyecto y corporativo necesitan cliente de operación para la actividad o el proyecto.
-    // Comercial (cotización) no. El alta del CRM viejo, sin tipo ni sector, sigue provisionando.
-    const explicito = Boolean(dto.tipo) || Boolean(dto.sectors?.length) || rapida;
-    if (!created.serviceClientId && (needsOpsProvision([tipo]) || !explicito)) {
+    // Todo cliente nace con su cliente de operación, también el comercial: así el que se dio
+    // de alta en una cotización se puede elegir después en una actividad o en un proyecto.
+    if (!created.serviceClientId) {
       try {
-        const provisioned = await this.provisionServiceClient(created.id, user, resolvedCompanyId);
+        const provisioned = await this.vincularClienteDeOperacion(created, user);
         return provisioned.salesClient;
       } catch {
         return created;
       }
     }
     return created;
+  }
+
+  /**
+   * El cliente vigente de esta empresa con ese nombre, sin distinguir mayúsculas.
+   * Los inactivos no cuentan: un alta nueva no revive a uno que dirección desactivó.
+   */
+  private async clienteVigenteConEseNombre(nombre: string, companyId: number) {
+    if (nombre.trim().length < 2) return null;
+    const candidatos = await this.prisma.salesClient.findMany({
+      where: { companyId, name: { equals: nombre, mode: 'insensitive' } },
+      orderBy: { id: 'asc' },
+      include: this.clientInclude(),
+      take: 10,
+    });
+    return candidatos.find((c) => !isInactiveClientStatus(c.status)) ?? null;
+  }
+
+  /**
+   * El alta pidió un cliente que ya está en el padrón: se le suman los tipos que falten y
+   * se completan solo los datos que estaban vacíos. Lo ya capturado no se pisa: para
+   * corregirlo está la ficha del cliente.
+   */
+  private async reutilizarCliente(
+    existente: NonNullable<Awaited<ReturnType<VentasService['clienteVigenteConEseNombre']>>>,
+    dto: CreateSalesClientDto,
+    sectores: ClientSectorCode[],
+    alta: { rapida: boolean; altaProyecto: boolean },
+    user?: any,
+  ) {
+    const yaTiene = sectoresDelCliente(existente);
+    const faltan = sectores.filter((s) => !yaTiene.includes(s));
+    const actual = existente as unknown as Record<string, unknown>;
+    const relleno: Record<string, string> = {};
+    const llenar = (campo: string, valor?: string | null) => {
+      const nuevo = String(valor ?? '').trim();
+      if (nuevo && !String(actual[campo] ?? '').trim()) relleno[campo] = nuevo;
+    };
+    if (!alta.altaProyecto) {
+      llenar('taxId', dto.taxId);
+      llenar('billingEmail', dto.billingEmail);
+      llenar('billingPhone', dto.billingPhone);
+    }
+    if (!alta.rapida && !alta.altaProyecto) {
+      llenar('legalName', dto.legalName);
+      llenar('fiscalAddress', dto.fiscalAddress);
+      llenar('fiscalZipCode', dto.fiscalZipCode);
+      llenar('fiscalRegime', dto.fiscalRegime);
+      llenar('industry', dto.industry);
+      llenar('website', dto.website);
+      llenar('notes', dto.notes);
+    }
+
+    let cliente = existente;
+    if (faltan.length || Object.keys(relleno).length) {
+      cliente = await this.prisma.salesClient.update({
+        where: { id: existente.id },
+        data: {
+          ...relleno,
+          ...(faltan.length
+            ? { sectors: { create: faltan.map((sector) => ({ sector, companyId: existente.companyId })) } }
+            : {}),
+        },
+        include: this.clientInclude(),
+      });
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'SALES_CLIENT',
+        entityId: cliente.id,
+        companyId: cliente.companyId,
+        userId: user?.id,
+        payload: { name: cliente.name, sectors: [...yaTiene, ...faltan], reutilizado: true },
+      });
+    }
+    if (!cliente.serviceClientId) {
+      try {
+        return (await this.vincularClienteDeOperacion(cliente, user)).salesClient;
+      } catch {
+        return cliente;
+      }
+    }
+    return cliente;
   }
 
   async listClients(
@@ -604,9 +706,11 @@ export class VentasService {
       if (!(await this.puedeListarTipo(user, sector))) {
         this.assertCanUseSectors(user, [sector]);
       }
+      // Por membresía, no por el tipo principal: el que es de proyecto y además comercial
+      // sale en las dos listas (y en los dos selectores).
       where = {
         ...where,
-        tipo: sector,
+        AND: [filtroPorSector(sector)],
       };
     } else if (this.vePadronDeLaEmpresa(user)) {
       if (ownerId) where = { ...where, ...this.buildScopedOwnerWhere(user, ownerId) };
@@ -641,19 +745,15 @@ export class VentasService {
       include: this.clientInclude(),
     });
     assertCompanyAccess(client, tenantId, 'Cliente');
-    const tipoCliente = String((client as { tipo?: string }).tipo || '');
+    const tipos = sectoresDelCliente(client);
     // Corporativo y proyecto se eligen en la actividad: son de la empresa, no del sector ni del dueño.
-    if (tipoCliente !== 'CORPORATIVO' && tipoCliente !== 'PROYECTO') {
-      this.assertOwnerAccess(client!.ownerId, user, 'cliente');
+    if (!tipos.includes('CORPORATIVO') && !tipos.includes('PROYECTO')) {
+      // Quien administra el padrón abre cualquier cliente de su empresa, no solo los que dio
+      // de alta: la lista ya se los enseñaba y la ficha se los negaba.
+      if (!this.vePadronDeLaEmpresa(user)) this.assertOwnerAccess(client!.ownerId, user, 'cliente');
       const allowedSectors = clientSectorsForActor(user);
-      if (
-        allowedSectors.length &&
-        !this.isSuperAdminUser(user) &&
-        !this.isSalesTeamManager(user) &&
-        (client!.sectors ?? []).length
-      ) {
-        const clientSectors = (client!.sectors ?? []).map((s) => s.sector as ClientSectorCode);
-        if (!clientSectors.some((s) => allowedSectors.includes(s))) {
+      if (allowedSectors.length && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user) && tipos.length) {
+        if (!tipos.some((s) => allowedSectors.includes(s))) {
           throw new ForbiddenException('No tienes acceso a este cliente');
         }
       }
@@ -661,24 +761,17 @@ export class VentasService {
     return client!;
   }
 
+  /**
+   * Suma un tipo al cliente sin quitarle los que ya tiene: el mismo cliente puede ser de
+   * proyecto, corporativo y comercial. El tipo principal no cambia.
+   */
   async addClientSector(id: number, sector: string, user?: any, companyId?: number | null) {
     if (!isClientSector(sector)) throw new BadRequestException('Sector inválido');
     await this.assertCanManageClients(user);
     this.assertCanUseSectors(user, [sector]);
     const client = await this.getClient(id, user, companyId);
-    if ((client as { tipo?: string }).tipo === sector) return client;
 
-    await this.prisma.salesClient.update({
-      where: { id },
-      data: { tipo: sector },
-    });
-    await this.prisma.salesClientSector.deleteMany({
-      where: { salesClientId: id, sector: { not: sector } },
-    });
-    const ya = await this.prisma.salesClientSector.findFirst({
-      where: { salesClientId: id, sector },
-    });
-    if (!ya) {
+    if (!(client.sectors ?? []).some((s) => s.sector === sector)) {
       await this.prisma.salesClientSector.create({
         data: {
           salesClientId: id,
@@ -688,9 +781,9 @@ export class VentasService {
       });
     }
 
-    if (needsOpsProvision([sector]) && !client.serviceClientId) {
+    if (!client.serviceClientId) {
       try {
-        await this.provisionServiceClient(id, user, companyId);
+        await this.vincularClienteDeOperacion(client, user);
       } catch {
         /* ignore */
       }
@@ -698,20 +791,40 @@ export class VentasService {
     return this.getClient(id, user, companyId);
   }
 
+  /**
+   * Quita un tipo. El cliente conserva al menos uno, y el de proyecto no se quita mientras
+   * tenga proyectos: dejarían de verse desde su ficha y desde Proyectos.
+   */
   async removeClientSector(id: number, sector: string, user?: any, companyId?: number | null) {
     if (!isClientSector(sector)) throw new BadRequestException('Sector inválido');
+    await this.assertCanManageClients(user);
     this.assertCanUseSectors(user, [sector]);
     const client = await this.getClient(id, user, companyId);
-    const existing = client.sectors ?? [];
-    if (existing.length <= 1) {
-      throw new BadRequestException('El cliente debe conservar al menos un sector');
+    const tipos = sectoresDelCliente(client);
+    if (!tipos.includes(sector)) return client;
+    if (tipos.length <= 1) {
+      throw new BadRequestException('El cliente debe conservar al menos un tipo');
     }
-    if (!existing.some((s: { sector: string }) => s.sector === sector)) {
-      return client;
+    if (sector === 'PROYECTO' && client.serviceClientId) {
+      const proyectos = await this.prisma.operationalProject.count({
+        where: { clientId: client.serviceClientId, deletedAt: null },
+      });
+      if (proyectos > 0) {
+        throw new BadRequestException(
+          `Este cliente tiene ${proyectos === 1 ? 'un proyecto' : `${proyectos} proyectos`}: no se le puede quitar el tipo Proyecto.`,
+        );
+      }
     }
     await this.prisma.salesClientSector.deleteMany({
       where: { salesClientId: id, sector },
     });
+    // Si era el principal, pasa a serlo otro de los que conserva.
+    if (client.tipo === sector) {
+      await this.prisma.salesClient.update({
+        where: { id },
+        data: { tipo: tipos.find((s) => s !== sector)! },
+      });
+    }
     return this.getClient(id, user, companyId);
   }
 
@@ -878,6 +991,19 @@ export class VentasService {
   /** Crea o devuelve el ServiceClient operativo vinculado a un cliente comercial. */
   async provisionServiceClient(id: number, user?: any, companyId?: number | null) {
     const salesClient = await this.getClient(id, user, companyId);
+    return this.vincularClienteDeOperacion(salesClient, user);
+  }
+
+  /**
+   * El paso de `provisionServiceClient` con el cliente ya cargado y ya autorizado.
+   * Lo usan las altas (incluida la rápida de un operativo, que no pasa por las reglas
+   * de acceso a la ficha) y sumar un tipo.
+   */
+  private async vincularClienteDeOperacion(
+    salesClient: Awaited<ReturnType<VentasService['getClient']>>,
+    user?: any,
+  ) {
+    const id = salesClient.id;
     if (salesClient.serviceClientId) {
       const existing = await this.prisma.serviceClient.findUnique({
         where: { id: salesClient.serviceClientId },
@@ -891,12 +1017,13 @@ export class VentasService {
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, salesClient.companyId);
     const serviceClient = await this.prisma.serviceClient.create({
       data: {
-        name: salesClient.legalName?.trim() || salesClient.name,
-        contactName: salesClient.name,
+        // Las columnas de operación son más cortas que las del padrón.
+        name: (salesClient.legalName?.trim() || salesClient.name).slice(0, 200),
+        contactName: salesClient.name.slice(0, 160),
         contactEmail: salesClient.billingEmail,
         contactPhone: salesClient.billingPhone,
-        address: salesClient.fiscalAddress,
-        accountCode,
+        address: salesClient.fiscalAddress?.slice(0, 220) ?? null,
+        accountCode: accountCode.slice(0, 80),
         isActive: true,
         companyId: resolvedCompanyId,
       },

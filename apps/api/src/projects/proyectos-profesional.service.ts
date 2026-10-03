@@ -22,6 +22,7 @@ import {
   resolveRequiredCompanyId,
 } from '../common/tenant/tenant-scope.js';
 import { fueraDeAlcance, mensajeFueraDeAlcance } from './proyecto-equipo-alcance.js';
+import { marcarClienteDeProyectoSinFallar } from './cliente-de-proyecto.js';
 import { periodoDto } from '../activities/actividad-periodo.js';
 import { esCerrada } from '../activities/actividad-tiempos.js';
 import type { Alcanzador } from '../me/equipo-alcance.js';
@@ -376,6 +377,9 @@ export class ProyectosProfesionalService {
       },
       include: detalleInclude,
     });
+
+    // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos).
+    await marcarClienteDeProyectoSinFallar(this.prisma, dto.clientId, actor.id);
 
     return this.detalle(creado.id, tenantId);
   }

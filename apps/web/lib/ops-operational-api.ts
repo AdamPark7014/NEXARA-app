@@ -174,10 +174,13 @@ export function createOperationalProject(token: string, dto: CreateOperationalPr
   );
 }
 
-/** Nombre y cliente de proyecto. Lo demás se completa en Proyectos. */
+/**
+ * Nombre y cliente del padrón (y, desde la ficha del cliente, el inicio planeado).
+ * Lo demás se completa en Proyectos. Si el cliente aún no era de proyecto, queda como tal.
+ */
 export function quickCreateOperationalProject(
   token: string,
-  dto: { title: string; salesClientId: number },
+  dto: { title: string; salesClientId: number; startDate?: string },
 ) {
   return opsProjectRequest<OperationalProject>(
     "operational-projects/alta-rapida",
