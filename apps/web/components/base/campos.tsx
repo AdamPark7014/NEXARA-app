@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Children,
   cloneElement,
   forwardRef,
   Fragment,
@@ -222,9 +221,13 @@ export function Field({
   const hintId = `campo-pista-${autoId}`;
   const messageId = error ? errorId : hint || valid ? hintId : undefined;
 
+  // Siempre el mismo camino para el control: si se clonara solo cuando hay pista, error u
+  // obligatorio (y con `Children.toArray`, que le pone llave «.0»), al aparecer o irse un
+  // mensaje cambiaba la llave del control, React lo volvía a montar y se perdía el foco a
+  // media captura.
   let control: ReactNode = children;
-  const only = Children.count(children) === 1 ? Children.toArray(children)[0] : null;
-  if (isValidElement(only) && only.type !== Fragment && (messageId || required)) {
+  const only = isValidElement(children) ? children : null;
+  if (only && only.type !== Fragment) {
     const el = only as ReactElement<ControlAria>;
     const own = el.props;
     const describedBy = [own["aria-describedby"], messageId].filter(Boolean).join(" ") || undefined;
