@@ -1,29 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { type Socket } from "socket.io-client";
-import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import styles from "./WorkspaceChat.module.css";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
-import type { SvgIconComponent } from "@mui/icons-material";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
-import PushPinIcon from "@mui/icons-material/PushPin";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
-import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOutlined";
-import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
-import StarIcon from "@mui/icons-material/Star";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
-import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-import SentimentSatisfiedAltOutlinedIcon from "@mui/icons-material/SentimentSatisfiedAltOutlined";
-import AddReactionOutlinedIcon from "@mui/icons-material/AddReactionOutlined";
-import MentionTextarea, { type MentionTextareaHandle } from "./chat/MentionTextarea";
-import EmojiPicker from "./chat/EmojiPicker";
+import { type MentionTextareaHandle } from "./chat/MentionTextarea";
 import { esCeoChristian } from "@/lib/ceo-user";
-import { isJumboEmoji } from "@/lib/chat-emoji";
 import { formatApiError } from "@/lib/erp-api";
 import InlineAlert from "@/components/ui/InlineAlert";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -33,403 +16,43 @@ import {
   toDisplay,
   userMentionToken,
 } from "@/lib/chat-mentions";
-
-type Attachment = { url: string; name: string; mime: string; size: number };
-
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
-
-function isImageAttachment(name: string) {
-  return IMAGE_EXT.test(name);
-}
-
-function attachmentHref(url: string) {
-  return `${getApiAssetOrigin()}${url}`;
-}
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** Reacciones de un toque, las tres que más se usan. El resto va en el selector. */
-const REACCIONES_RAPIDAS = ["👍", "✅", "👀"];
-
-type ChannelKind = "PUBLIC" | "PRIVATE" | "DIRECT";
-
-type ChatUser = { id: number; nombre: string; email: string };
-
-type Channel = {
-  id: number;
-  kind: ChannelKind;
-  slug: string | null;
-  name: string;
-  topic?: string | null;
-  description?: string | null;
-  peer?: ChatUser | null;
-  members?: Array<ChatUser & { role?: string; lastReadAt?: string | null }>;
-  memberCount: number;
-  lastMessageAt?: string | null;
-  lastMessagePreview?: string | null;
-  unread?: boolean;
-  unreadCount?: number;
-  lastReadAt?: string | null;
-  muted?: boolean;
-  mutedUntil?: string | null;
-  /** Vista por jerarquía (dueño / supervisor), no membresía propia */
-  supervised?: boolean;
-  readOnly?: boolean;
-};
-
-type ReactionUser = { id: number; nombre: string; avatarUrl?: string | null; reactedAt?: string | null };
-
-type Reaction = { emoji: string; count: number; userIds: number[]; users?: ReactionUser[] };
-
-type MentionEntity = {
-  kind: "USER" | "ACTIVITY" | "EVIDENCE";
-  id: number;
-  label: string;
-  subtitle: string;
-  href?: string;
-};
-
-type ReceiptState = "sent" | "delivered" | "read";
-
-type MessageReceipt = {
-  state: ReceiptState;
-  readCount: number;
-  recipientCount: number;
-};
-
-type ReadPerson = {
-  id: number;
-  nombre: string;
-  avatarUrl: string | null;
-  readAt?: string;
-  delivered?: boolean;
-};
-
-type Message = {
-  id: number;
-  channelId: number;
-  authorId: number;
-  parentId: number | null;
-  kind: string;
-  body: string;
-  attachmentUrl?: string | null;
-  attachmentName?: string | null;
-  pinnedAt?: string | null;
-  editedAt?: string | null;
-  createdAt: string;
-  author: ChatUser;
-  replyCount: number;
-  reactions: Reaction[];
-  channel?: { id: number; name: string; kind: ChannelKind; slug: string | null };
-  receipt?: MessageReceipt | null;
-  /** Cita del mensaje padre cuando ese mensaje ya se eliminó. */
-  replyTo?: { id: number; deleted: true; body: string } | null;
-  /** Marcador local del hilo abierto: el original ya no está en la lista. */
-  deleted?: boolean;
-  /** Optimistic client id until server ack */
-  clientMsgId?: string;
-  pending?: boolean;
-  failed?: boolean;
-};
-
-type DeletedPayload = {
-  id: number;
-  channelId: number;
-  parentId?: number | null;
-  authorId?: number;
-  createdAt?: string;
-  lastMessagePreview?: string | null;
-  lastMessageAt?: string | null;
-};
-
-const FAVORITES_KEY = "nexara.chat.favorites";
-const DRAFTS_KEY = "nexara.chat.drafts";
-
-function loadJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveJson(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* ignore quota */
-  }
-}
-
-async function apiFetch(path: string, token: string, init: RequestInit = {}) {
-  const res = await fetch(buildApiUrl(path), {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> | undefined),
-    },
-  });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  if (res.status === 204) return null;
-  const t = await res.text();
-  return t ? JSON.parse(t) : null;
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function avatarHue(id: number) {
-  return styles[`avatarHue${id % 6}` as keyof typeof styles] ?? styles.avatarHue0;
-}
-
-function formatClock(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Mexico_City",
-  });
-}
-
-function formatMexicoDateTime(iso: string) {
-  return new Date(iso).toLocaleString("es-MX", {
-    timeZone: "America/Mexico_City",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function CheckMark() {
-  return (
-    <svg className={styles.tickSvg} width="15" height="11" viewBox="0 0 16 11" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M15.01 1.01a1 1 0 0 0-1.42 0L6.3 8.3 2.41 4.4A1 1 0 1 0 1 5.82l4.6 4.6a1 1 0 0 0 1.41 0l8-8a1 1 0 0 0 0-1.41z"
-      />
-    </svg>
-  );
-}
-
-function ReceiptTicks({
-  receipt,
-  pending,
-  failed,
-}: {
-  receipt?: MessageReceipt | null;
-  pending?: boolean;
-  failed?: boolean;
-}) {
-  if (failed) return <span className={styles.receiptFailed}>No se envió</span>;
-  const state: ReceiptState = pending || !receipt ? "sent" : receipt.state;
-  const title =
-    state === "read" ? "Visto por todos" : state === "delivered" ? "Entregado" : "Enviado";
-  const double = state === "delivered" || state === "read";
-  return (
-    <span
-      className={`${styles.ticks} ${state === "read" ? styles.ticksRead : ""}`}
-      title={title}
-      aria-label={title}
-    >
-      <CheckMark />
-      {double ? (
-        <span className={styles.tickSecond}>
-          <CheckMark />
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function mergeMessage(prev: Message, incoming: Message): Message {
-  return {
-    ...prev,
-    ...incoming,
-    receipt: incoming.receipt ?? prev.receipt ?? null,
-  };
-}
-
-function dayKey(iso: string) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function dayLabel(iso: string) {
-  const d = new Date(iso);
-  const today = new Date();
-  const yest = new Date();
-  yest.setDate(today.getDate() - 1);
-  if (dayKey(iso) === dayKey(today.toISOString())) return "Hoy";
-  if (dayKey(iso) === dayKey(yest.toISOString())) return "Ayer";
-  return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
-}
-
-function formatRelativeTime(iso?: string | null): string {
-  if (!iso) return "";
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return "";
-  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
-  if (diffSec < 45) return "ahora";
-  const min = Math.round(diffSec / 60);
-  if (min < 60) return `hace ${min} min`;
-  const hr = Math.round(min / 60);
-  if (hr < 24) return `hace ${hr} h`;
-  const day = Math.round(hr / 24);
-  if (day < 7) return `hace ${day} d`;
-  return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
-}
-
-/** Resumen corto para el tooltip al pasar el mouse sobre una reacción. */
-function summarizeReactors(users?: ReactionUser[]): string {
-  const names = (users ?? []).map((u) => u.nombre).filter(Boolean);
-  if (!names.length) return "";
-  if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} y ${names[1]}`;
-  return `${names[0]}, ${names[1]} y ${names.length - 2} más`;
-}
-
-/** Busca un mensaje por id entre la lista principal y el panel de hilo. */
-function findMessageInLists(
-  id: number,
-  lists: Array<Message[] | Message | null | undefined>,
-): Message | undefined {
-  for (const l of lists) {
-    if (!l) continue;
-    if (Array.isArray(l)) {
-      const found = l.find((m) => m.id === id);
-      if (found) return found;
-    } else if (l.id === id) {
-      return l;
-    }
-  }
-  return undefined;
-}
-
-/** Avatar de un reactor: imagen si hay avatarUrl (con fallback a iniciales si falla), o iniciales. */
-function ReactorAvatar({ user }: { user: ReactionUser }) {
-  const [imgError, setImgError] = useState(false);
-  if (user.avatarUrl && !imgError) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={attachmentHref(user.avatarUrl)}
-        alt=""
-        className={styles.reactorAvatarImg}
-        onError={() => setImgError(true)}
-      />
-    );
-  }
-  return (
-    <div className={`${styles.avatar} ${avatarHue(user.id)}`} style={{ width: 30, height: 30, fontSize: 11, marginTop: 0 }}>
-      {initials(user.nombre)}
-    </div>
-  );
-}
-
-/** Prefijo de texto (placeholders): solo los públicos llevan "#". */
-function channelPrefix(kind: ChannelKind) {
-  return kind === "PUBLIC" ? "#" : "";
-}
-
-/** Prefijo visual del canal: candado para privados, "#" para públicos, null para directos. */
-function channelPrefixNode(kind: ChannelKind): ReactNode {
-  if (kind === "DIRECT") return null;
-  if (kind === "PRIVATE") {
-    return (
-      <LockOutlinedIcon
-        titleAccess="Canal privado"
-        sx={{ fontSize: 14, verticalAlign: "middle", display: "inline-block" }}
-      />
-    );
-  }
-  return "#";
-}
-
-/** Preview de canal legible: `[@Nombre](user:2)` → `@Nombre`, `[etiqueta](/ruta)` → `etiqueta`, sin emojis. */
-function readableChatPreview(body: string): string {
-  const limpio = body
-    .replace(/\[@?([^\]\n]+)\]\(user:\d+\)/g, "@$1")
-    .replace(/\[([^\]\n]+)\]\(([^)]+)\)/g, "$1")
-    .replace(/\p{Extended_Pictographic}️?\s?/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  // Un sticker es solo emoji: quitarlos dejaba la fila del canal en blanco.
-  if (!limpio && body.trim()) return body.trim();
-  return limpio;
-}
-
-const MENTION_KIND_ICON: Record<"USER" | "ACTIVITY" | "EVIDENCE", SvgIconComponent> = {
-  USER: PersonOutlineIcon,
-  ACTIVITY: AssignmentOutlinedIcon,
-  EVIDENCE: PhotoCameraOutlinedIcon,
-};
-
-function renderRichText(text: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const pattern =
-    /(\[[^\]\n]+\]\((?:\/[^)\s]*|user:\d+)\)|`[^`]+`|\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|_[^_\s][^_\n]*_|https?:\/\/[^\s]+|@[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]+)/g;
-  let last = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > last) nodes.push(text.slice(last, match.index));
-    const token = match[0];
-    const entityLink = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (entityLink) {
-      const [, label, href] = entityLink;
-      if (href.startsWith("user:")) {
-        nodes.push(
-          <span key={key++} className={styles.mention}>
-            {label}
-          </span>,
-        );
-      } else {
-        nodes.push(
-          <a key={key++} href={href} className={`${styles.mention} ${styles.entityMention}`}>
-            {label}
-          </a>,
-        );
-      }
-    } else if (token.startsWith("`") && token.endsWith("`")) {
-      nodes.push(<code key={key++}>{token.slice(1, -1)}</code>);
-    } else if (token.startsWith("**") && token.endsWith("**")) {
-      nodes.push(<strong key={key++}>{token.slice(2, -2)}</strong>);
-    } else if (token.startsWith("*") && token.endsWith("*")) {
-      nodes.push(<strong key={key++}>{token.slice(1, -1)}</strong>);
-    } else if (token.startsWith("_") && token.endsWith("_")) {
-      nodes.push(<em key={key++}>{token.slice(1, -1)}</em>);
-    } else if (token.startsWith("http")) {
-      nodes.push(
-        <a key={key++} href={token} target="_blank" rel="noreferrer">
-          {token}
-        </a>,
-      );
-    } else {
-      nodes.push(
-        <span key={key++} className={styles.mention}>
-          {token}
-        </span>,
-      );
-    }
-    last = match.index + token.length;
-  }
-  if (last < text.length) nodes.push(text.slice(last));
-  return nodes;
-}
+import type {
+  Attachment,
+  Channel,
+  ChatUser,
+  DeletedPayload,
+  MentionEntity,
+  Message,
+  MessageReceipt,
+  ReadPerson,
+  SearchScope,
+} from "./chat/types";
+import {
+  DRAFTS_KEY,
+  FAVORITES_KEY,
+  apiFetch,
+  channelPrefix,
+  findMessageInLists,
+  formatMexicoDateTime,
+  loadJson,
+  mergeMessage,
+  readableChatPreview,
+  saveJson,
+} from "./chat/chat-utils";
+import { Avatar } from "./chat/ChatAtoms";
+import ChatSidebar from "./chat/ChatSidebar";
+import ChannelHeader, { TAB_IDS } from "./chat/ChannelHeader";
+import MessageList, { type MessageListCtx } from "./chat/MessageList";
+import Composer from "./chat/Composer";
+import { MembersPanel, ThreadPanel } from "./chat/ChatSidePanel";
+import {
+  ColleaguesDialog,
+  EntityPickerDialog,
+  NewChannelDialog,
+  ReactionsDialog,
+  ReadInfoDialog,
+  SwitcherDialog,
+} from "./chat/ChatDialogs";
 
 type Props = {
   token: string;
@@ -459,6 +82,8 @@ export default function WorkspaceChat({
   const [showDm, setShowDm] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
+  const [newChannelTopic, setNewChannelTopic] = useState("");
+  const [newChannelDescription, setNewChannelDescription] = useState("");
   const [newChannelPrivate, setNewChannelPrivate] = useState(false);
   /** Errores del alta de canal van dentro del modal: antes salían detrás del fondo y parecía que no pasaba nada. */
   const [newChannelError, setNewChannelError] = useState<string | null>(null);
@@ -469,6 +94,7 @@ export default function WorkspaceChat({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [searchHits, setSearchHits] = useState<Message[]>([]);
+  const [searchScope, setSearchScope] = useState<SearchScope>("channel");
   const [typingUsers, setTypingUsers] = useState<Record<number, { nombre: string; at: number }>>({});
   const [presence, setPresence] = useState<Record<number, "online" | "away">>({});
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -497,7 +123,8 @@ export default function WorkspaceChat({
   const [readInfo, setReadInfo] = useState<{ seen: ReadPerson[]; pending: ReadPerson[] } | null>(null);
   const [readInfoLoading, setReadInfoLoading] = useState(false);
   const [readInfoError, setReadInfoError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<ConfirmState | null>(null);
+  /** Confirmaciones de la pantalla (eliminar mensaje, salir del canal). */
+  const [confirmAction, setConfirmAction] = useState<ConfirmState | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [unreadBoundary, setUnreadBoundary] = useState<{ channelId: number; before: string } | null>(null);
   const [notifyOn, setNotifyOn] = useState(() => {
@@ -507,6 +134,7 @@ export default function WorkspaceChat({
   const [starredIds, setStarredIds] = useState<number[]>(() => loadJson<number[]>(FAVORITES_KEY, []));
   const [pinned, setPinned] = useState<Message[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  /** Pestaña «Fijados» de la cabecera; `false` es la pestaña «Mensajes». */
   const [showPins, setShowPins] = useState(false);
   const [entityPickerOpen, setEntityPickerOpen] = useState(false);
   const [entityKind, setEntityKind] = useState<MentionEntity["kind"]>("ACTIVITY");
@@ -519,15 +147,14 @@ export default function WorkspaceChat({
   const deepMsgRef = useRef<number | null>(null);
   const deepLinkBootstrapped = useRef(false);
   const skipAutoScrollRef = useRef(false);
+  /** Mensaje al que saltar en cuanto llegue a la lista (búsqueda o fijados de un mensaje no cargado). */
+  const pendingJumpRef = useRef<number | null>(null);
+  const searchSeqRef = useRef(0);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const threadFileInputRef = useRef<HTMLInputElement | null>(null);
   const composerRef = useRef<MentionTextareaHandle | null>(null);
   const threadComposerRef = useRef<MentionTextareaHandle | null>(null);
-  const emojiBtnRef = useRef<HTMLButtonElement | null>(null);
-  const threadEmojiBtnRef = useRef<HTMLButtonElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const activeIdRef = useRef<number | null>(null);
   const threadRootRef = useRef<Message | null>(null);
@@ -1491,7 +1118,7 @@ export default function WorkspaceChat({
 
   const askDelete = (message: Message) => {
     if (!canDeleteMessages || message.pending || message.id <= 0 || message.deleted) return;
-    setConfirmDelete({
+    setConfirmAction({
       title: "Eliminar mensaje",
       message: "¿Eliminar este mensaje para todos? Desaparece del canal, de los fijados y de la búsqueda.",
       confirmLabel: "Eliminar",
@@ -1524,7 +1151,7 @@ export default function WorkspaceChat({
     }
   };
 
-  const jumpToMessage = (msg: Message) => {
+  const jumpToMessage = (msg: { id: number }) => {
     setHighlightId(msg.id);
     setShowPins(false);
     setMobilePane("chat");
@@ -1534,6 +1161,30 @@ export default function WorkspaceChat({
     });
     window.setTimeout(() => setHighlightId((cur) => (cur === msg.id ? null : cur)), 2800);
   };
+
+  /**
+   * Ir a un mensaje del canal abierto aunque no esté cargado: se piden los mensajes alrededor de él
+   * (`aroundId`) y el salto ocurre cuando llegan.
+   */
+  const goToMessage = (id: number) => {
+    if (messages.some((m) => m.id === id)) {
+      jumpToMessage({ id });
+      return;
+    }
+    if (!activeId) return;
+    setShowPins(false);
+    nearBottomRef.current = false;
+    pendingJumpRef.current = id;
+    void loadMessages(activeId, { aroundId: id });
+  };
+
+  useEffect(() => {
+    const target = pendingJumpRef.current;
+    if (target == null || loadingMessages) return;
+    if (!messages.some((m) => m.id === target)) return;
+    pendingJumpRef.current = null;
+    jumpToMessage({ id: target });
+  }, [messages, loadingMessages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onFilesDropped = async (files: FileList | File[], isThread = false) => {
     const list = Array.from(files);
@@ -1546,15 +1197,21 @@ export default function WorkspaceChat({
     setCreatingChannel(true);
     setNewChannelError(null);
     try {
+      const topic = newChannelTopic.trim();
+      const description = newChannelDescription.trim();
       const ch = await apiFetch("chat/channels", token, {
         method: "POST",
         body: JSON.stringify({
           name: newChannelName.trim(),
           kind: newChannelPrivate ? "PRIVATE" : "PUBLIC",
+          ...(topic ? { topic } : {}),
+          ...(description ? { description } : {}),
         }),
       });
       setShowNewChannel(false);
       setNewChannelName("");
+      setNewChannelTopic("");
+      setNewChannelDescription("");
       setNewChannelPrivate(false);
       await loadChannels();
       if (ch?.id) selectChannel(ch.id);
@@ -1621,27 +1278,48 @@ export default function WorkspaceChat({
     }
   };
 
-  const runSearch = async (q: string) => {
+  const runSearch = async (q: string, scope: SearchScope = searchScope) => {
     setSearchQ(q);
+    const seq = ++searchSeqRef.current;
     if (q.trim().length < 2) {
       setSearchHits([]);
       return;
     }
     try {
       const data = await apiFetch(
-        `chat/search?q=${encodeURIComponent(q)}&channelId=${activeId ?? ""}`,
+        `chat/search?q=${encodeURIComponent(q)}${scope === "channel" ? `&channelId=${activeId ?? ""}` : ""}`,
         token,
       );
+      if (seq !== searchSeqRef.current) return;
       setSearchHits(Array.isArray(data?.messages) ? data.messages : []);
     } catch {
+      if (seq !== searchSeqRef.current) return;
       setSearchHits([]);
     }
   };
 
-  const editTopic = async () => {
+  const changeSearchScope = (scope: SearchScope) => {
+    setSearchScope(scope);
+    void runSearch(searchQ, scope);
+  };
+
+  /** Resultado de búsqueda: abre su canal si es otro y salta al mensaje (al original, si es respuesta). */
+  const openSearchHit = (hit: Message) => {
+    setSearchOpen(false);
+    const target = hit.parentId ?? hit.id;
+    if (hit.channelId !== activeId) {
+      selectChannel(hit.channelId);
+      deepMsgRef.current = target;
+      pendingJumpRef.current = target;
+      nearBottomRef.current = false;
+      syncChatUrl(hit.channelId, target);
+      return;
+    }
+    goToMessage(target);
+  };
+
+  const saveTopic = async (next: string) => {
     if (!activeId) return;
-    const next = window.prompt("Tema del canal", detail?.topic ?? "");
-    if (next === null) return;
     try {
       const ch = await apiFetch(`chat/channels/${activeId}/topic`, token, {
         method: "PATCH",
@@ -1668,16 +1346,24 @@ export default function WorkspaceChat({
     }
   };
 
-  const leaveCurrentChannel = async () => {
+  const leaveCurrentChannel = () => {
     if (!activeId || !detail) return;
-    if (!window.confirm(`¿Salir de ${detail.name}?`)) return;
-    try {
-      await apiFetch(`chat/channels/${activeId}/leave`, token, { method: "DELETE" });
-      setActiveId(null);
-      await loadChannels();
-    } catch (e) {
-      setError(formatApiError(e, "No se pudo salir del canal"));
-    }
+    const channelId = activeId;
+    setConfirmAction({
+      title: "Salir del canal",
+      message: `¿Salir de ${detail.name}?`,
+      confirmLabel: "Salir",
+      danger: true,
+      fn: async () => {
+        try {
+          await apiFetch(`chat/channels/${channelId}/leave`, token, { method: "DELETE" });
+          setActiveId(null);
+          await loadChannels();
+        } catch (e) {
+          setError(formatApiError(e, "No se pudo salir del canal"));
+        }
+      },
+    });
   };
 
   /** Baja solo la lista de mensajes: scrollIntoView también movía los contenedores de la página. */
@@ -1753,6 +1439,31 @@ export default function WorkspaceChat({
     setMentionOpen(false);
   };
 
+  /** Teclas del menú de `@`: si está abierto, flechas, Enter, Tab y Esc son suyas. */
+  const onMentionKeys = (e: ReactKeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (!mentionOpen || !mentionCandidates.length) return false;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMentionIndex((i) => (i + 1) % mentionCandidates.length);
+      return true;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMentionIndex((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length);
+      return true;
+    }
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      insertMention(mentionCandidates[mentionIndex]);
+      return true;
+    }
+    if (e.key === "Escape") {
+      setMentionOpen(false);
+      return true;
+    }
+    return false;
+  };
+
   const filteredChannels = useMemo(() => {
     const q = sidebarFilter.trim().toLowerCase();
     const match = (c: Channel) =>
@@ -1811,324 +1522,36 @@ export default function WorkspaceChat({
     };
   }, [totalUnread]);
 
-  const renderMessageList = (
-    list: Message[],
-    opts?: { compactStart?: boolean; showUnreadDivider?: boolean },
-  ) => {
-    let lastAuthor: number | null = null;
-    let lastDay: string | null = null;
-    let lastTs = 0;
-    let dividerShown = false;
-    const boundaryTs =
-      opts?.showUnreadDivider && unreadBoundary && unreadBoundary.channelId === activeId
-        ? new Date(unreadBoundary.before).getTime()
-        : null;
-    return list.map((m) => {
-      const dk = dayKey(m.createdAt);
-      const showDay = dk !== lastDay;
-      lastDay = dk;
-      const ts = new Date(m.createdAt).getTime();
-      const showUnreadDivider =
-        boundaryTs != null && !dividerShown && ts > boundaryTs && m.authorId !== currentUserId;
-      if (showUnreadDivider) dividerShown = true;
-      const compact =
-        !showDay &&
-        lastAuthor === m.authorId &&
-        ts - lastTs < 5 * 60 * 1000 &&
-        !opts?.compactStart;
-      lastAuthor = m.authorId;
-      lastTs = ts;
-      const mine = m.authorId === currentUserId;
-      const canEdit = mine && Date.now() - ts <= 60 * 60 * 1000;
-      const mineReaction = (emoji: string) =>
-        m.reactions.some((r) => r.emoji === emoji && r.userIds.includes(currentUserId));
-
-      return (
-        <div key={m.id}>
-          {showDay && <div className={styles.dayDivider}>{dayLabel(m.createdAt)}</div>}
-          {showUnreadDivider && (
-            <div className={styles.newDivider}>
-              <span>Mensajes nuevos</span>
-            </div>
-          )}
-          <div
-            className={`${styles.msg} ${compact ? styles.msgCompact : ""} ${
-              highlightId === m.id ? styles.msgHighlight : ""
-            } ${mine ? styles.msgMine : ""}`}
-            id={`msg-${m.id}`}
-            {...(!mine && m.id > 0
-              ? { "data-incoming-msg": String(m.id), "data-channel-id": String(m.channelId) }
-              : {})}
-          >
-            {compact ? (
-              <>
-                <span className={styles.msgTimeHover}>{formatClock(m.createdAt)}</span>
-                <div className={styles.avatarSpacer} />
-              </>
-            ) : (
-              <div className={`${styles.avatar} ${avatarHue(m.authorId)}`}>{initials(m.author.nombre)}</div>
-            )}
-            <div>
-              {!compact && (
-                <div className={styles.msgMeta}>
-                  <span className={styles.msgAuthor}>{m.author.nombre}</span>
-                  <span className={styles.msgTime} style={{ opacity: 1 }}>
-                    {formatClock(m.createdAt)}
-                  </span>
-                  {m.pinnedAt && (
-                    <span className={styles.pinnedBadge} title="Fijado" aria-label="Fijado">
-                      <PushPinIcon aria-hidden="true" sx={{ fontSize: 13 }} />
-                    </span>
-                  )}
-                  {m.editedAt && !m.deleted && <span className={styles.edited}>(editado)</span>}
-                  {mine && !m.deleted && (
-                    <button
-                      type="button"
-                      className={styles.receiptBtn}
-                      title="Visto por"
-                      aria-label="Visto por"
-                      disabled={Boolean(m.pending) || m.id < 0}
-                      onClick={() => openReadInfo(m.id)}
-                    >
-                      <ReceiptTicks receipt={m.receipt} pending={m.pending} failed={m.failed} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {m.replyTo?.deleted && !m.deleted && (
-                <div className={styles.replyCite}>Mensaje eliminado</div>
-              )}
-
-              {m.deleted ? (
-                <div className={styles.msgDeleted}>Mensaje eliminado</div>
-              ) : editingId === m.id ? (
-                <div className={styles.editBox}>
-                  <MentionTextarea
-                    value={editDraft}
-                    onChange={setEditDraft}
-                    rows={3}
-                    aria-label="Editar mensaje"
-                  />
-                  <div className={styles.editActions}>
-                    <button type="button" className={styles.sendBtn} onClick={() => void saveEdit(m.id)}>
-                      Guardar
-                    </button>
-                    <button type="button" className={styles.actionBtn} onClick={() => setEditingId(null)}>
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                m.body && m.body !== `Archivo: ${m.attachmentName}` && (
-                  <div
-                    className={`${styles.msgBody} ${
-                      !m.attachmentUrl && isJumboEmoji(m.body) ? styles.msgBodyJumbo : ""
-                    }`}
-                  >
-                    {renderRichText(m.body)}
-                  </div>
-                )
-              )}
-
-              {!m.deleted && m.attachmentUrl && editingId !== m.id && (
-                isImageAttachment(m.attachmentName ?? "") ? (
-                  <a
-                    href={attachmentHref(m.attachmentUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={styles.msgAttachmentImageLink}
-                  >
-                    <img
-                      src={attachmentHref(m.attachmentUrl)}
-                      alt={m.attachmentName ?? "Adjunto"}
-                      className={styles.msgAttachmentImage}
-                    />
-                  </a>
-                ) : (
-                  <a
-                    href={attachmentHref(m.attachmentUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={styles.msgAttachmentFile}
-                  >
-                    <span className={styles.attachChipIcon}>
-                      <DescriptionOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    </span>
-                    <span className={styles.attachChipName}>{m.attachmentName ?? "Archivo"}</span>
-                    <span className={styles.msgAttachmentDownload}>Descargar</span>
-                  </a>
-                )
-              )}
-
-              {!m.deleted && m.reactions?.length > 0 && (
-                <div className={styles.reactions}>
-                  {m.reactions.map((r) => (
-                    <div
-                      key={r.emoji}
-                      className={`${styles.reaction} ${mineReaction(r.emoji) ? styles.reactionMine : ""}`}
-                      onMouseEnter={() => setHoveredReaction({ messageId: m.id, emoji: r.emoji })}
-                      onMouseLeave={() =>
-                        setHoveredReaction((cur) =>
-                          cur && cur.messageId === m.id && cur.emoji === r.emoji ? null : cur,
-                        )
-                      }
-                    >
-                      <button
-                        type="button"
-                        className={styles.reactionEmojiBtn}
-                        onClick={() => {
-                          if (detail?.readOnly) return;
-                          void react(m.id, r.emoji);
-                        }}
-                        disabled={detail?.readOnly}
-                        title={mineReaction(r.emoji) ? "Quitar tu reacción" : "Reaccionar"}
-                      >
-                        {r.emoji}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.reactionCountBtn}
-                        onClick={() => setReactionsDialog({ messageId: m.id, emoji: r.emoji })}
-                        aria-label={`Ver quién reaccionó con ${r.emoji}`}
-                      >
-                        {r.count}
-                      </button>
-                      {hoveredReaction?.messageId === m.id &&
-                        hoveredReaction.emoji === r.emoji &&
-                        r.users?.length ? (
-                          <div className={styles.reactionTooltip} role="tooltip">
-                            {summarizeReactors(r.users)}
-                          </div>
-                        ) : null}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!m.deleted && (!detail?.readOnly || canDeleteMessages) && (
-              <div className={styles.msgActions} data-emoji-picker>
-                {!detail?.readOnly && REACCIONES_RAPIDAS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    className={styles.actionBtn}
-                    aria-label={`Reaccionar con ${e}`}
-                    aria-pressed={mineReaction(e)}
-                    onClick={() => void react(m.id, e)}
-                  >
-                    <span aria-hidden="true">{e}</span>
-                  </button>
-                ))}
-                {!detail?.readOnly && (
-                <button
-                  type="button"
-                  className={styles.actionBtn}
-                  title="Más emojis"
-                  aria-label="Elegir otra reacción"
-                  aria-expanded={emojiPickerFor === m.id}
-                  aria-haspopup="dialog"
-                  onClick={() => setEmojiPickerFor((cur) => (cur === m.id ? null : m.id))}
-                >
-                  <AddReactionOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-                </button>
-                )}
-                {!detail?.readOnly && emojiPickerFor === m.id && (
-                  <div data-emoji-picker>
-                    <EmojiPicker
-                      title="Reaccionar con un emoji"
-                      className={styles.reactionPickerPos}
-                      onSelect={(emoji) => {
-                        void react(m.id, emoji);
-                        setEmojiPickerFor(null);
-                      }}
-                      onClose={() => setEmojiPickerFor(null)}
-                    />
-                  </div>
-                )}
-                {!detail?.readOnly && !m.parentId && (
-                  <button type="button" className={styles.actionBtn} onClick={() => void openThread(m)}>
-                    Responder
-                  </button>
-                )}
-                {!detail?.readOnly && (
-                <button
-                  type="button"
-                  className={styles.actionBtn}
-                  title={m.pinnedAt ? "Quitar pin" : "Fijar mensaje"}
-                  aria-label={m.pinnedAt ? "Quitar pin" : "Fijar mensaje"}
-                  onClick={() => void togglePin(m.id)}
-                >
-                  {m.pinnedAt ? (
-                    <PushPinIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-                  ) : (
-                    <PushPinOutlinedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-                  )}
-                </button>
-                )}
-                {!detail?.readOnly && canEdit && (
-                  <button
-                    type="button"
-                    className={styles.actionBtn}
-                    title="Disponible durante 1 hora después de enviar"
-                    onClick={() => {
-                      setEditingId(m.id);
-                      setEditDraft(m.body);
-                    }}
-                  >
-                    Editar
-                  </button>
-                )}
-                {!detail?.readOnly && mine && !m.pending && m.id > 0 && (
-                  <button
-                    type="button"
-                    className={styles.actionBtn}
-                    title="Visto por"
-                    onClick={() => openReadInfo(m.id)}
-                  >
-                    Info
-                  </button>
-                )}
-                {canDeleteMessages && !m.pending && m.id > 0 && (
-                  <button
-                    type="button"
-                    className={`${styles.actionBtn} ${styles.actionDanger}`}
-                    title="Eliminar para todos"
-                    onClick={() => askDelete(m)}
-                  >
-                    Eliminar
-                  </button>
-                )}
-              </div>
-              )}
-
-              {mine && compact && !m.deleted && (
-                <div className={styles.receiptLine}>
-                  <button
-                    type="button"
-                    className={styles.receiptBtn}
-                    title="Visto por"
-                    aria-label="Visto por"
-                    disabled={Boolean(m.pending) || m.id < 0}
-                    onClick={() => openReadInfo(m.id)}
-                  >
-                    <ReceiptTicks receipt={m.receipt} pending={m.pending} failed={m.failed} />
-                  </button>
-                </div>
-              )}
-
-              {!m.parentId && m.replyCount > 0 && (
-                <button type="button" className={styles.threadHint} onClick={() => void openThread(m)}>
-                  <span>{m.replyCount}</span>
-                  <span>{m.replyCount === 1 ? "respuesta" : "respuestas"} · Ver hilo</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    });
+  const listCtx: MessageListCtx = {
+    currentUserId,
+    token,
+    readOnly: Boolean(detail?.readOnly),
+    canDeleteMessages,
+    highlightId,
+    editingId,
+    editDraft,
+    onEditDraft: setEditDraft,
+    onStartEdit: (m) => {
+      setEditingId(m.id);
+      setEditDraft(m.body);
+    },
+    onSaveEdit: (id) => void saveEdit(id),
+    onCancelEdit: () => setEditingId(null),
+    onReact: (id, emoji) => void react(id, emoji),
+    onOpenReactions: (id, emoji) => setReactionsDialog({ messageId: id, emoji }),
+    hoveredReaction,
+    onHoverReaction: setHoveredReaction,
+    emojiPickerFor,
+    onEmojiPickerFor: setEmojiPickerFor,
+    onOpenThread: (m) => void openThread(m),
+    onTogglePin: (id) => void togglePin(id),
+    onOpenReadInfo: openReadInfo,
+    onAskDelete: askDelete,
+    openThreadId: threadRoot?.id ?? null,
   };
+
+  const unreadBoundaryTs =
+    unreadBoundary && unreadBoundary.channelId === activeId ? new Date(unreadBoundary.before).getTime() : null;
 
   const panelOpen = Boolean(threadRoot || showMembers);
   const shellClass = [
@@ -2149,165 +1572,50 @@ export default function WorkspaceChat({
     if (activeId) syncChatUrl(activeId, null);
   };
 
-  const channelRow = (c: Channel) => (
-    <button
-      key={c.id}
-      type="button"
-      className={`${styles.channelBtn} ${activeId === c.id ? styles.channelBtnActive : ""} ${
-        c.unread && activeId !== c.id ? styles.channelBtnUnread : ""
-      }`}
-      onClick={() => selectChannel(c.id)}
-      title={(c.lastMessagePreview ? readableChatPreview(c.lastMessagePreview) : null) ?? c.topic ?? c.name}
-    >
-      {c.kind === "DIRECT" ? (
-        <span className={styles.presenceWrap}>
-          <span className={`${styles.avatar} ${styles.avatarSm} ${avatarHue(c.peer?.id ?? c.id)}`}>
-            {initials(c.name)}
-          </span>
-          <span
-            className={`${styles.presenceDot} ${
-              c.peer && presence[c.peer.id] === "online" ? styles.presenceOnline : ""
-            }`}
-          />
-        </span>
-      ) : (
-        <span className={styles.channelPrefix}>{channelPrefixNode(c.kind)}</span>
-      )}
-      <span className={styles.channelLabel}>
-        {c.name}
-        {c.muted ? (
-          <span className={styles.muteTag} title="Silenciado" aria-label="Silenciado">
-            <NotificationsOffOutlinedIcon aria-hidden="true" sx={{ fontSize: 13 }} />
-          </span>
-        ) : null}
-        {c.supervised ? <span className={styles.superviseTag}>Sup</span> : null}
-      </span>
-      <span className={styles.channelMeta}>
-        <span
-          role="button"
-          tabIndex={0}
-          className={`${styles.starBtn} ${starredIds.includes(c.id) ? styles.starBtnOn : ""}`}
-          title={starredIds.includes(c.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
-          aria-label={starredIds.includes(c.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
-          onClick={(e) => toggleStar(c.id, e)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              toggleStar(c.id);
-            }
-          }}
-        >
-          {starredIds.includes(c.id) ? (
-            <StarIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-          ) : (
-            <StarBorderIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-          )}
-        </span>
-        {(c.unreadCount ?? 0) > 0 && activeId !== c.id && (
-          <span className={styles.unreadBadge}>{c.unreadCount! > 99 ? "99+" : c.unreadCount}</span>
-        )}
-      </span>
-      {c.lastMessagePreview && activeId !== c.id && (
-        <span className={styles.previewLine}>{readableChatPreview(c.lastMessagePreview)}</span>
-      )}
-    </button>
-  );
+  const toggleMembersPanel = () => {
+    setShowMembers((v) => {
+      const next = !v;
+      setMobilePane(next ? "panel" : "chat");
+      return next;
+    });
+    setThreadRoot(null);
+  };
+
+  const openDmDialog = () => {
+    setShowDm(true);
+    void searchColleagues("");
+  };
+
+  const openNewChannelDialog = () => {
+    setNewChannelError(null);
+    setShowNewChannel(true);
+  };
+
+  const channelPlaceholder = `Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`;
 
   return (
     <>
       <div className={styles.fill}>
       <div className={shellClass}>
-        <aside className={styles.sidebar}>
-          <div className={styles.workspaceHead}>
-            <div className={styles.workspaceName}>
-              <span className={styles.liveDot} />
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                NEXARA
-              </span>
-              {totalUnread > 0 && (
-                <span className={styles.unreadBadge}>{totalUnread > 99 ? "99+" : totalUnread}</span>
-              )}
-            </div>
-            <div className={styles.headActions}>
-              <button
-                type="button"
-                className={styles.headIcon}
-                title="Buscar canal (Ctrl+K)"
-                onClick={() => setSwitcherOpen(true)}
-              >
-                Buscar
-              </button>
-              <button
-                type="button"
-                className={styles.headIcon}
-                title="Nuevo mensaje directo"
-                onClick={() => {
-                  setShowDm(true);
-                  void searchColleagues("");
-                }}
-              >
-                Mensaje
-              </button>
-            </div>
-          </div>
+        <ChatSidebar
+          starred={filteredChannels.starred}
+          publics={filteredChannels.publics}
+          dms={filteredChannels.dms}
+          activeId={activeId}
+          loading={loadingChannels}
+          presence={presence}
+          starredIds={starredIds}
+          totalUnread={totalUnread}
+          filter={sidebarFilter}
+          onFilterChange={setSidebarFilter}
+          onSelect={selectChannel}
+          onToggleStar={(id) => toggleStar(id)}
+          onNewChannel={openNewChannelDialog}
+          onNewDm={openDmDialog}
+          onOpenSwitcher={() => setSwitcherOpen(true)}
+        />
 
-          <div className={styles.sidebarSearch}>
-            <input
-              aria-label="Filtrar canales"
-              placeholder="Filtrar canales…"
-              value={sidebarFilter}
-              onChange={(e) => setSidebarFilter(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-                  e.preventDefault();
-                  setSwitcherOpen(true);
-                }
-              }}
-            />
-            <span className={styles.kbd}>Ctrl+K</span>
-          </div>
-
-          <div className={styles.sidebarScroll}>
-            {filteredChannels.starred.length > 0 && (
-              <>
-                <div className={styles.sectionLabel}>
-                  <span>Favoritos</span>
-                </div>
-                {filteredChannels.starred.map(channelRow)}
-              </>
-            )}
-            <div className={styles.sectionLabel}>
-              <span>Canales</span>
-              <button type="button" className={styles.sectionAction} title="Nuevo canal" aria-label="Crear canal" onClick={() => {
-                setNewChannelError(null);
-                setShowNewChannel(true);
-              }}>
-                +
-              </button>
-            </div>
-            {loadingChannels && <div className={styles.loadingLine}>Cargando…</div>}
-            {filteredChannels.publics.map(channelRow)}
-
-            <div className={styles.sectionLabel}>
-              <span>Mensajes directos</span>
-              <button
-                type="button"
-                className={styles.sectionAction}
-                title="Nuevo mensaje"
-                aria-label="Nuevo mensaje directo"
-                onClick={() => {
-                  setShowDm(true);
-                  void searchColleagues("");
-                }}
-              >
-                +
-              </button>
-            </div>
-            {filteredChannels.dms.map(channelRow)}
-          </div>
-        </aside>
-
-        <section className={styles.main}>
+        <section className={styles.main} aria-label="Conversación">
           {!activeId ? (
             <div className={styles.emptyMain}>
               <div>
@@ -2318,200 +1626,84 @@ export default function WorkspaceChat({
             </div>
           ) : (
             <>
-              <header className={styles.channelHeader}>
-                <button
-                  type="button"
-                  className={styles.mobileBack}
-                  aria-label="Volver a la lista de canales"
-                  onClick={() => setMobilePane("list")}
+              <ChannelHeader
+                detail={detail}
+                starred={starredIds.includes(activeId)}
+                onToggleStar={() => toggleStar(activeId)}
+                showMembers={showMembers}
+                onToggleMembers={toggleMembersPanel}
+                soundOn={soundOn}
+                onToggleSound={() => setSoundOn((v) => !v)}
+                notifyOn={notifyOn}
+                onToggleNotify={toggleNotify}
+                onToggleMute={() => void toggleChannelMute()}
+                canLeave={
+                  detail?.kind !== "DIRECT" &&
+                  detail?.slug !== "general" &&
+                  detail?.slug !== "anuncios" &&
+                  !detail?.readOnly
+                }
+                onLeave={leaveCurrentChannel}
+                onSaveTopic={(topic) => void saveTopic(topic)}
+                tab={showPins ? "pins" : "messages"}
+                onTab={(tab) => setShowPins(tab === "pins")}
+                pinnedCount={pinned.length}
+                searchOpen={searchOpen}
+                onSearchOpen={setSearchOpen}
+                searchQ={searchQ}
+                onSearch={(q) => void runSearch(q)}
+                searchScope={searchScope}
+                onSearchScope={changeSearchScope}
+                searchHits={searchHits}
+                onPickHit={openSearchHit}
+                onMobileBack={() => setMobilePane("list")}
+              />
+
+              {showPins && (
+                <div
+                  className={styles.pinsPanel}
+                  id={TAB_IDS.pins.panel}
+                  role="tabpanel"
+                  aria-labelledby={TAB_IDS.pins.tab}
                 >
-                  ← Canales
-                </button>
-                <div className={styles.channelTitleBlock}>
-                  <div className={styles.channelTitle}>
-                    <span>{channelPrefixNode(detail?.kind ?? "PUBLIC")}</span>
-                    <span>{detail?.name ?? "…"}</span>
-                    {detail?.supervised ? (
-                      <span className={styles.supervisePill} title="Vista de supervisión (solo lectura)">
-                        Supervisión
-                      </span>
-                    ) : null}
-                  </div>
-                  <div
-                    className={styles.channelTopic}
-                    onClick={() => {
-                      if (detail?.readOnly) return;
-                      void editTopic();
-                    }}
-                    title={detail?.readOnly ? "Solo lectura" : "Editar tema"}
-                    style={detail?.readOnly ? { cursor: "default" } : undefined}
-                  >
-                    {detail?.topic || (detail?.readOnly ? "Sin tema" : "Añadir tema…")}
-                  </div>
-                  {detail?.description ? (
-                    <div className={styles.channelDescription}>{detail.description}</div>
-                  ) : null}
-                </div>
-                <div className={styles.headerMeta}>
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${soundOn ? styles.iconBtnActive : ""}`}
-                    title={soundOn ? "Sonido activado" : "Sonido desactivado"}
-                    onClick={() => setSoundOn((v) => !v)}
-                  >
-                    {soundOn ? "Sonido" : "Sin sonido"}
-                  </button>
-                  {!detail?.readOnly && (
-                    <button
-                      type="button"
-                      className={`${styles.iconBtn} ${detail?.muted ? styles.iconBtnActive : ""}`}
-                      title={detail?.muted ? "Reactivar notificaciones del canal" : "Silenciar canal"}
-                      aria-label={detail?.muted ? "Reactivar notificaciones del canal" : "Silenciar canal"}
-                      onClick={() => void toggleChannelMute()}
-                    >
-                      {detail?.muted ? (
-                        <NotificationsOffOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                      ) : (
-                        "Silenciar"
-                      )}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${notifyOn ? styles.iconBtnActive : ""}`}
-                    title={notifyOn ? "Notificaciones activadas" : "Activar notificaciones del navegador"}
-                    aria-label={notifyOn ? "Notificaciones activadas" : "Activar notificaciones del navegador"}
-                    onClick={toggleNotify}
-                  >
-                    {notifyOn ? (
-                      <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    ) : (
-                      <NotificationsOffOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    )}
-                  </button>
-                  {pinned.length > 0 && (
-                    <button
-                      type="button"
-                      className={`${styles.iconBtn} ${showPins ? styles.iconBtnActive : ""}`}
-                      title="Mensajes fijados"
-                      aria-label={`Mensajes fijados: ${pinned.length}`}
-                      onClick={() => setShowPins((v) => !v)}
-                    >
-                      <span className={styles.iconBtnInner}>
-                        <PushPinOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-                        {pinned.length}
-                      </span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${searchOpen ? styles.iconBtnActive : ""}`}
-                    title="Buscar en canal"
-                    onClick={() => setSearchOpen((v) => !v)}
-                  >
-                    Buscar
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${showMembers ? styles.iconBtnActive : ""}`}
-                    title="Miembros"
-                    aria-label="Ver miembros del canal"
-                    aria-pressed={showMembers}
-                    onClick={() => {
-                      setShowMembers((v) => {
-                        const next = !v;
-                        setMobilePane(next ? "panel" : "chat");
-                        return next;
-                      });
-                      setThreadRoot(null);
-                    }}
-                  >
-                    Miembros
-                  </button>
-                  {typeof detail?.memberCount === "number" && (
-                    <span className={styles.pill}>{detail.memberCount}</span>
-                  )}
-                  {detail?.kind !== "DIRECT" &&
-                    detail?.slug !== "general" &&
-                    detail?.slug !== "anuncios" &&
-                    !detail?.readOnly && (
-                      <button
-                        type="button"
-                        className={styles.iconBtn}
-                        title="Salir del canal"
-                        onClick={() => void leaveCurrentChannel()}
-                      >
-                        Salir
-                      </button>
-                    )}
-                </div>
-              </header>
-
-              {showPins && pinned.length > 0 && (
-                <div className={styles.pinsBar}>
-                  <div className={styles.pinsBarHead}>
-                    <strong>Fijados</strong>
-                    <button type="button" className={styles.actionBtn} onClick={() => setShowPins(false)}>
-                      Cerrar
-                    </button>
-                  </div>
-                  {pinned.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={styles.pinItem}
-                      onClick={() => jumpToMessage(p)}
-                    >
-                      <span className={styles.pinItemAuthor}>{p.author.nombre}</span>
-                      <span className={styles.pinItemBody}>
-                        {p.attachmentName ? `Adjunto: ${p.attachmentName}` : p.body.slice(0, 120)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {searchOpen && (
-                <>
-                  <div className={styles.searchBar}>
-                    <input
-                      autoFocus
-                      placeholder="Buscar mensajes en este canal…"
-                      value={searchQ}
-                      onChange={(e) => void runSearch(e.target.value)}
-                    />
-                    <button type="button" className={styles.actionBtn} onClick={() => { setSearchOpen(false); setSearchHits([]); }}>
-                      Cerrar
-                    </button>
-                  </div>
-                  {searchHits.length > 0 && (
-                    <div className={styles.searchHits}>
-                      {searchHits.map((h) => (
-                        <button
-                          key={h.id}
-                          type="button"
-                          className={styles.searchHit}
-                          onClick={() => {
-                            setHighlightId(h.id);
-                            setSearchOpen(false);
-                            requestAnimationFrame(() => {
-                              document.getElementById(`msg-${h.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                            });
-                          }}
-                        >
-                          <div className={styles.searchHitMeta}>
-                            {h.author.nombre} · {formatClock(h.createdAt)}
-                          </div>
-                          {h.replyTo?.deleted && <div className={styles.replyCite}>Mensaje eliminado</div>}
-                          <div className={styles.searchHitBody}>{h.body}</div>
-                        </button>
-                      ))}
+                  {pinned.length === 0 ? (
+                    <div className={styles.pinsEmpty}>
+                      Aún no hay mensajes fijados en este canal. Pasa el puntero sobre un mensaje y usa el alfiler para
+                      fijarlo.
                     </div>
+                  ) : (
+                    pinned.map((p) => (
+                      <button key={p.id} type="button" className={styles.pinItem} onClick={() => goToMessage(p.id)}>
+                        <Avatar user={p.author} size="md" />
+                        <span className={styles.pinItemText}>
+                          <span className={styles.pinItemHead}>
+                            <strong className={styles.pinItemAuthor}>{p.author.nombre}</strong>
+                            <span className={styles.pinItemWhen}>
+                              {p.pinnedAt
+                                ? `Fijado el ${formatMexicoDateTime(p.pinnedAt)}`
+                                : formatMexicoDateTime(p.createdAt)}
+                            </span>
+                          </span>
+                          <span className={styles.pinItemBody}>
+                            {p.attachmentName ? `Adjunto: ${p.attachmentName}` : readableChatPreview(p.body).slice(0, 160)}
+                          </span>
+                        </span>
+                        <span className={styles.pinItemGo}>Ir al mensaje</span>
+                      </button>
+                    ))
                   )}
-                </>
+                </div>
               )}
 
-              <div className={styles.messages} ref={messagesRef} onScroll={onScrollMessages}>
+              <div
+                className={styles.messages}
+                ref={messagesRef}
+                onScroll={onScrollMessages}
+                hidden={showPins}
+                id={TAB_IDS.messages.panel}
+                role="tabpanel"
+                aria-labelledby={TAB_IDS.messages.tab}
+              >
                 <div className={styles.messagesInner}>
                 {hasMore && (
                   <button
@@ -2534,7 +1726,7 @@ export default function WorkspaceChat({
                     </div>
                   </div>
                 )}
-                {renderMessageList(messages, { showUnreadDivider: true })}
+                <MessageList list={messages} ctx={listCtx} unreadBoundaryTs={unreadBoundaryTs} />
                 <div ref={bottomRef} />
                 {showJump && (
                   <button
@@ -2585,7 +1777,7 @@ export default function WorkspaceChat({
                     Suelta el archivo para adjuntarlo
                   </div>
                 )}
-                <div className={styles.typingLine}>
+                <div className={styles.typingLine} aria-live="polite">
                   {typingLabel ? (
                     <>
                       <span className={styles.typingDots}>
@@ -2600,189 +1792,53 @@ export default function WorkspaceChat({
                     <InlineAlert variant="danger" dense message={error} onDismiss={() => setError(null)} />
                   </div>
                 )}
-                <div className={styles.composer}>
-                  {mentionOpen && mentionCandidates.length > 0 && (
-                    <div className={styles.mentionMenu}>
-                      {mentionCandidates.map((u, i) => (
-                        <button
-                          key={u.id}
-                          type="button"
-                          className={`${styles.mentionItem} ${i === mentionIndex ? styles.mentionItemActive : ""}`}
-                          onClick={() => insertMention(u)}
-                        >
-                          <span className={`${styles.avatar} ${avatarHue(u.id)}`} style={{ width: 26, height: 26, fontSize: 10, marginTop: 0 }}>
-                            {initials(u.nombre)}
-                          </span>
-                          <span>
-                            <strong>{u.nombre}</strong>
-                            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{u.email}</div>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {(attachment || uploading) && (
-                    <div className={styles.attachChip}>
-                      {uploading && !attachment ? (
-                        <span className={styles.attachChipName}>Subiendo…</span>
-                      ) : attachment ? (
-                        <>
-                          {isImageAttachment(attachment.name) ? (
-                            <img
-                              src={attachmentHref(attachment.url)}
-                              alt={attachment.name}
-                              className={styles.attachChipThumb}
-                            />
-                          ) : (
-                            <span className={styles.attachChipIcon}>
-                              <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                            </span>
-                          )}
-                          <span className={styles.attachChipName}>{attachment.name}</span>
-                          <span className={styles.attachChipSize}>{formatFileSize(attachment.size)}</span>
+                <Composer
+                  variant="main"
+                  textareaRef={composerRef}
+                  value={draft}
+                  onChange={onDraftChange}
+                  placeholder={channelPlaceholder}
+                  ariaLabel={channelPlaceholder}
+                  attachment={attachment}
+                  uploading={uploading}
+                  onRemoveAttachment={() => setAttachment(null)}
+                  onPickFile={(file) => void onPickFile(file, false)}
+                  onSend={() => void send()}
+                  onSticker={(emoji) => {
+                    setComposerEmojiFor(null);
+                    void send(null, emoji);
+                  }}
+                  sendDisabled={sending || uploading || (!draft.trim() && !attachment)}
+                  sendLabel="Enviar"
+                  emojiOpen={composerEmojiFor === "main"}
+                  onToggleEmoji={() => setComposerEmojiFor((cur) => (cur === "main" ? null : "main"))}
+                  onCloseEmoji={() => setComposerEmojiFor(null)}
+                  onOpenEntityPicker={(kind) => openEntityPicker(kind)}
+                  onKeyDownBefore={onMentionKeys}
+                  hint="Enter envía · Shift + Enter salto de línea"
+                  menu={
+                    mentionOpen && mentionCandidates.length > 0 ? (
+                      <div className={styles.mentionMenu} role="listbox" aria-label="Personas para mencionar">
+                        {mentionCandidates.map((u, i) => (
                           <button
+                            key={u.id}
                             type="button"
-                            className={styles.attachChipRemove}
-                            onClick={() => setAttachment(null)}
+                            role="option"
+                            aria-selected={i === mentionIndex}
+                            className={`${styles.mentionItem} ${i === mentionIndex ? styles.mentionItemActive : ""}`}
+                            onClick={() => insertMention(u)}
                           >
-                            ×
+                            <Avatar user={u} size="sm" />
+                            <span>
+                              <strong>{u.nombre}</strong>
+                              <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{u.email}</div>
+                            </span>
                           </button>
-                        </>
-                      ) : null}
-                    </div>
-                  )}
-                  <MentionTextarea
-                    ref={composerRef}
-                    className={styles.composerTextarea}
-                    aria-label={`Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`}
-                    placeholder={`Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`}
-                    value={draft}
-                    rows={2}
-                    onChange={onDraftChange}
-                    onPaste={(e) => {
-                      const file = Array.from(e.clipboardData?.files ?? [])[0];
-                      if (file) void onPickFile(file, false);
-                    }}
-                    onKeyDown={(e) => {
-                      if (mentionOpen && mentionCandidates.length) {
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          setMentionIndex((i) => (i + 1) % mentionCandidates.length);
-                          return;
-                        }
-                        if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          setMentionIndex((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length);
-                          return;
-                        }
-                        if (e.key === "Enter" || e.key === "Tab") {
-                          e.preventDefault();
-                          insertMention(mentionCandidates[mentionIndex]);
-                          return;
-                        }
-                        if (e.key === "Escape") {
-                          setMentionOpen(false);
-                          return;
-                        }
-                      }
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void send();
-                      }
-                    }}
-                  />
-                  <div className={styles.composerBar}>
-                    <div className={styles.composerBarLeft}>
-                      <button
-                        type="button"
-                        className={styles.attachBtn}
-                        title="Adjuntar archivo"
-                        aria-label="Adjuntar archivo"
-                        disabled={uploading}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        hidden
-                        onChange={(e) => {
-                          void onPickFile(e.target.files?.[0], false);
-                          e.target.value = "";
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className={styles.mentionToolBtn}
-                        title="Mencionar persona"
-                        aria-label="Mencionar persona"
-                        onClick={() => openEntityPicker("USER")}
-                      >
-                        <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.mentionToolBtn}
-                        title="Mencionar actividad"
-                        aria-label="Mencionar actividad"
-                        onClick={() => openEntityPicker("ACTIVITY")}
-                      >
-                        <AssignmentOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.mentionToolBtn}
-                        title="Mencionar evidencia"
-                        aria-label="Mencionar evidencia"
-                        onClick={() => openEntityPicker("EVIDENCE")}
-                      >
-                        <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                      </button>
-                      <span className={styles.emojiAnchor}>
-                        <button
-                          ref={emojiBtnRef}
-                          type="button"
-                          className={styles.mentionToolBtn}
-                          title="Emojis y stickers"
-                          aria-label="Emojis y stickers"
-                          aria-haspopup="dialog"
-                          aria-expanded={composerEmojiFor === "main"}
-                          onClick={() =>
-                            setComposerEmojiFor((cur) => (cur === "main" ? null : "main"))
-                          }
-                        >
-                          <SentimentSatisfiedAltOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                        </button>
-                        {composerEmojiFor === "main" && (
-                          <EmojiPicker
-                            title="Emojis y stickers"
-                            className={styles.composerPickerPos}
-                            returnFocusTo={emojiBtnRef}
-                            onSelect={(emoji) => {
-                              composerRef.current?.insertText(emoji);
-                              composerRef.current?.focus();
-                            }}
-                            onSticker={(emoji) => {
-                              setComposerEmojiFor(null);
-                              void send(null, emoji);
-                            }}
-                            onClose={() => setComposerEmojiFor(null)}
-                          />
-                        )}
-                      </span>
-                      <span className={styles.composerHint}>Enter envía · @ menciona</span>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.sendBtn}
-                      disabled={sending || uploading || (!draft.trim() && !attachment)}
-                      onClick={() => void send()}
-                    >
-                      Enviar
-                    </button>
-                  </div>
-                </div>
+                        ))}
+                      </div>
+                    ) : null
+                  }
+                />
                   </>
                 )}
               </div>
@@ -2791,250 +1847,55 @@ export default function WorkspaceChat({
         </section>
 
         {panelOpen && (
-          <aside className={styles.sidePanel}>
+          <aside className={styles.sidePanel} aria-label={threadRoot ? "Hilo" : "Miembros"}>
             {showMembers && (
-              <>
-                <div className={styles.panelHead}>
-                  <button
-                    type="button"
-                    className={styles.mobileBack}
-                    aria-label="Volver al canal"
-                    onClick={closeSidePanel}
-                  >
-                    ← Chat
-                  </button>
-                  <div className={styles.panelTitle}>Miembros</div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {detail?.kind !== "DIRECT" && !detail?.readOnly && (
-                      <button
-                        type="button"
-                        className={styles.actionBtn}
-                        onClick={() => {
-                          setShowInvite(true);
-                          void searchColleagues("");
-                        }}
-                      >
-                        + Invitar
-                      </button>
-                    )}
-                    <button type="button" className={styles.panelClose} aria-label="Cerrar panel" onClick={closeSidePanel}>
-                      ×
-                    </button>
-                  </div>
-                </div>
-                <div className={styles.panelBody}>
-                  {(detail?.members ?? []).map((m) => (
-                    <div key={m.id} className={styles.memberRow}>
-                      <span className={styles.presenceWrap}>
-                        <span className={`${styles.avatar} ${avatarHue(m.id)}`}>
-                          {initials(m.nombre)}
-                        </span>
-                        <span
-                          className={`${styles.presenceDot} ${
-                            presence[m.id] === "online" ? styles.presenceOnline : ""
-                          }`}
-                          style={{ borderColor: "var(--surface)" }}
-                        />
-                      </span>
-                      <div className={styles.memberMeta}>
-                        <div className={styles.memberName}>
-                          {m.nombre}
-                          {m.role === "owner" ? (
-                            <span className={styles.roleBadge}>Owner</span>
-                          ) : null}
-                        </div>
-                        <div className={styles.memberEmail}>{m.email}</div>
-                      </div>
-                      {m.id !== currentUserId && (
-                        <button
-                          type="button"
-                          className={styles.actionBtn}
-                          style={{ marginLeft: "auto" }}
-                          onClick={() => void openDm(m.id)}
-                        >
-                          DM
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
+              <MembersPanel
+                detail={detail}
+                currentUserId={currentUserId}
+                presence={presence}
+                onClose={closeSidePanel}
+                onInvite={() => {
+                  setShowInvite(true);
+                  void searchColleagues("");
+                }}
+                onOpenDm={(userId) => void openDm(userId)}
+              />
             )}
 
             {threadRoot && (
-              <>
-                <div className={styles.panelHead}>
-                  <button
-                    type="button"
-                    className={styles.mobileBack}
-                    aria-label="Volver al canal"
-                    onClick={closeSidePanel}
-                  >
-                    ← Chat
-                  </button>
-                  <div className={styles.panelTitle}>Hilo</div>
-                  <button type="button" className={styles.panelClose} aria-label="Cerrar hilo" onClick={closeSidePanel}>
-                    ×
-                  </button>
-                </div>
-                <div className={styles.panelBody}>
-                  {renderMessageList([threadRoot], { compactStart: true })}
-                  {threadReplies.length > 0 && (
-                    <div className={styles.dayDivider}>{threadReplies.length} respuestas</div>
-                  )}
-                  {renderMessageList(threadReplies)}
-                </div>
-                <div className={styles.composerWrap}>
-                  {detail?.readOnly ? (
-                    <div className={styles.superviseBanner} role="status">
-                      Solo lectura en supervisión
-                    </div>
-                  ) : (
-                  <div className={styles.composer}>
-                    {(threadAttachment || uploading) && (
-                      <div className={styles.attachChip}>
-                        {threadAttachment ? (
-                          <>
-                            {isImageAttachment(threadAttachment.name) ? (
-                              <img
-                                src={attachmentHref(threadAttachment.url)}
-                                alt={threadAttachment.name}
-                                className={styles.attachChipThumb}
-                              />
-                            ) : (
-                              <span className={styles.attachChipIcon}>
-                                <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                              </span>
-                            )}
-                            <span className={styles.attachChipName}>{threadAttachment.name}</span>
-                            <span className={styles.attachChipSize}>{formatFileSize(threadAttachment.size)}</span>
-                            <button
-                              type="button"
-                              className={styles.attachChipRemove}
-                              onClick={() => setThreadAttachment(null)}
-                            >
-                              ×
-                            </button>
-                          </>
-                        ) : (
-                          <span className={styles.attachChipName}>Subiendo…</span>
-                        )}
-                      </div>
-                    )}
-                    <MentionTextarea
-                      ref={threadComposerRef}
-                      className={styles.composerTextarea}
-                      aria-label="Responder en el hilo"
-                      placeholder="Responder en el hilo…"
-                      value={threadDraft}
-                      rows={2}
-                      onChange={setThreadDraft}
-                      onPaste={(e) => {
-                        const file = Array.from(e.clipboardData?.files ?? [])[0];
-                        if (file) void onPickFile(file, true);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          void send(threadRoot.id);
-                        }
-                      }}
-                    />
-                    <div className={styles.composerBar}>
-                      <div className={styles.composerBarLeft}>
-                        <button
-                          type="button"
-                          className={styles.attachBtn}
-                          title="Adjuntar archivo"
-                          aria-label="Adjuntar archivo"
-                          disabled={uploading}
-                          onClick={() => threadFileInputRef.current?.click()}
-                        >
-                          <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                        </button>
-                        <input
-                          ref={threadFileInputRef}
-                          type="file"
-                          hidden
-                          onChange={(e) => {
-                            void onPickFile(e.target.files?.[0], true);
-                            e.target.value = "";
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className={styles.mentionToolBtn}
-                          title="Mencionar persona"
-                          aria-label="Mencionar persona"
-                          onClick={() => openEntityPicker("USER", "thread")}
-                        >
-                          <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.mentionToolBtn}
-                          title="Mencionar actividad"
-                          aria-label="Mencionar actividad"
-                          onClick={() => openEntityPicker("ACTIVITY", "thread")}
-                        >
-                          <AssignmentOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.mentionToolBtn}
-                          title="Mencionar evidencia"
-                          aria-label="Mencionar evidencia"
-                          onClick={() => openEntityPicker("EVIDENCE", "thread")}
-                        >
-                          <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                        </button>
-                        <span className={styles.emojiAnchor}>
-                          <button
-                            ref={threadEmojiBtnRef}
-                            type="button"
-                            className={styles.mentionToolBtn}
-                            title="Emojis y stickers"
-                            aria-label="Emojis y stickers"
-                            aria-haspopup="dialog"
-                            aria-expanded={composerEmojiFor === "thread"}
-                            onClick={() =>
-                              setComposerEmojiFor((cur) => (cur === "thread" ? null : "thread"))
-                            }
-                          >
-                            <SentimentSatisfiedAltOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                          </button>
-                          {composerEmojiFor === "thread" && (
-                            <EmojiPicker
-                              title="Emojis y stickers del hilo"
-                              className={styles.composerPickerPos}
-                              returnFocusTo={threadEmojiBtnRef}
-                              onSelect={(emoji) => {
-                                threadComposerRef.current?.insertText(emoji);
-                                threadComposerRef.current?.focus();
-                              }}
-                              onSticker={(emoji) => {
-                                setComposerEmojiFor(null);
-                                void send(threadRoot.id, emoji);
-                              }}
-                              onClose={() => setComposerEmojiFor(null)}
-                            />
-                          )}
-                        </span>
-                        <span className={styles.composerHint}>Respuesta al hilo</span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.sendBtn}
-                        disabled={sending || uploading || (!threadDraft.trim() && !threadAttachment)}
-                        onClick={() => void send(threadRoot.id)}
-                      >
-                        Responder
-                      </button>
-                    </div>
-                  </div>
-                  )}
-                </div>
-              </>
+              <ThreadPanel
+                detail={detail}
+                root={threadRoot}
+                replies={threadReplies}
+                ctx={listCtx}
+                onClose={closeSidePanel}
+                composer={
+                  <Composer
+                    variant="thread"
+                    textareaRef={threadComposerRef}
+                    value={threadDraft}
+                    onChange={setThreadDraft}
+                    placeholder="Responder en el hilo…"
+                    ariaLabel="Responder en el hilo"
+                    attachment={threadAttachment}
+                    uploading={uploading}
+                    onRemoveAttachment={() => setThreadAttachment(null)}
+                    onPickFile={(file) => void onPickFile(file, true)}
+                    onSend={() => void send(threadRoot.id)}
+                    onSticker={(emoji) => {
+                      setComposerEmojiFor(null);
+                      void send(threadRoot.id, emoji);
+                    }}
+                    sendDisabled={sending || uploading || (!threadDraft.trim() && !threadAttachment)}
+                    sendLabel="Responder"
+                    emojiOpen={composerEmojiFor === "thread"}
+                    onToggleEmoji={() => setComposerEmojiFor((cur) => (cur === "thread" ? null : "thread"))}
+                    onCloseEmoji={() => setComposerEmojiFor(null)}
+                    onOpenEntityPicker={(kind) => openEntityPicker(kind, "thread")}
+                    hint="Respuesta al hilo"
+                  />
+                }
+              />
             )}
           </aside>
         )}
@@ -3042,461 +1903,101 @@ export default function WorkspaceChat({
       </div>
 
       {showNewChannel && (
-        <div
-          className={styles.modalBackdrop}
-          role="presentation"
-          onClick={() => setShowNewChannel(false)}
-        >
-          <div
-            className={styles.modal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-modal-new-channel"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalTitle} id="chat-modal-new-channel">
-              Crear canal
-            </div>
-            <p className={styles.modalHint}>
-              Un canal reúne a un equipo o a un tema. Los públicos los ve toda la empresa; los privados, solo quien
-              invites.
-            </p>
-            <input
-              className={styles.modalInput}
-              placeholder="Nombre del canal, por ejemplo: operaciones"
-              aria-label="Nombre del canal"
-              value={newChannelName}
-              onChange={(e) => {
-                setNewChannelName(e.target.value);
-                setNewChannelError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void createChannel();
-                }
-              }}
-              autoFocus
-            />
-            <label className={styles.optionRow}>
-              <input
-                type="checkbox"
-                checked={newChannelPrivate}
-                onChange={(e) => setNewChannelPrivate(e.target.checked)}
-              />
-              <span className={styles.optionText}>
-                Canal privado
-                <small>Solo lo ven y entran quienes invites.</small>
-              </span>
-            </label>
-            {newChannelError ? (
-              <p className={styles.modalError} role="alert">
-                {newChannelError}
-              </p>
-            ) : null}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.actionBtn} onClick={() => setShowNewChannel(false)}>
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className={styles.sendBtn}
-                onClick={() => void createChannel()}
-                disabled={!newChannelName.trim() || creatingChannel}
-              >
-                {creatingChannel ? "Creando…" : "Crear canal"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <NewChannelDialog
+          name={newChannelName}
+          onName={(v) => {
+            setNewChannelName(v);
+            setNewChannelError(null);
+          }}
+          topic={newChannelTopic}
+          onTopic={setNewChannelTopic}
+          description={newChannelDescription}
+          onDescription={setNewChannelDescription}
+          isPrivate={newChannelPrivate}
+          onPrivate={setNewChannelPrivate}
+          error={newChannelError}
+          creating={creatingChannel}
+          onCreate={() => void createChannel()}
+          onClose={() => setShowNewChannel(false)}
+        />
       )}
 
       {showDm && (
-        <div className={styles.modalBackdrop} role="presentation" onClick={() => setShowDm(false)}>
-          <div
-            className={styles.modal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-modal-dm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalTitle} id="chat-modal-dm">
-              Mensaje directo
-            </div>
-            <input
-              className={styles.modalInput}
-              placeholder="Buscar compañero…"
-              value={colleagueQ}
-              onChange={(e) => void searchColleagues(e.target.value)}
-              autoFocus
-            />
-            <div className={styles.colleagueList}>
-              {colleagues.map((u) => (
-                <button key={u.id} type="button" className={styles.colleagueBtn} onClick={() => void openDm(u.id)}>
-                  <span className={styles.presenceWrap}>
-                    <div className={`${styles.avatar} ${avatarHue(u.id)}`} style={{ width: 32, height: 32, fontSize: 11, marginTop: 0 }}>
-                      {initials(u.nombre)}
-                    </div>
-                    <span
-                      className={`${styles.presenceDot} ${presence[u.id] === "online" ? styles.presenceOnline : ""}`}
-                      style={{ borderColor: "var(--surface)" }}
-                    />
-                  </span>
-                  <div className={styles.colleagueMeta}>
-                    <div className={styles.colleagueName}>{u.nombre}</div>
-                    <div className={styles.colleagueEmail}>{u.email}</div>
-                  </div>
-                </button>
-              ))}
-              {colleagues.length === 0 && (
-                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", padding: 8 }}>Sin resultados</div>
-              )}
-            </div>
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.actionBtn} onClick={() => setShowDm(false)}>
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ColleaguesDialog
+          id="chat-modal-dm"
+          title="Mensaje directo"
+          query={colleagueQ}
+          onQuery={(q) => void searchColleagues(q)}
+          colleagues={colleagues}
+          presence={presence}
+          onPick={(userId) => void openDm(userId)}
+          onClose={() => setShowDm(false)}
+        />
       )}
 
       {showInvite && (
-        <div className={styles.modalBackdrop} role="presentation" onClick={() => setShowInvite(false)}>
-          <div
-            className={styles.modal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-modal-invite"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalTitle} id="chat-modal-invite">
-              Invitar a {detail?.name ?? "el canal"}
-            </div>
-            <input
-              className={styles.modalInput}
-              placeholder="Buscar compañero…"
-              value={colleagueQ}
-              onChange={(e) => void searchColleagues(e.target.value)}
-              autoFocus
-            />
-            <div className={styles.colleagueList}>
-              {colleagues
-                .filter((u) => !(detail?.members ?? []).some((m) => m.id === u.id))
-                .map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    className={styles.colleagueBtn}
-                    onClick={() => void addMemberToChannel(u.id)}
-                  >
-                    <span className={styles.presenceWrap}>
-                      <div className={`${styles.avatar} ${avatarHue(u.id)}`} style={{ width: 32, height: 32, fontSize: 11, marginTop: 0 }}>
-                        {initials(u.nombre)}
-                      </div>
-                      <span
-                        className={`${styles.presenceDot} ${presence[u.id] === "online" ? styles.presenceOnline : ""}`}
-                        style={{ borderColor: "var(--surface)" }}
-                      />
-                    </span>
-                    <div className={styles.colleagueMeta}>
-                      <div className={styles.colleagueName}>{u.nombre}</div>
-                      <div className={styles.colleagueEmail}>{u.email}</div>
-                    </div>
-                  </button>
-                ))}
-              {colleagues.length === 0 && (
-                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", padding: 8 }}>Sin resultados</div>
-              )}
-            </div>
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.actionBtn} onClick={() => setShowInvite(false)}>
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ColleaguesDialog
+          id="chat-modal-invite"
+          title={`Invitar a ${detail?.name ?? "el canal"}`}
+          query={colleagueQ}
+          onQuery={(q) => void searchColleagues(q)}
+          colleagues={colleagues.filter((u) => !(detail?.members ?? []).some((m) => m.id === u.id))}
+          presence={presence}
+          onPick={(userId) => void addMemberToChannel(userId)}
+          onClose={() => setShowInvite(false)}
+        />
       )}
 
       {entityPickerOpen && (
-        <div className={styles.modalBackdrop} role="presentation" onClick={() => setEntityPickerOpen(false)}>
-          <div
-            className={`${styles.modal} ${styles.entityPickerModal}`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-modal-entity"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalTitle} id="chat-modal-entity">
-              Mencionar en el mensaje
-            </div>
-            <div className={styles.entityTabs}>
-              {(
-                [
-                  ["USER", "Personas"],
-                  ["ACTIVITY", "Actividades"],
-                  ["EVIDENCE", "Evidencias"],
-                ] as Array<[MentionEntity["kind"], string]>
-              ).map(([kind, label]) => {
-                const TabIcon = MENTION_KIND_ICON[kind];
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    className={`${styles.entityTab} ${entityKind === kind ? styles.entityTabActive : ""}`}
-                    onClick={() => {
-                      setEntityKind(kind);
-                      setEntityQ("");
-                      setEntityResults([]);
-                    }}
-                  >
-                    <TabIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <input
-              className={styles.modalInput}
-              placeholder={
-                entityKind === "USER"
-                  ? "Buscar por nombre o correo…"
-                  : entityKind === "ACTIVITY"
-                    ? "Buscar por AN, título o estado…"
-                    : "Buscar evidencia, actividad o comentario…"
-              }
-              value={entityQ}
-              onChange={(e) => setEntityQ(e.target.value)}
-              autoFocus
-            />
-            <div className={styles.entityResults}>
-              {entityLoading && <div className={styles.loadingLine}>Buscando…</div>}
-              {!entityLoading &&
-                entityResults.map((entity) => (
-                  <button
-                    key={`${entity.kind}-${entity.id}`}
-                    type="button"
-                    className={styles.entityResult}
-                    onClick={() => insertEntityMention(entity)}
-                  >
-                    <span className={styles.entityResultIcon}>
-                      {(() => {
-                        const KindIcon = MENTION_KIND_ICON[entity.kind];
-                        return <KindIcon aria-hidden="true" sx={{ fontSize: 18 }} />;
-                      })()}
-                    </span>
-                    <span className={styles.entityResultText}>
-                      <strong>{entity.label}</strong>
-                      <small>{entity.subtitle}</small>
-                    </span>
-                    <span className={styles.entityResultAdd}>Mencionar</span>
-                  </button>
-                ))}
-              {!entityLoading && entityResults.length === 0 && (
-                <div className={styles.entityEmpty}>No hay resultados disponibles.</div>
-              )}
-            </div>
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.actionBtn} onClick={() => setEntityPickerOpen(false)}>
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <EntityPickerDialog
+          kind={entityKind}
+          onKind={(kind) => {
+            setEntityKind(kind);
+            setEntityQ("");
+            setEntityResults([]);
+          }}
+          query={entityQ}
+          onQuery={setEntityQ}
+          results={entityResults}
+          loading={entityLoading}
+          onPick={insertEntityMention}
+          onClose={() => setEntityPickerOpen(false)}
+        />
       )}
 
       {switcherOpen && (
-        <div className={styles.modalBackdrop} role="presentation" onClick={() => setSwitcherOpen(false)}>
-          <div
-            className={`${styles.modal} ${styles.switcher}`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-modal-switcher"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalTitle} id="chat-modal-switcher">
-              Ir a canal
-            </div>
-            <input
-              className={styles.modalInput}
-              placeholder="Escribe para filtrar…"
-              value={switcherQ}
-              onChange={(e) => {
-                setSwitcherQ(e.target.value);
-                setSwitcherIndex(0);
-              }}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setSwitcherIndex((i) => Math.min(i + 1, Math.max(switcherItems.length - 1, 0)));
-                } else if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setSwitcherIndex((i) => Math.max(i - 1, 0));
-                } else if (e.key === "Enter" && switcherItems[switcherIndex]) {
-                  e.preventDefault();
-                  selectChannel(switcherItems[switcherIndex].id);
-                }
-              }}
-            />
-            <div className={styles.switcherList}>
-              {switcherItems.map((c, i) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`${styles.switcherItem} ${i === switcherIndex ? styles.switcherItemActive : ""}`}
-                  onMouseEnter={() => setSwitcherIndex(i)}
-                  onClick={() => selectChannel(c.id)}
-                >
-                  <span className={styles.channelPrefix}>{channelPrefixNode(c.kind) ?? "·"}</span>
-                  <span className={styles.channelLabel}>{c.name}</span>
-                  {(c.unreadCount ?? 0) > 0 && (
-                    <span className={styles.unreadBadge}>{c.unreadCount}</span>
-                  )}
-                </button>
-              ))}
-              {switcherItems.length === 0 && (
-                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", padding: 10 }}>Sin coincidencias</div>
-              )}
-            </div>
-            <div className={styles.switcherHint}>↑↓ navegar · Enter abrir · Esc cerrar</div>
-          </div>
-        </div>
+        <SwitcherDialog
+          query={switcherQ}
+          onQuery={(q) => {
+            setSwitcherQ(q);
+            setSwitcherIndex(0);
+          }}
+          items={switcherItems}
+          index={switcherIndex}
+          onIndex={setSwitcherIndex}
+          onPick={selectChannel}
+          onClose={() => setSwitcherOpen(false)}
+        />
       )}
 
       {readInfoId != null && (
-        <div className={styles.modalBackdrop} role="presentation" onClick={() => setReadInfoId(null)}>
-          <div
-            className={`${styles.modal} ${styles.reactorsModal}`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chat-modal-reads"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalTitle} id="chat-modal-reads">
-              Info · Visto por
-            </div>
-            {readInfoLoading && <div className={styles.loadingLine}>Cargando…</div>}
-            {readInfoError && <InlineAlert variant="danger" dense message={readInfoError} />}
-            {!readInfoLoading && readInfo && (
-              <div className={styles.reactorsList}>
-                <div className={styles.readSectionLabel}>Visto · {readInfo.seen.length}</div>
-                {readInfo.seen.map((person) => (
-                  <div key={`seen-${person.id}`} className={styles.reactorRow}>
-                    <ReactorAvatar user={person} />
-                    <div className={styles.reactorMeta}>
-                      <span className={styles.reactorName}>{person.nombre}</span>
-                      <span className={styles.reactorTime}>
-                        {person.readAt ? formatMexicoDateTime(person.readAt) : "—"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {readInfo.seen.length === 0 && (
-                  <div className={styles.readEmpty}>Nadie lo ha visto todavía.</div>
-                )}
-                <div className={styles.readSectionLabel}>Aún no · {readInfo.pending.length}</div>
-                {readInfo.pending.map((person) => (
-                  <div key={`pending-${person.id}`} className={styles.reactorRow}>
-                    <ReactorAvatar user={person} />
-                    <div className={styles.reactorMeta}>
-                      <span className={styles.reactorName}>{person.nombre}</span>
-                      <span className={styles.reactorTime}>{person.delivered ? "Entregado" : "Sin entregar"}</span>
-                    </div>
-                  </div>
-                ))}
-                {readInfo.pending.length === 0 && (
-                  <div className={styles.readEmpty}>Todos los destinatarios lo vieron.</div>
-                )}
-              </div>
-            )}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.actionBtn} onClick={() => setReadInfoId(null)}>
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReadInfoDialog
+          loading={readInfoLoading}
+          error={readInfoError}
+          info={readInfo}
+          onClose={() => setReadInfoId(null)}
+        />
       )}
 
-      {reactionsDialog && (() => {
-        const target = findMessageInLists(reactionsDialog.messageId, [messages, threadRoot, threadReplies]);
-        const reactions = target?.reactions ?? [];
-        if (!target || !reactions.length) return null;
-        const activeEmoji = reactions.some((r) => r.emoji === reactionsDialog.emoji)
-          ? reactionsDialog.emoji
-          : "__all__";
-        const totalCount = reactions.reduce((sum, r) => sum + r.count, 0);
-        const activeReactors: Array<ReactionUser & { emoji: string }> =
-          activeEmoji === "__all__"
-            ? reactions
-                .flatMap((r) => (r.users ?? []).map((u) => ({ ...u, emoji: r.emoji })))
-                .sort((a, b) => {
-                  const ta = a.reactedAt ? new Date(a.reactedAt).getTime() : 0;
-                  const tb = b.reactedAt ? new Date(b.reactedAt).getTime() : 0;
-                  return ta - tb;
-                })
-            : (reactions.find((r) => r.emoji === activeEmoji)?.users ?? []).map((u) => ({
-                ...u,
-                emoji: activeEmoji,
-              }));
-
-        return (
-          <div className={styles.modalBackdrop} role="presentation" onClick={() => setReactionsDialog(null)}>
-            <div
-              className={`${styles.modal} ${styles.reactorsModal}`}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="chat-modal-reactions"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={styles.modalTitle} id="chat-modal-reactions">
-                Reacciones
-              </div>
-              <div className={styles.entityTabs}>
-                <button
-                  type="button"
-                  className={`${styles.entityTab} ${activeEmoji === "__all__" ? styles.entityTabActive : ""}`}
-                  onClick={() => setReactionsDialog({ messageId: reactionsDialog.messageId, emoji: "__all__" })}
-                >
-                  Todas · {totalCount}
-                </button>
-                {reactions.map((r) => (
-                  <button
-                    key={r.emoji}
-                    type="button"
-                    className={`${styles.entityTab} ${activeEmoji === r.emoji ? styles.entityTabActive : ""}`}
-                    onClick={() => setReactionsDialog({ messageId: reactionsDialog.messageId, emoji: r.emoji })}
-                  >
-                    <span>{r.emoji}</span> {r.count}
-                  </button>
-                ))}
-              </div>
-              <div className={styles.reactorsList}>
-                {activeReactors.map((u, i) => (
-                  <div key={`${u.emoji}-${u.id}-${i}`} className={styles.reactorRow}>
-                    <ReactorAvatar user={u} />
-                    <div className={styles.reactorMeta}>
-                      <span className={styles.reactorName}>{u.nombre}</span>
-                      <span className={styles.reactorTime}>{formatRelativeTime(u.reactedAt) || "—"}</span>
-                    </div>
-                    {activeEmoji === "__all__" && <span className={styles.reactorEmoji}>{u.emoji}</span>}
-                  </div>
-                ))}
-                {activeReactors.length === 0 && (
-                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", padding: 8 }}>Sin reacciones</div>
-                )}
-              </div>
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.actionBtn} onClick={() => setReactionsDialog(null)}>
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-      <ConfirmDialog state={confirmDelete} onClose={() => setConfirmDelete(null)} />
+      {reactionsDialog && (
+        <ReactionsDialog
+          target={findMessageInLists(reactionsDialog.messageId, [messages, threadRoot, threadReplies])}
+          emoji={reactionsDialog.emoji}
+          onEmoji={(emoji) => setReactionsDialog({ messageId: reactionsDialog.messageId, emoji })}
+          onClose={() => setReactionsDialog(null)}
+        />
+      )}
+      <ConfirmDialog state={confirmAction} onClose={() => setConfirmAction(null)} />
     </>
   );
 }

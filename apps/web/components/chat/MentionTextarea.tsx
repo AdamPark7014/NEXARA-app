@@ -22,6 +22,10 @@ export type MentionTextareaHandle = {
   insertText: (text: string) => void;
   /** Markdown guardado, por si el padre lo necesita fuera del estado. */
   getMarkup: () => string;
+  /** Selección actual en coordenadas del texto visible. */
+  getSelection: () => { start: number; end: number };
+  /** Selección a reponer en cuanto el texto visible cambie (la usa la barra de formato). */
+  selectAfterChange: (start: number, end: number) => void;
 };
 
 type Props = {
@@ -97,6 +101,7 @@ const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function Mentio
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
   const espejoRef = useRef<HTMLDivElement | null>(null);
   const caretPendiente = useRef<number | null>(null);
+  const seleccionPendiente = useRef<{ start: number; end: number } | null>(null);
   const [aviso, setAviso] = useState("");
 
   const display = useMemo(() => toDisplay(value), [value]);
@@ -126,6 +131,14 @@ const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function Mentio
   // el cursor salta al final en cuanto se escribe en medio de una frase.
   useLayoutEffect(() => {
     const area = areaRef.current;
+    const sel = seleccionPendiente.current;
+    seleccionPendiente.current = null;
+    if (area && sel) {
+      caretPendiente.current = null;
+      const largo = area.value.length;
+      area.setSelectionRange(Math.min(sel.start, largo), Math.min(sel.end, largo));
+      return;
+    }
     const pos = caretPendiente.current;
     caretPendiente.current = null;
     if (!area || pos == null) return;
@@ -148,6 +161,14 @@ const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function Mentio
     () => ({
       focus: () => areaRef.current?.focus(),
       getMarkup: () => value,
+      getSelection: () => {
+        const area = areaRef.current;
+        const start = area?.selectionStart ?? display.text.length;
+        return { start, end: area?.selectionEnd ?? start };
+      },
+      selectAfterChange: (start: number, end: number) => {
+        seleccionPendiente.current = { start, end };
+      },
       insertText: (texto: string) => {
         const area = areaRef.current;
         const caret = area?.selectionStart ?? display.text.length;
