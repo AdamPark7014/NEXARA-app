@@ -12,13 +12,16 @@ import styles from "./Map.module.css";
  * repinta con la paleta del sistema tonal (navy, azul profundo, cian) para que
  * sea parte del diseño y no un recuadro ajeno.
  *
- * El worker se sirve desde /public (variante CSP) porque la política del sitio
- * no permite `blob:` en script-src.
+ * MapLibre 6 corre su worker como módulo ES. Lo servimos desde /public/maplibre
+ * (mismo origen): webpack convierte el `import.meta.url` del paquete en una ruta
+ * `file://` y la política del sitio no permite `blob:` en script-src. Los dos
+ * `.mjs` de esa carpeta son copia exacta de `node_modules/maplibre-gl/dist`;
+ * `maplibre-worker.spec.ts` falla si se sube MapLibre sin volver a copiarlos.
  */
 export const NEXARA_COORDS: [number, number] = [-98.277838, 19.073803];
 export const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
-const WORKER_URL = "/maplibre-gl-csp-worker.js";
+export const MAPLIBRE_WORKER_URL = "/maplibre/maplibre-gl-worker.mjs";
 
 type Palette = Record<"bg" | "land" | "park" | "water" | "building" | "roadMinor" | "roadMajor" | "roadCasing" | "rail" | "boundary" | "text" | "textHalo", string>;
 
@@ -61,11 +64,8 @@ let libPromise: Promise<MapLibreModule> | null = null;
 /** Carga MapLibre solo cuando un mapa entra en escena: no pesa en el First Load de ninguna página. */
 const loadMapLibre = (): Promise<MapLibreModule> => {
   if (!libPromise) {
-    libPromise = import("maplibre-gl/dist/maplibre-gl-csp").then((mod) => {
-      const lib = (mod.default ?? mod) as MapLibreModule;
-      const cfg = lib as unknown as { setWorkerUrl?: (url: string) => void; workerUrl?: string };
-      if (typeof cfg.setWorkerUrl === "function") cfg.setWorkerUrl(WORKER_URL);
-      else cfg.workerUrl = WORKER_URL;
+    libPromise = import("maplibre-gl").then((lib) => {
+      lib.setWorkerUrl(MAPLIBRE_WORKER_URL);
       return lib;
     });
   }
