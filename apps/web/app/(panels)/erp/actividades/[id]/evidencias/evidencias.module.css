@@ -1,0 +1,46 @@
+/* Pestaña Evidencias de la ficha de actividad (v2). Solo tokens --ui-*. */
+
+/* Anclas del primario de la cabecera (#captura, #revision): que no queden pegadas al borde. */
+.ancla {
+  scroll-margin-top: var(--ui-s6);
+  min-width: 0;
+}
+
+.archivos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.archivo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  min-width: 0;
+}
+
+.archivoTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.archivoT {
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.archivoM {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}

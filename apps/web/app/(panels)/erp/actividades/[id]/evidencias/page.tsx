@@ -6,36 +6,30 @@
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { buildApiUrl } from "@/lib/api-base";
-import EmptyState from "@/components/ui/EmptyState";
-import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
 import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import { esActividadComercial } from "@/lib/evidence-flow-helpers";
-import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
+import { quienMira, useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
-import { resolveV2RoleKey } from "@/lib/user-access";
-import { ROLES } from "@/lib/rbac";
-import { isCeoEmail } from "@/lib/activity-kinds";
-import KpiCard from "@/components/ui/KpiCard";
+import { Alert, Button, EmptyState, RecordSection, SkeletonRows, Stat, StatRow, buttonClass } from "@/components/base";
 import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
 import UploadOutlinedIcon from "@mui/icons-material/UploadOutlined";
+import s from "./evidencias.module.css";
 
-const ActivityEvidenceFlow = dynamic(() => import("@/components/ActivityEvidenceFlow"), { ssr: false });
+const ActivityEvidenceFlow = dynamic(() => import("@/components/ActivityEvidenceFlow"), {
+  ssr: false,
+  loading: () => <SkeletonRows rows={4} label="Cargando captura de evidencias" />,
+});
 
 export default function ActivityEvidencesPage() {
-  const { activity, error, reload, core } = useActivityDetail();
+  const { activity, core, error, reload } = useActivityDetail();
   const { user } = useUser();
-  const v2 = resolveV2RoleKey(user);
   // En despacho, el LEAD solo reparte: no sube evidencias.
-  const myRow = activity?.assignees?.find((m) => m.user?.id === user?.id && !m.retiradoAt);
-  const despacho = activity?.assignmentCharge === "despacho";
-  const soyResponsable = Boolean(user?.id && activity?.responsable?.id === user.id);
-  const reparte = despacho && (myRow?.rol === "LEAD" || (soyResponsable && !myRow));
   // Core: solo quien la ejecuta captura (equipo o responsable). Christian y los superiores revisan abajo.
-  const canUpload = core
-    ? !isCeoEmail(user?.email) && !reparte && (Boolean(myRow) || soyResponsable)
-    : v2 === ROLES.ING_CAMPO || v2 === ROLES.ING_SOPORTE || user?.isSuperAdmin;
+  const { reparte, puedeCapturar: canUpload } = activity
+    ? quienMira(activity, user, core)
+    : { reparte: false, puedeCapturar: false };
   const puedeSubirPuntos = puedeSubirFotoDePunto({
     userId: user?.id,
     responsableId: activity?.responsable?.id,
@@ -56,36 +50,56 @@ export default function ActivityEvidencesPage() {
     }
   }, [activity?.id]);
 
-  if (error) return <DetailError message={error} onRetry={reload} />;
+  // La ficha (shell) ya pinta la carga y el error cuando la actividad no llegó.
   if (!activity) return null;
 
   const files = activity.evidencias ?? [];
 
   return (
     <>
+      {error ? (
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" variant="tertiary" onClick={reload}>
+              Reintentar
+            </Button>
+          }
+        >
+          No se pudo actualizar: {error}
+        </Alert>
+      ) : null}
       {!core && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <KpiCard label="Archivos" value={files.length} icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={files.length > 0 ? "accent" : "default"} />
-          <KpiCard label="Puede cargar" value={canUpload ? "Sí" : "No"} icon={<UploadOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={canUpload ? "positive" : "default"} />
-        </div>
+        <StatRow cols={2} ariaLabel="Resumen de evidencias">
+          <Stat label="Archivos" value={files.length} icon={<AttachFileOutlinedIcon fontSize="inherit" />} />
+          <Stat
+            label="Puede cargar"
+            value={canUpload ? "Sí" : "No"}
+            tone={canUpload ? "success" : "default"}
+            icon={<UploadOutlinedIcon fontSize="inherit" />}
+          />
+        </StatRow>
       )}
       {reparte && (
-        <DetailSection title="Tú repartes esta actividad">
-          <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-            En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias. El registro de a quién se la
-            pasaste está en la pestaña Historial.
-          </p>
-        </DetailSection>
+        <Alert tone="info" title="Tú repartes esta actividad">
+          En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias. El registro de a quién se la
+          pasaste está en la pestaña Historial.
+        </Alert>
       )}
       {canUpload && (
-        <DetailSection title="Captura de evidencias">
-          <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
-            {esActividadComercial(activity.coreKind)
-              ? "Inicio de actividad, evidencias, cotización y conclusión de actividad."
-              : "Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida."}
-          </p>
-          <ActivityEvidenceFlow />
-        </DetailSection>
+        <div id="captura" className={s.ancla}>
+          <RecordSection
+            title="Captura de evidencias"
+            subtitle={
+              esActividadComercial(activity.coreKind)
+                ? "Inicio de actividad, evidencias, cotización y conclusión de actividad."
+                : "Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida."
+            }
+          >
+            <ActivityEvidenceFlow />
+          </RecordSection>
+        </div>
       )}
 
       <EvidenciaPorCampos
@@ -93,52 +107,45 @@ export default function ActivityEvidencesPage() {
         anNumber={activity.anNumber}
         titulo={activity.titulo}
         puedeSubir={puedeSubirPuntos}
-        style={{ marginBottom: 20 }}
       />
 
-      <div style={{ marginBottom: 16 }}>
+      <div id="revision" className={s.ancla}>
         <EquipoEvidencias activityId={activity.id} />
       </div>
 
       {(files.length > 0 || !core) && (
-      <DetailSection title={`Otros archivos (${files.length})`}>
-        {files.length === 0 ? (
-          <EmptyState icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin otros archivos" description="Aquí aparecen archivos sueltos adjuntos a la actividad." />
-        ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
-            {files.map((ev) => (
-              <li
-                key={ev.id}
-                style={{
-                  padding: 14,
-                  borderRadius: 10,
-                  border: "1px solid var(--border)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{ev.tipo ?? `Evidencia #${ev.id}`}</div>
-                  {ev.descripcion && (
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{ev.descripcion}</div>
-                  )}
-                </div>
-                {ev.url && (
-                  <a
-                    href={buildApiUrl(ev.url.replace(/^\//, ""))}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}
-                  >
-                    Ver
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </DetailSection>
+        <RecordSection title="Otros archivos" subtitle={`${files.length} archivo${files.length === 1 ? "" : "s"} suelto${files.length === 1 ? "" : "s"}`}>
+          {files.length === 0 ? (
+            <EmptyState
+              tone="neutral"
+              size="compact"
+              icon={<AttachFileOutlinedIcon fontSize="inherit" />}
+              title="Sin otros archivos"
+              description="Aquí aparecen archivos sueltos adjuntos a la actividad."
+            />
+          ) : (
+            <ul className={s.archivos}>
+              {files.map((ev) => (
+                <li key={ev.id} className={s.archivo}>
+                  <div className={s.archivoTexto}>
+                    <span className={s.archivoT}>{ev.tipo ?? `Evidencia #${ev.id}`}</span>
+                    {ev.descripcion ? <span className={s.archivoM}>{ev.descripcion}</span> : null}
+                  </div>
+                  {ev.url ? (
+                    <a
+                      href={buildApiUrl(ev.url.replace(/^\//, ""))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonClass("secondary", { size: "sm" })}
+                    >
+                      Ver
+                    </a>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </RecordSection>
       )}
     </>
   );

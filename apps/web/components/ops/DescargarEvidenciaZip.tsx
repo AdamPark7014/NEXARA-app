@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import FolderZipOutlinedIcon from "@mui/icons-material/FolderZipOutlined";
-import Button from "@/components/ui/Button";
+import { Button } from "@/components/base";
+import s from "./DescargarEvidenciaZip.module.css";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { descargarEvidenciaZip, esErrorDePermiso, nombreZipPorOmision } from "@/lib/evidencia-campos";
@@ -44,17 +45,17 @@ export default function DescargarEvidenciaZip({ activityId, anNumber, titulo, si
   };
 
   return (
-    <div style={{ display: "grid", gap: 4, justifyItems: "start" }}>
+    <div className={s.caja}>
       <Button
         size={size}
         variant="secondary"
         onClick={() => void descargar()}
         loading={descargando}
-        iconLeft={<FolderZipOutlinedIcon fontSize="inherit" />}
+        iconStart={<FolderZipOutlinedIcon fontSize="inherit" />}
       >
         {descargando ? "Preparando carpeta…" : "Descargar evidencia (carpeta .zip)"}
       </Button>
-      <span aria-live="polite" style={{ fontSize: 12, color: error ? "var(--danger)" : "var(--text-tertiary)" }}>
+      <span aria-live="polite" className={s.estado} data-error={error ? "true" : undefined}>
         {error ?? listo ?? ""}
       </span>
     </div>

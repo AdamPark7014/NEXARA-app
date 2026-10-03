@@ -2,21 +2,18 @@
 
 // Historial de la actividad (incluye el registro de despacho). Vivía en
 // /ops/activities/[id]/historial y Core la reexportaba; ahora vive aquí.
+// Línea de tiempo v2 (`Timeline`), del suceso más reciente al más viejo.
 
 import { useCallback, useEffect, useState } from "react";
-import EmptyState from "@/components/ui/EmptyState";
-import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
-import { Tag } from "@/components/ui/DataTable";
-import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
+import { formatDateTime } from "@/components/detail/DetailFrame";
+import { Alert, Badge, Button, EmptyState, RecordSection, SkeletonRows, Timeline, TimelineItem, type TimelineState } from "@/components/base";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { listActivityTimeline, type ActivityTimelineEvent } from "@/lib/ops-activities-api";
 import { formatApiError } from "@/lib/erp-api";
+import s from "./historial.module.css";
 import type { SvgIconComponent } from "@mui/icons-material";
 import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
@@ -82,6 +79,14 @@ function timelineIcon(ev: ActivityTimelineEvent): SvgIconComponent {
   return (cp !== undefined ? TIMELINE_ICON_BY_CODEPOINT[cp] : undefined) ?? TIMELINE_ICON_BY_KIND[ev.kind] ?? ScheduleOutlinedIcon;
 }
 
+/** El suceso más reciente va resaltado; una cancelación o una incidencia, en rojo. */
+function timelineState(ev: ActivityTimelineEvent, idx: number): TimelineState {
+  if (/cancel/i.test(ev.kind)) return "danger";
+  if (idx === 0) return "current";
+  if (/cumplida|revision/i.test(ev.kind)) return "done";
+  return "default";
+}
+
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.round(Math.abs(diff) / 60000);
@@ -121,82 +126,82 @@ export default function ActivityHistoryPage() {
     void loadTimeline();
   }, [loadTimeline]);
 
-  if (error) return <DetailError message={error} onRetry={reload} />;
+  // La ficha (shell) ya pinta la carga y el error cuando la actividad no llegó.
   if (!activity) return null;
 
   const isCompleted = !!activity.fechaFinalizacion;
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <KpiCard label="Eventos" value={events.length} icon={<EventOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
-        <KpiCard label="Estado" value={isCompleted ? "Finalizada" : activity.estatus} icon={<SettingsOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={isCompleted ? "positive" : "accent"} />
-      </div>
-
-      <DetailSection title="Línea de tiempo unificada">
-        {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando historial…" description="" />}
-        {timelineError && (
+      {error ? (
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" variant="tertiary" onClick={reload}>
+              Reintentar
+            </Button>
+          }
+        >
+          No se pudo actualizar: {error}
+        </Alert>
+      ) : null}
+      <RecordSection
+        title="Línea de tiempo unificada"
+        subtitle={
+          loading
+            ? "Cargando historial…"
+            : `${events.length} evento${events.length === 1 ? "" : "s"} · ${isCompleted ? "Finalizada" : activity.estatus}`
+        }
+      >
+        {loading ? <SkeletonRows rows={4} label="Cargando historial" /> : null}
+        {!loading && timelineError ? (
           <EmptyState
-            icon={<ErrorOutlineIcon fontSize="inherit" aria-hidden="true" />}
+            tone="danger"
+            icon={<ErrorOutlineIcon fontSize="inherit" />}
             title="Historial limitado"
             description={timelineError}
-            action={<Button size="sm" variant="secondary" onClick={() => void loadTimeline()}>Reintentar</Button>}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void loadTimeline()}>
+                Reintentar
+              </Button>
+            }
           />
-        )}
+        ) : null}
 
-        {!loading && !timelineError && events.length === 0 && (
-          <EmptyState icon={<ScheduleOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin eventos" description="Aún no hay movimientos registrados en esta actividad." />
-        )}
+        {!loading && !timelineError && events.length === 0 ? (
+          <EmptyState
+            tone="neutral"
+            icon={<ScheduleOutlinedIcon fontSize="inherit" />}
+            title="Sin eventos"
+            description="Aún no hay movimientos registrados en esta actividad."
+          />
+        ) : null}
 
-        {!loading && events.length > 0 && (
-          <div style={{ position: "relative", paddingLeft: 28 }}>
-            <div style={{ position: "absolute", left: 9, top: 10, bottom: 10, width: 2, background: "var(--border)" }} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {events.map((ev, idx) => {
-                const EvIcon = timelineIcon(ev);
-                return (
-                <div key={ev.id} style={{ position: "relative", paddingBottom: idx < events.length - 1 ? 16 : 0 }}>
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: -28,
-                      top: 12,
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      background: "var(--primary)",
-                      border: "2px solid var(--surface)",
-                      zIndex: 1,
-                    }}
-                  />
-                  <div
-                    style={{
-                      padding: "12px 14px",
-                      background: idx === 0 ? "color-mix(in srgb, var(--primary) 5%, var(--surface))" : "var(--surface)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                        <EvIcon aria-hidden="true" sx={{ fontSize: 16, color: "var(--primary)", flexShrink: 0 }} />
-                        <span>{ev.title}</span>
-                      </div>
-                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{relativeTime(ev.at)}</span>
-                    </div>
-                    <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>
-                      <Tag variant="neutral">{ev.kind}</Tag>
-                      {ev.subtitle && <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{ev.subtitle}</span>}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>{formatDateTime(ev.at)}</div>
+        {!loading && events.length > 0 ? (
+          <Timeline ariaLabel="Historial de la actividad">
+            {events.map((ev, idx) => {
+              const EvIcon = timelineIcon(ev);
+              return (
+                <TimelineItem
+                  key={ev.id}
+                  state={timelineState(ev, idx)}
+                  icon={<EvIcon fontSize="inherit" />}
+                  title={ev.title}
+                  meta={`${relativeTime(ev.at)} · ${formatDateTime(ev.at)}`}
+                >
+                  <div className={s.sub}>
+                    <Badge tone="neutral" size="sm">
+                      {ev.kind}
+                    </Badge>
+                    {ev.subtitle ? <span>{ev.subtitle}</span> : null}
                   </div>
-                </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </DetailSection>
+                </TimelineItem>
+              );
+            })}
+          </Timeline>
+        ) : null}
+      </RecordSection>
     </>
   );
 }

@@ -8,7 +8,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import Button from "@/components/ui/Button";
+import { Alert, Badge, Button, Input, type Tone } from "@/components/base";
+import s from "./HerramientasChecklist.module.css";
 import { useUser } from "@/components/UserContext";
 import HerramientasChecklistEditor from "@/components/ops/HerramientasChecklistEditor";
 import { formatApiError } from "@/lib/erp-api";
@@ -36,8 +37,6 @@ type Props = {
   style?: CSSProperties;
 };
 
-const VERDE = "#16a34a";
-const NARANJA = "#d97706";
 
 const AYUDA =
   "Quien ejecuta palomea cada herramienta antes de salir; con pendientes la app no deja iniciar la OT.";
@@ -58,40 +57,13 @@ function esSinPermiso(e: unknown): boolean {
   return e instanceof Error && /forbidden/i.test(e.message);
 }
 
-type Estado = { label: string; color: string; icon: SvgIconComponent };
+type Estado = { label: string; tone: Tone; icon: SvgIconComponent };
 
 function estadoDe(r: RequisitoHerramienta): Estado {
-  if (!r.check) return { label: "Pendiente", color: NARANJA, icon: HourglassEmptyIcon };
-  if (r.check.ok) return { label: "Listo", color: VERDE, icon: CheckCircleOutlineIcon };
-  return { label: "Falta", color: "var(--danger)", icon: ErrorOutlineIcon };
+  if (!r.check) return { label: "Pendiente", tone: "warning", icon: HourglassEmptyIcon };
+  if (r.check.ok) return { label: "Listo", tone: "success", icon: CheckCircleOutlineIcon };
+  return { label: "Falta", tone: "danger", icon: ErrorOutlineIcon };
 }
-
-const fila: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 10,
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "9px 12px",
-  borderRadius: 12,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  minWidth: 0,
-};
-
-const notaInput: CSSProperties = {
-  flex: "1 1 200px",
-  minWidth: 0,
-  boxSizing: "border-box",
-  padding: "7px 10px",
-  minHeight: 34,
-  borderRadius: 9,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  font: "inherit",
-  fontSize: 13,
-};
 
 /**
  * «Herramientas a llevar» en el detalle de la actividad: qué se pidió, quién lo palomeó y
@@ -246,93 +218,64 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
   if (sinPermiso) return null;
 
   return (
-    <section aria-labelledby={tituloId} style={{ display: "grid", gap: 10, ...style }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <h2 id={tituloId} style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>
+    <section aria-labelledby={tituloId} className={s.caja} style={style}>
+      <div className={s.cabeza}>
+        <div className={s.titulo}>
+          <span className={s.ico} aria-hidden="true">
+            <BuildOutlinedIcon fontSize="inherit" />
+          </span>
+          <h2 id={tituloId} className={s.tituloT}>
             Herramientas a llevar
           </h2>
-          {lista.length > 0 ? (
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-secondary)" }}>({lista.length})</span>
-          ) : null}
-          <button
-            type="button"
+          {lista.length > 0 ? <span className={s.cuantas}>({lista.length})</span> : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            icon
             onClick={() => setAyuda((v) => !v)}
             aria-expanded={ayuda}
             aria-label="Qué es el checklist de herramientas"
             title={AYUDA}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 26,
-              height: 26,
-              padding: 0,
-              borderRadius: 999,
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-            }}
           >
-            <InfoOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-          </button>
+            <InfoOutlinedIcon fontSize="inherit" />
+          </Button>
         </div>
         {puedeEditar && !editando && checklist ? (
           <Button
             size="sm"
-            variant={lista.length ? "secondary" : "primary"}
+            variant={lista.length ? "secondary" : "tonal"}
             onClick={abrirEditor}
-            iconLeft={lista.length ? <EditOutlinedIcon fontSize="inherit" /> : <BuildOutlinedIcon fontSize="inherit" />}
+            iconStart={lista.length ? <EditOutlinedIcon fontSize="inherit" /> : <BuildOutlinedIcon fontSize="inherit" />}
           >
             {lista.length ? "Editar herramientas" : "Definir herramientas"}
           </Button>
         ) : null}
       </div>
 
-      {ayuda ? (
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>{AYUDA}</p>
-      ) : null}
+      {ayuda ? <p className={s.ayuda}>{AYUDA}</p> : null}
 
       {error && !checklist ? (
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <span role="alert" style={{ fontSize: 13, color: "var(--danger)" }}>
-            {error}
-          </span>
-          <Button size="sm" variant="secondary" onClick={() => void cargar()}>
-            Reintentar
-          </Button>
-        </div>
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
       ) : null}
 
       {aviso ? (
-        <p
-          role="status"
-          style={{
-            margin: 0,
-            padding: "9px 12px",
-            borderRadius: 12,
-            fontSize: 13,
-            fontWeight: 650,
-            background: `color-mix(in srgb, ${VERDE} 10%, var(--surface))`,
-            border: `1px solid color-mix(in srgb, ${VERDE} 35%, var(--border))`,
-          }}
-        >
+        <Alert tone="success" role="status" dense>
           {aviso}
-        </p>
+        </Alert>
       ) : null}
 
       {editando ? (
-        <div
-          style={{
-            display: "grid",
-            gap: 12,
-            padding: 14,
-            borderRadius: 16,
-            border: "1px solid color-mix(in srgb, var(--primary) 30%, var(--border))",
-            background: "color-mix(in srgb, var(--primary) 4%, var(--surface))",
-          }}
-        >
+        <div className={s.editor}>
           <HerramientasChecklistEditor
             value={borrador}
             onChange={setBorrador}
@@ -345,15 +288,15 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
             onToggleUsePersonalKit={setUsaKit}
           />
           {errorGuardar ? (
-            <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>
+            <p role="alert" className={s.error}>
               {errorGuardar}
             </p>
           ) : null}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Button size="sm" variant="secondary" onClick={() => setEditando(false)} disabled={guardando}>
+          <div className={s.editorPie}>
+            <Button variant="tertiary" onClick={() => setEditando(false)} disabled={guardando}>
               Cancelar
             </Button>
-            <Button size="sm" variant="primary" onClick={() => void guardar()} loading={guardando}>
+            <Button variant="primary" onClick={() => void guardar()} loading={guardando}>
               {guardando ? "Guardando…" : "Guardar herramientas"}
             </Button>
           </div>
@@ -362,16 +305,18 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
 
       {!editando && lista.length > 0 ? (
         <>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <strong style={{ fontSize: 13 }}>
+          <div className={s.avance}>
+            <strong className={s.avanceN}>
               {avance.listos} de {avance.total} lista{avance.total === 1 ? "" : "s"}
             </strong>
             {!avance.completo ? (
-              <span style={{ fontSize: 12.5, fontWeight: 650, color: NARANJA }}>No se puede iniciar aún.</span>
+              <Badge tone="warning" size="sm" dot>
+                No se puede iniciar aún.
+              </Badge>
             ) : null}
           </div>
 
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+          <ul className={s.lista}>
             {lista.map((r) => {
               const estado = estadoDe(r);
               const Icono = estado.icon;
@@ -381,42 +326,24 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
               const nota = notaDe?.id === r.id ? notaDe : null;
               const ocupada = palomeando === r.id;
               return (
-                <li key={r.id} style={{ display: "grid", gap: 8, ...fila }}>
-                  <div style={{ display: "grid", gap: 2, minWidth: 0, flex: "1 1 220px" }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, overflowWrap: "anywhere" }}>
+                <li key={r.id} className={s.fila} data-estado={estado.tone}>
+                  <div className={s.filaTexto}>
+                    <span className={s.filaT}>
                       {r.descripcion}
-                      {r.cantidad > 1 ? (
-                        <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}> ×{r.cantidad}</span>
-                      ) : null}
+                      {r.cantidad > 1 ? <span className={s.cantidad}> ×{r.cantidad}</span> : null}
                     </span>
-                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.35 }}>
-                      {[meta, r.check?.nota].filter(Boolean).join(" · ") || "Sin revisar"}
-                    </span>
+                    <span className={s.filaM}>{[meta, r.check?.nota].filter(Boolean).join(" · ") || "Sin revisar"}</span>
                   </div>
 
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "2px 9px",
-                        borderRadius: 999,
-                        fontSize: 11.5,
-                        fontWeight: 700,
-                        color: estado.color,
-                        border: `1px solid color-mix(in srgb, ${estado.color} 35%, var(--border))`,
-                        background: `color-mix(in srgb, ${estado.color} 9%, var(--surface))`,
-                      }}
-                    >
-                      <Icono aria-hidden="true" sx={{ fontSize: 14 }} />
+                  <div className={s.filaAcciones}>
+                    <Badge tone={estado.tone} size="sm" icon={<Icono fontSize="inherit" />}>
                       {estado.label}
-                    </span>
+                    </Badge>
                     {puedePalomear ? (
                       <>
                         <Button
                           size="sm"
-                          variant={r.check?.ok ? "secondary" : "primary"}
+                          variant={r.check?.ok ? "secondary" : "tonal"}
                           onClick={() => void palomear(r, true)}
                           disabled={ocupada}
                         >
@@ -424,7 +351,7 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
                         </Button>
                         <Button
                           size="sm"
-                          variant="secondary"
+                          variant="tertiary"
                           onClick={() => setNotaDe(nota ? null : { id: r.id, texto: r.check?.nota ?? "" })}
                           disabled={ocupada}
                           aria-expanded={Boolean(nota)}
@@ -436,8 +363,11 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
                   </div>
 
                   {nota ? (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%", alignItems: "center" }}>
-                      <input
+                    <div className={s.nota}>
+                      <Input
+                        controlSize="sm"
+                        wrapperClassName={s.notaInput}
+                        className={s.notaInput}
                         value={nota.texto}
                         maxLength={300}
                         autoFocus
@@ -445,7 +375,6 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
                         aria-label={`Nota de ${r.descripcion}`}
                         disabled={ocupada}
                         onChange={(e) => setNotaDe({ id: r.id, texto: e.target.value })}
-                        style={notaInput}
                       />
                       <Button size="sm" variant="danger" onClick={() => void palomear(r, false, nota.texto)} loading={ocupada}>
                         Marcar faltante
@@ -457,7 +386,7 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
                   ) : null}
 
                   {errorFila?.id === r.id ? (
-                    <p role="alert" style={{ margin: 0, width: "100%", fontSize: 12.5, color: "var(--danger)" }}>
+                    <p role="alert" className={s.error}>
                       {errorFila.mensaje}
                     </p>
                   ) : null}
@@ -469,7 +398,7 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
       ) : null}
 
       {!editando && checklist && lista.length === 0 && !cargando ? (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Sin checklist de herramientas</p>
+        <p className={s.vacio}>Sin checklist de herramientas</p>
       ) : null}
     </section>
   );

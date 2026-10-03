@@ -1,0 +1,13 @@
+/* Pestaña Historial de la ficha de actividad (v2). Solo tokens --ui-*. */
+
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin-top: var(--ui-s1);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

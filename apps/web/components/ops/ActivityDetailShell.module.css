@@ -1,0 +1,63 @@
+/* Ficha de actividad (v2): marco de página alrededor de la plantilla RecordPage. Solo tokens --ui-*. */
+
+.wrap {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: var(--ui-s5) var(--ui-s6);
+  min-width: 0;
+}
+
+.back {
+  margin-bottom: var(--ui-s3);
+  font-size: var(--ui-text-sm);
+}
+
+.back a {
+  color: var(--ui-fg-2);
+  text-decoration: none;
+}
+
+.back a:hover {
+  color: var(--ui-fg);
+}
+
+.loading {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+}
+
+/* El hueco de acciones de las pestañas no agrega caja propia: sus botones se acomodan
+   en la misma fila que el primario. */
+.slot {
+  display: contents;
+}
+
+.factLink {
+  color: var(--ui-brand-text);
+  font-weight: var(--ui-fw-semibold);
+  text-decoration: none;
+}
+
+.factLink:hover {
+  text-decoration: underline;
+}
+
+.factOk {
+  color: var(--ui-success-text);
+  font-weight: var(--ui-fw-semibold);
+}
+
+.factBad {
+  color: var(--ui-danger-text);
+  font-weight: var(--ui-fw-semibold);
+}
+
+@media (max-width: 767px) {
+  .wrap {
+    padding: var(--ui-s4);
+  }
+}

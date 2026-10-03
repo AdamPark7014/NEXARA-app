@@ -48,10 +48,74 @@ import {
   type PuntoGeo,
 } from '@/lib/activity-geofence';
 import dynamic from 'next/dynamic';
+import { Alert, Badge, Button, DateInput, Field, Input, Select, Textarea } from '@/components/base';
 
 const VisorPdf = dynamic(
   () => import('@/components/ops/EquipoEvidencias').then((m) => m.VisorPdf),
-  { ssr: false, loading: () => <p style={{ fontSize: 13, color: '#6b7280' }}>Cargando vista previa PDF…</p> },
+  { ssr: false, loading: () => <p className={styles.muted}>Cargando vista previa PDF…</p> },
+);
+
+/* Iconos de trazo de los botones del flujo (sustituyen a los emojis de antes). */
+const trazo = { stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+const IcoCamara = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M2.5 5.5h2.2l1.1-1.6h4.4l1.1 1.6h2.2v7h-11z" {...trazo} />
+    <circle cx="8" cy="8.8" r="2.1" {...trazo} />
+  </svg>
+);
+const IcoGirar = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M13 5.5A5.5 5.5 0 0 0 3.2 6M3 10.5A5.5 5.5 0 0 0 12.8 10M13 2.5v3h-3M3 13.5v-3h3" {...trazo} />
+  </svg>
+);
+const IcoClip = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M10.8 4.6 5.6 9.8a1.6 1.6 0 0 0 2.3 2.3l5.4-5.4a3 3 0 0 0-4.3-4.3L3.6 7.8a4.4 4.4 0 0 0 6.2 6.2l3.6-3.6" {...trazo} />
+  </svg>
+);
+const IcoCheck = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M3.5 8.4l3 3 6-6.6" {...trazo} strokeWidth={2} />
+  </svg>
+);
+const IcoFlecha = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M3 8h10M9 4l4 4-4 4" {...trazo} />
+  </svg>
+);
+const IcoPin = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M8 14s4.6-4.1 4.6-7.6A4.6 4.6 0 0 0 3.4 6.4C3.4 9.9 8 14 8 14z" {...trazo} />
+    <circle cx="8" cy="6.4" r="1.7" {...trazo} />
+  </svg>
+);
+const IcoDoc = () => (
+  <svg width="26" height="26" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M4 1.8h5.2L12.4 5v9.2H4z" {...trazo} strokeWidth={1.3} />
+    <path d="M9 1.8V5h3.4M6 8.2h4.2M6 10.6h4.2" {...trazo} strokeWidth={1.3} />
+  </svg>
+);
+const IcoForm = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <rect x="2.8" y="2" width="10.4" height="12" rx="1.8" {...trazo} />
+    <path d="M5.3 5.6l1 1 1.8-2M9.6 5.8h1.6M5.3 9.6l1 1 1.8-2M9.6 9.8h1.6" {...trazo} />
+  </svg>
+);
+const IcoSalida = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M6 2.5H3.5v11H6M10 5l3 3-3 3M13 8H6.5" {...trazo} />
+  </svg>
+);
+const IcoX = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <path d="M4 4l8 8M12 4l-8 8" {...trazo} strokeWidth={2} />
+  </svg>
+);
+const IcoReloj = () => (
+  <svg width="26" height="26" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+    <circle cx="8" cy="8" r="6" {...trazo} strokeWidth={1.4} />
+    <path d="M8 4.8V8l2.2 1.4" {...trazo} strokeWidth={1.4} />
+  </svg>
 );
 type EvidenceBootstrap = {
   status?: string;
@@ -1593,68 +1657,45 @@ const ActivityEvidenceFlow = () => {
     return () => window.removeEventListener('paste', onPaste);
   }, [flowData?.step, isFlowLocked, porCampos, camposEvidencia, adjuntarEvidencia]);
 
-  if (!user) return <div>Cargando...</div>;
+  if (!user) return <p className={styles.muted} role="status">Cargando…</p>;
 
   // Si no ha seleccionado actividad, mostrar selector
   if (!flowData) {
     return (
-      <div className={`card ${styles.flowCard}`}>
-        <h2 className={styles.flowTitle}>Selecciona una Actividad</h2>
-        <p className={styles.flowSubtitle}>
-          Elige la actividad para comenzar el flujo de evidencias.
-        </p>
-        <select
-          className={`input ${styles.activitySelect}`}
-          value={selectedActivityId}
-          onChange={(e) => handleActivitySelect(parseInt(e.target.value))}
-          disabled={loading}
-        >
-          <option value="">-- Selecciona una actividad --</option>
-          {actividades.map((act) => (
-            <option key={act.id} value={act.id}>
-              {act.anNumber} - {act.titulo}
-            </option>
-          ))}
-        </select>
+      <div className={styles.flowCard}>
+        <div>
+          <h2 className={styles.flowTitle}>Selecciona una Actividad</h2>
+          <p className={styles.flowSubtitle}>Elige la actividad para comenzar el flujo de evidencias.</p>
+        </div>
+        <Field label="Actividad">
+          <Select
+            controlSize="lg"
+            value={selectedActivityId}
+            onChange={(e) => handleActivitySelect(parseInt(e.target.value))}
+            disabled={loading}
+          >
+            <option value="">-- Selecciona una actividad --</option>
+            {actividades.map((act) => (
+              <option key={act.id} value={act.id}>
+                {act.anNumber} - {act.titulo}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </div>
     );
   }
 
   // Mostrar paso actual
   return (
-    <div className={`card ${styles.flowCard}`}>
+    <div className={styles.flowCard}>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
       {/* Portal a body: dentro de la tarjeta la capa quedaba atrapada y se encimaba con la página. */}
       {pendingPhoto && typeof document !== 'undefined' ? createPortal(
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Revisa tu foto"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            background: 'rgba(15, 23, 42, 0.6)',
-            display: 'grid',
-            placeItems: 'center',
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 520,
-              background: 'var(--surface)',
-              color: 'inherit',
-              border: '1px solid var(--border)',
-              borderRadius: 18,
-              padding: 18,
-              display: 'grid',
-              gap: 12,
-            }}
-          >
+        <div role="dialog" aria-modal="true" aria-label="Revisa tu foto" className={styles.overlay}>
+          <div className={styles.dialog}>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 800 }}>
+              <p className={styles.dialogTitle}>
                 {pendingPhoto.kind === 'entry'
                   ? textos.inicio.vistaPrevia
                   : pendingPhoto.kind === 'exit'
@@ -1662,35 +1703,22 @@ const ActivityEvidenceFlow = () => {
                     : campoTarget
                       ? `${MOMENTO_LABEL[campoTarget.momento]} · campo`
                       : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
-                ¿Se ve bien? Si salió oscura o movida, toma otra.
-              </div>
+              </p>
+              <p className={styles.dialogSub}>¿Se ve bien? Si salió oscura o movida, toma otra.</p>
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={pendingPhoto.dataUrl}
-              alt="Foto que tomaste"
-              style={{
-                width: '100%',
-                maxHeight: '55vh',
-                objectFit: 'contain',
-                borderRadius: 12,
-                background: '#000',
-              }}
-            />
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+            <img src={pendingPhoto.dataUrl} alt="Foto que tomaste" className={styles.previewImg} />
+            <div className={styles.dialogMeta}>
               {(() => {
                 const punto = puntoDeFoto(pendingPhoto.latitude, pendingPhoto.longitude);
                 if (!punto) return <>Sin ubicación GPS. La evidencia se guarda igual.</>;
                 return (
                   <>
-                    📍 Ubicación capturada: {punto.latitude.toFixed(5)}, {punto.longitude.toFixed(5)} ·{' '}
+                    Ubicación capturada: {punto.latitude.toFixed(5)}, {punto.longitude.toFixed(5)} ·{' '}
                     <a
                       href={`https://www.google.com/maps?q=${punto.latitude},${punto.longitude}`}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ color: 'var(--primary)', fontWeight: 650 }}
                     >
                       Ver en mapa
                     </a>
@@ -1701,73 +1729,48 @@ const ActivityEvidenceFlow = () => {
             {pendingPhoto.kind === 'exit' && zonaSalidaError ? (
               <AvisoFueraDeZona mensaje={zonaSalidaError} />
             ) : null}
-            {error ? <div style={{ fontSize: 13, color: '#b91c1c' }}>❌ {error}</div> : null}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                type="button"
+            {error ? (
+              <p className={styles.dialogError} role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className={styles.dialogActions}>
+              <Button
+                variant="primary"
+                size="lg"
+                className={`${styles.tap} ${styles.grow}`}
                 onClick={() => void confirmPendingPhoto()}
-                disabled={loading}
-                style={{
-                  flex: '1 1 160px',
-                  minHeight: 48,
-                  border: 'none',
-                  borderRadius: 12,
-                  background: 'var(--primary)',
-                  color: '#fff',
-                  fontWeight: 750,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  opacity: loading ? 0.7 : 1,
-                }}
+                loading={loading}
+                iconStart={<IcoCheck />}
               >
                 {loading
-                  ? '⏳ Enviando…'
+                  ? 'Enviando…'
                   : pendingPhoto.kind === 'evidence'
-                    ? '✓ Usar esta foto'
-                    : '✓ Enviar esta foto'}
-              </button>
-              <button
-                type="button"
+                    ? 'Usar esta foto'
+                    : 'Enviar esta foto'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                className={`${styles.tap} ${styles.growSm}`}
                 onClick={() => void retakePendingPhoto()}
                 disabled={loading}
-                style={{
-                  flex: '1 1 120px',
-                  minHeight: 48,
-                  borderRadius: 12,
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
-                  color: 'inherit',
-                  fontWeight: 650,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
+                iconStart={<IcoCamara />}
               >
-                📷 Tomar otra
-              </button>
-              <button
-                type="button"
+                Tomar otra
+              </Button>
+              <Button
+                variant="tertiary"
+                size="lg"
+                className={styles.tap}
                 onClick={() => {
                   setPendingPhoto(null);
                   setError(null);
                 }}
                 disabled={loading}
-                style={{
-                  minHeight: 48,
-                  padding: '0 14px',
-                  borderRadius: 12,
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--text-secondary)',
-                  fontWeight: 650,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
               >
                 Cancelar
-              </button>
+              </Button>
             </div>
           </div>
         </div>,
@@ -1775,35 +1778,10 @@ const ActivityEvidenceFlow = () => {
       ) : null}
       {liveKind && typeof document !== 'undefined'
         ? createPortal(
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Cámara"
-              style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 10000,
-                background: 'rgba(15, 23, 42, 0.75)',
-                display: 'grid',
-                placeItems: 'center',
-                padding: 16,
-              }}
-            >
-              <div
-                style={{
-                  width: '100%',
-                  maxWidth: 560,
-                  background: 'var(--surface)',
-                  color: 'inherit',
-                  border: '1px solid var(--border)',
-                  borderRadius: 18,
-                  padding: 18,
-                  display: 'grid',
-                  gap: 12,
-                }}
-              >
+            <div role="dialog" aria-modal="true" aria-label="Cámara" className={styles.overlay}>
+              <div className={`${styles.dialog} ${styles.dialogWide}`}>
                 <div>
-                  <div style={{ fontSize: 17, fontWeight: 800 }}>
+                  <p className={styles.dialogTitle}>
                     {liveKind === 'entry'
                       ? textos.inicio.nombre
                       : liveKind === 'exit'
@@ -1811,145 +1789,83 @@ const ActivityEvidenceFlow = () => {
                         : campoTarget
                           ? `${MOMENTO_LABEL[campoTarget.momento]} · campo`
                           : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
-                    Acomódate o encuadra bien y toca «Tomar foto».
-                  </div>
+                  </p>
+                  <p className={styles.dialogSub}>Acomódate o encuadra bien y toca «Tomar foto».</p>
                 </div>
-                <div
-                  style={{
-                    position: 'relative',
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    background: '#000',
-                    minHeight: 220,
-                  }}
-                >
+                <div className={styles.videoBox}>
                   <video
                     ref={liveVideoRef}
                     autoPlay
                     playsInline
                     muted
                     onLoadedData={() => setLiveReady(true)}
-                    style={{
-                      width: '100%',
-                      maxHeight: '55vh',
-                      display: 'block',
-                      objectFit: 'contain',
-                      // Frontal en espejo, como un espejo real; la foto se guarda sin espejo.
-                      transform: cameraFacing === 'user' ? 'scaleX(-1)' : undefined,
-                    }}
+                    className={`${styles.video} ${cameraFacing === 'user' ? styles.videoMirror : ''}`}
                   />
-                  {!liveReady && !liveError ? (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'grid',
-                        placeItems: 'center',
-                        color: '#fff',
-                        fontSize: 14,
-                      }}
-                    >
-                      Abriendo cámara…
-                    </div>
-                  ) : null}
+                  {!liveReady && !liveError ? <div className={styles.videoWait}>Abriendo cámara…</div> : null}
                 </div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                  📍 Al tomar la foto se guarda tu ubicación.
-                </div>
-                {liveError ? <div style={{ fontSize: 13, color: '#b91c1c' }}>❌ {liveError}</div> : null}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
+                <div className={styles.dialogMeta}>Al tomar la foto se guarda tu ubicación.</div>
+                {liveError ? (
+                  <p className={styles.dialogError} role="alert">
+                    {liveError}
+                  </p>
+                ) : null}
+                <div className={styles.dialogActions}>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className={`${styles.tap} ${styles.grow}`}
                     onClick={() => void shootLive()}
                     disabled={!liveReady || loading}
-                    style={{
-                      flex: '1 1 160px',
-                      minHeight: 52,
-                      border: 'none',
-                      borderRadius: 12,
-                      background: 'var(--primary)',
-                      color: '#fff',
-                      fontWeight: 800,
-                      fontSize: 16,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      opacity: !liveReady || loading ? 0.6 : 1,
-                    }}
+                    loading={loading}
+                    iconStart={<IcoCamara />}
                   >
-                    {loading ? '⏳ Ubicando…' : '📸 Tomar foto'}
-                  </button>
-                  <button
-                    type="button"
+                    {loading ? 'Ubicando…' : 'Tomar foto'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    className={`${styles.tap} ${styles.growSm}`}
                     onClick={() =>
                       setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
                     }
                     disabled={loading}
-                    style={{
-                      flex: '1 1 120px',
-                      minHeight: 52,
-                      borderRadius: 12,
-                      border: '1px solid var(--border)',
-                      background: 'var(--surface)',
-                      color: 'inherit',
-                      fontWeight: 650,
-                      fontSize: 15,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
+                    iconStart={<IcoGirar />}
                   >
-                    🔄 {cameraFacing === 'environment' ? 'Usar frontal' : 'Usar trasera'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeCamera}
-                    disabled={loading}
-                    style={{
-                      minHeight: 52,
-                      padding: '0 14px',
-                      borderRadius: 12,
-                      border: 'none',
-                      background: 'transparent',
-                      color: 'var(--text-secondary)',
-                      fontWeight: 650,
-                      fontSize: 14,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
+                    {cameraFacing === 'environment' ? 'Usar frontal' : 'Usar trasera'}
+                  </Button>
+                  <Button variant="tertiary" size="lg" className={styles.tap} onClick={closeCamera} disabled={loading}>
                     Cancelar
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>,
             document.body,
           )
         : null}
-      {error && <div className={styles.alertError}>❌ {error}</div>}
+      {error ? (
+        <Alert tone="danger" role="alert" srLabel="Error">
+          {error}
+        </Alert>
+      ) : null}
 
-      {successMsg && <div className={styles.alertSuccess}>{successMsg}</div>}
+      {successMsg ? (
+        <Alert tone="success" role="status">
+          {successMsg}
+        </Alert>
+      ) : null}
 
       {(flowData.indicaciones || flowData.assigneeIndicaciones) && (
-        <div className={styles.stepCard} style={{ marginBottom: 12 }}>
+        <div className={styles.infoCard}>
           {flowData.indicaciones ? (
-            <div style={{ marginBottom: flowData.assigneeIndicaciones ? 10 : 0 }}>
-              <strong className={styles.stepTitle} style={{ fontSize: 14 }}>
-                Indicaciones generales
-              </strong>
-              <p className={styles.stepDescription} style={{ marginBottom: 0 }}>
-                {flowData.indicaciones}
-              </p>
+            <div>
+              <strong className={styles.infoTitle}>Indicaciones generales</strong>
+              <p className={styles.infoText}>{flowData.indicaciones}</p>
             </div>
           ) : null}
           {flowData.assigneeIndicaciones ? (
             <div>
-              <strong className={styles.stepTitle} style={{ fontSize: 14 }}>
-                Indicaciones para ti
-              </strong>
-              <p className={styles.stepDescription} style={{ marginBottom: 0 }}>
-                {flowData.assigneeIndicaciones}
-              </p>
+              <strong className={styles.infoTitle}>Indicaciones para ti</strong>
+              <p className={styles.infoText}>{flowData.assigneeIndicaciones}</p>
             </div>
           ) : null}
         </div>
@@ -1968,45 +1884,40 @@ const ActivityEvidenceFlow = () => {
               )
             : [];
         return (
-          <div key={`avance-${av.userId}`} className={styles.stepCard} style={{ marginBottom: 12 }}>
-            <strong className={styles.stepTitle} style={{ fontSize: 14 }}>
-              {av.titulo}
-            </strong>
-            <p className={styles.stepDescription} style={{ marginBottom: 8 }}>
-              Solo lectura · {av.progressPct}% avanzado
-              {av.movidaPor ? ` · ${av.movidaPor} te la pasó` : ''}
-              {av.motivo ? ` · Motivo: ${av.motivo}` : ''}. {textos.relevo}
-            </p>
+          <div key={`avance-${av.userId}`} className={styles.infoCard}>
+            <div>
+              <strong className={styles.infoTitle}>{av.titulo}</strong>
+              <p className={styles.stepDescription}>
+                Solo lectura · {av.progressPct}% avanzado
+                {av.movidaPor ? ` · ${av.movidaPor} te la pasó` : ''}
+                {av.motivo ? ` · Motivo: ${av.motivo}` : ''}. {textos.relevo}
+              </p>
+            </div>
             {fotos.length > 0 ? (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: campos.length || ev?.serviceSheetPdfUrl ? 8 : 0 }}>
+              <div className={styles.thumbs}>
                 {fotos.map((url) => (
                   <a key={url} href={getAssetUrl(url)} target="_blank" rel="noreferrer">
-                    <img
-                      src={getAssetUrl(url)}
-                      alt={`Evidencia de ${av.nombre}`}
-                      style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
-                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={getAssetUrl(url)} alt={`Evidencia de ${av.nombre}`} className={styles.thumb} />
                   </a>
                 ))}
               </div>
             ) : (
-              <p className={styles.stepDescription} style={{ marginBottom: 0 }}>
-                No alcanzó a subir fotos.
-              </p>
+              <p className={styles.stepDescription}>No alcanzó a subir fotos.</p>
             )}
             {ev?.serviceSheetPdfUrl ? (
-              <a href={getAssetUrl(ev.serviceSheetPdfUrl)} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600 }}>
+              <a href={getAssetUrl(ev.serviceSheetPdfUrl)} target="_blank" rel="noreferrer" className={styles.link}>
                 Ver hoja de servicio que subió
               </a>
             ) : null}
             {campos.length > 0 ? (
-              <dl style={{ margin: '8px 0 0', display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 10px', fontSize: 12.5 }}>
+              <dl className={styles.prevList}>
                 {campos.slice(0, 12).map(([k, v]) => (
                   <React.Fragment key={k}>
-                    <dt style={{ color: '#6b7280' }}>
+                    <dt>
                       {digitalFormLabels(flowData.coreKind).find((f) => f.key === k)?.label ?? k}
                     </dt>
-                    <dd style={{ margin: 0 }}>{String(v)}</dd>
+                    <dd>{String(v)}</dd>
                   </React.Fragment>
                 ))}
               </dl>
@@ -2015,49 +1926,46 @@ const ActivityEvidenceFlow = () => {
         );
       })}
 
-      {/* Banner de Rechazo */}
+      {/* Aviso de rechazo */}
       {flowData.reviewStatus === 'REJECTED' &&
         (rejectedList.length > 0 || flowData.reviewNotes) && (
-          <div className={styles.rejectedBanner}>
-            <h3 className={styles.rejectedTitle}>
-              <span className={styles.rejectedEmoji}>⚠️</span>
-              Tu evidencia fue rechazada
-            </h3>
-            {rejectedList.length > 0 && (
-              <div className={styles.rejectedStepRow}>
-                <strong className={styles.rejectedStrong}>
-                  {rejectedList.length > 1 ? 'Pasos a corregir:' : 'Paso rechazado:'}
-                </strong>{' '}
-                <span className={styles.rejectedStepText}>
+          <Alert tone="danger" role="alert" title="Tu evidencia fue rechazada">
+            <span className={styles.rejectedBody}>
+              {rejectedList.length > 0 && (
+                <span>
+                  <strong className={styles.rejectedStrong}>
+                    {rejectedList.length > 1 ? 'Pasos a corregir:' : 'Paso rechazado:'}
+                  </strong>{' '}
                   {rejectedList.map((step) => evidenceStepLabel(step, flowData.coreKind)).join(' · ')}
                 </span>
-              </div>
-            )}
-            <div>
-              <strong className={styles.rejectedStrong}>Observaciones del revisor:</strong>
-              <p className={styles.rejectedNotes}>
-                {(flowData.reviewNotes || '').trim() || 'Sin observaciones registradas.'}
-              </p>
-            </div>
-            <div className={styles.rejectedHint}>
-              💡 <strong>Instrucciones:</strong> Corrige el paso actual.{' '}
-              {rejectedList.length > 1
-                ? 'Luego podrás corregir los demás pasos indicados.'
-                : 'Al terminar, se enviará nuevamente a revisión.'}
-            </div>
-          </div>
+              )}
+              <span>
+                <strong className={styles.rejectedStrong}>Observaciones del revisor:</strong>
+                <span className={styles.rejectedNotes}>
+                  {(flowData.reviewNotes || '').trim() || 'Sin observaciones registradas.'}
+                </span>
+              </span>
+              <span className={styles.rejectedHint}>
+                <strong>Instrucciones:</strong> Corrige el paso actual.{' '}
+                {rejectedList.length > 1
+                  ? 'Luego podrás corregir los demás pasos indicados.'
+                  : 'Al terminar, se enviará nuevamente a revisión.'}
+              </span>
+            </span>
+          </Alert>
         )}
 
-      {/* Barra de progreso */}
+      {/* Pasos del flujo */}
       <div className={styles.progressWrap}>
         <div className={styles.progressMeta}>
-          Actividad:{' '}
-          <strong>{actividades.find((a) => a.id === flowData.activityId)?.anNumber}</strong>
+          Actividad <strong>{actividades.find((a) => a.id === flowData.activityId)?.anNumber}</strong>
           {flowData.progressPct != null ? (
-            <span style={{ marginLeft: 8, color: '#6b7280' }}>{flowData.progressPct}%</span>
+            <Badge tone={flowData.progressPct >= 100 ? 'success' : 'brand'} size="sm">
+              {flowData.progressPct}%
+            </Badge>
           ) : null}
         </div>
-        <div className={styles.progressRow}>
+        <ol className={styles.progressRow} aria-label="Pasos de la evidencia">
           {visibleSteps.map((stepKey, index) => {
             const completed =
               stepKey === 'ENTRY_PHOTO'
@@ -2073,7 +1981,7 @@ const ActivityEvidenceFlow = () => {
                       : Boolean(flowData.exitPhotoUrl);
             return (
               <React.Fragment key={stepKey}>
-                {index > 0 ? <div className={styles.progressDivider} /> : null}
+                {index > 0 ? <li aria-hidden="true" className={styles.progressDivider} /> : null}
                 <ProgressStep
                   step={index + 1}
                   active={flowData.step === stepKey}
@@ -2089,7 +1997,7 @@ const ActivityEvidenceFlow = () => {
               </React.Fragment>
             );
           })}
-        </div>
+        </ol>
       </div>
 
       {/* Geocerca: punto de inicio, recorrido y salidas de zona por justificar */}
@@ -2100,46 +2008,61 @@ const ActivityEvidenceFlow = () => {
       {/* PASO 1: Foto de Entrada */}
       {flowData.step === 'ENTRY_PHOTO' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepEntry}`}>
-          <h3 className={styles.stepTitle}>📸 {textos.inicio.paso}</h3>
+          <h3 className={styles.stepTitle}>
+            <span className={styles.stepIco}>
+              <IcoCamara />
+            </span>
+            {textos.inicio.paso}
+          </h3>
           <p className={styles.stepDescription}>{textos.inicio.descripcion}</p>
           <div className={styles.actionGrid}>
-            <button
-              className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEntry}`}
+            <Button
+              variant="primary"
+              size="lg"
+              className={styles.tap}
               onClick={handleEntryPhoto}
               disabled={loading || cameraActive}
+              loading={loading}
+              iconStart={<IcoCamara />}
             >
-              {loading ? '⏳ Capturando...' : `📷 ${textos.inicio.boton}`}
-            </button>
-            <button
-              className={`${styles.actionButton} ${styles.actionSecondary}`}
+              {loading ? 'Capturando...' : textos.inicio.boton}
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              className={styles.tap}
               onClick={() =>
                 setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
               }
               disabled={loading}
+              iconStart={<IcoGirar />}
             >
-              🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
-            </button>
+              {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
+            </Button>
             {flowData.allowAttach ? (
               <>
                 <input
                   ref={adjuntoEntradaRef}
                   type="file"
                   accept="image/*"
-                  style={{ display: 'none' }}
+                  className={styles.hiddenInput}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     e.target.value = '';
                     if (file) void attachEntryOrExitPhoto('entry', file);
                   }}
                 />
-                <button
-                  className={`${styles.actionButton} ${styles.actionSecondary}`}
+                <Button
+                  variant="tertiary"
+                  size="lg"
+                  className={styles.tap}
                   onClick={() => adjuntoEntradaRef.current?.click()}
                   disabled={loading || cameraActive}
                   title="Excepción puntual: adjunta una foto que ya tienes, en vez de tomarla ahora"
+                  iconStart={<IcoClip />}
                 >
-                  📎 Adjuntar (excepción)
-                </button>
+                  Adjuntar (excepción)
+                </Button>
               </>
             ) : null}
           </div>
@@ -2175,11 +2098,14 @@ const ActivityEvidenceFlow = () => {
           }}
         >
           <h3 className={styles.stepTitle}>
+            <span className={styles.stepIco}>
+              <IcoCamara />
+            </span>
             {isInventoryFlow
-              ? `🗂️ Paso 2: Inventario comparativo + evidencias (${flowData.evidencePhotos.length} foto${flowData.evidencePhotos.length === 1 ? '' : 's'})`
+              ? `Paso 2: Inventario comparativo + evidencias (${flowData.evidencePhotos.length} foto${flowData.evidencePhotos.length === 1 ? '' : 's'})`
               : porCampos
-                ? `📷 Paso 2: Fotos por campo (${camposProgreso.cumplidas}/${camposProgreso.requeridas})`
-                : `📷 Paso 2: Evidencias (${flowData.evidencePhotos.length}/${photoRequired})`}
+                ? `Paso 2: Fotos por campo (${camposProgreso.cumplidas}/${camposProgreso.requeridas})`
+                : `Paso 2: Evidencias (${flowData.evidencePhotos.length}/${photoRequired})`}
           </h3>
           <p className={styles.stepDescription}>
             {isInventoryFlow
@@ -2192,41 +2118,25 @@ const ActivityEvidenceFlow = () => {
           </p>
 
           {porCampos ? (
-            <div style={{ display: 'grid', gap: 14, marginBottom: 12 }}>
+            <div className={styles.campoList}>
               {camposEvidencia.map((campo) => {
                 const momentos = MOMENTOS.filter((m) => campo.momentos.includes(m));
                 return (
-                  <div
-                    key={campo.id}
-                    style={{
-                      display: 'grid',
-                      gap: 8,
-                      padding: 12,
-                      borderRadius: 14,
-                      border: '1px solid var(--border)',
-                      background: 'var(--surface)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <strong style={{ fontSize: 14 }}>{campo.nombre}</strong>
+                  <div key={campo.id} className={styles.campoCard}>
+                    <div className={styles.campoHead}>
+                      <strong className={styles.campoName}>{campo.nombre}</strong>
                       {campo.completo ? (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--success)' }}>Listo</span>
+                        <Badge tone="success" size="sm" dot>
+                          Listo
+                        </Badge>
                       ) : (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#d97706' }}>
+                        <Badge tone="warning" size="sm" dot>
                           Faltan {campo.pendientes?.length ?? momentos.filter((m) => !campo.fotos?.[m]).length}
-                        </span>
+                        </Badge>
                       )}
                     </div>
-                    {campo.notas ? (
-                      <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-secondary)' }}>{campo.notas}</p>
-                    ) : null}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${Math.max(momentos.length, 1)}, minmax(0, 1fr))`,
-                        gap: 8,
-                      }}
-                    >
+                    {campo.notas ? <p className={styles.campoNote}>{campo.notas}</p> : null}
+                    <div className={styles.momentos} data-cols={Math.min(Math.max(momentos.length, 1), 3)}>
                       {momentos.map((m) => {
                         const foto = campo.fotos?.[m] ?? null;
                         return (
@@ -2235,107 +2145,61 @@ const ActivityEvidenceFlow = () => {
                             data-campo-slot=""
                             data-field-id={campo.id}
                             data-momento={m}
-                            style={{ display: 'grid', gap: 4, minWidth: 0 }}
+                            className={styles.momento}
                           >
-                            <span style={{ fontSize: 12, fontWeight: 700 }}>{MOMENTO_LABEL[m]}</span>
+                            <span className={styles.momentoLabel}>{MOMENTO_LABEL[m]}</span>
                             {foto ? (
-                              <div style={{ display: 'grid', gap: 4 }}>
-                              <div style={{ position: 'relative' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCaptureCampoPhoto(campo.id, m)}
-                                  disabled={loading}
-                                  title="Volver a tomar"
-                                  style={{
-                                    padding: 0,
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 12,
-                                    overflow: 'hidden',
-                                    background: '#111',
-                                    cursor: 'pointer',
-                                    height: 96,
-                                    width: '100%',
-                                    display: 'block',
-                                  }}
-                                >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={getAssetUrl(foto.photoUrl)}
-                                    alt={`${campo.nombre} ${MOMENTO_LABEL[m]}`}
-                                    style={{ width: '100%', height: 96, objectFit: 'cover', display: 'block' }}
-                                  />
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.removePhotoButton}
-                                  aria-label={`Quitar foto ${MOMENTO_LABEL[m]} de ${campo.nombre}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleQuitarCampoPhoto(campo.id, m);
-                                  }}
-                                  disabled={loading}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => abrirAdjuntoCampo(campo.id, m)}
-                                disabled={loading}
-                                style={{
-                                  height: 28,
-                                  borderRadius: 8,
-                                  border: '1px solid var(--border)',
-                                  background: 'var(--surface)',
-                                  color: 'inherit',
-                                  fontWeight: 650,
-                                  fontSize: 12,
-                                  cursor: 'pointer',
-                                  fontFamily: 'inherit',
-                                }}
-                              >
-                                Adjuntar
-                              </button>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'grid', gap: 4 }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCaptureCampoPhoto(campo.id, m)}
-                                  disabled={loading}
-                                  style={{
-                                    height: 72,
-                                    borderRadius: 12,
-                                    border: '1px dashed color-mix(in srgb, #d97706 45%, var(--border))',
-                                    background: 'color-mix(in srgb, #d97706 6%, var(--surface))',
-                                    color: '#d97706',
-                                    fontWeight: 700,
-                                    fontSize: 13,
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit',
-                                  }}
-                                >
-                                  📷 Tomar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => abrirAdjuntoCampo(campo.id, m)}
-                                  disabled={loading}
-                                  style={{
-                                    height: 28,
-                                    borderRadius: 8,
-                                    border: '1px solid var(--border)',
-                                    background: 'var(--surface)',
-                                    color: 'inherit',
-                                    fontWeight: 650,
-                                    fontSize: 12,
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit',
-                                  }}
-                                >
+                              <>
+                                <div className={styles.campoFoto}>
+                                  {/* La miniatura es el botón «volver a tomar»: imagen a sangre, no cabe en Button. */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCaptureCampoPhoto(campo.id, m)}
+                                    disabled={loading}
+                                    title="Volver a tomar"
+                                    className={styles.campoFotoBtn}
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={getAssetUrl(foto.photoUrl)}
+                                      alt={`${campo.nombre} ${MOMENTO_LABEL[m]}`}
+                                      className={styles.campoFotoImg}
+                                    />
+                                  </button>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    icon
+                                    className={styles.removePhotoButton}
+                                    aria-label={`Quitar foto ${MOMENTO_LABEL[m]} de ${campo.nombre}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleQuitarCampoPhoto(campo.id, m);
+                                    }}
+                                    disabled={loading}
+                                  >
+                                    <IcoX />
+                                  </Button>
+                                </div>
+                                <Button size="sm" fullWidth onClick={() => abrirAdjuntoCampo(campo.id, m)} disabled={loading}>
                                   Adjuntar
-                                </button>
-                              </div>
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  fullWidth
+                                  className={styles.campoTomar}
+                                  onClick={() => handleCaptureCampoPhoto(campo.id, m)}
+                                  disabled={loading}
+                                  iconStart={<IcoCamara />}
+                                >
+                                  Tomar
+                                </Button>
+                                <Button size="sm" fullWidth onClick={() => abrirAdjuntoCampo(campo.id, m)} disabled={loading}>
+                                  Adjuntar
+                                </Button>
+                              </>
                             )}
                           </div>
                         );
@@ -2345,23 +2209,29 @@ const ActivityEvidenceFlow = () => {
                 );
               })}
               <div className={`${styles.actionGrid} ${styles.actionGridBottom}`}>
-                <button
-                  className={`${styles.actionButton} ${styles.actionSecondary}`}
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className={styles.tap}
                   onClick={() =>
                     setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
                   }
                   disabled={loading}
+                  iconStart={<IcoGirar />}
                 >
-                  🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
-                </button>
+                  {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
+                </Button>
                 {camposFaltan === 0 ? (
-                  <button
-                    className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className={styles.tap}
                     onClick={() => void handleSaveEvidencePhotos()}
-                    disabled={loading}
+                    loading={loading}
+                    iconEnd={<IcoFlecha />}
                   >
-                    {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
-                  </button>
+                    {loading ? 'Guardando...' : 'Siguiente Paso'}
+                  </Button>
                 ) : null}
               </div>
             </div>
@@ -2370,10 +2240,9 @@ const ActivityEvidenceFlow = () => {
           {!porCampos && isInventoryFlow && (
             <div className={styles.inventorySection}>
               <div className={styles.inventoryHeaderRow}>
-                <strong>Equipos de sucursal ({inventoryItems.length})</strong>
-                <button
-                  type="button"
-                  className="button-secondary"
+                <strong className={styles.campoName}>Equipos de sucursal ({inventoryItems.length})</strong>
+                <Button
+                  size="sm"
                   onClick={() =>
                     setInventoryItems((prev) => [
                       ...prev,
@@ -2404,14 +2273,13 @@ const ActivityEvidenceFlow = () => {
                   }
                 >
                   + Agregar equipo
-                </button>
+                </Button>
               </div>
 
               {inventoryItems.map((item, index) => (
                 <div key={`${item.equipmentName}-${index}`} className={styles.inventoryItemCard}>
                   <div className={styles.inventoryFieldsGrid}>
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Apartado"
                       value={item.sectionName}
                       onChange={(e) =>
@@ -2424,8 +2292,7 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Grupo (servidores, scanner, impresora...)"
                       value={item.groupName}
                       onChange={(e) =>
@@ -2438,8 +2305,7 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Nombre equipo"
                       value={item.equipmentName}
                       onChange={(e) =>
@@ -2452,8 +2318,7 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Serie ANTES"
                       value={item.serialBefore}
                       onChange={(e) =>
@@ -2470,8 +2335,7 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Modelo ANTES"
                       value={item.modelBefore}
                       onChange={(e) =>
@@ -2484,8 +2348,7 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Serie DESPUÉS"
                       value={item.serialAfter}
                       onChange={(e) =>
@@ -2502,8 +2365,7 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Modelo DESPUÉS"
                       value={item.modelAfter}
                       onChange={(e) =>
@@ -2516,8 +2378,7 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <input
-                      className="input"
+                    <Input
                       placeholder="¿Qué se le hizo al equipo?"
                       value={item.maintenanceActions}
                       onChange={(e) =>
@@ -2574,16 +2435,18 @@ const ActivityEvidenceFlow = () => {
                               setInventoryImageField(index, field, event.target.files?.[0])
                             }
                           />
-                          <button
-                            type="button"
-                            className="button-secondary"
+                          <Button
+                            size="sm"
+                            fullWidth
                             onClick={() => inventoryFileRefs.current[fileKey]?.click()}
+                            loading={inventoryUploadingKey === fileKey}
                           >
                             {inventoryUploadingKey === fileKey
                               ? 'Subiendo...'
                               : 'Cargar / arrastrar imagen'}
-                          </button>
+                          </Button>
                           {imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={getAssetUrl(imageUrl)}
                               alt={label}
@@ -2597,8 +2460,7 @@ const ActivityEvidenceFlow = () => {
                     })}
                   </div>
                   <div className={styles.inventoryFooterRow}>
-                    <input
-                      className="input"
+                    <Input
                       placeholder="Comentario técnico de mantenimiento"
                       value={item.maintenanceComments}
                       onChange={(e) =>
@@ -2615,9 +2477,8 @@ const ActivityEvidenceFlow = () => {
                         )
                       }
                     />
-                    <button
-                      type="button"
-                      className="button-secondary"
+                    <Button
+                      variant="danger-ghost"
                       onClick={() =>
                         setInventoryItems((prev) =>
                           prev.filter((_, itemIndex) => itemIndex !== index),
@@ -2625,13 +2486,12 @@ const ActivityEvidenceFlow = () => {
                       }
                     >
                       Eliminar
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
 
-              <textarea
-                className="input"
+              <Textarea
                 rows={2}
                 placeholder="Notas globales del inventario y mantenimiento"
                 value={inventoryNotes}
@@ -2658,7 +2518,6 @@ const ActivityEvidenceFlow = () => {
                       }
                     }}
                     title="Ver en grande"
-                    style={{ cursor: 'zoom-in' }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -2666,8 +2525,10 @@ const ActivityEvidenceFlow = () => {
                       alt={`evidencia ${idx + 1}`}
                       className={styles.evidencePhotoImg}
                     />
-                    <button
-                      type="button"
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon
                       className={styles.removePhotoButton}
                       aria-label={`Quitar evidencia ${idx + 1}`}
                       onClick={(event) => {
@@ -2675,8 +2536,8 @@ const ActivityEvidenceFlow = () => {
                         handleRemoveEvidencePhoto(idx);
                       }}
                     >
-                      ✕
-                    </button>
+                      <IcoX />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -2685,54 +2546,69 @@ const ActivityEvidenceFlow = () => {
 
           {!porCampos ? (
             <div className={`${styles.actionGrid} ${styles.actionGridBottom}`}>
-              <button
-                className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEvidence}`}
+              <Button
+                variant={
+                  (isInventoryFlow ? flowData.evidencePhotos.length >= 1 : flowData.evidencePhotos.length >= photoRequired)
+                    ? 'secondary'
+                    : 'primary'
+                }
+                size="lg"
+                className={styles.tap}
                 onClick={handleAddEvidencePhoto}
                 disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= photoRequired)}
+                iconStart={<IcoCamara />}
               >
-                {loading ? '⏳ Capturando...' : '📷 Tomar foto'}
-              </button>
-              <button
-                type="button"
-                className={`${styles.actionButton} ${styles.actionSecondary}`}
+                {loading ? 'Capturando...' : 'Tomar foto'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                className={styles.tap}
                 onClick={abrirAdjuntoLibre}
                 disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= photoRequired)}
+                iconStart={<IcoClip />}
               >
                 Adjuntar
-              </button>
-              <button
-                className={`${styles.actionButton} ${styles.actionSecondary}`}
+              </Button>
+              <Button
+                variant="tertiary"
+                size="lg"
+                className={styles.tap}
                 onClick={() =>
                   setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
                 }
                 disabled={loading}
+                iconStart={<IcoGirar />}
               >
-                🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
-              </button>
+                {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
+              </Button>
               {(isInventoryFlow
                 ? flowData.evidencePhotos.length >= 1
                 : flowData.evidencePhotos.length >= photoRequired) && (
-                <button
-                  className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className={styles.tap}
                   onClick={() => void handleSaveEvidencePhotos()}
-                  disabled={loading}
+                  loading={loading}
+                  iconEnd={<IcoFlecha />}
                 >
-                  {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
-                </button>
+                  {loading ? 'Guardando...' : 'Siguiente Paso'}
+                </Button>
               )}
             </div>
           ) : null}
           {/* El aviso de arriba queda fuera de vista con 4 fotos: se repite junto al botón. */}
           {error ? (
-            <div className={styles.alertError} role="alert" style={{ marginTop: 12 }}>
-              ❌ {error}
-            </div>
+            <Alert tone="danger" role="alert" srLabel="Error">
+              {error}
+            </Alert>
           ) : null}
           <input
             ref={adjuntoRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
-            style={{ display: 'none' }}
+            className={styles.hiddenInput}
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = '';
@@ -2752,82 +2628,49 @@ const ActivityEvidenceFlow = () => {
               aria-modal="true"
               aria-label={`Evidencia ${galleryLightbox + 1}`}
               onClick={() => setGalleryLightbox(null)}
-              style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 10000,
-                background: 'rgba(15, 23, 42, 0.72)',
-                display: 'grid',
-                placeItems: 'center',
-                padding: 16,
-              }}
+              className={styles.overlay}
             >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  width: '100%',
-                  maxWidth: 640,
-                  display: 'grid',
-                  gap: 12,
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 16,
-                  padding: 14,
-                }}
-              >
+              <div onClick={(e) => e.stopPropagation()} className={`${styles.dialog} ${styles.dialogXl}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={getAssetUrl(flowData.evidencePhotos[galleryLightbox])}
                   alt={`Evidencia ${galleryLightbox + 1}`}
-                  style={{
-                    width: '100%',
-                    maxHeight: '70vh',
-                    objectFit: 'contain',
-                    borderRadius: 12,
-                    background: '#000',
-                  }}
+                  className={`${styles.previewImg} ${styles.lightboxImg}`}
                 />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="button-secondary"
-                    onClick={() => setGalleryLightbox(null)}
-                    style={{ minHeight: 44, flex: '1 1 120px' }}
-                  >
-                    Cerrar
-                  </button>
-                  <button
-                    type="button"
-                    className="button-secondary"
+                <div className={styles.dialogActions}>
+                  {galleryLightbox > 0 ? (
+                    <Button
+                      size="lg"
+                      aria-label="Foto anterior"
+                      onClick={() => setGalleryLightbox((i) => (i != null ? i - 1 : i))}
+                    >
+                      ←
+                    </Button>
+                  ) : null}
+                  {galleryLightbox < flowData.evidencePhotos.length - 1 ? (
+                    <Button
+                      size="lg"
+                      aria-label="Foto siguiente"
+                      onClick={() => setGalleryLightbox((i) => (i != null ? i + 1 : i))}
+                    >
+                      →
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="danger-ghost"
+                    size="lg"
+                    className={styles.growSm}
                     onClick={() => {
                       const idx = galleryLightbox;
                       setGalleryLightbox(null);
                       handleRemoveEvidencePhoto(idx);
                     }}
-                    style={{ minHeight: 44, flex: '1 1 120px', color: 'var(--danger)' }}
                   >
                     Quitar foto
-                  </button>
-                  {galleryLightbox > 0 ? (
-                    <button
-                      type="button"
-                      className="button-secondary"
-                      onClick={() => setGalleryLightbox((i) => (i != null ? i - 1 : i))}
-                      style={{ minHeight: 44 }}
-                    >
-                      ←
-                    </button>
-                  ) : null}
-                  {galleryLightbox < flowData.evidencePhotos.length - 1 ? (
-                    <button
-                      type="button"
-                      className="button-secondary"
-                      onClick={() => setGalleryLightbox((i) => (i != null ? i + 1 : i))}
-                      style={{ minHeight: 44 }}
-                    >
-                      →
-                    </button>
-                  ) : null}
+                  </Button>
+                  <Button variant="secondary" size="lg" className={styles.growSm} onClick={() => setGalleryLightbox(null)}>
+                    Cerrar
+                  </Button>
                 </div>
               </div>
             </div>,
@@ -2838,7 +2681,12 @@ const ActivityEvidenceFlow = () => {
       {/* PASO 3: PDF (solo servicio) */}
       {flowData.step === 'SERVICE_SHEET_PDF' && needsServiceSheetPdf && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepPdf}`}>
-          <h3 className={styles.stepTitle}>📄 Paso: Hoja de Servicio (PDF)</h3>
+          <h3 className={styles.stepTitle}>
+            <span className={styles.stepIco}>
+              <IcoForm />
+            </span>
+            Paso: Hoja de Servicio (PDF)
+          </h3>
           <p className={styles.stepDescription}>
             Carga el PDF de la hoja de servicio con arrastrar y soltar o selección manual. Solo PDF.
           </p>
@@ -2853,14 +2701,7 @@ const ActivityEvidenceFlow = () => {
               setPdfDragging(false);
               handleServiceSheetPdfFile(event.dataTransfer.files?.[0]);
             }}
-            style={{
-              border: `2px dashed ${pdfDragging ? '#0f6ad6' : '#d1d5db'}`,
-              borderRadius: '8px',
-              padding: '12px',
-              marginBottom: '16px',
-              background: pdfDragging ? 'rgba(15, 106, 214, 0.08)' : 'transparent',
-              transition: 'all 0.2s ease',
-            }}
+            className={`${styles.pdfDropzone} ${pdfDragging ? styles.pdfDropzoneDragging : ''}`}
           >
             <input
               ref={(ref) => {
@@ -2870,73 +2711,38 @@ const ActivityEvidenceFlow = () => {
               accept="application/pdf"
               onChange={handleServiceSheetPdfUpload}
               disabled={loading}
-              style={{
-                position: 'absolute',
-                width: 0,
-                height: 0,
-                opacity: 0,
-                overflow: 'hidden',
-                pointerEvents: 'none',
-              }}
+              className={styles.pdfInputHidden}
             />
             <div
+              role="button"
+              tabIndex={loading ? -1 : 0}
+              aria-disabled={loading ? 'true' : undefined}
               onClick={() => {
                 const input = (window as any).pdfInputRef;
                 if (input && !loading) input.click();
               }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '16px',
-                padding: '24px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                borderRadius: '8px',
-                background:
-                  'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)',
-                opacity: loading ? 0.6 : 1,
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                const input = (window as any).pdfInputRef;
+                if (input && !loading) input.click();
               }}
-              onMouseEnter={(e) => {
-                if (!loading) {
-                  (e.currentTarget as any).style.background =
-                    'linear-gradient(135deg, rgba(249, 144, 0, 0.12) 0%, rgba(249, 144, 0, 0.08) 100%)';
-                  (e.currentTarget as any).style.transform = 'translateY(-2px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as any).style.background =
-                  'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)';
-                (e.currentTarget as any).style.transform = 'translateY(0)';
-              }}
+              className={styles.pdfInputLabel}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '12px',
-                  background: 'rgba(249, 144, 0, 0.15)',
-                  fontSize: '32px',
-                  flexShrink: 0,
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                📄
+              <div className={styles.pdfIconContainer}>
+                <IcoDoc />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>
-                  Seleccionar PDF
-                </div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>o arrastra aquí</div>
+              <div className={styles.pdfLabelText}>
+                <div className={styles.pdfLabelMain}>Seleccionar PDF</div>
+                <div className={styles.pdfLabelHint}>o arrastra aquí</div>
               </div>
             </div>
           </div>
           {flowData.serviceSheetPdfUrl && (
             <div className={styles.pdfPreviewCard}>
-              <div>✅ PDF cargado correctamente</div>
+              <Alert tone="success" dense>
+                PDF cargado correctamente
+              </Alert>
               {/* Mismo VisorPdf/pdf.js que EquipoEvidencias (CSP bloquea object/embed). Altura mayor. */}
               <VisorPdf url={flowData.serviceSheetPdfUrl} alto="700px" />
             </div>
@@ -2947,7 +2753,12 @@ const ActivityEvidenceFlow = () => {
       {/* PASO: Formulario digital por coreKind */}
       {flowData.step === 'SERVICE_SHEET_DATA' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepData}`}>
-          <h3 className={styles.stepTitle}>📝 Paso: Formulario</h3>
+          <h3 className={styles.stepTitle}>
+            <span className={styles.stepIco}>
+              <IcoForm />
+            </span>
+            Paso: Formulario
+          </h3>
           <p className={styles.stepDescription}>
             Completa los datos requeridos para esta actividad.
           </p>
@@ -2963,7 +2774,12 @@ const ActivityEvidenceFlow = () => {
       {/* PASO 5: Foto de Salida */}
       {flowData.step === 'EXIT_PHOTO' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepExit}`}>
-          <h3 className={styles.stepTitle}>🚪 {textos.cierre.paso}</h3>
+          <h3 className={styles.stepTitle}>
+            <span className={styles.stepIco}>
+              <IcoSalida />
+            </span>
+            {textos.cierre.paso}
+          </h3>
           <p className={styles.stepDescription}>{textos.cierre.descripcion}</p>
           {geocerca.estado?.exigeMismaUbicacion === true ? (
             <p className={styles.stepDescription}>
@@ -2973,55 +2789,61 @@ const ActivityEvidenceFlow = () => {
           ) : (
             <p className={styles.stepDescription}>{textos.cierre.sinMismoLugar}</p>
           )}
-          {zonaSalidaError && !pendingPhoto ? (
-            <div style={{ marginBottom: 12 }}>
-              <AvisoFueraDeZona mensaje={zonaSalidaError} />
-            </div>
-          ) : null}
+          {zonaSalidaError && !pendingPhoto ? <AvisoFueraDeZona mensaje={zonaSalidaError} /> : null}
           {flowData.exitLatitude != null && flowData.exitLongitude != null && (
-            <p className={styles.stepDescription}>
-              📍 Última ubicación registrada: {Number(flowData.exitLatitude).toFixed(5)},{' '}
+            <p className={styles.dialogMeta}>
+              <IcoPin /> Última ubicación registrada: {Number(flowData.exitLatitude).toFixed(5)},{' '}
               {Number(flowData.exitLongitude).toFixed(5)}
             </p>
           )}
           <div className={styles.actionGrid}>
-            <button
-              className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionExit}`}
+            <Button
+              variant="primary"
+              size="lg"
+              className={styles.tap}
               onClick={() => void handleExitPhoto()}
               disabled={loading}
+              loading={loading}
+              iconStart={<IcoCamara />}
             >
-              {loading ? '⏳ Capturando...' : `📷 ${textos.cierre.boton}`}
-            </button>
-            <button
-              className={`${styles.actionButton} ${styles.actionSecondary}`}
+              {loading ? 'Capturando...' : textos.cierre.boton}
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              className={styles.tap}
               onClick={() =>
                 setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
               }
               disabled={loading}
+              iconStart={<IcoGirar />}
             >
-              🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
-            </button>
+              {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
+            </Button>
             {flowData.allowAttach ? (
               <>
                 <input
                   ref={adjuntoSalidaRef}
                   type="file"
                   accept="image/*"
-                  style={{ display: 'none' }}
+                  className={styles.hiddenInput}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     e.target.value = '';
                     if (file) void attachEntryOrExitPhoto('exit', file);
                   }}
                 />
-                <button
-                  className={`${styles.actionButton} ${styles.actionSecondary}`}
+                <Button
+                  variant="tertiary"
+                  size="lg"
+                  className={styles.tap}
                   onClick={() => adjuntoSalidaRef.current?.click()}
                   disabled={loading}
                   title="Excepción puntual: adjunta una foto que ya tienes, en vez de tomarla ahora"
+                  iconStart={<IcoClip />}
                 >
-                  📎 Adjuntar (excepción)
-                </button>
+                  Adjuntar (excepción)
+                </Button>
               </>
             ) : null}
           </div>
@@ -3030,11 +2852,14 @@ const ActivityEvidenceFlow = () => {
 
       {/* COMPLETADO */}
       {flowData.step === 'COMPLETED' && (
-        <div className={styles.completedCard}>
+        <div className={styles.completedCard} data-locked={isFlowLocked ? 'true' : undefined}>
+          <span className={styles.completedIco} aria-hidden="true">
+            {isFlowLocked ? <IcoReloj /> : <IcoCheck />}
+          </span>
           <h2 className={styles.completedTitle}>
             {isFlowLocked
-              ? '⏳ Evidencias enviadas a revisión'
-              : '🎉 ¡Asignación Completada Exitosamente!'}
+              ? 'Evidencias enviadas a revisión'
+              : '¡Asignación Completada Exitosamente!'}
           </h2>
           <p className={styles.completedText}>
             {isFlowLocked
@@ -3042,16 +2867,19 @@ const ActivityEvidenceFlow = () => {
               : 'Todos los pasos han sido completados correctamente y se encuentran guardados en el sistema.'}
           </p>
           {!isFlowLocked && (
-            <button
-              className={styles.completedButton}
+            <Button
+              variant="secondary"
+              size="lg"
+              className={styles.tap}
               onClick={() => {
                 setFlowData(null);
                 setSelectedActivityId('');
                 setSuccessMsg(null);
               }}
+              iconStart={<IcoGirar />}
             >
-              ↻ Seleccionar Otra Actividad
-            </button>
+              Seleccionar Otra Actividad
+            </Button>
           )}
         </div>
       )}
@@ -3071,14 +2899,21 @@ const ProgressStep = ({
   completed: boolean;
   label: string;
 }) => (
-  <div className={styles.progressStep}>
-    <div
+  <li
+    className={`${styles.progressStep} ${active ? styles.progressStepActive : ''}`}
+    aria-current={active ? 'step' : undefined}
+  >
+    <span
       className={`${styles.progressCircle} ${active ? styles.progressCircleActive : ''} ${completed ? styles.progressCircleCompleted : ''}`}
+      aria-hidden="true"
     >
-      {completed ? '✓' : step}
-    </div>
-    <div className={styles.progressLabel}>{label}</div>
-  </div>
+      {completed ? <IcoCheck /> : step}
+    </span>
+    <span className={styles.progressLabel}>
+      {label}
+      <span className="ui-sr-only">{completed ? ', hecho' : active ? ', en curso' : ', pendiente'}</span>
+    </span>
+  </li>
 );
 
 // Formulario digital por coreKind (serviceSheetData JSON)
@@ -3129,58 +2964,42 @@ export const DigitalEvidenceForm = ({
     onSubmit(data);
   };
 
-  const inp: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 14px',
-    borderRadius: '8px',
-    border: '1.5px solid #d1d5db',
-    fontSize: '14px',
-    background: '#fff',
-    outline: 'none',
-    boxSizing: 'border-box',
-    marginBottom: '10px',
-  };
-  const lbl: React.CSSProperties = {
-    fontSize: '12px',
-    fontWeight: 600,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '4px',
-    display: 'block',
-  };
-
   return (
     <form onSubmit={handleSubmit} className={styles.serviceForm}>
       {fields.map(({ key, label }) => {
         const multiline = /que|observ|hiciste|hizo/i.test(key) || /observ/i.test(label);
         return (
-          <div key={key}>
-            <label style={lbl}>{label}</label>
+          <Field key={key} label={label} required>
             {multiline ? (
-              <textarea
-                style={{ ...inp, minHeight: '90px', resize: 'vertical' } as React.CSSProperties}
+              <Textarea
+                rows={4}
                 value={data[key] || ''}
                 onChange={(e) => setData((prev) => ({ ...prev, [key]: e.target.value }))}
                 required
                 disabled={loading}
               />
             ) : (
-              <input
+              <Input
                 type="text"
-                style={inp}
                 value={data[key] || ''}
                 onChange={(e) => setData((prev) => ({ ...prev, [key]: e.target.value }))}
                 required
                 disabled={loading}
               />
             )}
-          </div>
+          </Field>
         );
       })}
-      <button type="submit" className={`button-primary ${styles.serviceSubmit}`} disabled={loading}>
-        {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
-      </button>
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        className={`${styles.tap} ${styles.serviceSubmit}`}
+        loading={loading}
+        iconEnd={<IcoFlecha />}
+      >
+        {loading ? 'Guardando...' : 'Siguiente Paso'}
+      </Button>
     </form>
   );
 };
@@ -3339,44 +3158,13 @@ const SignaturePad = ({
   };
 
   return (
-    <div style={{ marginTop: '4px' }}>
-      <canvas
-        ref={canvasRef}
-        style={{
-          width: '100%',
-          height: '150px',
-          border: '1.5px dashed #9ca3af',
-          borderRadius: '10px',
-          background: '#f9fafb',
-          cursor: disabled ? 'not-allowed' : 'crosshair',
-          touchAction: 'none',
-          display: 'block',
-        }}
-      />
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '6px',
-        }}
-      >
-        <span style={{ fontSize: '12px', color: '#9ca3af' }}>✍️ Firmar con el dedo o el mouse</span>
-        <button
-          type="button"
-          onClick={clear}
-          disabled={disabled}
-          style={{
-            fontSize: '12px',
-            color: '#ef4444',
-            background: 'none',
-            border: 'none',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            padding: '2px 8px',
-          }}
-        >
-          🗑️ Limpiar
-        </button>
+    <div>
+      <canvas ref={canvasRef} className={styles.sigCanvas} data-disabled={disabled ? 'true' : undefined} />
+      <div className={styles.sigFoot}>
+        <span className={styles.sigHint}>Firmar con el dedo o el mouse</span>
+        <Button variant="danger-ghost" size="sm" onClick={clear} disabled={disabled}>
+          Limpiar
+        </Button>
       </div>
     </div>
   );
@@ -3424,185 +3212,150 @@ const ServiceSheetForm = ({
     onSubmit(data);
   };
 
-  const inp: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 14px',
-    borderRadius: '8px',
-    border: '1.5px solid #d1d5db',
-    fontSize: '14px',
-    background: '#fff',
-    outline: 'none',
-    boxSizing: 'border-box',
-    marginBottom: '10px',
-  };
-  const lbl: React.CSSProperties = {
-    fontSize: '12px',
-    fontWeight: 600,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '4px',
-    display: 'block',
-  };
-  const sec: React.CSSProperties = {
-    background: '#f8fafc',
-    border: '1px solid #e5e7eb',
-    borderRadius: '10px',
-    padding: '14px',
-    marginBottom: '14px',
-  };
-  const secTitle: React.CSSProperties = {
-    fontSize: '13px',
-    fontWeight: 700,
-    color: '#374151',
-    marginBottom: '12px',
-    paddingBottom: '6px',
-    borderBottom: '1px solid #e5e7eb',
-  };
-
   return (
     <form onSubmit={handleSubmit} className={styles.serviceForm}>
       {/* Datos del Servicio */}
-      <div style={sec}>
-        <div style={secTitle}>📋 Datos del Servicio</div>
-        <label style={lbl}>Nombre del Técnico</label>
-        <input
-          type="text"
-          style={inp}
-          placeholder="Nombre completo del técnico"
-          value={data.technicianName}
-          onChange={(e) => setData({ ...data, technicianName: e.target.value })}
-          required
-          disabled={loading}
-        />
-        <label style={lbl}>Fecha del Servicio</label>
-        <input
-          type="date"
-          style={inp}
-          value={data.serviceDate}
-          onChange={(e) => setData({ ...data, serviceDate: e.target.value })}
-          required
-          disabled={loading}
-        />
-      </div>
+      <section className={styles.sec}>
+        <h4 className={styles.secTitle}>Datos del Servicio</h4>
+        <Field label="Nombre del Técnico" required>
+          <Input
+            type="text"
+            placeholder="Nombre completo del técnico"
+            value={data.technicianName}
+            onChange={(e) => setData({ ...data, technicianName: e.target.value })}
+            required
+            disabled={loading}
+          />
+        </Field>
+        <Field label="Fecha del Servicio" required>
+          <DateInput
+            value={data.serviceDate}
+            onChange={(e) => setData({ ...data, serviceDate: e.target.value })}
+            required
+            disabled={loading}
+          />
+        </Field>
+      </section>
 
       {/* Datos del Cliente */}
-      <div style={sec}>
-        <div style={secTitle}>🏢 Datos del Cliente</div>
-        <label style={lbl}>Empresa / Organización</label>
-        <input
-          type="text"
-          style={inp}
-          placeholder="Nombre de la empresa o cliente"
-          value={data.clientCompany}
-          onChange={(e) => setData({ ...data, clientCompany: e.target.value })}
-          required
-          disabled={loading}
-        />
-        <label style={lbl}>Teléfono de Contacto</label>
-        <PhoneField
-          style={inp}
-          placeholder="Número de teléfono"
-          value={data.clientPhone}
-          onChange={(clientPhone) => setData({ ...data, clientPhone })}
-          disabled={loading}
-        />
-      </div>
+      <section className={styles.sec}>
+        <h4 className={styles.secTitle}>Datos del Cliente</h4>
+        <Field label="Empresa / Organización" required>
+          <Input
+            type="text"
+            placeholder="Nombre de la empresa o cliente"
+            value={data.clientCompany}
+            onChange={(e) => setData({ ...data, clientCompany: e.target.value })}
+            required
+            disabled={loading}
+          />
+        </Field>
+        <Field label="Teléfono de Contacto">
+          <PhoneField
+            placeholder="Número de teléfono"
+            value={data.clientPhone}
+            onChange={(clientPhone) => setData({ ...data, clientPhone })}
+            disabled={loading}
+          />
+        </Field>
+      </section>
 
       {/* Trabajo Realizado */}
-      <div style={sec}>
-        <div style={secTitle}>🔧 Trabajo Realizado</div>
-        <label style={lbl}>Resumen del trabajo realizado</label>
-        <textarea
-          style={{ ...inp, minHeight: '90px', resize: 'vertical' } as React.CSSProperties}
-          placeholder="Describe el trabajo realizado..."
-          value={data.workSummary}
-          onChange={(e) => setData({ ...data, workSummary: e.target.value })}
-          required
-          disabled={loading}
-        />
-        <label style={lbl}>Materiales / Equipos utilizados</label>
-        <textarea
-          style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
-          placeholder="Lista de materiales o equipos utilizados"
-          value={data.materialsUsed}
-          onChange={(e) => setData({ ...data, materialsUsed: e.target.value })}
-          disabled={loading}
-        />
-        <label style={lbl}>Horas trabajadas</label>
-        <input
-          type="number"
-          style={{ ...inp, width: '140px' }}
-          placeholder="ej. 4.5"
-          min="0"
-          step="0.5"
-          value={data.hoursWorked}
-          onChange={(e) => setData({ ...data, hoursWorked: e.target.value })}
-          disabled={loading}
-        />
-        <label style={lbl}>Observaciones</label>
-        <textarea
-          style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
-          placeholder="Observaciones adicionales"
-          value={data.observations}
-          onChange={(e) => setData({ ...data, observations: e.target.value })}
-          disabled={loading}
-        />
-      </div>
+      <section className={styles.sec}>
+        <h4 className={styles.secTitle}>Trabajo Realizado</h4>
+        <Field label="Resumen del trabajo realizado" required>
+          <Textarea
+            rows={4}
+            placeholder="Describe el trabajo realizado..."
+            value={data.workSummary}
+            onChange={(e) => setData({ ...data, workSummary: e.target.value })}
+            required
+            disabled={loading}
+          />
+        </Field>
+        <Field label="Materiales / Equipos utilizados">
+          <Textarea
+            rows={3}
+            placeholder="Lista de materiales o equipos utilizados"
+            value={data.materialsUsed}
+            onChange={(e) => setData({ ...data, materialsUsed: e.target.value })}
+            disabled={loading}
+          />
+        </Field>
+        <Field label="Horas trabajadas">
+          <Input
+            type="number"
+            wrapperClassName={styles.narrow}
+            className={styles.narrow}
+            placeholder="ej. 4.5"
+            min="0"
+            step="0.5"
+            value={data.hoursWorked}
+            onChange={(e) => setData({ ...data, hoursWorked: e.target.value })}
+            disabled={loading}
+          />
+        </Field>
+        <Field label="Observaciones">
+          <Textarea
+            rows={3}
+            placeholder="Observaciones adicionales"
+            value={data.observations}
+            onChange={(e) => setData({ ...data, observations: e.target.value })}
+            disabled={loading}
+          />
+        </Field>
+      </section>
 
       {/* Conformidad del Gerente */}
-      <div style={{ ...sec, borderColor: data.managerSignature ? '#10b981' : '#e5e7eb' }}>
-        <div style={{ ...secTitle, color: data.managerSignature ? '#059669' : '#374151' }}>
-          ✅ Conformidad del Gerente / Representante
+      <section className={`${styles.sec} ${data.managerSignature ? styles.secOk : ''}`}>
+        <h4 className={styles.secTitle}>Conformidad del Gerente / Representante</h4>
+        <Field label="Nombre del Gerente / Representante" required>
+          <Input
+            type="text"
+            placeholder="Nombre completo"
+            value={data.managerName}
+            onChange={(e) => setData({ ...data, managerName: e.target.value })}
+            required
+            disabled={loading}
+          />
+        </Field>
+        <Field label="Cargo" required>
+          <Input
+            type="text"
+            placeholder="Cargo del gerente o representante"
+            value={data.managerRole}
+            onChange={(e) => setData({ ...data, managerRole: e.target.value })}
+            required
+            disabled={loading}
+          />
+        </Field>
+        <div>
+          <span className={styles.momentoLabel}>
+            Firma Digital <span aria-hidden="true">*</span>
+          </span>
+          {data.managerSignature ? (
+            <Alert tone="success" dense>
+              Firma capturada correctamente
+            </Alert>
+          ) : null}
+          <SignaturePad
+            onSignature={(sig) => setData((prev) => ({ ...prev, managerSignature: sig }))}
+            disabled={loading}
+            initialValue={initialData?.managerSignature}
+          />
         </div>
-        <label style={lbl}>Nombre del Gerente / Representante</label>
-        <input
-          type="text"
-          style={inp}
-          placeholder="Nombre completo"
-          value={data.managerName}
-          onChange={(e) => setData({ ...data, managerName: e.target.value })}
-          required
-          disabled={loading}
-        />
-        <label style={lbl}>Cargo</label>
-        <input
-          type="text"
-          style={inp}
-          placeholder="Cargo del gerente o representante"
-          value={data.managerRole}
-          onChange={(e) => setData({ ...data, managerRole: e.target.value })}
-          required
-          disabled={loading}
-        />
-        <label style={{ ...lbl, marginTop: '4px' }}>
-          Firma Digital <span style={{ color: '#ef4444' }}>*</span>
-        </label>
-        {data.managerSignature && (
-          <div
-            style={{
-              marginBottom: '8px',
-              padding: '6px',
-              background: '#ecfdf5',
-              borderRadius: '6px',
-              border: '1px solid #a7f3d0',
-              fontSize: '12px',
-              color: '#059669',
-            }}
-          >
-            ✓ Firma capturada correctamente
-          </div>
-        )}
-        <SignaturePad
-          onSignature={(sig) => setData((prev) => ({ ...prev, managerSignature: sig }))}
-          disabled={loading}
-          initialValue={initialData?.managerSignature}
-        />
-      </div>
+      </section>
 
-      <button type="submit" className={`button-primary ${styles.serviceSubmit}`} disabled={loading}>
-        {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
-      </button>
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        className={`${styles.tap} ${styles.serviceSubmit}`}
+        loading={loading}
+        iconEnd={<IcoFlecha />}
+      >
+        {loading ? 'Guardando...' : 'Siguiente Paso'}
+      </Button>
     </form>
   );
 };

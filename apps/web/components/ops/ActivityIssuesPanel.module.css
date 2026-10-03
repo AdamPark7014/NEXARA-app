@@ -1,0 +1,140 @@
+/* Incidencias y recomendaciones de un servicio (v2). Solo tokens --ui-*. */
+
+.panel {
+  display: grid;
+  gap: var(--ui-s5);
+  min-width: 0;
+}
+
+.bloque {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.bloqueSep {
+  padding-top: var(--ui-s4);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.cuantas {
+  font-weight: var(--ui-fw-medium);
+  color: var(--ui-fg-3);
+}
+
+.ayuda {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.alta {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.altaPie {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lista {
+  display: grid;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s3);
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  min-width: 0;
+}
+
+.item[data-tono="warning"] {
+  border-left-color: var(--ui-warning);
+}
+
+.item[data-tono="danger"] {
+  border-left-color: var(--ui-danger);
+}
+
+.item[data-tono="info"] {
+  border-left-color: var(--ui-info);
+}
+
+.item[data-tono="resuelta"] {
+  border-left-color: var(--ui-success);
+  background: var(--ui-surface-2);
+}
+
+.itemTexto {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.itemT {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.itemD {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.itemA {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.itemM {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 640px) {
+  .item {
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,309 @@
+/* Ubicación de la actividad (geocerca) y justificación de salidas de zona (v2). Solo tokens --ui-*. */
+
+.caja {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+  text-align: left;
+  min-width: 0;
+}
+
+.caja[data-alerta="true"] {
+  border-color: var(--ui-danger-border);
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.cabezaTexto {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.sub {
+  margin: 2px 0 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.4;
+  color: var(--ui-fg-2);
+}
+
+.muted {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-danger-text);
+}
+
+.enlace {
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-brand-text);
+}
+
+.peligro {
+  color: var(--ui-danger-text);
+}
+
+.inicio:is(button) {
+  justify-self: start;
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--ui-s2);
+  margin: 0;
+}
+
+.dato {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.datoE {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+
+.datoV {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.datoV[data-tono="ok"] {
+  color: var(--ui-success-text);
+}
+
+.datoV[data-tono="mal"] {
+  color: var(--ui-danger-text);
+}
+
+.datoD {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.grupo {
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.grupoT {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-fg);
+}
+
+.lista {
+  display: grid;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pendiente {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-danger-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-danger-bg);
+}
+
+.pendienteTexto {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.pendienteT {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.pendienteM {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.justificada {
+  padding: 8px 12px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface-2);
+  font-size: var(--ui-fs-meta);
+  line-height: 1.45;
+  color: var(--ui-fg);
+}
+
+.seguimiento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.lecturas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lectura {
+  padding: 6px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  font-size: var(--ui-fs-meta);
+  white-space: nowrap;
+  color: var(--ui-fg);
+}
+
+.lectura[data-fuera="true"] {
+  border-color: var(--ui-danger-border);
+  background: var(--ui-danger-bg);
+}
+
+.lectura[data-fuera="true"] strong {
+  color: var(--ui-danger-text);
+}
+
+/* ─── Diálogo de justificación ─────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--ui-s4);
+  background: var(--ui-scrim);
+}
+
+.dialogo {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  box-shadow: var(--ui-elev-3);
+  text-align: left;
+}
+
+.dialogoCabeza {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+}
+
+.dialogoT {
+  margin: 0;
+  font-size: var(--ui-text-xl);
+  font-weight: var(--ui-fw-bold);
+}
+
+.dialogoD {
+  margin: 2px 0 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.campo {
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.req {
+  color: var(--ui-danger);
+}
+
+/* Ocultos sin display:none (Safari de iPhone no abre el selector de un input así). */
+.inputOculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fotoFila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.foto {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+}
+
+.fotoAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.crece {
+  flex: 1 1 150px;
+}
+
+.dialogoPie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+@media (max-width: 640px) {
+  .dialogoPie > * {
+    flex: 1 1 auto;
+  }
+}

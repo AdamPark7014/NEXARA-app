@@ -1,0 +1,71 @@
+/* Pestaña Detalle de la ficha de actividad (v2). Solo tokens --ui-*. */
+
+.lista {
+  margin: var(--ui-s1) 0 0;
+  padding-left: var(--ui-s5);
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+}
+
+.galeriaFin {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 180px;
+}
+
+.galeriaFin > :first-child {
+  flex: 1 1 auto;
+}
+
+.edicion {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.prioridad {
+  min-width: 0;
+}
+
+.edicionPie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.textos {
+  display: grid;
+  gap: var(--ui-s4);
+}
+
+.textoT {
+  margin: 0 0 var(--ui-s1);
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  line-height: 1.55;
+  color: var(--ui-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .galeriaFin {
+    min-width: 0;
+    width: 100%;
+  }
+  .edicionPie > * {
+    flex: 1 1 auto;
+  }
+}

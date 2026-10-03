@@ -1,10 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
-import Link from "next/link";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import Button from "@/components/ui/Button";
-import Section from "@/components/ui/Section";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import Modal from "@/components/ui/Modal";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  DateInput,
+  EmptyState,
+  Field,
+  FieldGrid,
+  FormFooter,
+  FormPage,
+  FormSection,
+  Input,
+  Select,
+  SkeletonRows,
+  Textarea,
+  type PendingItem,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import EvidenciaCamposEditor from "@/components/ops/EvidenciaCamposEditor";
 import HerramientasChecklistEditor from "@/components/ops/HerramientasChecklistEditor";
@@ -69,6 +84,7 @@ import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
 import { aInputFecha, hoyISO } from "@/lib/proyecto-plan";
 import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-periodo";
 import coreCss from "./OpsActivityFormCore.module.css";
+import s from "./OpsActivityForm.module.css";
 
 type Props = {
   activityId?: number;
@@ -104,20 +120,6 @@ type Props = {
   onCancel?: () => void;
 };
 
-const gridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 12,
-};
-
-/** Etiqueta visible arriba del campo (tono Core). */
-const coreLabelStyle: CSSProperties = {
-  display: "grid",
-  gap: 6,
-  fontSize: 13,
-  fontWeight: 650,
-  color: "var(--text-secondary)",
-};
 
 export default function OpsActivityForm({
   activityId,
@@ -189,6 +191,8 @@ export default function OpsActivityForm({
   const [creandoProyecto, setCreandoProyecto] = useState(false);
 
   const [tareaOtroOpen, setTareaOtroOpen] = useState(false);
+  /** Ya intentó guardar: desde ahí cada campo que falta dice por qué bajo el control. */
+  const [intentado, setIntentado] = useState(false);
 
   // Periodo: en una actividad de proyecto se propone la etapa que corre (o la ventana del
   // proyecto) para no tener que cargarla cada día. Mientras nadie toque las fechas, cambiar
@@ -774,93 +778,182 @@ export default function OpsActivityForm({
 
   if (!canAssign) {
     return (
-      <Section
+      <EmptyState
+        tone="warning"
         title="Sin permisos"
-        subtitle={tone === "core" ? "No puedes asignar actividades." : "No tienes permiso para crear o asignar OT."}
-      >
-        <Link href={tone === "core" ? "/erp/pizarra" : "/ops/activities"}>← Volver</Link>
-      </Section>
+        description={tone === "core" ? "No puedes asignar actividades." : "No tienes permiso para crear o asignar OT."}
+        action={
+          <ButtonLink href={tone === "core" ? "/erp/pizarra" : "/ops/activities"} variant="secondary">
+            ← Volver
+          </ButtonLink>
+        }
+      />
     );
   }
 
   if (loading) {
     return (
-      <Section
-        title={tone === "core" ? "Cargando…" : "Cargando OT…"}
-        subtitle="Preparando formulario."
-      >
-        <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Un momento…</p>
-      </Section>
+      <div className={s.cargando} aria-busy="true">
+        <p className={s.cargandoT}>{tone === "core" ? "Cargando…" : "Cargando OT…"}</p>
+        <SkeletonRows rows={6} label="Preparando formulario." />
+      </div>
     );
   }
 
   const isCore = tone === "core";
+  const reintentoPendiente = Boolean(camposPendiente || herramientasPendiente);
+
+  /* Lo que falta, con las mismas reglas que `handleSubmit` (las enseña; no las sustituye). */
+  const tituloOk = Boolean(form.titulo.trim());
+  const responsableOk = Boolean(form.responsableId);
+  const tipoTareaOk =
+    !isTareaCore || (Boolean(tareaTipo) && (tareaTipo !== "otro" || Boolean(form.ticketTypeCustom.trim())));
+  const proyectoOk = form.projectMode !== "with_project" || Boolean(form.projectId);
+  const pideClienteServicio = coreKind === "servicio" && form.projectMode !== "with_project";
+  const clienteServicioOk = !pideClienteServicio || Boolean(form.clientId);
+  const agendaOk = !requireSchedule || (Boolean(form.fecha) && Boolean(form.hora));
+  const periodoMal = Boolean(form.periodoFin && form.fecha && form.periodoFin < form.fecha);
+  const periodoOk = !form.periodoFin || (Boolean(form.fecha) && !periodoMal);
+  const conCampos = puedeDefinirCampos && campos.length > 0;
+  const conHerramientas = puedeDefinirCampos && herramientas.length > 0;
+  const camposOk = !conCampos || !hayErrores(erroresCampos);
+  const herramientasOk = !conHerramientas || !hayErroresRequisitos(erroresHerramientas);
+
+  const pendientes: PendingItem[] = [
+    { id: "titulo", label: isCore ? "Qué hay que hacer" : "Título", done: tituloOk, error: intentado && !tituloOk, fieldId: "oaf-titulo" },
+  ];
+  if (isTareaCore) {
+    pendientes.push({ id: "tipo", label: "Tipo de tarea", done: tipoTareaOk, error: intentado && !tipoTareaOk, fieldId: "oaf-tipo-tarea" });
+  }
+  if (form.projectMode === "with_project") {
+    pendientes.push({ id: "proyecto", label: "Proyecto", done: proyectoOk, error: intentado && !proyectoOk, fieldId: "oaf-proyecto" });
+  }
+  if (pideClienteServicio) {
+    pendientes.push({ id: "cliente", label: "Cliente corporativo", done: clienteServicioOk, error: intentado && !clienteServicioOk, fieldId: "oaf-donde" });
+  }
+  if (!hideResponsableSelect || !responsableOk) {
+    pendientes.push({
+      id: "responsable",
+      label: "Responsable",
+      done: responsableOk,
+      error: intentado && !responsableOk,
+      fieldId: hideResponsableSelect ? undefined : "oaf-responsable",
+    });
+  }
+  if (requireSchedule) {
+    pendientes.push({ id: "agenda", label: "Día y hora", done: agendaOk, error: intentado && !agendaOk, fieldId: "oaf-dia" });
+  }
+  if (form.periodoFin) {
+    pendientes.push({ id: "periodo", label: "Periodo válido", done: periodoOk, error: periodoMal || (intentado && !periodoOk), fieldId: "oaf-al" });
+  }
+  if (conCampos) {
+    pendientes.push({ id: "campos", label: "Qué hay que fotografiar", done: camposOk, error: camposIntentado && !camposOk, fieldId: "oaf-campos" });
+  }
+  if (conHerramientas) {
+    pendientes.push({
+      id: "herramientas",
+      label: "Herramientas a llevar",
+      done: herramientasOk,
+      error: herramientasIntentado && !herramientasOk,
+      fieldId: "oaf-herramientas",
+    });
+  }
+
+  const hayDonde = form.projectMode === "with_project" || needsClientPicker || Boolean(pendingRequestId);
+  const textoSinProyecto =
+    tone === "core"
+      ? needsClientPicker
+        ? "Elige el cliente de este padrón."
+        : "Trabajo del día sin proyecto."
+      : "Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo.";
+  let paso = 0;
+  const siguiente = () => ++paso;
+
+  const guardar = () => {
+    setIntentado(true);
+    void handleSubmit();
+  };
+
+  const titulo = isEdit
+    ? isCore
+      ? "Editar actividad"
+      : `Editar OT #${activityId}`
+    : isCore
+      ? "Datos de la actividad"
+      : "Nueva orden de trabajo";
+  const subtitulo = isCore
+    ? form.projectMode === "with_project"
+      ? "Elige proyecto, prioridad y agenda. El cliente sale del proyecto."
+      : "Qué hay que hacer, qué tan urgente es y para cuándo."
+    : form.projectMode === "with_project"
+      ? "OT con proyecto operativo: el cliente sale del proyecto."
+      : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto.";
+
+  const duracion = (cual: "tiempoEstimadoMin" | "tiempoMaximoMin") => ({
+    horas: splitMinutes(Number(form[cual]) || 0).horas,
+    minutos: splitMinutes(Number(form[cual]) || 0).minutos,
+    onChange: ({ horas, minutos }: { horas: number; minutos: number }) =>
+      setForm({ ...form, [cual]: String(joinMinutes(horas, minutos) || "") }),
+  });
 
   return (
-    <div className={isCore ? coreCss.core : undefined}>
-    <Section
-      title={
-        isEdit
-          ? isCore
-            ? "Editar actividad"
-            : `Editar OT #${activityId}`
-          : isCore
-            ? "Datos de la actividad"
-            : "Nueva orden de trabajo"
-      }
-      subtitle={
-        isCore
-          ? form.projectMode === "with_project"
-            ? "Elige proyecto, prioridad y agenda. El cliente sale del proyecto."
-            : "Qué hay que hacer, qué tan urgente es y para cuándo."
-          : form.projectMode === "with_project"
-            ? "OT con proyecto operativo: el cliente sale del proyecto."
-            : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto."
-      }
-      actions={
-        !isEdit && !isCore ? (
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            AN sugerido: {nextAn || (nextAnLoaded ? "No disponible" : "Calculando…")}
-          </span>
-        ) : null
-      }
-    >
-      {showOtroModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "var(--surface)",
-              color: "var(--text-primary, inherit)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              padding: "24px 28px",
-              width: "min(420px, calc(100vw - 32px))",
-              boxSizing: "border-box",
-            }}
+    <div className={[s.wrap, isCore ? coreCss.core : ""].filter(Boolean).join(" ")}>
+      <FormPage
+        title={titulo}
+        head={
+          <header className={s.cabeza}>
+            <div>
+              <h2 className={s.cabezaT}>{titulo}</h2>
+              <p className={s.cabezaD}>
+                {subtitulo} Los campos con <b className={s.req}>*</b> son obligatorios.
+              </p>
+            </div>
+            {!isEdit && !isCore ? (
+              <Badge tone="outline">AN sugerido: {nextAn || (nextAnLoaded ? "No disponible" : "Calculando…")}</Badge>
+            ) : null}
+          </header>
+        }
+        pending={pendientes}
+        pendingTitle={isEdit ? "Antes de guardar" : "Antes de crear"}
+        footer={
+          <FormFooter
+            start={
+              error ? (
+                <span role="alert" className={s.statusError}>
+                  {error}
+                </span>
+              ) : success ? (
+                <span role="status" className={s.statusOk}>
+                  {success}
+                </span>
+              ) : null
+            }
           >
-            <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700 }}>Tipo personalizado</h3>
-            <input
-              className="input"
-              autoFocus
-              placeholder="Ej: Auditoría de red…"
-              value={otroInput}
-              onChange={(e) => setOtroInput(e.target.value)}
-              style={{ width: "100%", marginBottom: 16 }}
-            />
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <Button variant="secondary" size="sm" onClick={() => setShowOtroModal(false)}>Cancelar</Button>
+            {onCancel && !reintentoPendiente ? (
+              <Button variant="tertiary" size={isCore ? "lg" : "md"} onClick={onCancel}>
+                Cancelar
+              </Button>
+            ) : null}
+            {!reintentoPendiente ? (
+              <Button variant="primary" size={isCore ? "lg" : "md"} onClick={guardar} loading={saving}>
+                {saving ? "Guardando…" : activitySubmitLabel(form, isEdit, tone)}
+              </Button>
+            ) : null}
+          </FormFooter>
+        }
+      >
+        <Modal
+          open={showOtroModal}
+          onClose={() => setShowOtroModal(false)}
+          title="Tipo personalizado"
+          size="sm"
+          footer={
+            <>
+              <Button variant="tertiary" onClick={() => setShowOtroModal(false)}>
+                Cancelar
+              </Button>
               <Button
-                size="sm"
+                variant="primary"
                 disabled={!otroInput.trim()}
                 onClick={() => {
                   setForm({ ...form, ticketTypeCustom: otroInput.trim() });
@@ -869,217 +962,82 @@ export default function OpsActivityForm({
               >
                 Confirmar
               </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!(hideProjectModePicker || forcedProjectMode) && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 10,
-            marginBottom: 16,
-          }}
+            </>
+          }
         >
-          {(
-            [
-              {
-                mode: "with_project" as ActivityProjectMode,
-                title: "Proyecto",
-                help: "Actividad ligada a un proyecto; el cliente sale del proyecto.",
-              },
-              {
-                mode: "without_project" as ActivityProjectMode,
-                title: "Tarea",
-                help: "Tarea del día sin proyecto ni cliente de servicio.",
-              },
-            ] as const
-          ).map((opt) => {
-            const selected = form.projectMode === opt.mode;
-            return (
-              <button
-                key={opt.mode}
-                type="button"
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    projectMode: opt.mode,
-                    projectId: opt.mode === "without_project" ? "" : prev.projectId,
-                    clientId: opt.mode === "without_project" ? "" : prev.clientId,
-                  }))
-                }
-                style={{
-                  textAlign: "left",
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  border: selected ? "2px solid var(--primary)" : "1px solid var(--border)",
-                  background: selected ? "color-mix(in srgb, var(--primary) 8%, var(--surface))" : "var(--surface)",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{opt.title}</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.35 }}>{opt.help}</div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+          <Field label="Tipo">
+            <Input
+              autoFocus
+              placeholder="Ej: Auditoría de red…"
+              value={otroInput}
+              onChange={(e) => setOtroInput(e.target.value)}
+            />
+          </Field>
+        </Modal>
 
-      <div style={gridStyle}>
-        {!isEdit && !isCore && (
-          <input
-            className="input"
-            placeholder="AN (automático)"
-            value={nextAn || (nextAnLoaded ? "No disponible" : "Calculando…")}
-            disabled
-          />
-        )}
-        {isCore ? (
-          <label style={{ ...coreLabelStyle, gridColumn: "1 / -1" }}>
-            ¿Qué hay que hacer? *
-            <input
-              className="input"
-              placeholder="Ej. Revisar cámaras de la entrada principal"
-              value={form.titulo}
-              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              style={{ fontWeight: 400 }}
-            />
-          </label>
-        ) : (
-          <input
-            className="input"
-            placeholder="Título de la OT"
-            value={form.titulo}
-            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-          />
-        )}
-        {form.projectMode === "with_project" ? (
-          <>
-            <select
-              className="input"
-              value={form.projectId}
-              onChange={(e) => {
-                const projectId = e.target.value;
-                const project = activeProjects.find((p) => String(p.id) === projectId);
-                setForm({
-                  ...form,
-                  projectId,
-                  clientId: project ? String(project.client.id) : "",
-                  // La etapa es de otro proyecto: se vuelve a proponer con el nuevo.
-                  projectMilestoneId: "",
-                });
-              }}
-            >
-              <option value="">Seleccionar proyecto…</option>
-              {activeProjects
-                .filter((p) => !form.clientId || String(p.client.id) === form.clientId)
-                .map((project) => (
-                  <option key={project.id} value={project.id}>{project.title}</option>
-                ))}
-            </select>
-            <input
-              className="input"
-              placeholder="Cliente (automático)"
-              value={activeProjects.find((p) => String(p.id) === form.projectId)?.client.name ?? ""}
-              disabled
-            />
-            <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setAltaProyectoAbierta((v) => !v)}
-                style={{
-                  justifySelf: "start",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  color: "var(--primary)",
-                  fontWeight: 650,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  fontSize: 13,
-                }}
-              >
-                {altaProyectoAbierta ? "Cerrar alta de proyecto" : "¿No está el proyecto? Créalo aquí"}
-              </button>
-              {altaProyectoAbierta ? (
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 10,
-                    padding: 12,
-                    borderRadius: 10,
-                    border: "1px solid var(--border)",
-                    background: "var(--surface)",
-                  }}
-                >
-                  <label style={coreLabelStyle}>
-                    Nombre del proyecto *
-                    <input
-                      className="input"
-                      value={nombreProyecto}
-                      maxLength={200}
-                      placeholder="Ej. Cámaras sucursal norte"
-                      onChange={(e) => setNombreProyecto(e.target.value)}
-                      style={{ fontWeight: 400 }}
-                    />
-                  </label>
-                  <div style={{ fontSize: 13, fontWeight: 650, color: "var(--text-secondary)" }}>Cliente *</div>
-                  <ClienteTipoPicker
-                    token={token}
-                    tipo="PROYECTO"
-                    salesClientId={salesProyectoId}
-                    editable={!creandoProyecto}
-                    puedeCrear
-                    puedeEditar={puedeClienteProyecto}
-                    altaSoloNombre={!puedeClienteProyecto}
-                    clientes={clientesProyecto}
-                    onCreado={(creado) => {
-                      setClientesProyecto((prev) =>
-                        [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) =>
-                          a.name.localeCompare(b.name, "es"),
-                        ),
-                      );
-                      setSalesProyectoId(creado.id);
-                    }}
-                    onSelect={(c) => setSalesProyectoId(c.id)}
-                  />
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    disabled={creandoProyecto || nombreProyecto.trim().length < 3 || !salesProyectoId}
-                    onClick={() => void crearProyectoRapido()}
-                  >
-                    {creandoProyecto ? "Creando…" : "Crear y usar este proyecto"}
-                  </Button>
-                  <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
-                    Fechas, alcance y equipo se completan después en Proyectos.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-              {tone === "core"
-                ? needsClientPicker
-                  ? "Elige el cliente de este padrón."
-                  : "Trabajo del día sin proyecto."
-                : "Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo."}
-            </div>
+        {/* 1 · Qué se va a hacer */}
+        <FormSection
+          step={siguiente()}
+          done={tituloOk && tipoTareaOk}
+          title="¿Qué se va a hacer?"
+          description={hayDonde ? "El tipo y el título son lo primero que ve quien la ejecuta." : textoSinProyecto}
+        >
+          <div className={s.cuerpo}>
+            {!(hideProjectModePicker || forcedProjectMode) && (
+              <div className={s.opciones} role="group" aria-label="Con o sin proyecto">
+                {(
+                  [
+                    {
+                      mode: "with_project" as ActivityProjectMode,
+                      title: "Proyecto",
+                      help: "Actividad ligada a un proyecto; el cliente sale del proyecto.",
+                    },
+                    {
+                      mode: "without_project" as ActivityProjectMode,
+                      title: "Tarea",
+                      help: "Tarea del día sin proyecto ni cliente de servicio.",
+                    },
+                  ] as const
+                ).map((opt) => {
+                  const selected = form.projectMode === opt.mode;
+                  return (
+                    <Button
+                      key={opt.mode}
+                      className={s.opcion}
+                      aria-pressed={selected}
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          projectMode: opt.mode,
+                          projectId: opt.mode === "without_project" ? "" : prev.projectId,
+                          clientId: opt.mode === "without_project" ? "" : prev.clientId,
+                        }))
+                      }
+                    >
+                      <span className={s.opcionT}>{opt.title}</span>
+                      <span className={s.opcionD}>{opt.help}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+
             {isTareaCore ? (
-              <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 650 }}>Tipo de tarea *</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {TAREA_TIPOS.map((t) => {
+              <div className={s.grupo}>
+                <span className={s.etiqueta}>
+                  Tipo de tarea <b className={s.req}>*</b>
+                </span>
+                <div className={s.chips} role="group" aria-label="Tipo de tarea">
+                  {TAREA_TIPOS.map((t, i) => {
                     const on = tareaTipo === t.id;
                     return (
-                      <button
+                      <Button
                         key={t.id}
-                        type="button"
+                        id={i === 0 ? "oaf-tipo-tarea" : undefined}
+                        size="sm"
+                        className={s.chip}
+                        aria-pressed={on}
+                        iconStart={<ActivityKindIcon kind={t.icon} size={18} />}
                         onClick={() => {
                           const isOtro = t.id === "otro";
                           setTareaOtroOpen(isOtro);
@@ -1094,599 +1052,581 @@ export default function OpsActivityForm({
                             workType: "ISSUE",
                           }));
                         }}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "7px 12px",
-                          borderRadius: 999,
-                          border: on ? "1.5px solid var(--primary)" : "1px solid var(--border)",
-                          background: on
-                            ? "color-mix(in srgb, var(--primary) 12%, var(--surface))"
-                            : "var(--surface)",
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          color: "inherit",
-                          fontSize: 12.5,
-                          fontWeight: on ? 750 : 600,
-                        }}
                       >
-                        <ActivityKindIcon kind={t.icon} size={18} />
                         {t.label}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
+                {intentado && isTareaCore && !tareaTipo ? (
+                  <span className={s.errorCampo} role="alert">
+                    Elige el tipo de tarea
+                  </span>
+                ) : null}
                 {tareaTipo === "otro" ? (
-                  <input
-                    className="input"
-                    autoFocus
-                    maxLength={120}
-                    placeholder="Especifica el tipo (ej. Visita a proveedor)"
-                    value={form.ticketTypeCustom}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, ticketType: "OTRO", ticketTypeCustom: e.target.value }))
-                    }
-                  />
+                  <Field
+                    label="¿Qué tipo de tarea es?"
+                    required
+                    error={intentado && !form.ticketTypeCustom.trim() ? "Especifica el tipo de tarea" : null}
+                  >
+                    <Input
+                      autoFocus
+                      maxLength={120}
+                      placeholder="Especifica el tipo (ej. Visita a proveedor)"
+                      value={form.ticketTypeCustom}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, ticketType: "OTRO", ticketTypeCustom: e.target.value }))
+                      }
+                    />
+                  </Field>
                 ) : null}
               </div>
             ) : null}
-            {needsClientPicker && coreKind === "servicio" ? (
-              <ClienteTipoPicker
-                token={token}
-                tipo="CORPORATIVO"
-                salesClientId={salesServicioId}
-                editable
-                puedeCrear
-                puedeEditar={permisosCliente.puedeEditar}
-                altaCorporativa
-                clientes={clientesCorporativos}
-                onCreado={(creado) => {
-                  setClientesCorporativos((prev) =>
-                    [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) => a.name.localeCompare(b.name, "es")),
-                  );
-                  setSalesServicioId(creado.id);
-                  void (async () => {
-                    if (!token) return;
-                    let serviceId = creado.serviceClientId ?? null;
-                    if (!serviceId) {
-                      try {
-                        const activado = await provisionSalesServiceClient(token, creado.id);
-                        serviceId = activado.serviceClient.id;
-                      } catch (e) {
-                        setError(apiErrorMessage(e, "El cliente se creó, pero no quedó listo para la actividad"));
-                        return;
-                      }
-                    }
-                    setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
-                  })();
-                }}
-                onSelect={async (c) => {
-                  setSalesServicioId(c.id);
-                  if (!token) return;
-                  try {
-                    let serviceId = c.serviceClientId ?? null;
-                    if (!serviceId) {
-                      const activado = await provisionSalesServiceClient(token, c.id);
-                      serviceId = activado.serviceClient.id;
-                      setClientesCorporativos((prev) =>
-                        prev.map((row) => (row.id === c.id ? { ...row, serviceClientId: serviceId } : row)),
-                      );
-                    }
-                    setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
-                  } catch (e) {
-                    setError(apiErrorMessage(e, "No se pudo usar ese cliente en la actividad"));
-                  }
-                }}
-              />
-            ) : needsClientPicker ? (
-              <select
-                className="input"
-                value={form.clientId}
-                onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+
+            <FieldGrid>
+              {!isEdit && !isCore ? (
+                <Field label="AN">
+                  <Input placeholder="AN (automático)" value={nextAn || (nextAnLoaded ? "No disponible" : "Calculando…")} disabled />
+                </Field>
+              ) : null}
+              <Field
+                label={isCore ? "Título" : "Título de la OT"}
                 required
+                fullWidth={isCore || isEdit}
+                hint="Lo que verá quien la ejecute en su lista."
+                error={intentado && !tituloOk ? "Escribe qué hay que hacer." : null}
               >
-                <option value="">Seleccionar cliente…</option>
-                {sectorClients.map((c) => (
-                  <option key={c.salesClientId} value={c.serviceClientId}>
-                    {c.name}
+                <Input
+                  id="oaf-titulo"
+                  placeholder={isCore ? "Ej. Revisar cámaras de la entrada principal" : "Título de la OT"}
+                  value={form.titulo}
+                  onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+                  valid={intentado && tituloOk}
+                />
+              </Field>
+              {!(tone === "core" && forcedTicketType) && (
+                <Field label="Tipo">
+                  <Select
+                    value={form.ticketType}
+                    onChange={(e) => {
+                      const t = e.target.value;
+                      if (t === "OTRO") {
+                        setForm({ ...form, ticketType: "OTRO", workType: "ISSUE" });
+                        setOtroInput(form.ticketTypeCustom || "");
+                        setShowOtroModal(true);
+                      } else {
+                        setForm({
+                          ...form,
+                          ticketType: t,
+                          ticketTypeCustom: "",
+                          workType: t === "INVENTARIO" ? "PREVENTIVE_INVENTORY" : "ISSUE",
+                        });
+                      }
+                    }}
+                  >
+                    <option value="PREVENTIVO">Tipo: Preventivo</option>
+                    <option value="CORRECTIVO">Tipo: Correctivo</option>
+                    <option value="EMERGENCIA">Tipo: Emergencia</option>
+                    <option value="INSTALACION">Tipo: Instalación</option>
+                    <option value="INVENTARIO">Tipo: Inventario</option>
+                    <option value="OTRO">Tipo: Otro</option>
+                  </Select>
+                </Field>
+              )}
+              <Field label={isCore ? "Indicaciones para todos" : "Indicaciones"} optional fullWidth>
+                {isCore ? (
+                  <Textarea
+                    rows={3}
+                    placeholder="Qué deben saber todos los que la hagan: acceso, material, contacto…"
+                    value={form.indicaciones}
+                    onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
+                  />
+                ) : (
+                  <Input
+                    placeholder="Indicaciones para el responsable"
+                    value={form.indicaciones}
+                    onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
+                  />
+                )}
+              </Field>
+            </FieldGrid>
+          </div>
+        </FormSection>
+
+        {/* 2 · Dónde y para quién */}
+        {hayDonde ? (
+          <FormSection
+            id="oaf-donde"
+            step={siguiente()}
+            done={proyectoOk && clienteServicioOk && (form.projectMode === "with_project" || !needsClientPicker || Boolean(form.clientId))}
+            title="¿Dónde y para quién?"
+            description={form.projectMode === "with_project" ? "El cliente sale del proyecto." : textoSinProyecto}
+          >
+            <div className={s.cuerpo}>
+              {form.projectMode === "with_project" ? (
+                <>
+                  <FieldGrid>
+                    <Field label="Proyecto" required error={intentado && !proyectoOk ? "Selecciona un proyecto" : null}>
+                      <Select
+                        id="oaf-proyecto"
+                        value={form.projectId}
+                        onChange={(e) => {
+                          const projectId = e.target.value;
+                          const project = activeProjects.find((p) => String(p.id) === projectId);
+                          setForm({
+                            ...form,
+                            projectId,
+                            clientId: project ? String(project.client.id) : "",
+                            // La etapa es de otro proyecto: se vuelve a proponer con el nuevo.
+                            projectMilestoneId: "",
+                          });
+                        }}
+                      >
+                        <option value="">Seleccionar proyecto…</option>
+                        {activeProjects
+                          .filter((p) => !form.clientId || String(p.client.id) === form.clientId)
+                          .map((project) => (
+                            <option key={project.id} value={project.id}>{project.title}</option>
+                          ))}
+                      </Select>
+                    </Field>
+                    <Field label="Cliente">
+                      <Input
+                        placeholder="Cliente (automático)"
+                        value={activeProjects.find((p) => String(p.id) === form.projectId)?.client.name ?? ""}
+                        disabled
+                      />
+                    </Field>
+                  </FieldGrid>
+                  <div className={s.grupo}>
+                    <Button variant="link" className={s.linkInicio} onClick={() => setAltaProyectoAbierta((v) => !v)}>
+                      {altaProyectoAbierta ? "Cerrar alta de proyecto" : "¿No está el proyecto? Créalo aquí"}
+                    </Button>
+                    {altaProyectoAbierta ? (
+                      <div className={s.alta}>
+                        <Field label="Nombre del proyecto" required>
+                          <Input
+                            value={nombreProyecto}
+                            maxLength={200}
+                            placeholder="Ej. Cámaras sucursal norte"
+                            onChange={(e) => setNombreProyecto(e.target.value)}
+                          />
+                        </Field>
+                        <div className={s.grupo}>
+                          <span className={s.etiqueta}>
+                            Cliente <b className={s.req}>*</b>
+                          </span>
+                          <ClienteTipoPicker
+                            token={token}
+                            tipo="PROYECTO"
+                            salesClientId={salesProyectoId}
+                            editable={!creandoProyecto}
+                            puedeCrear
+                            puedeEditar={puedeClienteProyecto}
+                            altaSoloNombre={!puedeClienteProyecto}
+                            clientes={clientesProyecto}
+                            onCreado={(creado) => {
+                              setClientesProyecto((prev) =>
+                                [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) =>
+                                  a.name.localeCompare(b.name, "es"),
+                                ),
+                              );
+                              setSalesProyectoId(creado.id);
+                            }}
+                            onSelect={(c) => setSalesProyectoId(c.id)}
+                          />
+                        </div>
+                        <div className={s.altaPie}>
+                          <Button
+                            variant="tonal"
+                            disabled={nombreProyecto.trim().length < 3 || !salesProyectoId}
+                            loading={creandoProyecto}
+                            onClick={() => void crearProyectoRapido()}
+                          >
+                            {creandoProyecto ? "Creando…" : "Crear y usar este proyecto"}
+                          </Button>
+                          <p className={s.nota}>Fechas, alcance y equipo se completan después en Proyectos.</p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : needsClientPicker && coreKind === "servicio" ? (
+                <div className={s.grupo}>
+                  <span className={s.etiqueta}>
+                    Cliente corporativo <b className={s.req}>*</b>
+                  </span>
+                  <ClienteTipoPicker
+                    token={token}
+                    tipo="CORPORATIVO"
+                    salesClientId={salesServicioId}
+                    editable
+                    puedeCrear
+                    puedeEditar={permisosCliente.puedeEditar}
+                    altaCorporativa
+                    clientes={clientesCorporativos}
+                    onCreado={(creado) => {
+                      setClientesCorporativos((prev) =>
+                        [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) => a.name.localeCompare(b.name, "es")),
+                      );
+                      setSalesServicioId(creado.id);
+                      void (async () => {
+                        if (!token) return;
+                        let serviceId = creado.serviceClientId ?? null;
+                        if (!serviceId) {
+                          try {
+                            const activado = await provisionSalesServiceClient(token, creado.id);
+                            serviceId = activado.serviceClient.id;
+                          } catch (e) {
+                            setError(apiErrorMessage(e, "El cliente se creó, pero no quedó listo para la actividad"));
+                            return;
+                          }
+                        }
+                        setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
+                      })();
+                    }}
+                    onSelect={async (c) => {
+                      setSalesServicioId(c.id);
+                      if (!token) return;
+                      try {
+                        let serviceId = c.serviceClientId ?? null;
+                        if (!serviceId) {
+                          const activado = await provisionSalesServiceClient(token, c.id);
+                          serviceId = activado.serviceClient.id;
+                          setClientesCorporativos((prev) =>
+                            prev.map((row) => (row.id === c.id ? { ...row, serviceClientId: serviceId } : row)),
+                          );
+                        }
+                        setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
+                      } catch (e) {
+                        setError(apiErrorMessage(e, "No se pudo usar ese cliente en la actividad"));
+                      }
+                    }}
+                  />
+                  {intentado && !clienteServicioOk ? (
+                    <span className={s.errorCampo} role="alert">
+                      Elige o crea el cliente corporativo
+                    </span>
+                  ) : null}
+                </div>
+              ) : needsClientPicker ? (
+                <Field label="Cliente" required>
+                  <Select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} required>
+                    <option value="">Seleccionar cliente…</option>
+                    {sectorClients.map((c) => (
+                      <option key={c.salesClientId} value={c.serviceClientId}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              ) : null}
+
+              {pendingRequestId ? (
+                <FieldGrid>
+                  <Field label="Sucursal">
+                    <Input placeholder="Sucursal" value={form.branchName} onChange={(e) => setForm({ ...form, branchName: e.target.value })} />
+                  </Field>
+                  <Field label="Número sucursal">
+                    <Input placeholder="Número sucursal" value={form.branchNumber} onChange={(e) => setForm({ ...form, branchNumber: e.target.value })} />
+                  </Field>
+                  <Field label="Ciudad">
+                    <Input placeholder="Ciudad" value={form.branchCity} onChange={(e) => setForm({ ...form, branchCity: e.target.value })} />
+                  </Field>
+                  <Field label="Estado">
+                    <Input placeholder="Estado" value={form.branchState} onChange={(e) => setForm({ ...form, branchState: e.target.value })} />
+                  </Field>
+                  <Field label="Dirección sucursal" fullWidth>
+                    <Input placeholder="Dirección sucursal" value={form.branchAddress} onChange={(e) => setForm({ ...form, branchAddress: e.target.value })} />
+                  </Field>
+                </FieldGrid>
+              ) : null}
+            </div>
+          </FormSection>
+        ) : null}
+
+        {/* 3 · Quién y cuándo */}
+        <FormSection
+          step={siguiente()}
+          done={responsableOk && agendaOk && periodoOk}
+          title="¿Quién y cuándo?"
+          description="Prioridad, agenda y cuánto tiempo toma."
+        >
+          <div className={s.cuerpo}>
+            <FieldGrid>
+              {!hideResponsableSelect && (
+                <Field label="Responsable" required error={intentado && !responsableOk ? "Elige al responsable." : null}>
+                  <Select
+                    id="oaf-responsable"
+                    value={form.responsableId}
+                    onChange={(e) => setForm({ ...form, responsableId: e.target.value })}
+                  >
+                    <option value="">Responsable</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nombre}{u.email ? ` · ${u.email}` : ""}{u.role?.nombre ? ` (${u.role.nombre})` : ""}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+              <div className={s.prioridad}>
+                <PrioritySemaforo
+                  value={form.prioridad || "MEDIA"}
+                  onChange={(prioridad) => setForm({ ...form, prioridad })}
+                />
+              </div>
+            </FieldGrid>
+            <FieldGrid columns={3}>
+              <Field
+                label={form.periodoFin ? "Del" : requireSchedule || tone === "core" ? "Día" : "Fecha"}
+                required={requireSchedule}
+                error={intentado && requireSchedule && !form.fecha ? "Indica el día" : null}
+              >
+                <DateInput
+                  id="oaf-dia"
+                  value={form.fecha}
+                  onChange={(e) => {
+                    setPeriodoAuto(false);
+                    setForm({ ...form, fecha: e.target.value });
+                  }}
+                  required={requireSchedule}
+                />
+              </Field>
+              <Field label="Al (último día, si dura varios)" optional>
+                <DateInput
+                  id="oaf-al"
+                  value={form.periodoFin}
+                  min={form.fecha || undefined}
+                  invalid={periodoMal}
+                  onChange={(e) => {
+                    setPeriodoAuto(false);
+                    setForm({ ...form, periodoFin: e.target.value });
+                  }}
+                  aria-describedby={`${periodoId}-resumen`}
+                />
+              </Field>
+              {(requireSchedule || tone === "core") && (
+                <Field
+                  label="Hora"
+                  required={requireSchedule}
+                  error={intentado && requireSchedule && !form.hora ? "Indica la hora" : null}
+                >
+                  <Input
+                    id="oaf-hora"
+                    type="time"
+                    value={form.hora || "09:00"}
+                    onChange={(e) => setForm({ ...form, hora: e.target.value })}
+                    required={requireSchedule}
+                  />
+                </Field>
+              )}
+            </FieldGrid>
+            {etapas && etapas.length > 0 ? (
+              <Field label="Etapa del proyecto">
+                <Select value={form.projectMilestoneId} onChange={(e) => elegirEtapa(e.target.value)}>
+                  <option value="">
+                    Todo el proyecto
+                    {ventanaProyecto?.inicio && ventanaProyecto?.fin
+                      ? ` · ${fechaCorta(ventanaProyecto.inicio)} – ${fechaCorta(ventanaProyecto.fin)}`
+                      : ""}
                   </option>
-                ))}
-              </select>
+                  {etapas.map((etapa) => (
+                    <option key={etapa.hitoId} value={etapa.hitoId}>
+                      {etapa.nombre} · {fechaCorta(etapa.inicio)} – {fechaCorta(etapa.fin)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
             ) : null}
-          </div>
-        )}
-        {!(tone === "core" && forcedTicketType) && (
-        <select
-          className="input"
-          value={form.ticketType}
-          onChange={(e) => {
-            const t = e.target.value;
-            if (t === "OTRO") {
-              setForm({ ...form, ticketType: "OTRO", workType: "ISSUE" });
-              setOtroInput(form.ticketTypeCustom || "");
-              setShowOtroModal(true);
-            } else {
-              setForm({
-                ...form,
-                ticketType: t,
-                ticketTypeCustom: "",
-                workType: t === "INVENTARIO" ? "PREVENTIVE_INVENTORY" : "ISSUE",
-              });
-            }
-          }}
-        >
-          <option value="PREVENTIVO">Tipo: Preventivo</option>
-          <option value="CORRECTIVO">Tipo: Correctivo</option>
-          <option value="EMERGENCIA">Tipo: Emergencia</option>
-          <option value="INSTALACION">Tipo: Instalación</option>
-          <option value="INVENTARIO">Tipo: Inventario</option>
-          <option value="OTRO">Tipo: Otro</option>
-        </select>
-        )}
-        {!hideResponsableSelect && (
-        <select
-          className="input"
-          value={form.responsableId}
-          onChange={(e) => setForm({ ...form, responsableId: e.target.value })}
-        >
-          <option value="">Responsable</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.nombre}{u.email ? ` · ${u.email}` : ""}{u.role?.nombre ? ` (${u.role.nombre})` : ""}
-            </option>
-          ))}
-        </select>
-        )}
-        <PrioritySemaforo
-          value={form.prioridad || "MEDIA"}
-          onChange={(prioridad) => setForm({ ...form, prioridad })}
-        />
-        <div>
-          <label
-            htmlFor={`${periodoId}-del`}
-            style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}
-          >
-            {form.periodoFin ? "Del" : requireSchedule || tone === "core" ? "Día" : "Fecha"}
-          </label>
-          <input
-            id={`${periodoId}-del`}
-            className="input"
-            type="date"
-            value={form.fecha}
-            onChange={(e) => {
-              setPeriodoAuto(false);
-              setForm({ ...form, fecha: e.target.value });
-            }}
-            required={requireSchedule}
-          />
-        </div>
-        <div>
-          <label
-            htmlFor={`${periodoId}-al`}
-            style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}
-          >
-            Al (último día, si dura varios)
-          </label>
-          <input
-            id={`${periodoId}-al`}
-            className="input"
-            type="date"
-            value={form.periodoFin}
-            min={form.fecha || undefined}
-            onChange={(e) => {
-              setPeriodoAuto(false);
-              setForm({ ...form, periodoFin: e.target.value });
-            }}
-            aria-describedby={`${periodoId}-resumen`}
-          />
-        </div>
-        {(requireSchedule || tone === "core") && (
-          <div>
-            <label style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}>
-              Hora
-            </label>
-            <input
-              className="input"
-              type="time"
-              value={form.hora || "09:00"}
-              onChange={(e) => setForm({ ...form, hora: e.target.value })}
-              required={requireSchedule}
-            />
-          </div>
-        )}
-        <div style={{ gridColumn: "1 / -1", display: "grid", gap: 6 }}>
-          {etapas && etapas.length > 0 ? (
-            <label style={{ display: "grid", gap: 4, maxWidth: 460 }}>
-              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Etapa del proyecto</span>
-              <select
-                className="input"
-                value={form.projectMilestoneId}
-                onChange={(e) => elegirEtapa(e.target.value)}
-              >
-                <option value="">
-                  Todo el proyecto
-                  {ventanaProyecto?.inicio && ventanaProyecto?.fin
-                    ? ` · ${fechaCorta(ventanaProyecto.inicio)} – ${fechaCorta(ventanaProyecto.fin)}`
-                    : ""}
-                </option>
-                {etapas.map((etapa) => (
-                  <option key={etapa.hitoId} value={etapa.hitoId}>
-                    {etapa.nombre} · {fechaCorta(etapa.inicio)} – {fechaCorta(etapa.fin)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <p
-            id={`${periodoId}-resumen`}
-            style={{
-              margin: 0,
-              fontSize: 12.5,
-              lineHeight: 1.4,
-              color:
-                form.periodoFin && form.fecha && form.periodoFin < form.fecha
-                  ? "var(--danger)"
-                  : "var(--text-secondary)",
-            }}
-          >
-            {form.periodoFin && form.fecha
-              ? form.periodoFin < form.fecha
-                ? "El último día no puede ser anterior al primero."
-                : `${resumenDelRango({ inicio: form.fecha, fin: form.periodoFin })}. Se queda en la pizarra cada día hasta terminarla y no cuenta como atrasada antes del último día.`
-              : "Sin último día es de un solo momento (día y hora). Si el trabajo dura varios días, pon hasta cuándo: así no hay que cargarla cada día."}
-          </p>
-          {form.fecha && form.responsableId ? (
-            <AvisoGuardia
-              token={token}
-              fecha={form.fecha}
-              personas={[Number(form.responsableId), ...(extraTeamIds ?? [])]
-                .filter((id, i, arr) => arr.indexOf(id) === i)
-                .map((id) => ({
-                  id,
-                  nombre: users.find((u) => u.id === id)?.nombre?.split(/\s+/).slice(0, 2).join(" ") || "esta persona",
-                }))}
-            />
-          ) : null}
-        </div>
-        {isCore ? (
-          <>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ ...coreLabelStyle, display: "block", marginBottom: 8 }}>
-                ¿Cuánto tiempo toma?
-              </label>
-              <DurationWheelPicker
-                horas={splitMinutes(Number(form.tiempoEstimadoMin) || 0).horas}
-                minutos={splitMinutes(Number(form.tiempoEstimadoMin) || 0).minutos}
-                onChange={({ horas, minutos }) =>
-                  setForm({
-                    ...form,
-                    tiempoEstimadoMin: String(joinMinutes(horas, minutos) || ""),
-                  })
-                }
-                // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
-                maxHoras={12}
-                topeMinutos={720}
-                minuteStep={5}
-                hint="Gira las ruedas. Máximo 12 h: si lleva más días, se reanuda cada día."
-              />
-            </div>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ ...coreLabelStyle, display: "block", marginBottom: 8 }}>
-                Máximo permitido
-              </label>
-              <DurationWheelPicker
-                horas={splitMinutes(Number(form.tiempoMaximoMin) || 0).horas}
-                minutos={splitMinutes(Number(form.tiempoMaximoMin) || 0).minutos}
-                onChange={({ horas, minutos }) =>
-                  setForm({
-                    ...form,
-                    tiempoMaximoMin: String(joinMinutes(horas, minutos) || ""),
-                  })
-                }
-                maxHoras={24}
-                minuteStep={5}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 650, marginBottom: 6 }}>
-                Tiempo esperado
-              </label>
-              <DurationWheelPicker
-                horas={splitMinutes(Number(form.tiempoEstimadoMin) || 0).horas}
-                minutos={splitMinutes(Number(form.tiempoEstimadoMin) || 0).minutos}
-                onChange={({ horas, minutos }) =>
-                  setForm({
-                    ...form,
-                    tiempoEstimadoMin: String(joinMinutes(horas, minutos) || ""),
-                  })
-                }
-                maxHoras={12}
-                topeMinutos={720}
-                minuteStep={5}
-              />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 650, marginBottom: 6 }}>
-                Tiempo máximo
-              </label>
-              <DurationWheelPicker
-                horas={splitMinutes(Number(form.tiempoMaximoMin) || 0).horas}
-                minutos={splitMinutes(Number(form.tiempoMaximoMin) || 0).minutos}
-                onChange={({ horas, minutos }) =>
-                  setForm({
-                    ...form,
-                    tiempoMaximoMin: String(joinMinutes(horas, minutos) || ""),
-                  })
-                }
-                maxHoras={24}
-                minuteStep={5}
-              />
-            </div>
-          </>
-        )}
-        {pendingRequestId && (
-          <>
-            <input className="input" placeholder="Sucursal" value={form.branchName} onChange={(e) => setForm({ ...form, branchName: e.target.value })} />
-            <input className="input" placeholder="Número sucursal" value={form.branchNumber} onChange={(e) => setForm({ ...form, branchNumber: e.target.value })} />
-            <input className="input" placeholder="Ciudad" value={form.branchCity} onChange={(e) => setForm({ ...form, branchCity: e.target.value })} />
-            <input className="input" placeholder="Estado" value={form.branchState} onChange={(e) => setForm({ ...form, branchState: e.target.value })} />
-            <input className="input" placeholder="Dirección sucursal" value={form.branchAddress} onChange={(e) => setForm({ ...form, branchAddress: e.target.value })} />
-          </>
-        )}
-        {isCore ? (
-          <label style={{ ...coreLabelStyle, gridColumn: "1 / -1" }}>
-            Indicaciones para todos
-            <textarea
-              className="input"
-              rows={3}
-              placeholder="Qué deben saber todos los que la hagan: acceso, material, contacto…"
-              value={form.indicaciones}
-              onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
-              style={{ fontSize: 16, fontWeight: 400, lineHeight: 1.4, resize: "vertical", fontFamily: "inherit" }}
-            />
-          </label>
-        ) : (
-          <input
-            className="input"
-            placeholder="Indicaciones para el responsable"
-            value={form.indicaciones}
-            onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
-            style={{ gridColumn: "1 / -1" }}
-          />
-        )}
-        {isCore ? (
-          <div
-            role="group"
-            aria-label="Fotos de evidencia por persona"
-            style={{
-              gridColumn: "1 / -1",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: 10,
-              fontSize: 13,
-              fontWeight: 650,
-              color: "var(--text-secondary)",
-            }}
-          >
-            Fotos de evidencia por persona
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <button
-                type="button"
-                className="btn"
-                aria-label="Una foto menos"
-                disabled={Number(form.evidencePhotoRequired || 4) <= 2}
-                style={{ minWidth: 44, minHeight: 44, padding: "4px 10px", fontSize: 18 }}
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    evidencePhotoRequired: String(
-                      Math.max(2, Number(prev.evidencePhotoRequired || 4) - 1),
-                    ),
-                  }))
-                }
-              >
-                −
-              </button>
-              <strong
-                aria-live="polite"
-                style={{ minWidth: 28, textAlign: "center", fontSize: 16, color: "var(--text-primary, var(--text))" }}
-              >
-                {form.evidencePhotoRequired}
-              </strong>
-              <button
-                type="button"
-                className="btn"
-                aria-label="Una foto más"
-                disabled={Number(form.evidencePhotoRequired || 4) >= 8}
-                style={{ minWidth: 44, minHeight: 44, padding: "4px 10px", fontSize: 18 }}
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    evidencePhotoRequired: String(
-                      Math.min(8, Number(prev.evidencePhotoRequired || 4) + 1),
-                    ),
-                  }))
-                }
-              >
-                +
-              </button>
-            </span>
-            <span style={{ fontWeight: 500, fontSize: 13 }}>(de 2 a 8)</span>
-          </div>
-        ) : null}
-      </div>
-
-      {puedeDefinirCampos ? (
-        <section
-          aria-labelledby={camposTituloId}
-          style={{
-            marginTop: 16,
-            padding: 14,
-            borderRadius: 14,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <div>
-            <h3 id={camposTituloId} style={{ margin: 0, fontSize: 14, fontWeight: 750 }}>
-              Qué hay que fotografiar{" "}
-              <span style={{ fontWeight: 500, fontSize: 12, color: "var(--text-tertiary)" }}>(opcional)</span>
-            </h3>
-            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-              {campos.length
-                ? "Quien la ejecute verá estos puntos en la app y no podrá avanzar sin la foto de cada momento marcado. Las fotos libres quedan como extra."
-                : "Define cada cosa que se debe documentar (Cámara 1, Rack, Canalización…) y en qué momento se pide la foto: antes, en progreso o después. Si no defines nada, se piden fotos libres como hasta ahora."}
+            <p id={`${periodoId}-resumen`} className={periodoMal ? `${s.resumen} ${s.resumenMal}` : s.resumen}>
+              {form.periodoFin && form.fecha
+                ? form.periodoFin < form.fecha
+                  ? "El último día no puede ser anterior al primero."
+                  : `${resumenDelRango({ inicio: form.fecha, fin: form.periodoFin })}. Se queda en la pizarra cada día hasta terminarla y no cuenta como atrasada antes del último día.`
+                : "Sin último día es de un solo momento (día y hora). Si el trabajo dura varios días, pon hasta cuándo: así no hay que cargarla cada día."}
             </p>
+            {form.fecha && form.responsableId ? (
+              <AvisoGuardia
+                token={token}
+                fecha={form.fecha}
+                personas={[Number(form.responsableId), ...(extraTeamIds ?? [])]
+                  .filter((id, i, arr) => arr.indexOf(id) === i)
+                  .map((id) => ({
+                    id,
+                    nombre: users.find((u) => u.id === id)?.nombre?.split(/\s+/).slice(0, 2).join(" ") || "esta persona",
+                  }))}
+              />
+            ) : null}
+            <div className={s.duraciones}>
+              <div className={s.grupo}>
+                <span className={s.etiqueta}>{isCore ? "¿Cuánto tiempo toma?" : "Tiempo esperado"}</span>
+                <DurationWheelPicker
+                  {...duracion("tiempoEstimadoMin")}
+                  // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
+                  maxHoras={12}
+                  topeMinutos={720}
+                  minuteStep={5}
+                  hint={isCore ? "Gira las ruedas. Máximo 12 h: si lleva más días, se reanuda cada día." : undefined}
+                />
+              </div>
+              <div className={s.grupo}>
+                <span className={s.etiqueta}>{isCore ? "Máximo permitido" : "Tiempo máximo"}</span>
+                <DurationWheelPicker {...duracion("tiempoMaximoMin")} maxHoras={24} minuteStep={5} />
+              </div>
+            </div>
           </div>
-          <EvidenciaCamposEditor
-            value={campos}
-            onChange={setCampos}
-            errores={camposIntentado ? erroresCampos : null}
-            disabled={saving}
-          />
-        </section>
-      ) : null}
+        </FormSection>
 
-      {puedeDefinirCampos ? (
-        <section
-          aria-labelledby={herramientasTituloId}
-          style={{
-            marginTop: 16,
-            padding: 14,
-            borderRadius: 14,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <h3
-            id={herramientasTituloId}
-            style={{ margin: 0, fontSize: 14, fontWeight: 750, display: "flex", alignItems: "center", gap: 6 }}
-          >
-            Herramientas a llevar{" "}
-            <span style={{ fontWeight: 500, fontSize: 12, color: "var(--text-tertiary)" }}>(opcional)</span>
-            <InfoOutlinedIcon
-              aria-label="Quien ejecuta palomea cada herramienta antes de salir; con pendientes la app no deja iniciar."
-              titleAccess="Quien ejecuta palomea cada herramienta antes de salir; con pendientes la app no deja iniciar."
-              sx={{ fontSize: 16, color: "var(--text-tertiary)" }}
-            />
-          </h3>
-          <HerramientasChecklistEditor
-            value={herramientas}
-            onChange={setHerramientas}
-            errores={herramientasIntentado ? erroresHerramientas : null}
-            disabled={saving}
-            responsableId={form.responsableId ? Number(form.responsableId) : undefined}
-            extraTeamUserIds={extraTeamIds}
-            responsableNombreCorto={
-              users.find((u) => String(u.id) === String(form.responsableId))?.nombre?.split(/\s+/).slice(0, 2).join(" ")
+        {/* 4 · Evidencia que se pedirá */}
+        {isCore || puedeDefinirCampos ? (
+          <FormSection
+            id="oaf-campos"
+            step={siguiente()}
+            title="Evidencia que se pedirá"
+            description={
+              puedeDefinirCampos
+                ? campos.length
+                  ? "Quien la ejecute verá estos puntos en la app y no podrá avanzar sin la foto de cada momento marcado. Las fotos libres quedan como extra."
+                  : "Define cada cosa que se debe documentar (Cámara 1, Rack, Canalización…) y en qué momento se pide la foto: antes, en progreso o después. Si no defines nada, se piden fotos libres como hasta ahora."
+                : "Cuántas fotos de evidencia sube cada persona."
             }
-            usePersonalKit={usaKit}
-            onToggleUsePersonalKit={setUsaKit}
-          />
-        </section>
-      ) : null}
-
-      {camposPendiente ? (
-        <div
-          role="alert"
-          style={{
-            marginTop: 16,
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
-            background: "color-mix(in srgb, #d97706 9%, var(--surface))",
-            display: "grid",
-            gap: 10,
-            fontSize: 13,
-            lineHeight: 1.45,
-          }}
-        >
-          <span>
-            <strong>{tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}</strong>, pero no se guardó qué hay
-            que fotografiar: {camposPendiente.error}
-          </span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            <Button size="sm" variant="primary" onClick={() => void reintentarCampos()} loading={saving}>
-              Reintentar guardar los puntos
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => void seguirSinCampos()} disabled={saving}>
-              Seguir sin puntos
-            </Button>
-          </div>
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            Si sigues sin puntos, puedes definirlos después desde el detalle de la actividad.
-          </span>
-        </div>
-      ) : null}
-
-      {herramientasPendiente ? (
-        <div
-          role="alert"
-          style={{
-            marginTop: 16,
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
-            background: "color-mix(in srgb, #d97706 9%, var(--surface))",
-            display: "grid",
-            gap: 10,
-            fontSize: 13,
-            lineHeight: 1.45,
-          }}
-        >
-          <span>
-            <strong>{tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}</strong>, pero no se guardaron las
-            herramientas a llevar: {herramientasPendiente.error}
-          </span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            <Button size="sm" variant="primary" onClick={() => void reintentarHerramientas()} loading={saving}>
-              Reintentar guardar las herramientas
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => void seguirSinHerramientas()} disabled={saving}>
-              Seguir sin herramientas
-            </Button>
-          </div>
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            Si sigues sin herramientas, puedes definirlas después desde el detalle de la actividad.
-          </span>
-        </div>
-      ) : null}
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 16 }}>
-        {onCancel && !camposPendiente && !herramientasPendiente && (
-          <Button variant="secondary" size={isCore ? "lg" : "sm"} onClick={onCancel}>Cancelar</Button>
-        )}
-        {!camposPendiente && !herramientasPendiente ? (
-          <Button
-            size={isCore ? "lg" : "sm"}
-            variant={isCore ? "primary" : undefined}
-            onClick={() => void handleSubmit()}
-            disabled={saving}
           >
-            {saving ? "Guardando…" : activitySubmitLabel(form, isEdit, tone)}
-          </Button>
+            <div className={s.cuerpo}>
+              {isCore ? (
+                <div role="group" aria-label="Fotos de evidencia por persona" className={s.fotos}>
+                  <span className={s.etiqueta}>Fotos de evidencia por persona</span>
+                  <span className={s.contador}>
+                    <Button
+                      icon
+                      size="lg"
+                      aria-label="Una foto menos"
+                      disabled={Number(form.evidencePhotoRequired || 4) <= 2}
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          evidencePhotoRequired: String(
+                            Math.max(2, Number(prev.evidencePhotoRequired || 4) - 1),
+                          ),
+                        }))
+                      }
+                    >
+                      −
+                    </Button>
+                    <strong aria-live="polite" className={s.contadorN}>
+                      {form.evidencePhotoRequired}
+                    </strong>
+                    <Button
+                      icon
+                      size="lg"
+                      aria-label="Una foto más"
+                      disabled={Number(form.evidencePhotoRequired || 4) >= 8}
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          evidencePhotoRequired: String(
+                            Math.min(8, Number(prev.evidencePhotoRequired || 4) + 1),
+                          ),
+                        }))
+                      }
+                    >
+                      +
+                    </Button>
+                  </span>
+                  <span className={s.nota}>(de 2 a 8)</span>
+                </div>
+              ) : null}
+              {puedeDefinirCampos ? (
+                <section aria-labelledby={camposTituloId} className={s.subseccion}>
+                  <h3 id={camposTituloId} className={s.subseccionT}>
+                    Qué hay que fotografiar{" "}
+                    <Badge tone="outline" size="sm">
+                      Opcional
+                    </Badge>
+                  </h3>
+                  <EvidenciaCamposEditor
+                    value={campos}
+                    onChange={setCampos}
+                    errores={camposIntentado ? erroresCampos : null}
+                    disabled={saving}
+                  />
+                </section>
+              ) : null}
+            </div>
+          </FormSection>
         ) : null}
-        {error && (
-          <span role="alert" style={{ color: "var(--danger)", fontSize: isCore ? 14 : 13 }}>
-            {error}
-          </span>
-        )}
-        {success && (
-          <span role="status" style={{ color: "var(--success)", fontSize: isCore ? 14 : 13 }}>
-            {success}
-          </span>
-        )}
-      </div>
-    </Section>
+
+        {/* 5 · Herramientas a llevar */}
+        {puedeDefinirCampos ? (
+          <FormSection
+            id="oaf-herramientas"
+            step={siguiente()}
+            title={<span id={herramientasTituloId}>Herramientas a llevar</span>}
+            description="Quien ejecuta palomea cada herramienta antes de salir; con pendientes la app no deja iniciar."
+            actions={
+              <Badge tone="outline" size="sm">
+                Opcional
+              </Badge>
+            }
+          >
+            <HerramientasChecklistEditor
+              value={herramientas}
+              onChange={setHerramientas}
+              errores={herramientasIntentado ? erroresHerramientas : null}
+              disabled={saving}
+              responsableId={form.responsableId ? Number(form.responsableId) : undefined}
+              extraTeamUserIds={extraTeamIds}
+              responsableNombreCorto={
+                users.find((u) => String(u.id) === String(form.responsableId))?.nombre?.split(/\s+/).slice(0, 2).join(" ")
+              }
+              usePersonalKit={usaKit}
+              onToggleUsePersonalKit={setUsaKit}
+            />
+          </FormSection>
+        ) : null}
+
+        {camposPendiente ? (
+          <Alert
+            tone="warning"
+            role="alert"
+            title={tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}
+          >
+            <span className={s.reintento}>
+              <span>Pero no se guardó qué hay que fotografiar: {camposPendiente.error}</span>
+              <span className={s.reintentoAcciones}>
+                <Button size="sm" variant="primary" onClick={() => void reintentarCampos()} loading={saving}>
+                  Reintentar guardar los puntos
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => void seguirSinCampos()} disabled={saving}>
+                  Seguir sin puntos
+                </Button>
+              </span>
+              <span className={s.nota}>Si sigues sin puntos, puedes definirlos después desde el detalle de la actividad.</span>
+            </span>
+          </Alert>
+        ) : null}
+
+        {herramientasPendiente ? (
+          <Alert
+            tone="warning"
+            role="alert"
+            title={tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}
+          >
+            <span className={s.reintento}>
+              <span>Pero no se guardaron las herramientas a llevar: {herramientasPendiente.error}</span>
+              <span className={s.reintentoAcciones}>
+                <Button size="sm" variant="primary" onClick={() => void reintentarHerramientas()} loading={saving}>
+                  Reintentar guardar las herramientas
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => void seguirSinHerramientas()} disabled={saving}>
+                  Seguir sin herramientas
+                </Button>
+              </span>
+              <span className={s.nota}>Si sigues sin herramientas, puedes definirlas después desde el detalle de la actividad.</span>
+            </span>
+          </Alert>
+        ) : null}
+      </FormPage>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { SvgIconComponent } from "@mui/icons-material";
 import AddAPhotoOutlinedIcon from "@mui/icons-material/AddAPhotoOutlined";
@@ -25,9 +25,11 @@ import {
 } from "@/lib/activity-geofence";
 import { formatApiError } from "@/lib/erp-api";
 import { mapsUrl } from "@/lib/evidence-display";
+import { Alert, Badge, Button, Textarea, type Tone } from "@/components/base";
+import s from "./UbicacionActividad.module.css";
 
-const VERDE = "var(--success, #16a34a)";
-const ROJO = "var(--danger, #dc2626)";
+const VERDE = "var(--ui-success)";
+const ROJO = "var(--ui-danger)";
 
 /** Cada cuánto se vuelve a pedir el recorrido mientras la actividad sigue en curso. */
 const REFRESCO_MS = 60_000;
@@ -48,66 +50,11 @@ function fechaHora(iso?: string | null): string {
   return d.toLocaleString("es-MX", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
-const btn: CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  fontWeight: 650,
-  fontSize: 13.5,
-  padding: "8px 14px",
-  minHeight: 42,
-  borderRadius: 12,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-};
-
-const btnPrimario: CSSProperties = { ...btn, border: 0, background: "var(--primary)", color: "#fff" };
-
-const inputOculto: CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  opacity: 0,
-  overflow: "hidden",
-  pointerEvents: "none",
-};
-
-const linkBtn: CSSProperties = {
-  border: 0,
-  background: "transparent",
-  padding: "4px 0",
-  color: "var(--primary)",
-  fontWeight: 650,
-  fontSize: 12.5,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  justifySelf: "start",
-};
-
-function Chip({ children, color, icon: Icon }: { children: ReactNode; color?: string; icon?: SvgIconComponent }) {
+function Chip({ children, tone = "neutral", icon: Icon }: { children: ReactNode; tone?: Tone; icon?: SvgIconComponent }) {
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "3px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 650,
-        border: `1px solid ${color ? `color-mix(in srgb, ${color} 35%, var(--border))` : "var(--border)"}`,
-        background: color ? `color-mix(in srgb, ${color} 10%, var(--surface))` : "var(--surface)",
-        color: color ?? "var(--text-secondary)",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto" }} /> : null}
+    <Badge tone={tone} icon={Icon ? <Icon fontSize="inherit" /> : undefined}>
       {children}
-    </span>
+    </Badge>
   );
 }
 
@@ -169,43 +116,25 @@ export type GeocercaHook = ReturnType<typeof useGeocerca>;
 /** Aviso destacado cuando la foto de salida se bloquea por estar fuera del radio. */
 export function AvisoFueraDeZona({ mensaje }: { mensaje: string }) {
   return (
-    <div
+    <Alert
+      tone="danger"
       role="alert"
-      style={{
-        display: "flex",
-        gap: 10,
-        alignItems: "flex-start",
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: `1px solid color-mix(in srgb, ${ROJO} 45%, var(--border))`,
-        background: `color-mix(in srgb, ${ROJO} 9%, var(--surface))`,
-        color: "inherit",
-        textAlign: "left",
-      }}
+      icon={<WrongLocationOutlinedIcon fontSize="inherit" />}
+      title="Estás fuera de la zona de la actividad"
     >
-      <WrongLocationOutlinedIcon aria-hidden="true" sx={{ fontSize: 24, color: ROJO, flex: "0 0 auto", mt: "1px" }} />
-      <div style={{ display: "grid", gap: 2 }}>
-        <strong style={{ fontSize: 14, color: ROJO }}>Estás fuera de la zona de la actividad</strong>
-        <span style={{ fontSize: 13.5, lineHeight: 1.45 }}>{mensaje}</span>
-      </div>
-    </div>
+      {mensaje}
+    </Alert>
   );
 }
 
-function Dato({ etiqueta, valor, detalle, color }: { etiqueta: string; valor: string; detalle?: ReactNode; color?: string }) {
+function Dato({ etiqueta, valor, detalle, tono }: { etiqueta: string; valor: string; detalle?: ReactNode; tono?: "ok" | "mal" }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gap: 2,
-        padding: "10px 12px",
-        borderRadius: 12,
-        background: "color-mix(in srgb, var(--text-secondary) 6%, var(--surface))",
-      }}
-    >
-      <dt style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)" }}>{etiqueta}</dt>
-      <dd style={{ margin: 0, fontSize: 15, fontWeight: 800, color }}>{valor}</dd>
-      {detalle ? <dd style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>{detalle}</dd> : null}
+    <div className={s.dato}>
+      <dt className={s.datoE}>{etiqueta}</dt>
+      <dd className={s.datoV} data-tono={tono}>
+        {valor}
+      </dd>
+      {detalle ? <dd className={s.datoD}>{detalle}</dd> : null}
     </div>
   );
 }
@@ -245,11 +174,11 @@ export default function UbicacionActividadCard({
 
   const chipEstado =
     estado?.dentro === true ? (
-      <Chip color={VERDE} icon={CheckCircleOutlineIcon}>
+      <Chip tone="success" icon={CheckCircleOutlineIcon}>
         Dentro de la zona
       </Chip>
     ) : estado?.dentro === false ? (
-      <Chip color={ROJO} icon={WrongLocationOutlinedIcon}>
+      <Chip tone="danger" icon={WrongLocationOutlinedIcon}>
         Fuera de la zona
       </Chip>
     ) : estado ? (
@@ -259,62 +188,50 @@ export default function UbicacionActividadCard({
   return (
     <section
       aria-labelledby={`geocerca-titulo-${activityId}`}
-      style={{
-        border: `1px solid ${
-          pendientes.length || estado?.dentro === false ? `color-mix(in srgb, ${ROJO} 40%, var(--border))` : "var(--border)"
-        }`,
-        borderRadius: 16,
-        background: "var(--surface)",
-        padding: 14,
-        display: "grid",
-        gap: 12,
-        marginBottom: 12,
-        textAlign: "left",
-      }}
+      className={s.caja}
+      data-alerta={pendientes.length || estado?.dentro === false ? "true" : undefined}
     >
-      <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <header className={s.cabeza}>
         <IconBadge icon={MyLocationOutlinedIcon} size={36} />
-        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
-          <h3 id={`geocerca-titulo-${activityId}`} style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>
+        <div className={s.cabezaTexto}>
+          <h3 id={`geocerca-titulo-${activityId}`} className={s.titulo}>
             Ubicación de la actividad
           </h3>
-          <p style={{ margin: "2px 0 0", fontSize: 12.5, lineHeight: 1.4, color: "var(--text-secondary)" }}>
+          <p className={s.sub}>
             {estado?.exigeMismaUbicacion === true
               ? `Mantente a no más de ${radio} m del punto donde iniciaste: la foto de salida solo se acepta dentro de ese radio.`
               : "La foto de salida lleva tu ubicación. En este tipo de actividad no hace falta que coincida con el punto de inicio."}
           </p>
         </div>
         {chipEstado}
-        <button
-          type="button"
-          style={{ ...btn, opacity: cargando ? 0.7 : 1 }}
+        <Button
+          size="sm"
+          variant="tertiary"
           onClick={() => void recargar()}
-          disabled={cargando}
+          loading={cargando}
           aria-label="Actualizar ubicación de la actividad"
+          iconStart={<RefreshIcon fontSize="inherit" />}
         >
-          <RefreshIcon aria-hidden="true" sx={{ fontSize: 18 }} />
           {cargando ? "Actualizando…" : "Actualizar"}
-        </button>
+        </Button>
       </header>
 
       {error ? (
-        <p role="alert" style={{ margin: 0, fontSize: 13, color: ROJO }}>
+        <p role="alert" className={s.error}>
           {error}
         </p>
       ) : null}
 
-      {!estado && !error ? (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Cargando ubicación de la actividad…</p>
-      ) : null}
+      {!estado && !error ? <p className={s.muted}>Cargando ubicación de la actividad…</p> : null}
 
       {estado && !origen ? (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+        <p className={s.muted}>
           Tu foto de entrada no tiene ubicación registrada, así que no hay punto de inicio contra el cual medir.
         </p>
       ) : null}
 
       {estado && origen ? (
-        <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+        <dl className={s.datos}>
           <Dato
             etiqueta="Inicio"
             valor={hora(origen.at)}
@@ -324,7 +241,7 @@ export default function UbicacionActividadCard({
                 {mapaOrigen ? (
                   <>
                     {" · "}
-                    <a href={mapaOrigen} target="_blank" rel="noreferrer" style={{ color: "var(--primary)", fontWeight: 650 }}>
+                    <a href={mapaOrigen} target="_blank" rel="noreferrer" className={s.enlace}>
                       Ver en mapa
                     </a>
                   </>
@@ -336,64 +253,37 @@ export default function UbicacionActividadCard({
           <Dato
             etiqueta="Última distancia"
             valor={formatoDistancia(ultimo?.distanciaM)}
-            color={estado.dentro === false ? ROJO : estado.dentro === true ? VERDE : undefined}
+            tono={estado.dentro === false ? "mal" : estado.dentro === true ? "ok" : undefined}
             detalle={ultimo ? `Lectura de las ${hora(ultimo.at)}` : "Sin lecturas de GPS todavía"}
           />
         </dl>
       ) : null}
 
       {aviso ? (
-        <p
-          role="status"
-          style={{
-            margin: 0,
-            padding: "8px 12px",
-            borderRadius: 10,
-            fontSize: 13,
-            fontWeight: 650,
-            background: `color-mix(in srgb, ${VERDE} 10%, var(--surface))`,
-          }}
-        >
+        <Alert tone="success" role="status" dense>
           {aviso}
-        </p>
+        </Alert>
       ) : null}
 
       {pendientes.length ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 800 }}>
+        <div className={s.grupo}>
+          <div className={s.grupoT}>
             {pendientes.length === 1 ? "Salida de zona por justificar" : `Salidas de zona por justificar (${pendientes.length})`}
           </div>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+          <ul className={s.lista}>
             {pendientes.map((a) => (
-              <li
-                key={a.id}
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: `1px solid color-mix(in srgb, ${ROJO} 35%, var(--border))`,
-                  background: `color-mix(in srgb, ${ROJO} 6%, var(--surface))`,
-                }}
-              >
+              <li key={a.id} className={s.pendiente}>
                 <WrongLocationOutlinedIcon aria-hidden="true" sx={{ fontSize: 22, color: ROJO, flex: "0 0 auto" }} />
-                <div style={{ flex: "1 1 200px", minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 750 }}>Saliste de la zona a las {hora(a.detectedAt)}</div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                <div className={s.pendienteTexto}>
+                  <div className={s.pendienteT}>Saliste de la zona a las {hora(a.detectedAt)}</div>
+                  <div className={s.pendienteM}>
                     Hasta {formatoDistancia(a.maxDistanciaM)} del punto de inicio ·{" "}
-                    {a.abierta ? (
-                      <strong style={{ color: ROJO }}>Sigues fuera</strong>
-                    ) : (
-                      `Regresaste a las ${hora(a.returnedAt)}`
-                    )}
+                    {a.abierta ? <strong className={s.peligro}>Sigues fuera</strong> : `Regresaste a las ${hora(a.returnedAt)}`}
                   </div>
                 </div>
-                <button type="button" style={btnPrimario} onClick={() => setJustificando(a)}>
-                  <EditNoteOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                <Button variant="primary" onClick={() => setJustificando(a)} iconStart={<EditNoteOutlinedIcon fontSize="inherit" />}>
                   Justificar
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -401,18 +291,9 @@ export default function UbicacionActividadCard({
       ) : null}
 
       {justificadas.length ? (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
+        <ul className={s.lista}>
           {justificadas.map((a) => (
-            <li
-              key={a.id}
-              style={{
-                fontSize: 12.5,
-                lineHeight: 1.45,
-                padding: "8px 12px",
-                borderRadius: 10,
-                background: "color-mix(in srgb, var(--text-secondary) 6%, var(--surface))",
-              }}
-            >
+            <li key={a.id} className={s.justificada}>
               <IconLabel icon={TaskAltIcon} size={16} gap={4} iconColor={VERDE}>
                 <strong>Justificada</strong>
               </IconLabel>{" "}
@@ -425,59 +306,35 @@ export default function UbicacionActividadCard({
       ) : null}
 
       {estado && origen ? (
-        <div style={{ display: "grid", gap: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, fontWeight: 800 }}>
+        <div className={s.grupo}>
+          <div className={s.seguimiento}>
+            <span className={s.grupoT}>
               <IconLabel icon={TimelineOutlinedIcon} size={18} gap={6}>
                 Seguimiento paulatino
               </IconLabel>
             </span>
-            <Chip color={estado.seguimientoActivo ? "var(--primary)" : undefined}>
+            <Chip tone={estado.seguimientoActivo ? "brand" : "neutral"}>
               {estado.seguimientoActivo ? "En curso" : "Terminado"}
             </Chip>
           </div>
           {puntos.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
-              Aquí aparecen las lecturas de GPS registradas desde que iniciaste la actividad.
-            </p>
+            <p className={s.muted}>Aquí aparecen las lecturas de GPS registradas desde que iniciaste la actividad.</p>
           ) : (
             <>
-              <ol
-                aria-label="Lecturas recientes de ubicación"
-                style={{
-                  listStyle: "none",
-                  margin: 0,
-                  padding: 0,
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                  gap: 6,
-                }}
-              >
+              <ol aria-label="Lecturas recientes de ubicación" className={s.lecturas}>
                 {visibles.map((p, i) => {
                   const fuera = p.distanciaM != null && p.distanciaM > radio;
                   return (
-                    <li
-                      key={`${p.at}-${i}`}
-                      title={fechaHora(p.at)}
-                      style={{
-                        fontSize: 12.5,
-                        padding: "6px 10px",
-                        borderRadius: 10,
-                        border: `1px solid ${fuera ? `color-mix(in srgb, ${ROJO} 35%, var(--border))` : "var(--border)"}`,
-                        background: fuera ? `color-mix(in srgb, ${ROJO} 6%, var(--surface))` : "var(--surface)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {hora(p.at)} ·{" "}
-                      <strong style={{ color: fuera ? ROJO : undefined }}>{formatoDistancia(p.distanciaM)}</strong>
+                    <li key={`${p.at}-${i}`} title={fechaHora(p.at)} className={s.lectura} data-fuera={fuera ? "true" : undefined}>
+                      {hora(p.at)} · <strong>{formatoDistancia(p.distanciaM)}</strong>
                     </li>
                   );
                 })}
               </ol>
               {puntos.length > PUNTOS_VISIBLES ? (
-                <button type="button" style={linkBtn} onClick={() => setVerTodos((v) => !v)} aria-expanded={verTodos}>
+                <Button variant="link" size="sm" className={s.inicio} onClick={() => setVerTodos((v) => !v)} aria-expanded={verTodos}>
                   {verTodos ? "Ver menos" : `Ver las ${puntos.length} lecturas`}
-                </button>
+                </Button>
               ) : null}
             </>
           )}
@@ -580,72 +437,37 @@ export function JustificarSalidaDialog({
       aria-modal="true"
       aria-labelledby={tituloId}
       onClick={() => !enviando && onClose()}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 10000,
-        background: "rgba(2, 6, 23, 0.55)",
-        display: "grid",
-        placeItems: "center",
-        padding: 16,
-      }}
+      className={s.overlay}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          maxHeight: "calc(100dvh - 32px)",
-          overflowY: "auto",
-          background: "var(--surface)",
-          color: "inherit",
-          borderRadius: 20,
-          border: "1px solid var(--border)",
-          boxShadow: "0 24px 60px rgba(2, 6, 23, 0.35)",
-          padding: 20,
-          display: "grid",
-          gap: 14,
-          textAlign: "left",
-        }}
-      >
-        <header style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} className={s.dialogo}>
+        <header className={s.dialogoCabeza}>
           <IconBadge icon={WrongLocationOutlinedIcon} color={ROJO} size={40} />
           <div>
-            <h3 id={tituloId} style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>
+            <h3 id={tituloId} className={s.dialogoT}>
               Justificar salida de zona
             </h3>
-            <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--text-secondary)" }}>
+            <p className={s.dialogoD}>
               Saliste a las {hora(alerta.detectedAt)} y llegaste a {formatoDistancia(alerta.maxDistanciaM)} del punto de inicio
               {alerta.abierta ? "; sigues fuera." : `; regresaste a las ${hora(alerta.returnedAt)}.`}
             </p>
           </div>
         </header>
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 750 }}>¿Por qué saliste de la zona?</span>
-          <textarea
+        <label className={s.campo}>
+          <span className={s.etiqueta}>
+            ¿Por qué saliste de la zona? <b className={s.req}>*</b>
+          </span>
+          <Textarea
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             rows={4}
             maxLength={1000}
             placeholder="Ej. Fui a la ferretería de enfrente por un conector que faltaba para terminar la instalación."
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              borderRadius: 12,
-              border: "1px solid var(--border)",
-              padding: "10px 12px",
-              font: "inherit",
-              fontSize: 14.5,
-              background: "var(--surface)",
-              color: "inherit",
-              resize: "vertical",
-            }}
           />
         </label>
 
-        <div style={{ display: "grid", gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 750 }}>Foto (recomendada)</span>
+        <div className={s.campo}>
+          <span className={s.etiqueta}>Foto (recomendada)</span>
           {/* Ocultos sin display:none: algunos Safari de iPhone no abren el selector de un input oculto así. */}
           <input
             ref={camaraRef}
@@ -654,7 +476,7 @@ export function JustificarSalidaDialog({
             capture="environment"
             tabIndex={-1}
             aria-hidden="true"
-            style={inputOculto}
+            className={s.inputOculto}
             onChange={(e) => void elegirFoto(e)}
           />
           <input
@@ -663,64 +485,61 @@ export function JustificarSalidaDialog({
             accept="image/*"
             tabIndex={-1}
             aria-hidden="true"
-            style={inputOculto}
+            className={s.inputOculto}
             onChange={(e) => void elegirFoto(e)}
           />
           {foto ? (
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div className={s.fotoFila}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={foto}
-                alt="Foto de la justificación"
-                style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 10, border: "1px solid var(--border)" }}
-              />
-              <button type="button" style={btn} onClick={() => setFoto(null)} disabled={enviando}>
+              <img src={foto} alt="Foto de la justificación" className={s.foto} />
+              <Button size="sm" variant="danger-ghost" onClick={() => setFoto(null)} disabled={enviando}>
                 Quitar foto
-              </button>
+              </Button>
             </div>
           ) : null}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              style={{ ...btn, flex: "1 1 150px" }}
+          <div className={s.fotoAcciones}>
+            <Button
+              size="lg"
+              className={s.crece}
               onClick={() => camaraRef.current?.click()}
               disabled={enviando || procesandoFoto}
+              iconStart={<AddAPhotoOutlinedIcon fontSize="inherit" />}
             >
-              <AddAPhotoOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
               {foto ? "Tomar otra" : "Tomar foto"}
-            </button>
-            <button
-              type="button"
-              style={{ ...btn, flex: "1 1 150px" }}
+            </Button>
+            <Button
+              size="lg"
+              className={s.crece}
               onClick={() => galeriaRef.current?.click()}
               disabled={enviando || procesandoFoto}
+              iconStart={<PhotoLibraryOutlinedIcon fontSize="inherit" />}
             >
-              <PhotoLibraryOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
               Elegir de la galería
-            </button>
+            </Button>
           </div>
-          {procesandoFoto ? <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Preparando foto…</span> : null}
+          {procesandoFoto ? <span className={s.muted}>Preparando foto…</span> : null}
         </div>
 
         {error ? (
-          <p role="alert" style={{ margin: 0, fontSize: 13.5, color: ROJO }}>
+          <p role="alert" className={s.error}>
             {error}
           </p>
         ) : null}
 
-        <footer style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button type="button" style={btn} onClick={onClose} disabled={enviando}>
+        <footer className={s.dialogoPie}>
+          <Button variant="tertiary" size="lg" onClick={onClose} disabled={enviando}>
             Cancelar
-          </button>
-          <button
-            type="button"
-            style={{ ...btnPrimario, opacity: enviando || procesandoFoto ? 0.7 : 1 }}
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
             onClick={() => void enviar()}
-            disabled={enviando || procesandoFoto}
+            disabled={procesandoFoto}
+            loading={enviando}
+            iconStart={<EditNoteOutlinedIcon fontSize="inherit" />}
           >
-            <EditNoteOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
             {enviando ? "Enviando…" : "Enviar justificación"}
-          </button>
+          </Button>
         </footer>
       </div>
     </div>,

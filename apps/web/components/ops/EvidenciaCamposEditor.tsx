@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, type CSSProperties } from "react";
+import { useEffect, useId, useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -18,6 +18,8 @@ import {
   type ErroresCampos,
   type Momento,
 } from "@/lib/evidencia-campos";
+import { Button, Input } from "@/components/base";
+import s from "./EvidenciaCamposEditor.module.css";
 
 type Props = {
   value: CampoBorrador[];
@@ -27,43 +29,6 @@ type Props = {
   disabled?: boolean;
 };
 
-const input: CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "9px 12px",
-  minHeight: 40,
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  font: "inherit",
-  fontSize: 14,
-};
-
-const chip: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  padding: "6px 12px",
-  minHeight: 36,
-  borderRadius: 999,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  fontSize: 13,
-  fontWeight: 650,
-};
-
-function toggle(on: boolean): CSSProperties {
-  return {
-    ...chip,
-    border: on ? "1.5px solid var(--primary)" : "1px solid var(--border)",
-    background: on ? "color-mix(in srgb, var(--primary) 12%, var(--surface))" : "var(--surface)",
-    color: on ? "var(--primary)" : "var(--text-secondary)",
-  };
-}
 
 /**
  * Editor de «qué hay que fotografiar»: una fila por cosa (Cámara 1, Rack…) con los momentos
@@ -100,15 +65,16 @@ export default function EvidenciaCamposEditor({ value, onChange, errores, disabl
   const quitar = (key: string) => onChange(value.filter((f) => f.key !== key));
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        <span style={{ fontSize: 12.5, fontWeight: 650, color: "var(--text-secondary)" }}>Agregar rápido:</span>
+    <div className={s.editor}>
+      <div className={s.rapido}>
+        <span className={s.rapidoT}>Agregar rápido:</span>
         {PRESETS_CAMPOS.map((p) => (
-          <button
+          <Button
             key={p.nombre}
-            type="button"
-            style={{ ...chip, opacity: lleno || disabled ? 0.55 : 1 }}
+            size="sm"
+            className={s.chip}
             disabled={lleno || disabled}
+            iconStart={<AddIcon fontSize="inherit" />}
             onClick={() =>
               agregar(
                 campoVacio(
@@ -123,14 +89,13 @@ export default function EvidenciaCamposEditor({ value, onChange, errores, disabl
               )
             }
           >
-            <AddIcon aria-hidden="true" sx={{ fontSize: 16 }} />
             {p.nombre}
-          </button>
+          </Button>
         ))}
       </div>
 
       {value.length > 0 ? (
-        <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+        <ol className={s.filas}>
           {value.map((fila, i) => {
             const nombreId = `${idBase}-${fila.key}-nombre`;
             const errorId = `${idBase}-${fila.key}-error`;
@@ -139,23 +104,11 @@ export default function EvidenciaCamposEditor({ value, onChange, errores, disabl
               (fila.momentos.length === 0 ? "Elige al menos un momento: antes, en progreso o después." : null);
             const nombreVisible = fila.nombre.trim() || `punto ${i + 1}`;
             return (
-              <li
-                key={fila.key}
-                style={{
-                  display: "grid",
-                  gap: 8,
-                  padding: 12,
-                  borderRadius: 14,
-                  border: `1px solid ${mensaje ? "color-mix(in srgb, var(--danger) 45%, var(--border))" : "var(--border)"}`,
-                  background: "var(--surface)",
-                }}
-              >
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end" }}>
-                  <label htmlFor={nombreId} style={{ display: "grid", gap: 4, flex: "1 1 220px", minWidth: 0 }}>
-                    <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-                      Punto {i + 1} · Qué fotografiar
-                    </span>
-                    <input
+              <li key={fila.key} className={s.fila} data-error={mensaje ? "true" : undefined}>
+                <div className={s.filaArriba}>
+                  <label htmlFor={nombreId} className={s.nombre}>
+                    <span className={s.etiqueta}>Punto {i + 1} · Qué fotografiar</span>
+                    <Input
                       id={nombreId}
                       value={fila.nombre}
                       maxLength={MAX_LARGO_NOMBRE}
@@ -164,54 +117,49 @@ export default function EvidenciaCamposEditor({ value, onChange, errores, disabl
                       aria-invalid={Boolean(mensaje)}
                       aria-describedby={mensaje ? errorId : undefined}
                       onChange={(e) => cambiar(fila.key, { nombre: e.target.value })}
-                      style={input}
                     />
                   </label>
-                  <div
-                    role="group"
-                    aria-label={`Momentos en que se pide foto de ${nombreVisible}`}
-                    style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-                  >
+                  <div role="group" aria-label={`Momentos en que se pide foto de ${nombreVisible}`} className={s.momentos}>
                     {MOMENTOS.map((m) => {
                       const on = fila.momentos.includes(m);
                       return (
-                        <button
+                        <Button
                           key={m}
-                          type="button"
+                          size="sm"
                           aria-pressed={on}
                           disabled={disabled}
                           onClick={() => alternarMomento(fila, m)}
-                          style={toggle(on)}
+                          className={s.chip}
+                          iconStart={on ? <CheckIcon fontSize="inherit" /> : undefined}
                         >
-                          {on ? <CheckIcon aria-hidden="true" sx={{ fontSize: 16 }} /> : null}
                           {MOMENTO_LABEL[m]}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
+                    variant="danger-ghost"
                     onClick={() => quitar(fila.key)}
                     disabled={disabled}
                     aria-label={`Quitar ${nombreVisible}`}
                     title="Quitar"
-                    style={{ ...chip, color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 35%, var(--border))" }}
+                    iconStart={<DeleteOutlineIcon fontSize="inherit" />}
                   >
-                    <DeleteOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                     Quitar
-                  </button>
+                  </Button>
                 </div>
-                <input
+                <Input
+                  controlSize="sm"
                   value={fila.notas}
                   maxLength={MAX_LARGO_NOTAS}
                   placeholder="Nota para quien toma la foto (opcional). Ej. que se vea la etiqueta"
                   aria-label={`Nota para la foto de ${nombreVisible} (opcional)`}
                   disabled={disabled}
                   onChange={(e) => cambiar(fila.key, { notas: e.target.value })}
-                  style={{ ...input, fontSize: 13, minHeight: 36, padding: "7px 12px" }}
                 />
                 {mensaje ? (
-                  <p id={errorId} style={{ margin: 0, fontSize: 12.5, color: "var(--danger)", fontWeight: 600 }}>
+                  <p id={errorId} className={s.error}>
                     {mensaje}
                   </p>
                 ) : null}
@@ -221,25 +169,25 @@ export default function EvidenciaCamposEditor({ value, onChange, errores, disabl
         </ol>
       ) : null}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-        <button
-          type="button"
-          style={{ ...chip, borderStyle: "dashed", opacity: lleno || disabled ? 0.55 : 1 }}
+      <div className={s.pie}>
+        <Button
+          size="sm"
+          className={s.agregar}
           disabled={lleno || disabled}
           onClick={() => agregar(campoVacio(), true)}
+          iconStart={<AddIcon fontSize="inherit" />}
         >
-          <AddIcon aria-hidden="true" sx={{ fontSize: 18 }} />
           Agregar punto
-        </button>
+        </Button>
         {value.length > 0 ? (
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+          <span className={s.cuenta}>
             {value.length} de {MAX_CAMPOS} puntos
           </span>
         ) : null}
       </div>
 
       {errores?.general ? (
-        <p role="alert" style={{ margin: 0, fontSize: 12.5, color: "var(--danger)", fontWeight: 600 }}>
+        <p role="alert" className={s.error}>
           {errores.general}
         </p>
       ) : null}

@@ -1,0 +1,99 @@
+/* Piezas compartidas de Actividades (v2). Solo tokens --ui-*; claro y oscuro salen de los tokens. */
+
+/* ─── Pestañas por ruta ─────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: var(--ui-s5);
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: -1px;
+  min-width: 0;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  height: 46px;
+  padding: 0 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--ui-fg-2);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-medium);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color var(--ui-duration-fast) ease, border-color var(--ui-duration-fast) ease;
+}
+
+.tab:hover {
+  color: var(--ui-fg);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: -2px;
+  border-radius: var(--ui-radius-xs);
+}
+
+.tab[aria-current="page"] {
+  color: var(--ui-fg);
+  font-weight: var(--ui-fw-semibold);
+  border-bottom-color: var(--ui-brand);
+}
+
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-neutral-bg);
+  color: var(--ui-neutral-text);
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tab[aria-current="page"] .count {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+/* ─── Menú «···» ────────────────────────────────────────────────────────── */
+
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.menuList {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--ui-z-dropdown);
+  min-width: 220px;
+  margin: 0;
+  padding: var(--ui-s1);
+  list-style: none;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-3);
+  box-shadow: var(--ui-elev-2);
+}
+
+.menuItem {
+  justify-content: flex-start;
+}
+
+@media (max-width: 767px) {
+  .menuList {
+    right: auto;
+    left: 0;
+  }
+}
