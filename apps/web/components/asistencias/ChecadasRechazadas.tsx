@@ -28,6 +28,7 @@ const MOTIVOS = [
   { id: "VIAJE_IMPOSIBLE", label: "Viaje imposible" },
   { id: "UBICACION_VIEJA", label: "Ubicación vieja" },
   { id: "ORIGEN_WEB", label: "Navegador" },
+  { id: "FIN_DE_SEMANA_SIN_GUARDIA", label: "Sin guardia" },
 ] as const;
 
 /** Un rechazo por GPS falso no es lo mismo que uno por abrir la web: se pintan distinto. */
@@ -36,6 +37,7 @@ const TONO: Record<string, "danger" | "warning" | "outline"> = {
   VIAJE_IMPOSIBLE: "danger",
   UBICACION_VIEJA: "warning",
   ORIGEN_WEB: "outline",
+  FIN_DE_SEMANA_SIN_GUARDIA: "outline",
 };
 
 const fechaHora = (iso: string) =>

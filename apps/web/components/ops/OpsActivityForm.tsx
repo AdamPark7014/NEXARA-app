@@ -8,6 +8,7 @@ import Section from "@/components/ui/Section";
 import { useUser } from "@/components/UserContext";
 import EvidenciaCamposEditor from "@/components/ops/EvidenciaCamposEditor";
 import HerramientasChecklistEditor from "@/components/ops/HerramientasChecklistEditor";
+import AvisoGuardia from "@/components/asistencias/AvisoGuardia";
 import {
   definirCamposEvidencia,
   hayErrores,
@@ -1335,6 +1336,18 @@ export default function OpsActivityForm({
                 : `${resumenDelRango({ inicio: form.fecha, fin: form.periodoFin })}. Se queda en la pizarra cada día hasta terminarla y no cuenta como atrasada antes del último día.`
               : "Sin último día es de un solo momento (día y hora). Si el trabajo dura varios días, pon hasta cuándo: así no hay que cargarla cada día."}
           </p>
+          {form.fecha && form.responsableId ? (
+            <AvisoGuardia
+              token={token}
+              fecha={form.fecha}
+              personas={[Number(form.responsableId), ...(extraTeamIds ?? [])]
+                .filter((id, i, arr) => arr.indexOf(id) === i)
+                .map((id) => ({
+                  id,
+                  nombre: users.find((u) => u.id === id)?.nombre?.split(/\s+/).slice(0, 2).join(" ") || "esta persona",
+                }))}
+            />
+          ) : null}
         </div>
         {isCore ? (
           <>

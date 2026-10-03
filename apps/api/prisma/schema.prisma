@@ -976,6 +976,8 @@ model User {
   evidenceFieldPhotos     ActivityEvidenceFieldPhoto[] @relation("EvidenceFieldPhotoAuthor")
   workSessions            ActivityWorkSession[] @relation("WorkSessionUser")
   workSessionsEnded       ActivityWorkSession[] @relation("WorkSessionEndedBy")
+  guardias                Guardia[]             @relation("GuardiaUser")
+  guardiasProgramadas     Guardia[]             @relation("GuardiaCreadaPor")
 
   // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
   checadasRechazadas    AttendanceRejection[] @relation("AttendanceRejectionUser")
@@ -6104,6 +6106,7 @@ model CompanyProfile {
 
   activityGeofenceAlerts  ActivityGeofenceAlert[]
   activityWorkSessions    ActivityWorkSession[]
+  guardias                Guardia[]
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   attendanceRejections        AttendanceRejection[]
@@ -6639,6 +6642,28 @@ model ActivityWorkSession {
   @@index([activityId, userId])
   @@index([companyId])
   @@map("activity_work_sessions")
+}
+
+/// Guardia de fin de semana: quien la tiene es el único que puede abrir jornada ese sábado o
+/// domingo, y su entrada sale sola al iniciar su primer servicio o tarea del día.
+model Guardia {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  userId      Int
+  /// Día calendario en la zona de la jornada (America/Mexico_City). Siempre sábado o domingo.
+  fecha       DateTime @db.Date
+  nota        String?  @db.VarChar(300)
+  /// Quién la programó. null si se borra su usuario: la guardia se conserva.
+  creadoPorId Int?
+  createdAt   DateTime @default(now())
+
+  user      User           @relation("GuardiaUser", fields: [userId], references: [id], onDelete: Cascade)
+  creadoPor User?          @relation("GuardiaCreadaPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, userId, fecha])
+  @@index([companyId, fecha])
+  @@map("guardias")
 }
 
 /// Una cosa que hay que documentar en la actividad: «Cámara 1», «Rack», «Canalización».

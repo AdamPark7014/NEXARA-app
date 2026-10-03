@@ -55,6 +55,7 @@ import styles from "./asistencias.module.css";
 const ChecadasRechazadas = dynamic(() => import("@/components/asistencias/ChecadasRechazadas"), { ssr: false });
 const HorariosEquipo = dynamic(() => import("@/components/asistencias/HorariosEquipo"), { ssr: false });
 const RegistroAsistido = dynamic(() => import("@/components/asistencias/RegistroAsistido"), { ssr: false });
+const GuardiasPanel = dynamic(() => import("@/components/asistencias/GuardiasPanel"), { ssr: false });
 import ChecarEnWeb from "@/components/asistencias/ChecarEnWeb";
 type TabId = "equipo" | "comidas" | "trayectoria" | "rechazos" | "horarios";
 type Estado = "PRESENTE" | "COMPLETO" | "JUSTIFICADA" | "AUSENTE";
@@ -275,6 +276,7 @@ export default function ErpAsistenciasPage() {
   const canSeeOwnTrajectory = canLiveGps;
 
   const [tab, setTab] = useState<TabId>("equipo");
+  const [verGuardias, setVerGuardias] = useState(false);
   // Los avisos de comida abren /erp/asistencias?tab=comidas.
   useEffect(() => {
     const inicial = new URLSearchParams(window.location.search).get("tab");
@@ -643,6 +645,9 @@ export default function ErpAsistenciasPage() {
                 KPIs del equipo
               </Link>
             ) : null}
+            <Button size="sm" variant="secondary" onClick={() => setVerGuardias(true)}>
+              Guardias
+            </Button>
             <input
               type="date"
               aria-label="Día"
@@ -1281,6 +1286,10 @@ export default function ErpAsistenciasPage() {
           )}
         </>
       )}
+
+      <Modal open={verGuardias} onClose={() => setVerGuardias(false)} title="Guardias de fin de semana" size="lg">
+        {verGuardias ? <GuardiasPanel token={token} /> : null}
+      </Modal>
 
       <Modal
         open={justificando != null}

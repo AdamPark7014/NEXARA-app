@@ -146,6 +146,7 @@ describe('las claves de rechazo son estables', () => {
   it('son las que se guardan en la base y las que traduce la interfaz', () => {
     // Cambiarlas rompería las filas ya escritas: si esto falla, hay que migrar.
     expect(Object.values(MOTIVO_RECHAZO).sort()).toEqual([
+      'FIN_DE_SEMANA_SIN_GUARDIA',
       'MOCK_LOCATION',
       'ORIGEN_WEB',
       'UBICACION_VIEJA',
