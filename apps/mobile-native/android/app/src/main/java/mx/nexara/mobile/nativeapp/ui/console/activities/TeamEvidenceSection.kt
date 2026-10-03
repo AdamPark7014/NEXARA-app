@@ -589,7 +589,7 @@ private fun EvidenceContent(
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     ) {
                         NxIconText(
-                            text = CoreActivityRules.stepLabel(step),
+                            text = CoreActivityRules.stepLabel(step, coreKind),
                             icon = when {
                                 corregir -> NxGlyph.RETURNED.icon
                                 corregido -> NxGlyph.CORRECTION.icon
@@ -628,13 +628,23 @@ private fun EvidenceContent(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (entrada != null) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionTitle("Entrada", ev.entryPhotoUploadedAt, STEP_ENTRY, onDevolverPaso)
+                        SectionTitle(
+                            if (CoreActivityRules.esComercial(coreKind)) "Inicio" else "Entrada",
+                            ev.entryPhotoUploadedAt,
+                            STEP_ENTRY,
+                            onDevolverPaso,
+                        )
                         PhotoThumb(set.fotos[entrada], 160.dp) { onOpenVisor(set.fotos, entrada) }
                     }
                 }
                 if (salida != null) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionTitle("Salida", ev.exitPhotoUploadedAt, STEP_EXIT, onDevolverPaso)
+                        SectionTitle(
+                            if (CoreActivityRules.esComercial(coreKind)) "Conclusión" else "Salida",
+                            ev.exitPhotoUploadedAt,
+                            STEP_EXIT,
+                            onDevolverPaso,
+                        )
                         PhotoThumb(set.fotos[salida], 160.dp) { onOpenVisor(set.fotos, salida) }
                     }
                 }
@@ -779,7 +789,7 @@ private fun ReviewHistory(
                 r.calificacion?.takeIf { it > 0 }?.let { StarsText(it) }
                 if (r.decision == "DEVUELTA_PASOS" && !r.pasos.isNullOrEmpty()) {
                     Text(
-                        "Corregir: ${r.pasos.joinToString(", ") { CoreActivityRules.stepLabel(it) }}",
+                        "Corregir: ${r.pasos.joinToString(", ") { CoreActivityRules.stepLabel(it, coreKind) }}",
                         fontSize = 12.5.sp,
                         color = NxColors.Muted,
                     )
@@ -992,7 +1002,7 @@ private fun ReviewSheet(
                                         checked = checked,
                                         onCheckedChange = { on -> marcados = if (on) marcados + step else marcados - step },
                                     )
-                                    Text(CoreActivityRules.stepLabel(step), fontSize = 14.sp, color = NxColors.Slate)
+                                    Text(CoreActivityRules.stepLabel(step, coreKind), fontSize = 14.sp, color = NxColors.Slate)
                                 }
                             }
                         }

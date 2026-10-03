@@ -94,7 +94,7 @@ const CLASE_ESTADO: Record<EstadoAro, string> = {
 function claseDeEstadoActividad(estado: string): string {
   if (estado === "En curso") return s.estadoTrabajando;
   if (estado.startsWith("Atrasada")) return s.estadoAtrasada;
-  if (estado === "Por vencer") return s.estadoRetraso;
+  if (estado === "Por vencer" || estado === "En pausa") return s.estadoRetraso;
   if (estado === "Sin iniciar") return s.estadoEnTiempo;
   return "";
 }

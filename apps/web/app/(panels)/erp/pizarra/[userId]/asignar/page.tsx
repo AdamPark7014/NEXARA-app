@@ -862,9 +862,15 @@ export default function AsignarActividadPage() {
               setPlanHoras(horas);
               setPlanMinutos(minutos);
             }}
-            maxHoras={24}
+            // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
+            maxHoras={12}
+            topeMinutos={720}
             minuteStep={5}
-            hint={!planValido ? "Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede." : undefined}
+            hint={
+              !planValido
+                ? "Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede."
+                : "Máximo 12 h. Si lleva más días, se reanuda cada día."
+            }
           />
           {!planValido ? (
             <p style={{ margin: 0, fontSize: 13, color: "#b45309" }}>

@@ -1,3 +1,5 @@
+import { textosDeInicioYCierre } from "@/lib/evidence-flow-helpers";
+
 export const EVIDENCE_STEP_ORDER = [
   "ENTRY_PHOTO",
   "EVIDENCE_PHOTOS",
@@ -46,10 +48,11 @@ export function canStartActivity(
   return !/proceso|curso|en_curso/i.test(estatus) && !/finaliz|completada|aprobada/i.test(estatus);
 }
 
-export function evidenceStepLabel(step: string): string {
+/** `coreKind`: en comercial el primer y el último paso se llaman distinto (ver `textosDeInicioYCierre`). */
+export function evidenceStepLabel(step: string, coreKind?: string | null): string {
   switch (step) {
     case "ENTRY_PHOTO":
-      return "Paso 1: Foto de Entrada";
+      return textosDeInicioYCierre(coreKind).inicio.paso;
     case "EVIDENCE_PHOTOS":
       return "Paso 2: Fotos de Evidencia";
     case "SERVICE_SHEET_PDF":
@@ -57,7 +60,7 @@ export function evidenceStepLabel(step: string): string {
     case "SERVICE_SHEET_DATA":
       return "Paso 4: Plantilla Interna";
     case "EXIT_PHOTO":
-      return "Paso 5: Foto de Salida";
+      return textosDeInicioYCierre(coreKind).cierre.paso;
     default:
       return step;
   }

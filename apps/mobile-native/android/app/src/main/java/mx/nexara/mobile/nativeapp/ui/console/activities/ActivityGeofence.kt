@@ -66,10 +66,13 @@ import kotlin.math.sqrt
 /**
  * Geocerca de actividades — espejo de `apps/api/src/activities/geofence/geocerca.ts`:
  * quien inicia una actividad (foto de entrada con GPS) debe quedarse y registrar la salida
- * a menos de [RADIO_M] metros de ese punto.
+ * a menos de [RADIO_M] metros de ese punto. Si la salida tiene que coincidir con el inicio lo
+ * decide la API por tipo de actividad (`exigeMismaUbicacion`): servicio, proyecto, obra y
+ * tarea sí —menos recolección, entrega y compra de material—; comercial no.
  */
 object ActivityGeofence {
-    const val RADIO_M = 100
+    /** 500 m y no 100: un sitio grande (un Walmart) no cabe en 100 m. */
+    const val RADIO_M = 500
 
     private const val RADIO_TIERRA_M = 6_371_000.0
 
@@ -103,7 +106,7 @@ object ActivityGeofence {
 
 /**
  * «Ubicación de la actividad»: punto de inicio, seguimiento de ubicación cada pocos minutos,
- * si está dentro de los 100 m y las salidas de zona con su justificación.
+ * si está dentro del radio y las salidas de zona con su justificación.
  */
 @Composable
 fun GeocercaActividadCard(
@@ -172,7 +175,7 @@ fun GeocercaActividadCard(
                     "la foto de salida solo se acepta ahí."
             } else {
                 "Iniciaste a las ${ActivityGeofence.horaDe(e.origen.at)}. La foto de salida lleva tu ubicación; " +
-                    "en esta área no hace falta que coincida con el inicio."
+                    "en este tipo de actividad no hace falta que coincida con el inicio."
             },
             fontSize = 12.sp,
             color = NxColors.Muted,

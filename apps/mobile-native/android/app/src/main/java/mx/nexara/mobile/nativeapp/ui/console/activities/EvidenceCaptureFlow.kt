@@ -170,6 +170,8 @@ fun EvidenceCaptureFlow(
     }
 
     val coreKind = flow?.activity?.coreKind ?: activity.coreKind
+    // Comercial no es trabajo «en sitio»: su entrada y su salida se llaman inicio y conclusión.
+    val comercial = CoreActivityRules.esComercial(coreKind)
     val photoRequired = (flow?.activity?.evidencePhotoRequired ?: activity.evidencePhotoRequired ?: 4)
         .coerceAtLeast(1)
     val step = flow?.status ?: STEP_ENTRY
@@ -213,7 +215,7 @@ fun EvidenceCaptureFlow(
         }
     }
 
-    // Geocerca (100 m del punto de inicio): la tarjeta la carga y aquí se usa para la foto de salida.
+    // Geocerca (radio alrededor del punto de inicio): la tarjeta la carga y aquí se usa para la foto de salida.
     var geocerca by remember(activity.id) { mutableStateOf<GeocercaDto?>(null) }
     LaunchedEffect(activity.id, flow?.status) {
         val enCurso = !flow?.entryPhotoUrl.isNullOrBlank() && step != STEP_COMPLETED && !locked
@@ -268,7 +270,7 @@ fun EvidenceCaptureFlow(
 
     fun correctionMessage(saved: EvidenceFlowDto): String = when {
         saved.status == STEP_COMPLETED -> "¡Corrección enviada! Tu evidencia será revisada nuevamente."
-        !saved.status.isNullOrBlank() -> "Paso corregido. Siguiente: ${CoreActivityRules.stepLabel(saved.status)}"
+        !saved.status.isNullOrBlank() -> "Paso corregido. Siguiente: ${CoreActivityRules.stepLabel(saved.status, coreKind)}"
         else -> "Corrección enviada."
     }
 
@@ -346,9 +348,11 @@ fun EvidenceCaptureFlow(
             }
             val message = when {
                 isCorrection -> correctionMessage(saved)
-                kind == KIND_ENTRY -> "Foto de entrada guardada. Siguiente: toma $photoRequired fotos de evidencia."
+                kind == KIND_ENTRY ->
+                    (if (comercial) "Inicio de actividad guardado." else "Foto de entrada guardada.") +
+                        " Siguiente: toma $photoRequired fotos de evidencia."
                 saved.status == STEP_COMPLETED -> "¡Listo! Tus evidencias quedaron enviadas a revisión."
-                else -> "Foto de salida guardada."
+                else -> if (comercial) "Conclusión de actividad guardada." else "Foto de salida guardada."
             }
             applySaved(saved, message)
             if (saved.status != null) {
@@ -557,6 +561,7 @@ fun EvidenceCaptureFlow(
                 applySaved(
                     saved,
                     if (isCorrection) correctionMessage(saved)
+                    else if (comercial) "Formulario guardado. Siguiente: conclusión de actividad."
                     else "Formulario guardado. Siguiente: toma la foto de salida.",
                 )
             } catch (e: Exception) {
@@ -650,7 +655,9 @@ fun EvidenceCaptureFlow(
             color = NxColors.Slate,
         )
         Text(
-            if (needsPdf) {
+            if (comercial) {
+                "Inicio de actividad, fotos de evidencia, formulario y conclusión de actividad."
+            } else if (needsPdf) {
                 "Foto de entrada, fotos en sitio, hoja de servicio, formulario y foto de salida."
             } else {
                 "Foto de entrada, fotos en sitio, formulario y foto de salida."
@@ -686,7 +693,7 @@ fun EvidenceCaptureFlow(
             }
 
             if (isCorrection && (rejected.isNotEmpty() || !flow?.reviewNotes.isNullOrBlank())) {
-                CorrectionBanner(rejected = rejected, steps = steps, notes = flow?.reviewNotes)
+                CorrectionBanner(rejected = rejected, steps = steps, notes = flow?.reviewNotes, coreKind = coreKind)
             }
 
             StepProgress(steps = steps, flow = flow, current = step)
@@ -740,11 +747,19 @@ fun EvidenceCaptureFlow(
                 step == STEP_COMPLETED || locked -> CompletedCard(locked = locked, reviewStatus = reviewStatus)
 
                 step == STEP_ENTRY -> StepCard(
-                    title = "$stepPrefix: Foto de entrada",
-                    description = "Tómala al llegar al sitio. Se guarda con tu ubicación GPS (obligatoria).",
+                    title = "$stepPrefix: ${CoreActivityRules.stepLabel(STEP_ENTRY, coreKind)}",
+                    description = if (comercial) {
+                        "Tómala al iniciar la actividad. Se guarda con tu ubicación GPS (obligatoria)."
+                    } else {
+                        "Tómala al llegar al sitio. Se guarda con tu ubicación GPS (obligatoria)."
+                    },
                     icon = NxGlyph.ENTRY.icon,
                 ) {
-                    PrimaryAction("Tomar foto de entrada", icon = NxGlyph.PHOTO.icon, enabled = !busy) {
+                    PrimaryAction(
+                        if (comercial) "Tomar foto de inicio" else "Tomar foto de entrada",
+                        icon = NxGlyph.PHOTO.icon,
+                        enabled = !busy,
+                    ) {
                         success = null
                         error = null
                         cameraKind = KIND_ENTRY
@@ -861,14 +876,19 @@ fun EvidenceCaptureFlow(
                 }
 
                 step == STEP_EXIT -> StepCard(
-                    title = "$stepPrefix: Foto de salida",
-                    description = "Tómala en el sitio al terminar. Tu ubicación GPS es obligatoria para cerrar.",
+                    title = "$stepPrefix: ${CoreActivityRules.stepLabel(STEP_EXIT, coreKind)}",
+                    description = if (comercial) {
+                        "Tómala al concluir la actividad. Tu ubicación GPS es obligatoria para cerrar; " +
+                            "no tiene que ser donde iniciaste."
+                    } else {
+                        "Tómala en el sitio al terminar. Tu ubicación GPS es obligatoria para cerrar."
+                    },
                     icon = NxGlyph.EXIT.icon,
                 ) {
                     // Con campos no se cierra hasta que no falte ninguna foto obligatoria.
                     val bloqueoCampos = CoreActivityRules.camposBloqueoSalida(campos)
                     PrimaryAction(
-                        "Tomar foto de salida",
+                        if (comercial) "Tomar foto de conclusión" else "Tomar foto de salida",
                         icon = NxGlyph.PHOTO.icon,
                         enabled = !busy && bloqueoCampos == null,
                     ) {
@@ -902,8 +922,8 @@ fun EvidenceCaptureFlow(
     cameraKind?.let { kind ->
         LiveCameraCaptureDialog(
             title = when (kind) {
-                KIND_ENTRY -> "Foto de entrada"
-                KIND_EXIT -> "Foto de salida"
+                KIND_ENTRY -> CoreActivityRules.stepLabel(STEP_ENTRY, coreKind)
+                KIND_EXIT -> CoreActivityRules.stepLabel(STEP_EXIT, coreKind)
                 KIND_CAMPO -> campoTitulo ?: "Foto del campo"
                 else -> "Foto de evidencia ${drafts.size + 1} de $photoRequired"
             },
@@ -927,8 +947,8 @@ fun EvidenceCaptureFlow(
     if (photo != null && kind != null) {
         GeoPhotoPreviewDialog(
             title = when (kind) {
-                KIND_ENTRY -> "Tu foto de entrada"
-                KIND_EXIT -> "Tu foto de salida"
+                KIND_ENTRY -> if (comercial) "Tu foto de inicio de actividad" else "Tu foto de entrada"
+                KIND_EXIT -> if (comercial) "Tu foto de conclusión de actividad" else "Tu foto de salida"
                 KIND_CAMPO -> campoTitulo ?: "Tu foto del campo"
                 else -> "Tu foto de evidencia ${drafts.size + 1} de $photoRequired"
             },
@@ -1193,7 +1213,7 @@ private fun StepProgress(steps: List<String>, flow: EvidenceFlowDto?, current: S
                     }
                 }
                 Text(
-                    CoreActivityRules.stepLabel(s),
+                    CoreActivityRules.stepLabel(s, flow?.activity?.coreKind),
                     fontSize = 12.sp,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                     color = if (active) NxColors.Slate else NxColors.Muted,
@@ -1451,7 +1471,7 @@ private fun CampoSlot(
 }
 
 @Composable
-private fun CorrectionBanner(rejected: List<String>, steps: List<String>, notes: String?) {
+private fun CorrectionBanner(rejected: List<String>, steps: List<String>, notes: String?, coreKind: String?) {
     val todo = rejected.isNotEmpty() && steps.all { it in rejected }
     Column(
         modifier = Modifier
@@ -1472,7 +1492,7 @@ private fun CorrectionBanner(rejected: List<String>, steps: List<String>, notes:
         if (rejected.isNotEmpty()) {
             Text(
                 (if (rejected.size > 1) "Pasos a corregir: " else "Paso a corregir: ") +
-                    rejected.joinToString(" · ") { CoreActivityRules.stepLabel(it) },
+                    rejected.joinToString(" · ") { CoreActivityRules.stepLabel(it, coreKind) },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = NxColors.Slate,

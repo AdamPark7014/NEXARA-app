@@ -127,6 +127,7 @@ export function DurationWheelPicker({
   onChange,
   maxHoras = 24,
   minuteStep = 5,
+  topeMinutos,
   label,
   hint,
   id,
@@ -137,10 +138,20 @@ export function DurationWheelPicker({
   maxHoras?: number;
   /** Paso de minutos (1 o 5). */
   minuteStep?: 1 | 5;
+  /**
+   * Tope del total en minutos: con `maxHoras={12}` y `topeMinutos={720}` la rueda ofrece
+   * «12» pero 12 h 30 min se queda en 12 h (ninguna actividad dura más de 12 horas).
+   */
+  topeMinutos?: number;
   label?: string;
   hint?: string;
   id?: string;
 }) {
+  const topar = (next: DurationValue): DurationValue => {
+    if (topeMinutos == null) return next;
+    const total = Math.min(joinMinutes(next.horas, next.minutos), Math.max(0, Math.floor(topeMinutos)));
+    return splitMinutes(total);
+  };
   const hourValues = useMemo(
     () => Array.from({ length: Math.max(1, maxHoras) + 1 }, (_, i) => i),
     [maxHoras],
@@ -170,14 +181,14 @@ export function DurationWheelPicker({
           ariaLabel="horas"
           values={hourValues}
           value={h}
-          onChange={(next) => onChange({ horas: next, minutos: m })}
+          onChange={(next) => onChange(topar({ horas: next, minutos: m }))}
         />
         <WheelColumn
           label="Minutos"
           ariaLabel="minutos"
           values={minuteValues}
           value={m}
-          onChange={(next) => onChange({ horas: h, minutos: next })}
+          onChange={(next) => onChange(topar({ horas: h, minutos: next }))}
         />
       </div>
       {hint ? <p className={styles.hint}>{hint}</p> : null}

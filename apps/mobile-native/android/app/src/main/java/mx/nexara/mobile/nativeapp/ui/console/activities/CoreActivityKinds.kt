@@ -143,6 +143,8 @@ object CoreActivityKinds {
         OrgEmails.ANTONIO to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL),
         OrgEmails.DANIELA to listOf(TAREA, COMERCIAL),
         OrgEmails.MONICA to listOf(TAREA, COMERCIAL),
+        // Paulina (contadora): lo comercial es parte de su trabajo; sin estar aquí solo veía Tarea.
+        OrgEmails.PAULINA to listOf(TAREA, COMERCIAL),
         OrgEmails.JOAN to listOf(TAREA),
         OrgEmails.ISRAEL to listOf(TAREA),
         OrgEmails.JUAN to listOf(TAREA),
@@ -169,6 +171,7 @@ object CoreActivityKinds {
         // Comercial / admin
         OrgEmails.DANIELA to listOf(TAREA, COMERCIAL),
         OrgEmails.MONICA to listOf(TAREA, COMERCIAL),
+        OrgEmails.PAULINA to listOf(TAREA, COMERCIAL),
         // Josué, encargado de obra: todo menos servicio
         OrgEmails.JOSUE to listOf(TAREA, PROYECTO, OBRA, COMERCIAL),
     )
@@ -315,7 +318,9 @@ object CoreActivityKinds {
         return when (kind) {
             PROYECTO, OBRA -> allowed.filter { it == ClientSector.PROYECTO }
             SERVICIO -> allowed.filter { it == ClientSector.CORPORATIVO }
-            COMERCIAL -> allowed
+            // Quien crea comercial sin estar en la matriz de Clientes (Paulina) usa el padrón
+            // comercial: sin él, el cliente obligatorio salía vacío y no podía guardar.
+            COMERCIAL -> allowed.ifEmpty { listOf(ClientSector.COMERCIAL) }
             else -> emptyList()
         }
     }

@@ -1,13 +1,17 @@
 import Foundation
 
 // Geocerca de actividades: quien inicia una actividad (foto de entrada con GPS)
-// debe permanecer y registrar la salida a 100 m o menos de ese punto.
+// se mide contra un radio alrededor de ese punto. Si la salida tiene que coincidir
+// con el inicio lo decide el API por tipo de actividad (`exigeMismaUbicacion`):
+// servicio, proyecto, obra y tarea sí —menos recolección, entrega y compra de
+// material—; comercial no.
 // Espejo de `apps/api/src/activities/geofence/geocerca.ts` y de lo que devuelve
 // `GET activity-evidence/:id/geocerca`.
 
 enum ActivityGeofence {
     /// Radio de la zona alrededor del punto de inicio (`RADIO_ACTIVIDAD_M`).
-    static let radioM = 100
+    /// 500 m y no 100: un sitio grande (un Walmart) no cabe en 100 m.
+    static let radioM = 500
 
     private static let radioTierraM = 6_371_000.0
 

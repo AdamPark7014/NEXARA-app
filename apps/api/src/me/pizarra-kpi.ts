@@ -9,6 +9,15 @@
  */
 import { esMultiDia, finDelPeriodo, type Periodo } from '../activities/actividad-periodo.js';
 import { evaluarSemaforo } from '../activities/semaforo-actividad.js';
+import {
+  cruzarTramos,
+  minutosDeTramosMs,
+  minutosTrabajados,
+  tramosTrabajados,
+  unirTramos,
+  type SesionTrabajo,
+  type TramoMs,
+} from '../activities/sessions/sesiones-trabajo.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Semaforo = 'rojo' | 'amarillo' | 'verde';
@@ -138,6 +147,12 @@ export type ActividadPizarra = {
    * (que es de una jornada) no la marca excedida mientras corre.
    */
   periodo?: Periodo | null;
+  /**
+   * Sesiones de trabajo de esta persona en la actividad. Con ellas el tiempo real es su
+   * suma (cada una con tope de 12 h y sin pasar de su día); sin ellas se mide el intervalo
+   * de antes, también con tope: ninguna actividad dura más de 12 horas.
+   */
+  sesiones?: SesionTrabajo[] | null;
 };
 
 export type ActividadCalculada = {
@@ -157,6 +172,8 @@ export type ActividadCalculada = {
   retirado: boolean;
   /** Solo cuando terminó: ¿cerró dentro de su fecha máxima? Sin fecha máxima cuenta a tiempo. */
   aTiempo: boolean | null;
+  /** Tramos en que de verdad corrió su reloj (para cruzarlos con la jornada). */
+  tramos?: TramoMs[];
 };
 
 /**
@@ -171,7 +188,9 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
   const terminada = Boolean(act.terminada);
   const cancelada = Boolean(act.cancelada);
   const minutosPlan = act.minutosPlan ?? null;
-  const minutosReales = minutosEntre(inicio, fin, ahora);
+  // Antes era `fin − inicio` de corrido: una actividad de varios días sumaba noches enteras.
+  const fuente = { inicio, fin, sesiones: act.sesiones ?? null, ahora };
+  const minutosReales = minutosTrabajados(fuente);
   const iniciada = inicio != null || estatusArrancado(act.estatus) || terminada;
   const referencia = terminada ? (fin ?? ahora) : ahora;
   const periodo = act.periodo ?? null;
@@ -210,6 +229,7 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
     rechazada: act.rechazadaAt != null,
     retirado: Boolean(act.retirado),
     aTiempo: terminada ? !vencida : null,
+    tramos: tramosTrabajados(fuente),
   };
 }
 
@@ -250,6 +270,41 @@ export function minutosAsistidos(
   return total;
 }
 
+/**
+ * Horas laboradas como tramos: cada jornada (entrada → salida real, o el tope de 9 h si
+ * no checó salida) menos su comida. Mismas reglas que `minutosAsistidos`; sirve para
+ * saber qué parte del tiempo en actividades cayó dentro de la jornada.
+ */
+export function ventanasLaboradas(jornadas: Jornada[], comidas: Comida[], ahora: Date): TramoMs[] {
+  const out: TramoMs[] = [];
+  for (const j of jornadas) {
+    if (!j.entrada) continue;
+    const inicio = j.entrada.getTime();
+    const tope = Math.min(ahora.getTime(), inicio + MINUTOS_MAX_JORNADA * 60_000);
+    const fin = j.salida ? j.salida.getTime() : tope;
+    if (fin <= inicio) continue;
+    let cursor = inicio;
+    const cortes = unirTramos(
+      comidas
+        .filter((c) => c.inicio)
+        .map((c) => ({
+          inicio: Math.max(c.inicio.getTime(), inicio),
+          fin: Math.min(
+            (c.fin ?? new Date(c.inicio.getTime() + MINUTOS_COMIDA_POR_OMISION * 60_000)).getTime(),
+            ahora.getTime(),
+            fin,
+          ),
+        })),
+    );
+    for (const c of cortes) {
+      if (c.inicio > cursor) out.push({ inicio: cursor, fin: c.inicio });
+      cursor = Math.max(cursor, c.fin);
+    }
+    if (cursor < fin) out.push({ inicio: cursor, fin });
+  }
+  return unirTramos(out);
+}
+
 export type KpisPersona = {
   asignadas: number;
   cerradas: number;
@@ -283,6 +338,13 @@ function pct(numerador: number, denominador: number): number | null {
 export function kpisDePersona(
   actividades: ActividadCalculada[],
   minutos: number | null,
+  /**
+   * Horas laboradas del rango (`ventanasLaboradas`). Con ellas, las horas productivas son
+   * solo el tiempo en actividades que cayó **dentro** de la jornada (entre su entrada y
+   * su salida), y dos actividades a la vez no cuentan doble. Sin ellas se suma el tiempo
+   * de cada actividad, como antes.
+   */
+  ventanas?: TramoMs[] | null,
 ): KpisPersona {
   const propias = actividades.filter((a) => !a.cancelada && !a.retirado);
   const cerradas = propias.filter((a) => a.terminada);
@@ -294,7 +356,12 @@ export function kpisDePersona(
   const realCerradas = conPlan.reduce((s, a) => s + (a.minutosReales ?? 0), 0);
   const minutosPlan = propias.reduce((s, a) => s + (a.minutosPlan ?? 0), 0);
   const minutosReales = propias.reduce((s, a) => s + (a.minutosReales ?? 0), 0);
-  const minutosEnActividad = minutosReales;
+  const dentroDeJornada = ventanas
+    ? minutosDeTramosMs(cruzarTramos(propias.flatMap((a) => a.tramos ?? []), ventanas))
+    : minutosReales;
+  // Las dos cuentas redondean por separado: lo productivo nunca rebasa lo asistido.
+  const minutosEnActividad =
+    ventanas && minutos != null ? Math.min(dentroDeJornada, minutos) : dentroDeJornada;
   return {
     asignadas: propias.length,
     cerradas: cerradas.length,

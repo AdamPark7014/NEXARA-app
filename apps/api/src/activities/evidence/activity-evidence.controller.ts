@@ -145,7 +145,7 @@ export class ActivityEvidenceController {
       fileUrl = saveBase64Photo(fileUrl, __dirname, 'activities');
     }
 
-    return this.campos.guardarFoto({
+    const campos = await this.campos.guardarFoto({
       activityId: parseInt(activityId, 10),
       fieldId: parseInt(fieldId, 10),
       momento: body?.momento,
@@ -156,6 +156,9 @@ export class ActivityEvidenceController {
       userId: req.user.id,
       companyId,
     });
+    // Documentar un campo también es trabajar en la actividad: reanuda su reloj si estaba detenido.
+    await this.service.reanudarSesion(parseInt(activityId, 10), req.user.id, companyId);
+    return campos;
   }
 
   /** Quitar la foto de un campo deja el hueco pendiente otra vez. */
@@ -164,12 +167,14 @@ export class ActivityEvidenceController {
     @Param('activityId') activityId: string,
     @Param('fieldId') fieldId: string,
     @Body() body: { momento: string },
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.campos.borrarFoto({
       activityId: parseInt(activityId, 10),
       fieldId: parseInt(fieldId, 10),
       momento: body?.momento,
+      userId: req.user?.id ?? null,
       companyId,
     });
   }

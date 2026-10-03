@@ -1,6 +1,7 @@
 import type { GeocercaAlerta } from "@/lib/activity-geofence";
 import type { Aceptacion, Semaforo } from "@/lib/actividad-tiempos";
 import type { PeriodoActividad } from "@/lib/actividad-periodo";
+import type { PausaTipo } from "@/lib/sesion-actividad";
 import { erpFetch } from "@/lib/erp-api";
 
 /** Fila de Mis actividades (GET /me/activities). Fechas en ISO. */
@@ -70,6 +71,17 @@ export type MyActivityItem = {
   saltoPrioridad?: boolean;
   /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep» (lo calcula la API). */
   periodo?: PeriodoActividad | null;
+  /**
+   * Sesiones de trabajo (API nueva; opcional). `enCurso`: su reloj corre. `enPausa`: ya la
+   * inició y está detenida (pausa, salida del día o corte automático): hay que reanudarla.
+   */
+  enCurso?: boolean;
+  enPausa?: boolean;
+  pausaTipo?: PausaTipo | null;
+  pausadaAt?: string | null;
+  pausadaPor?: { id: number; nombre: string } | null;
+  motivoPausa?: string | null;
+  sesionAbiertaDesde?: string | null;
 };
 
 export type MyActivitiesResponse = {

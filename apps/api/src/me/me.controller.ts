@@ -192,6 +192,74 @@ export class MeController {
   }
 
   /**
+   * Pausar mi actividad: detiene mi reloj sin terminarla. Las horas productivas solo
+   * cuentan mientras corre.
+   */
+  @Post('activities/:id/pausar')
+  pausarActividad(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: { motivo?: string },
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.pausar(
+      { id: Number(user.id), email: user.email ?? null },
+      companyId,
+      activityId,
+      body?.motivo,
+    );
+  }
+
+  /** Reanudar mi actividad (cada día, o después de una pausa): mi reloj vuelve a correr. */
+  @Post('activities/:id/reanudar')
+  reanudarActividad(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.reanudar(
+      { id: Number(user.id), email: user.email ?? null },
+      companyId,
+      activityId,
+    );
+  }
+
+  /**
+   * Un jefe (o dirección) pausa la actividad en curso de alguien de su equipo para que
+   * atienda otra urgente. Motivo obligatorio; mismo alcance que para asignarle trabajo.
+   */
+  @Post('board/:userId/activities/:id/pausar')
+  pausarActividadDeEquipo(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: { motivo?: string },
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.pausarDeEquipo(
+      {
+        id: Number(user.id),
+        email: user.email ?? null,
+        roleKey: user.roleKey ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+      },
+      companyId,
+      userId,
+      activityId,
+      body?.motivo,
+    );
+  }
+
+  /**
    * Checklist de herramientas de una OT mía: qué tengo que llevar y qué ya palomeé.
    * Mientras quede algo sin palomear, `iniciar` se niega.
    */

@@ -13,6 +13,7 @@ import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
+import { ActivitySessionsService } from '../sessions/activity-sessions.service.js';
 import { ActivityEvidenceFieldsService } from './activity-evidence-fields.service.js';
 import { progresoDeCampos } from './evidence-fields.helpers.js';
 import { claveVentanaAdjuntar, ventanaAdjuntarEntradaSalida } from './adjuntar-entrada-salida.js';
@@ -31,6 +32,7 @@ import {
   isPdfUrl,
   evidenceProgressPct,
   evidenceStepsForKind,
+  fotosAlCerrarPaso,
   type EvidenceStep,
 } from './evidence-flow.helpers.js';
 import PDFDocument from 'pdfkit';
@@ -129,6 +131,7 @@ export class ActivityEvidenceService {
     private notificationHierarchy: NotificationHierarchyService,
     @Optional() private geofence?: ActivityGeofenceService,
     @Optional() private campos?: ActivityEvidenceFieldsService,
+    @Optional() private sesiones?: ActivitySessionsService,
   ) {}
 
   private async notifyEvidenceReadyForReview(
@@ -486,7 +489,19 @@ export class ActivityEvidenceService {
       });
     }
 
+    // Las apps publicadas no tienen «Reanudar»: tocar la evidencia de una actividad ya
+    // iniciada y con el reloj detenido la reanuda sola (sesiones de trabajo).
+    await this.sesiones?.asegurarAbierta({ activityId, userId, companyId: activity.companyId });
+
     return evidence;
+  }
+
+  /**
+   * Sesiones de trabajo: reanuda el reloj de la persona si lo tenía detenido (para los
+   * pasos que no pasan por `getOrCreateActivityEvidence`, como la foto de un campo).
+   */
+  async reanudarSesion(activityId: number, userId: number, companyId?: number | null): Promise<void> {
+    await this.sesiones?.asegurarAbierta({ activityId, userId, companyId });
   }
 
   /**
@@ -665,6 +680,8 @@ export class ActivityEvidenceService {
           },
         });
       }
+      // El inicio real abre su sesión de trabajo: de las sesiones sale el tiempo real.
+      await this.sesiones?.abrir({ activityId, userId, at });
 
       // «Pendiente» → «En Proceso» en cuanto alguien la empieza (el resto de estatus no se toca).
       if (/^pendiente/i.test(activity.estatus || '')) {
@@ -767,6 +784,10 @@ export class ActivityEvidenceService {
     const campos = await this.camposDeActividad(activityId, activity.companyId);
     const porCampos = progresoDeCampos(campos);
 
+    // Cerrar el paso no borra lo que ya se guardó foto por foto (ver `fotosAlCerrarPaso`).
+    const cierre = fotosAlCerrarPaso(evidence.evidencePhotos, photoUrls);
+    const fotos = cierre.fotos;
+
     if (porCampos.requeridas > 0) {
       if (!porCampos.completo) {
         throw new BadRequestException(
@@ -775,25 +796,26 @@ export class ActivityEvidenceService {
         );
       }
     } else if (isInventoryFlow) {
-      if (photoUrls.length < 1) {
+      if (fotos.length < 1) {
         throw new BadRequestException('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
       }
-    } else if (photoUrls.length < required) {
+    } else if (fotos.length < required) {
       // Al menos las requeridas: mandar de más no debe bloquear el paso.
       throw new BadRequestException(`Se requieren al menos ${required} fotos de evidencia`);
     }
 
-    const geo = sanitizePhotoGeo(photoGeo, photoUrls.length);
+    // Si se conservan las guardadas, su ubicación también: la que llega no está alineada con ellas.
+    const geo = cierre.conservaGuardadas ? undefined : sanitizePhotoGeo(photoGeo, fotos.length);
     const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
-        evidencePhotos: photoUrls,
+        evidencePhotos: fotos,
         evidencePhotosUploadedAt: new Date(),
         ...(geo ? { evidencePhotosGeo: geo } : {}),
         status: nextEvidenceStep('EVIDENCE_PHOTOS', activity.coreKind),
       },
     });
-    this.avisarAvance({ activityId, actorId: userId, paso: 'evidencias', fotos: photoUrls.length });
+    this.avisarAvance({ activityId, actorId: userId, paso: 'evidencias', fotos: fotos.length });
     return updated;
   }
 
@@ -944,7 +966,7 @@ export class ActivityEvidenceService {
       throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
     }
     const urlFoto = urlDeFotoGuardable(photoUrl, 'salida');
-    // Geocerca: la salida solo se registra a menos de 100 m de donde inició.
+    // Geocerca: según el tipo de actividad, la salida solo se registra dentro del radio de donde inició.
     await this.geofence?.validarSalida(activityId, userId, punto.latitude, punto.longitude);
 
     const updated = await this.prisma.activityEvidence.update({
@@ -962,6 +984,7 @@ export class ActivityEvidenceService {
 
     // La foto de salida cierra el tiempo real de esa persona (y sus horas reales).
     await this.registrarFinReal(activityId, userId, updated.exitPhotoUploadedAt ?? new Date());
+    await this.sesiones?.terminar({ activityId, userId, at: updated.exitPhotoUploadedAt ?? new Date() });
 
     await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
     void this.notifyEvidenceReadyForReview(activityId, updated.userId);
@@ -2211,10 +2234,15 @@ export class ActivityEvidenceService {
           throw new BadRequestException(`Se requieren al menos ${required} fotos de evidencia`);
         }
         {
-          const geo = sanitizePhotoGeo(data.photoGeo, data.photoUrls.length);
+          // Corregir el paso tampoco borra lo ya guardado: por campos llega `[]` y eso
+          // vaciaba las fotos libres (ver `fotosAlCerrarPaso`).
+          const cierre = fotosAlCerrarPaso(evidence.evidencePhotos, data.photoUrls);
+          const geo = cierre.conservaGuardadas
+            ? undefined
+            : sanitizePhotoGeo(data.photoGeo, cierre.fotos.length);
           updateData = {
             ...updateData,
-            evidencePhotos: data.photoUrls,
+            evidencePhotos: cierre.fotos,
             evidencePhotosUploadedAt: new Date(),
             ...(geo ? { evidencePhotosGeo: geo } : {}),
           };
@@ -2273,6 +2301,7 @@ export class ActivityEvidenceService {
     if (transition.status === 'COMPLETED') {
       // Igual que la foto de salida normal: corregirla también cierra el tiempo real.
       await this.registrarFinReal(activityId, userId, updated.exitPhotoUploadedAt ?? new Date());
+      await this.sesiones?.terminar({ activityId, userId, at: updated.exitPhotoUploadedAt ?? new Date() });
       await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
       // Corrigió todo lo devuelto: vuelve a «Por revisar» y sus superiores pueden aprobar o devolver otra vez.
       void this.notifyEvidenceReadyForReview(activityId, updated.userId, true);

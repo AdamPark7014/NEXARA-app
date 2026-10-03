@@ -1351,9 +1351,11 @@ export default function OpsActivityForm({
                     tiempoEstimadoMin: String(joinMinutes(horas, minutos) || ""),
                   })
                 }
-                maxHoras={24}
+                // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
+                maxHoras={12}
+                topeMinutos={720}
                 minuteStep={5}
-                hint="Gira las ruedas. Se guarda en minutos para el API."
+                hint="Gira las ruedas. Máximo 12 h: si lleva más días, se reanuda cada día."
               />
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
@@ -1389,7 +1391,8 @@ export default function OpsActivityForm({
                     tiempoEstimadoMin: String(joinMinutes(horas, minutos) || ""),
                   })
                 }
-                maxHoras={24}
+                maxHoras={12}
+                topeMinutos={720}
                 minuteStep={5}
               />
             </div>

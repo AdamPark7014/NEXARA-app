@@ -389,7 +389,9 @@ struct ActivityCoreDetailView: View {
                 if canCapture {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Captura de evidencias").font(.headline)
-                        Text("Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida. La foto de salida lleva tu ubicación; en Servicios tiene que tomarse donde iniciaste.")
+                        Text(CoreEvidence.isComercial(coreKind)
+                             ? "Inicio de actividad, evidencias, cotización y conclusión de actividad. La conclusión lleva tu ubicación; no tiene que registrarse donde iniciaste."
+                             : "Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida. La foto de salida lleva tu ubicación; en servicio, proyecto, obra y tarea tiene que tomarse donde iniciaste.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                         EvidenceCaptureFlowView(

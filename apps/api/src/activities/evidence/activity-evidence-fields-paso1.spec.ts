@@ -21,7 +21,7 @@ function build(opts: { entryPhotoUrl?: string | null; campo?: Record<string, unk
       ),
       findMany: jest.fn().mockResolvedValue([]),
     },
-    activityEvidenceFieldPhoto: { upsert },
+    activityEvidenceFieldPhoto: { upsert, findFirst: jest.fn().mockResolvedValue(null) },
   };
   const service = new ActivityEvidenceFieldsService(prisma as never);
   return { service, prisma, upsert };

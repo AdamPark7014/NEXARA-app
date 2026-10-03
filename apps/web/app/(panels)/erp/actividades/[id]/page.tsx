@@ -34,6 +34,7 @@ import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
 import IniciarActividad from "@/components/pizarra/IniciarActividad";
+import { SesionPropia } from "@/components/pizarra/SesionActividad";
 import {
   normalizarPrioridad,
   PRIORIDAD_UI,
@@ -355,6 +356,18 @@ export default function ActivityDetailPage() {
         >
           <div style={{ fontSize: 13, fontWeight: 700 }}>Te asignaron esta actividad</div>
           <IniciarActividad token={token} activityId={activity.id} onDone={reload} />
+        </div>
+      ) : null}
+      {/* Ya la inicié: mi reloj corre (Pausar) o está detenido (En pausa · Reanudar). */}
+      {token && miFila && !mostrarIniciar ? (
+        <div style={{ marginBottom: 14 }}>
+          <SesionPropia
+            token={token}
+            activityId={activity.id}
+            actividad={{ ...miFila, despachador: despacho && miFila.rol === "LEAD", estatus: activity.estatus }}
+            miId={user?.id}
+            onDone={reload}
+          />
         </div>
       ) : null}
       {/cancel/i.test(activity.estatus) && (activity.cancelReason || activity.cancelledAt) ? (

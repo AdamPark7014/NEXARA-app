@@ -33,6 +33,8 @@ import {
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
 import { chargeLabel, estatusUi, formatHourMinute, initials, kindLabel } from "@/lib/activity-labels";
 import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
+import { PausarDeEquipo } from "@/components/pizarra/SesionActividad";
+import { textoPausa } from "@/lib/sesion-actividad";
 import { FotoProtegida, VisorPdf } from "@/components/ops/EquipoEvidencias";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
@@ -252,6 +254,12 @@ export default function PizarraPersonaPage() {
   const color = STATUS_COLORS[user.status];
   const act = user.currentActivity;
   const actEstatus = act ? estatusUi(act.estatus) : null;
+  // Sesiones de trabajo: la fila completa de lo que está haciendo (corre / en pausa) y
+  // lo demás que tenga con el reloj corriendo. Solo su jefe (o dirección) lo pausa.
+  const abiertas = user.openActivities ?? [];
+  const actAbierta = act ? abiertas.find((a) => a.id === act.id) : undefined;
+  const otrasCorriendo = abiertas.filter((a) => a.enCurso && a.id !== act?.id);
+  const puedoPausar = Boolean(!isSelf && token && user.puedePausar);
   const src = user.avatarUrl ? resolveAssetUrl(user.avatarUrl) : null;
   const actCfg = getActivitiesSectionConfig(me);
   const canAssign =
@@ -434,8 +442,21 @@ export default function PizarraPersonaPage() {
         <Stat
           label="En actividad"
           value={formatMinutes(user.activityElapsedMinutes)}
-          hint={user.activityStartedAt ? `Desde las ${formatClock(user.activityStartedAt)}` : "Sin actividad iniciada"}
+          hint={
+            actAbierta?.enPausa
+              ? "En pausa"
+              : user.activityStartedAt
+                ? `Desde las ${formatClock(user.activityStartedAt)}`
+                : "Sin actividad iniciada"
+          }
         />
+        {user.kpis ? (
+          <Stat
+            label="Horas productivas"
+            value={formatMinutes(user.kpis.minutosEnActividad)}
+            hint="Con una actividad corriendo, dentro de su jornada"
+          />
+        ) : null}
       </div>
 
       <KpiStrip kpis={user.kpis} />
@@ -463,7 +484,30 @@ export default function PizarraPersonaPage() {
                   {act.periodo.etiqueta}
                 </span>
               ) : null}
+              {actAbierta?.enPausa ? (
+                <Chip color="#d97706" style={{ fontSize: 12, fontWeight: 650 }}>
+                  En pausa
+                </Chip>
+              ) : actAbierta?.enCurso ? (
+                <Chip color="#16a34a" style={{ fontSize: 12, fontWeight: 650 }}>
+                  Reloj corriendo
+                </Chip>
+              ) : null}
             </div>
+            {actAbierta?.enPausa ? (
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                {textoPausa(actAbierta, { miId: me?.id, propia: isSelf })}
+              </div>
+            ) : null}
+            {puedoPausar && token && actAbierta?.enCurso ? (
+              <PausarDeEquipo
+                token={token}
+                userId={user.id}
+                activityId={act.id}
+                nombre={user.nombre}
+                onDone={() => void load()}
+              />
+            ) : null}
             <Link href={`/erp/actividades/${act.id}`} style={{ ...btnSecondary, justifySelf: "start" }}>
               Abrir actividad →
             </Link>
@@ -471,6 +515,19 @@ export default function PizarraPersonaPage() {
         ) : (
           <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>No tiene nada abierto en este momento.</div>
         )}
+        {puedoPausar && token && otrasCorriendo.length ? (
+          <div style={{ display: "grid", gap: 10, paddingTop: 6, borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>También tiene el reloj corriendo en</div>
+            {otrasCorriendo.map((a) => (
+              <div key={a.id} style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: 14, fontWeight: 650 }}>
+                  {a.titulo} <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 500 }}>Folio {a.anNumber}</span>
+                </div>
+                <PausarDeEquipo token={token} userId={user.id} activityId={a.id} nombre={user.nombre} onDone={() => void load()} />
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       {isSelf && token ? (

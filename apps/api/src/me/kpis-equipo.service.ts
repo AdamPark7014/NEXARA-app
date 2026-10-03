@@ -6,6 +6,7 @@ import { esMultiDia, periodoDeActividad } from '../activities/actividad-periodo.
 import { tiposVisibles } from './equipo-alcance.js';
 import { estatusCerrado, tiemposReales } from './pizarra-kpi.js';
 import { TeamBoardService } from './team-board.service.js';
+import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
 import {
   calculaKpisPersona,
   diasDelRango,
@@ -298,12 +299,23 @@ export class KpisEquipoService {
       this.leerAprobacionesExtra(userIds, rango, companyId),
     ]);
 
+    // Sesiones de trabajo que tocan la ventana. Una actividad iniciada hace semanas no aparece
+    // por su `inicioRealAt`, pero sí por la sesión que tuvo esta semana.
+    await cerrarSesionesVencidas(this.prisma, { userIds, companyId });
+    const sesionesEnVentana = await leerSesiones(this.prisma, { userIds, companyId, desde: ini, hasta: fin });
+    const paresConSesion = [...sesionesEnVentana.values()].map((lista) => lista[0]);
+
     // Una fila por persona y actividad, juntando lo que diga la asignación y la evidencia.
     const clave = (userId: number, activityId: number) => `${userId}:${activityId}`;
     const asignacionPor = new Map(asignaciones.map((a) => [clave(a.userId, a.activityId), a]));
     const evidenciaPor = new Map(evidencias.map((e) => [clave(e.userId, e.activityId), e]));
-    const claves = new Set([...asignacionPor.keys(), ...evidenciaPor.keys()]);
-    const activityIds = [...new Set([...asignaciones, ...evidencias].map((r) => r.activityId))];
+    const claves = new Set([...asignacionPor.keys(), ...evidenciaPor.keys(), ...sesionesEnVentana.keys()]);
+    const activityIds = [
+      ...new Set([...asignaciones, ...evidencias, ...paresConSesion].map((r) => r.activityId)),
+    ];
+    // Todas las sesiones de esas actividades (no solo las de la ventana): si una persona ya
+    // tiene sesiones, su intervalo de antes deja de medir aunque caiga dentro del rango.
+    const sesiones = await leerSesiones(this.prisma, { userIds, activityIds, companyId });
 
     // Las que se encontraron por un lado pero tienen fila del otro fuera de la ventana.
     const [actividades, asignacionesExtra, evidenciasExtra] = activityIds.length
@@ -410,6 +422,7 @@ export class KpisEquipoService {
         fin: tiempos.fin,
         terminada: cerrada || ev?.status === 'COMPLETED',
         periodoFin: esMultiDia(periodo) ? periodo!.fin : null,
+        sesiones: sesiones.get(k) ?? null,
       });
     }
 

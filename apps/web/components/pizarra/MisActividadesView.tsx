@@ -18,11 +18,13 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CheckIcon from "@mui/icons-material/Check";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
 import { useUser } from "@/components/UserContext";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
 import IniciarActividad from "@/components/pizarra/IniciarActividad";
+import { SesionPropia } from "@/components/pizarra/SesionActividad";
 import { colorBordeActividad, puedeIniciar, SEMAFORO_UI, textoChipSemaforo, textoPlanVsReal } from "@/lib/actividad-tiempos";
 import {
   estatusUi,
@@ -440,6 +442,11 @@ export default function MisActividadesPage() {
                     </Chip>
                   ) : null}
                   {puedeIniciar(a) && a.semaforo === "verde" ? <Chip color="#2563eb">Sin iniciar</Chip> : null}
+                  {a.enPausa ? (
+                    <Chip color="#d97706" icon={PauseCircleOutlineIcon}>
+                      En pausa
+                    </Chip>
+                  ) : null}
                   <Chip>
                     <ActivityKindIcon kind={kindIcon(a)} size={15} />
                     {kindLabel(a)}
@@ -506,6 +513,10 @@ export default function MisActividadesPage() {
                 {/* Quien la recibe no la acepta ni la rechaza: únicamente la inicia. */}
                 {token && puedeIniciar(a) ? (
                   <IniciarActividad token={token} activityId={a.id} onDone={() => void load()} />
+                ) : null}
+                {/* Ya iniciada: su reloj corre (Pausar) o está detenido (En pausa · Reanudar). */}
+                {token && !puedeIniciar(a) ? (
+                  <SesionPropia token={token} activityId={a.id} actividad={a} miId={myId} onDone={() => void load()} />
                 ) : null}
                 {canReorder ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

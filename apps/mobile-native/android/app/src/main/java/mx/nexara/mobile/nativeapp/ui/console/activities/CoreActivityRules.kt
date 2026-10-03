@@ -83,6 +83,20 @@ object CoreActivityRules {
 
     fun stepLabel(step: String?): String = STEP_LABEL[step] ?: step.orEmpty()
 
+    fun esComercial(coreKind: String?): Boolean = coreKind?.trim()?.lowercase() == "comercial"
+
+    /**
+     * Lo comercial no es trabajo «en sitio»: su primer y último paso se llaman «Inicio de
+     * actividad» y «Conclusión de actividad» (espejo de `textosDeInicioYCierre` en la web).
+     * Los demás tipos conservan su nombre.
+     */
+    fun stepLabel(step: String?, coreKind: String?): String = when {
+        !esComercial(coreKind) -> stepLabel(step)
+        step == STEP_ENTRY -> "Inicio de actividad"
+        step == STEP_EXIT -> "Conclusión de actividad"
+        else -> stepLabel(step)
+    }
+
     data class FormField(val key: String, val label: String) {
         /** Igual que DigitalEvidenceForm: los campos narrativos van en varias líneas. */
         val multiline: Boolean

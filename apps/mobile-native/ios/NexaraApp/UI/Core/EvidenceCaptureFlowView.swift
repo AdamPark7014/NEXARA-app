@@ -258,7 +258,7 @@ struct EvidenceCaptureFlowView: View {
         if isApproved {
             bannerText("Tu evidencia fue aprobada.", icon: "checkmark.seal.fill", color: CorePalette.green)
         } else if isCorrection {
-            let labels = rejected.map { CoreEvidence.label($0) }.joined(separator: ", ")
+            let labels = rejected.map { CoreEvidence.label($0, coreKind: coreKind) }.joined(separator: ", ")
             let notes = (flow?.reviewNotes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             bannerText(
                 "Te devolvieron: \(labels.isEmpty ? "algunos pasos" : labels). Corrige solo eso."
@@ -435,7 +435,7 @@ struct EvidenceCaptureFlowView: View {
         switch step {
         case CoreEvidence.evidencePhotos:
             return porCampos ? "Fotos en sitio (por campo)" : "Fotos en sitio (mínimo \(photoRequired))"
-        default: return CoreEvidence.label(step)
+        default: return CoreEvidence.label(step, coreKind: coreKind)
         }
     }
 
@@ -474,10 +474,17 @@ struct EvidenceCaptureFlowView: View {
         switch step {
         case CoreEvidence.entryPhoto, CoreEvidence.exitPhoto:
             let isEntry = step == CoreEvidence.entryPhoto
+            // Comercial no es trabajo «en sitio»: se inicia y se concluye la actividad,
+            // y su conclusión no tiene que registrarse donde inició.
+            let comercial = CoreEvidence.isComercial(coreKind)
             VStack(alignment: .leading, spacing: 8) {
-                Text(isEntry
-                     ? "Tómala al llegar. Se guarda con tu ubicación y marca el centro de tu zona de \(ActivityGeofence.radioM) m."
-                     : "Tómala al terminar, a \(ActivityGeofence.radioM) m o menos de donde iniciaste. Con esta foto envías tu evidencia.")
+                Text(comercial
+                     ? (isEntry
+                        ? "Tómala al iniciar la actividad. Se guarda con tu ubicación."
+                        : "Tómala al concluir la actividad. Se guarda con tu ubicación; no tiene que ser donde iniciaste. Con esta foto envías tu evidencia.")
+                     : (isEntry
+                        ? "Tómala al llegar. Se guarda con tu ubicación y marca el centro de tu zona de \(ActivityGeofence.radioM) m."
+                        : "Tómala al terminar. Si tu actividad lo pide, a \(ActivityGeofence.radioM) m o menos de donde iniciaste. Con esta foto envías tu evidencia."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Button {
@@ -489,7 +496,9 @@ struct EvidenceCaptureFlowView: View {
                     }
                 } label: {
                     Label(
-                        isEntry ? "Tomar foto de entrada" : (checkingExitZone ? "Verificando ubicación…" : "Tomar foto de salida"),
+                        isEntry
+                            ? (comercial ? "Tomar foto de inicio" : "Tomar foto de entrada")
+                            : (checkingExitZone ? "Verificando ubicación…" : (comercial ? "Tomar foto de conclusión" : "Tomar foto de salida")),
                         systemImage: "camera.fill"
                     )
                     .frame(maxWidth: .infinity)
@@ -697,7 +706,7 @@ struct EvidenceCaptureFlowView: View {
                 time: flow?.entryPhotoUploadedAt,
                 latitude: flow?.entryLatitude?.value,
                 longitude: flow?.entryLongitude?.value,
-                label: "Foto de entrada"
+                label: CoreEvidence.label(CoreEvidence.entryPhoto, coreKind: coreKind)
             )
         case CoreEvidence.exitPhoto:
             photoSummary(
@@ -705,7 +714,7 @@ struct EvidenceCaptureFlowView: View {
                 time: flow?.exitPhotoUploadedAt,
                 latitude: flow?.exitLatitude?.value,
                 longitude: flow?.exitLongitude?.value,
-                label: "Foto de salida"
+                label: CoreEvidence.label(CoreEvidence.exitPhoto, coreKind: coreKind)
             )
         case CoreEvidence.evidencePhotos:
             ScrollView(.horizontal, showsIndicators: false) {
@@ -790,7 +799,7 @@ struct EvidenceCaptureFlowView: View {
         switch request.step {
         case CoreEvidence.entryPhoto:
             GeoPhotoCaptureView(
-                title: "Tu foto de entrada",
+                title: CoreEvidence.isComercial(coreKind) ? "Tu foto de inicio de actividad" : "Tu foto de entrada",
                 confirmLabel: "Enviar esta foto",
                 requireLocation: true,
                 onConfirm: { photo in
@@ -815,7 +824,7 @@ struct EvidenceCaptureFlowView: View {
             )
         case CoreEvidence.exitPhoto:
             GeoPhotoCaptureView(
-                title: "Tu foto de salida",
+                title: CoreEvidence.isComercial(coreKind) ? "Tu foto de conclusión de actividad" : "Tu foto de salida",
                 confirmLabel: "Enviar esta foto",
                 requireLocation: true,
                 onConfirm: { photo in await sendGeoPhoto(step: CoreEvidence.exitPhoto, photo: photo) },
@@ -937,9 +946,9 @@ struct EvidenceCaptureFlowView: View {
                 ? "¡Corrección enviada! Tu evidencia será revisada nuevamente."
                 : "¡Evidencia enviada! Queda en revisión."
         } else if correction {
-            message = "Paso corregido. Siguiente: \(CoreEvidence.label(status))"
+            message = "Paso corregido. Siguiente: \(CoreEvidence.label(status, coreKind: coreKind))"
         } else {
-            message = "Listo: \(CoreEvidence.label(step)). Siguiente: \(CoreEvidence.label(status))"
+            message = "Listo: \(CoreEvidence.label(step, coreKind: coreKind)). Siguiente: \(CoreEvidence.label(status, coreKind: coreKind))"
         }
         onChanged?()
     }
@@ -952,7 +961,7 @@ struct EvidenceCaptureFlowView: View {
     }
 
     /// Mensaje de bloqueo si el punto queda fuera del radio y el API exige la misma
-    /// ubicación (solo Servicios). Sin la bandera, o en false, no se pre-bloquea.
+    /// ubicación (según el tipo de actividad). Sin la bandera, o en false, no se pre-bloquea.
     private func exitZoneMessage(latitude: Double?, longitude: Double?) async -> String? {
         let state = try? await ActivityGeofenceRepository.shared.estado(activityId: activityId)
         guard state?.exigeMismaUbicacion == true else { return nil }

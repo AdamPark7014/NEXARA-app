@@ -4,6 +4,7 @@ import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/t
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { isClosedStatus } from './activity-status.js';
 import { horasPlanValidas } from './actividad-tiempos.js';
+import { errorDeHorasPlan } from './sessions/sesiones-trabajo.js';
 import { camposDePeriodo, diasEntre, periodoDeActividad, sumarDias } from './actividad-periodo.js';
 import { workDateKey } from '../common/time/workday.js';
 import {
@@ -209,6 +210,9 @@ export class ActivityTeamService {
       input.indicaciones != null ? String(input.indicaciones).trim() || null : undefined;
     const byId = actorId && actorId > 0 ? actorId : null;
     // Tiempo estimado de esta persona (la web de asignar lo pide): horas con dos decimales.
+    // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
+    const planInvalido = errorDeHorasPlan(input.horasPlan);
+    if (planInvalido) throw new BadRequestException(planInvalido);
     const horasPlan = horasPlanValidas(input.horasPlan);
 
     let member;

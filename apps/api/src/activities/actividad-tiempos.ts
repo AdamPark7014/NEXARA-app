@@ -11,6 +11,12 @@ import {
   type MotivoSemaforo as MotivoSemaforoReloj,
   type Semaforo as SemaforoReloj,
 } from './semaforo-actividad.js';
+import {
+  TOPE_SESION_MIN,
+  estadoDeTrabajo,
+  minutosTrabajados,
+  type SesionTrabajo,
+} from './sessions/sesiones-trabajo.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Aceptacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
@@ -194,10 +200,27 @@ export function tiemposDto(
     periodoFin?: Date | string | null;
   },
   ahora: Date = new Date(),
+  /**
+   * Sesiones de trabajo de esta persona en la actividad. Con ellas el tiempo real es su
+   * suma; sin ellas (actividades de antes) se mide el intervalo de siempre, con tope de 12 h.
+   */
+  sesiones?: SesionTrabajo[] | null,
 ) {
   const plan = minutosPlan(fila.horasPlan);
-  const reales = minutosReales(fila.inicioRealAt, fila.finRealAt, ahora);
   const cerrada = esCerrada(actividad.estatus);
+  const fuente = {
+    inicio: fila.inicioRealAt ?? null,
+    fin: fila.finRealAt ?? null,
+    sesiones: sesiones ?? null,
+    ahora,
+  };
+  // Ninguna actividad dura más de 12 horas: ni la de antes, que era un solo intervalo.
+  const legadoCerrado = !sesiones?.length && fila.inicioRealAt && fila.finRealAt;
+  const reales = legadoCerrado
+    ? Math.min(minutosReales(fila.inicioRealAt, fila.finRealAt, ahora) ?? 0, TOPE_SESION_MIN)
+    : minutosTrabajados(fuente);
+  // «En pausa» no es un estatus nuevo: se deduce de las sesiones.
+  const trabajo = estadoDeTrabajo({ ...fuente, terminada: cerrada });
   // Varios días: el plan es de una jornada y el reloj corre de corrido; no se compara.
   const variosDias = esMultiDia(periodoDeActividad(actividad));
   const luz = evaluarSemaforo({
@@ -228,6 +251,13 @@ export function tiemposDto(
     inicioRealAt: fila.inicioRealAt ?? null,
     finRealAt: fila.finRealAt ?? null,
     saltoPrioridad: Boolean(fila.saltoPrioridad),
+    enCurso: trabajo.enCurso,
+    enPausa: trabajo.enPausa,
+    pausaTipo: trabajo.pausaTipo,
+    pausadaAt: trabajo.pausadaAt,
+    pausadaPor: trabajo.pausadaPor,
+    motivoPausa: trabajo.motivoPausa,
+    sesionAbiertaDesde: trabajo.sesionAbiertaDesde,
   };
 }
 

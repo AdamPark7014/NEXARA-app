@@ -118,6 +118,8 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'ToolKitInspection',
   'VehiclePosition',
   'OvertimeApproval',
+  // Sesiones de trabajo de una actividad (migración 20261002130000_activity_work_sessions).
+  'ActivityWorkSession',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */

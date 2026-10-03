@@ -6,9 +6,11 @@ import {
   IsDateString,
   IsEnum,
   Matches,
+  Max,
   MaxLength,
 } from 'class-validator';
 import { ActivityType, ActivityWorkType, TicketType } from '@prisma/client';
+import { MENSAJE_TOPE_12H, TOPE_SESION_MIN } from '../sessions/sesiones-trabajo.js';
 
 /** Los topes de largo son los de cada columna (`@db.VarChar` en schema.prisma). */
 export class CreateActivityDto {
@@ -89,8 +91,10 @@ export class CreateActivityDto {
   @MaxLength(220, { message: 'La dirección no puede pasar de 220 caracteres' })
   branchAddress?: string;
 
+  // «¿Cuánto tiempo toma?»: ninguna actividad dura más de 12 horas (regla del dueño).
   @IsOptional()
   @IsInt()
+  @Max(TOPE_SESION_MIN, { message: MENSAJE_TOPE_12H })
   tiempoEstimadoMin?: number;
 
   @IsOptional()

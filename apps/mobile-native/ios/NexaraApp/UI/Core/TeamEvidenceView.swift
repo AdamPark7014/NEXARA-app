@@ -541,7 +541,7 @@ private struct TeamEvidenceContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             stepChecklist
-            section("Entrada", time: evidence.entryPhotoUploadedAt, step: CoreEvidence.entryPhoto) {
+            section(CoreEvidence.isComercial(coreKind) ? "Inicio" : "Entrada", time: evidence.entryPhotoUploadedAt, step: CoreEvidence.entryPhoto) {
                 photoThumb(
                     evidence.entryPhotoUrl,
                     title: TeamEvidenceUI.entryLabel,
@@ -561,7 +561,7 @@ private struct TeamEvidenceContent: View {
             section("Formulario", time: evidence.serviceSheetCompletedAt, step: CoreEvidence.serviceSheetData) {
                 formView
             }
-            section("Salida", time: evidence.exitPhotoUploadedAt, step: CoreEvidence.exitPhoto) {
+            section(CoreEvidence.isComercial(coreKind) ? "Conclusión" : "Salida", time: evidence.exitPhotoUploadedAt, step: CoreEvidence.exitPhoto) {
                 photoThumb(
                     evidence.exitPhotoUrl,
                     title: TeamEvidenceUI.exitLabel,
@@ -608,7 +608,7 @@ private struct TeamEvidenceContent: View {
                 Image(systemName: icon)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(tone ?? Color.secondary)
-                Text(CoreEvidence.label(step))
+                Text(CoreEvidence.label(step, coreKind: coreKind))
             }
             .font(.caption.weight(.semibold))
             .lineLimit(1)
@@ -902,7 +902,7 @@ private struct TeamEvidenceReviewSheet: View {
                         }
                         if !todo {
                             ForEach(steps, id: \.self) { step in
-                                Toggle(CoreEvidence.label(step), isOn: stepBinding(step))
+                                Toggle(CoreEvidence.label(step, coreKind: coreKind), isOn: stepBinding(step))
                             }
                         }
                     }

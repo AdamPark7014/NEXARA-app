@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { ActivitiesModule } from '../activities/activities.module.js';
 import { ActivityEvidenceModule } from '../activities/evidence/activity-evidence.module.js';
 import { ActivityToolsModule } from '../activities/tools/activity-tools.module.js';
+import { ActivitySessionsModule } from '../activities/sessions/activity-sessions.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { MeController } from './me.controller.js';
 import { MeService } from './me.service.js';
@@ -21,6 +22,7 @@ import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
     ActivitiesModule,
     ActivityEvidenceModule,
     ActivityToolsModule,
+    ActivitySessionsModule,
     NotificationsModule,
     ModulePolicyModule,
   ],

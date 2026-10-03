@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { alertaDto } from '../activities/geofence/activity-geofence.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { ActivityTeamService, type AssigneeRole } from '../activities/activity-team.service.js';
@@ -21,7 +27,14 @@ import {
 } from '../activities/actividad-tiempos.js';
 import { periodoDto, type PeriodoDto } from '../activities/actividad-periodo.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
-import { extrasDeAsignacion, reportesDirectos } from './equipo-alcance.js';
+import { extrasDeAsignacion, reportesDirectos, type Alcanzador } from './equipo-alcance.js';
+import {
+  ActivitySessionsService,
+  cerrarSesionesVencidas,
+  leerSesiones,
+  sesionesDe,
+} from '../activities/sessions/activity-sessions.service.js';
+import { errorDeHorasPlan, type MotivoFinSesion } from '../activities/sessions/sesiones-trabajo.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
 
@@ -158,6 +171,20 @@ export type MyActivityItem = {
    * hasta que se termina; null si es de un solo momento.
    */
   periodo: PeriodoDto | null;
+  /**
+   * Sesiones de trabajo (campos nuevos, opcionales para las apps ya instaladas).
+   * `enPausa`: ya la inició, no la ha entregado y su reloj está detenido; hay que reanudarla.
+   * No es un estatus: la actividad sigue «En Proceso».
+   */
+  enCurso?: boolean;
+  enPausa?: boolean;
+  /** PAUSA (alguien la detuvo) | SALIDA (checó salida) | TOPE_12H | CORTE_DIA (se cortó sola). */
+  pausaTipo?: MotivoFinSesion | null;
+  pausadaAt?: Date | null;
+  /** Quién la pausó: la propia persona o su jefe. */
+  pausadaPor?: { id: number; nombre: string } | null;
+  motivoPausa?: string | null;
+  sesionAbiertaDesde?: Date | null;
 };
 
 export type MyActivitiesResponse = {
@@ -197,6 +224,7 @@ export class MyActivitiesService {
     private readonly evidence: ActivityEvidenceService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly activityTools: ActivityToolsService,
+    @Optional() private readonly sesiones?: ActivitySessionsService,
   ) {}
 
   /**
@@ -238,6 +266,10 @@ export class MyActivitiesService {
         inicioRealAt: ahora,
       });
     }
+    // Su reloj empieza a correr (o se reanuda, si lo había detenido su salida de ayer).
+    if (!despachador) {
+      await this.sesiones?.abrir({ activityId, userId: viewer.id, at: ahora, companyId });
+    }
     return {
       ok: true,
       aceptacion: 'ACEPTADA' as const,
@@ -262,6 +294,47 @@ export class MyActivitiesService {
    */
   rechazar(): never {
     throw new ForbiddenException(MENSAJE_SIN_RECHAZO);
+  }
+
+  /**
+   * Pausar mi actividad: detiene mi reloj sin terminarla (sigue «En Proceso»). El motivo
+   * es opcional cuando la pausa uno mismo.
+   */
+  pausar(viewer: MyActivitiesViewer, companyId: number | null, activityId: number, motivo?: string | null) {
+    return this.sesionesRequeridas().pausar({
+      actor: { id: viewer.id, email: viewer.email ?? null },
+      userId: viewer.id,
+      activityId,
+      motivo,
+      companyId,
+    });
+  }
+
+  /** Reanudar mi actividad: mi reloj vuelve a correr (cada día, y después de una pausa). */
+  reanudar(viewer: MyActivitiesViewer, companyId: number | null, activityId: number) {
+    return this.sesionesRequeridas().reanudar({ userId: viewer.id, activityId, companyId });
+  }
+
+  /**
+   * Un jefe pausa la actividad de alguien de su equipo para que atienda otra que salió
+   * urgente. Motivo obligatorio; queda quién la pausó y por qué, y la persona recibe aviso.
+   */
+  pausarDeEquipo(
+    viewer: Alcanzador,
+    companyId: number | null,
+    userId: number,
+    activityId: number,
+    motivo?: string | null,
+  ) {
+    if (Number(userId) === Number(viewer.id)) {
+      throw new BadRequestException('Tu propia actividad se pausa desde Mis actividades');
+    }
+    return this.sesionesRequeridas().pausar({ actor: viewer, userId, activityId, motivo, companyId });
+  }
+
+  private sesionesRequeridas(): ActivitySessionsService {
+    if (!this.sesiones) throw new BadRequestException('Las sesiones de trabajo no están disponibles');
+    return this.sesiones;
   }
 
   /** Su fila de equipo en una actividad abierta (la que inicia). */
@@ -336,6 +409,8 @@ export class MyActivitiesService {
     }
 
     const notas = typeof dto?.indicaciones === 'string' ? dto.indicaciones.trim().slice(0, 500) : '';
+    const planInvalido = errorDeHorasPlan(dto?.horasPlan);
+    if (planInvalido) throw new BadRequestException(planInvalido);
     const horasPlan = horasPlanValidas(dto?.horasPlan);
     for (const t of targets) {
       // Si quien recibe también reparte (Luis → Antonio) entra como LEAD; si no, la ejecuta.
@@ -960,9 +1035,16 @@ export class MyActivitiesService {
 
     const ahora = new Date();
     const dayStart = new Date(`${ahora.toLocaleDateString('sv-SE')}T00:00:00`);
+    // Sesiones de trabajo: lo que quedó corriendo de ayer (o lleva 12 h) se cierra al leerlo.
+    await cerrarSesionesVencidas(this.prisma, { userIds: [viewer.id], companyId }, ahora);
+    const sesiones = await leerSesiones(this.prisma, {
+      userIds: [viewer.id],
+      activityIds: rows.map((row) => row.activity.id),
+      companyId,
+    });
     const items: MyActivityItem[] = rows.map((row) => {
       const a = row.activity;
-      const tiempos = tiemposDto(row, a, ahora);
+      const tiempos = tiemposDto(row, a, ahora, sesionesDe(sesiones, viewer.id, a.id));
       const despachador = a.assignmentCharge === 'despacho' && String(row.rol) === 'LEAD';
       const statusByUser = new Map(a.activityEvidences.map((e) => [e.userId, e.status]));
       const pasadaA = a.assignees
@@ -1031,6 +1113,13 @@ export class MyActivitiesService {
             : null,
         saltoPrioridad: tiempos.saltoPrioridad,
         periodo: periodoDto(a, ahora, isClosed(a.estatus)),
+        enCurso: tiempos.enCurso,
+        enPausa: tiempos.enPausa,
+        pausaTipo: tiempos.pausaTipo,
+        pausadaAt: tiempos.pausadaAt,
+        pausadaPor: tiempos.pausadaPor,
+        motivoPausa: tiempos.motivoPausa,
+        sesionAbiertaDesde: tiempos.sesionAbiertaDesde,
       };
     });
 

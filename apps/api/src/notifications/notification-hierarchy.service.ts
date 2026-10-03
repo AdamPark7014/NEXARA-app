@@ -14,6 +14,7 @@ import {
 } from './portal-ticket-notify.js';
 import { fechaAviso, horaAviso, nombreCorto } from './notification-push-meta.js';
 import { CEO_EQUIVALENT_EMAILS, PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
+import { RADIO_ACTIVIDAD_M } from '../activities/geofence/geocerca.js';
 
 /**
  * Nombre de la actividad para el aviso. El folio (AN-0001) nunca es el identificador principal:
@@ -348,6 +349,7 @@ export class NotificationHierarchyService {
           where: { id: activityId },
           select: {
             titulo: true,
+            coreKind: true,
             responsableId: true,
             creadoPorId: true,
             client: { select: { name: true } },
@@ -373,8 +375,12 @@ export class NotificationHierarchyService {
         hoja: `${nombre} subió la hoja de servicio`,
         formulario: `${nombre} llenó el formulario de servicio`,
       }[paso];
+      // Lo comercial no es trabajo en sitio: no «llega», inicia la actividad.
+      const comercial = String(activity.coreKind ?? '').trim().toLowerCase() === 'comercial';
       const message =
-        paso === 'inicio' ? unir(cliente, `Llegó a las ${hora}`) : unir(actividad, cliente);
+        paso === 'inicio'
+          ? unir(cliente, comercial ? `Inicio de actividad a las ${hora}` : `Llegó a las ${hora}`)
+          : unir(actividad, cliente);
       const icon = {
         inicio: 'actividad_inicio',
         evidencias: 'fotos',
@@ -464,7 +470,7 @@ export class NotificationHierarchyService {
         title: 'Estás fuera de la zona de tu actividad',
         message: unir(
           actividad,
-          `Te alejaste ${params.distanciaM} m del punto de inicio (máx. 100 m) a las ${hora}`,
+          `Te alejaste ${params.distanciaM} m del punto de inicio (máx. ${RADIO_ACTIVIDAD_M} m) a las ${hora}`,
           'Justifica el motivo con una foto',
         ),
         relatedUrl: `/erp/actividades/${params.activityId}`,

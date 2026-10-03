@@ -67,7 +67,6 @@ import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ModulePlaceholderScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
-import mx.nexara.mobile.nativeapp.ui.console.more.OrgchartScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ProyectosScreen
 import mx.nexara.mobile.nativeapp.ui.console.pagos.PagosEmpleadosScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
@@ -126,9 +125,6 @@ internal object ConsoleRoutes {
 
     /** KPIs del equipo (`/erp/asistencias/indicadores`) — consulta del periodo. */
     const val KpisEquipo = "console/kpis-equipo"
-
-    /** Organigrama (`/erp/organigrama`) — se recorre por niveles, no es el árbol. */
-    const val Organigrama = "console/organigrama"
 
     /** Proyectos (`/erp/proyectos`) — tarjetas por salud. */
     const val Proyectos = "console/proyectos"
@@ -201,7 +197,6 @@ internal object ConsoleRoutes {
     fun forExtra(module: CoreExtraModule): String = when (module) {
         CoreExtraModule.VEHICULOS -> Vehiculos
         CoreExtraModule.KPIS_EQUIPO -> KpisEquipo
-        CoreExtraModule.ORGANIGRAMA -> Organigrama
         CoreExtraModule.PROYECTOS -> Proyectos
         CoreExtraModule.ALMACEN -> Almacen
         CoreExtraModule.HERRAMIENTAS -> Herramientas
@@ -308,7 +303,7 @@ fun ConsoleNavHost(
     var unreadCount by remember { mutableIntStateOf(0) }
 
     val modules = remember(user) { CoreMenu.modulesFor(user) }
-    /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos, organigrama). */
+    /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos). */
     val extras = remember(userAlDia) { CoreMenu.extraModulesFor(userAlDia) }
     val tabs = remember(modules) { modules.map { ConsoleRoutes.forModule(it) to it } }
     val startRoute = tabs.firstOrNull()?.first ?: ConsoleRoutes.MyProfile
@@ -408,7 +403,6 @@ fun ConsoleNavHost(
         ConsoleRoutes.More, ConsoleRoutes.ModulePlaceholder -> "Más"
         ConsoleRoutes.Vehiculos -> "Vehículos"
         ConsoleRoutes.KpisEquipo -> "KPIs del equipo"
-        ConsoleRoutes.Organigrama -> "Organigrama"
         ConsoleRoutes.Proyectos -> "Proyectos"
         ConsoleRoutes.Almacen -> "Almacén"
         ConsoleRoutes.Herramientas -> "Herramientas"
@@ -644,13 +638,10 @@ fun ConsoleNavHost(
             nxComposable(ConsoleRoutes.Vehiculos, style = NxNavAnimStyle.Push) {
                 VehiculosScreen()
             }
-            // Los cuatro de solo consulta. Cada uno comprueba su permiso igual que
+            // Los tres de solo consulta. Cada uno comprueba su permiso igual que
             // el resto de «Más»: sin el módulo en el rol, de vuelta a la casa.
             nxComposable(ConsoleRoutes.KpisEquipo, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.KPIS_EQUIPO in extras) KpisEquipoScreen()
-            }
-            nxComposable(ConsoleRoutes.Organigrama, style = NxNavAnimStyle.Push) {
-                if (CoreExtraModule.ORGANIGRAMA in extras) OrgchartScreen()
             }
             nxComposable(ConsoleRoutes.Proyectos, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.PROYECTOS in extras) ProyectosScreen()
