@@ -1,188 +1,555 @@
-/* Controles del organigrama. El lienzo y el árbol siguen con estilos en línea:
-   el ajuste de zoom mide esas cajas directamente. */
+/* Organigrama radial. Las medidas de las tarjetas (ancho y alto) llegan en línea
+   desde `radial-layout.ts`: el cálculo y el dibujo usan el mismo número, y por eso
+   ninguna tarjeta pisa a otra. Aquí va solo el aspecto. */
 
-.herramientas {
+.pagina {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 12px;
+  min-width: 0;
+  /* El lienzo llega casi al borde de la ventana: se come parte del relleno
+     inferior del panel para no dejar una franja vacía ni sacar barra de página. */
+  margin-bottom: -32px;
 }
 
-.fila {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+.pagina[data-modo="lista"] {
+  margin-bottom: 0;
 }
 
-.busqueda {
-  flex: 1 1 220px;
-  min-width: 160px;
-  max-width: 360px;
-  min-height: 36px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 16px;
+.pagina > nav {
+  margin-bottom: 0 !important;
 }
 
-.busqueda:focus-visible,
-.zoomBtn:focus-visible,
-.chip:focus-visible,
-.editar:focus-visible,
-.select:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+/* ── Lienzo ─────────────────────────────────────────────────────────────── */
+
+.lienzo {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg, 12px);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font-family: var(--ui-font);
 }
 
-.zoom {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
+.lienzoRadial {
+  /* Altura de respaldo; la real la fija la vista midiendo la ventana. */
+  height: calc(100dvh - var(--ui-topbar-h, 52px) - 40px);
+  min-height: 420px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.zoomBtn {
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--foreground);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  font-variant-numeric: tabular-nums;
+.lienzoArrastrando {
+  cursor: grabbing;
 }
 
-.zoomBtn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.estado {
+  padding: 24px;
 }
 
-.zoomPorcentaje {
-  min-width: 56px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.2;
-  cursor: pointer;
-}
-
-.chip[aria-pressed="true"] {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
-  color: var(--primary);
-  font-weight: 700;
-}
-
-.chipCuenta {
-  opacity: 0.7;
-  font-weight: 600;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.rotulo {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-right: 2px;
-}
-
-.coincidencias {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-
-.sinCoincidencias {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-}
-
-.editar {
+.mundo {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 36px;
-  height: 36px;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.mundoSuave {
+  transition: transform var(--ui-duration-slow, 260ms) var(--ui-ease-out, ease-out);
+}
+
+/* ── Anillos y conectores ───────────────────────────────────────────────── */
+
+.trazos {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.anillo {
+  fill: none;
+  stroke: var(--ui-border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  opacity: 0.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.enlace {
+  fill: none;
+  stroke: color-mix(in srgb, var(--area, var(--ui-neutral)) 46%, var(--ui-border-strong));
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.enlacePunteado {
+  stroke: var(--ui-fg-3);
+  stroke-dasharray: 2 6;
+  stroke-width: 1.75;
+  pointer-events: stroke;
+}
+
+/* ── Tarjeta de persona ─────────────────────────────────────────────────── */
+
+.tarjeta {
+  --area: var(--ui-neutral);
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 10px 0 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+  color: var(--ui-fg);
+  font: inherit;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.avatar {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: none;
-  color: var(--text-tertiary);
-  font-size: 14px;
+  background: color-mix(in srgb, var(--area) 14%, var(--ui-surface));
+  color: color-mix(in srgb, var(--area) 78%, var(--ui-fg));
+  /* El aro lleva el color del área. */
+  box-shadow:
+    0 0 0 2px var(--ui-surface),
+    0 0 0 4px color-mix(in srgb, var(--area) 78%, var(--ui-surface));
+  margin: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   line-height: 1;
+}
+
+.texto {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nombre {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+}
+
+.puestoFila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.puesto {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ui-fg-2);
+}
+
+.tarjetaCompacta {
+  gap: 7px;
+  padding: 0 8px 0 5px;
+  border-radius: 12px;
+}
+
+.tarjetaCompacta .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 10.5px;
+}
+
+.tarjetaCompacta .nombre {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.tarjetaCompacta .puestoFila {
+  margin-top: 1px;
+}
+
+.tarjetaCompacta .puesto {
+  font-size: 10px;
+}
+
+/* El director: la misma tarjeta, un escalón más grande y más marcada. */
+.tarjetaCentro {
+  gap: 12px;
+  padding: 0 16px 0 12px;
+  border-color: var(--ui-border-strong);
+  border-radius: 18px;
+  box-shadow: var(--ui-elev-2);
+}
+
+.tarjetaCentro .avatar {
+  width: 50px;
+  height: 50px;
+  font-size: 16px;
+}
+
+.tarjetaCentro .nombre {
+  font-size: 14.5px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.012em;
+}
+
+.tarjetaCentro .puestoFila {
+  margin-top: 3px;
+}
+
+.tarjetaCentro .puesto {
+  font-size: 12px;
+  font-weight: 550;
+  color: color-mix(in srgb, var(--area) 78%, var(--ui-fg));
+}
+
+.tarjetaSinJefe {
+  border-style: dashed;
+  border-color: var(--ui-border-strong);
+}
+
+.marcaSinJefe {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--ui-warning-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-warning) 12%, var(--ui-surface));
+  color: var(--ui-warning-text);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.tarjetaEditable {
+  cursor: pointer;
+  transition:
+    border-color var(--ui-duration-fast, 120ms) ease,
+    box-shadow var(--ui-duration-fast, 120ms) ease;
+}
+
+.tarjetaEditable:hover {
+  border-color: color-mix(in srgb, var(--area) 60%, var(--ui-border-strong));
+  box-shadow: var(--ui-elev-2);
+}
+
+.tarjetaSeleccionada,
+.tarjetaSeleccionada:hover {
+  border-style: solid;
+  border-color: var(--area);
+  background: color-mix(in srgb, var(--area) 7%, var(--ui-surface));
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--area) 30%, transparent),
+    var(--ui-elev-2);
+}
+
+.tarjetaEditable:focus-visible,
+.control:focus-visible,
+.select:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+/* ── Controles flotantes ────────────────────────────────────────────────── */
+
+.controles {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface-3, var(--ui-surface));
+  box-shadow: var(--ui-elev-2);
+  overflow: hidden;
+  cursor: default;
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-fg-2);
   cursor: pointer;
 }
 
-.editar:hover {
-  color: var(--primary);
-  border-color: var(--border);
-  background: var(--surface-2);
+.control + .control {
+  border-top: 1px solid var(--ui-border);
+}
+
+.control svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.control:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+}
+
+.control:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.leyenda {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  max-width: calc(100% - 96px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ui-fg-2);
+  cursor: default;
+}
+
+.leyenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.leyenda li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--area);
+}
+
+/* ── Editor de colocación ───────────────────────────────────────────────── */
+
+.editor {
+  --area: var(--ui-neutral);
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(320px, calc(100% - 28px));
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg, 12px);
+  background: var(--ui-surface-3, var(--ui-surface));
+  box-shadow: var(--ui-elev-pop);
+  cursor: default;
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: auto;
+}
+
+.editorCabeza {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+
+.editorNombre {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.editorDetalle {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ui-fg-2);
+}
+
+.etiqueta {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-fg-2);
 }
 
 .select {
   width: 100%;
   min-height: 36px;
   padding: 6px 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: var(--surface);
-  color: var(--foreground);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
   font: inherit;
   font-size: 13px;
 }
 
-@media (max-width: 640px) {
-  .busqueda {
-    max-width: none;
-    min-height: 44px;
-  }
+.nota {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ui-fg-label, var(--ui-fg-2));
+}
 
-  .zoomBtn,
-  .editar {
-    min-width: 44px;
-    min-height: 44px;
-  }
+.fallo {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ui-danger-text);
+}
 
-  .editar {
-    width: 44px;
-    height: 44px;
-    top: 0;
-    right: 0;
-  }
+.editorAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
 
-  .chip {
-    min-height: 40px;
+/* ── Lista vertical (pantallas angostas) ────────────────────────────────── */
+
+.lista,
+.sublista,
+.listaSueltos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lista {
+  padding: 10px;
+}
+
+.sublista {
+  margin-left: 21px;
+  padding-left: 12px;
+  border-left: 1px solid var(--ui-border);
+}
+
+.fila {
+  --area: var(--ui-neutral);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--ui-fg);
+  font: inherit;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.fila .avatar {
+  width: 34px;
+  height: 34px;
+}
+
+.filaCentro {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-2);
+  margin-bottom: 4px;
+}
+
+.fila[aria-pressed="true"] {
+  border-color: var(--area);
+  background: color-mix(in srgb, var(--area) 7%, var(--ui-surface));
+}
+
+.filaNombre {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.filaPuesto {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ui-fg-2);
+}
+
+.filaNota {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ui-fg-label, var(--ui-fg-2));
+}
+
+.listaGrupo {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--ui-border-strong);
+}
+
+.listaRotulo {
+  display: block;
+  padding: 0 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-warning-text);
+}
+
+@media (max-width: 719px) {
+  .editor {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    z-index: var(--ui-z-dropdown, 50);
+    width: auto;
+    max-height: 70dvh;
   }
 
   .select {

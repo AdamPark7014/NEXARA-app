@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
-import mx.nexara.mobile.nativeapp.data.api.OrgNodeDto
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreExtrasRepository
@@ -139,38 +138,6 @@ class KpisEquipoViewModel(app: Application) : CargaViewModel<KpisEquipoDto>(app)
 
     fun descripcionRango(hoy: LocalDate = LocalDate.now()): String =
         BoardRange.descripcion(_rango.value, hoy)
-}
-
-// ── Organigrama ──────────────────────────────────────────────────────────────
-
-/**
- * El organigrama entero se trae de una vez (`users/orgchart` devuelve el árbol
- * completo de la empresa) y se navega sin volver a pedir nada: bajar y subir de
- * nivel es instantáneo aunque no haya señal.
- */
-class OrgchartViewModel(app: Application) : CargaViewModel<List<OrgNodeDto>>(app) {
-    override val mensajeDeFallo = "No se pudo cargar el organigrama"
-
-    override suspend fun cargar(): List<OrgNodeDto> = repo.orgchart()
-
-    /** A quién se está viendo. `null` = la cúpula. */
-    private val _foco = MutableStateFlow<Long?>(null)
-    val foco: StateFlow<Long?> = _foco
-
-    private val _consulta = MutableStateFlow("")
-    val consulta: StateFlow<String> = _consulta
-
-    fun enfocar(id: Long?) {
-        _foco.value = id
-        _consulta.value = ""
-    }
-
-    fun buscar(texto: String) { _consulta.value = texto }
-
-    /** Sube un escalón; en la cúpula ya no hay a dónde subir. */
-    fun subir(indice: OrgchartRules.Indice) {
-        _foco.value = OrgchartRules.arriba(indice, _foco.value)
-    }
 }
 
 // ── Proyectos ────────────────────────────────────────────────────────────────

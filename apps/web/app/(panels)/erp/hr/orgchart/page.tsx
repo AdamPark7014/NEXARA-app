@@ -9,5 +9,5 @@ import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
  */
 export default function OrgChartPage() {
   const cfg = useHrManagementGuard();
-  return <OrgChartView canEditOrg={cfg.canAssign} eyebrow="ERP · Personas" showHrRail />;
+  return <OrgChartView canEditOrg={cfg.canAssign} showHrRail />;
 }

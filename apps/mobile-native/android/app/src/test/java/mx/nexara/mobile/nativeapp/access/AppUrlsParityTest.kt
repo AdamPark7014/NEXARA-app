@@ -64,13 +64,15 @@ class AppUrlsParityTest {
         home("erpProcurement", "/erp/procurement?tab=orders&id=1"),
         home("erpApprovals", "/erp/approvals?highlight=1"),
         home("integraAccess", "/integra/access"),
+        // El organigrama es de escritorio: la app ya no lo tiene.
+        home("erpOrganigrama", "/erp/organigrama"),
+        home("erpHrOrgchart", "/erp/hr/orgchart"),
 
         // ── Módulos de «Más»: el aviso abre su ficha, no la casa de Core ─────
         Case("erpMisVehiculos", "/erp/vehiculos/mis-vehiculos?highlight=1", PanelId.ERP, CoreKeys.VEHICULOS, null),
         Case("erpVehiculos", "/erp/vehiculos?tab=requests&highlight=1", PanelId.ERP, CoreKeys.VEHICULOS, null),
         Case("erpHerramientas", "/erp/almacen/herramientas?tab=requests&highlight=1", PanelId.ERP, CoreKeys.HERRAMIENTAS, null),
         Case("erpAlmacen", "/erp/almacen?productId=1", PanelId.ERP, CoreKeys.ALMACEN, null),
-        Case("erpOrganigrama", "/erp/organigrama", PanelId.ERP, CoreKeys.ORGANIGRAMA, null),
         Case("erpCotizaciones", "/erp/cotizaciones/1", PanelId.ERP, CoreKeys.COTIZACIONES, 1L),
         // Enlaces viejos de OPS que la web ya manda a Core.
         Case("opsProject", "/ops/projects/1", PanelId.ERP, CoreKeys.PROYECTOS, 1L),

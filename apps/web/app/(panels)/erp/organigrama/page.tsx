@@ -13,5 +13,5 @@ import { getHrSectionConfig } from "@/lib/section-views";
 export default function OrganigramaPage() {
   const { user } = useUser();
   const canEditOrg = useMemo(() => getHrSectionConfig(user).canAssign, [user]);
-  return <OrgChartView canEditOrg={canEditOrg} eyebrow="Core · Recursos" />;
+  return <OrgChartView canEditOrg={canEditOrg} />;
 }

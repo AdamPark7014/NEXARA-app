@@ -18,8 +18,6 @@ struct CoreExtraDestination: View {
             VehiculosView()
         case .kpisEquipo:
             KpisEquipoView()
-        case .organigrama:
-            OrganigramaView()
         case .proyectos:
             ProyectosView()
         case .almacen:
@@ -36,7 +34,7 @@ struct CoreExtraDestination: View {
     /// antes de que se toque, de cuáles siguen sacando al navegador.
     static func tienePantallaNativa(_ module: CoreExtraModule) -> Bool {
         switch module {
-        case .vehiculos, .kpisEquipo, .organigrama, .proyectos, .almacen, .viaticos:
+        case .vehiculos, .kpisEquipo, .proyectos, .almacen, .viaticos:
             return true
         case .executive, .cotizaciones, .herramientas, .gastos, .aprobaciones, .pagosEmpleados, .documentos:
             return false

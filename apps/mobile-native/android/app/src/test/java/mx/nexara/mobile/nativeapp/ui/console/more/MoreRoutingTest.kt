@@ -17,10 +17,9 @@ import org.junit.Test
  */
 class MoreRoutingTest {
 
-    /** Los cuatro de solo consulta de esta ola. */
+    /** Los tres de solo consulta de esta ola. */
     private val deConsulta = listOf(
         CoreExtraModule.KPIS_EQUIPO,
-        CoreExtraModule.ORGANIGRAMA,
         CoreExtraModule.PROYECTOS,
         CoreExtraModule.ALMACEN,
     )
@@ -40,7 +39,6 @@ class MoreRoutingTest {
         val rutas = deConsulta.map { ConsoleRoutes.forExtra(it) }
         assertEquals("dos módulos comparten ruta: $rutas", rutas.distinct(), rutas)
         assertEquals(ConsoleRoutes.KpisEquipo, ConsoleRoutes.forExtra(CoreExtraModule.KPIS_EQUIPO))
-        assertEquals(ConsoleRoutes.Organigrama, ConsoleRoutes.forExtra(CoreExtraModule.ORGANIGRAMA))
         assertEquals(ConsoleRoutes.Proyectos, ConsoleRoutes.forExtra(CoreExtraModule.PROYECTOS))
         assertEquals(ConsoleRoutes.Almacen, ConsoleRoutes.forExtra(CoreExtraModule.ALMACEN))
     }

@@ -166,6 +166,9 @@ class DeepLinkParserTest {
             "/contabilidad/pagos",
             "/erp/dashboard",
             "/erp/hr/fines?highlight=1",
+            // El organigrama es de escritorio: en la app no hay pantalla.
+            "/erp/organigrama",
+            "/erp/hr/orgchart",
             "/panels",
         ).forEach { url ->
             assertEquals("$url debe abrir la casa de Core", DeepLinkParser.CORE_HOME, DeepLinkParser.parseWebPath(url))
@@ -189,8 +192,6 @@ class DeepLinkParserTest {
         assertEquals(CoreKeys.VEHICULOS, module("/erp/vehiculos").key)
         assertEquals(CoreKeys.VEHICULOS, module("/erp/vehiculos/mis-vehiculos?highlight=4").key)
         assertEquals(7L, module("/erp/vehiculos/7").entityId)
-        assertEquals(CoreKeys.ORGANIGRAMA, module("/erp/organigrama").key)
-        assertEquals(CoreKeys.ORGANIGRAMA, module("/erp/hr/orgchart").key)
         // Viáticos vive bajo /erp/finance en la web; el id se conserva para
         // abrir el viático del aviso y no la lista.
         assertEquals(CoreKeys.VIATICOS, module("/erp/finance/viatics").key)

@@ -75,7 +75,6 @@ enum class CoreExtraModule(
     ALMACEN(CoreKeys.ALMACEN, "Almacén", "/erp/almacen", "Inventario, entradas y salidas, y reabastecimiento.", Group.RECURSOS),
     HERRAMIENTAS(CoreKeys.HERRAMIENTAS, "Herramientas", "/erp/almacen/herramientas", "Solicita herramienta, revisa tu kit y tus préstamos.", Group.RECURSOS),
     VEHICULOS(CoreKeys.VEHICULOS, "Vehículos", "/erp/vehiculos", "Solicita un vehículo; entrega y recepción con fotos.", Group.RECURSOS),
-    ORGANIGRAMA(CoreKeys.ORGANIGRAMA, "Organigrama", "/erp/organigrama", "Quién reporta a quién en NEXARA.", Group.RECURSOS),
     GASTOS(CoreKeys.GASTOS, "Gastos", "/erp/finance/expenses", "Gastos de la operación: captura, comprobación y estado.", Group.FINANZAS),
     APROBACIONES(CoreKeys.APROBACIONES, "Aprobaciones", "/erp/approvals", "Lo que espera tu visto bueno, en un solo sitio.", Group.HOY),
     PAGOS_EMPLEADOS(
@@ -127,13 +126,13 @@ object CoreMenu {
     const val CORE_WEB_BASE = "https://core.nexara.com.mx"
 
     /**
-     * Los de «Más» que todo el personal tiene: herramientas, vehículos,
-     * organigrama y viáticos (ver [CoreExtraModule.paraTodoElPersonal]).
+     * Los de «Más» que todo el personal tiene: herramientas, vehículos y
+     * viáticos (ver [CoreExtraModule.paraTodoElPersonal]). El organigrama no va
+     * en el teléfono: es una pantalla de escritorio.
      */
     private val EVERYONE_EXTRAS = listOf(
         CoreExtraModule.HERRAMIENTAS,
         CoreExtraModule.VEHICULOS,
-        CoreExtraModule.ORGANIGRAMA,
         CoreExtraModule.VIATICOS,
     )
 

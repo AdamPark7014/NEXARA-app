@@ -4,12 +4,11 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 /**
- * Los cuatro módulos de «Más» que son **solo consulta** — espejo de:
+ * Los tres módulos de «Más» que son **solo consulta** — espejo de:
  *
  * | Pantalla          | Endpoint                                              |
  * |-------------------|-------------------------------------------------------|
  * | KPIs del equipo   | `GET me/kpis/equipo?desde&hasta` (`me/me.controller.ts`) |
- * | Organigrama       | `GET users/orgchart` (`users/users.controller.ts`)      |
  * | Proyectos         | `GET proyectos` (`projects/proyectos-profesional.controller.ts`) |
  * | Almacén           | `GET stock/levels` · `GET stock/alerts/low-stock` (`warehouse/stock.controller.ts`) |
  *
@@ -26,9 +25,6 @@ interface CoreExtrasApi {
         @Query("desde") desde: String,
         @Query("hasta") hasta: String,
     ): KpisEquipoDto
-
-    @GET("users/orgchart")
-    suspend fun orgchart(): List<OrgNodeDto>
 
     @GET("proyectos")
     suspend fun proyectos(): List<ProyectoResumenDto>
@@ -117,31 +113,6 @@ data class KpiTotalesDto(
     val jornadasSinSalida: Int? = null,
     val cierresAutomaticos: Int? = null,
     val actividadesFueraDeJornada: Int? = null,
-)
-
-// ── Organigrama ──────────────────────────────────────────────────────────────
-
-data class OrgRefDto(
-    val id: Long? = null,
-    val nombre: String? = null,
-)
-
-/**
- * Un nodo del árbol que devuelve `users/orgchart`: ya viene anidado por
- * `managerId`, con las raíces (quien no tiene jefe dentro de la empresa) en el
- * primer nivel. [lateralDeId] es la colocación al costado del dibujo de la web:
- * no cambia a quién reporta, y en el teléfono se enseña como una etiqueta.
- */
-data class OrgNodeDto(
-    val id: Long? = null,
-    val nombre: String? = null,
-    val managerId: Long? = null,
-    val lateralDeId: Long? = null,
-    val puesto: String? = null,
-    val avatarUrl: String? = null,
-    val role: OrgRefDto? = null,
-    val department: OrgRefDto? = null,
-    val children: List<OrgNodeDto>? = null,
 )
 
 // ── Proyectos ────────────────────────────────────────────────────────────────

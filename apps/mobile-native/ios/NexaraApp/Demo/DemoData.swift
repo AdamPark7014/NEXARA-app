@@ -2,7 +2,7 @@ import Foundation
 
 // Datos ficticios del modo demostración. Todo es inventado: personas, clientes, obras,
 // conversaciones y montos. Las mismas diez personas y los mismos clientes salen en TODAS
-// las pantallas (pizarra, asistencias, chat, viáticos, organigrama…), para que la app se
+// las pantallas (pizarra, asistencias, chat, viáticos, proyectos…), para que la app se
 // vea como una operación real y coherente.
 //
 // Las horas NO viven aquí: se guardan como minutos relativos al instante en que se
