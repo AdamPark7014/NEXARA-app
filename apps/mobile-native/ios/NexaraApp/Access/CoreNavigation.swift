@@ -52,7 +52,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     case almacen = "erp-almacen"
     case herramientas = "erp-herramientas"
     case vehiculos = "erp-vehiculos"
-    case organigrama = "erp-organigrama"
     case gastos = "erp-gastos"
     case aprobaciones = "erp-aprobaciones"
     case pagosEmpleados = "erp-pagos-empleados"
@@ -73,7 +72,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .almacen: return "Almacén"
         case .herramientas: return "Herramientas"
         case .vehiculos: return "Vehículos"
-        case .organigrama: return "Organigrama"
         case .gastos: return "Gastos"
         case .aprobaciones: return "Aprobaciones"
         case .pagosEmpleados: return "Pagos a empleados"
@@ -91,7 +89,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .almacen: return "shippingbox"
         case .herramientas: return "wrench.and.screwdriver"
         case .vehiculos: return "car"
-        case .organigrama: return "person.3"
         case .gastos: return "creditcard"
         case .aprobaciones: return "checkmark.seal"
         case .pagosEmpleados: return "wallet.pass"
@@ -110,7 +107,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .almacen: return "/erp/almacen"
         case .herramientas: return "/erp/almacen/herramientas"
         case .vehiculos: return "/erp/vehiculos"
-        case .organigrama: return "/erp/organigrama"
         case .gastos: return "/erp/finance/expenses"
         case .aprobaciones: return "/erp/approvals"
         case .pagosEmpleados: return "/erp/finance/employee-payments"
@@ -129,7 +125,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .almacen: return "Inventario, entradas y salidas, y reabastecimiento."
         case .herramientas: return "Solicita herramienta, revisa tu kit y tus préstamos."
         case .vehiculos: return "Solicita un vehículo; entrega y recepción con fotos."
-        case .organigrama: return "Quién reporta a quién en NEXARA."
         case .gastos: return "Gastos de la operación: captura, comprobación y estado."
         case .aprobaciones: return "Lo que espera tu visto bueno, en un solo sitio."
         case .pagosEmpleados: return "Pagos y anticipos al personal, con su comprobante."
@@ -168,7 +163,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     var group: Group {
         switch self {
         case .executive, .cotizaciones, .proyectos, .kpisEquipo, .aprobaciones: return .hoy
-        case .almacen, .herramientas, .vehiculos, .organigrama: return .recursos
+        case .almacen, .herramientas, .vehiculos: return .recursos
         case .gastos, .pagosEmpleados, .viaticos: return .finanzas
         case .documentos: return .gobierno
         }
@@ -193,7 +188,8 @@ enum CoreNavigation {
     /// - super admin: todos;
     /// - con navegación: los que ésta concede;
     /// - sin navegación todavía (primer arranque u offline): Herramientas,
-    ///   Vehículos y Organigrama, los tres que tiene todo el personal.
+    ///   Vehículos y Viáticos, los tres que tiene todo el personal. (El
+    ///   organigrama se quedó en la web: es una pantalla de escritorio.)
     static func extraModules(for user: SessionUser?) -> [CoreExtraModule] {
         guard let user, !isExternal(user) else { return [] }
         // Modo demostración: solo los módulos con pantalla propia y datos de muestra.
@@ -203,7 +199,7 @@ enum CoreNavigation {
         }
         if user.isSuperAdmin { return CoreExtraModule.allCases }
         let nav = Set((user.navModules ?? []).map { $0.lowercased() })
-        guard !nav.isEmpty else { return [.herramientas, .vehiculos, .organigrama, .viaticos] }
+        guard !nav.isEmpty else { return [.herramientas, .vehiculos, .viaticos] }
         return CoreExtraModule.allCases.filter { modulo in
             modulo.paraTodoElPersonal || !modulo.claves.isDisjoint(with: nav)
         }

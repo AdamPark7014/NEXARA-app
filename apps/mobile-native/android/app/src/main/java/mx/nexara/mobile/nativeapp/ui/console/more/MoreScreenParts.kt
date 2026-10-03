@@ -48,8 +48,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.bg
 import mx.nexara.mobile.nativeapp.ui.enterprise.fg
 
 /**
- * Piezas que comparten las cuatro pantallas de consulta de «Más» (KPIs del
- * equipo, organigrama, proyectos y almacén). Material 3 de arriba abajo: nada de
+ * Piezas que comparten las tres pantallas de consulta de «Más» (KPIs del
+ * equipo, proyectos y almacén). Material 3 de arriba abajo: nada de
  * calcar aquí lo que se hizo en SwiftUI.
  *
  * Los tamaños de toque salen de los propios componentes de Material: un

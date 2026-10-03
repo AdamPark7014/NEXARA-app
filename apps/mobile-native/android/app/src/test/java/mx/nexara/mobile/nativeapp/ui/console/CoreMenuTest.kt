@@ -117,6 +117,7 @@ class CoreMenuTest {
     fun masListaLosModulosQueConcedeLaNavegacion() {
         val ingeniero = user(
             roleKey = "ing_campo",
+            // `erp-organigrama` llega de la web, pero la app ya no tiene ese módulo: se ignora.
             navModuleKeys = listOf("activities", "attendance", "erp-herramientas", "erp-vehiculos", "erp-organigrama"),
         )
         assertEquals(
@@ -125,7 +126,6 @@ class CoreMenuTest {
             listOf(
                 CoreExtraModule.HERRAMIENTAS,
                 CoreExtraModule.VEHICULOS,
-                CoreExtraModule.ORGANIGRAMA,
                 CoreExtraModule.VIATICOS,
             ),
             CoreMenu.extraModulesFor(ingeniero),
@@ -138,7 +138,7 @@ class CoreMenuTest {
     fun masRespetaElOrdenDelCatalogo() {
         val almacen = user(
             roleKey = "coord_admin",
-            navModuleKeys = listOf("erp-vehiculos", "erp-almacen", "erp-cotizaciones", "erp-herramientas", "erp-organigrama"),
+            navModuleKeys = listOf("erp-vehiculos", "erp-almacen", "erp-cotizaciones", "erp-herramientas"),
         )
         assertEquals(
             listOf(
@@ -146,7 +146,6 @@ class CoreMenuTest {
                 CoreExtraModule.ALMACEN,
                 CoreExtraModule.HERRAMIENTAS,
                 CoreExtraModule.VEHICULOS,
-                CoreExtraModule.ORGANIGRAMA,
                 CoreExtraModule.VIATICOS,
             ),
             CoreMenu.extraModulesFor(almacen),
@@ -155,12 +154,11 @@ class CoreMenuTest {
 
     @Test
     fun masSinNavegacionDaLosTresDeTodoElPersonal() {
-        // Sin conexión o con sesión restaurada: herramientas, vehículos y organigrama.
+        // Sin conexión o con sesión restaurada: herramientas, vehículos y viáticos.
         assertEquals(
             listOf(
                 CoreExtraModule.HERRAMIENTAS,
                 CoreExtraModule.VEHICULOS,
-                CoreExtraModule.ORGANIGRAMA,
                 CoreExtraModule.VIATICOS,
             ),
             CoreMenu.extraModulesFor(user(roleKey = "ing_campo")),

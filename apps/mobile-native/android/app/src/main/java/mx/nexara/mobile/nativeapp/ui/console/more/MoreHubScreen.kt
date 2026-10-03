@@ -26,7 +26,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -82,7 +81,6 @@ fun CoreExtraModule.icon(): ImageVector = when (this) {
     CoreExtraModule.ALMACEN -> Icons.Default.Inventory2
     CoreExtraModule.HERRAMIENTAS -> Icons.Default.Build
     CoreExtraModule.VEHICULOS -> Icons.Default.DirectionsCar
-    CoreExtraModule.ORGANIGRAMA -> Icons.Default.AccountTree
     CoreExtraModule.VIATICOS -> Icons.Default.Payments
     CoreExtraModule.GASTOS -> Icons.AutoMirrored.Filled.ReceiptLong
     CoreExtraModule.APROBACIONES -> Icons.AutoMirrored.Filled.FactCheck

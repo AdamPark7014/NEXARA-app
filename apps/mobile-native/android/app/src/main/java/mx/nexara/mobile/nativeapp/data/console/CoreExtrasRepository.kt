@@ -9,16 +9,14 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CoreExtrasApi
 import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
-import mx.nexara.mobile.nativeapp.data.api.OrgNodeDto
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 
 /**
- * Lectura de los cuatro módulos de consulta de «Más»: KPIs del equipo,
- * organigrama, proyectos y almacén.
+ * Lectura de los tres módulos de consulta de «Más»: KPIs del equipo, proyectos
+ * y almacén. (El organigrama se quedó en la web: es una pantalla de escritorio.)
  *
- * Son de solo lectura a propósito: en el teléfono no se edita el organigrama ni
- * se mueve inventario. Lo que la app no hace, lo dice la pantalla; no hay ningún
+ * Son de solo lectura a propósito: en el teléfono no se mueve inventario. Lo que la app no hace, lo dice la pantalla; no hay ningún
  * botón que eche al navegador.
  */
 class CoreExtrasRepository(context: Context) {
@@ -30,9 +28,6 @@ class CoreExtrasRepository(context: Context) {
 
     suspend fun kpisEquipo(desde: String, hasta: String): KpisEquipoDto =
         withContext(Dispatchers.IO) { api.kpisEquipo(desde, hasta) }
-
-    suspend fun orgchart(): List<OrgNodeDto> =
-        withContext(Dispatchers.IO) { api.orgchart() }
 
     suspend fun proyectos(): List<ProyectoResumenDto> =
         withContext(Dispatchers.IO) { api.proyectos() }

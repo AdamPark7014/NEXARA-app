@@ -130,7 +130,6 @@ object DeepLinkParser {
     private val TOOL_SEGMENTS = setOf("herramientas", "tools")
     private val WAREHOUSE_SEGMENTS = setOf("almacen", "warehouse", "inventario")
     private val PROJECT_SEGMENTS = setOf("proyectos", "projects")
-    private val ORGCHART_SEGMENTS = setOf("organigrama", "orgchart")
 
     /**
      * Viáticos. La web los tiene bajo `/erp/finance/viatics`, y los enlaces
@@ -201,8 +200,8 @@ object DeepLinkParser {
                 )
             first in VIATIC_SEGMENTS ->
                 module(CoreKeys.VIATICOS, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
-            first in ORGCHART_SEGMENTS || (first == "hr" && second in ORGCHART_SEGMENTS) ->
-                module(CoreKeys.ORGANIGRAMA, params = extra)
+            // El organigrama no está en la app (es de escritorio): `/erp/organigrama` y
+            // `/erp/hr/orgchart` caen en la casa de Core, como todo lo que no existe aquí.
             // `/erp/hr/attendance` y `/erp/hr/lunch-breaks` (appUrls viejos) → Asistencias.
             first == "hr" && second in ATTENDANCE_SEGMENTS -> module(CoreKeys.ATTENDANCE, params = extra)
             first in LUNCH_SEGMENTS || (first == "hr" && second in LUNCH_SEGMENTS) ->

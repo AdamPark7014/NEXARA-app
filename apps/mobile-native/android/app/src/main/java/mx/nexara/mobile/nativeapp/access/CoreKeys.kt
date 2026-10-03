@@ -58,9 +58,6 @@ object CoreKeys {
     /** Documentos (`/erp/documents`). */
     const val DOCUMENTOS = "erp-documentos"
 
-    /** Organigrama (`/erp/organigrama`). */
-    const val ORGANIGRAMA = "erp-organigrama"
-
     /**
      * Viáticos (`/erp/finance/viatics`).
      *

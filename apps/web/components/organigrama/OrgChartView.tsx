@@ -1,55 +1,52 @@
 "use client";
 
 /**
- * Organigrama: flowchart de quién reporta a quién (`GET users/orgchart`).
+ * Organigrama: una telaraña con el director al centro (`GET users/orgchart`).
  *
- * Montado en `/erp/organigrama` (Core) y `/erp/hr/orgchart` (RH).
- * Reasignar jefe (✎) solo con `canEditOrg`; la API exige USERS_MANAGE / CONSOLE_ADMIN.
- * El subtítulo del nodo es `puesto`, no el nombre del rol RBAC.
+ * Montado en `/erp/organigrama` (Core) y `/erp/hr/orgchart` (RH). La página es
+ * **solo el organigrama**: sin encabezado, sin cifras, sin barra por departamento
+ * ni filtros. El director va al centro, sus reportes directos en el primer anillo
+ * y cada equipo se abre en abanico detrás de su jefe (`radial-layout.ts`).
+ *
+ * - Se mueve arrastrando y se acerca con la rueda, con dos dedos o con los botones.
+ * - Reasignar jefe o colocar a alguien «al lado de» otro: tocar su tarjeta. Solo con
+ *   `canEditOrg` (RH y Dirección); la API exige USERS_MANAGE / CONSOLE_ADMIN.
+ * - En pantallas angostas una telaraña no se lee: se cambia por una lista vertical.
+ * - El subtítulo de cada persona es su `puesto`, no el nombre del rol RBAC.
  */
 import {
-  useEffect,
-  useState,
   useCallback,
-  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
+  useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
 import EmptyState from "@/components/ui/EmptyState";
-import { Tag } from "@/components/ui/DataTable";
 import { SkeletonRows } from "@/components/base";
 import HrModuleRail from "@/components/hr/HrModuleRail";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { errorLegible } from "@/lib/recursos-ui";
-import MetricStrip from "@/components/ui/MetricStrip";
-import s from "./organigrama.module.css";
 import {
   type OrgChartNode,
-  ANCHO_TARJETA,
-  HUECO,
-  MAX_POR_FILA,
-  SANGRIA,
   contarSubordinados,
-  convieneCompacto,
-  esLateral,
   flattenOrgNodes,
-  hijosDeMando,
-  lateralesDe,
   orgNodeSubtitle,
-  maxOrgDepth,
-  countWithManager,
-  countWithoutManager,
-  countOrphanRoots,
-  raicesDibujadas,
-  soloHojas,
 } from "@/lib/orgchart-layout";
+import {
+  type Medida,
+  type NodoRadial,
+  calcularRadial,
+  elegirCentro,
+  zoomQueCabe,
+} from "./radial-layout";
+import s from "./organigrama.module.css";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -64,102 +61,176 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
   return res.json();
 }
 
-const LINE = "color-mix(in srgb, var(--primary) 55%, var(--border))";
-/** Línea de una colocación lateral: punteada y más tenue. No es mando. */
-const LINEA_LATERAL = "color-mix(in srgb, var(--text-tertiary) 70%, transparent)";
-const ZOOM_MIN = 0.3;
-/**
- * Por debajo de esto los nombres dejan de leerse. **No es un suelo al que
- * agarrarse**: cuando el árbol extendido no cabría ni a este zoom, lo que cambia
- * es la forma del árbol (modo compacto), no el número. Encajar a la fuerza un
- * zoom que sigue desbordando la caja es lo que hacía que el botón dijera
- * «ajustar» y el organigrama saliera cortado igual.
- */
-const ZOOM_LEGIBLE = 0.45;
-const ZOOM_MAX = 1.5;
-const ZOOM_STEP = 0.1;
-/** Altura aproximada del centro de la tarjeta: dónde nace un codo o una línea lateral. */
-const CENTRO_TARJETA = 26;
+const ZOOM_MIN = 0.35;
+const ZOOM_MAX = 2.4;
+/** Cuánto acerca o aleja cada pulsación de los botones. */
+const ZOOM_PASO = 1.2;
+/** Por debajo de este ancho de ventana se muestra la lista vertical. */
+const ANCHO_LISTA = 720;
+/** Píxeles que hay que mover el puntero para que cuente como arrastre y no como toque. */
+const UMBRAL_ARRASTRE = 5;
+/** Alto mínimo del lienzo: en una ventana muy baja se desplaza la página antes que aplastarlo. */
+const ALTO_MINIMO = 420;
 
-function norm(s: string) {
-  return s
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
+/** Colores por área, todos de los tokens del tema: sirven en claro y en oscuro. */
+const COLORES_AREA = [
+  "var(--ui-brand)",
+  "var(--ui-info)",
+  "var(--ui-violet)",
+  "var(--ui-warning)",
+  "var(--nx-magenta)",
+  "var(--ui-success)",
+  "var(--nx-skyblue-strong)",
+  "var(--ui-danger)",
+];
+const COLOR_SIN_AREA = "var(--ui-neutral)";
+const SIN_AREA = "Sin área";
 
-function Avatar({ url, name }: { url?: string | null; name: string }) {
-  const src = url ? resolveAssetUrl(url) : "";
-  if (src) {
-    return (
-      // El nombre ya va escrito al lado: la foto es decorativa para el lector de pantalla.
-      <img
-        src={src}
-        alt=""
-        loading="lazy"
-        style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-      />
-    );
-  }
-  const initials = name
+type Vista = { z: number; x: number; y: number };
+
+function iniciales(nombre: string) {
+  return nombre
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0])
     .join("")
     .toUpperCase();
+}
+
+function Avatar({ url, nombre, className }: { url?: string | null; nombre: string; className: string }) {
+  const src = url ? resolveAssetUrl(url) : "";
+  if (src) {
+    // El nombre ya va escrito al lado: la foto es decorativa para el lector de pantalla.
+    return <img src={src} alt="" loading="lazy" draggable={false} className={className} />;
+  }
   return (
-    <div
-      style={{
-        width: 34,
-        height: 34,
-        borderRadius: "50%",
-        flexShrink: 0,
-        background: "color-mix(in srgb, var(--primary) 20%, var(--surface))",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 12,
-        fontWeight: 700,
-        color: "var(--primary)",
-      }}
+    <span aria-hidden className={className}>
+      {iniciales(nombre)}
+    </span>
+  );
+}
+
+/** Lo que dice la tarjeta al pasar el puntero: todo lo que no cabe escrito. */
+function resumenDe(persona: OrgChartNode, ancla: OrgChartNode | undefined, sinJefe: boolean) {
+  const partes = [persona.nombre];
+  const puesto = orgNodeSubtitle(persona);
+  if (puesto) partes.push(puesto);
+  if (persona.department?.nombre) partes.push(persona.department.nombre);
+  const aCargo = contarSubordinados(persona);
+  if (aCargo > 0) partes.push(`${aCargo} a cargo`);
+  if (ancla) partes.push(`va al lado de ${ancla.nombre}`);
+  if (sinJefe) partes.push("sin jefe asignado");
+  return partes.join(" · ");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tarjeta de persona
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Tarjeta({
+  nodo,
+  color,
+  compacto,
+  ancla,
+  editable,
+  seleccionada,
+  onEditar,
+}: {
+  nodo: NodoRadial;
+  color: string;
+  compacto: boolean;
+  ancla?: OrgChartNode;
+  editable: boolean;
+  seleccionada: boolean;
+  onEditar: (id: number) => void;
+}) {
+  const persona = nodo.persona;
+  const puesto = orgNodeSubtitle(persona);
+  const sinJefe = nodo.tipoEnlace === "sinJefe";
+  const clases = [
+    s.tarjeta,
+    nodo.nivel === 0 ? s.tarjetaCentro : "",
+    compacto && nodo.nivel > 0 ? s.tarjetaCompacta : "",
+    sinJefe ? s.tarjetaSinJefe : "",
+    seleccionada ? s.tarjetaSeleccionada : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const estilo = {
+    left: nodo.x - nodo.ancho / 2,
+    top: nodo.y - nodo.alto / 2,
+    width: nodo.ancho,
+    height: nodo.alto,
+    "--area": color,
+  } as CSSProperties;
+  const contenido = (
+    <>
+      <Avatar url={persona.avatarUrl} nombre={persona.nombre} className={s.avatar} />
+      <span className={s.texto}>
+        <span className={s.nombre}>{persona.nombre}</span>
+        {puesto || sinJefe ? (
+          <span className={s.puestoFila}>
+            {puesto ? <span className={s.puesto}>{puesto}</span> : null}
+            {sinJefe ? <span className={s.marcaSinJefe}>Sin jefe</span> : null}
+          </span>
+        ) : null}
+      </span>
+    </>
+  );
+  const resumen = resumenDe(persona, ancla, sinJefe);
+
+  if (!editable) {
+    return (
+      <div className={clases} style={estilo} title={resumen} data-org-id={persona.id}>
+        {contenido}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className={`${clases} ${s.tarjetaEditable}`}
+      style={estilo}
+      title={`${resumen}. Toca para cambiar a quién reporta.`}
+      aria-label={`Colocar a ${persona.nombre} en el organigrama`}
+      aria-pressed={seleccionada}
+      data-org-id={persona.id}
+      onClick={() => onEditar(persona.id)}
     >
-      {initials}
-    </div>
+      {contenido}
+    </button>
   );
 }
 
-interface NodeCardProps {
-  node: OrgChartNode;
-  allUsers: OrgChartNode[];
-  token: string;
-  onRefresh: () => void;
-  canEditOrg: boolean;
-  isRoot?: boolean;
-  dimmed?: boolean;
-  highlighted?: boolean;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Editor: a quién reporta y al lado de quién se dibuja
+// ─────────────────────────────────────────────────────────────────────────────
 
-function NodeCard({
-  node,
-  allUsers,
+function EditorColocacion({
+  persona,
+  todos,
   token,
-  onRefresh,
-  canEditOrg,
-  isRoot,
-  dimmed,
-  highlighted,
-}: NodeCardProps) {
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
-  const [selectedManager, setSelectedManager] = useState(
-    node.managerId ? String(node.managerId) : "",
-  );
-  const [selectedLateral, setSelectedLateral] = useState(
-    node.lateralDeId ? String(node.lateralDeId) : "",
-  );
+  color,
+  onGuardado,
+  onCerrar,
+}: {
+  persona: OrgChartNode;
+  todos: OrgChartNode[];
+  token: string;
+  color: string;
+  onGuardado: () => void;
+  onCerrar: () => void;
+}) {
+  const [guardando, setGuardando] = useState(false);
+  const [fallo, setFallo] = useState<string | null>(null);
+  const [jefe, setJefe] = useState(persona.managerId ? String(persona.managerId) : "");
+  const [lateral, setLateral] = useState(persona.lateralDeId ? String(persona.lateralDeId) : "");
+  const primerCampo = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => {
+    primerCampo.current?.focus();
+  }, []);
 
   /**
    * Guarda las dos colocaciones por separado, porque son dos cosas distintas:
@@ -167,477 +238,210 @@ function NodeCard({
    * lado de» solo cambia dónde se dibuja. Cada una tiene su endpoint y solo se
    * llama la que cambió.
    */
-  const guardarColocacion = async () => {
-    setSaving(true);
-    setSaveErr(null);
+  const guardar = async () => {
+    setGuardando(true);
+    setFallo(null);
     try {
-      const managerId = selectedManager ? parseInt(selectedManager, 10) : null;
-      const lateralDeId = selectedLateral ? parseInt(selectedLateral, 10) : null;
-      if (managerId !== (node.managerId ?? null)) {
-        await apiFetch(`users/${node.id}/manager`, token, {
+      const managerId = jefe ? parseInt(jefe, 10) : null;
+      const lateralDeId = lateral ? parseInt(lateral, 10) : null;
+      if (managerId !== (persona.managerId ?? null)) {
+        await apiFetch(`users/${persona.id}/manager`, token, {
           method: "PATCH",
           body: JSON.stringify({ managerId }),
         });
       }
-      if (lateralDeId !== (node.lateralDeId ?? null)) {
-        await apiFetch(`users/${node.id}/lateral`, token, {
+      if (lateralDeId !== (persona.lateralDeId ?? null)) {
+        await apiFetch(`users/${persona.id}/lateral`, token, {
           method: "PATCH",
           body: JSON.stringify({ lateralDeId }),
         });
       }
-      setEditing(false);
-      onRefresh();
+      onGuardado();
     } catch (e: unknown) {
-      setSaveErr(errorLegible(e, "No se pudo guardar el cambio. Intenta de nuevo."));
+      setFallo(errorLegible(e, "No se pudo guardar el cambio. Intenta de nuevo."));
     } finally {
-      setSaving(false);
+      setGuardando(false);
     }
   };
 
-  /** Solo se calcula con el editor abierto: recorrer descendientes por cada tarjeta pesaba. */
-  const managerOptions = useMemo(() => {
-    if (!editing) return [];
-    const descendants = new Set<number>();
-    const collectDesc = (n: OrgChartNode) => {
-      descendants.add(n.id);
-      n.children.forEach(collectDesc);
-    };
-    collectDesc(node);
-    return allUsers.filter((u) => !descendants.has(u.id));
-  }, [editing, node, allUsers]);
-  const puesto = orgNodeSubtitle(node);
-  const aCargo = contarSubordinados(node);
+  /** Nadie puede reportar a su propia gente: se quitan la persona y todo lo que cuelga de ella. */
+  const opciones = useMemo(() => {
+    const propios = new Set(flattenOrgNodes([persona]).map((n) => n.id));
+    return todos
+      .filter((u) => !propios.has(u.id))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [persona, todos]);
+
+  const puesto = orgNodeSubtitle(persona);
+  const aCargo = contarSubordinados(persona);
+  const detalle = [puesto, persona.department?.nombre, aCargo > 0 ? `${aCargo} a cargo` : ""]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
-      data-org-id={node.id}
-      style={{
-        position: "relative",
-        padding: "8px 10px",
-        paddingRight: canEditOrg ? 40 : 10,
-        background: isRoot
-          ? "color-mix(in srgb, var(--primary) 10%, transparent)"
-          : "var(--surface)",
-        border: highlighted
-          ? "2px solid var(--primary)"
-          : "1px solid var(--border)",
-        borderRadius: 12,
-        display: "flex",
-        flexDirection: "column",
-        gap: 5,
-        // Tarjeta mas angosta: con 16 personas, a 204px el arbol medía 3,650px
-        // y para caber en pantalla habia que encogerlo al 40 %, donde el nombre
-        // ya no se lee. Quitando ancho a la tarjeta, cabe al ~50 %: se gana
-        // legibilidad sin quitar informacion.
-        minWidth: ANCHO_TARJETA - 4,
-        width: ANCHO_TARJETA,
-        boxShadow: highlighted
-          ? "0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent)"
-          : "0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)",
-        opacity: dimmed ? 0.28 : 1,
-        pointerEvents: dimmed ? "none" : "auto",
-        transition: "opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
+      className={s.editor}
+      role="dialog"
+      aria-label={`Colocar a ${persona.nombre}`}
+      data-sin-arrastre
+      style={{ "--area": color } as CSSProperties}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && !guardando) onCerrar();
       }}
     >
-      {canEditOrg && (
-        <button
-          type="button"
-          onClick={() => {
-            setEditing((e) => !e);
-            setSelectedManager(node.managerId ? String(node.managerId) : "");
-            setSelectedLateral(node.lateralDeId ? String(node.lateralDeId) : "");
-            setSaveErr(null);
-          }}
-          title={`Colocar a ${node.nombre} en el organigrama`}
-          aria-label={`Colocar a ${node.nombre} en el organigrama`}
-          aria-expanded={editing}
-          className={s.editar}
-        >
-          <span aria-hidden>✎</span>
-        </button>
-      )}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <Avatar url={node.avatarUrl} name={node.nombre} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: 12.5,
-              lineHeight: 1.3,
-              wordBreak: "break-word",
-              color: highlighted ? "var(--primary)" : undefined,
-            }}
-          >
-            {node.nombre}
-          </div>
-          {puesto ? (
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--text-secondary)",
-                marginTop: 2,
-                lineHeight: 1.3,
-                wordBreak: "break-word",
-              }}
-            >
-              {puesto}
-            </div>
-          ) : null}
+      <div className={s.editorCabeza}>
+        <Avatar url={persona.avatarUrl} nombre={persona.nombre} className={s.avatar} />
+        <div className={s.texto}>
+          <div className={s.editorNombre}>{persona.nombre}</div>
+          {detalle ? <div className={s.editorDetalle}>{detalle}</div> : null}
         </div>
       </div>
-      {(node.department || aCargo > 0) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-          {node.department && (
-            <Tag variant={isRoot ? "accent" : "neutral"} size="sm">
-              {node.department.nombre}
-            </Tag>
-          )}
-          {aCargo > 0 && (
-            <span
-              style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 600 }}
-              title={`Gente a cargo de ${node.nombre} por línea de mando`}
-            >
-              {aCargo} a cargo
-            </span>
-          )}
-        </div>
-      )}
 
-      {editing && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            paddingTop: 6,
-            borderTop: "1px solid var(--border)",
-          }}
-        >
-          <label
-            htmlFor={`jefe-${node.id}`}
-            style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600 }}
-          >
-            Reporta a:
-          </label>
-          <select
-            id={`jefe-${node.id}`}
-            value={selectedManager}
-            onChange={(e) => setSelectedManager(e.target.value)}
-            className={s.select}
-          >
-            <option value="">— Nadie: encabeza el organigrama —</option>
-            {managerOptions.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nombre}
-                {orgNodeSubtitle(u) ? ` · ${orgNodeSubtitle(u)}` : u.role ? ` · ${u.role.nombre}` : ""}
-              </option>
-            ))}
-          </select>
-          <label
-            htmlFor={`lateral-${node.id}`}
-            style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600, marginTop: 2 }}
-          >
-            Al lado de:
-          </label>
-          <select
-            id={`lateral-${node.id}`}
-            value={selectedLateral}
-            onChange={(e) => setSelectedLateral(e.target.value)}
-            className={s.select}
-          >
-            <option value="">— En su lugar del árbol —</option>
-            {managerOptions.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nombre}
-                {orgNodeSubtitle(u) ? ` · ${orgNodeSubtitle(u)}` : ""}
-              </option>
-            ))}
-          </select>
-          <div style={{ fontSize: 10, color: "var(--text-tertiary)", lineHeight: 1.35 }}>
-            Se dibuja a su costado, a la misma altura y con línea punteada. No manda sobre esa
-            persona ni cuenta como gente suya.
-          </div>
-          {saveErr && (
-            <div role="alert" style={{ fontSize: 11.5, color: "var(--danger)", lineHeight: 1.35 }}>
-              {saveErr}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <Button size="md" variant="primary" onClick={() => void guardarColocacion()} loading={saving}>
-              Guardar
-            </Button>
-            <Button size="md" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      )}
+      <label htmlFor={`jefe-${persona.id}`} className={s.etiqueta}>
+        Reporta a:
+      </label>
+      <select
+        id={`jefe-${persona.id}`}
+        ref={primerCampo}
+        value={jefe}
+        onChange={(e) => setJefe(e.target.value)}
+        className={s.select}
+      >
+        <option value="">— Nadie: sin jefe asignado —</option>
+        {opciones.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.nombre}
+            {orgNodeSubtitle(u) ? ` · ${orgNodeSubtitle(u)}` : u.role ? ` · ${u.role.nombre}` : ""}
+          </option>
+        ))}
+      </select>
+
+      <label htmlFor={`lateral-${persona.id}`} className={s.etiqueta}>
+        Al lado de:
+      </label>
+      <select
+        id={`lateral-${persona.id}`}
+        value={lateral}
+        onChange={(e) => setLateral(e.target.value)}
+        className={s.select}
+      >
+        <option value="">— En su lugar del organigrama —</option>
+        {opciones.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.nombre}
+            {orgNodeSubtitle(u) ? ` · ${orgNodeSubtitle(u)}` : ""}
+          </option>
+        ))}
+      </select>
+      <p className={s.nota}>
+        Se dibuja a su costado, con línea punteada. No manda sobre esa persona ni cuenta como
+        gente suya.
+      </p>
+
+      {fallo ? (
+        <p role="alert" className={s.fallo}>
+          {fallo}
+        </p>
+      ) : null}
+
+      <div className={s.editorAcciones}>
+        <Button size="md" variant="primary" onClick={() => void guardar()} loading={guardando}>
+          Guardar
+        </Button>
+        <Button size="md" variant="ghost" onClick={onCerrar} disabled={guardando}>
+          Cancelar
+        </Button>
+      </div>
     </div>
   );
 }
 
-interface TreeBranchProps {
-  node: OrgChartNode;
-  allUsers: OrgChartNode[];
-  token: string;
-  onRefresh: () => void;
-  canEditOrg: boolean;
-  isRoot?: boolean;
-  matchIds: Set<number> | null;
-  hasActiveFilter: boolean;
-  /** Apila en columna a los jefes cuyos hijos son todos hojas. */
-  compacto: boolean;
-  /** Profundidad de laterales ya atravesada; corta cualquier dato en ciclo. */
-  saltoLateral?: number;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Lista vertical (pantallas angostas)
+// ─────────────────────────────────────────────────────────────────────────────
 
-/** Hasta dónde se sigue una cadena de laterales al dibujar. */
-const MAX_SALTOS_LATERALES = 6;
-
-/**
- * Rama del flowchart: nodo + conectores + su gente debajo + quien vaya a su costado.
- *
- * Tres formas de unir, y cada línea significa algo distinto:
- *  - vertical llena hacia abajo → manda sobre;
- *  - codo llena en columna (modo compacto) → lo mismo, pero apilado para caber;
- *  - horizontal **punteada** al costado → colocación lateral: ni manda ni cuelga.
- */
-function TreeBranch({
-  node,
-  allUsers,
-  token,
-  onRefresh,
-  canEditOrg,
-  isRoot = false,
-  matchIds,
-  hasActiveFilter,
-  compacto,
-  saltoLateral = 0,
-}: TreeBranchProps) {
-  // Los hijos colocados al costado de alguien salen de la fila de mando: si se
-  // quedaran, les bajaría encima una línea de jefe que es justo lo que no son.
-  const kids = hijosDeMando(node);
-  const hasKids = kids.length > 0;
-  const laterales =
-    saltoLateral < MAX_SALTOS_LATERALES ? lateralesDe(node.id, allUsers) : [];
-  /** Con muchos hermanos se cambia ancho por alto. */
-  const envuelve = kids.length > MAX_POR_FILA;
-  /** Hijos todos hoja: en vez de una fila larguísima, una columna con codos. */
-  const apila = compacto && soloHojas(node);
-  const isMatch = !hasActiveFilter || (matchIds?.has(node.id) ?? true);
-  const highlighted = hasActiveFilter && (matchIds?.has(node.id) ?? false);
-  const dimmed = hasActiveFilter && !isMatch;
-
-  const tarjetaYGente = (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: apila ? "flex-start" : "center",
-        position: "relative",
-      }}
-    >
-      <NodeCard
-        node={node}
-        allUsers={allUsers}
-        token={token}
-        onRefresh={onRefresh}
-        canEditOrg={canEditOrg}
-        isRoot={isRoot}
-        dimmed={dimmed}
-        highlighted={highlighted}
-      />
-
-      {hasKids && apila && (
-        <div style={{ width: "100%" }}>
-          {kids.map((child, i) => {
-            const ultimo = i === kids.length - 1;
-            return (
-              <div
-                key={child.id}
-                style={{ position: "relative", paddingLeft: SANGRIA, paddingTop: i === 0 ? 8 : 10 }}
-              >
-                {/* Espina vertical: llega hasta el último codo y ahí se corta. */}
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                    top: 0,
-                    width: 2,
-                    height: ultimo ? CENTRO_TARJETA + (i === 0 ? 8 : 10) : "100%",
-                    background: LINE,
-                    borderRadius: 1,
-                  }}
-                />
-                {/* Codo hacia la tarjeta. */}
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                    top: CENTRO_TARJETA + (i === 0 ? 8 : 10),
-                    width: SANGRIA - 10,
-                    height: 2,
-                    background: LINE,
-                    borderRadius: 1,
-                  }}
-                />
-                <TreeBranch
-                  node={child}
-                  allUsers={allUsers}
-                  token={token}
-                  onRefresh={onRefresh}
-                  canEditOrg={canEditOrg}
-                  matchIds={matchIds}
-                  hasActiveFilter={hasActiveFilter}
-                  compacto={compacto}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {hasKids && !apila && (
-        <>
-          {/* Bajada del jefe a la barra horizontal */}
-          <div
-            aria-hidden
-            style={{ width: 2, height: 18, background: LINE, flexShrink: 0, borderRadius: 1 }}
-          />
-
-          <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
-            {/* Barra horizontal del primer hermano al ultimo. Solo tiene sentido
-                cuando van en una sola fila: al envolver, cada hijo se enlaza con
-                su propio tramo vertical y una barra larga cruzaria por encima de
-                la segunda fila. */}
-            {kids.length > 1 && !envuelve && (
-              <div
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: `calc(100% / ${kids.length * 2})`,
-                  right: `calc(100% / ${kids.length * 2})`,
-                  height: 2,
-                  background: LINE,
-                  pointerEvents: "none",
-                  borderRadius: 1,
-                }}
-              />
-            )}
-
-            <div
-              style={{
-                display: "flex",
-                flexWrap: envuelve ? "wrap" : "nowrap",
-                justifyContent: "center",
-                alignItems: "flex-start",
-                gap: HUECO,
-                rowGap: 18,
-                // Con muchos hermanos, una sola fila estira el arbol a lo ancho
-                // y obliga a encogerlo hasta que no se lee. Se cambia ancho por
-                // alto: cuatro por renglon.
-                maxWidth: envuelve ? MAX_POR_FILA * (ANCHO_TARJETA + HUECO) : undefined,
-              }}
-            >
-              {kids.map((child) => (
-                <div
-                  key={child.id}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    aria-hidden
-                    style={{ width: 2, height: 18, background: LINE, flexShrink: 0, borderRadius: 1 }}
-                  />
-                  <TreeBranch
-                    node={child}
-                    allUsers={allUsers}
-                    token={token}
-                    onRefresh={onRefresh}
-                    canEditOrg={canEditOrg}
-                    matchIds={matchIds}
-                    hasActiveFilter={hasActiveFilter}
-                    compacto={compacto}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+function FilaLista({
+  persona,
+  porId,
+  colorDe,
+  editable,
+  editandoId,
+  onEditar,
+  esCentro = false,
+}: {
+  persona: OrgChartNode;
+  porId: Map<number, OrgChartNode>;
+  colorDe: (p: OrgChartNode) => string;
+  editable: boolean;
+  editandoId: number | null;
+  onEditar: (id: number) => void;
+  esCentro?: boolean;
+}) {
+  const puesto = orgNodeSubtitle(persona);
+  const ancla = persona.lateralDeId != null ? porId.get(persona.lateralDeId) : undefined;
+  const hijos = persona.children ?? [];
+  const contenido = (
+    <>
+      <Avatar url={persona.avatarUrl} nombre={persona.nombre} className={s.avatar} />
+      <span className={s.texto}>
+        <span className={s.filaNombre}>{persona.nombre}</span>
+        {puesto ? <span className={s.filaPuesto}>{puesto}</span> : null}
+        {ancla ? <span className={s.filaNota}>Al lado de {ancla.nombre}</span> : null}
+      </span>
+    </>
   );
-
-  if (laterales.length === 0) return tarjetaYGente;
-
+  const clases = `${s.fila} ${esCentro ? s.filaCentro : ""}`;
+  const estilo = { "--area": colorDe(persona) } as CSSProperties;
   return (
-    <div style={{ display: "flex", alignItems: "flex-start" }}>
-      {tarjetaYGente}
-      {laterales.map((lat) => (
-        <div key={lat.id} style={{ display: "flex", alignItems: "flex-start" }}>
-          {/* Línea punteada, a la altura de la tarjeta y sin punta: acompaña, no manda. */}
-          <div
-            aria-hidden
-            title={`${lat.nombre} va al lado de ${node.nombre}`}
-            style={{
-              width: HUECO,
-              height: 0,
-              marginTop: CENTRO_TARJETA,
-              borderTop: `2px dashed ${LINEA_LATERAL}`,
-              flexShrink: 0,
-            }}
-          />
-          <TreeBranch
-            node={lat}
-            allUsers={allUsers}
-            token={token}
-            onRefresh={onRefresh}
-            canEditOrg={canEditOrg}
-            matchIds={matchIds}
-            hasActiveFilter={hasActiveFilter}
-            compacto={compacto}
-            saltoLateral={saltoLateral + 1}
-          />
+    <li>
+      {editable ? (
+        <button
+          type="button"
+          className={`${clases} ${s.tarjetaEditable}`}
+          style={estilo}
+          aria-label={`Colocar a ${persona.nombre} en el organigrama`}
+          aria-pressed={editandoId === persona.id}
+          data-org-id={persona.id}
+          onClick={() => onEditar(persona.id)}
+        >
+          {contenido}
+        </button>
+      ) : (
+        <div className={clases} style={estilo} data-org-id={persona.id}>
+          {contenido}
         </div>
-      ))}
-    </div>
+      )}
+      {hijos.length > 0 ? (
+        <ul className={s.sublista}>
+          {hijos.map((hijo) => (
+            <FilaLista
+              key={hijo.id}
+              persona={hijo}
+              porId={porId}
+              colorDe={colorDe}
+              editable={editable}
+              editandoId={editandoId}
+              onEditar={onEditar}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </li>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vista
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type OrgChartViewProps = {
-  /** Muestra ✎ para reasignar jefe: RH y dirección (`getHrSectionConfig(user).canAssign`). */
+  /** Permite recolocar tocando una tarjeta: RH y dirección (`getHrSectionConfig(user).canAssign`). */
   canEditOrg: boolean;
-  eyebrow: string;
   /** Carril de RH (plantilla, incidencias, KPIs): solo dentro de `/erp/hr`. */
   showHrRail?: boolean;
 };
 
-const TITULO = "Organigrama";
-const SUBTITULO = "Quién reporta a quién.";
-
-/** Colores por área, todos derivados de los tokens del tema (claro y oscuro). */
-const COLORES_AREA = [
-  "var(--primary)",
-  "var(--success)",
-  "var(--warning)",
-  "var(--danger)",
-  "color-mix(in srgb, var(--primary) 50%, var(--success))",
-  "color-mix(in srgb, var(--primary) 45%, var(--surface))",
-  "color-mix(in srgb, var(--warning) 50%, var(--danger))",
-  "color-mix(in srgb, var(--text-tertiary) 80%, var(--surface))",
-];
-
-export default function OrgChartView({
-  canEditOrg,
-  eyebrow,
-  showHrRail = false,
-}: OrgChartViewProps) {
+export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChartViewProps) {
   const { user } = useUser();
   const token = user?.token ?? "";
 
@@ -645,35 +449,22 @@ export default function OrgChartView({
   const [loading, setLoading] = useState(true);
   const [reintentando, setReintentando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const busquedaDiferida = useDeferredValue(searchQuery);
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
-  /** Ancho natural del arbol, para poder ajustarlo al hueco disponible. */
-  const contentRef = useRef<HTMLDivElement>(null);
-  /**
-   * Tamaño real del arbol sin escalar. Hace falta guardarlo porque `scale()`
-   * encoge el DIBUJO pero no la CAJA: sin esto el arbol se veia pequeño y
-   * arrinconado dentro de un hueco enorme, y la barra de desplazamiento seguia
-   * ahi aunque ya cupiera entero.
-   */
-  const [tamanoNatural, setTamanoNatural] = useState<{ w: number; h: number } | null>(null);
-  /** Mientras nadie toque el zoom a mano, el arbol se reajusta solo al cambiar el ancho. */
-  const zoomManual = useRef(false);
-  /** Ancho útil del lienzo; decide la forma del árbol (extendido o compacto). */
-  const [anchoLienzo, setAnchoLienzo] = useState(0);
-  /** `null` = lo decide el propio árbol; true/false = lo decidió Adam con el botón. */
-  const [compactoManual, setCompactoManual] = useState<boolean | null>(null);
-  /** A dónde dejar el desplazamiento tras un zoom a mano, para no perder de vista lo mirado. */
-  const objetivoScroll = useRef<number | null>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
-  const [panning, setPanning] = useState(false);
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+
+  const lienzoRef = useRef<HTMLDivElement>(null);
+  const [tamano, setTamano] = useState<Medida>({ ancho: 0, alto: 0 });
+  const [altoLienzo, setAltoLienzo] = useState<number | null>(null);
+  const [estrecho, setEstrecho] = useState(false);
+  /** `null` = encuadre automático (todo el organigrama, director al centro). */
+  const [vistaManual, setVistaManual] = useState<Vista | null>(null);
+  /** Los botones animan el cambio; el arrastre y la rueda no, o se sentirían con retraso. */
+  const [suave, setSuave] = useState(false);
+  const [arrastrando, setArrastrando] = useState(false);
 
   /**
    * Solo la primera carga pinta el esqueleto. Recargar tras guardar una colocación
-   * deja el árbol a la vista (y el zoom y el desplazamiento donde estaban); si falla,
-   * se queda lo último que cargó y el aviso ofrece reintentar.
+   * deja el organigrama a la vista; si falla, se queda lo último que cargó y el
+   * aviso ofrece reintentar.
    */
   const load = useCallback(async () => {
     if (!token) return;
@@ -698,608 +489,424 @@ export default function OrgChartView({
     void load();
   }, [load]);
 
-  const allUsers = useMemo(() => flattenOrgNodes(roots), [roots]);
-  const withManager = useMemo(() => countWithManager(roots), [roots]);
-  const withoutManager = useMemo(() => countWithoutManager(roots), [roots]);
-  const orphanRoots = useMemo(() => countOrphanRoots(roots), [roots]);
-  const levels = useMemo(() => maxOrgDepth(roots), [roots]);
-  /** Quien se dibuja al costado de alguien no encabeza nada: sale de la fila de raíces. */
-  const dibujables = useMemo(() => raicesDibujadas(roots), [roots]);
-  const trueRoots = useMemo(() => dibujables.filter((r) => r.managerId == null), [dibujables]);
-  const danglingRoots = useMemo(() => dibujables.filter((r) => r.managerId != null), [dibujables]);
-  const laterales = useMemo(() => allUsers.filter((u) => esLateral(u)).length, [allUsers]);
+  const todos = useMemo(() => flattenOrgNodes(roots), [roots]);
+  const porId = useMemo(() => new Map(todos.map((n) => [n.id, n])), [todos]);
 
-  /**
-   * Forma del árbol. Se decide con los **datos**, no midiendo el DOM: así no puede
-   * entrar en el vaivén medir → escalar → volver a medir. Si extendido no cabría ni
-   * al zoom mínimo legible, se apila.
-   */
-  const compacto = useMemo(
-    () => compactoManual ?? convieneCompacto(roots, anchoLienzo - 24, ZOOM_LEGIBLE),
-    [compactoManual, roots, anchoLienzo],
+  /** Un color por área, el mismo en la tarjeta, en su conector y en la leyenda. */
+  const areas = useMemo(() => {
+    const cuenta = new Map<string, number>();
+    for (const u of todos) {
+      const nombre = u.department?.nombre ?? SIN_AREA;
+      cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
+    }
+    const conArea = [...cuenta.keys()]
+      .filter((n) => n !== SIN_AREA)
+      .sort((a, b) => (cuenta.get(b) ?? 0) - (cuenta.get(a) ?? 0) || a.localeCompare(b, "es"));
+    const lista = conArea.map((nombre, i) => ({
+      nombre,
+      color: COLORES_AREA[i % COLORES_AREA.length],
+    }));
+    if (cuenta.has(SIN_AREA)) lista.push({ nombre: SIN_AREA, color: COLOR_SIN_AREA });
+    return lista;
+  }, [todos]);
+  const colorDe = useCallback(
+    (p: OrgChartNode) =>
+      areas.find((a) => a.nombre === (p.department?.nombre ?? SIN_AREA))?.color ?? COLOR_SIN_AREA,
+    [areas],
   );
 
-  const byDept = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const u of allUsers) {
-      const dept = u.department?.nombre ?? "Sin área";
-      map[dept] = (map[dept] ?? 0) + 1;
-    }
-    return map;
-  }, [allUsers]);
+  // ── Medidas ────────────────────────────────────────────────────────────────
 
-  const deptEntries = useMemo(
-    () => Object.entries(byDept).sort((a, b) => b[1] - a[1]),
-    [byDept],
-  );
-
-  const q = norm(busquedaDiferida);
-  const hasSearch = q.length > 0;
-  const hasDept = selectedDept != null;
-  const hasActiveFilter = hasSearch || hasDept;
-
-  const matchIds = useMemo(() => {
-    if (!hasActiveFilter) return null;
-    const ids = new Set<number>();
-    for (const u of allUsers) {
-      const deptName = u.department?.nombre ?? "Sin área";
-      if (hasDept && deptName !== selectedDept) continue;
-      if (hasSearch) {
-        const hay = `${norm(u.nombre)} ${norm(orgNodeSubtitle(u) ?? "")}`;
-        if (!hay.includes(q)) continue;
-      }
-      ids.add(u.id);
-    }
-    return ids;
-  }, [allUsers, hasActiveFilter, hasDept, hasSearch, q, selectedDept]);
-
-  /**
-   * **Mide. Solo mide.** Y se ejecuta siempre, toque quien toque el zoom.
-   *
-   * Aquí estaba el fallo de fondo. Medir el árbol y decidir el zoom vivían en la
-   * misma función, y esa función estaba condicionada a «nadie ha tocado el zoom».
-   * En cuanto Adam pulsaba +, dejaba de decidirse el zoom (correcto) pero también
-   * dejaba de medirse el árbol (nada correcto): la caja escalada se quedaba
-   * clavada en el último tamaño natural conocido. Abrir el ✎ o cambiar de área
-   * hacía crecer el contenido dentro de una caja congelada y, como el lienzo
-   * recortaba lo que sobraba, media rama desaparecía sin barra a la que agarrarse.
-   * Ampliar «no servía»: ampliabas y el recorte se comía lo que acababas de ganar.
-   *
-   * `scale()` encoge el DIBUJO pero no la CAJA, así que `scrollWidth` sigue siendo
-   * el ancho natural aunque el árbol ya esté escalado.
-   */
-  const medir = useCallback(() => {
-    const caja = canvasRef.current;
-    const contenido = contentRef.current;
-    if (!caja || !contenido) return null;
-    setAnchoLienzo(caja.clientWidth);
-    const w = contenido.scrollWidth;
-    const h = contenido.scrollHeight;
-    if (w <= 0) return null;
-    // Se conserva el objeto cuando la medida no cambió: así el efecto no se
-    // reengancha solo y el observador no se persigue la cola.
-    setTamanoNatural((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
-    return { w, h, caja };
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const consulta = window.matchMedia(`(max-width: ${ANCHO_LISTA - 1}px)`);
+    const aplicar = () => setEstrecho(consulta.matches);
+    aplicar();
+    consulta.addEventListener?.("change", aplicar);
+    return () => consulta.removeEventListener?.("change", aplicar);
   }, []);
 
   /**
-   * Decide el zoom para que el árbol quepa entero, de ancho y de alto.
-   *
-   * Ya no hay suelo de legibilidad aquí. Lo había, y era el motivo de que el
-   * organigrama «se siguiera cortando»: con 16 personas el ajuste real daba 33 %
-   * y se subía a la fuerza al 45 %, devolviendo un árbol de 1,350px dentro de un
-   * hueco de 976px. El botón decía «ajustar» y entregaba algo cortado. La
-   * legibilidad se defiende cambiando la FORMA del árbol (modo compacto), no
-   * mintiendo con el número.
-   *
-   * Nunca amplía por encima del 100 %: un organigrama de tres personas se ve raro
-   * estirado a pantalla completa.
+   * El lienzo llena lo que queda de ventana debajo de él. Se calcula midiendo
+   * dónde empieza (el carril de RH o un aviso lo empujan) en vez de restar a ojo
+   * la barra superior: así no aparece una barra de desplazamiento de página.
    */
-  const ajustarAlAncho = useCallback(() => {
-    const medida = medir();
-    if (!medida) return;
-    const { w, h, caja } = medida;
-    const anchoDisponible = caja.clientWidth - 24; // relleno lateral del lienzo
-    const altoDisponible = Math.max(
-      360,
-      (typeof window !== "undefined" ? window.innerHeight : 900) - caja.getBoundingClientRect().top - 48,
+  const medir = useCallback(() => {
+    const el = lienzoRef.current;
+    if (!el) return;
+    const arriba = el.getBoundingClientRect().top + window.scrollY;
+    const alto = Math.max(ALTO_MINIMO, Math.floor(window.innerHeight - arriba - 16));
+    setAltoLienzo((prev) => (prev === alto ? prev : alto));
+    const ancho = el.clientWidth;
+    const altoReal = el.clientHeight;
+    setTamano((prev) =>
+      prev.ancho === ancho && prev.alto === altoReal ? prev : { ancho, alto: altoReal },
     );
-    const factor = Math.min(1, anchoDisponible / w, altoDisponible / Math.max(1, h));
-    setZoom(Math.max(ZOOM_MIN, Math.round(factor * 100) / 100));
-    objetivoScroll.current = null;
-    caja.scrollLeft = 0;
-    caja.scrollTop = 0;
+  }, []);
+
+  useLayoutEffect(() => {
+    medir();
+  }, [medir, altoLienzo, estrecho, loading, error, showHrRail]);
+
+  useEffect(() => {
+    const el = lienzoRef.current;
+    if (!el) return;
+    window.addEventListener("resize", medir);
+    const observador = typeof ResizeObserver !== "undefined" ? new ResizeObserver(medir) : null;
+    observador?.observe(el);
+    return () => {
+      window.removeEventListener("resize", medir);
+      observador?.disconnect();
+    };
   }, [medir]);
 
-  /**
-   * Al entrar, al cambiar el ancho y al cambiar el contenido. Medir va siempre;
-   * decidir el zoom, solo mientras nadie lo haya tomado a mano.
-   */
+  // ── Diseño y encuadre ──────────────────────────────────────────────────────
+
+  /** Redondeado: arrastrar el borde de la ventana no recalcula el dibujo a cada píxel. */
+  const aspecto = tamano.alto > 0 ? Math.round((tamano.ancho / tamano.alto) * 10) / 10 : 1.6;
+  const diseno = useMemo(() => calcularRadial(roots, { aspecto }), [roots, aspecto]);
+  const centro = useMemo(() => elegirCentro(roots), [roots]);
+
+  const vistaAuto = useMemo<Vista>(
+    () => ({ z: zoomQueCabe(diseno, tamano), x: tamano.ancho / 2, y: tamano.alto / 2 }),
+    [diseno, tamano],
+  );
+  const vista = vistaManual ?? vistaAuto;
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
+
+  /** Acerca o aleja dejando quieto el punto (px, py) del lienzo: lo que se mira no se va. */
+  const zoomEn = useCallback((px: number, py: number, factor: number) => {
+    const actual = vistaRef.current;
+    const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, actual.z * factor));
+    if (z === actual.z) return;
+    const k = z / actual.z;
+    setVistaManual({ z, x: px - (px - actual.x) * k, y: py - (py - actual.y) * k });
+  }, []);
+
+  const zoomConBoton = (factor: number) => {
+    setSuave(true);
+    zoomEn(tamano.ancho / 2, tamano.alto / 2, factor);
+  };
+
+  const centrar = () => {
+    setSuave(true);
+    setVistaManual(null);
+  };
+
+  // Rueda: acerca hacia donde apunta el cursor. Va con `addEventListener` porque
+  // React la registra pasiva y no dejaría frenar el desplazamiento de la página.
   useEffect(() => {
-    const caja = canvasRef.current;
-    if (!caja) return;
-    const reaccionar = () => {
-      if (zoomManual.current) medir();
-      else ajustarAlAncho();
+    const el = lienzoRef.current;
+    if (!el || estrecho) return;
+    const alGirar = (e: WheelEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("[data-sin-arrastre]")) return;
+      e.preventDefault();
+      setSuave(false);
+      const caja = el.getBoundingClientRect();
+      const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      // Con Ctrl llega el gesto de pellizco del touchpad, que viene en pasos más finos.
+      const factor = Math.exp(-delta * (e.ctrlKey ? 0.01 : 0.0015));
+      zoomEn(e.clientX - caja.left, e.clientY - caja.top, factor);
     };
-    reaccionar();
-    if (typeof ResizeObserver === "undefined") return;
-    const observador = new ResizeObserver(reaccionar);
-    observador.observe(caja);
-    // También el contenido: abrir el ✎ o plegar una rama cambia el árbol sin
-    // cambiar el lienzo, y esa caja también tiene que enterarse.
-    if (contentRef.current) observador.observe(contentRef.current);
-    return () => observador.disconnect();
-  }, [ajustarAlAncho, medir, roots, selectedDept, busquedaDiferida, compacto]);
+    el.addEventListener("wheel", alGirar, { passive: false });
+    return () => el.removeEventListener("wheel", alGirar);
+  }, [estrecho, zoomEn]);
 
-  /**
-   * Al buscar, lleva la vista a la primera coincidencia: con el árbol ancho, la
-   * persona buscada podía quedar fuera de pantalla aunque se resaltara.
-   */
-  const primeraCoincidencia = useMemo(() => {
-    if (!hasSearch || !matchIds || matchIds.size === 0) return null;
-    return matchIds.values().next().value ?? null;
-  }, [hasSearch, matchIds]);
+  // Arrastre con un dedo o el ratón; pellizco con dos dedos.
+  const punteros = useRef(new Map<number, { x: number; y: number }>());
+  const gesto = useRef<
+    | { tipo: "arrastre"; id: number; x0: number; y0: number; vista: Vista; movio: boolean }
+    | { tipo: "pellizco"; distancia: number; vista: Vista; mx: number; my: number }
+    | null
+  >(null);
 
-  useEffect(() => {
-    if (primeraCoincidencia == null) return;
-    const caja = canvasRef.current;
-    if (!caja) return;
-    const marco = requestAnimationFrame(() => {
-      const tarjeta = caja.querySelector<HTMLElement>(`[data-org-id="${primeraCoincidencia}"]`);
-      if (!tarjeta) return;
-      const rCaja = caja.getBoundingClientRect();
-      const rTarjeta = tarjeta.getBoundingClientRect();
-      caja.scrollLeft += rTarjeta.left - rCaja.left - (caja.clientWidth - rTarjeta.width) / 2;
-      caja.scrollTop += rTarjeta.top - rCaja.top - 24;
-    });
-    return () => cancelAnimationFrame(marco);
-  }, [primeraCoincidencia]);
-
-  /**
-   * Ampliar y alejar dejando quieto lo que se está mirando. Antes el zoom crecía
-   * desde la esquina superior izquierda sin tocar el desplazamiento: pulsabas + y
-   * la parte que te interesaba se iba de la pantalla, que es otra forma de que
-   * «no se pueda hacer zoom».
-   */
-  const bumpZoom = (delta: number) => {
-    const nuevo = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((zoom + delta) * 10) / 10));
-    if (nuevo === zoom) return;
-    zoomManual.current = true;
-    const caja = canvasRef.current;
-    if (caja && zoom > 0) {
-      const centro = caja.scrollLeft + caja.clientWidth / 2;
-      objetivoScroll.current = (centro * nuevo) / zoom - caja.clientWidth / 2;
+  const alBajar = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (estrecho) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("[data-sin-arrastre]")) return;
+    punteros.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const caja = e.currentTarget.getBoundingClientRect();
+    if (punteros.current.size === 2) {
+      const [a, b] = [...punteros.current.values()];
+      gesto.current = {
+        tipo: "pellizco",
+        distancia: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+        vista: vistaRef.current,
+        mx: (a.x + b.x) / 2 - caja.left,
+        my: (a.y + b.y) / 2 - caja.top,
+      };
+      for (const id of punteros.current.keys()) {
+        try {
+          e.currentTarget.setPointerCapture(id);
+        } catch {
+          /* el puntero ya no existe */
+        }
+      }
+      setSuave(false);
+      return;
     }
-    setZoom(nuevo);
-  };
-
-  /** Aplica el desplazamiento calculado arriba, ya con el árbol pintado al nuevo tamaño. */
-  useEffect(() => {
-    const caja = canvasRef.current;
-    const objetivo = objetivoScroll.current;
-    if (!caja || objetivo == null) return;
-    objetivoScroll.current = null;
-    caja.scrollLeft = Math.max(0, objetivo);
-  }, [zoom]);
-
-  const onCanvasPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    const t = e.target as HTMLElement;
-    if (t.closest("button, a, input, select, textarea, label")) return;
-    const el = canvasRef.current;
-    if (!el) return;
-    dragRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      sl: el.scrollLeft,
-      st: el.scrollTop,
+    gesto.current = {
+      tipo: "arrastre",
+      id: e.pointerId,
+      x0: e.clientX,
+      y0: e.clientY,
+      vista: vistaRef.current,
+      movio: false,
     };
-    setPanning(true);
-    el.setPointerCapture(e.pointerId);
   };
 
-  const onCanvasPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    const el = canvasRef.current;
-    if (!drag || !el) return;
-    el.scrollLeft = drag.sl - (e.clientX - drag.x);
-    el.scrollTop = drag.st - (e.clientY - drag.y);
-  };
-
-  const onCanvasPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    dragRef.current = null;
-    setPanning(false);
-    try {
-      canvasRef.current?.releasePointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
+  const alMover = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const g = gesto.current;
+    if (!g || !punteros.current.has(e.pointerId)) return;
+    punteros.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (g.tipo === "pellizco") {
+      if (punteros.current.size < 2) return;
+      const [a, b] = [...punteros.current.values()];
+      const z = Math.min(
+        ZOOM_MAX,
+        Math.max(ZOOM_MIN, (g.vista.z * Math.hypot(a.x - b.x, a.y - b.y)) / g.distancia),
+      );
+      const k = z / g.vista.z;
+      setVistaManual({ z, x: g.mx - (g.mx - g.vista.x) * k, y: g.my - (g.my - g.vista.y) * k });
+      return;
     }
+    if (g.id !== e.pointerId) return;
+    const dx = e.clientX - g.x0;
+    const dy = e.clientY - g.y0;
+    if (!g.movio) {
+      if (Math.hypot(dx, dy) < UMBRAL_ARRASTRE) return;
+      // Se captura al empezar a arrastrar y no al bajar: así un toque sin
+      // movimiento sigue llegando a la tarjeta, y un arrastre que empieza
+      // encima de una tarjeta no la abre al soltar.
+      g.movio = true;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* el puntero ya no existe */
+      }
+      setSuave(false);
+      setArrastrando(true);
+    }
+    setVistaManual({ z: g.vista.z, x: g.vista.x + dx, y: g.vista.y + dy });
+  };
+
+  const alSoltar = (e: ReactPointerEvent<HTMLDivElement>) => {
+    punteros.current.delete(e.pointerId);
+    if (gesto.current?.tipo === "pellizco" && punteros.current.size >= 2) return;
+    gesto.current = null;
+    setArrastrando(false);
+  };
+
+  // ── Edición ────────────────────────────────────────────────────────────────
+
+  const alEditar = useCallback(
+    (id: number) => setEditandoId((actual) => (actual === id ? null : id)),
+    [],
+  );
+  const enEdicion = editandoId != null ? porId.get(editandoId) : undefined;
+  const alGuardar = () => {
+    setEditandoId(null);
+    void load();
+  };
+
+  // ── Pintado ────────────────────────────────────────────────────────────────
+
+  const hayGente = roots.length > 0;
+  const radial = hayGente && !estrecho;
+  const colorDeId = (id: number) => {
+    const p = porId.get(id);
+    return p ? colorDe(p) : COLOR_SIN_AREA;
   };
 
   return (
-    <>
-      <PageHeader
-        eyebrow={eyebrow}
-        title={TITULO}
-        subtitle={
-          canEditOrg
-            ? `${SUBTITULO} Toca ✎ en una tarjeta para cambiar a quién reporta o dónde se dibuja.`
-            : `${SUBTITULO} Solo RH y Dirección pueden cambiar a quién reporta cada persona.`
-        }
-      />
+    <div className={s.pagina} data-modo={estrecho ? "lista" : "radial"}>
+      <h1 className="ui-sr-only">Organigrama</h1>
 
       {showHrRail && <HrModuleRail />}
 
-      {!loading && allUsers.length > 0 && (() => {
-        const total = allUsers.length;
-        const colors = COLORES_AREA;
-        return (
-          <div style={{ marginBottom: 10 }}>
-            <div
-              style={{ marginBottom: allUsers.length > 1 ? 8 : 0 }}
-            >
-              <MetricStrip
-                ariaLabel="Resumen del organigrama"
-                metrics={[
-                  { label: "Personas", value: allUsers.length },
-                  { label: "Con jefe", value: withManager },
-                  {
-                    label: "Sin jefe",
-                    value: withoutManager,
-                    hint: orphanRoots > 0 ? `${orphanRoots} con un jefe que ya no existe` : "encabezan el árbol",
-                    tone: orphanRoots > 0 ? "warning" : "default",
-                  },
-                  { label: "Niveles", value: levels },
-                  ...(laterales > 0
-                    ? [
-                        {
-                          label: "Al costado",
-                          value: laterales,
-                          hint: "sin línea de mando",
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-            </div>
-
-            {allUsers.length > 1 && (
-              <div
-                style={{
-                  padding: "8px 12px",
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "var(--text-tertiary)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 6,
-                  }}
-                >
-                  Por departamento
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    height: 10,
-                    borderRadius: 5,
-                    overflow: "hidden",
-                    background: "var(--surface)",
-                    marginBottom: 8,
-                  }}
-                  title="Distribución por departamento"
-                >
-                  {deptEntries.map(([dept, count], i) => (
-                    <div
-                      key={dept}
-                      title={`${dept}: ${count}`}
-                      style={{
-                        width: `${(count / total) * 100}%`,
-                        background: colors[i % colors.length],
-                        minWidth: count > 0 ? 2 : 0,
-                      }}
-                    />
-                  ))}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "4px 10px",
-                    alignItems: "center",
-                  }}
-                >
-                  {deptEntries.map(([dept, count], i) => (
-                    <span
-                      key={dept}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 5,
-                        fontSize: 11,
-                        color: "var(--text-secondary)",
-                        fontWeight: 500,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      <span
-                        aria-hidden
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 2,
-                          background: colors[i % colors.length],
-                          flexShrink: 0,
-                        }}
-                      />
-                      {dept}
-                      <span style={{ color: "var(--text-tertiary)", fontWeight: 600 }}>{count}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       {error && (
-        <div style={{ marginBottom: 12 }}>
-          <InlineAlert
-            variant={roots.length > 0 ? "warning" : "danger"}
-            message={roots.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
-            action={
-              <Button size="sm" variant="secondary" onClick={() => void reintentar()} loading={reintentando}>
-                Reintentar
-              </Button>
-            }
-          />
-        </div>
+        <InlineAlert
+          variant={hayGente ? "warning" : "danger"}
+          message={hayGente ? `${error}. Se muestra lo último que cargó.` : error}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void reintentar()} loading={reintentando}>
+              Reintentar
+            </Button>
+          }
+        />
       )}
 
-      <Section title={loading ? "Cargando…" : `${allUsers.length} personas`} dense>
+      <div
+        ref={lienzoRef}
+        className={`${s.lienzo} ${radial ? s.lienzoRadial : ""} ${arrastrando ? s.lienzoArrastrando : ""}`}
+        style={estrecho ? undefined : { height: altoLienzo ?? undefined }}
+        onPointerDown={radial ? alBajar : undefined}
+        onPointerMove={radial ? alMover : undefined}
+        onPointerUp={radial ? alSoltar : undefined}
+        onPointerCancel={radial ? alSoltar : undefined}
+      >
         {loading ? (
-          <SkeletonRows rows={5} label="Cargando organigrama" />
-        ) : roots.length === 0 ? (
+          <div className={s.estado}>
+            <SkeletonRows rows={5} label="Cargando organigrama" />
+          </div>
+        ) : !hayGente ? (
           error ? null : (
-            <EmptyState
-              title="Aún no hay nadie en el organigrama"
-              description="Cuando RH dé de alta al personal y le asigne jefe, el árbol aparece aquí."
-            />
+            <div className={s.estado}>
+              <EmptyState
+                title="Aún no hay nadie en el organigrama"
+                description="Cuando RH dé de alta al personal y le asigne jefe, aparece aquí."
+              />
+            </div>
           )
+        ) : estrecho ? (
+          <ul className={s.lista} aria-label="Organigrama">
+            {centro ? (
+              <FilaLista
+                persona={centro}
+                porId={porId}
+                colorDe={colorDe}
+                editable={canEditOrg}
+                editandoId={editandoId}
+                onEditar={alEditar}
+                esCentro
+              />
+            ) : null}
+            {roots.some((r) => r.id !== centro?.id) ? (
+              <li className={s.listaGrupo}>
+                <span className={s.listaRotulo}>Sin jefe asignado</span>
+                <ul className={s.listaSueltos}>
+                  {roots
+                    .filter((r) => r.id !== centro?.id)
+                    .map((r) => (
+                      <FilaLista
+                        key={r.id}
+                        persona={r}
+                        porId={porId}
+                        colorDe={colorDe}
+                        editable={canEditOrg}
+                        editandoId={editandoId}
+                        onEditar={alEditar}
+                      />
+                    ))}
+                </ul>
+              </li>
+            ) : null}
+          </ul>
         ) : (
           <>
-            <div className={s.herramientas}>
-              <div className={s.fila}>
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar persona o puesto…"
-                  aria-label="Buscar persona o puesto"
-                  className={s.busqueda}
-                />
-                <div role="group" aria-label="Zoom" className={s.zoom}>
-                  <button
-                    type="button"
-                    className={s.zoomBtn}
-                    onClick={() => bumpZoom(-ZOOM_STEP)}
-                    disabled={zoom <= ZOOM_MIN}
-                    title="Alejar"
-                    aria-label="Alejar"
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    className={`${s.zoomBtn} ${s.zoomPorcentaje}`}
-                    onClick={() => {
-                      zoomManual.current = false;
-                      ajustarAlAncho();
-                    }}
-                    title="Ajustar el organigrama a la pantalla"
-                    aria-label={`Ajustar a la pantalla (ahora al ${Math.round(zoom * 100)}%)`}
-                  >
-                    {Math.round(zoom * 100)}%
-                  </button>
-                  <button
-                    type="button"
-                    className={s.zoomBtn}
-                    onClick={() => bumpZoom(ZOOM_STEP)}
-                    disabled={zoom >= ZOOM_MAX}
-                    title="Acercar"
-                    aria-label="Acercar"
-                  >
-                    +
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className={s.chip}
-                  aria-pressed={compacto}
-                  onClick={() => setCompactoManual(!compacto)}
-                  title={
-                    compacto
-                      ? "Ahora los equipos van apilados en columna. Púlsalo para extenderlos en fila."
-                      : "Apila en columna los equipos cuya gente no tiene a nadie debajo: el árbol cabe sin encogerlo."
-                  }
-                >
-                  {compacto ? "Compacto" : "Extendido"}
-                </button>
-                {hasActiveFilter && (matchIds?.size ?? 0) > 0 && (
-                  <span className={s.coincidencias} role="status">
-                    {matchIds?.size ?? 0} coincidencia{(matchIds?.size ?? 0) === 1 ? "" : "s"}
-                  </span>
-                )}
-              </div>
-
-              {hasActiveFilter && (matchIds?.size ?? 0) === 0 && (
-                <p className={s.sinCoincidencias} role="status">
-                  Nadie coincide{hasSearch ? ` con «${busquedaDiferida.trim()}»` : ""}
-                  {hasDept ? ` en ${selectedDept}` : ""}.
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedDept(null);
-                    }}
-                  >
-                    Quitar filtros
-                  </Button>
-                </p>
-              )}
-
-              {deptEntries.length > 0 && (
-                <div className={s.fila} role="group" aria-label="Filtrar por área" style={{ gap: 6 }}>
-                  <span className={s.rotulo} aria-hidden>Área</span>
-                  <button
-                    type="button"
-                    className={s.chip}
-                    aria-pressed={selectedDept === null}
-                    onClick={() => setSelectedDept(null)}
-                  >
-                    Todas
-                  </button>
-                  {deptEntries.map(([dept, count]) => (
-                    <button
-                      key={dept}
-                      type="button"
-                      className={s.chip}
-                      aria-pressed={selectedDept === dept}
-                      onClick={() =>
-                        setSelectedDept((cur) => (cur === dept ? null : dept))
-                      }
+            <div
+              className={`${s.mundo} ${suave ? s.mundoSuave : ""}`}
+              style={{ transform: `translate(${vista.x}px, ${vista.y}px) scale(${vista.z})` }}
+              role="group"
+              aria-label="Organigrama"
+            >
+              <svg className={s.trazos} width="1" height="1" focusable="false">
+                {diseno.anillos.map((anillo, i) => (
+                  <path key={i} d={anillo} className={s.anillo} />
+                ))}
+                {diseno.enlaces.map((enlace) => {
+                  const hasta = porId.get(enlace.a);
+                  const desde = porId.get(enlace.de);
+                  const rotulo =
+                    enlace.tipo === "lateral"
+                      ? `${hasta?.nombre} va al lado de ${desde?.nombre}`
+                      : enlace.tipo === "sinJefe"
+                        ? `${hasta?.nombre} no tiene jefe asignado`
+                        : null;
+                  return (
+                    <path
+                      key={`${enlace.de}-${enlace.a}`}
+                      d={enlace.trazo}
+                      className={`${s.enlace} ${enlace.tipo === "mando" ? "" : s.enlacePunteado}`}
+                      style={{ "--area": colorDeId(enlace.a) } as CSSProperties}
                     >
-                      {dept}
-                      <span className={s.chipCuenta}>{count}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                      {rotulo ? <title>{rotulo}</title> : null}
+                    </path>
+                  );
+                })}
+              </svg>
+              {diseno.nodos.map((nodo) => (
+                <Tarjeta
+                  key={nodo.id}
+                  nodo={nodo}
+                  color={colorDe(nodo.persona)}
+                  compacto={diseno.compacto}
+                  ancla={
+                    nodo.tipoEnlace === "lateral" && nodo.enlazaCon != null
+                      ? porId.get(nodo.enlazaCon)
+                      : undefined
+                  }
+                  editable={canEditOrg}
+                  seleccionada={editandoId === nodo.id}
+                  onEditar={alEditar}
+                />
+              ))}
             </div>
 
-            <div
-              ref={canvasRef}
-              onPointerDown={onCanvasPointerDown}
-              onPointerMove={onCanvasPointerMove}
-              onPointerUp={onCanvasPointerUp}
-              onPointerCancel={onCanvasPointerUp}
-              style={{
-                // Sin `maxHeight`: la caja crece con el árbol ya escalado. Antes
-                // recortaba a 70vh y desplazaba por dentro, que es lo que
-                // rebanaba las tarjetas de la última fila. Si el árbol no cabe,
-                // se desplaza la página entera y ninguna tarjeta queda a medias.
-                overflowX: "auto",
-                overflowY: "auto",
-                padding: "16px 12px 24px",
-                background:
-                  "radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 6%, transparent), transparent 55%)",
-                borderRadius: 12,
-                cursor: panning ? "grabbing" : "grab",
-                userSelect: panning ? "none" : undefined,
-                border: "1px solid var(--border)",
-              }}
-            >
-              <div
-                style={{
-                  // La caja ocupa el tamaño YA ESCALADO, para que el hueco
-                  // sobrante desaparezca y la barra de desplazamiento solo
-                  // aparezca cuando de verdad no cabe.
-                  width: tamanoNatural ? tamanoNatural.w * zoom : "100%",
-                  height: tamanoNatural ? tamanoNatural.h * zoom : undefined,
-                  margin: "0 auto",
-                  position: "relative",
-                }}
-              >
-                <div
-                  ref={contentRef}
-                  style={{
-                    transform: `scale(${zoom})`,
-                    transformOrigin: "top left",
-                    position: tamanoNatural ? "absolute" : "relative",
-                    top: 0,
-                    left: 0,
-                    // Sin esto se muerde la cola: al estar posicionado, su ancho
-                    // lo marcaria el padre, y el ancho del padre sale de medirlo
-                    // a el. `max-content` lo ata a su propio contenido.
-                    width: tamanoNatural ? "max-content" : undefined,
-                    display: "flex",
-                    flexWrap: "wrap",
-                    justifyContent: "center",
-                    gap: 16,
-                    minWidth: "min-content",
-                  }}
-                >
-                  {trueRoots.map((root) => (
-                    <TreeBranch
-                      key={root.id}
-                      node={root}
-                      allUsers={allUsers}
-                      token={token}
-                      onRefresh={load}
-                      canEditOrg={canEditOrg}
-                      isRoot
-                      matchIds={matchIds}
-                      hasActiveFilter={hasActiveFilter}
-                      compacto={compacto}
-                    />
-                  ))}
-                </div>
+            {areas.length > 1 ? (
+              <ul className={s.leyenda} aria-label="Áreas" data-sin-arrastre>
+                {areas.map((area) => (
+                  <li key={area.nombre} style={{ "--area": area.color } as CSSProperties}>
+                    {area.nombre}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
-                {danglingRoots.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "var(--warning)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        marginBottom: 8,
-                        textAlign: "center",
-                      }}
-                    >
-                      Sin línea de reporte válida ({danglingRoots.length})
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        justifyContent: "center",
-                        gap: 12,
-                        minWidth: "min-content",
-                      }}
-                    >
-                      {danglingRoots.map((root) => (
-                        <TreeBranch
-                          key={root.id}
-                          node={root}
-                          allUsers={allUsers}
-                          token={token}
-                          onRefresh={load}
-                          canEditOrg={canEditOrg}
-                          isRoot
-                          matchIds={matchIds}
-                          hasActiveFilter={hasActiveFilter}
-                          compacto={compacto}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+            <div className={s.controles} role="group" aria-label="Zoom" data-sin-arrastre>
+              <button
+                type="button"
+                className={s.control}
+                onClick={() => zoomConBoton(ZOOM_PASO)}
+                disabled={vista.z >= ZOOM_MAX}
+                title="Acercar"
+                aria-label="Acercar"
+              >
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path d="M8 3v10M3 8h10" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={s.control}
+                onClick={() => zoomConBoton(1 / ZOOM_PASO)}
+                disabled={vista.z <= ZOOM_MIN}
+                title="Alejar"
+                aria-label="Alejar"
+              >
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path d="M3 8h10" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={s.control}
+                onClick={centrar}
+                title="Centrar: ver todo el organigrama"
+                aria-label="Centrar"
+              >
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <circle cx="8" cy="8" r="2.2" />
+                  <path d="M8 1.5v2.6M8 11.9v2.6M1.5 8h2.6M11.9 8h2.6" />
+                </svg>
+              </button>
             </div>
           </>
         )}
-      </Section>
-    </>
+
+        {enEdicion ? (
+          <EditorColocacion
+            key={enEdicion.id}
+            persona={enEdicion}
+            todos={todos}
+            token={token}
+            color={colorDe(enEdicion)}
+            onGuardado={alGuardar}
+            onCerrar={() => setEditandoId(null)}
+          />
+        ) : null}
+      </div>
+    </div>
   );
 }

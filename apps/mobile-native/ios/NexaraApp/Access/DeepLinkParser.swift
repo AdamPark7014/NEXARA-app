@@ -223,13 +223,12 @@ enum DeepLinkParser {
             // Donde la web tiene los viáticos: `/erp/finance/viatics[/:id]`.
             guard let second, viaticHeads.contains(second) else { return .core(CoreLink.home) }
             return .core(extraLink(.viaticos, entityId: positiveInt64(parts.count >= 3 ? parts[2] : nil)))
-        case "organigrama":
-            return .core(extraLink(.organigrama))
         case "viatics", "viaticos", "my-viatics", "mis-viaticos":
             return .core(extraLink(.viaticos, entityId: positiveInt64(second)))
         case "hr":
-            // `/erp/hr/orgchart`; lo demás de RH no existe en Core.
-            return .core(second == "orgchart" ? extraLink(.organigrama) : CoreLink.home)
+            // Nada de RH existe en Core; el organigrama (`/erp/hr/orgchart`,
+            // `/erp/organigrama`) es de escritorio y la app ya no lo tiene.
+            return .core(CoreLink.home)
         case "cotizaciones":
             return .core(extraLink(.cotizaciones))
         case "proyectos":

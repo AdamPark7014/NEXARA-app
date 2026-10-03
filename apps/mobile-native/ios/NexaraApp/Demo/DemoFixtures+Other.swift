@@ -1,6 +1,6 @@
 import Foundation
 
-// Notificaciones, viáticos, KPIs, organigrama, proyectos, almacén, vehículos, clientes,
+// Notificaciones, viáticos, KPIs, proyectos, almacén, vehículos, clientes,
 // perfil y datos sueltos de la sesión de la demostración.
 
 struct DemoNoticeSeed {
@@ -347,36 +347,6 @@ extension DemoStore {
             ]),
             "personas": people,
         ])
-    }
-
-    // MARK: Organigrama
-
-    func departmentId(_ name: String) -> Int {
-        switch name {
-        case "Operaciones": return 1
-        case "Proyectos": return 2
-        case "Ingeniería": return 3
-        case "Diseño": return 4
-        default: return 5
-        }
-    }
-
-    func orgNode(_ p: DemoPerson) -> DemoJSON {
-        let children: [DemoJSON] = DemoData.people.filter { $0.managerId == p.id }.map { orgNode($0) }
-        var json = dj([
-            "id": p.id,
-            "nombre": p.nombre,
-            "puesto": p.puesto,
-            "role": dj(["id": 1000 + p.id, "nombre": p.puesto]),
-            "department": dj(["id": departmentId(p.departamento), "nombre": p.departamento]),
-            "children": children,
-        ])
-        if let manager = p.managerId { json["managerId"] = manager }
-        return json
-    }
-
-    func fxOrgchart() -> [DemoJSON] {
-        [orgNode(DemoData.me)]
     }
 
     // MARK: Proyectos

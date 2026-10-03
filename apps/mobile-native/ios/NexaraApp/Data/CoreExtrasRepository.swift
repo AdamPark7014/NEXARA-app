@@ -1,12 +1,11 @@
 import Foundation
 
-/// Los cuatro módulos de «Más» que son **solo consulta** — mismo contrato que
+/// Los tres módulos de «Más» que son **solo consulta** — mismo contrato que
 /// `CoreExtrasApi` en Android:
 ///
 /// | Pantalla        | Endpoint                                         |
 /// |-----------------|--------------------------------------------------|
 /// | KPIs del equipo | `GET me/kpis/equipo?desde&hasta`                 |
-/// | Organigrama     | `GET users/orgchart`                             |
 /// | Proyectos       | `GET proyectos`                                  |
 /// | Almacén         | `GET stock/levels` · `GET stock/alerts/low-stock` |
 ///
@@ -180,93 +179,6 @@ struct KpisEquipoResumen: Decodable, Hashable {
     }
 
     var alcanceTexto: String { scope == "company" ? "Toda la empresa" : "Mi equipo" }
-}
-
-// MARK: - Organigrama
-
-struct OrgRef: Decodable, Hashable {
-    var id: Int = 0
-    var nombre: String = ""
-
-    private enum CodingKeys: String, CodingKey { case id, nombre }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
-        nombre = (try? c.decode(String.self, forKey: .nombre)) ?? ""
-    }
-}
-
-/// Un nodo del árbol que devuelve `users/orgchart`: ya viene anidado por
-/// `managerId`. En iOS es `Identifiable` y recursivo, así que se puede recorrer
-/// con `NavigationLink` nivel a nivel sin aplanar nada.
-struct OrgNode: Decodable, Identifiable, Hashable {
-    var id: Int = 0
-    var nombre: String = ""
-    var puesto: String?
-    var avatarUrl: String?
-    var managerId: Int?
-    /// Colocación al costado en el dibujo de la web; no es jerarquía.
-    var lateralDeId: Int?
-    var role: OrgRef?
-    var department: OrgRef?
-    var children: [OrgNode] = []
-
-    private enum CodingKeys: String, CodingKey {
-        case id, nombre, puesto, avatarUrl, managerId, lateralDeId, role, department, children
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
-        let crudo = (try? c.decode(String.self, forKey: .nombre)) ?? ""
-        nombre = crudo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Sin nombre" : crudo
-        puesto = (try? c.decode(String.self, forKey: .puesto))?.nilSiVacio
-        avatarUrl = (try? c.decode(String.self, forKey: .avatarUrl))?.nilSiVacio
-        managerId = try? c.decode(Int.self, forKey: .managerId)
-        lateralDeId = try? c.decode(Int.self, forKey: .lateralDeId)
-        role = try? c.decode(OrgRef.self, forKey: .role)
-        department = try? c.decode(OrgRef.self, forKey: .department)
-        // Un nodo sin `id` no se puede referenciar ni navegar: se descarta con
-        // su rama, igual que hace `OrgchartRules.construir` en Android.
-        children = ((try? c.decode([OrgNode].self, forKey: .children)) ?? []).filter { $0.id > 0 }
-    }
-
-    var esHoja: Bool { children.isEmpty }
-
-    /// Cuánta gente cuelga en total (directos e indirectos). El lienzo de la web
-    /// obliga a contarla a ojo; aquí es un número.
-    var aCargo: Int { children.reduce(children.count) { $0 + $1.aCargo } }
-
-    /// «4 directos · 11 en total» · «Sin equipo a su cargo».
-    var equipoTexto: String {
-        guard !children.isEmpty else { return "Sin equipo a su cargo" }
-        let base = "\(children.count) \(children.count == 1 ? "directo" : "directos")"
-        return aCargo > children.count ? "\(base) · \(aCargo) en total" : base
-    }
-
-    /// Todas las personas de esta rama, con su cadena de mando, para buscar.
-    func aplanado(cadena: [String] = []) -> [OrgBusquedaFila] {
-        var salida = [OrgBusquedaFila(nodo: self, cadena: cadena)]
-        for hijo in children {
-            salida.append(contentsOf: hijo.aplanado(cadena: cadena + [nombre]))
-        }
-        return salida
-    }
-}
-
-/// Una persona con su cadena de mando, lista para la búsqueda del organigrama.
-/// Es un tipo y no una tupla a propósito: `ForEach` quiere algo `Identifiable`.
-struct OrgBusquedaFila: Identifiable, Hashable {
-    let nodo: OrgNode
-    let cadena: [String]
-
-    var id: Int { nodo.id }
-
-    /// «Christian › Ana › Luis» — dónde cuelga esta persona.
-    var cadenaTexto: String {
-        cadena.isEmpty ? "Arriba del todo" : cadena.joined(separator: " › ")
-    }
 }
 
 // MARK: - Proyectos
@@ -542,8 +454,8 @@ struct AlmacenConsulta {
     var bajoMinimo: [StockNivel] = []
 }
 
-/// Lectura de los cuatro módulos de consulta. Solo lectura a propósito: en el
-/// teléfono no se edita el organigrama ni se mueve inventario.
+/// Lectura de los tres módulos de consulta. Solo lectura a propósito: en el
+/// teléfono no se mueve inventario. (El organigrama se quedó en la web.)
 final class CoreExtrasRepository {
     static let shared = CoreExtrasRepository()
     private let api = ApiClient.shared
@@ -557,14 +469,6 @@ final class CoreExtrasRepository {
         } catch {
             throw ApiError.decoding(error)
         }
-    }
-
-    /// `GET users/orgchart` — el árbol entero, ya anidado por el servidor.
-    func orgchart() async throws -> [OrgNode] {
-        let data = try await api.get("users/orgchart")
-        let nodos: [OrgNode] = try ApiClient.decodeList(data)
-        // Sin `id` no hay forma de navegar hasta ese nodo: fuera, con su rama.
-        return nodos.filter { $0.id > 0 }
     }
 
     /// `GET proyectos`.
