@@ -49,7 +49,6 @@ import {
   getUserPanelEntryPath,
   getUserPanelSwitchPath,
   getUserRoleLabel,
-  resolveDisplayOrgRoleKey,
   resolveV2RoleKey,
 } from "@/lib/user-access";
 import {
@@ -81,32 +80,35 @@ import {
 import styles from "./AppShell.module.scss";
 import ShellConnectionStatus from "./ShellConnectionStatus";
 import CelebracionesBanner from "./CelebracionesBanner";
-import { ModuleIcon } from "./ShellIcons";
+import { ModuleIcon, ShellIcon } from "./ShellIcons";
+import {
+  CHAT_MODULE_IDS,
+  DEFAULT_FOLDED_GROUP_IDS,
+  formatNavCount,
+  presentSidebarGroups,
+  readFoldedGroups,
+  writeFoldedGroups,
+} from "./sidebar-presentation";
 import { IconBadge } from "@/components/ui/IconBadge";
 import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
 import { stripLeadingEmoji } from "@/lib/notification-kind";
-import SearchIcon from "@mui/icons-material/Search";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
-import SwitchAccountOutlinedIcon from "@mui/icons-material/SwitchAccountOutlined";
-import LogoutIcon from "@mui/icons-material/Logout";
-import MenuIcon from "@mui/icons-material/Menu";
-import CloseIcon from "@mui/icons-material/Close";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import { resolveUserAvatarUrl } from "@/lib/user-avatar";
+import { listMyPendingApprovals } from "@/lib/workflow-api";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
-import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 
 /** La paleta solo se descarga la primera vez que alguien la abre (⌘K o «Buscar…»). */
 const CommandPalette = dynamic(() => import("./CommandPalette"), { ssr: false });
 
 const COLLAPSED_STORAGE_KEY = "nx-shell-collapsed";
+
+/** Acción principal de la barra superior en Core. */
+const NEW_ACTIVITY_PATH = "/erp/mis-actividades/nueva";
+/** Listas que ya traen su propio «Nuevo» como primario: un solo primario por pantalla. */
+const OWN_PRIMARY_ROUTE_RE = /^\/erp\/(clientes|cotizaciones|proyectos|mis-actividades\/nueva)(\/|$)/;
+
+type RailTip = { text: string; meta?: string; kbd?: string; top: number };
+type NavCount = { text: string; tone: "neutral" | "hot"; label: string };
 
 type AppShellProps = {
   panel: PanelId;
@@ -180,7 +182,12 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [navQuery, setNavQuery] = useState("");
+  const [foldedGroups, setFoldedGroups] = useState<Set<string>>(() => new Set(DEFAULT_FOLDED_GROUP_IDS));
+  const [chatUnread, setChatUnread] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [online, setOnline] = useState(true);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [railTip, setRailTip] = useState<RailTip | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteMounted, setPaletteMounted] = useState(false);
@@ -211,6 +218,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   }, []);
 
   const toggleCollapsed = useCallback(() => {
+    setRailTip(null);
     setCollapsed((prev) => {
       const next = !prev;
       try {
@@ -221,6 +229,49 @@ export default function AppShell({ panel, children }: AppShellProps) {
       return next;
     });
   }, []);
+
+  // Grupos plegados («Mi cuenta» de fábrica); se recuerdan entre visitas.
+  useEffect(() => {
+    setFoldedGroups(readFoldedGroups());
+  }, []);
+
+  const toggleGroupFold = useCallback((groupId: string) => {
+    setFoldedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      writeFoldedGroups(next);
+      return next;
+    });
+  }, []);
+
+  // Presencia propia: el punto de la foto dice si esta pestaña está conectada.
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [user?.avatarUrl]);
+
+  // Riel colapsado: globo con el nombre (y contador) junto al icono. Fijo a la ventana para que
+  // el scroll del menú no lo recorte.
+  const showRailTip = useCallback(
+    (e: React.SyntheticEvent<HTMLElement>, text: string, extra?: { meta?: string; kbd?: string }) => {
+      if (!collapsed || window.matchMedia("(max-width: 900px)").matches) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      setRailTip({ text, meta: extra?.meta, kbd: extra?.kbd, top: r.top + r.height / 2 });
+    },
+    [collapsed],
+  );
+  const hideRailTip = useCallback(() => setRailTip(null), []);
 
   // Con el cajón abierto la página de atrás no se desplaza (iOS arrastraba el fondo).
   useEffect(() => {
@@ -347,6 +398,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
     setSwitcherOpen(false);
     setUserMenuOpen(false);
     setNotifOpen(false);
+    setRailTip(null);
   }, [pathname]);
 
   useEffect(() => {
@@ -410,11 +462,6 @@ export default function AppShell({ panel, children }: AppShellProps) {
       menuBtnRef.current?.focus();
     };
   }, [mobileOpen]);
-
-  const orgRoleKey = useMemo(() => {
-    if (!user) return null;
-    return resolveDisplayOrgRoleKey(user);
-  }, [user]);
 
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const v2RoleKey = resolveV2RoleKey(user);
@@ -497,18 +544,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
     router.replace("/paneles");
   }, [isContextReady, user, hasAnyAccess, router]);
 
-  const filteredGroups = useMemo(() => {
-    const q = navQuery.trim().toLowerCase();
-    if (!q) return sidebarGroups;
-    return sidebarGroups
-      .map((g) => ({
-        ...g,
-        items: g.items.filter((it) =>
-          `${it.label} ${it.description}`.toLowerCase().includes(q),
-        ),
-      }))
-      .filter((g) => g.items.length > 0);
-  }, [navQuery, sidebarGroups]);
+  // Solo presentación: orden de grupos y renglones de la maqueta aprobada. Los módulos son los mismos.
+  const navGroups = useMemo(() => presentSidebarGroups(sidebarGroups, panel), [sidebarGroups, panel]);
 
   const accessGuardWarning = useMemo(() => {
     const path = pathname || "/";
@@ -520,10 +557,26 @@ export default function AppShell({ panel, children }: AppShellProps) {
     () =>
       rutaActivaDelMenu(
         pathname,
-        filteredGroups.flatMap((group) => group.items.map((item) => getModuleUrl(item.id))),
+        navGroups.flatMap((group) => group.items.map((item) => getModuleUrl(item.id))),
       ),
-    [pathname, filteredGroups],
+    [pathname, navGroups],
   );
+
+  const activeGroup = useMemo(
+    () => navGroups.find((g) => g.items.some((item) => getModuleUrl(item.id) === activeMenuTarget)) ?? null,
+    [navGroups, activeMenuTarget],
+  );
+
+  // Si la página actual vive en un grupo plegado, el grupo se abre (sin tocar la preferencia guardada).
+  useEffect(() => {
+    if (!activeGroup) return;
+    setFoldedGroups((prev) => {
+      if (!prev.has(activeGroup.id)) return prev;
+      const next = new Set(prev);
+      next.delete(activeGroup.id);
+      return next;
+    });
+  }, [activeGroup]);
 
   // Al entrar a un módulo que está al fondo del menú, el renglón activo queda a la vista.
   useEffect(() => {
@@ -533,24 +586,86 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
   const userJson = useMemo(() => (user ? JSON.stringify(user) : null), [user]);
 
-  const onNavQueryKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Escape" && navQuery) {
-        e.stopPropagation();
-        e.nativeEvent.stopImmediatePropagation();
-        setNavQuery("");
-        return;
-      }
-      if (e.key === "Enter") {
-        const first = filteredGroups[0]?.items[0];
-        if (!first || !navQuery.trim()) return;
-        e.preventDefault();
-        setNavQuery("");
-        router.push(getModuleUrl(first.id));
-      }
-    },
-    [filteredGroups, navQuery, router],
+  // ── Contadores del menú (solo de endpoints que ya existen) ──────────────
+  const menuModuleIds = useMemo(
+    () => new Set<string>(sidebarGroups.flatMap((g) => g.items.map((item) => item.id))),
+    [sidebarGroups],
   );
+  const showsChat = useMemo(() => [...menuModuleIds].some((id) => CHAT_MODULE_IDS.has(id)), [menuModuleIds]);
+  const showsApprovals = menuModuleIds.has("approvals");
+  const onChatRoute = Boolean(pathname && /\/chat(\/|$)/.test(pathname));
+
+  // Chat: suma de `unreadCount` de `GET chat/channels` (lo mismo que pinta la lista del chat).
+  // En el chat mismo no se consulta: al salir se vuelve a leer.
+  useEffect(() => {
+    if (!user?.token || !showsChat || onChatRoute) return;
+    const token = user.token;
+    let cancelled = false;
+    const load = async () => {
+      if (document.hidden) return;
+      try {
+        const res = await fetch(buildApiUrl("chat/channels"), {
+          credentials: "include",
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data: unknown = await res.json();
+        if (cancelled || !Array.isArray(data)) return;
+        const total = (data as Array<{ unreadCount?: number; muted?: boolean }>).reduce(
+          (sum, c) => sum + (c?.muted ? 0 : Number(c?.unreadCount ?? 0) || 0),
+          0,
+        );
+        setChatUnread(total);
+      } catch {
+        /* non-critical */
+      }
+    };
+    void load();
+    const id = window.setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [user?.token, showsChat, onChatRoute]);
+
+  // Aprobaciones: `GET workflow/my-pending` (la misma bandeja de /erp/approvals).
+  useEffect(() => {
+    if (!user?.token || !showsApprovals) {
+      setPendingApprovals(0);
+      return;
+    }
+    const token = user.token;
+    let cancelled = false;
+    const load = async () => {
+      if (document.hidden) return;
+      try {
+        const rows = await listMyPendingApprovals(token);
+        if (!cancelled) setPendingApprovals(rows.length);
+      } catch {
+        /* non-critical */
+      }
+    };
+    void load();
+    const id = window.setInterval(load, 120000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [user?.token, showsApprovals, activeMenuTarget]);
+
+  const navCounts = useMemo(() => {
+    const counts: Record<string, NavCount> = {};
+    const chat = onChatRoute ? null : formatNavCount(chatUnread);
+    if (chat) {
+      for (const id of CHAT_MODULE_IDS) counts[id] = { text: chat, tone: "neutral", label: `${chatUnread} sin leer` };
+    }
+    const approvals = formatNavCount(pendingApprovals);
+    if (approvals) counts.approvals = { text: approvals, tone: "hot", label: `${pendingApprovals} por decidir` };
+    const notifs = formatNavCount(unreadNotifs);
+    if (notifs) counts["notifications-center"] = { text: notifs, tone: "neutral", label: `${unreadNotifs} sin leer` };
+    return counts;
+  }, [onChatRoute, chatUnread, pendingApprovals, unreadNotifs]);
 
   // Ruta bloqueada dentro de un panel permitido → redirigir a la entrada del panel
   // (no al home global, evita saltos cross-panel y parpadeos).
@@ -639,8 +754,17 @@ export default function AppShell({ panel, children }: AppShellProps) {
     router.replace("/login");
   };
 
-  const isChatRoute = Boolean(pathname && /\/chat(\/|$)/.test(pathname));
+  const isChatRoute = onChatRoute;
   const isFullBleed = isChatRoute;
+
+  const panelName = panelMeta.name.replace(/^NEXARA\s+/i, "");
+  const avatarSrc = avatarFailed ? "" : resolveUserAvatarUrl(user.avatarUrl);
+  const presence = !online || user.offlineDegraded ? "away" : "on";
+  const presenceLabel = presence === "on" ? "En línea" : "Sin conexión";
+  const showNewActivity =
+    panel === "erp" &&
+    canUserAccessPath(user, NEW_ACTIVITY_PATH) &&
+    !OWN_PRIMARY_ROUTE_RE.test(pathname || "");
 
   // Panel completo sin permiso (p.ej. administrativo en /crm o diseño en /erp sin rutas)
   if (!isSuperAdmin && user && !canAccessPanel) {
@@ -715,21 +839,38 @@ export default function AppShell({ panel, children }: AppShellProps) {
           ? { role: "dialog", "aria-modal": true, "aria-label": "Menú de navegación" }
           : { "aria-label": "Navegación del panel" })}
       >
-        <div className={styles.brand}>
-          <div className={styles.brandLogo} aria-hidden="true">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              className={styles.brandLogoMark}
-              src={NEXARA_LOGO_MARK}
-              alt=""
-            />
-          </div>
+        <div className={styles.brand} ref={switcherRef}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className={styles.brandLogoMark} src={NEXARA_LOGO_MARK} alt="" aria-hidden="true" />
           <div className={styles.brandText}>
-            <div className={styles.brandName}>Nexara</div>
-            <div className={styles.brandPanel}>
-              {panelMeta.name.replace(/^NEXARA\s+/i, "")}
-            </div>
+            <div className={styles.brandName}>NEXARA</div>
+            {allowedPanels.length > 1 ? (
+              <button
+                type="button"
+                className={styles.brandPanelBtn}
+                onClick={() => setSwitcherOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={switcherOpen}
+                title="Cambiar de panel"
+              >
+                <span className={styles.brandPanel}>{panelName}</span>
+                <ShellIcon name="chevrons" size={14} />
+              </button>
+            ) : (
+              <div className={styles.brandPanel}>{panelName}</div>
+            )}
           </div>
+          <button
+            type="button"
+            className={styles.collapseBtn}
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Mostrar el menú completo" : "Reducir el menú a iconos"}
+            aria-controls="nx-sidebar-nav"
+            aria-expanded={!collapsed}
+            title={collapsed ? "Mostrar menú" : "Reducir menú"}
+          >
+            <ShellIcon name={collapsed ? "sidebarOpen" : "sidebar"} size={16} />
+          </button>
           {/* Solo en el cajón: cerrar sin tener que acertarle al velo. */}
           <button
             type="button"
@@ -738,39 +879,84 @@ export default function AppShell({ panel, children }: AppShellProps) {
             aria-label="Cerrar menú"
             title="Cerrar menú"
           >
-            <CloseIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+            <ShellIcon name="x" size={20} />
           </button>
+
+          {switcherOpen && (
+            <div className={styles.switcherDropdown} role="menu">
+              <div className={styles.switcherTitle}>Mis paneles</div>
+              {allowedPanels.map((p) => {
+                const isCurrent = p.id === panel;
+                const isHome = homeUrl.startsWith(`/${p.id}`);
+                const panelHref = buildCrossPanelUrl(p.id, getUserPanelSwitchPath(user, p.id), userJson);
+                return (
+                  <a
+                    key={p.id}
+                    href={panelHref}
+                    className={styles.switcherItem}
+                    role="menuitem"
+                    aria-current={isCurrent ? "page" : undefined}
+                    data-current={isCurrent ? "true" : "false"}
+                  >
+                    <span className={styles.switcherItemIcon} aria-hidden="true" style={{ color: p.accent }}>
+                      <ShellIcon name="grid" size={18} />
+                    </span>
+                    <div className={styles.switcherItemBody}>
+                      <div className={styles.switcherItemHead}>
+                        <span className={styles.switcherItemName}>{p.name}</span>
+                        {isCurrent && (
+                          <span className={styles.switcherPill} data-variant="current">
+                            Actual
+                          </span>
+                        )}
+                        {!isCurrent && isHome && (
+                          <span className={styles.switcherPill} data-variant="home">
+                            Mi base
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.switcherItemTagline}>{p.tagline}</div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className={styles.search}>
-          <div className={styles.searchWrap}>
-            <span className={styles.searchIcon} aria-hidden="true">
-              <SearchIcon aria-hidden="true" sx={{ fontSize: 16, display: "block" }} />
-            </span>
-            <input
-              type="search"
-              className={styles.searchInput}
-              placeholder="Filtrar…"
-              aria-label="Filtrar el menú (Enter abre el primero)"
-              value={navQuery}
-              onChange={(e) => setNavQuery(e.target.value)}
-              onKeyDown={onNavQueryKeyDown}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </div>
+          <button
+            type="button"
+            className={styles.searchBtn}
+            onClick={() => {
+              setMobileOpen(false);
+              setPaletteOpen(true);
+            }}
+            aria-label="Buscar o ir a… (módulos, clientes y acciones)"
+            aria-keyshortcuts="Control+K Meta+K"
+            aria-haspopup="dialog"
+            aria-expanded={paletteOpen}
+            onMouseEnter={(e) => showRailTip(e, "Buscar o ir a…", { kbd: shortcutLabel })}
+            onMouseLeave={hideRailTip}
+            onFocus={(e) => showRailTip(e, "Buscar o ir a…", { kbd: shortcutLabel })}
+            onBlur={hideRailTip}
+          >
+            <ShellIcon name="search" size={16} />
+            <span className={styles.searchLabel}>Buscar o ir a…</span>
+            <kbd className={styles.kbd} aria-hidden="true">
+              {shortcutLabel}
+            </kbd>
+          </button>
         </div>
 
-        <nav ref={menuRef} className={styles.menu} aria-label="Menú principal">
-          {filteredGroups.length === 0 ? (
-            <p className={styles.menuEmpty}>
-              {navQuery.trim()
-                ? `Sin resultados para «${navQuery.trim()}».`
-                : "Sin módulos disponibles para tu rol."}
-            </p>
+        <nav ref={menuRef} className={styles.menu} aria-label="Menú principal" onScroll={hideRailTip}>
+          {navGroups.length === 0 ? (
+            <p className={styles.menuEmpty}>Sin módulos disponibles para tu rol.</p>
           ) : (
-            filteredGroups.map((group) => {
+            navGroups.map((group) => {
               const groupLabelId = `nx-nav-group-${group.id}`;
+              const listId = `nx-nav-list-${group.id}`;
+              const folded = foldedGroups.has(group.id);
               return (
                 <div
                   key={group.id}
@@ -778,38 +964,71 @@ export default function AppShell({ panel, children }: AppShellProps) {
                   role="group"
                   aria-labelledby={groupLabelId}
                   data-kind={SECONDARY_NAV_GROUP_IDS.has(group.id) ? "secondary" : undefined}
+                  data-folded={folded ? "true" : undefined}
                 >
-                  <p className={styles.groupTitle} id={groupLabelId}>
-                    {group.title}
-                  </p>
-                  {group.items.map((item) => {
-                    // Quien tiene gente a su cargo entra a «Perfiles» en vez del formulario de un
-                    // solo perfil: ahí da de alta, cambia fotos y llega al suyo.
-                    const esPerfiles = item.id === "my-profile" && puedePerfiles;
-                    const target = esPerfiles ? "/erp/perfiles" : getModuleUrl(item.id);
-                    const etiqueta = esPerfiles ? "Perfiles" : item.label;
-                    const active = target === activeMenuTarget;
-                    return (
-                      <Link
-                        key={item.id}
-                        href={target}
-                        className={`${styles.menuItem} ${active ? styles.active : ""}`.trim()}
-                        aria-current={active ? "page" : undefined}
-                        // Colapsado el renglón es solo un icono: el globo dice el nombre.
-                        title={collapsed ? etiqueta : (esPerfiles ? "Tu perfil y el de tu gente" : item.description) || undefined}
-                      >
-                        <span className={styles.menuItemIcon} aria-hidden="true">
-                          <ModuleIcon id={item.id} size={16} />
-                        </span>
-                        <span className={styles.menuItemLabel}>{etiqueta}</span>
-                      </Link>
-                    );
-                  })}
+                  <button
+                    type="button"
+                    className={styles.groupTitle}
+                    id={groupLabelId}
+                    aria-expanded={!folded}
+                    aria-controls={listId}
+                    onClick={() => toggleGroupFold(group.id)}
+                  >
+                    <span className={styles.groupTitleText}>{group.title}</span>
+                    <span className={styles.groupChevron} aria-hidden="true">
+                      <ShellIcon name="right" size={14} />
+                    </span>
+                  </button>
+                  <div id={listId} className={styles.groupItems} hidden={folded}>
+                    {group.items.map((item) => {
+                      // Quien tiene gente a su cargo entra a «Perfiles» en vez del formulario de un
+                      // solo perfil: ahí da de alta, cambia fotos y llega al suyo.
+                      const esPerfiles = item.id === "my-profile" && puedePerfiles;
+                      const target = esPerfiles ? "/erp/perfiles" : getModuleUrl(item.id);
+                      const etiqueta = esPerfiles ? "Perfiles" : item.label;
+                      const active = target === activeMenuTarget;
+                      const count = navCounts[item.id];
+                      return (
+                        <Link
+                          key={item.id}
+                          href={target}
+                          className={`${styles.menuItem} ${active ? styles.active : ""}`.trim()}
+                          aria-current={active ? "page" : undefined}
+                          // Colapsado el renglón es solo un icono: el globo (railTip) dice el nombre.
+                          title={collapsed ? undefined : (esPerfiles ? "Tu perfil y el de tu gente" : item.description) || undefined}
+                          onMouseEnter={(e) => showRailTip(e, etiqueta, { meta: count?.label })}
+                          onMouseLeave={hideRailTip}
+                          onFocus={(e) => showRailTip(e, etiqueta, { meta: count?.label })}
+                          onBlur={hideRailTip}
+                        >
+                          <span className={styles.menuItemIcon} aria-hidden="true">
+                            <ModuleIcon id={item.id} size={18} />
+                          </span>
+                          <span className={styles.menuItemLabel}>{etiqueta}</span>
+                          {count ? (
+                            <>
+                              <span className={styles.navCount} data-tone={count.tone} aria-hidden="true">
+                                {count.text}
+                              </span>
+                              <span className={styles.srOnly}>, {count.label}</span>
+                            </>
+                          ) : null}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })
           )}
         </nav>
+
+        {railTip ? (
+          <div className={styles.railTip} style={{ top: railTip.top }} role="tooltip">
+            <span>{railTip.meta ? `${railTip.text} · ${railTip.meta}` : railTip.text}</span>
+            {railTip.kbd ? <kbd className={styles.railTipKbd}>{railTip.kbd}</kbd> : null}
+          </div>
+        ) : null}
 
         <div className={styles.userBlock} ref={userMenuRef}>
           {/* Todo el bloque es el disparador: también funciona colapsado,
@@ -821,17 +1040,24 @@ export default function AppShell({ panel, children }: AppShellProps) {
             onClick={() => setUserMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={userMenuOpen}
-            title={`${user.nombre || user.email} · ${roleLabel}`}
+            title={`${user.nombre || user.email} · ${roleLabel} · ${presenceLabel}`}
           >
             <span className={styles.avatar} aria-hidden="true">
-              {initials || "U"}
+              {avatarSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.avatarImg} src={avatarSrc} alt="" onError={() => setAvatarFailed(true)} />
+              ) : (
+                initials || "U"
+              )}
+              <span className={styles.presence} data-state={presence} />
             </span>
             <span className={styles.userInfo}>
               <span className={styles.userName}>{user.nombre || user.email}</span>
               <span className={styles.userRole}>{roleLabel}</span>
+              <span className={styles.srOnly}>, {presenceLabel}</span>
             </span>
             <span className={styles.userTriggerIcon} aria-hidden="true">
-              <MoreVertIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+              <ShellIcon name="chevrons" size={16} />
             </span>
           </button>
 
@@ -845,7 +1071,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 title={puedePerfiles ? "Tu perfil y el de tu gente" : undefined}
               >
                 <span className={styles.userMenuItemIcon} aria-hidden="true">
-                  <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                  <ShellIcon name="user" size={18} />
                 </span>
                 {puedePerfiles ? "Perfiles" : "Mi perfil"}
               </Link>
@@ -856,11 +1082,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 className={styles.userMenuItem}
               >
                 <span className={styles.userMenuItemIcon} aria-hidden="true">
-                  {darkMode ? (
-                    <LightModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                  ) : (
-                    <DarkModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                  )}
+                  <ShellIcon name={darkMode ? "sun" : "moon"} size={18} />
                 </span>
                 {darkMode ? "Modo claro" : "Modo oscuro"}
               </button>
@@ -877,7 +1099,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 aria-pressed={navMode === "avanzado"}
               >
                 <span className={styles.userMenuItemIcon} aria-hidden="true">
-                  <TuneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                  <ShellIcon name="sliders" size={18} />
                 </span>
                 Menú avanzado
                 {navMode === "avanzado" && (
@@ -894,7 +1116,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 title="Se abre en una pestaña nueva"
               >
                 <span className={styles.userMenuItemIcon} aria-hidden="true">
-                  <SwitchAccountOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                  <ShellIcon name="switchUser" size={18} />
                 </span>
                 Cambiar de cuenta
               </Link>
@@ -907,7 +1129,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 data-variant="danger"
               >
                 <span className={styles.userMenuItemIcon} aria-hidden="true">
-                  <LogoutIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                  <ShellIcon name="logout" size={18} />
                 </span>
                 Cerrar sesión
               </button>
@@ -933,115 +1155,23 @@ export default function AppShell({ panel, children }: AppShellProps) {
           aria-expanded={mobileOpen}
           aria-controls="nx-sidebar-nav"
         >
-          <MenuIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+          <ShellIcon name="menu" size={20} />
         </button>
 
-        <button
-          type="button"
-          className={styles.collapseBtn}
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? "Mostrar el menú completo" : "Reducir el menú a iconos"}
-          aria-controls="nx-sidebar-nav"
-          aria-expanded={!collapsed}
-          title={collapsed ? "Mostrar menú" : "Reducir menú"}
-        >
-          {collapsed ? (
-            <ChevronRightIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-          ) : (
-            <ChevronLeftIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-          )}
-        </button>
-
-        <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
+        <Breadcrumbs
+          panel={panel}
+          pathname={pathname || ""}
+          panelHome={panelEntryPath}
+          groupTitle={activeGroup?.title ?? null}
+        />
 
         <div className={styles.topbarActions}>
           {/* Core ola1: solo NEXARA — sin selector multi-empresa (Demo). */}
           {!CORE_SURFACE_ONLY ? <CompanySwitcher compact /> : null}
 
-          {(isSuperAdmin || orgRoleKey) && (
-            <div
-              className={styles.roleBadge}
-              title="Tu rol corporativo"
-              data-tier={
-                isSuperAdmin
-                  ? "executive"
-                  : orgRoleKey?.startsWith("director")
-                    ? "director"
-                    : orgRoleKey?.includes("manager") || orgRoleKey === "noc_lead" || orgRoleKey === "accountant" || orgRoleKey === "maintenance_coordinator" || orgRoleKey === "warehouse_manager"
-                      ? "manager"
-                      : "operative"
-              }
-            >
-              <span aria-hidden="true">●</span>
-              <span>{getUserRoleLabel(user)}</span>
-            </div>
-          )}
-
-          {allowedPanels.length > 1 && (
-            <div ref={switcherRef} className={styles.popAnchor}>
-              <button
-                type="button"
-                className={styles.switcherBtn}
-                onClick={() => setSwitcherOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={switcherOpen}
-              >
-                <span className={styles.switcherBtnIcon} aria-hidden="true">
-                  <AppsOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-                </span>
-                <span>{panelMeta.name.replace(/^NEXARA\s+/i, "")}</span>
-                <KeyboardArrowDownIcon aria-hidden="true" sx={{ fontSize: 16, opacity: 0.6 }} />
-              </button>
-
-              {switcherOpen && (
-                <div className={styles.switcherDropdown} role="menu">
-                  <div className={styles.switcherTitle}>Mis paneles</div>
-                  {allowedPanels.map((p) => {
-                    const isCurrent = p.id === panel;
-                    const isHome = homeUrl.startsWith(`/${p.id}`);
-                    const panelHref = buildCrossPanelUrl(
-                      p.id,
-                      getUserPanelSwitchPath(user, p.id),
-                      userJson,
-                    );
-                    return (
-                      <a
-                        key={p.id}
-                        href={panelHref}
-                        className={styles.switcherItem}
-                        role="menuitem"
-                        aria-current={isCurrent ? "page" : undefined}
-                        data-current={isCurrent ? "true" : "false"}
-                      >
-                        <span className={styles.switcherItemIcon} aria-hidden="true" style={{ color: p.accent }}>
-                          <AppsOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                        </span>
-                        <div className={styles.switcherItemBody}>
-                          <div className={styles.switcherItemHead}>
-                            <span className={styles.switcherItemName}>{p.name}</span>
-                            {isCurrent && (
-                              <span className={styles.switcherPill} data-variant="current">
-                                Actual
-                              </span>
-                            )}
-                            {!isCurrent && isHome && (
-                              <span className={styles.switcherPill} data-variant="home">
-                                Mi base
-                              </span>
-                            )}
-                          </div>
-                          <div className={styles.switcherItemTagline}>{p.tagline}</div>
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
           <ShellConnectionStatus />
 
+          {/* En escritorio el buscador vive en la barra lateral; en el teléfono, aquí. */}
           <button
             type="button"
             className={styles.paletteBtn}
@@ -1052,11 +1182,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
             aria-haspopup="dialog"
             aria-expanded={paletteOpen}
           >
-            <SearchIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-            <span className={styles.paletteBtnLabel}>Buscar…</span>
-            <kbd className={styles.paletteBtnKbd} aria-hidden="true">
-              {shortcutLabel}
-            </kbd>
+            <ShellIcon name="search" size={18} />
           </button>
 
           <button
@@ -1066,11 +1192,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
             aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             title={darkMode ? "Modo claro" : "Modo oscuro"}
           >
-            {darkMode ? (
-              <LightModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-            ) : (
-              <DarkModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-            )}
+            <ShellIcon name={darkMode ? "sun" : "moon"} size={18} />
           </button>
 
           {notificationsUrl && (
@@ -1090,12 +1212,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
                   if (next) void loadNotifPreview();
                 }}
               >
-                <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                {unreadNotifs > 0 && (
-                  <span className={styles.notifCount} aria-hidden="true">
-                    {unreadNotifs > 99 ? "99+" : unreadNotifs}
-                  </span>
-                )}
+                <ShellIcon name="bell" size={18} />
+                {unreadNotifs > 0 && <span className={styles.notifPip} aria-hidden="true" />}
               </button>
               {notifOpen && (
                 <div role="dialog" aria-label="Notificaciones recientes" className={styles.notifPop}>
@@ -1116,7 +1234,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                     )}
                     {!notifLoading && notifPreview.length === 0 && (
                       <div className={styles.notifEmpty}>
-                        <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 22 }} />
+                        <ShellIcon name="bell" size={22} />
                         <span>Estás al día. No hay avisos nuevos.</span>
                       </div>
                     )}
@@ -1160,6 +1278,13 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 </div>
               )}
             </div>
+          )}
+
+          {showNewActivity && (
+            <Link href={NEW_ACTIVITY_PATH} className={styles.primaryAction} aria-label="Nueva actividad">
+              <ShellIcon name="plus" size={16} />
+              <span className={styles.primaryActionLabel}>Nueva actividad</span>
+            </Link>
           )}
         </div>
       </header>
@@ -1277,10 +1402,13 @@ function Breadcrumbs({
   panel,
   pathname,
   panelHome,
+  groupTitle,
 }: {
   panel: PanelId;
   pathname: string;
   panelHome: string | null;
+  /** Grupo del menú donde vive la página («Hoy», «Recursos»…): sustituye al nombre del panel. */
+  groupTitle: string | null;
 }) {
   const homeHref =
     panelHome ??
@@ -1303,9 +1431,13 @@ function Breadcrumbs({
   const accumulated: string[] = [];
   return (
     <nav className={styles.breadcrumbs} aria-label="Estás en">
-      <Link href={homeHref} className={styles.crumbHome}>
-        {PANEL_META[panel].name}
-      </Link>
+      {groupTitle ? (
+        <span className={styles.crumbHome}>{groupTitle}</span>
+      ) : (
+        <Link href={homeHref} className={styles.crumbHome}>
+          {PANEL_META[panel].name}
+        </Link>
+      )}
       {segments.map((seg, idx) => {
         accumulated.push(seg);
         const isLast = idx === segments.length - 1;
@@ -1316,7 +1448,7 @@ function Breadcrumbs({
         return (
           <span key={target} className={styles.crumb} data-last={isLast ? "true" : undefined}>
             <span className={styles.crumbSep} aria-hidden="true">
-              /
+              <ShellIcon name="right" size={14} />
             </span>
             {isLast ? (
               <span className={styles.crumbCurrent} aria-current="page">

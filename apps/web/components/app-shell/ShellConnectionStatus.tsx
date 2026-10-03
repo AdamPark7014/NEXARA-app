@@ -57,7 +57,10 @@ export default function ShellConnectionStatus() {
     label = `Sync ${queued}`;
   }
 
-  // En línea es lo normal: solo un punto y texto gris. Sin conexión o sincronizando sí se tiñe.
+  // En línea es lo normal y ya lo dice el punto de la foto en la barra lateral: solo se avisa
+  // cuando no hay conexión o hay cambios por sincronizar.
+  if (tone === "ok") return null;
+
   const bg = tone === "warn" ? "var(--ui-warning-bg)" : tone === "sync" ? "var(--ui-info-bg)" : "transparent";
   const color = tone === "warn" ? "var(--ui-warning-text)" : tone === "sync" ? "var(--ui-info-text)" : "var(--ui-fg-3)";
   const dot = tone === "warn" ? "var(--ui-warning)" : tone === "sync" ? "var(--ui-info)" : "var(--ui-success)";

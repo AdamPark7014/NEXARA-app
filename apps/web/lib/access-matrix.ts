@@ -435,7 +435,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
       R.ARQUITECTO, R.COORD_OPERACIONES, R.PROJECT_MANAGER, R.MAINTENANCE_COORDINATOR,
       R.SALES_MANAGER, R.ADMIN_STAFF, R.SALES_REP,
     ],
-    group: "Hoy", visible: true,
+    group: "Clientes y obra", visible: true,
   },
   "erp-cotizaciones": {
     id: "erp-cotizaciones", panel: PANELS.ERP, path: "/cotizaciones",
@@ -447,7 +447,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
       R.SALES_MANAGER, R.PROJECT_MANAGER, R.SENIOR_ENGINEER,
       R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR,
     ],
-    group: "Hoy", visible: true,
+    group: "Clientes y obra", visible: true,
   },
   "erp-proyectos": {
     id: "erp-proyectos", panel: PANELS.ERP, path: "/proyectos",
@@ -459,7 +459,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
       R.SALES_MANAGER, R.PROJECT_MANAGER, R.SENIOR_ENGINEER,
       R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR,
     ],
-    group: "Hoy", visible: true,
+    group: "Clientes y obra", visible: true,
   },
   // ── Recursos de Core ──
   // Almacén: quien lo opera (almacén y administración), dirección y los coordinadores de campo
@@ -650,13 +650,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "warehouse", panel: PANELS.ERP, path: "/warehouse",
     label: "Inventario", description: "Entradas, salidas, stock y mínimos",
     icon: "📦", allowedRoles: WAREHOUSE_TEAM,
-    group: "Inventario", visible: true,
+    group: "Recursos", visible: true,
   },
   procurement: {
     id: "procurement", panel: PANELS.ERP, path: "/procurement",
     label: "Compras", description: "Requisiciones, OC y proveedores",
     icon: "🛒", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.PROCUREMENT_OFFICER, R.WAREHOUSE_MANAGER, R.ADMIN_STAFF],
-    group: "Inventario", visible: true,
+    group: "Recursos", visible: true,
   },
   documents: {
     id: "documents", panel: PANELS.ERP, path: "/documents",
