@@ -1,0 +1,318 @@
+/* NEXARA · Piezas del almacén (v2): foto de producto/herramienta, campo de escaneo,
+   tarjeta de resultado y celda de existencias con semáforo. Solo tokens --ui-*. */
+
+/* ─── Foto ─────────────────────────────────────────────────────────────── */
+
+.foto {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--ui-radius-md, 10px);
+  border: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-3);
+}
+
+.foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.foto svg {
+  width: 55%;
+  height: 55%;
+}
+
+a.foto:focus-visible {
+  outline: var(--ui-focus-outline, 2px solid var(--ui-brand));
+  outline-offset: 2px;
+}
+
+/* ─── Campo de escaneo ─────────────────────────────────────────────────── */
+
+.escaneo {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.escaneoFila {
+  display: flex;
+  gap: var(--ui-s2);
+  align-items: stretch;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.escaneoCampo {
+  flex: 1 1 260px;
+  min-width: 0;
+  max-width: 520px;
+}
+
+/* El campo del lector: 48 px y 18 px de letra (16+ evita el zoom de iOS).
+   Selectores dobles para ganarle a la caja `lg` de base sin `!important`. */
+.escaneoCampo .escaneoWrap.escaneoWrap {
+  height: 48px;
+  border-radius: var(--ui-radius-lg, 12px);
+}
+
+.escaneoCampo .escaneoInput {
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.escaneoCampo .escaneoMono {
+  font-family: var(--ui-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.escaneoBoton {
+  min-height: 48px;
+}
+
+.escaneoPista {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin: 0;
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-3);
+}
+
+.escaneoListo {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ui-success);
+  box-shadow: 0 0 0 3px var(--ui-success-bg);
+  flex: none;
+}
+
+.escaneoListo[data-off="true"] {
+  background: var(--ui-fg-4, var(--ui-fg-3));
+  box-shadow: none;
+}
+
+/* ─── Tarjeta de resultado ─────────────────────────────────────────────── */
+
+.hallazgo {
+  display: grid;
+  gap: var(--ui-s4);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+  min-width: 0;
+}
+
+.hallazgo[data-tono="warning"] {
+  border-color: var(--ui-warning-border);
+}
+
+.hallazgo[data-tono="danger"] {
+  border-color: var(--ui-danger-border);
+}
+
+.hallazgoCabeza {
+  display: flex;
+  gap: var(--ui-s4);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.hallazgoTexto {
+  display: grid;
+  gap: var(--ui-s1);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.hallazgoEyebrow {
+  margin: 0;
+  font-size: var(--ui-fs-caption, 11px);
+  font-weight: var(--ui-fw-semibold, 600);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.hallazgoTitulo {
+  margin: 0;
+  font-size: var(--ui-fs-section, 16px);
+  font-weight: var(--ui-fw-bold, 700);
+  line-height: 1.3;
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.hallazgoMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1) var(--ui-s3);
+  margin: 0;
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-2);
+}
+
+.hallazgoMeta code,
+.mono {
+  font-family: var(--ui-font-mono);
+  font-size: 0.95em;
+}
+
+.hallazgoInsignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  margin-top: var(--ui-s1);
+}
+
+.hallazgoCuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.hallazgoPie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+@media (max-width: 520px) {
+  .hallazgo {
+    padding: var(--ui-s3);
+  }
+
+  .hallazgoCabeza {
+    gap: var(--ui-s3);
+  }
+
+  .hallazgoPie > * {
+    flex: 1 1 100%;
+  }
+}
+
+/* ─── Existencias con semáforo ─────────────────────────────────────────── */
+
+.nivel {
+  display: grid;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.nivelFila {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+.nivelNum {
+  font-weight: var(--ui-fw-bold, 700);
+  font-size: var(--ui-fs-body, 14px);
+  font-feature-settings: var(--ui-numeric);
+  color: var(--ui-fg);
+}
+
+.nivelMin {
+  font-size: var(--ui-fs-caption, 11px);
+  color: var(--ui-fg-3);
+  font-feature-settings: var(--ui-numeric);
+}
+
+.nivelBarra {
+  height: 4px;
+  border-radius: var(--ui-radius-pill, 999px);
+  background: var(--ui-track, var(--ui-surface-3));
+  overflow: hidden;
+}
+
+.nivelRelleno {
+  height: 100%;
+  border-radius: inherit;
+  transition: width var(--ui-duration-slow, 0.3s) var(--ui-ease-out, ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nivelRelleno {
+    transition: none;
+  }
+}
+
+/* ─── Celda de producto (foto + nombre + meta) ─────────────────────────── */
+
+.producto {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.productoTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.productoNombre {
+  font-weight: var(--ui-fw-semibold, 600);
+  font-size: var(--ui-fs-body, 14px);
+  color: var(--ui-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productoMeta {
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productoBoton {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  border-radius: var(--ui-radius-sm, 6px);
+}
+
+.productoBoton:hover .productoNombre {
+  color: var(--ui-brand-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.productoBoton:focus-visible {
+  outline: var(--ui-focus-outline, 2px solid var(--ui-brand));
+  outline-offset: 2px;
+}
+
+.productoBoton:disabled {
+  cursor: default;
+}
+
+.productoBoton:disabled:hover .productoNombre {
+  color: var(--ui-fg);
+  text-decoration: none;
+}

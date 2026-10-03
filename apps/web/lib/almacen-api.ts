@@ -497,3 +497,25 @@ export function devolverHerramienta(token: string, toolRequestId: number, damage
     "No se pudo registrar la devolución",
   );
 }
+
+export type ResultadoCompletarCodigos = {
+  /** Herramientas sin código de etiqueta que se revisaron. */
+  revisadas: number;
+  /** A cuántas se les guardó su código. */
+  completadas: number;
+  /** Ids de las que no se dejaron guardar. */
+  errores: number[];
+};
+
+/**
+ * Guarda el código de etiqueta de las herramientas que se dieron de alta antes de la
+ * nomenclatura (el inventario ya no lo escribe al leer). Solo quien gestiona herramientas.
+ */
+export function completarCodigosHerramientas(token: string) {
+  return pedir<ResultadoCompletarCodigos>(
+    "tool-requests/inventory/codigos/completar",
+    token,
+    { method: "POST" },
+    "No se pudieron completar los códigos",
+  );
+}
