@@ -155,6 +155,7 @@ export class ActivityEvidenceController {
       capturedAt: body?.capturedAt ?? null,
       userId: req.user.id,
       companyId,
+      requester: req.user,
     });
     // Documentar un campo también es trabajar en la actividad: reanuda su reloj si estaba detenido.
     await this.service.reanudarSesion(parseInt(activityId, 10), req.user.id, companyId);
@@ -176,6 +177,7 @@ export class ActivityEvidenceController {
       momento: body?.momento,
       userId: req.user?.id ?? null,
       companyId,
+      requester: req.user ?? null,
     });
   }
 

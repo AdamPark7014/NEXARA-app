@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
+import { PERMISSIONS } from '../../common/permissions.js';
 import { esCerrada } from '../actividad-tiempos.js';
 import {
   MOMENTOS,
@@ -35,6 +36,9 @@ export type CampoDto = {
   completo: boolean;
 };
 
+/** Quien pide subir o quitar una foto, tal como viene del JWT (`req.user`). */
+export type QuienPide = { permissions?: string[] | null; isSuperAdmin?: boolean | null };
+
 /**
  * Los campos de evidencia de una actividad: qué hay que documentar y en qué momentos.
  *
@@ -52,10 +56,47 @@ export class ActivityEvidenceFieldsService {
     const tenantId = requireCompanyId(companyId);
     const activity = await this.prisma.activity.findFirst({
       where: { id: activityId, ...companyWhere(tenantId) },
-      select: { id: true, companyId: true, estatus: true, titulo: true, anNumber: true },
+      select: { id: true, companyId: true, estatus: true, titulo: true, anNumber: true, responsableId: true },
     });
     assertCompanyAccess(activity, tenantId, 'Actividad');
     return activity!;
+  }
+
+  /**
+   * Quién puede subir o quitar fotos de campo: la misma regla con la que se abre la evidencia
+   * de la actividad (`ActivityEvidenceService.getActivityEvidence`): quien está asignado y no
+   * fue retirado, el responsable, o quien revisa evidencias. Pasar el guard de la ruta no basta:
+   * un empleado cualquiera del tenant no toca el trabajo de otro equipo.
+   */
+  private async assertPuedeTocarCampos(
+    activity: { id: number; companyId: number; responsableId: number | null },
+    userId: number | null | undefined,
+    requester?: QuienPide | null,
+  ): Promise<void> {
+    const sinAcceso = () => new ForbiddenException('No tienes acceso a la evidencia de esta actividad');
+    if (!userId) throw sinAcceso();
+    if (requester?.isSuperAdmin) return;
+    const permisos = requester?.permissions ?? [];
+    if (permisos.includes(PERMISSIONS.EVIDENCES_REVIEW) || permisos.includes(PERMISSIONS.CONSOLE_ADMIN)) return;
+    if (activity.responsableId != null && Number(activity.responsableId) === Number(userId)) return;
+    const asignado = await this.prisma.activityAssignee.findFirst({
+      where: { activityId: activity.id, userId, retiradoAt: null, ...companyWhere(activity.companyId) },
+      select: { id: true },
+    });
+    if (!asignado) throw sinAcceso();
+  }
+
+  /**
+   * La evidencia de quien subió la foto que se va a pisar o quitar: es la que decide si la foto
+   * quedó congelada, no la de quien llama. Si no, bastaba con no tener fila de evidencia propia
+   * (o tenerla sin enviar) para borrar la foto aprobada de un compañero.
+   */
+  private evidenciaDelAutor(activityId: number, companyId: number, userId: number | null | undefined) {
+    if (!userId) return Promise.resolve(null);
+    return this.prisma.activityEvidence.findFirst({
+      where: { activityId, userId, ...companyWhere(companyId) },
+      select: { status: true, reviewStatus: true },
+    });
   }
 
   /**
@@ -204,6 +245,8 @@ export class ActivityEvidenceFieldsService {
     capturedAt?: string | null;
     userId: number;
     companyId?: number | null;
+    /** Permisos de quien sube (`req.user`): revisor o dirección pueden sin estar asignados. */
+    requester?: QuienPide | null;
   }): Promise<CampoDto[]> {
     const activity = await this.cargarActividad(params.activityId, params.companyId);
 
@@ -211,6 +254,8 @@ export class ActivityEvidenceFieldsService {
     if (!momento) {
       throw new BadRequestException('Indica el momento de la foto: antes, en progreso o después.');
     }
+
+    await this.assertPuedeTocarCampos(activity, params.userId, params.requester);
 
     // El flujo va por pasos: nadie documenta un campo sin haber tomado antes su foto de
     // entrada (Paso 1), aunque la active por el formulario web en vez de la pantalla del flujo.
@@ -248,12 +293,19 @@ export class ActivityEvidenceFieldsService {
     const capturedAt = this.fecha(params.capturedAt);
 
     // Llenar un hueco vacío siempre se puede (seguir adjuntando). Reemplazar la foto que ya
-    // está, no cuando la evidencia quedó congelada.
+    // está, no cuando la evidencia de QUIEN LA SUBIÓ quedó congelada: la foto es de la
+    // actividad, y la congela la evidencia de su autor, no la de quien la quiere pisar.
     const yaHay = await this.prisma.activityEvidenceFieldPhoto.findFirst({
       where: { fieldId: campo.id, momento, ...companyWhere(activity.companyId) },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
-    if (yaHay) this.assertEvidenciaSinCongelar(activity.estatus, miEvidencia);
+    if (yaHay) {
+      const evidenciaAutor =
+        Number(yaHay.userId) === Number(params.userId)
+          ? miEvidencia
+          : await this.evidenciaDelAutor(params.activityId, activity.companyId, yaHay.userId);
+      this.assertEvidenciaSinCongelar(activity.estatus, evidenciaAutor);
+    }
 
     await this.prisma.activityEvidenceFieldPhoto.upsert({
       where: { fieldId_momento: { fieldId: campo.id, momento } },
@@ -307,30 +359,45 @@ export class ActivityEvidenceFieldsService {
     activityId: number;
     fieldId: number;
     momento: unknown;
-    /** Quien la quita: si su evidencia ya está congelada, no se quita. */
+    /** Quien la quita: tiene que estar en la actividad (o revisar), y la foto no estar congelada. */
     userId?: number | null;
     companyId?: number | null;
+    /** Permisos de quien quita (`req.user`). */
+    requester?: QuienPide | null;
   }): Promise<CampoDto[]> {
     const activity = await this.cargarActividad(params.activityId, params.companyId);
     const momento = normalizarMomento(params.momento);
     if (!momento) throw new BadRequestException('Momento inválido');
 
-    const miEvidencia = params.userId
-      ? await this.prisma.activityEvidence.findFirst({
-          where: { activityId: params.activityId, userId: params.userId, ...companyWhere(activity.companyId) },
-          select: { status: true, reviewStatus: true },
-        })
-      : null;
-    this.assertEvidenciaSinCongelar(activity.estatus, miEvidencia);
+    await this.assertPuedeTocarCampos(activity, params.userId, params.requester);
 
-    await this.prisma.activityEvidenceFieldPhoto.deleteMany({
+    // La foto que se va a quitar y quién la subió: su evidencia es la que la congela, no la
+    // de quien llama (que puede no tener evidencia propia en esta actividad).
+    const existente = await this.prisma.activityEvidenceFieldPhoto.findFirst({
       where: {
         fieldId: params.fieldId,
         activityId: params.activityId,
         momento,
         ...companyWhere(activity.companyId),
       },
+      select: { id: true, userId: true },
     });
+    const evidenciaAutor = existente
+      ? await this.evidenciaDelAutor(params.activityId, activity.companyId, existente.userId)
+      : null;
+    this.assertEvidenciaSinCongelar(activity.estatus, evidenciaAutor);
+
+    if (existente) {
+      await this.prisma.activityEvidenceFieldPhoto.deleteMany({
+        where: {
+          id: existente.id,
+          fieldId: params.fieldId,
+          activityId: params.activityId,
+          momento,
+          ...companyWhere(activity.companyId),
+        },
+      });
+    }
     return this.listarCamposDeActividad(params.activityId, activity.companyId);
   }
 

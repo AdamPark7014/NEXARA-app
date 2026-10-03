@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { esCerrada, estaExcedida, minutosPlan } from './actividad-tiempos.js';
-import { leerSesiones, sesionesDe } from './sessions/activity-sessions.service.js';
+import { leerSesiones, sesionesDe, type SesionFila } from './sessions/activity-sessions.service.js';
 import { minutosTrabajados } from './sessions/sesiones-trabajo.js';
 import { esMultiDia, periodoDeActividad } from './actividad-periodo.js';
 
@@ -43,6 +43,7 @@ export class ActivityTimeAlertsService {
         id: true,
         userId: true,
         activityId: true,
+        companyId: true,
         horasPlan: true,
         inicioRealAt: true,
         activity: { select: { estatus: true, periodoInicio: true, periodoFin: true } },
@@ -50,10 +51,22 @@ export class ActivityTimeAlertsService {
       take: 500,
     });
     // El tiempo real es la suma de sus sesiones: una actividad en pausa no se «excede» sola.
-    const sesiones = await leerSesiones(this.prisma, {
-      userIds: [...new Set(enCurso.map((f) => f.userId))],
-      activityIds: [...new Set(enCurso.map((f) => f.activityId))],
-    });
+    // El barrido es de todas las empresas, pero las sesiones se leen con el alcance de cada una
+    // (`leerSesiones` exige empresa): se agrupa por la de cada fila de equipo.
+    const porEmpresa = new Map<number, typeof enCurso>();
+    for (const f of enCurso) {
+      if (f.companyId == null) continue;
+      porEmpresa.set(f.companyId, [...(porEmpresa.get(f.companyId) ?? []), f]);
+    }
+    const sesiones = new Map<string, SesionFila[]>();
+    for (const [companyId, filas] of porEmpresa) {
+      const parte = await leerSesiones(this.prisma, {
+        userIds: [...new Set(filas.map((f) => f.userId))],
+        activityIds: [...new Set(filas.map((f) => f.activityId))],
+        companyId,
+      });
+      for (const [clave, lista] of parte) sesiones.set(clave, lista);
+    }
 
     for (const fila of enCurso) {
       if (esCerrada(fila.activity?.estatus)) continue;

@@ -604,15 +604,19 @@ export class TeamBoardService {
       rango ?? this.resolveRange(null, null, now),
       viewer.id,
     );
-    return { ...card, puedePausar: await this.puedePausarA(viewer, userId) };
+    return { ...card, puedePausar: await this.puedePausarA(viewer, userId, companyId) };
   }
 
-  /** ¿Quien mira puede pausarle una actividad a esta persona? Mismo alcance que para asignarle. */
-  private async puedePausarA(viewer: Viewer, userId: number): Promise<boolean> {
+  /**
+   * ¿Quien mira puede pausarle una actividad a esta persona? Mismo alcance que para asignarle,
+   * y mismo padrón que `resolveScope`: solo la gente de esta empresa. Sin empresa, no.
+   */
+  private async puedePausarA(viewer: Viewer, userId: number, companyId: number | null): Promise<boolean> {
     if (viewer.id === userId) return false;
+    if (!companyId) return false;
     try {
       const activos = await this.prisma.user.findMany({
-        where: { isActive: true },
+        where: { isActive: true, companyMemberships: { some: { companyId } } },
         select: { id: true, email: true, managerId: true },
       });
       const email = viewer.email ?? activos.find((u) => u.id === viewer.id)?.email ?? null;
