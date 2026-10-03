@@ -1,5 +1,29 @@
 # RELEVO
 
+- **Turno 03-10 (mañana, claude-code — rediseño v2, en paralelo con la sesión de dependencias):**
+  **Etapas 5 y 6 terminadas** (commits locales; push y deploy al cierre de este turno):
+  - `ba6b4cf9` primer tramo (préstamos/kits de herramientas, reabasto, recolección, recorrido, prioridad).
+  - `8fdb7059` **apps** Android+iOS: teal `#1F9E84`, pestaña Inicio, barra inferior de 5 destinos,
+    dock de acción en el detalle (Iniciar/Reanudar/Pausar). Android 699 pruebas en verde. **iOS sin
+    compilar** (Windows): verificar en Xcode aislamiento de hilo principal, `#Preview`, dock sobre listas,
+    diálogo de pausa, insignias y capturas. Falta build/release de tiendas. (Este commit se llevó por
+    índice compartido dos borrados de maplibre de la otra sesión; el estado final es el correcto.)
+  - `ff2f138e` Asistencias · `3b9aa281` pizarra/ficha/flujo/Mis actividades · `b5b97f4c` Almacén y
+    Herramientas (+ API: existencias traen foto/categoría/precio; valor del inventario con `unitCost`,
+    antes salía $0) · `ce1cea7c` Cotizaciones · `42219482` **fix base**: `Field` remontaba el input al
+    aparecer/irse un error (se perdía el foco) · `b7eb4512` Clientes y Proyectos · `3283ec98` detalle,
+    evidencias y alta de actividad.
+  - Resultado: `style={{` y `<button>` crudos casi en cero en los módulos migrados (quedan los de valores
+    calculados). Quedan 94 `style={{` en 6 componentes de `components/ops` que **ninguna página importa**
+    (`ActivityEvidenceReviewPanel`, `EvidenceReviewQueue`, `OpsActivitiesBoard`, `OpsTicketRequestQueue`,
+    `OpsProjectDetailShell`; `OpsActivitiesImport` sí tiene 1 uso): candidatos a borrar.
+  - Pruebas al cierre (con los cambios de dependencias incluidos): API 272 suites / 3,366, web 111 / 957,
+    `tsc` API y web 0, Android compile + unit tests verde.
+  - **No visto en navegador** (no hay sesión local): Adam debe recorrer Actividades, Cotizaciones, Almacén,
+    Asistencias, Clientes y Proyectos en claro/oscuro y en el celular.
+  - `.ai/audit/` (reporte de `ollama_audit`) queda **sin commitear a propósito**: puede llevar fragmentos
+    de llaves.
+
 - **Turno 03-10 (mañana, claude-code — dependencias, en paralelo con el agente del rediseño v2):**
   commits **locales, sin push ni deploy** (debajo hay commits del rediseño que su agente aún no sube):
   - `5f51ac19` parches de runtime: protobufjs 7.6.6, websocket-driver 0.7.5, tar 7 (vía override de
