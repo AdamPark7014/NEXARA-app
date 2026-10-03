@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listAssignableUsers } from "@/lib/ops-activities-api";
 import type { Persona } from "@/lib/proyectos-api";
-import styles from "../proyectos.module.css";
+import { Select, type ControlSize } from "@/components/base";
 
 export type OpcionPersona = { id: number; nombre: string; detalle?: string | null };
 
@@ -59,6 +59,7 @@ export function usePersonasAsignables(
   return { personas, cargando, aviso };
 }
 
+/** Lista de personas con la caja del sistema (`Select`); recibe los `aria-*` que le pone `Field`. */
 export function PersonaSelect({
   id,
   value,
@@ -68,7 +69,12 @@ export function PersonaSelect({
   excluir = [],
   disabled,
   required,
+  controlSize,
+  className,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
+  "aria-required": ariaRequired,
 }: {
   id?: string;
   value: string;
@@ -79,18 +85,27 @@ export function PersonaSelect({
   excluir?: number[];
   disabled?: boolean;
   required?: boolean;
+  controlSize?: ControlSize;
+  className?: string;
   "aria-label"?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean | "true" | "false";
+  "aria-required"?: boolean;
 }) {
   const opciones = personas.filter((p) => !excluir.includes(p.id) || String(p.id) === value);
   return (
-    <select
+    <Select
       id={id}
-      className={styles.select}
+      wrapperClassName={className}
+      controlSize={controlSize}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
       required={required}
       aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      aria-invalid={ariaInvalid}
+      aria-required={ariaRequired}
     >
       {vacio !== null ? <option value="">{vacio}</option> : null}
       {opciones.map((p) => (
@@ -98,6 +113,6 @@ export function PersonaSelect({
           {p.nombre}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import EventRepeatOutlinedIcon from "@mui/icons-material/EventRepeatOutlined";
+import { Alert, Button, Checkbox, DateInput, Field, FilterChip, RecordSection } from "@/components/base";
 import {
   ESTADO_HITO_LABEL,
   obtenerProgramacion,
@@ -14,7 +16,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { rangosSeEmpalman, reencadenar, resumenDelRango } from "@/lib/actividad-periodo";
 import { PersonaSelect } from "./personas";
 import type { SeccionProps } from "./tipos";
-import styles from "../proyectos.module.css";
+import styles from "./secciones.module.css";
 
 /** Una etapa tal como se va a programar (lo que se puede mover antes de confirmar). */
 export type Fila = {
@@ -154,201 +156,167 @@ export default function ProgramarActividades({ proyecto: p, token, ocupado, pers
   const etapaDe = (hitoId: number) => p.milestones.find((h) => h.id === hitoId)?.name ?? "Etapa";
 
   return (
-    <section className={styles.panel} aria-labelledby="prog-titulo">
-      <div className={styles.panelHead}>
-        <h3 id="prog-titulo" className={styles.panelTitle}>
-          Programar actividades del proyecto
-        </h3>
-        {!abierto ? (
-          <button
-            type="button"
-            className={styles.primaryBtn}
-            disabled={ocupado || cerrado || sinEtapas}
-            onClick={() => void abrir()}
-          >
+    <RecordSection
+      title="Programar actividades del proyecto"
+      subtitle="Una actividad por etapa del cronograma, con su periodo: sale en la pizarra de quien la lleva cada día, del primero al último, sin volver a cargarla. Cada etapa empieza al día siguiente de que termina la anterior."
+      end={
+        !abierto ? (
+          <Button variant="tonal" iconStart={<EventRepeatOutlinedIcon />} disabled={ocupado || cerrado || sinEtapas} onClick={() => void abrir()}>
             Programar actividades
-          </button>
+          </Button>
+        ) : null
+      }
+    >
+      <div className={styles.pila}>
+        {sinEtapas ? (
+          <p className={styles.vacio}>Primero agrega las etapas en la pestaña Cronograma.</p>
+        ) : cerrado ? (
+          <p className={styles.vacio}>El proyecto está {p.status === "CANCELLED" ? "cancelado" : "terminado"}: no se programan actividades.</p>
+        ) : null}
+
+        {resultado && !abierto ? (
+          <Alert tone="success" role="status">
+            {resultado.creadas.length
+              ? `Se crearon ${resultado.creadas.length} actividad${resultado.creadas.length === 1 ? "" : "es"}: `
+              : "No se creó ninguna actividad nueva. "}
+            {resultado.creadas
+              .map((c) => `${c.anNumber} (${etapaDe(c.hitoId)}${c.sitio ? ` · Sucursal ${c.sitio}` : ""})`)
+              .join(", ")}
+            {resultado.omitidas.length
+              ? ` · Omitidas por estar ya programadas: ${resultado.omitidas.map((o) => etapaDe(o.hitoId)).join(", ")}.`
+              : ""}
+          </Alert>
+        ) : null}
+
+        {abierto ? (
+          cargando ? (
+            <p className={styles.ayuda} aria-busy="true">
+              Preparando la propuesta…
+            </p>
+          ) : (
+            <div className={styles.edicion}>
+              <ol className={styles.lista} aria-label="Etapas a programar">
+                {filas.map((f, i) => {
+                  const revision = revisiones[i];
+                  const idBase = `prog-${f.hitoId}`;
+                  return (
+                    <li key={f.hitoId} className={`${styles.fila} ${styles.filaEdicion} ${f.incluir ? "" : styles.filaApagada}`}>
+                      <div className={styles.edicion}>
+                        <Checkbox
+                          checked={f.incluir}
+                          onChange={(e) => cambiar(i, { incluir: e.target.checked })}
+                          label={
+                            <strong>
+                              {i + 1}. {f.nombre}
+                            </strong>
+                          }
+                          description={ESTADO_HITO_LABEL[f.estado] ?? f.estado}
+                        />
+                        {f.programadas.length ? (
+                          <span className={styles.meta}>
+                            Ya programada:{" "}
+                            {f.programadas
+                              .map((a) => `${a.anNumber}${a.sitio ? ` (sucursal ${a.sitio})` : ""}${a.periodo ? ` · ${a.periodo.etiqueta}` : ""}`)
+                              .join(" · ")}
+                          </span>
+                        ) : null}
+                        {f.incluir ? (
+                          <>
+                            <div className={styles.campos} data-cols="3">
+                              <Field label="Del">
+                                <DateInput id={`${idBase}-del`} value={aInputFecha(f.inicio)} onChange={(e) => cambiar(i, { inicio: e.target.value }, true)} />
+                              </Field>
+                              <Field label="Al">
+                                <DateInput
+                                  id={`${idBase}-al`}
+                                  min={f.inicio || undefined}
+                                  value={aInputFecha(f.fin)}
+                                  onChange={(e) => cambiar(i, { fin: e.target.value }, true)}
+                                />
+                              </Field>
+                              <Field label="La lleva">
+                                <PersonaSelect
+                                  id={`${idBase}-resp`}
+                                  value={f.responsableId}
+                                  onChange={(v) =>
+                                    cambiar(i, {
+                                      responsableId: v,
+                                      apoyoIds: f.apoyoIds.filter((x) => String(x) !== v),
+                                    })
+                                  }
+                                  personas={personas}
+                                  vacio="Elige a alguien…"
+                                />
+                              </Field>
+                            </div>
+                            <div className={styles.chips} aria-label={`Apoyo en ${f.nombre}`}>
+                              {f.apoyoIds.map((id) => (
+                                <FilterChip
+                                  key={id}
+                                  onRemove={() => cambiar(i, { apoyoIds: f.apoyoIds.filter((x) => x !== id) })}
+                                  removeLabel={`Quitar a ${nombreDe(id)} del apoyo`}
+                                >
+                                  {nombreDe(id)}
+                                </FilterChip>
+                              ))}
+                              <PersonaSelect
+                                value=""
+                                onChange={(v) => {
+                                  const id = Number(v);
+                                  if (id && !f.apoyoIds.includes(id)) cambiar(i, { apoyoIds: [...f.apoyoIds, id] });
+                                }}
+                                personas={personas}
+                                excluir={[Number(f.responsableId) || 0, ...f.apoyoIds]}
+                                vacio="+ Sumar apoyo…"
+                                aria-label={`Sumar apoyo en ${f.nombre}`}
+                                controlSize="sm"
+                                className={styles.selectCompacto}
+                              />
+                            </div>
+                            <span className={styles.meta}>{resumenDelRango({ inicio: f.inicio, fin: f.fin }) ?? ""}</span>
+                            {revision?.error && intentado ? (
+                              <Alert tone="danger" role="alert" dense>
+                                {revision.error}
+                              </Alert>
+                            ) : null}
+                            {revision?.avisos.length ? (
+                              <Alert tone="warning" dense>
+                                {revision.avisos.join(" ")}
+                              </Alert>
+                            ) : null}
+                          </>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+
+              {sitios ? (
+                <Checkbox
+                  checked={porSitio}
+                  onChange={(e) => setPorSitio(e.target.checked)}
+                  label={`Una actividad por sitio en cada etapa (${sitios} sitio${sitios === 1 ? "" : "s"})`}
+                />
+              ) : null}
+
+              {error ? (
+                <Alert tone="danger" role="alert" dense>
+                  {error}
+                </Alert>
+              ) : null}
+              <div className={styles.botonera}>
+                <Button variant="tertiary" disabled={ocupado} onClick={() => setAbierto(false)}>
+                  Cancelar
+                </Button>
+                <Button variant="tonal" loading={ocupado} disabled={total === 0} onClick={() => void confirmar()}>
+                  {total === 1 ? "Crear 1 actividad" : `Crear ${total} actividades`}
+                </Button>
+              </div>
+            </div>
+          )
         ) : null}
       </div>
-      <p className={styles.hint}>
-        Una actividad por etapa del cronograma, con su periodo: sale en la pizarra de quien la lleva cada día,
-        del primero al último, sin volver a cargarla. Cada etapa empieza al día siguiente de que termina la
-        anterior.
-      </p>
-      {sinEtapas ? (
-        <div className={styles.empty}>Primero agrega las etapas en la pestaña Cronograma.</div>
-      ) : cerrado ? (
-        <div className={styles.empty}>El proyecto está {p.status === "CANCELLED" ? "cancelado" : "terminado"}: no se programan actividades.</div>
-      ) : null}
-
-      {resultado && !abierto ? (
-        <div className={styles.okBox} role="status">
-          {resultado.creadas.length
-            ? `Se crearon ${resultado.creadas.length} actividad${resultado.creadas.length === 1 ? "" : "es"}: `
-            : "No se creó ninguna actividad nueva. "}
-          {resultado.creadas
-            .map((c) => `${c.anNumber} (${etapaDe(c.hitoId)}${c.sitio ? ` · Sucursal ${c.sitio}` : ""})`)
-            .join(", ")}
-          {resultado.omitidas.length
-            ? ` · Omitidas por estar ya programadas: ${resultado.omitidas.map((o) => etapaDe(o.hitoId)).join(", ")}.`
-            : ""}
-        </div>
-      ) : null}
-
-      {abierto ? (
-        cargando ? (
-          <p className={styles.hint}>Preparando la propuesta…</p>
-        ) : (
-          <div className={styles.gantt} style={{ gap: 10 }}>
-            <ol className={styles.editor} aria-label="Etapas a programar">
-              {filas.map((f, i) => {
-                const revision = revisiones[i];
-                const idBase = `prog-${f.hitoId}`;
-                return (
-                  <li
-                    key={f.hitoId}
-                    className={styles.item}
-                    style={{ gridTemplateColumns: "minmax(0, 1fr)", opacity: f.incluir ? 1 : 0.65 }}
-                  >
-                    <label className={styles.check}>
-                      <input
-                        type="checkbox"
-                        checked={f.incluir}
-                        onChange={(e) => cambiar(i, { incluir: e.target.checked })}
-                      />
-                      <strong>
-                        {i + 1}. {f.nombre}
-                      </strong>
-                      <span className={styles.rowSub}>{ESTADO_HITO_LABEL[f.estado] ?? f.estado}</span>
-                    </label>
-                    {f.programadas.length ? (
-                      <span className={styles.rowWrap}>
-                        Ya programada:{" "}
-                        {f.programadas
-                          .map((a) => `${a.anNumber}${a.sitio ? ` (sucursal ${a.sitio})` : ""}${a.periodo ? ` · ${a.periodo.etiqueta}` : ""}`)
-                          .join(" · ")}
-                      </span>
-                    ) : null}
-                    {f.incluir ? (
-                      <>
-                        <div className={styles.grid3}>
-                          <div>
-                            <label className={styles.fieldLabel} htmlFor={`${idBase}-del`}>
-                              Del
-                            </label>
-                            <input
-                              id={`${idBase}-del`}
-                              className={styles.input}
-                              type="date"
-                              value={aInputFecha(f.inicio)}
-                              onChange={(e) => cambiar(i, { inicio: e.target.value }, true)}
-                            />
-                          </div>
-                          <div>
-                            <label className={styles.fieldLabel} htmlFor={`${idBase}-al`}>
-                              Al
-                            </label>
-                            <input
-                              id={`${idBase}-al`}
-                              className={styles.input}
-                              type="date"
-                              min={f.inicio || undefined}
-                              value={aInputFecha(f.fin)}
-                              onChange={(e) => cambiar(i, { fin: e.target.value }, true)}
-                            />
-                          </div>
-                          <div>
-                            <label className={styles.fieldLabel} htmlFor={`${idBase}-resp`}>
-                              La lleva
-                            </label>
-                            <PersonaSelect
-                              id={`${idBase}-resp`}
-                              value={f.responsableId}
-                              onChange={(v) =>
-                                cambiar(i, {
-                                  responsableId: v,
-                                  apoyoIds: f.apoyoIds.filter((x) => String(x) !== v),
-                                })
-                              }
-                              personas={personas}
-                              vacio="Elige a alguien…"
-                            />
-                          </div>
-                        </div>
-                        <div className={styles.chips} aria-label={`Apoyo en ${f.nombre}`}>
-                          {f.apoyoIds.map((id) => (
-                            <button
-                              key={id}
-                              type="button"
-                              className={styles.smallBtn}
-                              onClick={() => cambiar(i, { apoyoIds: f.apoyoIds.filter((x) => x !== id) })}
-                              aria-label={`Quitar a ${nombreDe(id)} del apoyo`}
-                            >
-                              {nombreDe(id)} ×
-                            </button>
-                          ))}
-                          <PersonaSelect
-                            value=""
-                            onChange={(v) => {
-                              const id = Number(v);
-                              if (id && !f.apoyoIds.includes(id)) cambiar(i, { apoyoIds: [...f.apoyoIds, id] });
-                            }}
-                            personas={personas}
-                            excluir={[Number(f.responsableId) || 0, ...f.apoyoIds]}
-                            vacio="+ Sumar apoyo…"
-                            aria-label={`Sumar apoyo en ${f.nombre}`}
-                          />
-                        </div>
-                        <span className={styles.rowWrap}>
-                          {resumenDelRango({ inicio: f.inicio, fin: f.fin }) ?? ""}
-                        </span>
-                        {revision?.error && intentado ? (
-                          <p className={styles.error} role="alert">
-                            {revision.error}
-                          </p>
-                        ) : null}
-                        {revision?.avisos.length ? (
-                          <span className={`${styles.rowWrap} ${styles.vencido}`}>{revision.avisos.join(" ")}</span>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ol>
-
-            {sitios ? (
-              <label className={styles.check}>
-                <input type="checkbox" checked={porSitio} onChange={(e) => setPorSitio(e.target.checked)} />
-                Una actividad por sitio en cada etapa ({sitios} sitio{sitios === 1 ? "" : "s"})
-              </label>
-            ) : null}
-
-            {error ? (
-              <p className={styles.error} role="alert">
-                {error}
-              </p>
-            ) : null}
-            <div className={styles.acciones}>
-              <button
-                type="button"
-                className={styles.primaryBtn}
-                disabled={ocupado || total === 0}
-                onClick={() => void confirmar()}
-              >
-                {ocupado
-                  ? "Programando…"
-                  : total === 1
-                    ? "Crear 1 actividad"
-                    : `Crear ${total} actividades`}
-              </button>
-              <button type="button" className={styles.secondaryBtn} disabled={ocupado} onClick={() => setAbierto(false)}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )
-      ) : null}
-    </section>
+    </RecordSection>
   );
 }

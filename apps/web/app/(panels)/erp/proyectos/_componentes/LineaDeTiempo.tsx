@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { formatoFecha } from "@/lib/proyectos-api";
 import {
   barraEnRango,
@@ -12,7 +12,12 @@ import {
   tramosDeEtapas,
   type Rango,
 } from "@/lib/proyecto-plan";
-import styles from "../proyectos.module.css";
+import styles from "./linea.module.css";
+
+/** Posición de una barra o marca dentro de la pista (en % del rango); el CSS lee --l y --w. */
+function pos(left: number, width?: number): CSSProperties {
+  return { "--l": `${left}%`, ...(width != null ? { "--w": `${width}%` } : {}) } as CSSProperties;
+}
 
 export type EtapaEnLinea = {
   id: number;
@@ -66,9 +71,7 @@ export default function LineaDeTiempo({
 
   if (!rango) {
     return (
-      <p className={styles.sub}>
-        Pon la fecha de inicio y las fechas de las etapas para ver el cronograma.
-      </p>
+      <p className={styles.vacio}>Pon la fecha de inicio y las fechas de las etapas para ver el cronograma.</p>
     );
   }
 
@@ -82,45 +85,39 @@ export default function LineaDeTiempo({
   const dInicioReal = diaDe(inicioReal);
   const dFinReal = diaDe(finReal) ?? (dInicioReal !== null ? diaHoy : null);
 
-  const lineaHoy = posHoy !== null ? <span className={styles.ganttToday} style={{ left: `${posHoy}%` }} /> : null;
+  const lineaHoy = posHoy !== null ? <span className={styles.hoy} style={pos(posHoy)} /> : null;
 
   return (
     <div className={styles.gantt}>
-      <div className={styles.ganttRow} aria-hidden="true">
-        <span className={styles.ganttScaleSpacer} />
-        <div className={styles.ganttScale}>
+      <div className={styles.fila} aria-hidden="true">
+        <span className={styles.escalaHueco} />
+        <div className={styles.escala}>
           {marcas.map((m) => (
-            <span key={m.dia} className={styles.ganttMonth} style={{ left: `${m.porcentaje}%` }}>
+            <span key={m.dia} className={styles.mes} style={pos(m.porcentaje)}>
               {m.etiqueta}
             </span>
           ))}
         </div>
       </div>
 
-      <div className={styles.ganttRow}>
-        <span className={styles.ganttLabel}>
+      <div className={styles.fila}>
+        <span className={styles.etiqueta}>
           Proyecto
-          <span className={styles.ganttLabelSub}>
+          <span className={styles.etiquetaSub}>
             Plan: {formatoFecha(inicio, false)} → {fin ? formatoFecha(fin, false) : "sin fin"}
             {inicioReal ? ` · Real: ${formatoFecha(inicioReal, false)} → ${finReal ? formatoFecha(finReal, false) : "en curso"}` : ""}
           </span>
         </span>
-        <div className={styles.ganttTrack} aria-hidden="true">
+        <div className={styles.pista} aria-hidden="true">
           {dInicio !== null && dFin !== null ? (
-            <span
-              className={styles.ganttBarProyecto}
-              style={{ left: `${barraEnRango(dInicio, dFin, rango).left}%`, width: `${barraEnRango(dInicio, dFin, rango).width}%` }}
-            />
+            <span className={styles.barraProyecto} style={pos(barraEnRango(dInicio, dFin, rango).left, barraEnRango(dInicio, dFin, rango).width)} />
           ) : dInicio !== null ? (
-            <span className={styles.ganttMarker} style={{ left: `${porcentajeEnRango(dInicio, rango)}%` }} />
+            <span className={styles.marca} style={pos(porcentajeEnRango(dInicio, rango))} />
           ) : null}
           {dInicioReal !== null && dFinReal !== null ? (
             <span
-              className={styles.ganttBarReal}
-              style={{
-                left: `${barraEnRango(dInicioReal, dFinReal, rango).left}%`,
-                width: `${barraEnRango(dInicioReal, dFinReal, rango).width}%`,
-              }}
+              className={styles.barraReal}
+              style={pos(barraEnRango(dInicioReal, dFinReal, rango).left, barraEnRango(dInicioReal, dFinReal, rango).width)}
             />
           ) : null}
           {lineaHoy}
@@ -134,39 +131,33 @@ export default function LineaDeTiempo({
         const vencida = hitoVencido(etapa, hoy);
         const estadoTexto = cancelada ? "cancelada" : cumplida ? "cumplida" : vencida ? "vencida" : "";
         const claseBarra = cancelada
-          ? styles.ganttBarCancelada
+          ? styles.barraCancelada
           : cumplida
-            ? styles.ganttBarCumplida
+            ? styles.barraCumplida
             : vencida
-              ? styles.ganttBarVencida
+              ? styles.barraVencida
               : "";
-        const claseMarca = cumplida ? styles.ganttMarkerCumplida : vencida ? styles.ganttMarkerVencida : "";
+        const claseMarca = cumplida ? styles.marcaCumplida : vencida ? styles.marcaVencida : "";
         return (
-          <div key={etapa.id} className={styles.ganttRow}>
-            <span className={styles.ganttLabel} title={etapa.nombre}>
+          <div key={etapa.id} className={styles.fila}>
+            <span className={styles.etiqueta} title={etapa.nombre}>
               {etapa.nombre}
-              <span className={styles.ganttLabelSub}>
+              <span className={styles.etiquetaSub}>
                 {etapa.plannedDate ? formatoFecha(etapa.plannedDate, false) : "Sin fecha"}
                 {etapa.responsable ? ` · ${etapa.responsable}` : ""}
                 {estadoTexto ? ` · ${estadoTexto}` : ""}
               </span>
             </span>
-            <div className={styles.ganttTrack} aria-hidden="true">
+            <div className={styles.pista} aria-hidden="true">
               {tramo && tramo.desde !== null && tramo.hasta !== null ? (
                 <>
                   {tramo.hasta > tramo.desde ? (
                     <span
-                      className={`${styles.ganttBar} ${claseBarra}`}
-                      style={{
-                        left: `${barraEnRango(tramo.desde, tramo.hasta, rango).left}%`,
-                        width: `${barraEnRango(tramo.desde, tramo.hasta, rango).width}%`,
-                      }}
+                      className={`${styles.barra} ${claseBarra}`}
+                      style={pos(barraEnRango(tramo.desde, tramo.hasta, rango).left, barraEnRango(tramo.desde, tramo.hasta, rango).width)}
                     />
                   ) : null}
-                  <span
-                    className={`${styles.ganttMarker} ${claseMarca}`}
-                    style={{ left: `${porcentajeEnRango(tramo.hasta, rango)}%` }}
-                  />
+                  <span className={`${styles.marca} ${claseMarca}`} style={pos(porcentajeEnRango(tramo.hasta, rango))} />
                 </>
               ) : null}
               {lineaHoy}
@@ -175,22 +166,22 @@ export default function LineaDeTiempo({
         );
       })}
 
-      <div className={styles.ganttLegend} aria-hidden="true">
-        <span className={styles.ganttLegendItem}>
-          <span className={`${styles.swatch} ${styles.swatchPlan}`} />
+      <div className={styles.leyenda} aria-hidden="true">
+        <span className={styles.leyendaItem}>
+          <span className={`${styles.muestra} ${styles.muestraPlan}`} />
           Plan del proyecto
         </span>
-        <span className={styles.ganttLegendItem}>
-          <span className={`${styles.swatch} ${styles.swatchReal}`} />
+        <span className={styles.leyendaItem}>
+          <span className={`${styles.muestra} ${styles.muestraReal}`} />
           Fechas reales / etapa cumplida
         </span>
-        <span className={styles.ganttLegendItem}>
-          <span className={`${styles.swatch} ${styles.swatchVencida}`} />
+        <span className={styles.leyendaItem}>
+          <span className={`${styles.muestra} ${styles.muestraVencida}`} />
           Etapa vencida
         </span>
         {posHoy !== null ? (
-          <span className={styles.ganttLegendItem}>
-            <span className={`${styles.swatch} ${styles.swatchHoy}`} />
+          <span className={styles.leyendaItem}>
+            <span className={`${styles.muestra} ${styles.muestraHoy}`} />
             Hoy
           </span>
         ) : null}

@@ -2,10 +2,24 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { useUser } from "@/components/UserContext";
-import { Alert, Button, ButtonLink, Card, CardHead, EmptyState, PageHead, Skeleton } from "@/components/base";
+import {
+  ButtonLink,
+  Checkbox,
+  EmptyState,
+  Field,
+  FieldGrid,
+  FormPage,
+  FormSection,
+  Input,
+  PageHead,
+  RequiredMark,
+  Skeleton,
+  Textarea,
+  fieldClass,
+  type PendingItem,
+} from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import {
   ALL_CLIENT_SECTORS,
@@ -34,6 +48,13 @@ const empty = {
   notes: "",
 };
 
+/** Para qué sirve cada tipo, en una línea (la ayuda larga vive en la lista). */
+const USO_DEL_TIPO: Record<ClientSector, string> = {
+  PROYECTO: "Se le llevan proyectos con plan y cronograma.",
+  CORPORATIVO: "Recibe servicio y actividades de operación.",
+  COMERCIAL: "Cotizaciones y actividades comerciales.",
+};
+
 export default function NuevoClientePage() {
   const router = useRouter();
   const { user, token } = useUser();
@@ -45,6 +66,7 @@ export default function NuevoClientePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorTelefono, setErrorTelefono] = useState<string | null>(null);
+  const [intento, setIntento] = useState(false);
   /** null = consultando; la API decide quién agrega (coordinación, gerencia, encargada comercial). */
   const [puedeAgregar, setPuedeAgregar] = useState<boolean | null>(null);
 
@@ -68,25 +90,29 @@ export default function NuevoClientePage() {
 
   if (!canAccessClientPadron(user) || puedeAgregar === false) {
     return (
-      <div className={styles.wrap}>
-        <PageHead back={{ href: "/erp/clientes", label: "Clientes" }} title="Nuevo cliente" />
+      <div className={styles.pagina}>
+        <PageHead back={{ href: "/erp/clientes", label: "Volver a Clientes" }} title="Nuevo cliente" />
         <EmptyState
           icon={<LockOutlinedIcon />}
           title="No puedes dar de alta clientes"
           description="Solo coordinación, gerencia y la encargada comercial pueden agregar clientes. Un ingeniero o un operativo no puede."
           action={<ButtonLink href="/erp/clientes">Volver a clientes</ButtonLink>}
+          tone="neutral"
         />
       </div>
     );
   }
   if (puedeAgregar === null) {
     return (
-      <div className={styles.wrap} aria-busy="true" aria-label="Cargando formulario">
+      <div className={styles.pagina} aria-busy="true" aria-label="Cargando formulario">
         <div className={styles.skeletonHead}>
-          <Skeleton width={90} height={12} />
-          <Skeleton width={220} height={24} />
+          <Skeleton width={120} height={12} />
+          <Skeleton width={240} height={26} />
         </div>
-        <Skeleton height={420} radius={12} />
+        <div className={styles.skeletonCuerpo}>
+          <Skeleton height={420} radius={16} />
+          <Skeleton height={200} radius={16} />
+        </div>
       </div>
     );
   }
@@ -104,6 +130,11 @@ export default function NuevoClientePage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
+    setIntento(true);
+    if (!form.name.trim()) {
+      document.getElementById("name")?.focus();
+      return;
+    }
     if (sectors.length === 0) {
       setError("Elige al menos un sector");
       return;
@@ -135,162 +166,149 @@ export default function NuevoClientePage() {
   const set = (campo: keyof typeof empty) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [campo]: e.target.value }));
 
+  const visibles = ALL_CLIENT_SECTORS.filter((s) => allowedSectors.includes(s));
+  const errorNombre = intento && !form.name.trim() ? "Escribe el nombre comercial" : null;
+  const pendientes: PendingItem[] = [
+    { id: "nombre", label: "Nombre comercial", done: Boolean(form.name.trim()), error: Boolean(errorNombre), fieldId: "name" },
+    {
+      id: "tipos",
+      label: sectors.length > 1 ? `${sectors.length} tipos elegidos` : "Al menos un tipo",
+      done: sectors.length > 0,
+      fieldId: sectors[0] ? `tipo-${sectors[0]}` : undefined,
+    },
+    {
+      id: "rfc",
+      label: "RFC para facturar",
+      hint: form.taxId.trim() ? undefined : "Opcional: se puede completar después",
+      done: Boolean(form.taxId.trim()),
+      fieldId: "fiscal-rfc",
+    },
+    {
+      id: "correo",
+      label: "Correo de facturación",
+      hint: form.billingEmail.trim() ? undefined : "Opcional",
+      done: Boolean(form.billingEmail.trim()),
+      fieldId: "billingEmail",
+    },
+  ];
+
   return (
-    <div className={styles.wrap}>
-      <PageHead
-        back={{ href: "/erp/clientes", label: "Clientes" }}
-        title="Nuevo cliente"
-        description="Solo el nombre es obligatorio. RFC, razón social, dirección, régimen y CP se pueden completar después."
-      />
+    <FormPage
+      className={styles.pagina}
+      title="Nuevo cliente"
+      breadcrumbs={[{ label: "Clientes", href: "/erp/clientes" }, { label: "Nuevo cliente" }]}
+      back={{ href: "/erp/clientes", label: "Volver a Clientes" }}
+      description={
+        <>
+          Los campos con <RequiredMark /> son obligatorios. RFC, razón social, dirección, régimen y CP se pueden completar
+          después.
+        </>
+      }
+      pendingTitle="Antes de crear"
+      pending={pendientes}
+      error={error}
+      onSubmit={(e) => void onSubmit(e)}
+      cancelHref="/erp/clientes"
+      submitLabel="Crear cliente"
+      loading={saving}
+    >
+      <FormSection step={1} done={Boolean(form.name.trim())} title="Identidad" description="Cómo lo ubica tu equipo en listas y buscadores." columns={1}>
+        <Field label="Nombre comercial" required error={errorNombre} hint="Como lo conoce tu equipo, por ejemplo «Plaza Norte».">
+          <Input id="name" autoComplete="organization" value={form.name} onChange={set("name")} />
+        </Field>
+      </FormSection>
 
-      <Card as="div">
-        <form onSubmit={(e) => void onSubmit(e)}>
-          <div className={styles.cardPad}>
-            <fieldset className={styles.fieldset}>
-              <legend className={styles.legend}>Sectores</legend>
-              <p className={styles.fieldHint}>
-                Elige uno o varios: el mismo cliente puede ser comercial, de proyecto y corporativo a la vez. Si ya
-                existe con ese nombre, no se duplica: se le suman los sectores que elijas.
-              </p>
-              <div className={styles.sectorPick} role="group" aria-label="Sectores del cliente">
-                {ALL_CLIENT_SECTORS.filter((s) => allowedSectors.includes(s)).map((s) => {
-                  const on = sectors.includes(s);
-                  const Icono = CLIENT_SECTOR_ICONS[CLIENT_SECTOR_META[s].icon];
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      aria-pressed={on}
-                      className={`${styles.sectorPickBtn} ${on ? styles.sectorPickBtnOn : ""}`}
-                      onClick={() => toggleSector(s)}
-                    >
-                      {on ? <CheckRoundedIcon aria-hidden="true" fontSize="inherit" /> : <Icono aria-hidden="true" fontSize="inherit" />}
-                      {nombreSector(s)}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
+      <FormSection step={2} title="Datos fiscales" description="Con el RFC se consulta el SAT y se llenan razón social, régimen y CP.">
+        <FieldGrid>
+          <div className={styles.rfcLookup}>
+            <FiscalRfcLookup
+              token={token}
+              rfc={form.taxId}
+              onRfcChange={(taxId) => setForm((f) => ({ ...f, taxId }))}
+              fiscalRegime={form.fiscalRegime}
+              onRegimeChange={(fiscalRegime) => setForm((f) => ({ ...f, fiscalRegime }))}
+              inputClassName={fieldClass}
+              selectClassName={fieldClass}
+              disabled={saving}
+              onApply={(data) =>
+                setForm((f) => ({
+                  ...f,
+                  legalName: data.legalName?.trim() ? data.legalName : f.legalName,
+                  fiscalZipCode: data.fiscalZipCode?.trim() ? data.fiscalZipCode : f.fiscalZipCode,
+                  fiscalRegime: data.fiscalRegime || f.fiscalRegime,
+                }))
+              }
+            />
+          </div>
+          <Field label="Razón social" hint="Tal como aparece en su constancia fiscal.">
+            <Input id="legalName" value={form.legalName} onChange={set("legalName")} />
+          </Field>
+          <Field label="Dirección fiscal" fullWidth>
+            <Input id="fiscalAddress" autoComplete="street-address" value={form.fiscalAddress} onChange={set("fiscalAddress")} />
+          </Field>
+          <Field label="Código postal fiscal">
+            <Input id="fiscalZipCode" inputMode="numeric" autoComplete="postal-code" value={form.fiscalZipCode} onChange={set("fiscalZipCode")} />
+          </Field>
+        </FieldGrid>
+      </FormSection>
 
-            <fieldset className={styles.fieldset}>
-              <legend className={styles.legend}>Datos fiscales</legend>
-              <div className={styles.formGrid}>
-                <div className={`${styles.field} ${styles.fieldFull}`}>
-                  <label htmlFor="name">Nombre comercial *</label>
-                  <input
-                    id="name"
-                    className={styles.input}
-                    required
-                    autoComplete="organization"
-                    value={form.name}
-                    onChange={set("name")}
-                  />
-                  <span className={styles.fieldHint}>Como lo conoce tu equipo, por ejemplo «Plaza Norte».</span>
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="legalName">Razón social</label>
-                  <input id="legalName" className={styles.input} value={form.legalName} onChange={set("legalName")} />
-                  <span className={styles.fieldHint}>Tal como aparece en su constancia fiscal.</span>
-                </div>
-                <div className={styles.field}>
-                  <FiscalRfcLookup
-                    token={token}
-                    rfc={form.taxId}
-                    onRfcChange={(taxId) => setForm((f) => ({ ...f, taxId }))}
-                    fiscalRegime={form.fiscalRegime}
-                    onRegimeChange={(fiscalRegime) => setForm((f) => ({ ...f, fiscalRegime }))}
-                    inputClassName={styles.input}
-                    selectClassName={styles.input}
-                    disabled={saving}
-                    onApply={(data) =>
-                      setForm((f) => ({
-                        ...f,
-                        legalName: data.legalName?.trim() ? data.legalName : f.legalName,
-                        fiscalZipCode: data.fiscalZipCode?.trim() ? data.fiscalZipCode : f.fiscalZipCode,
-                        fiscalRegime: data.fiscalRegime || f.fiscalRegime,
-                      }))
-                    }
-                  />
-                </div>
-                <div className={`${styles.field} ${styles.fieldFull}`}>
-                  <label htmlFor="fiscalAddress">Dirección fiscal</label>
-                  <input
-                    id="fiscalAddress"
-                    className={styles.input}
-                    autoComplete="street-address"
-                    value={form.fiscalAddress}
-                    onChange={set("fiscalAddress")}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="fiscalZipCode">Código postal fiscal</label>
-                  <input
-                    id="fiscalZipCode"
-                    className={styles.input}
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                    value={form.fiscalZipCode}
-                    onChange={set("fiscalZipCode")}
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            <fieldset className={styles.fieldset}>
-              <legend className={styles.legend}>Contacto</legend>
-              <div className={styles.formGrid}>
-                <div className={styles.field}>
-                  <label htmlFor="billingEmail">Correo de facturación</label>
-                  <input
-                    id="billingEmail"
-                    type="email"
-                    className={styles.input}
-                    autoComplete="email"
-                    value={form.billingEmail}
-                    onChange={set("billingEmail")}
-                  />
-                  <span className={styles.fieldHint}>Aquí llegan cotizaciones y facturas.</span>
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="billingPhone">Teléfono</label>
-                  <PhoneField
-                    id="billingPhone"
-                    value={form.billingPhone}
-                    invalid={Boolean(errorTelefono)}
-                    onChange={(billingPhone) => {
-                      setForm((f) => ({ ...f, billingPhone }));
-                      if (errorTelefono) setErrorTelefono(null);
-                    }}
-                  />
-                  {errorTelefono ? (
-                    <span className={styles.fieldError} role="alert">
-                      {errorTelefono}
-                    </span>
-                  ) : null}
-                </div>
-                <div className={`${styles.field} ${styles.fieldFull}`}>
-                  <label htmlFor="notes">Notas</label>
-                  <textarea id="notes" className={styles.textarea} value={form.notes} onChange={set("notes")} />
-                  <span className={styles.fieldHint}>Solo las ve tu equipo.</span>
-                </div>
-              </div>
-            </fieldset>
-
-            {error ? (
-              <Alert tone="danger" role="alert">
-                {error}
-              </Alert>
+      <FormSection step={3} title="Contacto" description="A dónde llegan cotizaciones y facturas.">
+        <FieldGrid>
+          <Field label="Correo de facturación" hint="Aquí llegan cotizaciones y facturas.">
+            <Input id="billingEmail" type="email" autoComplete="email" value={form.billingEmail} onChange={set("billingEmail")} />
+          </Field>
+          <div className={styles.campo}>
+            <label htmlFor="billingPhone" className={styles.campoLabel}>
+              Teléfono
+            </label>
+            <PhoneField
+              id="billingPhone"
+              value={form.billingPhone}
+              invalid={Boolean(errorTelefono)}
+              onChange={(billingPhone) => {
+                setForm((f) => ({ ...f, billingPhone }));
+                if (errorTelefono) setErrorTelefono(null);
+              }}
+            />
+            {errorTelefono ? (
+              <span className={styles.campoError} role="alert">
+                {errorTelefono}
+              </span>
             ) : null}
           </div>
+          <Field label="Notas" hint="Solo las ve tu equipo." fullWidth>
+            <Textarea id="notes" rows={3} value={form.notes} onChange={set("notes")} />
+          </Field>
+        </FieldGrid>
+      </FormSection>
 
-          <div className={styles.saveBar}>
-            <ButtonLink href="/erp/clientes">Cancelar</ButtonLink>
-            <Button type="submit" variant="primary" disabled={saving} aria-busy={saving || undefined}>
-              {saving ? "Guardando…" : "Crear cliente"}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+      <FormSection
+        step={4}
+        done={sectors.length > 0}
+        title="Tipos"
+        description="Elige uno o varios: el mismo cliente puede ser comercial, de proyecto y corporativo a la vez. Si ya existe con ese nombre, no se duplica: se le suman los tipos que elijas."
+      >
+        <div className={styles.tiposElegir} role="group" aria-label="Sectores del cliente">
+          {visibles.map((s) => {
+            const on = sectors.includes(s);
+            const Icono = CLIENT_SECTOR_ICONS[CLIENT_SECTOR_META[s].icon];
+            return (
+              <div key={s} className={styles.tipoOpcion} data-on={on ? "true" : undefined}>
+                <span className={styles.tipoOpcionIco} aria-hidden="true">
+                  <Icono fontSize="inherit" />
+                </span>
+                <Checkbox
+                  id={`tipo-${s}`}
+                  checked={on}
+                  onChange={() => toggleSector(s)}
+                  label={nombreSector(s)}
+                  description={on && sectors.length === 1 ? `${USO_DEL_TIPO[s]} Siempre queda al menos uno.` : USO_DEL_TIPO[s]}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </FormSection>
+    </FormPage>
   );
 }

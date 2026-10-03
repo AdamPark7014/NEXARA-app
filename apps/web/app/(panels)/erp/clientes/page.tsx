@@ -5,23 +5,29 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { useRouter } from "next/navigation";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import PauseCircleOutlineRoundedIcon from "@mui/icons-material/PauseCircleOutlineRounded";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import {
   Alert,
-  Badge,
   Button,
   ButtonLink,
-  EmptyState,
-  Kbd,
+  DataTable,
+  FilterChip,
+  FilterChips,
   LinkButton,
-  PageHead,
+  ModulePage,
+  ModuleToolbar,
+  PersonCell,
   SearchInput,
-  Segmented,
-  SkeletonRows,
   Stat,
   StatRow,
+  StatusCell,
   Tabs,
-  Toolbar,
-  tabla,
+  type Column,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { isCeoEquivalentEmail } from "@/lib/platform-accounts";
@@ -42,17 +48,19 @@ import {
 } from "@/lib/sales-api";
 import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
 import { nombreSector } from "./sectores";
+import { TiposCliente } from "./_componentes/TiposCliente";
 import styles from "./clientes-core.module.css";
 
-type FiltroEstado = "TODOS" | "ACTIVOS" | "INACTIVOS";
+type FiltroEstado = "TODOS" | "ACTIVOS" | "INACTIVOS" | "SIN_RFC";
 
 function cumpleEstado(c: SalesClient, filtro: FiltroEstado): boolean {
   if (filtro === "TODOS") return true;
+  if (filtro === "SIN_RFC") return !c.taxId?.trim();
   return filtro === "INACTIVOS" ? isInactiveClient(c.status) : !isInactiveClient(c.status);
 }
 
-function encargadoCorto(c: SalesClient): string {
-  return c.owner?.nombre?.split(/\s+/).slice(0, 2).join(" ") || "Sin encargado";
+function sectoresDe(c: SalesClient): ClientSector[] {
+  return (c.sectors ?? []).map((s) => s.sector as ClientSector);
 }
 
 export default function ClientesHubPage() {
@@ -154,20 +162,70 @@ export default function ClientesHubPage() {
     const inactivosVista = porTexto.filter((c) => isInactiveClient(c.status)).length;
     return {
       visible: porTexto.filter((c) => cumpleEstado(c, estado)),
-      conteoEstado: { TODOS: porTexto.length, ACTIVOS: porTexto.length - inactivosVista, INACTIVOS: inactivosVista },
+      conteoEstado: {
+        TODOS: porTexto.length,
+        ACTIVOS: porTexto.length - inactivosVista,
+        INACTIVOS: inactivosVista,
+        SIN_RFC: porTexto.filter((c) => !c.taxId?.trim()).length,
+      },
       cifras: { total: items.length, activos, inactivos: items.length - activos, sinRfc },
     };
   }, [items, coincide, estado]);
 
+  const columnas = useMemo<Column<SalesClient>[]>(() => {
+    const cols: Column<SalesClient>[] = [
+      {
+        key: "cliente",
+        label: "Cliente",
+        render: (c) => (
+          <span className={styles.celdaCliente}>
+            <Link href={`/erp/clientes/${c.id}`} className={styles.nombre} onClick={(e) => e.stopPropagation()}>
+              {c.name}
+            </Link>
+            <span className={styles.sub}>
+              <span className={c.taxId ? styles.rfc : styles.sinRfc}>{c.taxId || "Sin RFC"}</span>
+              {c.legalName && c.legalName !== c.name ? (
+                <span className={styles.razon}>{c.legalName}</span>
+              ) : c.billingEmail ? (
+                <span className={styles.razon}>{c.billingEmail}</span>
+              ) : null}
+            </span>
+          </span>
+        ),
+      },
+      { key: "tipos", label: "Tipos", render: (c) => <TiposCliente sectores={sectoresDe(c)} size="sm" /> },
+    ];
+    if (showOwner) {
+      cols.push({
+        key: "encargado",
+        label: "Encargado",
+        render: (c) =>
+          c.owner?.nombre ? <PersonCell name={c.owner.nombre} size={26} /> : <span className={styles.tenue}>Sin encargado</span>,
+      });
+    }
+    cols.push({
+      key: "estado",
+      label: "Estado",
+      render: (c) => {
+        const inactivo = isInactiveClient(c.status);
+        return <StatusCell label={inactivo ? "Inactivo" : "Activo"} tone={inactivo ? "neutral" : "success"} size="sm" />;
+      },
+    });
+    return cols;
+  }, [showOwner]);
+
   if (!canAccessClientPadron(user) || !sector) {
     return (
-      <div className={styles.wrap}>
-        <EmptyState
-          icon={<GroupsOutlinedIcon />}
-          title="Sin acceso a clientes"
-          description="Tu puesto no tiene clientes asignados. Si crees que es un error, pide acceso a Dirección."
-        />
-      </div>
+      <ModulePage
+        title="Clientes"
+        empty
+        emptyState={{
+          icon: <GroupsOutlinedIcon />,
+          title: "Sin acceso a clientes",
+          description: "Tu puesto no tiene clientes asignados. Si crees que es un error, pide acceso a Dirección.",
+          tone: "neutral",
+        }}
+      />
     );
   }
 
@@ -186,161 +244,170 @@ export default function ClientesHubPage() {
   const primeraCarga = loading && (!datos || datos.sector !== sector);
   const sinRegistros = !loading && items.length === 0;
   const hrefNuevo = `/erp/clientes/nuevo?sector=${meta.slug}`;
+  const chip = (id: FiltroEstado, label: string, dot?: "success" | "neutral" | "warning") => (
+    <FilterChip active={estado === id} count={conteoEstado[id]} dot={dot} onClick={() => setEstado(estado === id && id !== "TODOS" ? "TODOS" : id)}>
+      {label}
+    </FilterChip>
+  );
 
   return (
-    <div className={styles.wrap}>
-      <PageHead
-        title="Clientes"
-        description={meta.help}
-        actions={
-          puedeAgregar && !(sinRegistros && !error) ? (
-            <ButtonLink variant="primary" href={hrefNuevo}>
-              Nuevo cliente <Kbd>N</Kbd>
-            </ButtonLink>
-          ) : null
-        }
-        tabs={
-          allowedSectors.length > 1 ? (
-            <Tabs
-              ariaLabel="Sector"
-              items={allowedSectors.map((s) => ({
-                id: s,
-                label: nombreSector(s),
-                icon: CLIENT_SECTOR_ICONS[CLIENT_SECTOR_META[s].icon],
-              }))}
-              value={sector}
-              onChange={selectSector}
-            />
-          ) : null
-        }
-      />
-
-      {items.length ? (
-        <StatRow cols={4}>
-          <Stat label="En el padrón" value={cifras.total} hint={nombreSector(sector).toLowerCase()} />
-          <Stat label="Activos" value={cifras.activos} hint="con trato vigente" />
-          <Stat label="Inactivos" value={cifras.inactivos} hint="se conservan con su historial" />
-          <Stat
-            label="Sin RFC"
-            value={cifras.sinRfc}
-            hint="faltan datos para facturar"
-            tone={cifras.sinRfc ? "warning" : "default"}
+    <ModulePage
+      className={styles.pagina}
+      title="Clientes"
+      description={meta.help}
+      icon={<GroupsOutlinedIcon />}
+      primaryAction={
+        puedeAgregar && !(sinRegistros && !error) ? (
+          <ButtonLink variant="primary" href={hrefNuevo} iconStart={<AddRoundedIcon />} kbd="N">
+            Nuevo cliente
+          </ButtonLink>
+        ) : null
+      }
+      tabs={
+        allowedSectors.length > 1 ? (
+          <Tabs
+            ariaLabel="Sector"
+            items={allowedSectors.map((s) => ({
+              id: s,
+              label: nombreSector(s),
+              icon: CLIENT_SECTOR_ICONS[CLIENT_SECTOR_META[s].icon],
+            }))}
+            value={sector}
+            onChange={selectSector}
           />
-        </StatRow>
-      ) : null}
-
-      {error ? (
-        <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void load()}>Reintentar</LinkButton>}>
-          {error}
-        </Alert>
-      ) : null}
-
-      <div className={tabla.marco}>
-        <div className={tabla.barra}>
-          <Toolbar
-            end={
-              hayFiltros ? (
-                <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton>
-              ) : items.length ? (
-                <span className={styles.conteo}>
-                  {visible.length === 1 ? "1 cliente" : `${visible.length} clientes`}
-                </span>
-              ) : null
-            }
-          >
-            <label htmlFor="buscar-clientes" className={styles.soloLector}>
-              Buscar clientes
-            </label>
+        ) : null
+      }
+      stats={
+        items.length || primeraCarga ? (
+          <StatRow cols={4} ariaLabel="Resumen del padrón">
+            <Stat
+              label="En el padrón"
+              value={cifras.total}
+              hint={nombreSector(sector).toLowerCase()}
+              icon={<GroupsOutlinedIcon />}
+              loading={primeraCarga}
+            />
+            <Stat
+              label="Activos"
+              value={cifras.activos}
+              hint="con trato vigente"
+              icon={<CheckCircleOutlineRoundedIcon />}
+              tone="success"
+              meter={cifras.total ? [{ value: cifras.activos, tone: "success" }] : undefined}
+              meterMax={cifras.total || undefined}
+              loading={primeraCarga}
+            />
+            <Stat
+              label="Inactivos"
+              value={cifras.inactivos}
+              hint="se conservan con su historial"
+              icon={<PauseCircleOutlineRoundedIcon />}
+              iconTone="neutral"
+              loading={primeraCarga}
+            />
+            <Stat
+              label="Sin RFC"
+              value={cifras.sinRfc}
+              hint="faltan datos para facturar"
+              icon={<ReceiptLongOutlinedIcon />}
+              tone={cifras.sinRfc ? "warning" : "default"}
+              loading={primeraCarga}
+            />
+          </StatRow>
+        ) : null
+      }
+      before={
+        error ? (
+          <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void load()}>Reintentar</LinkButton>}>
+            {error}
+          </Alert>
+        ) : null
+      }
+      listLabel="Padrón de clientes"
+      toolbar={
+        <ModuleToolbar
+          search={
             <SearchInput
-              id="buscar-clientes"
               ref={buscador}
+              aria-label="Buscar clientes"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Nombre, razón social, RFC o correo"
               shortcut="/"
             />
-            <Segmented
-              ariaLabel="Filtrar por estado"
-              items={[
-                { id: "TODOS" as const, label: "Todos", count: conteoEstado.TODOS },
-                { id: "ACTIVOS" as const, label: "Activos", count: conteoEstado.ACTIVOS },
-                { id: "INACTIVOS" as const, label: "Inactivos", count: conteoEstado.INACTIVOS },
-              ]}
-              value={estado}
-              onChange={setEstado}
-            />
-          </Toolbar>
-        </div>
-
-        {primeraCarga ? (
-          <SkeletonRows rows={6} label="Cargando clientes" />
-        ) : sinRegistros && !error ? (
-          <EmptyState
-            icon={<GroupsOutlinedIcon />}
-            title={`Aún no hay ${meta.title.toLowerCase()}`}
-            description={
-              puedeAgregar
-                ? "Da de alta el primero con sus datos fiscales; después podrás sumarlo a otros sectores."
-                : "Cuando alguien de tu equipo dé de alta un cliente en este sector, aparecerá aquí."
+          }
+          chips={
+            <FilterChips ariaLabel="Filtrar por estado">
+              {chip("TODOS", "Todos")}
+              {chip("ACTIVOS", "Activos", "success")}
+              {chip("INACTIVOS", "Inactivos", "neutral")}
+              {conteoEstado.SIN_RFC || estado === "SIN_RFC" ? chip("SIN_RFC", "Sin RFC", "warning") : null}
+            </FilterChips>
+          }
+          end={
+            hayFiltros ? (
+              <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton>
+            ) : items.length ? (
+              <span className={styles.conteo}>{visible.length === 1 ? "1 cliente" : `${visible.length} clientes`}</span>
+            ) : null
+          }
+        />
+      }
+      loading={primeraCarga}
+      empty={!primeraCarga && visible.length === 0}
+      emptyState={
+        sinRegistros && error
+          ? {
+              icon: <CloudOffOutlinedIcon />,
+              title: "No se pudo cargar el padrón",
+              description: "Revisa tu conexión y vuelve a intentarlo con el aviso de arriba.",
+              tone: "danger",
             }
-            action={
-              puedeAgregar ? (
-                <ButtonLink variant="primary" href={hrefNuevo}>
-                  Crear el primero
-                </ButtonLink>
-              ) : null
-            }
-          />
-        ) : visible.length ? (
-          <nav className={styles.list} aria-label="Clientes">
-            <div className={`${tabla.cabeza} ${styles.rejilla} ${showOwner ? styles.conEncargado : ""}`} aria-hidden>
-              <span>Cliente</span>
-              <span>RFC</span>
-              <span>Sectores</span>
-              {showOwner ? <span>Encargado</span> : null}
-              <span>Estado</span>
-            </div>
-            {visible.map((c) => {
-              const inactivo = isInactiveClient(c.status);
-              return (
-                <Link
-                  key={c.id}
-                  href={`/erp/clientes/${c.id}`}
-                  className={`${tabla.fila} ${styles.rejilla} ${styles.row} ${showOwner ? styles.conEncargado : ""}`}
-                >
-                  <span className={`${tabla.celda} ${styles.cCliente}`}>
-                    <span className={tabla.fuerte}>{c.name}</span>
-                    <span className={tabla.tenue}>{c.legalName || c.billingEmail || "Sin razón social"}</span>
-                  </span>
-                  <span className={`${styles.cRfc} ${c.taxId ? styles.rfc : tabla.tenue}`}>{c.taxId || "Sin RFC"}</span>
-                  <span className={`${styles.sectores} ${styles.cSectores}`}>
-                    {(c.sectors ?? []).map((s) => (
-                      <Badge key={s.id} tone="outline">
-                        {nombreSector(s.sector as ClientSector)}
-                      </Badge>
-                    ))}
-                  </span>
-                  {showOwner ? (
-                    <span className={`${tabla.tenue} ${styles.cEncargado}`}>{encargadoCorto(c)}</span>
-                  ) : null}
-                  <span className={styles.cEstado}>
-                    <Badge tone={inactivo ? "neutral" : "success"} dot>
-                      {inactivo ? "Inactivo" : "Activo"}
-                    </Badge>
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
-        ) : items.length ? (
-          <EmptyState
-            icon={<FilterAltOffOutlinedIcon />}
-            title="Ningún cliente coincide"
-            description="Prueba con otro nombre o RFC, o quita los filtros."
-            action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
-          />
-        ) : null}
-      </div>
-    </div>
+          : sinRegistros
+            ? {
+                icon: <GroupsOutlinedIcon />,
+                title: `Aún no hay ${meta.title.toLowerCase()}`,
+                description: puedeAgregar
+                  ? "Da de alta el primero con sus datos fiscales; después podrás sumarlo a otros sectores."
+                  : "Cuando alguien de tu equipo dé de alta un cliente en este sector, aparecerá aquí.",
+                action: puedeAgregar ? (
+                  <ButtonLink variant="primary" href={hrefNuevo} iconStart={<AddRoundedIcon />}>
+                    Crear el primero
+                  </ButtonLink>
+                ) : undefined,
+              }
+            : {
+                icon: <FilterAltOffOutlinedIcon />,
+                title: "Ningún cliente coincide",
+                description: "Prueba con otro nombre o RFC, o quita los filtros.",
+                action: <Button onClick={quitarFiltros}>Quitar filtros</Button>,
+                tone: "neutral",
+              }
+      }
+    >
+      <DataTable
+        flush
+        className={`${styles.tabla} ${showOwner ? styles.tablaConEncargado : ""}`}
+        ariaLabel="Clientes"
+        columns={columnas}
+        rows={visible}
+        rowKey={(c) => c.id}
+        loading={loading && !primeraCarga}
+        onRowClick={(c) => router.push(`/erp/clientes/${c.id}`)}
+        rowActionsLabel="Acciones"
+        rowActions={(c) => (
+          <ButtonLink
+            href={`/erp/clientes/${c.id}`}
+            variant="ghost"
+            size="sm"
+            icon
+            aria-label={`Abrir la ficha de ${c.name}`}
+            title="Abrir ficha"
+          >
+            <ChevronRightRoundedIcon fontSize="small" />
+          </ButtonLink>
+        )}
+      />
+    </ModulePage>
   );
 }

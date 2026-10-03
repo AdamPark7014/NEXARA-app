@@ -1,17 +1,39 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import { useUser } from "@/components/UserContext";
-import { Alert, Button, ButtonLink, EmptyState, LinkButton, Skeleton } from "@/components/base";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  DateInput,
+  EmptyState,
+  Field,
+  LinkButton,
+  Progress,
+  RecordPage,
+  Skeleton,
+  Tabs,
+  Textarea,
+  type KindId,
+  type RecordFact,
+  type RecordStep,
+} from "@/components/base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { formatApiError } from "@/lib/erp-api";
 import {
   ESTADO_PROYECTO_LABEL,
   ESTADO_TONO,
   SALUD_TONO,
+  formatoFecha,
+  formatoMoneda,
   obtenerProyecto,
   type ProyectoDetalle,
 } from "@/lib/proyectos-api";
@@ -19,7 +41,7 @@ import { accionesDeEstado, hoyISO, type AccionDeEstado } from "@/lib/proyecto-pl
 import { getServiceProjectTypeLabel } from "@/lib/service-project-types";
 import { cambiarEstado } from "../_componentes/acciones";
 import { usePersonasAsignables } from "../_componentes/personas";
-import { claseTono } from "../_componentes/tono";
+import { toneDe } from "../_componentes/tono";
 import type { SeccionProps } from "../_componentes/tipos";
 import SeccionResumen from "../_componentes/SeccionResumen";
 import SeccionCronograma from "../_componentes/SeccionCronograma";
@@ -28,7 +50,7 @@ import SeccionRequerimientos from "../_componentes/SeccionRequerimientos";
 import SeccionEquipo from "../_componentes/SeccionEquipo";
 import SeccionDocumentos from "../_componentes/SeccionDocumentos";
 import SeccionActividades from "../_componentes/SeccionActividades";
-import styles from "../proyectos.module.css";
+import styles from "../ficha.module.css";
 
 const PESTANAS = [
   { id: "resumen", titulo: "Resumen" },
@@ -42,7 +64,17 @@ const PESTANAS = [
 
 type Pestana = (typeof PESTANAS)[number]["id"];
 
-function conteoDe(p: ProyectoDetalle, pestana: Pestana): number | null {
+/** Color de categoría del icono según el tipo de proyecto (nunca de estado). */
+const KIND_POR_TIPO: Record<string, KindId> = {
+  INSTALACION_CCTV: "cctv",
+  CONTROL_ACCESO: "acceso",
+  REDES_WIFI: "red",
+  CABLEADO_ESTRUCTURADO: "red",
+  AUDITORIA_NODOS: "red",
+  PROYECTO_INTEGRAL: "obra",
+};
+
+function conteoDe(p: ProyectoDetalle, pestana: Pestana): number | undefined {
   switch (pestana) {
     case "cronograma":
       return p.milestones.length;
@@ -57,7 +89,7 @@ function conteoDe(p: ProyectoDetalle, pestana: Pestana): number | null {
     case "actividades":
       return p.activities.length;
     default:
-      return null;
+      return undefined;
   }
 }
 
@@ -81,6 +113,42 @@ function esPestana(valor: string | null): valor is Pestana {
   return PESTANAS.some((t) => t.id === valor);
 }
 
+/** La acción que hace avanzar el proyecto es la principal (una sola por pantalla). */
+function esPrincipal(p: ProyectoDetalle, a: AccionDeEstado): boolean {
+  return !a.peligro && (a.hacia === "COMPLETED" || (a.hacia === "ACTIVE" && p.status === "PLANNED"));
+}
+
+/** Planeado → En curso → Entregado, con las fechas que ya se conocen. */
+function pasosDe(p: ProyectoDetalle): RecordStep[] | undefined {
+  if (p.status === "CANCELLED") return undefined;
+  const arranco = p.status !== "PLANNED";
+  const termino = p.status === "COMPLETED";
+  return [
+    {
+      id: "planeado",
+      label: "Planeado",
+      hint: p.startDate ? `Inicio ${formatoFecha(p.startDate)}` : "Sin fecha de inicio",
+      state: arranco ? "done" : "current",
+    },
+    {
+      id: "curso",
+      label: p.status === "ON_HOLD" ? "En pausa" : "En curso",
+      hint: p.actualStartDate ? `Desde ${formatoFecha(p.actualStartDate)}` : "Aún no arranca",
+      state: termino ? "done" : arranco ? "current" : "pending",
+    },
+    {
+      id: "entregado",
+      label: "Entregado",
+      hint: p.actualEndDate
+        ? formatoFecha(p.actualEndDate)
+        : p.endDate
+          ? `Plan ${formatoFecha(p.endDate)}`
+          : "Sin fecha de fin",
+      state: termino ? "done" : "pending",
+    },
+  ];
+}
+
 export default function ProyectoDetallePage() {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
@@ -98,7 +166,6 @@ export default function ProyectoDetallePage() {
   const [confirmacion, setConfirmacion] = useState<ConfirmState | null>(null);
   const [cambio, setCambio] = useState<{ accion: AccionDeEstado; motivo: string; fecha: string } | null>(null);
   const [errorCambio, setErrorCambio] = useState<string | null>(null);
-  const botonesPestana = useRef<Array<HTMLButtonElement | null>>([]);
 
   // ?tab=cronograma abre directo en esa sección.
   useEffect(() => {
@@ -182,17 +249,18 @@ export default function ProyectoDetallePage() {
     else return;
     e.preventDefault();
     elegirPestana(PESTANAS[siguiente].id);
-    botonesPestana.current[siguiente]?.focus();
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[siguiente]?.focus();
   }
 
   if (!Number.isInteger(id) || id <= 0) {
     return (
-      <div className={styles.wrap}>
+      <div className={styles.pagina}>
         <EmptyState
           icon={<ErrorOutlineRoundedIcon />}
           title="Ese proyecto no existe"
           description="El enlace está incompleto o el proyecto ya no está disponible."
           action={<ButtonLink href="/erp/proyectos">Volver a proyectos</ButtonLink>}
+          size="page"
         />
       </div>
     );
@@ -200,38 +268,40 @@ export default function ProyectoDetallePage() {
 
   if (cargando && !proyecto) {
     return (
-      <div className={styles.wrap} aria-busy="true" aria-label="Cargando proyecto">
-        <div className={styles.esqueleto}>
-          <Skeleton width={80} height={12} />
-          <Skeleton width="45%" height={24} />
+      <div className={styles.pagina} aria-busy="true" aria-label="Cargando proyecto">
+        <div className={styles.esqueletoCabeza}>
+          <Skeleton width={120} height={12} />
+          <Skeleton width="45%" height={26} />
           <Skeleton width={260} height={14} />
-          <Skeleton width={200} height={22} radius={999} />
+          <Skeleton height={44} radius={12} />
         </div>
-        <Skeleton height={40} />
-        <Skeleton height={280} radius={12} />
+        <div className={styles.esqueletoCuerpo}>
+          <Skeleton height={360} radius={16} />
+          <Skeleton height={260} radius={16} />
+        </div>
       </div>
     );
   }
 
   if (!proyecto) {
     return (
-      <div className={styles.wrap}>
-        <Link className={styles.migas} href="/erp/proyectos">
+      <div className={styles.pagina}>
+        <ButtonLink href="/erp/proyectos" variant="tertiary" size="sm">
           ← Proyectos
-        </Link>
+        </ButtonLink>
         <div role="alert">
           <EmptyState
             icon={<ErrorOutlineRoundedIcon />}
             title="No pudimos abrir el proyecto"
             description={errorCarga ?? "Revisa tu conexión e inténtalo de nuevo."}
+            tone="danger"
+            size="page"
             action={
-              <span className={styles.acciones}>
-                <Button variant="primary" onClick={() => void cargar()}>
-                  Reintentar
-                </Button>
-                <ButtonLink href="/erp/proyectos">Volver a proyectos</ButtonLink>
-              </span>
+              <Button variant="primary" onClick={() => void cargar()}>
+                Reintentar
+              </Button>
             }
+            secondaryAction={<ButtonLink href="/erp/proyectos">Volver a proyectos</ButtonLink>}
           />
         </div>
       </div>
@@ -239,7 +309,11 @@ export default function ProyectoDetallePage() {
   }
 
   const p = proyecto;
-  const acciones = accionesDeEstado(p.status);
+  // Orden del sistema: peligro → secundarias → la principal al final.
+  const acciones = [...accionesDeEstado(p.status)].sort((a, b) => {
+    const peso = (x: AccionDeEstado) => (x.peligro ? 0 : esPrincipal(p, x) ? 2 : 1);
+    return peso(a) - peso(b);
+  });
   const seccion: SeccionProps | null = token
     ? { proyecto: p, token, hoy, ocupado, personas, mutar, confirmar: setConfirmacion }
     : null;
@@ -300,178 +374,179 @@ export default function ProyectoDetallePage() {
     etapasSinCumplir ? `${etapasSinCumplir} etapa(s) sin cumplir` : null,
   ].filter(Boolean);
 
+  const avance = p.resumen.avance.porcentaje;
+  const r = p.resumen;
+  const comoVa = p.actualEndDate
+    ? `Entregado ${formatoFecha(p.actualEndDate)}`
+    : r.diasDeRetraso > 0
+      ? `${r.diasDeRetraso} día${r.diasDeRetraso === 1 ? "" : "s"} de retraso`
+      : r.diasRestantes !== null
+        ? `Faltan ${r.diasRestantes} día${r.diasRestantes === 1 ? "" : "s"}`
+        : undefined;
+
+  const datosClave: RecordFact[] = [
+    {
+      label: "Avance",
+      value:
+        avance === null ? (
+          <span className={styles.tenue}>Sin datos todavía</span>
+        ) : (
+          <Progress value={avance} max={100} label={`${avance} %`} ariaLabel="Avance" tone={avance >= 100 ? "success" : "brand"} />
+        ),
+    },
+    {
+      label: "Entrega",
+      value: p.endDate ? formatoFecha(p.endDate) : <span className={styles.tenue}>Sin fecha</span>,
+      hint: comoVa ? <span className={r.diasDeRetraso > 0 && !p.actualEndDate ? styles.vencido : undefined}>{comoVa}</span> : undefined,
+    },
+    { label: "Cliente", value: p.client?.name ?? <span className={styles.tenue}>Sin cliente</span> },
+    {
+      label: "Presupuesto",
+      value: p.budgetAmount == null ? <span className={styles.tenue}>Sin capturar</span> : formatoMoneda(p.budgetAmount, p.currency ?? "MXN"),
+      hint: p.cotizacion ? `Cotización ${p.cotizacion.folioEnviado || p.cotizacion.quoteNumber}` : undefined,
+    },
+    { label: "Equipo", value: `${p.members.length} persona${p.members.length === 1 ? "" : "s"}` },
+  ];
+
   return (
-    <div className={styles.wrap}>
-      <div className={styles.top}>
-        <div style={{ minWidth: 0 }}>
-          <Link className={styles.migas} href="/erp/proyectos">
-            ← Proyectos
-          </Link>
-          <h1 className={styles.title}>{p.title}</h1>
-          <p className={styles.sub}>
-            {[p.client?.name, getServiceProjectTypeLabel(p.projectType), p.responsable ? `Responsable: ${p.responsable.nombre}` : null]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-          <div className={styles.badges} style={{ marginTop: 8 }}>
-            <span className={claseTono(ESTADO_TONO[p.status] ?? "neutral")}>{ESTADO_PROYECTO_LABEL[p.status] ?? "Sin estado"}</span>
-            {p.resumen.etiqueta !== ESTADO_PROYECTO_LABEL[p.status] ? (
-              <span className={claseTono(SALUD_TONO[p.resumen.salud] ?? "neutral")} title={p.resumen.motivo}>
-                {p.resumen.etiqueta}
-              </span>
-            ) : null}
-            <span className={styles.badge}>
-              Avance {p.resumen.avance.porcentaje === null ? "sin datos" : `${p.resumen.avance.porcentaje} %`}
-            </span>
+    <>
+      <RecordPage
+        className={styles.pagina}
+        breadcrumbs={[{ label: "Proyectos", href: "/erp/proyectos" }, { label: p.title }]}
+        icon={<AccountTreeOutlinedIcon />}
+        kind={p.projectType ? KIND_POR_TIPO[p.projectType] : undefined}
+        statusLabel={ESTADO_PROYECTO_LABEL[p.status] ?? "Sin estado"}
+        statusTone={toneDe(ESTADO_TONO[p.status])}
+        badges={
+          r.etiqueta !== ESTADO_PROYECTO_LABEL[p.status] ? (
+            <Badge tone={toneDe(SALUD_TONO[r.salud])} dot title={r.motivo}>
+              {r.etiqueta}
+            </Badge>
+          ) : null
+        }
+        title={p.title}
+        person={p.responsable ? { name: p.responsable.nombre, role: "Responsable" } : undefined}
+        meta={[
+          ...(p.client?.name ? [{ icon: <BusinessOutlinedIcon fontSize="inherit" />, label: p.client.name }] : []),
+          { icon: <CategoryOutlinedIcon fontSize="inherit" />, label: getServiceProjectTypeLabel(p.projectType) },
+          ...(p.siteCount != null
+            ? [{ icon: <PlaceOutlinedIcon fontSize="inherit" />, label: `${p.siteCount} sitio${p.siteCount === 1 ? "" : "s"}` }]
+            : []),
+        ]}
+        primaryAction={
+          acciones.length ? (
+            <div className={styles.acciones} role="group" aria-label="Cambiar estado del proyecto">
+              {acciones.map((a) => (
+                <Button
+                  key={a.hacia}
+                  variant={a.peligro ? "danger-ghost" : esPrincipal(p, a) ? "primary" : "secondary"}
+                  disabled={ocupado}
+                  onClick={() => pedirCambio(a)}
+                >
+                  {a.etiqueta}
+                </Button>
+              ))}
+            </div>
+          ) : null
+        }
+        steps={pasosDe(p)}
+        tabs={
+          <div onKeyDown={teclaEnPestanas} className={styles.pestanas}>
+            <Tabs<Pestana>
+              ariaLabel="Secciones del proyecto"
+              items={PESTANAS.map((t) => ({ id: t.id, label: t.titulo, count: conteoDe(p, t.id) }))}
+              value={pestana}
+              onChange={elegirPestana}
+            />
           </div>
-        </div>
-        {acciones.length ? (
-          <div className={styles.acciones} role="group" aria-label="Cambiar estado del proyecto">
-            {acciones.map((a) => (
-              <button
-                key={a.hacia}
-                type="button"
-                className={a.peligro ? styles.dangerBtn : a.hacia === "COMPLETED" || (a.hacia === "ACTIVE" && p.status === "PLANNED") ? styles.primaryBtn : styles.secondaryBtn}
-                disabled={ocupado}
-                onClick={() => pedirCambio(a)}
+        }
+        factsTitle="Datos clave"
+        facts={datosClave}
+      >
+        {cambio ? (
+          <div className={styles.estadoPanel} role="region" aria-label={cambio.accion.etiqueta} data-peligro={cambio.accion.peligro ? "true" : undefined}>
+            {cambio.accion.pide === "motivo" ? (
+              <Field
+                label="¿Por qué se cancela el proyecto?"
+                required
+                error={errorCambio}
+                hint="Queda guardado en el proyecto. Se puede reactivar después si hace falta."
               >
-                {a.etiqueta}
-              </button>
-            ))}
+                <Textarea
+                  id="motivo-cancelacion"
+                  rows={3}
+                  maxLength={500}
+                  value={cambio.motivo}
+                  onChange={(e) => setCambio({ ...cambio, motivo: e.target.value })}
+                  placeholder="Ej. El cliente pospuso la obra para el próximo año."
+                  autoFocus
+                />
+              </Field>
+            ) : (
+              <Field
+                label="Fecha real de entrega"
+                required
+                error={errorCambio}
+                hint={pendientesAlTerminar.length ? `Todavía queda: ${pendientesAlTerminar.join(", ")}.` : undefined}
+              >
+                <DateInput
+                  id="fecha-entrega"
+                  className={styles.fechaCorta}
+                  value={cambio.fecha}
+                  max={hoy}
+                  onChange={(e) => setCambio({ ...cambio, fecha: e.target.value })}
+                  autoFocus
+                />
+              </Field>
+            )}
+            <div className={styles.estadoAcciones}>
+              <Button variant="tertiary" disabled={ocupado} onClick={() => setCambio(null)}>
+                {cambio.accion.pide === "motivo" ? "No cancelar" : "Volver"}
+              </Button>
+              <Button variant={cambio.accion.peligro ? "danger" : "primary"} loading={ocupado} onClick={() => void confirmarCambio()}>
+                {cambio.accion.etiqueta}
+              </Button>
+            </div>
           </div>
         ) : null}
-      </div>
 
-      {cambio ? (
-        <div className={styles.estadoPanel} role="region" aria-label={cambio.accion.etiqueta}>
-          {cambio.accion.pide === "motivo" ? (
-            <>
-              <label className={styles.fieldLabel} htmlFor="motivo-cancelacion">
-                ¿Por qué se cancela el proyecto? *
-              </label>
-              <textarea
-                id="motivo-cancelacion"
-                className={styles.textarea}
-                maxLength={500}
-                value={cambio.motivo}
-                onChange={(e) => setCambio({ ...cambio, motivo: e.target.value })}
-                placeholder="Ej. El cliente pospuso la obra para el próximo año."
-                autoFocus
-              />
-              <p className={styles.hint}>Queda guardado en el proyecto. Se puede reactivar después si hace falta.</p>
-            </>
-          ) : (
-            <>
-              <label className={styles.fieldLabel} htmlFor="fecha-entrega">
-                Fecha real de entrega *
-              </label>
-              <input
-                id="fecha-entrega"
-                className={styles.input}
-                type="date"
-                value={cambio.fecha}
-                max={hoy}
-                onChange={(e) => setCambio({ ...cambio, fecha: e.target.value })}
-                style={{ maxWidth: "14rem" }}
-                autoFocus
-              />
-              {pendientesAlTerminar.length ? (
-                <p className={styles.hint}>Todavía queda: {pendientesAlTerminar.join(", ")}.</p>
-              ) : null}
-            </>
-          )}
-          {errorCambio ? (
-            <p className={styles.error} role="alert">
-              {errorCambio}
-            </p>
-          ) : null}
-          <div className={styles.acciones}>
-            <button
-              type="button"
-              className={cambio.accion.peligro ? styles.dangerBtn : styles.primaryBtn}
-              disabled={ocupado}
-              onClick={() => void confirmarCambio()}
-            >
-              {ocupado ? "Guardando…" : cambio.accion.etiqueta}
-            </button>
-            <button type="button" className={styles.secondaryBtn} disabled={ocupado} onClick={() => setCambio(null)}>
-              {cambio.accion.pide === "motivo" ? "No cancelar" : "Volver"}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <div
-        className={styles.tabs}
-        role="tablist"
-        aria-label="Secciones del proyecto"
-        onKeyDown={teclaEnPestanas}
-      >
-        {PESTANAS.map((t, i) => {
-          const activa = pestana === t.id;
-          const conteo = conteoDe(p, t.id);
-          return (
-            <button
-              key={t.id}
-              ref={(el) => {
-                botonesPestana.current[i] = el;
-              }}
-              type="button"
-              role="tab"
-              id={`tab-${t.id}`}
-              aria-selected={activa}
-              aria-controls={`panel-${t.id}`}
-              tabIndex={activa ? 0 : -1}
-              className={`${styles.tab} ${activa ? styles.tabActive : ""}`}
-              onClick={() => elegirPestana(t.id)}
-            >
-              {t.titulo}
-              {conteo !== null ? <span className={styles.tabCount}>{conteo}</span> : null}
-            </button>
-          );
-        })}
-      </div>
-
-      {errorCarga ? (
-        <Alert tone="warning" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
-          No se pudo actualizar el proyecto; ves la última versión cargada.
-        </Alert>
-      ) : null}
-
-      <div className={styles.avisos} aria-live="polite">
+        {errorCarga ? (
+          <Alert tone="warning" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
+            No se pudo actualizar el proyecto; ves la última versión cargada.
+          </Alert>
+        ) : null}
         {error ? (
-          <p className={styles.errorBox} role="alert">
+          <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
             {error}
-          </p>
+          </Alert>
         ) : null}
         {aviso ? (
-          <p className={styles.okBox} role="status">
+          <Alert tone="success" role="status">
             {aviso}
-          </p>
+          </Alert>
         ) : null}
-      </div>
 
-      <div role="tabpanel" id={`panel-${pestana}`} aria-labelledby={`tab-${pestana}`}>
-        {!seccion ? (
-          <p className={styles.sub}>Inicia sesión para ver el proyecto.</p>
-        ) : pestana === "resumen" ? (
-          <SeccionResumen {...seccion} />
-        ) : pestana === "cronograma" ? (
-          <SeccionCronograma {...seccion} />
-        ) : pestana === "alcance" ? (
-          <SeccionAlcance {...seccion} />
-        ) : pestana === "requerimientos" ? (
-          <SeccionRequerimientos {...seccion} />
-        ) : pestana === "equipo" ? (
-          <SeccionEquipo {...seccion} />
-        ) : pestana === "documentos" ? (
-          <SeccionDocumentos {...seccion} />
-        ) : (
-          <SeccionActividades {...seccion} />
-        )}
-      </div>
-
+        <div role="tabpanel" aria-label={PESTANAS.find((t) => t.id === pestana)?.titulo}>
+          {!seccion ? (
+            <p className={styles.tenue}>Inicia sesión para ver el proyecto.</p>
+          ) : pestana === "resumen" ? (
+            <SeccionResumen {...seccion} />
+          ) : pestana === "cronograma" ? (
+            <SeccionCronograma {...seccion} />
+          ) : pestana === "alcance" ? (
+            <SeccionAlcance {...seccion} />
+          ) : pestana === "requerimientos" ? (
+            <SeccionRequerimientos {...seccion} />
+          ) : pestana === "equipo" ? (
+            <SeccionEquipo {...seccion} />
+          ) : pestana === "documentos" ? (
+            <SeccionDocumentos {...seccion} />
+          ) : (
+            <SeccionActividades {...seccion} />
+          )}
+        </div>
+      </RecordPage>
       <ConfirmDialog state={confirmacion} onClose={() => setConfirmacion(null)} />
-    </div>
+    </>
   );
 }

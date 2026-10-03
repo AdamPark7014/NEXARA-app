@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import { Alert, Button, DateInput, Field, Input, RecordSection, Select, StatusBadge } from "@/components/base";
 import {
   ESTADOS_HITO,
   ESTADO_HITO_LABEL,
@@ -15,9 +17,9 @@ import {
 import { aInputFecha, hitoVencido, textoPlazo } from "@/lib/proyecto-plan";
 import LineaDeTiempo from "./LineaDeTiempo";
 import { PersonaSelect } from "./personas";
-import { claseTono } from "./tono";
+import { toneDe } from "./tono";
 import type { SeccionProps } from "./tipos";
-import styles from "../proyectos.module.css";
+import styles from "./secciones.module.css";
 
 type Edicion = { name: string; plannedDate: string; actualDate: string; responsableId: string; status: EstadoHito };
 
@@ -91,12 +93,11 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
     if (ok) setEditandoId(null);
   }
 
+  const cumplidas = p.milestones.filter((h) => h.status === "CUMPLIDO" || h.actualDate).length;
+
   return (
-    <div className={styles.gantt} style={{ gap: 12 }}>
-      <section className={styles.panel} aria-labelledby="crono-linea">
-        <h3 id="crono-linea" className={styles.panelTitle}>
-          Cronograma
-        </h3>
+    <div className={styles.pila}>
+      <RecordSection title="Cronograma" subtitle="Cada etapa va desde que termina la anterior hasta su fecha planeada.">
         <LineaDeTiempo
           inicio={p.startDate}
           fin={p.endDate}
@@ -112,82 +113,46 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
             responsable: h.responsable?.nombre ?? null,
           }))}
         />
-      </section>
+      </RecordSection>
 
-      <section className={styles.panel} aria-labelledby="crono-etapas">
-        <h3 id="crono-etapas" className={styles.panelTitle}>
-          Etapas ({p.milestones.length})
-        </h3>
+      <RecordSection
+        title={
+          <>
+            Etapas<span className={styles.conteo}>{p.milestones.length}</span>
+          </>
+        }
+        subtitle={p.milestones.length ? `${cumplidas} de ${p.milestones.length} cumplidas` : undefined}
+      >
         {p.milestones.length === 0 ? (
-          <div className={styles.empty}>
-            Este proyecto todavía no tiene etapas. Agrega la primera abajo: con etapas, el avance se mide aunque
-            aún no haya actividades.
-          </div>
+          <p className={styles.vacio}>
+            Este proyecto todavía no tiene etapas. Agrega la primera abajo: con etapas, el avance se mide aunque aún no haya
+            actividades.
+          </p>
         ) : (
-          <ol className={styles.items}>
+          <ol className={styles.lista}>
             {p.milestones.map((h, i) => {
               const est = estadoVisible(h, hoy);
               const cumplida = est.texto === "Cumplida";
               const cancelada = h.status === "CANCELADO";
               if (editandoId === h.id && edicion) {
                 return (
-                  <li key={h.id} className={styles.item} style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
-                    <form onSubmit={(e) => void guardarEdicion(e, h)} className={styles.gantt} noValidate aria-label={`Editar la etapa ${h.name}`}>
-                      <div className={styles.grid2}>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`h-n-${h.id}`}>
-                            Nombre
-                          </label>
-                          <input
-                            id={`h-n-${h.id}`}
-                            className={styles.input}
-                            value={edicion.name}
-                            maxLength={200}
-                            onChange={(e) => setEdicion({ ...edicion, name: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`h-r-${h.id}`}>
-                            Responsable
-                          </label>
+                  <li key={h.id} className={`${styles.fila} ${styles.filaEdicion}`}>
+                    <form onSubmit={(e) => void guardarEdicion(e, h)} className={styles.edicion} noValidate aria-label={`Editar la etapa ${h.name}`}>
+                      <div className={styles.campos} data-cols="3">
+                        <Field label="Nombre">
+                          <Input id={`h-n-${h.id}`} value={edicion.name} maxLength={200} onChange={(e) => setEdicion({ ...edicion, name: e.target.value })} />
+                        </Field>
+                        <Field label="Responsable">
                           <PersonaSelect
                             id={`h-r-${h.id}`}
                             value={edicion.responsableId}
                             onChange={(v) => setEdicion({ ...edicion, responsableId: v })}
                             personas={personas}
                           />
-                        </div>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`h-p-${h.id}`}>
-                            Fecha planeada
-                          </label>
-                          <input
-                            id={`h-p-${h.id}`}
-                            className={styles.input}
-                            type="date"
-                            value={edicion.plannedDate}
-                            onChange={(e) => setEdicion({ ...edicion, plannedDate: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`h-a-${h.id}`}>
-                            Fecha real (se cumplió)
-                          </label>
-                          <input
-                            id={`h-a-${h.id}`}
-                            className={styles.input}
-                            type="date"
-                            value={edicion.actualDate}
-                            onChange={(e) => setEdicion({ ...edicion, actualDate: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className={styles.fieldLabel} htmlFor={`h-s-${h.id}`}>
-                            Estado
-                          </label>
-                          <select
+                        </Field>
+                        <Field label="Estado">
+                          <Select
                             id={`h-s-${h.id}`}
-                            className={styles.select}
                             value={edicion.status}
                             onChange={(e) => setEdicion({ ...edicion, status: e.target.value as EstadoHito })}
                           >
@@ -196,73 +161,77 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
                                 {ESTADO_HITO_LABEL[s]}
                               </option>
                             ))}
-                          </select>
-                        </div>
+                          </Select>
+                        </Field>
+                        <Field label="Fecha planeada">
+                          <DateInput id={`h-p-${h.id}`} value={edicion.plannedDate} onChange={(e) => setEdicion({ ...edicion, plannedDate: e.target.value })} />
+                        </Field>
+                        <Field label="Fecha real (se cumplió)">
+                          <DateInput id={`h-a-${h.id}`} value={edicion.actualDate} onChange={(e) => setEdicion({ ...edicion, actualDate: e.target.value })} />
+                        </Field>
                       </div>
                       {errorEdicion ? (
-                        <p className={styles.error} role="alert">
+                        <Alert tone="danger" role="alert" dense>
                           {errorEdicion}
-                        </p>
+                        </Alert>
                       ) : null}
-                      <div className={styles.acciones}>
-                        <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
-                          Guardar
-                        </button>
-                        <button type="button" className={styles.secondaryBtn} onClick={() => setEditandoId(null)} disabled={ocupado}>
+                      <div className={styles.botonera}>
+                        <Button variant="tertiary" onClick={() => setEditandoId(null)} disabled={ocupado}>
                           Cancelar
-                        </button>
+                        </Button>
+                        <Button type="submit" variant="tonal" loading={ocupado}>
+                          Guardar
+                        </Button>
                       </div>
                     </form>
                   </li>
                 );
               }
               return (
-                <li key={h.id} className={styles.item}>
-                  <div className={styles.itemMain}>
-                    <span className={`${styles.itemTitle} ${cumplida ? styles.itemDone : ""}`}>
-                      {i + 1}. {h.name}
+                <li key={h.id} className={styles.fila}>
+                  <div className={styles.principal}>
+                    <span className={styles.tituloFila}>
+                      <span className={cumplida ? styles.hecho : undefined}>
+                        {i + 1}. {h.name}
+                      </span>
+                      <StatusBadge size="sm" label={est.texto} tone={toneDe(est.tono)} />
                     </span>
-                    <div className={styles.badges}>
-                      <span className={claseTono(est.tono)}>{est.texto}</span>
-                    </div>
-                    <span className={styles.rowWrap}>
+                    <span className={styles.meta}>
                       Plan: {h.plannedDate ? formatoFecha(h.plannedDate) : "sin fecha"}
                       {h.actualDate ? ` · Real: ${formatoFecha(h.actualDate)}` : ""}
                       {h.responsable ? ` · ${h.responsable.nombre}` : " · Sin responsable"}
                     </span>
                     {!cumplida && !cancelada && h.plannedDate ? (
-                      <span className={`${styles.rowWrap} ${est.tono === "peligro" ? styles.vencido : ""}`}>
-                        {textoPlazo(h.plannedDate, hoy)}
-                      </span>
+                      <span className={`${styles.meta} ${est.tono === "peligro" ? styles.vencido : ""}`}>{textoPlazo(h.plannedDate, hoy)}</span>
                     ) : null}
                   </div>
-                  <div className={styles.itemActions}>
+                  <div className={styles.acciones}>
                     {!cumplida && !cancelada ? (
-                      <button
-                        type="button"
-                        className={styles.smallBtn}
+                      <Button
+                        size="sm"
+                        variant="tonal"
                         disabled={ocupado}
                         onClick={() =>
                           void mutar(() => actualizarHito(token, p.id, h.id, { actualDate: hoy }), `«${h.name}» marcada como cumplida.`)
                         }
                       >
                         Marcar cumplida
-                      </button>
+                      </Button>
                     ) : null}
                     {h.status === "PENDIENTE" && !cumplida ? (
-                      <button
-                        type="button"
-                        className={styles.smallBtn}
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         disabled={ocupado}
                         onClick={() => void mutar(() => actualizarHito(token, p.id, h.id, { status: "EN_CURSO" }), `«${h.name}» en curso.`)}
                       >
                         Empezar
-                      </button>
+                      </Button>
                     ) : null}
                     {cumplida ? (
-                      <button
-                        type="button"
-                        className={styles.smallBtn}
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         disabled={ocupado}
                         onClick={() =>
                           void mutar(
@@ -272,14 +241,14 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
                         }
                       >
                         Desmarcar
-                      </button>
+                      </Button>
                     ) : null}
-                    <button type="button" className={styles.smallBtn} disabled={ocupado} onClick={() => abrirEdicion(h)}>
+                    <Button size="sm" variant="ghost" disabled={ocupado} onClick={() => abrirEdicion(h)}>
                       Editar
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.smallDangerBtn}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger-ghost"
                       disabled={ocupado}
                       onClick={() =>
                         confirmar({
@@ -293,64 +262,43 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
                       }
                     >
                       Borrar
-                    </button>
+                    </Button>
                   </div>
                 </li>
               );
             })}
           </ol>
         )}
-      </section>
+      </RecordSection>
 
-      <form className={styles.panel} onSubmit={agregar} aria-labelledby="crono-nueva" noValidate>
-        <h3 id="crono-nueva" className={styles.panelTitle}>
+      <form className={styles.alta} onSubmit={agregar} aria-labelledby="crono-nueva" noValidate>
+        <h3 id="crono-nueva" className={styles.altaTitulo}>
           Agregar etapa
         </h3>
-        <div className={styles.inlineForm}>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="h-nueva-nombre">
-              Nombre
-            </label>
-            <input
+        <div className={styles.campos}>
+          <Field label="Nombre">
+            <Input
               id="h-nueva-nombre"
-              className={styles.input}
               value={nuevo.name}
               maxLength={200}
               onChange={(e) => setNuevo({ ...nuevo, name: e.target.value })}
               placeholder="Ej. Pruebas y puesta en marcha"
             />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="h-nueva-fecha">
-              Fecha planeada
-            </label>
-            <input
-              id="h-nueva-fecha"
-              className={styles.input}
-              type="date"
-              value={nuevo.plannedDate}
-              onChange={(e) => setNuevo({ ...nuevo, plannedDate: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className={styles.fieldLabel} htmlFor="h-nueva-resp">
-              Responsable
-            </label>
-            <PersonaSelect
-              id="h-nueva-resp"
-              value={nuevo.responsableId}
-              onChange={(v) => setNuevo({ ...nuevo, responsableId: v })}
-              personas={personas}
-            />
-          </div>
-          <button type="submit" className={styles.primaryBtn} disabled={ocupado}>
+          </Field>
+          <Field label="Fecha planeada">
+            <DateInput id="h-nueva-fecha" value={nuevo.plannedDate} onChange={(e) => setNuevo({ ...nuevo, plannedDate: e.target.value })} />
+          </Field>
+          <Field label="Responsable">
+            <PersonaSelect id="h-nueva-resp" value={nuevo.responsableId} onChange={(v) => setNuevo({ ...nuevo, responsableId: v })} personas={personas} />
+          </Field>
+          <Button type="submit" variant="tonal" disabled={ocupado} iconStart={<AddRoundedIcon />}>
             Agregar
-          </button>
+          </Button>
         </div>
         {errorNuevo ? (
-          <p className={styles.error} role="alert">
+          <Alert tone="danger" role="alert" dense>
             {errorNuevo}
-          </p>
+          </Alert>
         ) : null}
       </form>
     </div>

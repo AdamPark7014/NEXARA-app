@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -94,7 +94,7 @@ describe("asistente de nuevo proyecto", () => {
     // Fechas: el responsable ya viene con quien crea.
     expect(await screen.findByRole("heading", { name: /Paso 2 de 7/ })).toBeInTheDocument();
     expect(screen.getByLabelText(/Responsable del proyecto/)).toHaveValue("1");
-    await user.type(screen.getByLabelText("Presupuesto autorizado"), "120,000");
+    await user.type(screen.getByLabelText(/^Presupuesto autorizado/), "120,000");
     await user.click(screen.getByRole("button", { name: "Siguiente →" }));
 
     // Cronograma: etapas típicas repartidas.
@@ -157,6 +157,32 @@ describe("el cliente del proyecto sale del padrón único", () => {
     const alta = llamadas.find((l) => l.method === "POST" && /ventas\/clientes$/.test(l.url))!;
     // Ada no está en la matriz de sectores ni tiene rol de padrón: solo el nombre.
     expect(alta.body.altaProyecto).toBe(true);
+  });
+
+  it("si el nombre ya está en el padrón y no es suyo, el alta rápida lo dice con las palabras del servidor", async () => {
+    servidor();
+    const MENSAJE =
+      "Ya existe un cliente con ese nombre en el padrón y no tienes acceso a él. Pide a coordinación que le sume el tipo que necesitas.";
+    const base = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        (init?.method ?? "GET").toUpperCase() === "POST" && /ventas\/clientes$/.test(String(input))
+          ? json({ statusCode: 403, message: MENSAJE }, 403)
+          : base(input, init),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<NuevoProyectoPage />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Hotel Centro" })).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Dar de alta un cliente" }));
+    await user.type(screen.getByLabelText("Nombre del cliente nuevo"), "Plaza Norte");
+    await user.click(screen.getByRole("button", { name: "Crear y usar" }));
+
+    const alta = screen.getByRole("group", { name: "Alta rápida de cliente" });
+    expect(await within(alta).findByRole("alert")).toHaveTextContent(MENSAJE);
+    expect(screen.getByLabelText("Cliente")).toHaveValue("");
   });
 
   it("desde la ficha de un cliente que aún no es de proyecto, llega ya elegido", async () => {

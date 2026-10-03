@@ -1,0 +1,93 @@
+/* Proyectos · ficha (RecordPage). Solo tokens --ui-*. */
+
+.pagina {
+  min-width: 0;
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.vencido {
+  color: var(--ui-danger-text);
+  font-weight: var(--ui-fw-medium);
+}
+
+/* Acciones de estado: peligro → secundarias → principal, en un solo renglón que se acomoda. */
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+@media (max-width: 640px) {
+  .acciones {
+    justify-content: stretch;
+    width: 100%;
+  }
+  .acciones > * {
+    flex: 1 1 auto;
+  }
+}
+
+.pestanas {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pestanas::-webkit-scrollbar {
+  display: none;
+}
+
+/* Panel para cancelar o terminar: pide el dato antes de tocar la API. */
+.estadoPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-brand-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-brand-soft);
+}
+
+.estadoPanel[data-peligro="true"] {
+  border-color: var(--ui-danger-border);
+  background: var(--ui-danger-bg);
+}
+
+.estadoAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+.fechaCorta {
+  max-width: 14rem;
+}
+
+.esqueletoCabeza {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+}
+
+.esqueletoCuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  gap: var(--ui-s5);
+  margin-top: var(--ui-s5);
+}
+
+@media (max-width: 860px) {
+  .esqueletoCuerpo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
