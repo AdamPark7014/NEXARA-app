@@ -98,6 +98,15 @@ export default function SeccionCotizacion({
     ...TERMINOS_EDITABLES.filter((c) => !partesBase.some((p) => p.clave === c)),
   ];
   const validezRapida = [15, 30, 45].map((dias) => ({ valor: sumarDias(doc.issueDate, dias), etiqueta: `${dias} días` }));
+  // Con el anticipo en 0 el PDF ya no pone ninguno por su cuenta; lo que quede escrito a mano sí
+  // sale tal cual, así que se avisa en el renglón que todavía lo menciona.
+  const sinAnticipo = !esLicitacion && Number(doc.depositPercent) === 0;
+  const avisoAnticipo = (texto: string) =>
+    sinAnticipo && /anticipo/i.test(texto) ? (
+      <p className={styles.pista} role="note">
+        El anticipo está en 0 %, pero este texto todavía menciona un anticipo y así saldrá en el PDF.
+      </p>
+    ) : null;
 
   return (
     <Hoja
@@ -333,9 +342,11 @@ export default function SeccionCotizacion({
                 Retroceso en un título vacío quita la fila. Debajo del título están Marca, Modelo, Costo y Margen %
                 de esa partida: con costo y margen puestos ahí, el precio de esa fila sale solo (costo × margen) —
                 aparte del margen general de arriba, que sigue yendo sobre el total. La descripción del PDF es el
-                recuadro de abajo: crece con el texto y conserva saltos de línea y viñetas. La última fila busca en
-                el catálogo mientras escribes; el menú ⋯ de cada renglón tiene el grupo (equipos, materiales o mano
-                de obra), subir, bajar y quitar.
+                recuadro de abajo: crece con el texto y conserva saltos de línea y viñetas. La última fila, mientras
+                escribes, te ofrece primero las partidas que ya cotizaste («Usadas antes») y luego el catálogo: una
+                usada antes entra con su descripción, marca, modelo, unidad, costo y precio de la última vez, y con
+                el margen vacío para que pongas el de esta cotización. El menú ⋯ de cada renglón tiene el grupo
+                (equipos, materiales o mano de obra), subir, bajar y quitar.
               </Ayuda>
             ) : null}
           </span>
@@ -353,6 +364,7 @@ export default function SeccionCotizacion({
           columnas={doc.opciones.columnas}
           margenPorcentaje={totales.margenPorcentaje}
           margenMonto={totales.margenMonto}
+          cotizacionId={detalle?.id ?? null}
         />
       </div>
 
@@ -362,12 +374,14 @@ export default function SeccionCotizacion({
             <span className={styles.etiqueta}>Términos y condiciones</span>
             <Ayuda titulo="los términos">
               {detalle
-                ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Cada término viene del segmento y de lo que cobras; si lo reescribes, se queda como lo escribiste («Restablecer» lo devuelve). El tiempo de entrega, la garantía y la vigencia de abajo son el texto que sale en el PDF.`
+                ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Cada término viene del segmento, del anticipo y de lo que cobras; si lo reescribes, se queda como lo escribiste («Restablecer» lo devuelve) y si lo dejas vacío no se imprime. La forma de pago es el renglón «Condiciones de pago» del PDF; con anticipo 0 ya no menciona ninguno. El tiempo de entrega, la garantía y la vigencia de abajo son el texto que sale en el PDF.`
                 : "Se arman al guardar, según el segmento y lo que cobres."}
             </Ayuda>
           </span>
           {!terminosIncluidos ? (
-            <span className={styles.pista}>Los términos no van en el PDF. Entrega, garantía y vigencia sí.</span>
+            <span className={styles.pista}>
+              Los términos no van en el PDF. Forma de pago, entrega, garantía y vigencia sí.
+            </span>
           ) : null}
           {!terminosIncluidos && editable && onIncluirTerminos ? (
             <button type="button" className={styles.secondaryBtn} onClick={onIncluirTerminos}>
@@ -377,8 +391,10 @@ export default function SeccionCotizacion({
         </div>
 
         <ul className={styles.terminos}>
-          {detalle && terminosIncluidos
-            ? orden.map((clave) => {
+          {/* La forma de pago es un renglón de las condiciones comerciales del PDF: se edita aunque
+              los demás términos estén apagados en «Personalizar». */}
+          {detalle
+            ? orden.filter((clave) => terminosIncluidos || clave === "pago").map((clave) => {
               const textoBase = base(clave);
               const propio = doc.terminos[clave];
               const editado = propio != null && propio.trim() !== textoBase.trim();
@@ -434,6 +450,8 @@ export default function SeccionCotizacion({
                       })
                     }
                   />
+                  {/* Solo en lo reescrito: el texto del segmento se pone al día solo al guardarse. */}
+                  {propio != null ? avisoAnticipo(valor) : null}
                 </li>
               );
             })
@@ -449,6 +467,7 @@ export default function SeccionCotizacion({
                 aria-label="Tiempo de entrega"
                 onValor={(v) => setCondicion("tiempoEntrega", v)}
               />
+              {avisoAnticipo(entregaTexto)}
             </li>
             <li className={styles.termino}>
               <div className={styles.terminoCabeza}>
@@ -461,6 +480,7 @@ export default function SeccionCotizacion({
                 aria-label="Garantía"
                 onValor={(v) => setCondicion("garantia", v)}
               />
+              {avisoAnticipo(garantiaTexto)}
             </li>
             <li className={styles.termino}>
               <div className={styles.terminoCabeza}>

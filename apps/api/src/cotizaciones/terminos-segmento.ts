@@ -63,7 +63,7 @@ export type TerminosInput = {
   segmento: unknown;
   /** Hay partidas de mano de obra / instalación en la cotización. */
   incluyeInstalacion: boolean;
-  /** Porcentaje de anticipo (50 por omisión, como en la propuesta modelo). */
+  /** Porcentaje de anticipo. Sin dato, 50 (la propuesta modelo); 0 = sin anticipo. */
   anticipoPct?: number | null;
   /** Días de vigencia, si se conocen (se calculan de `validUntil`). */
   vigenciaDias?: number | null;
@@ -118,17 +118,29 @@ export type Terminos = {
   partes: ParteTermino[];
 };
 
-function anticipo(pct?: number | null): number {
+/**
+ * Anticipo que rige los textos. Sin dato (cotización que nunca lo capturó) es el 50 % de la propuesta
+ * modelo; **0 es una respuesta**, no un hueco: quien lo quitó no quiere ver «50 % de anticipo» en el
+ * PDF. Antes el 0 caía al 50 y el anticipo seguía impreso después de borrarlo.
+ */
+export function anticipoDeCotizacion(pct?: unknown): number {
+  if (pct == null || pct === '') return 50;
   const n = Number(pct);
-  if (!Number.isFinite(n) || n <= 0 || n > 100) return 50;
+  if (!Number.isFinite(n) || n < 0 || n > 100) return 50;
   return Math.round(n);
+}
+
+/** Forma de pago por omisión: con anticipo, sin anticipo (todo contra entrega) o de contado. */
+function pagoPorOmision(pct: number, confirma: string, entrega: string): string {
+  if (pct <= 0) return `Pago del 100 % contra entrega ${entrega}.`;
+  if (pct >= 100) return `Pago de contado: 100 % para confirmar el pedido y ${confirma}.`;
+  return `${pct} % de anticipo para confirmar el pedido y ${confirma}; el ${100 - pct} % restante contra entrega ${entrega}.`;
 }
 
 /** Textos por omisión de cada parte según la modalidad. `otras` va vacío. */
 export function terminosPorOmision(input: TerminosInput): Record<ClaveTermino, string> {
   const modalidad = modalidadDeCotizacion(input);
-  const pct = anticipo(input.anticipoPct);
-  const resto = 100 - pct;
+  const pct = anticipoDeCotizacion(input.anticipoPct);
 
   if (modalidad === 'LICITACION') {
     return {
@@ -141,7 +153,7 @@ export function terminosPorOmision(input: TerminosInput): Record<ClaveTermino, s
   }
   if (modalidad === 'SUMINISTRO_INSTALACION') {
     return {
-      pago: `${pct} % de anticipo para confirmar el pedido y programar los trabajos; el ${resto} % restante contra entrega del sistema en operación.`,
+      pago: pagoPorOmision(pct, 'programar los trabajos', 'del sistema en operación'),
       alcance:
         'El precio cotizado cubre el suministro de los equipos y materiales descritos y la mano de obra de instalación, configuración y puesta en marcha señalada en el alcance.',
       noIncluye:
@@ -152,12 +164,17 @@ export function terminosPorOmision(input: TerminosInput): Record<ClaveTermino, s
     };
   }
   return {
-    pago: `${pct} % de anticipo para confirmar el pedido y programar el suministro; el ${resto} % restante contra entrega del equipo.`,
+    pago: pagoPorOmision(pct, 'programar el suministro', 'del equipo'),
     alcance: 'El precio cotizado cubre únicamente el suministro del equipo descrito en esta propuesta.',
     noIncluye:
       'Servicios de instalación, configuración, puesta en marcha, capacitación, adecuaciones eléctricas o de red, ni ningún otro servicio no especificado expresamente en la cotización.',
+    // Sin anticipo no se espera ninguno: la frase no puede seguir pidiéndolo.
     disponibilidad:
-      'La entrega está sujeta a la disponibilidad de inventario al momento de confirmar el pedido y recibir el anticipo.',
+      pct <= 0
+        ? 'La entrega está sujeta a la disponibilidad de inventario al momento de confirmar el pedido.'
+        : pct >= 100
+          ? 'La entrega está sujeta a la disponibilidad de inventario al momento de confirmar el pedido y recibir el pago.'
+          : 'La entrega está sujeta a la disponibilidad de inventario al momento de confirmar el pedido y recibir el anticipo.',
     otras: '',
   };
 }
@@ -191,12 +208,14 @@ function claveDeTitulo(titulo: string): ClaveTermino | null {
  */
 export function leerTerminosPersonalizados(texto: string | null | undefined): Partial<Record<ClaveTermino, string>> {
   const salida: Partial<Record<ClaveTermino, string[]>> = {};
+  const conTitulo = new Set<ClaveTermino>();
   let actual: ClaveTermino = 'otras';
   for (const linea of String(texto ?? '').replace(/\r\n?/g, '\n').split('\n')) {
     const encabezado = linea.match(/^\s*([^:]{2,40}):\s*(.*)$/);
     const clave = encabezado ? claveDeTitulo(encabezado[1]!) : null;
     if (clave) {
       actual = clave;
+      conTitulo.add(clave);
       salida[actual] = salida[actual] ?? [];
       if (encabezado![2]!.trim()) salida[actual]!.push(encabezado![2]!);
       continue;
@@ -207,15 +226,22 @@ export function leerTerminosPersonalizados(texto: string | null | undefined): Pa
   for (const clave of CLAVES_TERMINO) {
     const valor = (salida[clave] ?? []).join('\n').replace(/\n{3,}/g, '\n\n').trim();
     if (valor) limpio[clave] = valor;
+    // El título solo, sin texto: quien cotiza vació ese término. Es «no lo imprimas», no «usa el del
+    // segmento» — si se perdiera aquí, el PDF volvería a poner el texto que la persona borró.
+    else if (conTitulo.has(clave) && clave !== 'otras') limpio[clave] = '';
   }
   return limpio;
 }
 
-/** Lo contrario de `leerTerminosPersonalizados`. Sin nada reescrito, cadena vacía. */
+/**
+ * Lo contrario de `leerTerminosPersonalizados`. Sin nada reescrito, cadena vacía. Un término vaciado
+ * a propósito (`''`, no `null`) se guarda como su título solo: así no vuelve el texto del segmento.
+ */
 export function escribirTerminosPersonalizados(partes: Partial<Record<ClaveTermino, string | null | undefined>>): string {
   return CLAVES_TERMINO.map((clave) => {
     const texto = String(partes[clave] ?? '').replace(/\r\n?/g, '\n').trim();
-    return texto ? `${TITULO_TERMINO[clave]}:\n${texto}` : '';
+    if (texto) return `${TITULO_TERMINO[clave]}:\n${texto}`;
+    return partes[clave] != null && clave !== 'otras' ? `${TITULO_TERMINO[clave]}:` : '';
   })
     .filter(Boolean)
     .join('\n\n');

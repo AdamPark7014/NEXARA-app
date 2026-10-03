@@ -63,6 +63,19 @@ describe('términos por partes', () => {
     expect(escribirTerminosPersonalizados({})).toBe('');
   });
 
+  it('un término vaciado a propósito no se imprime ni vuelve al texto del segmento', () => {
+    // Quien borra la forma de pago en el editor no quiere que el PDF le reponga «50 % de anticipo».
+    const note = escribirTerminosPersonalizados({ pago: '', noIncluye: 'Obra civil.' });
+    expect(note).toBe('Forma de pago:\n\nNo incluye:\nObra civil.');
+    expect(leerTerminosPersonalizados(note)).toEqual({ pago: '', noIncluye: 'Obra civil.' });
+    const t = terminosDeCotizacion({ ...base, personalizados: note });
+    expect(t.partes.map((p) => p.clave)).toEqual(['alcance', 'noIncluye', 'disponibilidad', 'vigencia']);
+    expect(t.lineas.join(' ')).not.toContain('50 % de anticipo');
+    // Sin título no hay nada vaciado: una nota vacía sigue siendo «todo por omisión».
+    expect(leerTerminosPersonalizados('')).toEqual({});
+    expect(escribirTerminosPersonalizados({ pago: null, alcance: undefined })).toBe('');
+  });
+
   it('una nota vieja sin títulos no se pierde: sale como «Otras condiciones»', () => {
     const t = terminosDeCotizacion({ ...base, personalizados: 'Precios en dólares al tipo de cambio del día.' });
     const otras = t.partes.find((p) => p.clave === 'otras')!;

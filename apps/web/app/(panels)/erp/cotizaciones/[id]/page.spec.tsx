@@ -224,6 +224,49 @@ describe("editor de cotización", () => {
     );
   });
 
+  it("forma de pago: borrarla se guarda como «vacía» (el PDF no repone el anticipo) y sin anticipo avisa de lo que aún lo menciona", async () => {
+    const llamadas = servidor();
+    const user = userEvent.setup();
+    render(<CotizacionDetallePage />);
+    await screen.findByLabelText("Descripción de la nueva partida");
+    const seccion = within(document.getElementById("cotizacion")!);
+    const pago = seccion.getByRole("textbox", { name: "Forma de pago" });
+    expect(pago).toHaveValue("Se requiere un 50 % de anticipo.");
+    expect(seccion.queryByText(/todavía menciona un anticipo/)).toBeNull();
+
+    // Anticipo en 0 con un texto propio que sigue pidiéndolo: se avisa, porque así saldría en el PDF.
+    await user.type(pago, " El anticipo no es reembolsable.");
+    const anticipo = seccion.getByRole("spinbutton", { name: /Anticipo/ });
+    await user.clear(anticipo);
+    await user.type(anticipo, "0");
+    expect(seccion.getByText(/El anticipo está en 0 %, pero este texto todavía menciona un anticipo/)).toBeInTheDocument();
+
+    await user.clear(pago);
+    expect(seccion.queryByText(/todavía menciona un anticipo/)).toBeNull();
+    await waitFor(
+      () => {
+        const guardado = Object.assign({}, ...llamadas.filter((l) => l.metodo === "PUT").map((l) => l.cuerpo as object));
+        expect(guardado).toMatchObject({ depositPercent: 0, note: "Forma de pago:" });
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it("con los términos apagados la forma de pago se sigue editando: es un renglón del PDF", async () => {
+    servidor();
+    const user = userEvent.setup();
+    render(<CotizacionDetallePage />);
+    await user.click(await screen.findByRole("button", { name: "Ajustar" }));
+    const seccion = within(document.getElementById("cotizacion")!);
+    expect(seccion.getByRole("textbox", { name: "Alcance de la cotización" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: /Términos y condiciones/ }));
+
+    expect(seccion.queryByRole("textbox", { name: "Alcance de la cotización" })).toBeNull();
+    expect(seccion.getByRole("textbox", { name: "Forma de pago" })).toHaveValue("Se requiere un 50 % de anticipo.");
+    expect(seccion.getByText("Los términos no van en el PDF. Forma de pago, entrega, garantía y vigencia sí.")).toBeInTheDocument();
+  });
+
   it("envía por correo con copia y mensaje", async () => {
     const llamadas = servidor();
     const user = userEvent.setup();

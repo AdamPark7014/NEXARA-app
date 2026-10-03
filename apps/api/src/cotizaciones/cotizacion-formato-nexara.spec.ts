@@ -243,6 +243,129 @@ describe('formato Nexara', () => {
     expect(texto).toContain('Viñeta 15:');
   });
 
+  describe('forma de pago y términos: lo que quedó en el editor', () => {
+    // Cotización de Adam: quitó el anticipo en «Términos y condiciones → Forma de pago · Anticipo»
+    // y el PDF siguió imprimiendo «50% de anticipo para confirmar el pedido y 50% contra entrega…».
+    const todoElTexto = (f: ReturnType<typeof formatoDesdeCotizacion>) =>
+      [f.pagoCorto, f.condicionesPago, f.entrega, f.garantia, f.vigencia, ...f.terminos].join('\n');
+
+    it('sin tocar nada salen los términos del segmento con el anticipo capturado', () => {
+      const f = formatoDesdeCotizacion(grupoDice);
+      expect(f.pagoCorto).toBe('50% anticipo');
+      expect(f.condicionesPago).toBe(
+        '50 % de anticipo para confirmar el pedido y programar el suministro; el 50 % restante contra entrega del equipo.',
+      );
+      expect(f.terminos.map((t) => t.split(':')[0])).toEqual(['Alcance de la cotización', 'No incluye', 'Disponibilidad']);
+    });
+
+    it('con el anticipo en 0 nada menciona un anticipo: ni el renglón, ni la franja, ni los términos', async () => {
+      const sinAnticipo = { ...grupoDice, depositPercent: 0 };
+      const f = formatoDesdeCotizacion(sinAnticipo);
+      expect(f.pagoCorto).toBe('Contra entrega');
+      expect(f.condicionesPago).toBe('Pago del 100 % contra entrega del equipo.');
+      expect(todoElTexto(f)).not.toMatch(/anticipo/i);
+      const impreso = textoPorHoja(await generarCotizacionNexaraPdf(sinAnticipo)).join('\n');
+      expect(impreso).toContain('Condiciones de pago:');
+      expect(impreso).not.toMatch(/anticipo/i);
+    });
+
+    it('la forma de pago reescrita es la que sale, aunque el anticipo siga en 50', async () => {
+      const propia = { ...grupoDice, note: 'Forma de pago:\nCrédito a 30 días.' };
+      const f = formatoDesdeCotizacion(propia);
+      expect(f.condicionesPago).toBe('Crédito a 30 días.');
+      expect(f.pagoCorto).toBe('Crédito a 30 días');
+      expect(todoElTexto(f)).not.toContain('50');
+      const impreso = textoPorHoja(await generarCotizacionNexaraPdf(propia)).join('\n');
+      expect(impreso).toContain('Crédito a 30 días.');
+      expect(impreso).not.toContain('50% de anticipo');
+      expect(impreso).not.toContain('50 % de anticipo');
+    });
+
+    it('un texto propio largo no deja en la franja un anticipo que el texto no dice', () => {
+      const largo = 'Pago a 30 días naturales contados a partir de la entrega, mediante transferencia electrónica.';
+      expect(formatoDesdeCotizacion({ ...grupoDice, note: `Forma de pago:\n${largo}` }).pagoCorto).toBe('Ver condiciones');
+      // Si el texto sí habla de ese anticipo, la franja lo resume.
+      const conAnticipo = 'Se requiere 50 % de anticipo por transferencia a la cuenta BBVA y el resto contra entrega.';
+      expect(formatoDesdeCotizacion({ ...grupoDice, note: `Forma de pago:\n${conAnticipo}` }).pagoCorto).toBe('50% anticipo');
+    });
+
+    it('la forma de pago borrada no se imprime: el renglón desaparece', async () => {
+      const borrada = { ...grupoDice, depositPercent: 0, note: 'Forma de pago:' };
+      const f = formatoDesdeCotizacion(borrada);
+      expect(f.condicionesPago).toBe('');
+      expect(f.pagoCorto).toBe('');
+      const impreso = textoPorHoja(await generarCotizacionNexaraPdf(borrada)).join('\n');
+      expect(impreso).not.toContain('Condiciones de pago:');
+      expect(impreso).not.toMatch(/anticipo/i);
+      expect(impreso).toContain('Tiempo de entrega:');
+    });
+
+    it('los términos reescritos salen con su título y los demás siguen al segmento', () => {
+      const f = formatoDesdeCotizacion({ ...grupoDice, note: 'No incluye:\nObra civil ni permisos.' });
+      expect(f.terminos).toContain('No incluye: Obra civil ni permisos.');
+      expect(f.terminos.some((t) => t.startsWith('Alcance de la cotización: El precio cotizado cubre únicamente el suministro'))).toBe(true);
+    });
+
+    it('si se cobra instalación, los términos no dicen «únicamente el suministro»', () => {
+      const f = formatoDesdeCotizacion({
+        ...grupoDice,
+        items: [...grupoDice.items, { name: 'Instalación y puesta en marcha', unit: 'Servicio', qty: 1, unitPrice: 5000, tax: 16 }],
+      });
+      expect(f.terminos.join('\n')).toContain('mano de obra de instalación');
+      expect(f.terminos.join('\n')).not.toContain('únicamente el suministro');
+      expect(f.condicionesPago).toContain('contra entrega del sistema en operación');
+    });
+
+    it('con los términos apagados en «Personalizar» no se imprimen; la forma de pago sí', async () => {
+      const apagados = { ...grupoDice, opciones: { secciones: { terminos: false } } };
+      const f = formatoDesdeCotizacion(apagados);
+      expect(f.terminos).toEqual([]);
+      expect(f.condicionesPago).toContain('50 % de anticipo');
+      const impreso = textoPorHoja(await generarCotizacionNexaraPdf(apagados)).join('\n');
+      expect(impreso).not.toContain('TÉRMINOS Y CONDICIONES');
+      expect(impreso).toContain('Condiciones de pago:');
+    });
+
+    it('en licitación la franja no inventa un anticipo: mandan las bases', () => {
+      const f = formatoDesdeCotizacion({ ...grupoDice, segmento: 'LICITACION', depositPercent: 0 });
+      expect(f.pagoCorto).toBe('Según bases');
+      expect(f.condicionesPago).toContain('bases de la licitación');
+    });
+  });
+
+  describe('datos fiscales del emisor en el encabezado', () => {
+    const fiscales = [
+      'New Engineering Expertise And Resource Advancement S.A. De C.V.',
+      'RFC: NEE240925V73',
+      'Ignacio Allende 512 local 2 Santiago Momoxpan, 72775 San Pedro Cholula, Puebla',
+      'Correo electrónico: gerencia@nexara.com.mx',
+      'Teléfonos: 2226960350',
+    ];
+
+    it('abren la primera hoja, arriba del título', async () => {
+      const [primera] = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice));
+      const renglones = primera!.split('\n');
+      for (const linea of fiscales) expect(renglones).toContain(linea);
+      // Se dibujan antes que el título: van arriba de «COTIZACIÓN», en el orden pedido.
+      const posiciones = [...fiscales, 'COTIZACIÓN'].map((linea) => renglones.indexOf(linea));
+      expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
+    });
+
+    it('las hojas de continuación conservan su encabezado corto, sin datos fiscales', async () => {
+      const viñetas = Array.from({ length: 80 }, (_, i) => `• Característica ${i + 1}: detalle`).join('\n');
+      const hojas = textoPorHoja(
+        await generarCotizacionNexaraPdf({ ...grupoDice, items: [{ ...grupoDice.items[0], description: viñetas }] }),
+      );
+      expect(hojas.length).toBeGreaterThan(1);
+      expect(hojas[0]).toContain('RFC: NEE240925V73');
+      for (const hoja of hojas.slice(1)) {
+        expect(hoja).not.toContain('RFC: NEE240925V73');
+        expect(hoja).not.toContain('Correo electrónico: gerencia@nexara.com.mx');
+      }
+      expect(hojas[1]).toContain('(continuación)');
+    });
+  });
+
   it('el margen 20 va dentro del precio y del total: subtotal con IVA × 1.20, sin decir margen ni costo', async () => {
     const f = formatoDesdeCotizacion({
       quoteNumber: 'NEX-1',

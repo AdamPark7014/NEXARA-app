@@ -406,19 +406,28 @@ export type TerminosPropios = Partial<Record<ClaveTermino, string>>;
 export function escribirTerminos(propios: TerminosPropios): string {
   return CLAVES_TERMINO.map((clave) => {
     const texto = String(propios[clave] ?? "").replace(/\r\n?/g, "\n").trim();
-    return texto ? `${TITULO_TERMINO[clave]}:\n${texto}` : "";
+    if (texto) return `${TITULO_TERMINO[clave]}:\n${texto}`;
+    // Vaciado a propósito: va el título solo, para que el PDF no vuelva a poner el texto del
+    // segmento que la persona borró. («Otras condiciones» ya nace vacía: no hay nada que callar.)
+    return propios[clave] != null && clave !== "otras" ? `${TITULO_TERMINO[clave]}:` : "";
   })
     .filter(Boolean)
     .join("\n\n");
 }
 
 /** Lo reescrito, tal como lo reporta la API (`terminos.partes[].personalizado`). */
-export function terminosPropiosDeDetalle(d: Pick<CotizacionDetalle, "terminos">): TerminosPropios {
+export function terminosPropiosDeDetalle(d: Pick<CotizacionDetalle, "terminos" | "note">): TerminosPropios {
   const propios: TerminosPropios = {};
   for (const parte of d.terminos?.partes ?? []) {
     // Vigencia, entrega y garantía no se reescriben como término: salen de fechas y de Personalizar.
     if (parte.clave === "vigencia" || parte.clave === "entrega" || parte.clave === "garantia" || !parte.personalizado) continue;
     propios[parte.clave] = parte.texto;
+  }
+  // Un término vaciado no viene en `partes` (no se imprime): se lee de la nota, para que al reabrir
+  // siga vacío en vez de enseñar el texto del segmento que el PDF ya no trae.
+  const deNota = terminosPropiosDeNota(d.note);
+  for (const clave of CLAVES_TERMINO) {
+    if (deNota[clave] === "" && propios[clave] == null) propios[clave] = "";
   }
   return propios;
 }
@@ -563,12 +572,14 @@ export function documentoDesdePlantilla(
 export function terminosPropiosDeNota(nota: string | null | undefined): TerminosPropios {
   const propios: TerminosPropios = {};
   let actual: ClaveTermino | null = null;
+  const conTitulo = new Set<ClaveTermino>();
   const titulo = new Map(CLAVES_TERMINO.map((c) => [TITULO_TERMINO[c].toLowerCase(), c]));
   for (const linea of String(nota ?? "").replace(/\r\n?/g, "\n").split("\n")) {
     const m = linea.match(/^\s*([^:]{2,40}):\s*(.*)$/);
     const clave = m ? titulo.get(m[1]!.trim().toLowerCase()) : undefined;
     if (clave) {
       actual = clave;
+      conTitulo.add(clave);
       propios[clave] = m![2]!.trim();
       continue;
     }
@@ -577,6 +588,8 @@ export function terminosPropiosDeNota(nota: string | null | undefined): Terminos
   for (const clave of CLAVES_TERMINO) {
     const texto = propios[clave]?.trim();
     if (texto) propios[clave] = texto;
+    // El título solo es un término vaciado a propósito (ver `escribirTerminos`): se conserva vacío.
+    else if (conTitulo.has(clave) && clave !== "otras") propios[clave] = "";
     else delete propios[clave];
   }
   return propios;
