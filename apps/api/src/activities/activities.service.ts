@@ -12,6 +12,7 @@ import { generateActivitiesReportPdf } from './activities-report-pdf.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, isFinishedStatus } from './activity-status.js';
 import { esCerrada, normalizarPrioridad, tiemposDto } from './actividad-tiempos.js';
+import { leerSesiones, sesionesDe } from './sessions/activity-sessions.service.js';
 import { evaluarSemaforo } from './semaforo-actividad.js';
 import {
   camposDePeriodo,
@@ -466,9 +467,15 @@ export class ActivitiesService {
     // (aceptación, semáforo y tiempo planeado vs real), sin quitar nada de lo que ya mandaba.
     const ahora = new Date();
     type FilaEquipo = (typeof activity.assignees)[number];
+    // Sesiones de trabajo: de ellas sale el tiempo real y si cada quien está «en pausa».
+    const sesiones = await leerSesiones(this.prisma, {
+      userIds: (activity.assignees ?? []).map((a: FilaEquipo) => a.userId),
+      activityIds: [activity.id],
+      companyId: activity.companyId,
+    });
     const equipo = (activity.assignees ?? []).map((a: FilaEquipo) => ({
       ...a,
-      ...tiemposDto(a, activity, ahora),
+      ...tiemposDto(a, activity, ahora, sesionesDe(sesiones, a.userId, activity.id)),
     }));
     const propia = equipo.find((a) => a.userId === activity.responsableId) ?? equipo[0] ?? null;
     return {

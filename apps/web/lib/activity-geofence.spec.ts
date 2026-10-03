@@ -8,7 +8,13 @@ describe("geocerca de actividades (web)", () => {
     const d = distanciaM(zocaloPuebla, { latitude: 19.0424, longitude: -98.2063 });
     expect(d).toBeGreaterThanOrEqual(109);
     expect(d).toBeLessThanOrEqual(113);
-    expect(d).toBeGreaterThan(RADIO_ACTIVIDAD_M);
+  });
+
+  it("el radio es de 500 m, igual que en la API: un sitio grande cabe completo", () => {
+    expect(RADIO_ACTIVIDAD_M).toBe(500);
+    // ~445 m (dentro) y ~650 m (fuera) del punto de inicio.
+    expect(distanciaM(zocaloPuebla, { latitude: 19.0454, longitude: -98.2063 })).toBeLessThanOrEqual(RADIO_ACTIVIDAD_M);
+    expect(distanciaM(zocaloPuebla, { latitude: 19.04725, longitude: -98.2063 })).toBeGreaterThan(RADIO_ACTIVIDAD_M);
   });
 
   it("descarta lecturas sin GPS: (0,0), vacías o fuera de rango", () => {
@@ -20,8 +26,8 @@ describe("geocerca de actividades (web)", () => {
   });
 
   it("bloquea la salida con el mismo mensaje que la API", () => {
-    expect(mensajeSalidaFueraDeZona(245)).toBe(
-      "La salida se registra donde iniciaste la actividad: estás a 245 m y el máximo es 100 m. " +
+    expect(mensajeSalidaFueraDeZona(745)).toBe(
+      "La salida se registra donde iniciaste la actividad: estás a 745 m y el máximo es 500 m. " +
         "Regresa al punto de inicio para tomar la foto de salida.",
     );
   });

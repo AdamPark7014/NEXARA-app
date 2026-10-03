@@ -42,6 +42,14 @@ describe('CreateActivityDto', () => {
     expect(msgs.join(' ')).toMatch(/200 caracteres/);
   });
 
+  it('un tiempo estimado de más de 12 horas se rechaza con el motivo; 12 h exactas pasan', async () => {
+    const msgs = await errores(CreateActivityDto, payloadAsignar({ tiempoEstimadoMin: 721 }));
+    expect(msgs.join(' ')).toMatch(/no puede durar más de 12 horas/);
+    expect(await errores(CreateActivityDto, payloadAsignar({ tiempoEstimadoMin: 720 }))).toEqual([]);
+    // Editar tampoco lo salta.
+    expect((await errores(UpdateActivityDto, { tiempoEstimadoMin: 1440 })).join(' ')).toMatch(/12 horas/);
+  });
+
   it('las indicaciones largas siguen permitidas (columna sin tope)', async () => {
     expect(await errores(CreateActivityDto, payloadAsignar({ indicaciones: 'y'.repeat(5000) }))).toEqual([]);
   });

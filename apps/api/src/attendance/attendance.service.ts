@@ -28,6 +28,7 @@ import { saveBase64Photo } from '../common/file-upload.util';
 import { horaAviso } from '../notifications/notification-push-meta.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
+import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-sessions.service.js';
 import {
   AttendanceJustificationsService,
   type AttendanceJustificationDto,
@@ -1734,6 +1735,10 @@ export class AttendanceService {
         isOpen: false,
       },
     });
+
+    // Su salida detiene el reloj de las actividades que tenga en curso. No las termina:
+    // siguen «En Proceso» y mañana las reanuda (si no, los KPI cuentan la noche como trabajo).
+    await cerrarSesionesDeUsuario(this.prisma, { userId, at: now, companyId: tenantId });
 
     // El `false` de la salida sí se queda. Revocar no es fabricar: apagar el
     // rastreo al cerrar la jornada es el comportamiento conservador, y deja al

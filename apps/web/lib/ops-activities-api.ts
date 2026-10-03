@@ -70,6 +70,14 @@ export type ActivityDetail = {
     inicioRealAt?: string | null;
     finRealAt?: string | null;
     saltoPrioridad?: boolean;
+    /** Sesiones de trabajo (API nueva; opcional): su reloj corre o está en pausa, quién y por qué. */
+    enCurso?: boolean;
+    enPausa?: boolean;
+    pausaTipo?: "FIN" | "PAUSA" | "SALIDA" | "TOPE_12H" | "CORTE_DIA" | null;
+    pausadaAt?: string | null;
+    pausadaPor?: { id: number; nombre: string } | null;
+    motivoPausa?: string | null;
+    sesionAbiertaDesde?: string | null;
   }>;
   /** Resumen de tiempos de la actividad (responsable o primero del equipo). */
   semaforo?: Semaforo | null;

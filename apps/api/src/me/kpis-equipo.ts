@@ -18,9 +18,12 @@
  *   aunque la salida caiga después de medianoche.
  * - Horas laboradas = jornada menos la comida registrada. Comida sin regreso:
  *   una hora (como la pizarra).
- * - Horas productivas = unión de los tramos de actividad (foto de entrada →
- *   foto de salida / fin) dentro de las horas laboradas. Dos actividades a la vez
- *   no cuentan doble, y lo que se hizo fuera de la jornada no es tiempo laborado.
+ * - Horas productivas = unión de los tramos de actividad dentro de las horas
+ *   laboradas. Dos actividades a la vez no cuentan doble, y lo que se hizo fuera de
+ *   la jornada no es tiempo laborado. El tramo de una actividad son sus sesiones de
+ *   trabajo (se abren al iniciar o reanudar; se cierran con la foto de salida, una
+ *   pausa o la checada de salida); una actividad de antes, sin sesiones, es su
+ *   intervalo foto de entrada → foto de salida. Ningún tramo pasa de 12 horas.
  * - Inactividad = laboradas − productivas; nunca negativa.
  * - Retardo = misma regla que los avisos y RH: oficina 09:00, contratista 08:00,
  *   15 min de gracia; los minutos tarde se cuentan desde la hora de entrada.
@@ -36,6 +39,11 @@ import {
   workDayAtClock,
   workDayEnd,
 } from '../common/time/workday.js';
+import {
+  TOPE_SESION_MIN,
+  finEfectivo,
+  sesionVencida,
+} from '../activities/sessions/sesiones-trabajo.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tramos de tiempo (milisegundos). Todo el cálculo es unir, cruzar y restar.
@@ -368,6 +376,12 @@ export type ActividadKpi = {
    * solo del lunes. null = actividad de un día.
    */
   periodoFin?: string | null;
+  /**
+   * Sesiones de trabajo de la persona en esta actividad. Con ellas, `inicio`/`fin` ya no
+   * miden nada: cada sesión es un tramo, con tope de 12 h y sin pasar de su día. Así una
+   * obra de diez días cuenta lo que se trabajó cada día, no diez jornadas completas.
+   */
+  sesiones?: Array<{ startedAt: Date; endedAt: Date | null }> | null;
 };
 
 export type TramoActividad = {
@@ -386,8 +400,12 @@ export type TramoActividad = {
  * Una actividad abierta cuenta hasta ahora solo si empezó hoy; si empezó otro
  * día se corta al final de ese día. Sin ese tope, un «Iniciar» o una foto de
  * entrada olvidados de hace semanas volvían «productivo» cada minuto de cada
- * jornada posterior. La excepción es un periodo de varios días: abierta, cuenta
- * hasta ahora o hasta el final de su último día, lo que llegue antes.
+ * jornada posterior.
+ *
+ * Con sesiones de trabajo (`sesiones`) cada sesión es un tramo. Sin ellas —datos de
+ * antes de la regla— el intervalo nunca pasa de 12 horas, tampoco en un periodo de
+ * varios días: una obra de diez días ya no vuelve productivas diez jornadas por
+ * haberse iniciado el lunes; cuenta lo que se reanudó cada día.
  */
 export function tramosDeActividades(
   actividades: ActividadKpi[],
@@ -396,6 +414,23 @@ export function tramosDeActividades(
 ): TramoActividad[] {
   const out: TramoActividad[] = [];
   for (const a of actividades) {
+    if (a.sesiones?.length) {
+      for (const s of a.sesiones) {
+        if (!(s.startedAt instanceof Date) || Number.isNaN(s.startedAt.getTime())) continue;
+        let fin = finEfectivo(s, ahora, tz);
+        if (fin.getTime() > ahora.getTime()) fin = ahora;
+        if (fin.getTime() <= s.startedAt.getTime()) continue;
+        out.push({
+          activityId: a.activityId,
+          anNumber: a.anNumber ?? null,
+          titulo: a.titulo ?? null,
+          inicio: s.startedAt,
+          fin,
+          enCurso: !s.endedAt && !sesionVencida(s, ahora, tz),
+        });
+      }
+      continue;
+    }
     if (!a.inicio || Number.isNaN(a.inicio.getTime())) continue;
     let fin: Date | null = a.fin && !Number.isNaN(a.fin.getTime()) ? a.fin : null;
     let enCurso = false;
@@ -413,6 +448,10 @@ export function tramosDeActividades(
       }
     }
     if (fin.getTime() > ahora.getTime()) fin = ahora;
+    // Ninguna actividad dura más de 12 horas. Sin sesiones (datos de antes de la regla)
+    // el intervalo se corta ahí: un fin de días después ya no vuelve productivas esas jornadas.
+    const tope = a.inicio.getTime() + TOPE_SESION_MIN * 60_000;
+    if (fin.getTime() > tope) fin = new Date(tope);
     if (fin.getTime() <= a.inicio.getTime()) continue;
     out.push({
       activityId: a.activityId,
@@ -878,8 +917,9 @@ export function supuestosKpi(): string[] {
     'Jornada: de la entrada a la salida. Si hoy no hay salida, cuenta hasta ahora; en un día pasado sin salida se cierra como el cierre automático (entrada + 9 h, a más tardar 23:30).',
     'La jornada es del día de la entrada, aunque la salida caiga después de medianoche.',
     `Horas laboradas: jornada menos la comida registrada; comida sin regreso = ${MINUTOS_COMIDA_POR_OMISION} min.`,
-    'Horas productivas: tiempo en actividades («Iniciar» o foto de entrada → foto de salida o fin) dentro de las horas laboradas. Dos actividades a la vez no cuentan doble y lo hecho fuera de la jornada no suma.',
-    'Una actividad abierta cuenta hasta ahora solo si empezó hoy; si empezó otro día se corta al final de ese día. Las de un periodo de varios días cuentan en cada jornada de su periodo, hasta su último día.',
+    'Horas productivas: tiempo con el reloj de una actividad corriendo, dentro de las horas laboradas (entre la entrada y la salida). Dos actividades a la vez no cuentan doble y lo hecho fuera de la jornada no suma.',
+    `El reloj de una actividad corre por sesiones: empieza con «Iniciar», la foto de entrada o «Reanudar», y se detiene con la foto de salida, una pausa (propia o de su jefe) o la checada de salida. Ninguna sesión cuenta más de ${TOPE_SESION_MIN / 60} horas ni pasa del final de su día: una actividad de varios días se reanuda cada día.`,
+    `Las actividades de antes de esta regla (sin sesiones) cuentan su intervalo de foto de entrada a foto de salida, con tope de ${TOPE_SESION_MIN / 60} horas.`,
     'Inactividad: horas laboradas menos horas productivas.',
     `Retardo: entrada después de su hora (oficina 09:00, contratista 08:00) más ${RETARDO_GRACE_MINUTES} min de gracia, de lunes a viernes. Los minutos tarde se cuentan desde su hora de entrada. Dirección (24/7) no tiene retardos. A quien se le haya escrito un horario propio, se le mide con ese.`,
     `Tiempo extra: lo laborado arriba de ${JORNADA_ORDINARIA_MIN / 60} h en día laborable, o todo lo laborado en sábado o domingo. Sin horario no se calcula.`,

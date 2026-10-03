@@ -8,6 +8,8 @@
  * Campo David (Joan/Israel/Juan): solo reciben tarea/proyecto/obra.
  * Soporte Antonio (Carolina/Alejandro/Roberto): solo reciben tarea/proyecto/servicio.
  * Josué Encargado de Obra: todo menos servicio
+ * Paulina (contadora): tarea y comercial, igual que Daniela y Mónica.
+ * Quien no está en los mapas: solo tarea.
  */
 import { ROLES, type RoleKey } from '@/lib/rbac/roles';
 import type { ActivityProjectMode } from '@/lib/ops-activity-form';
@@ -44,6 +46,7 @@ export const ORG_EMAILS = {
   roberto: 'roberto.vivanco@nexara.com.mx',
   daniela: 'daniela.hernandez@nexara.com.mx',
   monica: 'soluciones@nexara.com.mx',
+  paulina: 'finanzas@nexara.com.mx',
   joan: 'joan.sanchez@nexara.com.mx',
   israel: 'israel.ramos@nexara.com.mx',
   juan: 'juan.gonzalez@nexara.com.mx',
@@ -147,6 +150,9 @@ const CREATE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial'],
   [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
   [ORG_EMAILS.monica]: ['tarea', 'comercial'],
+  // Paulina (contadora): lo comercial es parte de su trabajo. Sin estar aquí caía en el
+  // respaldo de «solo tarea» y en Auto-asignarme no veía otro tipo.
+  [ORG_EMAILS.paulina]: ['tarea', 'comercial'],
   [ORG_EMAILS.joan]: ['tarea'],
   [ORG_EMAILS.israel]: ['tarea'],
   [ORG_EMAILS.juan]: ['tarea'],
@@ -174,6 +180,7 @@ const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   // Comercial / admin
   [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
   [ORG_EMAILS.monica]: ['tarea', 'comercial'],
+  [ORG_EMAILS.paulina]: ['tarea', 'comercial'],
   // Josué Encargado de Obra
   [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial'], // Encargado de obra (Josué): todo menos servicio
 };

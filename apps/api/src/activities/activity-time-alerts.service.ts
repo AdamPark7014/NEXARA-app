@@ -3,7 +3,9 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
-import { esCerrada, estaExcedida, minutosPlan, minutosReales } from './actividad-tiempos.js';
+import { esCerrada, estaExcedida, minutosPlan } from './actividad-tiempos.js';
+import { leerSesiones, sesionesDe } from './sessions/activity-sessions.service.js';
+import { minutosTrabajados } from './sessions/sesiones-trabajo.js';
 import { esMultiDia, periodoDeActividad } from './actividad-periodo.js';
 
 /**
@@ -47,6 +49,11 @@ export class ActivityTimeAlertsService {
       },
       take: 500,
     });
+    // El tiempo real es la suma de sus sesiones: una actividad en pausa no se «excede» sola.
+    const sesiones = await leerSesiones(this.prisma, {
+      userIds: [...new Set(enCurso.map((f) => f.userId))],
+      activityIds: [...new Set(enCurso.map((f) => f.activityId))],
+    });
 
     for (const fila of enCurso) {
       if (esCerrada(fila.activity?.estatus)) continue;
@@ -54,7 +61,12 @@ export class ActivityTimeAlertsService {
       // de corrido, así que «excedida» no significa nada. Lo tarde lo dice el fin del periodo.
       if (esMultiDia(periodoDeActividad(fila.activity))) continue;
       const plan = minutosPlan(fila.horasPlan);
-      const reales = minutosReales(fila.inicioRealAt, null, ahora);
+      const reales = minutosTrabajados({
+        inicio: fila.inicioRealAt,
+        fin: null,
+        sesiones: sesionesDe(sesiones, fila.userId, fila.activityId),
+        ahora,
+      });
       if (!estaExcedida(plan, reales)) continue;
 
       // Marcar primero: si el aviso falla, no se repite cada 15 minutos.

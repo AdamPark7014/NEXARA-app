@@ -9,7 +9,7 @@ import org.junit.Test
 
 /** Mismas cifras que `apps/api/src/activities/geofence/geocerca.spec.ts`. */
 class ActivityGeofenceTest {
-    private val inicio = GeocercaDto(origen = GeocercaOrigenDto(latitude = 19.0414, longitude = -98.2063), radioM = 100)
+    private val inicio = GeocercaDto(origen = GeocercaOrigenDto(latitude = 19.0414, longitude = -98.2063), radioM = 500)
 
     @Test
     fun `0_001 grados de latitud son unos 111 m`() {
@@ -18,9 +18,10 @@ class ActivityGeofenceTest {
     }
 
     @Test
-    fun `a 55 m esta dentro y a 150 m fuera`() {
-        assertTrue(ActivityGeofence.distanciaAlInicio(inicio, 19.0419, -98.2063)!! <= 100)
-        assertTrue(ActivityGeofence.distanciaAlInicio(inicio, 19.04275, -98.2063)!! > 100)
+    fun `a 150 m y a 445 m esta dentro y a 650 m fuera`() {
+        assertTrue(ActivityGeofence.distanciaAlInicio(inicio, 19.04275, -98.2063)!! <= ActivityGeofence.RADIO_M)
+        assertTrue(ActivityGeofence.distanciaAlInicio(inicio, 19.0454, -98.2063)!! <= ActivityGeofence.RADIO_M)
+        assertTrue(ActivityGeofence.distanciaAlInicio(inicio, 19.04725, -98.2063)!! > ActivityGeofence.RADIO_M)
     }
 
     @Test
@@ -31,9 +32,9 @@ class ActivityGeofenceTest {
 
     @Test
     fun `el mensaje dice la distancia y el maximo`() {
-        val m = ActivityGeofence.mensajeSalida(245)
-        assertTrue(m.contains("245 m"))
-        assertTrue(m.contains("100 m"))
-        assertEquals(100, ActivityGeofence.RADIO_M)
+        val m = ActivityGeofence.mensajeSalida(745)
+        assertTrue(m.contains("745 m"))
+        assertTrue(m.contains("500 m"))
+        assertEquals(500, ActivityGeofence.RADIO_M)
     }
 }

@@ -9,10 +9,11 @@ describe('geocerca de actividades', () => {
     expect(d).toBeLessThanOrEqual(113);
   });
 
-  it('dentro del radio de 100 m no es fuera de zona; a 150 m sí', () => {
-    expect(fueraDeZona(zocaloPuebla, { lat: 19.0419, lng: -98.2063 })).toBe(false); // ~55 m
-    expect(fueraDeZona(zocaloPuebla, { lat: 19.04275, lng: -98.2063 })).toBe(true); // ~150 m
-    expect(RADIO_ACTIVIDAD_M).toBe(100);
+  it('el radio es de 500 m: un sitio grande cabe completo', () => {
+    expect(RADIO_ACTIVIDAD_M).toBe(500);
+    expect(fueraDeZona(zocaloPuebla, { lat: 19.04275, lng: -98.2063 })).toBe(false); // ~150 m: con 100 m ya era fuera
+    expect(fueraDeZona(zocaloPuebla, { lat: 19.0454, lng: -98.2063 })).toBe(false); // ~445 m
+    expect(fueraDeZona(zocaloPuebla, { lat: 19.04725, lng: -98.2063 })).toBe(true); // ~650 m
   });
 
   it('descarta el (0,0) y coordenadas fuera de rango', () => {
@@ -22,7 +23,7 @@ describe('geocerca de actividades', () => {
   });
 
   it('el mensaje dice la distancia y el máximo', () => {
-    expect(mensajeSalidaFueraDeZona(245)).toContain('245 m');
-    expect(mensajeSalidaFueraDeZona(245)).toContain('100 m');
+    expect(mensajeSalidaFueraDeZona(745)).toContain('745 m');
+    expect(mensajeSalidaFueraDeZona(745)).toContain('500 m');
   });
 });

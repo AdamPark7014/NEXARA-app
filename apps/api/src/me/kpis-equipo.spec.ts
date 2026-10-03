@@ -166,17 +166,24 @@ describe('armaJornadas', () => {
 describe('tramosDeActividades', () => {
   const ahora = M('18', '13:00');
 
-  it('abierta de hoy cuenta hasta ahora; abierta de otro día se corta al final de ese día', () => {
-    const [hoy, vieja] = tramosDeActividades(
-      [actividad(1, M('18', '10:00'), null, false), actividad(2, M('15', '10:00'), null, false)],
+  it('abierta de hoy cuenta hasta ahora; abierta de otro día se corta en su día, sin pasar de 12 h', () => {
+    const [hoy, vieja, tarde] = tramosDeActividades(
+      [
+        actividad(1, M('18', '10:00'), null, false),
+        actividad(2, M('15', '10:00'), null, false),
+        actividad(3, M('15', '16:00'), null, false),
+      ],
       ahora,
     );
     expect(hoy).toMatchObject({ enCurso: true, fin: ahora });
     expect(vieja.enCurso).toBe(true);
-    expect(vieja.fin.getTime()).toBe(M('16', '00:00').getTime() - 1);
+    // 10:00 + 12 h: ninguna actividad dura más de 12 horas.
+    expect(vieja.fin).toEqual(M('15', '22:00'));
+    // 16:00 + 12 h pasaría de medianoche: se corta al final de su día.
+    expect(tarde.fin.getTime()).toBe(M('16', '00:00').getTime() - 1);
   });
 
-  it('periodo de varios días abierto: cuenta hasta ahora o hasta el fin de su último día', () => {
+  it('periodo de varios días sin sesiones: ya no cuenta de corrido, se corta a las 12 h', () => {
     const [sigue, vencio] = tramosDeActividades(
       [
         { ...actividad(1, M('15', '10:00'), null, false), periodoFin: '2026-09-25' },
@@ -184,8 +191,35 @@ describe('tramosDeActividades', () => {
       ],
       ahora,
     );
-    expect(sigue).toMatchObject({ enCurso: true, fin: ahora });
-    expect(vencio.fin.getTime()).toBe(M('17', '00:00').getTime() - 1);
+    expect(sigue.fin).toEqual(M('15', '22:00'));
+    expect(vencio.fin).toEqual(M('14', '22:00'));
+  });
+
+  it('una actividad cerrada días después (dato de antes de la regla) cuenta 12 h, no los días', () => {
+    const [vieja] = tramosDeActividades([actividad(1, M('14', '09:00'), M('17', '18:00'), true)], ahora);
+    expect(vieja.fin).toEqual(M('14', '21:00'));
+  });
+
+  it('con sesiones, cada sesión es un tramo y el intervalo de antes deja de medir', () => {
+    const tramos = tramosDeActividades(
+      [
+        {
+          ...actividad(1, M('15', '10:00'), null, false),
+          sesiones: [
+            { startedAt: M('15', '10:00'), endedAt: M('15', '18:00') },
+            // Quedó abierta en la base desde el 16: se corta sola a las 12 h.
+            { startedAt: M('16', '09:00'), endedAt: null },
+            { startedAt: M('18', '12:00'), endedAt: null },
+          ],
+        },
+      ],
+      ahora,
+    );
+    expect(tramos.map((x) => [x.inicio, x.fin, x.enCurso])).toEqual([
+      [M('15', '10:00'), M('15', '18:00'), false],
+      [M('16', '09:00'), M('16', '21:00'), false],
+      [M('18', '12:00'), ahora, true],
+    ]);
   });
 
   it('terminada sin fin conocido o sin inicio no suma', () => {
@@ -296,8 +330,8 @@ describe('calculaKpisPersona', () => {
     expect(dias.find((d) => d.fecha === '2026-09-16')!.minutosProductivos).toBe(0);
   });
 
-  it('una obra de varios días iniciada el lunes cuenta en cada jornada de su periodo', () => {
-    const { dias } = calcula({
+  it('una obra de varios días cuenta cada día lo que se reanudó, no la jornada entera', () => {
+    const base = {
       desde: '2026-09-15',
       hasta: '2026-09-16',
       ahora: M('16', '19:00'),
@@ -306,10 +340,47 @@ describe('calculaKpisPersona', () => {
         { inicio: M('15', '15:00'), fin: M('15', '16:00') },
         { inicio: M('16', '15:00'), fin: M('16', '16:00') },
       ],
-      actividades: [{ ...actividad(1, M('15', '10:00'), null, false), periodoFin: '2026-09-18' }],
+    };
+    const obra = { ...actividad(1, M('15', '10:00'), null, false), periodoFin: '2026-09-18' };
+
+    // Sin sesiones (dato de antes de la regla): solo el día en que se inició.
+    const sinSesiones = calcula({ ...base, actividades: [obra] }).dias;
+    expect(sinSesiones.find((d) => d.fecha === '2026-09-15')!.minutosProductivos).toBe(420);
+    expect(sinSesiones.find((d) => d.fecha === '2026-09-16')!.minutosProductivos).toBe(0);
+
+    // Con sesiones: el 15 corrió de 10:00 a su salida; el 16 la reanudó a las 11:00.
+    const conSesiones = calcula({
+      ...base,
+      actividades: [
+        {
+          ...obra,
+          sesiones: [
+            { startedAt: M('15', '10:00'), endedAt: M('15', '18:00') },
+            { startedAt: M('16', '11:00'), endedAt: M('16', '18:00') },
+          ],
+        },
+      ],
+    }).dias;
+    expect(conSesiones.find((d) => d.fecha === '2026-09-15')!.minutosProductivos).toBe(420);
+    expect(conSesiones.find((d) => d.fecha === '2026-09-16')!.minutosProductivos).toBe(360);
+  });
+
+  it('una sesión que siguió después de la salida no suma: lo productivo va dentro de la jornada', () => {
+    const { dias } = calcula({
+      desde: '2026-09-15',
+      hasta: '2026-09-15',
+      ahora: M('16', '08:00'),
+      checadas: [entrada('15', '09:00'), salida('15', '18:00')],
+      actividades: [
+        {
+          ...actividad(1, M('15', '09:00'), null, false),
+          // Nadie la cerró: se corta sola a las 21:00, pero la jornada acabó a las 18:00.
+          sesiones: [{ startedAt: M('15', '09:00'), endedAt: null }],
+        },
+      ],
     });
-    expect(dias.find((d) => d.fecha === '2026-09-15')!.minutosProductivos).toBe(420);
-    expect(dias.find((d) => d.fecha === '2026-09-16')!.minutosProductivos).toBe(480);
+    expect(dias[0].minutosLaborados).toBe(540);
+    expect(dias[0].minutosProductivos).toBe(540);
   });
 
   it('medianoche: lo trabajado después de las 00:00 es del día de la entrada', () => {

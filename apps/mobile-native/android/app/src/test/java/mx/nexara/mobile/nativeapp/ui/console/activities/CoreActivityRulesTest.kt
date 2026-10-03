@@ -96,6 +96,19 @@ class CoreActivityRulesTest {
     }
 
     @Test
+    fun comercialNamesItsFirstAndLastStepDifferently() {
+        // Comercial no es trabajo «en sitio»: inicio y conclusión de actividad.
+        assertEquals("Inicio de actividad", CoreActivityRules.stepLabel("ENTRY_PHOTO", "comercial"))
+        assertEquals("Conclusión de actividad", CoreActivityRules.stepLabel("EXIT_PHOTO", " Comercial "))
+        assertEquals("Formulario", CoreActivityRules.stepLabel("SERVICE_SHEET_DATA", "comercial"))
+        // Los demás tipos conservan su nombre.
+        for (kind in listOf("tarea", "proyecto", "obra", "servicio", null)) {
+            assertEquals("Foto de entrada", CoreActivityRules.stepLabel("ENTRY_PHOTO", kind))
+            assertEquals("Foto de salida", CoreActivityRules.stepLabel("EXIT_PHOTO", kind))
+        }
+    }
+
+    @Test
     fun digitalFormKeysMatchTheWeb() {
         assertEquals(
             listOf("sucursal", "gerenteEncargado", "queSeHizo", "observaciones"),

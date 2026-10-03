@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
+import { esCerrada } from '../actividad-tiempos.js';
 import {
   MOMENTOS,
   normalizarCampos,
@@ -217,7 +218,7 @@ export class ActivityEvidenceFieldsService {
     // ese where no es el de la llave única.
     const miEvidencia = await this.prisma.activityEvidence.findFirst({
       where: { activityId: params.activityId, userId: params.userId, ...companyWhere(activity.companyId) },
-      select: { entryPhotoUrl: true },
+      select: { entryPhotoUrl: true, status: true, reviewStatus: true },
     });
     if (!miEvidencia?.entryPhotoUrl) {
       throw new BadRequestException(
@@ -246,6 +247,14 @@ export class ActivityEvidenceFieldsService {
     const lng = this.coordenada(params.longitude, 180);
     const capturedAt = this.fecha(params.capturedAt);
 
+    // Llenar un hueco vacío siempre se puede (seguir adjuntando). Reemplazar la foto que ya
+    // está, no cuando la evidencia quedó congelada.
+    const yaHay = await this.prisma.activityEvidenceFieldPhoto.findFirst({
+      where: { fieldId: campo.id, momento, ...companyWhere(activity.companyId) },
+      select: { id: true },
+    });
+    if (yaHay) this.assertEvidenciaSinCongelar(activity.estatus, miEvidencia);
+
     await this.prisma.activityEvidenceFieldPhoto.upsert({
       where: { fieldId_momento: { fieldId: campo.id, momento } },
       create: {
@@ -271,16 +280,48 @@ export class ActivityEvidenceFieldsService {
     return this.listarCamposDeActividad(params.activityId, activity.companyId);
   }
 
+  /**
+   * La evidencia que ya se envió queda congelada (Adam, 02-10): con la actividad cerrada, o con
+   * la evidencia de esa persona en revisión o aprobada, una foto por campo ya no se reemplaza ni
+   * se quita. Las fotos libres ya lo impedían (`getOrCreateActivityEvidence`); por campos se
+   * podía seguir pisando o borrando la foto de algo ya aprobado. Si se la devuelven a corregir,
+   * se vuelve a abrir.
+   */
+  private assertEvidenciaSinCongelar(
+    estatus: string | null | undefined,
+    evidencia: { status?: string | null; reviewStatus?: string | null } | null | undefined,
+  ) {
+    if (esCerrada(estatus)) {
+      throw new ForbiddenException('La actividad ya está cerrada: su evidencia no se puede cambiar ni quitar.');
+    }
+    if (evidencia?.reviewStatus === 'APPROVED') {
+      throw new ForbiddenException('La evidencia ya fue aprobada y no puede modificarse');
+    }
+    if (evidencia?.status === 'COMPLETED' && evidencia?.reviewStatus !== 'REJECTED') {
+      throw new ForbiddenException('La evidencia está en revisión y no puede modificarse');
+    }
+  }
+
   /** Quitar una foto deja el hueco pendiente otra vez. */
   async borrarFoto(params: {
     activityId: number;
     fieldId: number;
     momento: unknown;
+    /** Quien la quita: si su evidencia ya está congelada, no se quita. */
+    userId?: number | null;
     companyId?: number | null;
   }): Promise<CampoDto[]> {
     const activity = await this.cargarActividad(params.activityId, params.companyId);
     const momento = normalizarMomento(params.momento);
     if (!momento) throw new BadRequestException('Momento inválido');
+
+    const miEvidencia = params.userId
+      ? await this.prisma.activityEvidence.findFirst({
+          where: { activityId: params.activityId, userId: params.userId, ...companyWhere(activity.companyId) },
+          select: { status: true, reviewStatus: true },
+        })
+      : null;
+    this.assertEvidenciaSinCongelar(activity.estatus, miEvidencia);
 
     await this.prisma.activityEvidenceFieldPhoto.deleteMany({
       where: {

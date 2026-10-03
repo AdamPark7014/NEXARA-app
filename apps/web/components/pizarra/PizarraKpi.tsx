@@ -137,7 +137,7 @@ export function KpiStrip({ kpis, compacta = false }: { kpis?: BoardKpis; compact
         <Kpi
           label="Productividad"
           value={formatPct(kpis.productividadPct)}
-          hint={`${formatMinutes(kpis.minutosEnActividad)} en actividad de ${formatMinutes(kpis.minutosAsistidos)} asistidos`}
+          hint={`${formatMinutes(kpis.minutosEnActividad)} productivas de ${formatMinutes(kpis.minutosAsistidos)} trabajadas (con una actividad corriendo, entre su entrada y su salida)`}
         />
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>

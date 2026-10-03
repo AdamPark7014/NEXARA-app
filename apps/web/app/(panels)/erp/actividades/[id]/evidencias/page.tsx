@@ -11,6 +11,7 @@ import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
 import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
+import { esActividadComercial } from "@/lib/evidence-flow-helpers";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -79,7 +80,9 @@ export default function ActivityEvidencesPage() {
       {canUpload && (
         <DetailSection title="Captura de evidencias">
           <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
-            Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida.
+            {esActividadComercial(activity.coreKind)
+              ? "Inicio de actividad, evidencias, cotización y conclusión de actividad."
+              : "Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida."}
           </p>
           <ActivityEvidenceFlow />
         </DetailSection>

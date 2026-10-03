@@ -2,8 +2,11 @@
  * Geocerca de actividades: quien inicia una actividad (foto de entrada con GPS) debe
  * permanecer y registrar la salida dentro de este radio alrededor de ese punto.
  * Espejo en las apps: Android `ActivityGeofence.kt`, iOS `ActivityGeofence.swift`.
+ *
+ * 500 m y no 100: en un sitio grande (un Walmart, una planta) se entra por un lado y se
+ * termina por el otro sin haber salido del lugar.
  */
-export const RADIO_ACTIVIDAD_M = 100;
+export const RADIO_ACTIVIDAD_M = 500;
 
 export type Punto = { lat: number; lng: number };
 

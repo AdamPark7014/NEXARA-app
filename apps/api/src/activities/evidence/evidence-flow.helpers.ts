@@ -68,6 +68,32 @@ export function evidenceProgressPct(
   return Math.round((idx / steps.length) * 100);
 }
 
+/**
+ * Las fotos libres que quedan al cerrar el paso de evidencias (o al reenviarlo corregido).
+ *
+ * Cada foto se guarda en cuanto se toma (`addEvidencePhoto`) y solo se quita con su botón
+ * (`removeEvidencePhoto`). El envío final cierra el paso; no es una forma de borrar. Si el
+ * cliente manda la lista vacía (el flujo por campos lo hace a propósito) o solo un pedazo de
+ * lo ya guardado (pantalla atrasada, otro dispositivo), lo guardado se queda tal cual: antes
+ * la lista recibida lo pisaba y esas fotos desaparecían sin que nadie las quitara.
+ *
+ * Cuando sí trae fotos que el servidor no tenía —apps que mandan todo junto al final, o la
+ * cola sin conexión que reenvía las suyas— manda la lista recibida, como siempre.
+ */
+export function fotosAlCerrarPaso(
+  guardadas: readonly string[] | null | undefined,
+  recibidas: readonly string[] | null | undefined,
+): { fotos: string[]; conservaGuardadas: boolean } {
+  const yaGuardadas = (guardadas ?? []).filter((u) => typeof u === 'string' && u);
+  const nuevas = (recibidas ?? []).filter((u) => typeof u === 'string' && u);
+  const traeAlgoNuevo = nuevas.some((u) => !yaGuardadas.includes(u));
+  const faltaAlgoGuardado = yaGuardadas.some((u) => !nuevas.includes(u));
+  if (!traeAlgoNuevo && faltaAlgoGuardado) {
+    return { fotos: [...yaGuardadas], conservaGuardadas: true };
+  }
+  return { fotos: [...nuevas], conservaGuardadas: false };
+}
+
 /** ¿Es la imagen/archivo en sí (base64) y no una ruta ya subida? */
 export function esAdjuntoBase64(valor: unknown): valor is string {
   return typeof valor === 'string' && (valor.startsWith('data:') || valor.includes(';base64,'));

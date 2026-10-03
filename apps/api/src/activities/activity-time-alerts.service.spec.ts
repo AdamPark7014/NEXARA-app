@@ -43,6 +43,20 @@ describe('aviso de tiempo excedido', () => {
     expect(avisos.notifyActivityOvertime).not.toHaveBeenCalled();
   });
 
+  it('en pausa no se excede sola: cuenta lo que corrió su reloj, no el tiempo desde que la inició', async () => {
+    // La inició hace 155 min con 2 h de plan, pero su jefe la pausó a los 40 min.
+    const { service, prisma, avisos, update } = build([fila()]);
+    (prisma as any).activityWorkSession = {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 1, activityId: 10, userId: 9, startedAt: hace(155), endedAt: hace(115), endReason: 'PAUSA' },
+      ]),
+    };
+    await (service as never as { escanear: (d: Date) => Promise<void> }).escanear(AHORA);
+
+    expect(update).not.toHaveBeenCalled();
+    expect(avisos.notifyActivityOvertime).not.toHaveBeenCalled();
+  });
+
   it('una actividad ya cerrada no genera aviso', async () => {
     const { service, avisos } = build([fila({ activity: { estatus: 'Finalizada' } })]);
     await (service as never as { escanear: (d: Date) => Promise<void> }).escanear(AHORA);

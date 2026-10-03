@@ -50,6 +50,17 @@ class CoreActivityKindsTest {
     }
 
     @Test
+    fun paulinaCreatesAndReceivesTareaAndComercial() {
+        assertEquals("finanzas@nexara.com.mx", OrgEmails.PAULINA)
+        // Auto-asignarme: antes solo veía Tarea (caía en el respaldo de quien no está en los mapas).
+        assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.PAULINA, OrgEmails.PAULINA, null, false))
+        assertEquals(listOf("tarea", "comercial"), k.kindsForCreator(null, " Finanzas@Nexara.com.mx ", false))
+        assertEquals(listOf("tarea", "comercial"), k.kindsForTarget(OrgEmails.PAULINA))
+        assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.CEO, OrgEmails.PAULINA, RoleKeys.CEO, false))
+        assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.DAVID, OrgEmails.PAULINA, null, false))
+    }
+
+    @Test
     fun superAdminWithoutTargetSeesEverything() {
         assertEquals(k.ALL, k.kindsForAssignment("root@x.com", null, null, isSuperAdmin = true))
     }
@@ -157,6 +168,15 @@ class CoreActivityKindsTest {
         assertEquals(listOf(ClientSector.PROYECTO, ClientSector.COMERCIAL), k.clientSectorsForActivityKind("comercial", OrgEmails.DAVID))
         assertEquals(emptyList<ClientSector>(), k.clientSectorsForActivityKind("obra", OrgEmails.DANIELA))
         assertEquals(emptyList<ClientSector>(), k.clientSectorsForActivityKind("tarea", OrgEmails.CEO))
+    }
+
+    @Test
+    fun comercialFallsBackToTheCommercialPadron() {
+        // Paulina no está en la matriz de Clientes: sin esto el cliente obligatorio salía vacío.
+        assertEquals(listOf(ClientSector.COMERCIAL), k.clientSectorsForActivityKind("comercial", OrgEmails.PAULINA))
+        assertEquals(listOf(ClientSector.COMERCIAL), k.clientSectorsForActivityKind("comercial", OrgEmails.DANIELA))
+        assertEquals(emptyList<ClientSector>(), k.clientSectorsForActivityKind("servicio", OrgEmails.PAULINA))
+        assertEquals(emptyList<ClientSector>(), k.clientSectorsForActivityKind("obra", OrgEmails.PAULINA))
     }
 
     // ── Formulario: tipo fijo y subtipos de tarea ───────────────────────────

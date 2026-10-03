@@ -270,7 +270,7 @@ struct ActivityGeofenceCard: View {
             Text(
                 state.exigeMismaUbicacion
                     ? "La foto de salida solo se acepta a \(state.radioM) m o menos de donde iniciaste. Si sales de la zona, justifica el motivo."
-                    : "La foto de salida lleva tu ubicación. En esta área no tiene que coincidir con el inicio."
+                    : "La foto de salida lleva tu ubicación. En este tipo de actividad no tiene que coincidir con el inicio."
             )
                 .font(.caption)
                 .foregroundStyle(.secondary)

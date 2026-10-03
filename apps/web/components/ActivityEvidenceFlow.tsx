@@ -4,11 +4,13 @@ import { formatApiError } from '@/lib/erp-api';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
 import { evidenceStepLabel, isEvidenceLocked, rejectedStepsList } from '@/lib/evidence-lock';
 import {
+  claveDeFormulario,
   digitalFormLabels,
   emptyDigitalForm,
   evidenceStepsForKind,
   isPdfUrl,
   requiresServiceSheetPdf,
+  textosDeInicioYCierre,
   type DigitalFormFields,
   type EvidenceStep,
 } from '@/lib/evidence-flow-helpers';
@@ -224,7 +226,7 @@ const ActivityEvidenceFlow = () => {
   const camposFaltan = porCampos ? faltanFotosDeCampos(camposEvidencia) : 0;
   const camposProgreso = porCampos ? progresoDeCampos(camposEvidencia) : { requeridas: 0, cumplidas: 0 };
 
-  // Geocerca: desde la foto de entrada, la persona debe quedarse a ≤ 100 m del punto de inicio.
+  // Geocerca: desde la foto de entrada, la persona se mide contra el radio (500 m) del punto de inicio.
   const actividadIniciada = Boolean(
     flowData && (flowData.entryPhotoUrl || flowData.step !== 'ENTRY_PHOTO'),
   );
@@ -249,7 +251,7 @@ const ActivityEvidenceFlow = () => {
 
   /** Mensaje de bloqueo si `punto` queda fuera del radio del inicio; `null` si puede registrar la salida. */
   const bloqueoPorZona = (punto: PuntoGeo | null): string | null => {
-    // Sin la bandera del API (o en false) no se pre-bloquea: la regla es solo Servicios.
+    // Sin la bandera del API (o en false) no se pre-bloquea: la regla depende del tipo de actividad.
     if (geocerca.estado?.exigeMismaUbicacion !== true) return null;
     const origen = origenActividad();
     const aqui = punto ? puntoReal(punto.latitude, punto.longitude) : null;
@@ -311,7 +313,7 @@ const ActivityEvidenceFlow = () => {
       return '🎉 ¡Corrección enviada! Tu evidencia será revisada nuevamente.';
     }
     if (typeof saved.status === 'string') {
-      return `✅ Paso corregido. Siguiente: ${evidenceStepLabel(saved.status)}`;
+      return `✅ Paso corregido. Siguiente: ${evidenceStepLabel(saved.status, flowData?.coreKind)}`;
     }
     return fallback;
   };
@@ -321,6 +323,8 @@ const ActivityEvidenceFlow = () => {
   const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
   const photoRequired = Math.max(1, Number(flowData?.evidencePhotoRequired) || 4);
   const needsServiceSheetPdf = requiresServiceSheetPdf(flowData?.coreKind);
+  // En comercial no hay «entrada» ni «salida»: inicio y conclusión de actividad.
+  const textos = textosDeInicioYCierre(flowData?.coreKind);
   const visibleSteps = (
     Array.isArray(flowData?.stepsForKind) && flowData.stepsForKind.length > 0
       ? flowData.stepsForKind
@@ -846,7 +850,7 @@ const ActivityEvidenceFlow = () => {
       const { dataUrl: photoUrl } = photo;
       const punto = puntoDeFoto(photo.latitude, photo.longitude);
       if (!punto) {
-        setError('La foto de entrada necesita tu ubicación GPS.');
+        setError(textos.inicio.sinGps);
         setLoading(false);
         return false;
       }
@@ -879,7 +883,7 @@ const ActivityEvidenceFlow = () => {
         setSuccessMsg(
           isCorrection
             ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-            : `✅ Foto de entrada guardada. Siguiente: Tomar evidencias (${photoRequired} fotos)`,
+            : `✅ ${textos.inicio.guardado} Siguiente: Tomar evidencias (${photoRequired} fotos)`,
         );
         setCameraActive(false);
         return true;
@@ -1387,7 +1391,7 @@ const ActivityEvidenceFlow = () => {
         setSuccessMsg(
           isCorrection
             ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-            : '✅ Plantilla completada. Siguiente: Toma foto de salida',
+            : `✅ Plantilla completada. Siguiente: ${textos.cierre.siguiente}`,
         );
       } else {
         const errorData = await res.json();
@@ -1483,7 +1487,7 @@ const ActivityEvidenceFlow = () => {
       const { dataUrl: photoUrl } = photo;
       const punto = puntoDeFoto(photo.latitude, photo.longitude);
       if (!punto) {
-        setError('La foto de salida necesita tu ubicación GPS.');
+        setError(textos.cierre.sinGps);
         setLoading(false);
         return false;
       }
@@ -1652,9 +1656,9 @@ const ActivityEvidenceFlow = () => {
             <div>
               <div style={{ fontSize: 17, fontWeight: 800 }}>
                 {pendingPhoto.kind === 'entry'
-                  ? 'Tu foto de entrada'
+                  ? textos.inicio.vistaPrevia
                   : pendingPhoto.kind === 'exit'
-                    ? 'Tu foto de salida'
+                    ? textos.cierre.vistaPrevia
                     : campoTarget
                       ? `${MOMENTO_LABEL[campoTarget.momento]} · campo`
                       : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
@@ -1801,9 +1805,9 @@ const ActivityEvidenceFlow = () => {
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 800 }}>
                     {liveKind === 'entry'
-                      ? 'Foto de entrada'
+                      ? textos.inicio.nombre
                       : liveKind === 'exit'
-                        ? 'Foto de salida'
+                        ? textos.cierre.nombre
                         : campoTarget
                           ? `${MOMENTO_LABEL[campoTarget.momento]} · campo`
                           : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
@@ -1971,8 +1975,7 @@ const ActivityEvidenceFlow = () => {
             <p className={styles.stepDescription} style={{ marginBottom: 8 }}>
               Solo lectura · {av.progressPct}% avanzado
               {av.movidaPor ? ` · ${av.movidaPor} te la pasó` : ''}
-              {av.motivo ? ` · Motivo: ${av.motivo}` : ''}. Continúa desde aquí con tu propia foto de entrada y de
-              salida.
+              {av.motivo ? ` · Motivo: ${av.motivo}` : ''}. {textos.relevo}
             </p>
             {fotos.length > 0 ? (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: campos.length || ev?.serviceSheetPdfUrl ? 8 : 0 }}>
@@ -2026,7 +2029,7 @@ const ActivityEvidenceFlow = () => {
                   {rejectedList.length > 1 ? 'Pasos a corregir:' : 'Paso rechazado:'}
                 </strong>{' '}
                 <span className={styles.rejectedStepText}>
-                  {rejectedList.map((step) => evidenceStepLabel(step)).join(' · ')}
+                  {rejectedList.map((step) => evidenceStepLabel(step, flowData.coreKind)).join(' · ')}
                 </span>
               </div>
             )}
@@ -2075,7 +2078,13 @@ const ActivityEvidenceFlow = () => {
                   step={index + 1}
                   active={flowData.step === stepKey}
                   completed={completed}
-                  label={EVIDENCE_STEP_LABELS[stepKey]}
+                  label={
+                    stepKey === 'ENTRY_PHOTO'
+                      ? textos.inicio.corto
+                      : stepKey === 'EXIT_PHOTO'
+                        ? textos.cierre.corto
+                        : EVIDENCE_STEP_LABELS[stepKey]
+                  }
                 />
               </React.Fragment>
             );
@@ -2091,17 +2100,15 @@ const ActivityEvidenceFlow = () => {
       {/* PASO 1: Foto de Entrada */}
       {flowData.step === 'ENTRY_PHOTO' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepEntry}`}>
-          <h3 className={styles.stepTitle}>📸 Paso 1: Foto de Entrada</h3>
-          <p className={styles.stepDescription}>
-            Toma una foto de entrada. Se guardará automáticamente con tu ubicación.
-          </p>
+          <h3 className={styles.stepTitle}>📸 {textos.inicio.paso}</h3>
+          <p className={styles.stepDescription}>{textos.inicio.descripcion}</p>
           <div className={styles.actionGrid}>
             <button
               className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEntry}`}
               onClick={handleEntryPhoto}
               disabled={loading || cameraActive}
             >
-              {loading ? '⏳ Capturando...' : '📷 Entrada'}
+              {loading ? '⏳ Capturando...' : `📷 ${textos.inicio.boton}`}
             </button>
             <button
               className={`${styles.actionButton} ${styles.actionSecondary}`}
@@ -2956,20 +2963,15 @@ const ActivityEvidenceFlow = () => {
       {/* PASO 5: Foto de Salida */}
       {flowData.step === 'EXIT_PHOTO' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepExit}`}>
-          <h3 className={styles.stepTitle}>🚪 Paso 5: Foto de Salida</h3>
-          <p className={styles.stepDescription}>
-            Toma la foto de salida en el sitio. Se capturará automáticamente tu ubicación GPS — es
-            obligatoria para cerrar la actividad.
-          </p>
+          <h3 className={styles.stepTitle}>🚪 {textos.cierre.paso}</h3>
+          <p className={styles.stepDescription}>{textos.cierre.descripcion}</p>
           {geocerca.estado?.exigeMismaUbicacion === true ? (
             <p className={styles.stepDescription}>
               Debe tomarse a no más de {geocerca.estado?.radioM ?? RADIO_ACTIVIDAD_M} m del punto donde
               iniciaste la actividad.
             </p>
           ) : (
-            <p className={styles.stepDescription}>
-              En esta área la foto de salida no tiene que coincidir con el punto de inicio.
-            </p>
+            <p className={styles.stepDescription}>{textos.cierre.sinMismoLugar}</p>
           )}
           {zonaSalidaError && !pendingPhoto ? (
             <div style={{ marginBottom: 12 }}>
@@ -2988,7 +2990,7 @@ const ActivityEvidenceFlow = () => {
               onClick={() => void handleExitPhoto()}
               disabled={loading}
             >
-              {loading ? '⏳ Capturando...' : '📷 Salida'}
+              {loading ? '⏳ Capturando...' : `📷 ${textos.cierre.boton}`}
             </button>
             <button
               className={`${styles.actionButton} ${styles.actionSecondary}`}
@@ -3097,7 +3099,7 @@ const buildInitialDigitalForm = (
   return merged;
 };
 
-const DigitalEvidenceForm = ({
+export const DigitalEvidenceForm = ({
   coreKind,
   onSubmit,
   loading,
@@ -3113,9 +3115,14 @@ const DigitalEvidenceForm = ({
     buildInitialDigitalForm(coreKind, initialData),
   );
 
+  // Se compara por contenido, no por identidad: cada relectura (volver a la pestaña, aviso en
+  // tiempo real) trae un objeto nuevo con lo mismo guardado, y al corregir el formulario eso
+  // borraba lo que la persona llevaba escrito.
+  const guardado = claveDeFormulario(initialData);
   useEffect(() => {
     setData(buildInitialDigitalForm(coreKind, initialData));
-  }, [coreKind, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coreKind, guardado]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

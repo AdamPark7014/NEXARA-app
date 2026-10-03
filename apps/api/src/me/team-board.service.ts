@@ -15,7 +15,19 @@ import {
   periodoDto,
   type PeriodoDto,
 } from '../activities/actividad-periodo.js';
-import { esDeTodaLaEmpresa, extrasDeTablero, subarbolIds, tiposVisibles } from './equipo-alcance.js';
+import {
+  esDeTodaLaEmpresa,
+  extrasDeTablero,
+  puedeAsignarA,
+  subarbolIds,
+  tiposVisibles,
+} from './equipo-alcance.js';
+import {
+  cerrarSesionesVencidas,
+  leerSesiones,
+  sesionesDe,
+} from '../activities/sessions/activity-sessions.service.js';
+import { estadoDeTrabajo, type MotivoFinSesion } from '../activities/sessions/sesiones-trabajo.js';
 import {
   calculaActividad,
   enRango,
@@ -29,6 +41,7 @@ import {
   type KpisPersona,
   type Prioridad,
   type Semaforo,
+  ventanasLaboradas,
 } from './pizarra-kpi.js';
 import {
   accumulateWorkflow,
@@ -62,6 +75,8 @@ export type TeamBoardActivity = {
   bucket: BoardActivityBucket;
   /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep». */
   periodo: PeriodoDto | null;
+  /** Ya la inició pero su reloj está detenido (pausa, salida del día o corte automático). */
+  enPausa?: boolean;
 };
 
 export type TeamBoardOpenActivity = {
@@ -99,6 +114,18 @@ export type TeamBoardOpenActivity = {
   aceptacion: BoardAceptacion;
   /** Actividad de varios días: sigue en la pizarra cada día hasta su fin. */
   periodo: PeriodoDto | null;
+  /**
+   * Sesiones de trabajo. `enCurso`: su reloj corre ahora (es lo que un jefe puede pausar).
+   * `enPausa`: ya la inició y está detenida; no es un estatus, sigue «En Proceso».
+   */
+  enCurso?: boolean;
+  enPausa?: boolean;
+  /** PAUSA | SALIDA | TOPE_12H | CORTE_DIA. */
+  pausaTipo?: MotivoFinSesion | null;
+  pausadaAt?: Date | null;
+  pausadaPor?: { id: number; nombre: string } | null;
+  motivoPausa?: string | null;
+  sesionAbiertaDesde?: Date | null;
 };
 
 export type TeamBoardUser = {
@@ -132,6 +159,8 @@ export type TeamBoardUser = {
   enCorreccion: number;
   /** Contrato C: cómo le fue en el rango consultado. */
   kpis: KpisPersona;
+  /** Quien consulta puede pausarle una actividad (mismo alcance que para asignarle). */
+  puedePausar?: boolean;
 };
 
 export type TeamBoardResponse = {
@@ -575,7 +604,22 @@ export class TeamBoardService {
       rango ?? this.resolveRange(null, null, now),
       viewer.id,
     );
-    return card;
+    return { ...card, puedePausar: await this.puedePausarA(viewer, userId) };
+  }
+
+  /** ¿Quien mira puede pausarle una actividad a esta persona? Mismo alcance que para asignarle. */
+  private async puedePausarA(viewer: Viewer, userId: number): Promise<boolean> {
+    if (viewer.id === userId) return false;
+    try {
+      const activos = await this.prisma.user.findMany({
+        where: { isActive: true },
+        select: { id: true, email: true, managerId: true },
+      });
+      const email = viewer.email ?? activos.find((u) => u.id === viewer.id)?.email ?? null;
+      return puedeAsignarA({ ...viewer, email }, activos, userId);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -651,6 +695,11 @@ export class TeamBoardService {
       orderBy: { fechaAsignacion: 'desc' },
       take: Math.min(100, Math.max(1, take)),
     });
+    const sesiones = await leerSesiones(this.prisma, {
+      userIds: [userId],
+      activityIds: activities.map((a) => a.id),
+      companyId,
+    });
 
     return activities.map((a) => {
       const ev = a.activityEvidences[0] ?? null;
@@ -680,6 +729,7 @@ export class TeamBoardService {
           inicio: tiempos.inicio,
           fin: tiempos.fin,
           periodo: periodoDeActividad(a),
+          sesiones: sesionesDe(sesiones, userId, a.id),
         },
         now,
       );
@@ -771,6 +821,11 @@ export class TeamBoardService {
       orderBy: { asignadoAt: 'desc' },
       take: 400,
     });
+    const sesiones = await leerSesiones(this.prisma, {
+      userIds: [...new Set(filas.map((f) => f.userId))],
+      activityIds: [...new Set(filas.map((f) => f.activityId))],
+      companyId,
+    });
 
     const items: AsignadaPorMiItem[] = [];
     for (const fila of filas) {
@@ -810,6 +865,7 @@ export class TeamBoardService {
           inicio: tiempos.inicio,
           fin: tiempos.fin,
           periodo: periodoDeActividad(act),
+          sesiones: sesionesDe(sesiones, fila.userId, act.id),
         },
         now,
       );
@@ -1075,6 +1131,17 @@ export class TeamBoardService {
       }),
     ]);
 
+    // Sesiones de trabajo: lo que quedó corriendo de ayer (o lleva 12 h) se cierra al leerlo,
+    // y de ellas sale el tiempo real de cada tarjeta.
+    await cerrarSesionesVencidas(this.prisma, { userIds, companyId }, now);
+    const sesiones = await leerSesiones(this.prisma, {
+      userIds,
+      activityIds: [
+        ...new Set([...assigneeRows.map((r) => r.activityId), ...huerfanas.map((a) => a.id)]),
+      ],
+      companyId,
+    });
+
     // Una jornada por persona y día: primera entrada, última salida.
     const jornadasPorUsuario = new Map<number, Map<string, Jornada>>();
     for (const a of attendances) {
@@ -1112,6 +1179,7 @@ export class TeamBoardService {
       asignadoPor: { id: number; nombre: string } | null;
       aceptacion: BoardAceptacion;
       dentroDelRango: boolean;
+      enPausa: boolean;
     };
     const calculoPorFila = new Map<string, Calculo>();
     const clave = (userId: number, activityId: number) => `${userId}:${activityId}`;
@@ -1160,6 +1228,7 @@ export class TeamBoardService {
       });
       const terminada = isClosed || myEv?.status === 'COMPLETED';
       const periodo = periodoDeActividad(act);
+      const misSesiones = sesionesDe(sesiones, row.userId, act.id);
       const calc = calculaActividad(
         {
           prioridad: act.prioridad,
@@ -1174,9 +1243,18 @@ export class TeamBoardService {
           inicio: tiempos.inicio,
           fin: tiempos.fin,
           periodo,
+          sesiones: misSesiones,
         },
         now,
       );
+      // ¿Corre su reloj o está detenido? (no hay estatus «En pausa»: se deduce de las sesiones)
+      const trabajo = estadoDeTrabajo({
+        inicio: tiempos.inicio,
+        fin: tiempos.fin,
+        sesiones: misSesiones,
+        ahora: now,
+        terminada,
+      });
       // Una etapa que empieza después del rango todavía no es trabajo de esos días: si no,
       // al programar un proyecto todas sus etapas saldrían hoy en la pizarra.
       const programadaDespues = !terminada && periodo != null && periodo.inicio > workDateKey(dayEnd);
@@ -1198,6 +1276,7 @@ export class TeamBoardService {
         asignadoPor: row.asignadoPor ? { id: row.asignadoPor.id, nombre: row.asignadoPor.nombre } : null,
         aceptacion: aceptacionDe(row),
         dentroDelRango,
+        enPausa: trabajo.enPausa,
       });
       if (!dentroDelRango) continue;
 
@@ -1232,6 +1311,13 @@ export class TeamBoardService {
           : null,
         aceptacion: aceptacionDe(row),
         periodo: periodoDto(act, now, terminada),
+        enCurso: trabajo.enCurso,
+        enPausa: trabajo.enPausa,
+        pausaTipo: trabajo.pausaTipo,
+        pausadaAt: trabajo.pausadaAt,
+        pausadaPor: trabajo.pausadaPor,
+        motivoPausa: trabajo.motivoPausa,
+        sesionAbiertaDesde: trabajo.sesionAbiertaDesde,
       };
       // Cerrada no es «asignada» en la tarjeta: si no, el cupo de la lista se llena
       // de historial y las pendientes (AN-0001, AN-0002) no salen.
@@ -1286,7 +1372,13 @@ export class TeamBoardService {
       const enCurso =
         enElRango
           .filter((p) => !p.terminada)
-          .sort((x, y) => arranco(x.a.estatus) - arranco(y.a.estatus) || vence(x.a) - vence(y.a))[0] ?? null;
+          .sort(
+            (x, y) =>
+              arranco(x.a.estatus) - arranco(y.a.estatus) ||
+              // Entre las ya iniciadas, la que tiene el reloj corriendo va antes que la pausada.
+              Number(Boolean(x.calculo?.enPausa)) - Number(Boolean(y.calculo?.enPausa)) ||
+              vence(x.a) - vence(y.a),
+          )[0] ?? null;
       const act = enCurso?.a ?? null;
       // Entregó y nadie ha aprobado todavía / le devolvieron evidencia y la está corrigiendo.
       const enEsperaAprobacion = enElRango.filter((p) => p.envio && !p.aprobada && !p.cancelada).length;
@@ -1312,6 +1404,7 @@ export class TeamBoardService {
           fechaMaxima: act.fechaMaxima,
           bucket: act.projectId ? 'projects' : act.clientId ? 'services' : 'daily',
           periodo: periodoDto(act, now, false),
+          enPausa: Boolean(enCurso?.calculo?.enPausa),
         };
         // El inicio es el real (foto de entrada / `inicioRealAt`), no la hora a la que la citaron.
         activityStartedAt = enCurso?.calculo?.inicio ?? null;
@@ -1345,9 +1438,11 @@ export class TeamBoardService {
       const clockInAt = jornadas.length ? jornadas[jornadas.length - 1].entrada : null;
       // Antes se contaba de la entrada hasta ahora aunque ya se hubiera ido.
       const workedMinutes = minutosAsistidos(jornadas, comidas, now);
+      // Horas productivas = tiempo en actividades **dentro** de la jornada (entrada → salida).
       const kpis = kpisDePersona(
         enElRango.map((p) => p.calculo!.calc),
         workedMinutes,
+        ventanasLaboradas(jornadas, comidas, now),
       );
 
       return {

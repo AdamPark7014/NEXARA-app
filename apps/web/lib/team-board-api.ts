@@ -1,6 +1,7 @@
 import { erpFetch } from "@/lib/erp-api";
 import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 import type { PeriodoActividad } from "@/lib/actividad-periodo";
+import type { PausaTipo } from "@/lib/sesion-actividad";
 
 export type BoardActivityBucket = "daily" | "projects" | "services";
 export type BoardUserStatus = "activo" | "inactivo" | "atrasado" | "libre" | "sin_actividad";
@@ -20,6 +21,8 @@ export type TeamBoardActivity = {
   bucket: BoardActivityBucket;
   /** Actividad de varios días (API vieja: no viene). */
   periodo?: PeriodoActividad | null;
+  /** Ya la inició pero su reloj está detenido (pausa, salida del día o corte automático). */
+  enPausa?: boolean;
 };
 
 export type TeamBoardOpenActivity = {
@@ -55,6 +58,17 @@ export type TeamBoardOpenActivity = {
   aceptacion?: BoardAceptacion;
   /** Actividad de varios días: sigue en la pizarra cada día hasta su fin. */
   periodo?: PeriodoActividad | null;
+  /**
+   * Sesiones de trabajo (API nueva; opcional). `enCurso`: su reloj corre. `enPausa`: ya la
+   * inició y está detenida (pausa, salida del día o corte automático): hay que reanudarla.
+   */
+  enCurso?: boolean;
+  enPausa?: boolean;
+  pausaTipo?: PausaTipo | null;
+  pausadaAt?: string | null;
+  pausadaPor?: { id: number; nombre: string } | null;
+  motivoPausa?: string | null;
+  sesionAbiertaDesde?: string | null;
 };
 
 /** Contrato C: cómo le fue a la persona en el rango consultado. */
@@ -103,6 +117,8 @@ export type TeamBoardUser = {
   enCorreccion?: number;
   /** Contrato C (API vieja: puede no venir). */
   kpis?: BoardKpis;
+  /** Quien mira puede pausarle una actividad (mismo alcance que para asignarle). */
+  puedePausar?: boolean;
 };
 
 export type TeamBoardHistoryItem = {

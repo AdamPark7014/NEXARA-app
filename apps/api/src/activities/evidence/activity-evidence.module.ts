@@ -9,10 +9,18 @@ import { PrismaModule } from '../../prisma/prisma.module.js';
 import { ActivitiesModule } from '../activities.module.js';
 import { NotificationsModule } from '../../notifications/notifications.module.js';
 import { ActivityGeofenceModule } from '../geofence/activity-geofence.module.js';
+import { ActivitySessionsModule } from '../sessions/activity-sessions.module.js';
 import { ActivityEvidenceReminderCronService } from './activity-evidence-reminder.cron.js';
 
 @Module({
-  imports: [CoreModule, PrismaModule, ActivitiesModule, NotificationsModule, ActivityGeofenceModule],
+  imports: [
+    CoreModule,
+    PrismaModule,
+    ActivitiesModule,
+    NotificationsModule,
+    ActivityGeofenceModule,
+    ActivitySessionsModule,
+  ],
   controllers: [ActivityEvidenceController, ActivityEvidenceFieldsController],
   providers: [ActivityEvidenceService, ActivityEvidenceFieldsService, ActivityEvidenceZipService, ActivityEvidenceReminderCronService],
   exports: [ActivityEvidenceService, ActivityEvidenceFieldsService],

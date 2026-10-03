@@ -34,7 +34,7 @@ import { useUser } from "@/components/UserContext";
 import { formatoDistancia, type GeocercaAlerta } from "@/lib/activity-geofence";
 import { formatApiError } from "@/lib/erp-api";
 import { flattenServiceSheetFields, mapsUrl, resolveAssetUrl } from "@/lib/evidence-display";
-import { digitalFormLabels, evidenceStepsForKind } from "@/lib/evidence-flow-helpers";
+import { digitalFormLabels, evidenceStepsForKind, textosDeInicioYCierre } from "@/lib/evidence-flow-helpers";
 import {
   fetchTeamEvidence,
   revisarEvidencia,
@@ -56,6 +56,13 @@ const STEP_LABEL: Record<string, string> = {
   SERVICE_SHEET_DATA: "Formulario",
   EXIT_PHOTO: "Foto de salida",
 };
+
+/** En comercial el primer y el último paso son «Inicio de actividad» y «Conclusión de actividad». */
+function etiquetaDePaso(step: string, coreKind: string | null): string {
+  if (step === "ENTRY_PHOTO") return textosDeInicioYCierre(coreKind).inicio.nombre;
+  if (step === "EXIT_PHOTO") return textosDeInicioYCierre(coreKind).cierre.nombre;
+  return STEP_LABEL[step] ?? step;
+}
 
 const CALIF_LABEL = ["", "Deficiente", "Regular", "Buena", "Muy buena", "Excelente"];
 
@@ -744,7 +751,7 @@ function EvidenciaContenido({
             >
               <div style={{ fontSize: 12.5, fontWeight: 750 }}>
                 <IconLabel icon={marca} size={16} gap={4} iconColor={color ?? "var(--text-tertiary)"}>
-                  {STEP_LABEL[step] ?? step}
+                  {etiquetaDePaso(step, coreKind)}
                 </IconLabel>
               </div>
               <div
@@ -765,12 +772,12 @@ function EvidenciaContenido({
       {entrada != null || salida != null ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
           {entrada != null ? (
-            <Seccion titulo="Entrada" hora={fmt(ev.entryPhotoUploadedAt)} accion={devolver("ENTRY_PHOTO")}>
+            <Seccion titulo={textosDeInicioYCierre(coreKind).inicio.corto} hora={fmt(ev.entryPhotoUploadedAt)} accion={devolver("ENTRY_PHOTO")}>
               <Miniatura foto={fotos[entrada]} onOpen={() => abrirVisor(fotos, entrada)} alto={320} />
             </Seccion>
           ) : null}
           {salida != null ? (
-            <Seccion titulo="Salida" hora={fmt(ev.exitPhotoUploadedAt)} accion={devolver("EXIT_PHOTO")}>
+            <Seccion titulo={textosDeInicioYCierre(coreKind).cierre.corto} hora={fmt(ev.exitPhotoUploadedAt)} accion={devolver("EXIT_PHOTO")}>
               <Miniatura foto={fotos[salida]} onOpen={() => abrirVisor(fotos, salida)} alto={320} />
             </Seccion>
           ) : null}
@@ -850,7 +857,7 @@ function Historial({
               {r.calificacion ? <Estrellas valor={r.calificacion} /> : null}
               {r.decision === "DEVUELTA_PASOS" && r.pasos.length ? (
                 <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  Corregir: {r.pasos.map((p) => STEP_LABEL[p] ?? p).join(", ")}
+                  Corregir: {r.pasos.map((p) => etiquetaDePaso(p, coreKind)).join(", ")}
                 </div>
               ) : null}
               <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{r.observaciones}</p>
@@ -1194,7 +1201,7 @@ function RevisionModal({
                       }
                       style={{ width: 18, height: 18 }}
                     />
-                    {STEP_LABEL[step] ?? step}
+                    {etiquetaDePaso(step, coreKind)}
                   </label>
                 ))}
               </div>
@@ -1434,7 +1441,7 @@ function TarjetaPersona({
                 <IconoTexto icon={ReplayIcon} color={NARANJA} />
                 Corrigió lo que se le devolvió
                 {corregidos.length && ultimaDevolucion?.decision !== "DEVUELTA_TODO"
-                  ? ` (${corregidos.map((s) => STEP_LABEL[s] ?? s).join(", ")})`
+                  ? ` (${corregidos.map((s) => etiquetaDePaso(s, coreKind)).join(", ")})`
                   : " (rehízo toda la actividad)"}
                 {ev?.correctionSubmittedAt ? ` · ${fmt(ev.correctionSubmittedAt)}` : ""}. Revisa la corrección y apruébala o
                 devuélvela de nuevo.
@@ -1483,7 +1490,7 @@ function TarjetaPersona({
           }}
         >
           <IconoTexto icon={UndoIcon} color={NARANJA} />
-          Está corrigiendo: <strong>{corrigiendo.map((s) => STEP_LABEL[s] ?? s).join(", ")}</strong>
+          Está corrigiendo: <strong>{corrigiendo.map((s) => etiquetaDePaso(s, coreKind)).join(", ")}</strong>
           {ev?.reviewNotes ? ` · «${ev.reviewNotes}»` : ""}
           {m.puedoRevisar || m.revisiones.length ? ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez." : ""}
         </p>

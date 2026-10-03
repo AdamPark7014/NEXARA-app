@@ -14,6 +14,7 @@ extension CoreOrg {
     static let robertoEmail = "roberto.vivanco@nexara.com.mx"
     static let danielaEmail = "daniela.hernandez@nexara.com.mx"
     static let monicaEmail = "soluciones@nexara.com.mx"
+    static let paulinaEmail = "finanzas@nexara.com.mx"
     static let joanEmail = "joan.sanchez@nexara.com.mx"
     static let israelEmail = "israel.ramos@nexara.com.mx"
     static let juanEmail = "juan.gonzalez@nexara.com.mx"
@@ -97,7 +98,9 @@ enum ClientSector: String, CaseIterable, Identifiable, Hashable {
         switch kind {
         case .proyecto, .obra: return allowed.filter { $0 == .proyecto }
         case .servicio: return allowed.filter { $0 == .corporativo }
-        case .comercial: return allowed
+        // Quien crea comercial sin estar en la matriz de Clientes (Paulina) usa el padrón
+        // comercial: sin él, el cliente obligatorio salía vacío y no podía guardar.
+        case .comercial: return allowed.isEmpty ? [.comercial] : allowed
         case .tarea: return []
         }
     }
@@ -211,6 +214,8 @@ enum CoreActivityRules {
         CoreOrg.antonioEmail: [.tarea, .proyecto, .servicio, .comercial],
         CoreOrg.danielaEmail: [.tarea, .comercial],
         CoreOrg.monicaEmail: [.tarea, .comercial],
+        // Paulina (contadora): lo comercial es parte de su trabajo; sin estar aquí solo veía Tarea.
+        CoreOrg.paulinaEmail: [.tarea, .comercial],
         CoreOrg.joanEmail: [.tarea],
         CoreOrg.israelEmail: [.tarea],
         CoreOrg.juanEmail: [.tarea],
@@ -234,6 +239,7 @@ enum CoreActivityRules {
         CoreOrg.robertoEmail: [.tarea, .proyecto, .servicio],
         CoreOrg.danielaEmail: [.tarea, .comercial],
         CoreOrg.monicaEmail: [.tarea, .comercial],
+        CoreOrg.paulinaEmail: [.tarea, .comercial],
         CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial],
     ]
 

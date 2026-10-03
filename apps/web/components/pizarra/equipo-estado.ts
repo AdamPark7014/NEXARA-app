@@ -116,6 +116,8 @@ export function estadoDeActividad(a: {
   minutosAtraso?: number | null;
   semaforo?: "rojo" | "amarillo" | "verde" | null;
   periodo?: { etiqueta?: string | null } | null;
+  /** Sesiones de trabajo: ya la inició y su reloj está detenido. */
+  enPausa?: boolean | null;
 }): string {
   const est = (a.estatus || "").toLowerCase();
   if (/cancel/.test(est)) return "Cancelada";
@@ -125,6 +127,7 @@ export function estadoDeActividad(a: {
     return t && t !== "—" ? `Atrasada · ${t}` : "Atrasada";
   }
   if (a.semaforo === "amarillo") return "Por vencer";
+  if (a.enPausa) return "En pausa";
   if (a.inicioRealAt || /proceso|validar/.test(est)) return "En curso";
   return "Sin iniciar";
 }

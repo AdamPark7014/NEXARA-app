@@ -211,7 +211,7 @@ function Dato({ etiqueta, valor, detalle, color }: { etiqueta: string; valor: st
 }
 
 /**
- * «Ubicación de la actividad»: punto de inicio, radio de 100 m, última distancia, recorrido
+ * «Ubicación de la actividad»: punto de inicio, radio (500 m), última distancia, recorrido
  * reciente y salidas de zona por justificar.
  */
 export default function UbicacionActividadCard({
@@ -281,7 +281,7 @@ export default function UbicacionActividadCard({
           <p style={{ margin: "2px 0 0", fontSize: 12.5, lineHeight: 1.4, color: "var(--text-secondary)" }}>
             {estado?.exigeMismaUbicacion === true
               ? `Mantente a no más de ${radio} m del punto donde iniciaste: la foto de salida solo se acepta dentro de ese radio.`
-              : "La foto de salida lleva tu ubicación. En esta área no hace falta que coincida con el punto de inicio."}
+              : "La foto de salida lleva tu ubicación. En este tipo de actividad no hace falta que coincida con el punto de inicio."}
           </p>
         </div>
         {chipEstado}

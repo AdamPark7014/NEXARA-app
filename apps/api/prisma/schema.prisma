@@ -30,6 +30,9 @@ model Product {
   icecatDatasheet String?
   thumbnailUrl    String?
   upc             String?
+  /// Código de barras propio cuando no es UPC/EAN: Code 128 del fabricante o etiqueta interna.
+  /// Los UPC-A van en `upc` y los EAN en `ean`; el lector de almacén busca en los tres.
+  codigoBarras    String?         @db.VarChar(64)
   activo          Boolean?        @default(true)
   itemType        CatalogItemType @default(PRODUCT)
   existencia      Json?
@@ -75,7 +78,10 @@ model Product {
   supplierPriceBreaks SupplierPriceBreak[]
 
   @@unique([companyId, sku])
+  @@unique([companyId, codigoBarras])
   @@index([companyId])
+  @@index([companyId, upc])
+  @@index([companyId, ean])
 }
 
 /// Presentación en que se compra o se captura un producto: «Caja» = 100 piezas, «Rollo» = 305 m.
@@ -968,6 +974,8 @@ model User {
 
   geofenceAlerts          ActivityGeofenceAlert[] @relation("GeofenceAlertUser")
   evidenceFieldPhotos     ActivityEvidenceFieldPhoto[] @relation("EvidenceFieldPhotoAuthor")
+  workSessions            ActivityWorkSession[] @relation("WorkSessionUser")
+  workSessionsEnded       ActivityWorkSession[] @relation("WorkSessionEndedBy")
 
   // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
   checadasRechazadas    AttendanceRejection[] @relation("AttendanceRejectionUser")
@@ -1245,6 +1253,8 @@ model Activity {
   company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   geofenceAlerts          ActivityGeofenceAlert[]
+  /// Tramos en que corrió el reloj de cada persona (de aquí sale el tiempo real).
+  workSessions            ActivityWorkSession[]
   /// Qué hay que documentar en esta actividad («Cámara 1», «Rack») y en qué momentos.
   evidenceFields          ActivityEvidenceField[]
   evidenceFieldPhotos     ActivityEvidenceFieldPhoto[]
@@ -2773,10 +2783,10 @@ model SalesClient {
   ownerId         Int?
   serviceClientId Int?
   companyId       Int
-  /// Un cliente es de un solo tipo. COMERCIAL se elige en la cotización, PROYECTO en
-  /// el módulo de proyectos y CORPORATIVO al crear una actividad de servicio.
-  /// La clasificación de los que ya existían está en la migración
-  /// `20260928220000_sales_client_tipo` (el uso más reciente; empate o sin uso → COMERCIAL).
+  /// Tipo principal: con el que nació el cliente (COMERCIAL en una cotización, PROYECTO
+  /// en Proyectos, CORPORATIVO en una actividad de servicio). Un cliente puede ser de
+  /// varios tipos a la vez: la membresía completa vive en `sectors` y es la que leen las
+  /// listas y los selectores (`filtroPorSector` en ventas/client-sectors.ts).
   tipo            ClientSector          @default(COMERCIAL)
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
@@ -2797,8 +2807,9 @@ model SalesClient {
   @@map("sales_clients")
 }
 
-/// Membresía del tipo del cliente. Desde `tipo` en SalesClient hay una sola fila, la de ese tipo.
-/// Se conserva para no romper lecturas viejas que filtraban por sector.
+/// Tipos del cliente: una fila por cada uno (proyecto, corporativo, comercial). El mismo
+/// cliente puede tener los tres. `20261002140000_clientes_varios_tipos` recuperó por uso
+/// los que `20260928220000_sales_client_tipo` había reducido a uno.
 model SalesClientSector {
   id            Int          @id @default(autoincrement())
   salesClientId Int
@@ -6092,6 +6103,7 @@ model CompanyProfile {
   integraCameraCapabilities  IntegraCameraCapability[]
 
   activityGeofenceAlerts  ActivityGeofenceAlert[]
+  activityWorkSessions    ActivityWorkSession[]
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   attendanceRejections        AttendanceRejection[]
@@ -6594,6 +6606,39 @@ model ActivityGeofenceAlert {
   @@index([activityId, userId])
   @@index([companyId])
   @@map("activity_geofence_alerts")
+}
+
+/// Sesión de trabajo: un tramo en que el reloj de una persona corrió en una actividad.
+///
+/// `ActivityAssignee.inicioRealAt`/`finRealAt` es un solo intervalo, así que una actividad de
+/// varios días contaba noches y fines de semana como trabajo. Aquí cada tramo se guarda aparte:
+/// se abre al iniciar o reanudar y se cierra con la foto de salida, una pausa, la checada de
+/// salida, a las 12 horas o al terminar el día. El tiempo real es la suma de sus sesiones.
+model ActivityWorkSession {
+  id         Int       @id @default(autoincrement())
+  activityId Int
+  userId     Int
+  companyId  Int
+  startedAt  DateTime
+  /// null = sigue corriendo.
+  endedAt    DateTime?
+  /// FIN | PAUSA | SALIDA | TOPE_12H | CORTE_DIA
+  endReason  String?   @db.VarChar(20)
+  /// Quién la pausó (la propia persona o su jefe). null en los cierres automáticos.
+  endedById  Int?
+  /// Motivo de la pausa.
+  nota       String?   @db.VarChar(500)
+  createdAt  DateTime  @default(now())
+
+  activity Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User           @relation("WorkSessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  endedBy  User?          @relation("WorkSessionEndedBy", fields: [endedById], references: [id], onDelete: SetNull)
+  company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([userId, endedAt])
+  @@index([activityId, userId])
+  @@index([companyId])
+  @@map("activity_work_sessions")
 }
 
 /// Una cosa que hay que documentar en la actividad: «Cámara 1», «Rack», «Canalización».
