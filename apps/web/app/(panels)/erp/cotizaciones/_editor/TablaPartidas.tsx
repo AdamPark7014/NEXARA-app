@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { smartQuoteSearch, type SmartOffer } from "@/lib/smart-quote-api";
-import { GRUPOS_PARTIDA, GRUPO_LABEL, formatoMoneda, type GrupoPartida } from "@/lib/cotizaciones-api";
+import {
+  GRUPOS_PARTIDA,
+  GRUPO_LABEL,
+  buscarPartidasFrecuentes,
+  formatoMoneda,
+  type GrupoPartida,
+  type PartidaFrecuente,
+} from "@/lib/cotizaciones-api";
 import {
   UNIDADES,
   importeDeLinea,
@@ -254,6 +261,7 @@ export default function TablaPartidas({
   columnas = SIN_EXTRAS,
   margenPorcentaje = null,
   margenMonto = 0,
+  cotizacionId = null,
 }: {
   partidas: PartidaEditor[];
   setPartidas: (f: (p: PartidaEditor[]) => PartidaEditor[]) => void;
@@ -261,6 +269,8 @@ export default function TablaPartidas({
   moneda: string;
   token: string | null;
   totales: Totales;
+  /** La cotización en edición: sus propias partidas no cuentan como «usadas antes». */
+  cotizacionId?: number | null;
   /** Porcentaje ya aplicado al total. Null o 0: el total es subtotal + IVA. */
   margenPorcentaje?: number | null;
   margenMonto?: number;
@@ -608,6 +618,7 @@ export default function TablaPartidas({
           columnas={columnas}
           token={token}
           moneda={moneda}
+          cotizacionId={cotizacionId}
           refDe={refDe}
           alSubir={() => {
             const ultima = partidas[partidas.length - 1];
@@ -654,12 +665,35 @@ export default function TablaPartidas({
   );
 }
 
-/** Última fila: se escribe (o se busca en el catálogo) y Enter la agrega. */
+/** «Cámara  IP» y «camara ip» son la misma partida: sin acentos, sin mayúsculas, espacios simples. */
+const sinAdornos = (texto: string) =>
+  texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Primer renglón del título (los hay con viñetas y varios párrafos), para la lista de sugerencias. */
+const tituloCorto = (texto: string) => {
+  const linea = texto.split("\n")[0]?.trim() ?? "";
+  return linea.length > 110 ? `${linea.slice(0, 110)}…` : linea;
+};
+
+type Sugerencia =
+  | { clave: string; tipo: "usada"; usada: PartidaFrecuente }
+  | { clave: string; tipo: "catalogo"; oferta: SmartOffer };
+
+/**
+ * Última fila: se escribe y Enter la agrega. Mientras se escribe ofrece primero las partidas que la
+ * empresa ya cotizó («Usadas antes», con lo de su última vez) y después el catálogo del mayorista.
+ */
 function FilaNueva({
   numero,
   columnas,
   token,
   moneda,
+  cotizacionId,
   refDe,
   alAgregar,
   alSubir,
@@ -668,6 +702,7 @@ function FilaNueva({
   columnas: ColumnasOpcionales;
   token: string | null;
   moneda: string;
+  cotizacionId: number | null;
   refDe: (key: string, col: Columna) => (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) => void;
   alAgregar: (p: PartidaEditor, opciones?: { conFoco?: boolean }) => void;
   alSubir: () => void;
@@ -677,9 +712,42 @@ function FilaNueva({
   const [unidad, setUnidad] = useState("Pieza");
   const [cantidad, setCantidad] = useState(1);
   const [precio, setPrecio] = useState(Number.NaN);
+  const [usadas, setUsadas] = useState<PartidaFrecuente[]>([]);
   const [ofertas, setOfertas] = useState<SmartOffer[]>([]);
-  const [activa, setActiva] = useState(-1);
+  /** Sugerencia marcada con las flechas, por su clave: las dos listas llegan a destiempo. */
+  const [activa, setActiva] = useState<string | null>(null);
   const [sinCatalogo, setSinCatalogo] = useState(false);
+  const [sinUsadas, setSinUsadas] = useState(false);
+  /** Lo último que devolvió la búsqueda: la lista se cierra al salir de la celda, esto no. */
+  const conocidas = useRef<PartidaFrecuente[]>([]);
+
+  // Lo ya cotizado se busca desde la segunda letra y antes que el catálogo: es lo que más se repite.
+  useEffect(() => {
+    const q = nombre.trim();
+    if (!token || q.length < 2 || sinUsadas) {
+      setUsadas([]);
+      return;
+    }
+    const control = new AbortController();
+    const t = setTimeout(() => {
+      buscarPartidasFrecuentes(token, q, { moneda, excluir: cotizacionId, signal: control.signal })
+        .then((r) => {
+          const lista = Array.isArray(r) ? r : [];
+          conocidas.current = lista;
+          setUsadas(lista);
+        })
+        .catch((e) => {
+          if ((e as Error)?.name === "AbortError") return;
+          // Sin permiso o sin servicio: se sigue capturando a mano, sin insistir en cada tecla.
+          setSinUsadas(true);
+          setUsadas([]);
+        });
+    }, 250);
+    return () => {
+      clearTimeout(t);
+      control.abort();
+    };
+  }, [nombre, token, moneda, cotizacionId, sinUsadas]);
 
   useEffect(() => {
     const q = nombre.trim();
@@ -692,7 +760,6 @@ function FilaNueva({
       smartQuoteSearch(token, { q, take: 6 }, { signal: control.signal })
         .then((r) => {
           setOfertas(r.data ?? []);
-          setActiva(-1);
         })
         .catch((e) => {
           if ((e as Error)?.name === "AbortError") return;
@@ -712,14 +779,56 @@ function FilaNueva({
     setCantidad(1);
     setPrecio(Number.NaN);
     setUnidad("Pieza");
+    setUsadas([]);
     setOfertas([]);
-    setActiva(-1);
+    setActiva(null);
+    conocidas.current = [];
   };
 
   const cantidadSana = Math.max(1, Math.round(Number.isFinite(cantidad) ? cantidad : 1));
 
+  const sugerencias: Sugerencia[] = [
+    ...usadas.map((usada): Sugerencia => ({ clave: `u:${sinAdornos(usada.name)}|${sinAdornos(usada.model ?? "")}`, tipo: "usada", usada })),
+    ...ofertas.map((oferta): Sugerencia => ({ clave: `c:${oferta.id}`, tipo: "catalogo", oferta })),
+  ];
+  const indiceActiva = sugerencias.findIndex((s) => s.clave === activa);
+
+  /**
+   * Una partida ya cotizada entra con lo de su última vez (descripción, marca, modelo, unidad, costo
+   * y precio) y **sin margen**: en esta cotización puede ser otro. Sin margen el precio queda tal
+   * cual, editable a mano; en cuanto se escribe un margen, sale de costo × (1 + margen/100), igual
+   * que en cualquier otra partida. Lo que la persona ya tecleó en la fila (precio, unidad) manda.
+   */
+  const agregarUsada = (u: PartidaFrecuente, opciones?: { conFoco?: boolean; nombre?: string }) => {
+    const costo = Number(u.unitCost);
+    alAgregar(
+      partidaNueva({
+        name: opciones?.nombre ?? u.name,
+        description: u.description ?? null,
+        brand: u.brand ?? null,
+        model: u.model ?? null,
+        unit: unidad !== "Pieza" ? unidad : u.unit || unidad,
+        qty: cantidadSana,
+        unitCost: Number.isFinite(costo) && costo > 0 ? costo : null,
+        unitPrice: Math.max(0, Number.isFinite(precio) ? precio : Number(u.unitPrice) || 0),
+        marginPercent: null,
+        grupo: u.grupo ?? null,
+        imagenUrl: u.imagenUrl ?? null,
+      }),
+      opciones,
+    );
+    limpiar();
+  };
+
   const agregarLibre = (opciones?: { conFoco?: boolean }) => {
     if (!nombre.trim()) return;
+    // Se escribió completa una partida ya cotizada: se reconoce y entra con sus datos de siempre,
+    // aunque no se haya elegido de la lista (o ya se haya pasado a la cantidad o al precio).
+    const reconocida = conocidas.current.find((u) => sinAdornos(u.name) === sinAdornos(nombre));
+    if (reconocida) {
+      agregarUsada(reconocida, { ...opciones, nombre: nombre.trim() });
+      return;
+    }
     alAgregar(
       partidaNueva({
         name: nombre.trim(),
@@ -768,23 +877,62 @@ function FilaNueva({
   const alTeclear = (e: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (e.nativeEvent.isComposing) return;
     const enDescripcion = e.currentTarget instanceof HTMLInputElement && e.currentTarget.dataset["col"] === "desc";
-    if (e.key === "ArrowDown" && ofertas.length && enDescripcion) {
+    if (e.key === "ArrowDown" && sugerencias.length && enDescripcion) {
       e.preventDefault();
-      setActiva((a) => Math.min(ofertas.length - 1, a + 1));
-    } else if (e.key === "ArrowUp" && ofertas.length && enDescripcion && activa >= 0) {
+      setActiva(sugerencias[Math.min(sugerencias.length - 1, indiceActiva + 1)]?.clave ?? null);
+    } else if (e.key === "ArrowUp" && sugerencias.length && enDescripcion && indiceActiva >= 0) {
       e.preventDefault();
-      setActiva((a) => Math.max(-1, a - 1));
+      setActiva(indiceActiva > 0 ? sugerencias[indiceActiva - 1]!.clave : null);
     } else if (e.key === "ArrowUp" && !(e.currentTarget instanceof HTMLSelectElement)) {
       e.preventDefault();
       alSubir();
     } else if (e.key === "Escape") {
+      setUsadas([]);
       setOfertas([]);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const o = activa >= 0 ? ofertas[activa] : null;
-      if (o) agregarOferta(o);
+      const elegida = indiceActiva >= 0 ? sugerencias[indiceActiva] : null;
+      if (elegida?.tipo === "usada") agregarUsada(elegida.usada);
+      else if (elegida?.tipo === "catalogo") agregarOferta(elegida.oferta);
       else agregarLibre();
     }
+  };
+
+  const opcion = (s: Sugerencia) => {
+    const marcada = s.clave === activa;
+    const elegir = () => (s.tipo === "usada" ? agregarUsada(s.usada) : agregarOferta(s.oferta));
+    const detalle =
+      s.tipo === "usada"
+        ? [
+            s.usada.brand,
+            s.usada.model,
+            s.usada.veces === 1 ? "usada 1 vez" : `usada ${s.usada.veces} veces`,
+            `último precio ${formatoMoneda(s.usada.unitPrice, moneda)}`,
+          ]
+        : [
+            s.oferta.marca,
+            s.oferta.modelo,
+            formatoMoneda(s.oferta.sellPriceSuggested || s.oferta.precio),
+            s.oferta.stockTotal > 0 ? "en stock" : "sobre pedido",
+          ];
+    return (
+      <li
+        key={s.clave}
+        // Con las dos listas ya no caben todas a la vista: la marcada con las flechas se trae.
+        ref={marcada ? (el) => el?.scrollIntoView?.({ block: "nearest" }) : undefined}
+        role="option"
+        aria-selected={marcada}
+        className={`${styles.opcion} ${marcada ? styles.opcionActiva : ""}`}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          elegir();
+        }}
+        onMouseEnter={() => setActiva(s.clave)}
+      >
+        <span>{s.tipo === "usada" ? tituloCorto(s.usada.name) : s.oferta.nombre ?? s.oferta.clave}</span>
+        <small>{detalle.filter(Boolean).join(" · ")}</small>
+      </li>
+    );
   };
 
   return (
@@ -800,40 +948,37 @@ function FilaNueva({
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           onKeyDown={alTeclear}
-          onBlur={() => setTimeout(() => setOfertas([]), 150)}
+          onBlur={() =>
+            setTimeout(() => {
+              setUsadas([]);
+              setOfertas([]);
+            }, 150)
+          }
           placeholder="Nueva partida"
           aria-label="Descripción de la nueva partida"
           role="combobox"
-          aria-expanded={ofertas.length > 0}
+          aria-expanded={sugerencias.length > 0}
           aria-autocomplete="list"
         />
-        {ofertas.length ? (
+        {sugerencias.length ? (
           <ul
             className={styles.sugerencias}
             role="listbox"
-            aria-label="Catálogo"
+            aria-label="Sugerencias"
             onMouseDown={(e) => e.preventDefault()}
           >
-            {ofertas.map((o, i) => (
-              <li
-                key={o.id}
-                role="option"
-                aria-selected={i === activa}
-                className={`${styles.opcion} ${i === activa ? styles.opcionActiva : ""}`}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  agregarOferta(o);
-                }}
-                onMouseEnter={() => setActiva(i)}
-              >
-                <span>{o.nombre ?? o.clave}</span>
-                <small>
-                  {[o.marca, o.modelo, formatoMoneda(o.sellPriceSuggested || o.precio), o.stockTotal > 0 ? "en stock" : "sobre pedido"]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </small>
+            {usadas.length ? (
+              <li role="presentation" className={styles.sugerenciasGrupo}>
+                Usadas antes
               </li>
-            ))}
+            ) : null}
+            {sugerencias.filter((s) => s.tipo === "usada").map(opcion)}
+            {ofertas.length ? (
+              <li role="presentation" className={styles.sugerenciasGrupo}>
+                Catálogo
+              </li>
+            ) : null}
+            {sugerencias.filter((s) => s.tipo === "catalogo").map(opcion)}
           </ul>
         ) : null}
       </span>

@@ -19,6 +19,8 @@ import {
   porcentajeMargen,
   precioConMargen,
   sumarDias,
+  terminosPropiosDeDetalle,
+  terminosPropiosDeNota,
   totalesDePartidas,
 } from "./cotizacion-documento";
 import { formatoFecha, type CotizacionDetalle } from "./cotizaciones-api";
@@ -151,8 +153,34 @@ describe("partidas y totales", () => {
 
 describe("términos reescritos", () => {
   it("solo se guarda lo que se reescribió, con su título", () => {
-    expect(escribirTerminos({ noIncluye: "Obra civil.", pago: "" })).toBe("No incluye:\nObra civil.");
+    expect(escribirTerminos({ noIncluye: "Obra civil." })).toBe("No incluye:\nObra civil.");
     expect(escribirTerminos({})).toBe("");
+  });
+
+  it("un término vaciado a propósito se guarda como su título solo, y así vuelve al reabrir", () => {
+    // Antes un término en blanco no se guardaba: el PDF reponía el texto del segmento («50 % de
+    // anticipo…») que la persona acababa de borrar, y el editor lo seguía enseñando vacío.
+    const nota = escribirTerminos({ noIncluye: "Obra civil.", pago: "" });
+    expect(nota).toBe("Forma de pago:\n\nNo incluye:\nObra civil.");
+    expect(terminosPropiosDeNota(nota)).toEqual({ pago: "", noIncluye: "Obra civil." });
+    // «Otras condiciones» nace vacía: dejarla en blanco no es borrar nada.
+    expect(escribirTerminos({ otras: "" })).toBe("");
+  });
+
+  it("al reabrir, el término vaciado sigue vacío aunque la API ya no lo traiga en sus partes", () => {
+    const propios = terminosPropiosDeDetalle({
+      note: "Forma de pago:\n\nNo incluye:\nObra civil.",
+      terminos: {
+        modalidad: "SUMINISTRO",
+        titulo: "Términos y condiciones",
+        lineas: [],
+        partes: [
+          { clave: "alcance", titulo: "Alcance de la cotización", texto: "Solo equipo.", personalizado: false },
+          { clave: "noIncluye", titulo: "No incluye", texto: "Obra civil.", personalizado: true },
+        ],
+      },
+    });
+    expect(propios).toEqual({ pago: "", noIncluye: "Obra civil." });
   });
 });
 

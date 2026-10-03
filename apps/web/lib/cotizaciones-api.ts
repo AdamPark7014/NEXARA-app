@@ -470,6 +470,44 @@ export function aplicarPaquete(
   });
 }
 
+/**
+ * Una partida que la empresa ya cotizó, con sus datos de la última vez. No trae margen: en la
+ * cotización nueva puede ser otro.
+ */
+export type PartidaFrecuente = {
+  name: string;
+  description?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  unit?: string | null;
+  /** Costo interno de la última vez. */
+  unitCost?: number | null;
+  /** Precio al cliente de la última vez. */
+  unitPrice: number;
+  imagenUrl?: string | null;
+  grupo?: GrupoPartida | null;
+  /** En cuántas cotizaciones distintas salió. */
+  veces: number;
+  ultimaVez?: string | null;
+};
+
+/**
+ * «Usadas antes»: partidas ya cotizadas que coinciden con lo que se escribe en «Nueva partida».
+ * `moneda` deja fuera precios en otra moneda y `excluir`, la cotización que se está editando.
+ */
+export function buscarPartidasFrecuentes(
+  token: string,
+  q: string,
+  opciones: { moneda?: string | null; excluir?: number | null; signal?: AbortSignal } = {},
+) {
+  const qs = new URLSearchParams({ q: q.trim() });
+  if (opciones.moneda) qs.set("moneda", opciones.moneda);
+  if (opciones.excluir) qs.set("excluir", String(opciones.excluir));
+  return cotFetch<PartidaFrecuente[]>(`cotizaciones/partidas-frecuentes?${qs.toString()}`, token, {
+    signal: opciones.signal,
+  });
+}
+
 /** URL del PDF «Propuesta técnica» (requiere sesión). */
 export function urlPdfCotizacion(id: number) {
   return buildApiUrl(`cotizaciones/${id}/pdf`);

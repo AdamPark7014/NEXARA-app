@@ -77,6 +77,26 @@ export class CotizacionesController {
     return this.cotizacionesService.companerosQueCotizan(user?.id);
   }
 
+  /**
+   * Partidas ya cotizadas que coinciden con lo que se escribe en «Nueva partida» (`q`, 2 letras o
+   * más), con sus datos de la última vez. Mismo permiso que la lista: quien cotiza ve costos.
+   * Va **antes** de `:id` para que Nest no lea «partidas-frecuentes» como un id.
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('partidas-frecuentes')
+  partidasFrecuentes(
+    @Query('q') q: string | undefined,
+    @Query('moneda') moneda: string | undefined,
+    @Query('excluir') excluir: string | undefined,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.partidasFrecuentes(typeof q === 'string' ? q : undefined, companyId, {
+      moneda: typeof moneda === 'string' ? moneda : null,
+      excluir: excluir ? Number(excluir) : null,
+    });
+  }
+
   /** Catálogo de paquetes. Antes de `:id` para que no lo tome por un id. */
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })

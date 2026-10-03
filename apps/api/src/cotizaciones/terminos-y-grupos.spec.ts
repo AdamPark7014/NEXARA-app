@@ -108,9 +108,26 @@ describe('términos según el segmento y lo que se cobra', () => {
     expect(terminos.lineas[0]).toContain('40 %');
   });
 
-  it('sin anticipo capturado usa el 50 % de la propuesta modelo', () => {
-    const terminos = terminosDeCotizacion({ segmento: 'COMERCIAL', incluyeInstalacion: false, anticipoPct: 0 });
-    expect(terminos.lineas[0]).toContain('50 %');
+  it('sin anticipo capturado (ningún dato) usa el 50 % de la propuesta modelo', () => {
+    for (const anticipoPct of [undefined, null]) {
+      const terminos = terminosDeCotizacion({ segmento: 'COMERCIAL', incluyeInstalacion: false, anticipoPct });
+      expect(terminos.lineas[0]).toContain('50 % de anticipo');
+    }
+  });
+
+  it('anticipo 0 es «sin anticipo», no un hueco: ningún término lo menciona', () => {
+    // Antes el 0 caía al 50 y el PDF seguía pidiendo anticipo después de que la persona lo quitaba.
+    for (const incluyeInstalacion of [false, true]) {
+      const terminos = terminosDeCotizacion({ segmento: 'COMERCIAL', incluyeInstalacion, anticipoPct: 0 });
+      expect(terminos.lineas.join(' ')).not.toMatch(/anticipo/i);
+      expect(terminos.lineas[0]).toContain('Pago del 100 % contra entrega');
+    }
+  });
+
+  it('anticipo 100 es de contado: no deja un «0 % restante»', () => {
+    const terminos = terminosDeCotizacion({ segmento: 'COMERCIAL', incluyeInstalacion: false, anticipoPct: 100 });
+    expect(terminos.lineas[0]).toContain('Pago de contado: 100 %');
+    expect(terminos.lineas.join(' ')).not.toContain('0 % restante');
   });
 
   it('agrega la vigencia cuando hay fecha de vencimiento', () => {

@@ -9,6 +9,8 @@ import PDFDocument from 'pdfkit';
 import { importeConLetra } from './importe-letra.js';
 import { factorMargen } from './cotizacion-totals.js';
 import { normalizarOpciones } from './personalizacion.js';
+import { incluyeInstalacion } from './partidas-grupos.js';
+import { anticipoDeCotizacion, terminosDeCotizacion, type Terminos } from './terminos-segmento.js';
 import { segmentosLista } from './vinetas-texto.js';
 import { anexarPaginasPdf, clasificarPlanos, type PlanoArchivo } from '../common/pdf/planos-pdf.js';
 
@@ -27,22 +29,35 @@ const AW = PAGE_W - LM * 2;
 const TOP = 124;
 const BOTTOM = 684;
 
+/**
+ * Datos fiscales del emisor: abren la primera hoja de toda cotización (los pidió Adam, arriba del
+ * título). Van escritos aquí y no se leen de `company_profile` porque esa fila trae datos de relleno.
+ */
+export const EMISOR = {
+  razon: 'New Engineering Expertise And Resource Advancement S.A. De C.V.',
+  rfc: 'NEE240925V73',
+  domicilio: 'Ignacio Allende 512 local 2 Santiago Momoxpan, 72775 San Pedro Cholula, Puebla',
+  correo: 'gerencia@nexara.com.mx',
+  telefonos: '2226960350',
+} as const;
+
+/** Los renglones del emisor tal como se imprimen; el primero (la razón social) va en negritas. */
+export const RENGLONES_EMISOR: readonly string[] = [
+  EMISOR.razon,
+  `RFC: ${EMISOR.rfc}`,
+  EMISOR.domicilio,
+  `Correo electrónico: ${EMISOR.correo}`,
+  `Teléfonos: ${EMISOR.telefonos}`,
+];
+
 const FIRMA = {
   nombre: 'CHRISTIAN EDUARDO DEL POZO SÁNCHEZ',
   cargo: 'REPRESENTANTE LEGAL DE',
-  razon: 'NEW ENGINEERING EXPERTISE AND RESOURCE ADVANCEMENT S.A. DE C.V.',
+  razon: EMISOR.razon.toUpperCase(),
 };
 
 const ENTREGA_DEFAULT = '15 días naturales, o según disponibilidad de inventario al confirmar el pedido.';
-const PAGO_DEFAULT =
-  '50% de anticipo para confirmar el pedido y 50% contra entrega, mediante transferencia electrónica.';
 const GARANTIA_DEFAULT = 'La otorgada por el fabricante.';
-
-const TERMINOS_DEFAULT = [
-  'Forma de pago: se requiere un 50% de anticipo para la confirmación del pedido y programación del suministro. El 50% restante deberá liquidarse contra entrega del equipo.',
-  'Alcance: el precio cotizado cubre únicamente el suministro del equipo descrito en la presente propuesta. No se incluyen servicios de instalación, configuración, puesta en marcha, capacitación, adecuaciones eléctricas, de red o cualquier otro servicio no especificado expresamente en la cotización.',
-  'Disponibilidad: la entrega está sujeta a disponibilidad de inventario al momento de la confirmación del pedido y recepción del anticipo.',
-];
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -76,6 +91,7 @@ export type FormatoNexara = {
   entrega: string;
   /** Frase de vigencia de las condiciones comerciales (la misma que edita la cotización). */
   vigencia: string;
+  /** La forma de pago del editor. Vacía (la persona la borró): el renglón no se imprime. */
   condicionesPago: string;
   garantia: string;
   partidas: PartidaFormato[];
@@ -100,7 +116,8 @@ type QuoteLike = {
   trabajo?: string | null;
   projectName?: string | null;
   preparedBy?: string | null;
-  paymentTerms?: string | null;
+  /** Con las partidas (si se cobra instalación) decide los términos por omisión. */
+  segmento?: unknown;
   deliveryTime?: string | null;
   depositPercent?: number | null;
   /** 20 = el precio impreso ya incluye ese margen. Null o 0: el precio de la partida. */
@@ -147,21 +164,60 @@ export function textoVigencia(dias: number, vence: string, propia?: string | nul
   return '15 días naturales';
 }
 
-const pagoCorto = (deposito: unknown): string => {
-  const n = Math.round(Number(deposito ?? 50));
-  if (!Number.isFinite(n) || n >= 100) return n >= 100 ? 'Contado' : '50% anticipo';
-  if (n <= 0) return 'Contra entrega';
-  return `${n}% anticipo`;
-};
+/** Lo que cabe en un renglón de la celda «Condiciones de pago» de la franja (8 pt). */
+const CABE_EN_FRANJA = 26;
 
-function terminosDeNota(nota: string | null | undefined): string[] {
-  const texto = String(nota ?? '').replace(/\r\n?/g, '\n').trim();
-  if (!texto) return TERMINOS_DEFAULT;
-  const bloques = texto
-    .split(/\n{2,}/)
-    .map((b) => b.trim())
-    .filter(Boolean);
-  return bloques.length ? bloques : TERMINOS_DEFAULT;
+/**
+ * Los términos de la cotización, los mismos que enseña el editor: el texto del segmento con el
+ * anticipo capturado, o lo que quien cotiza reescribió (`note`). Entrega, garantía y vigencia no van
+ * aquí: son renglones propios de las condiciones comerciales.
+ */
+function terminosDelEditor(quote: QuoteLike): Terminos {
+  const texto = (valor: unknown) => (valor == null ? null : String(valor));
+  const partidas = (quote.items ?? []).map((item) => ({
+    grupo: texto(item['grupo']),
+    category: texto(item['category']),
+    name: texto(item['name']),
+    description: texto(item['description']),
+    unit: texto(item['unit']),
+    laborHours: Number(item['laborHours'] ?? 0) || 0,
+    laborRate: Number(item['laborRate'] ?? 0) || 0,
+  }));
+  return terminosDeCotizacion({
+    segmento: quote.segmento,
+    incluyeInstalacion: incluyeInstalacion(partidas),
+    anticipoPct: quote.depositPercent,
+    personalizados: quote.note,
+    condiciones: { formaPago: normalizarOpciones(quote.opciones).condiciones.formaPago },
+  });
+}
+
+/**
+ * Forma de pago de la cotización: el texto del renglón «Condiciones de pago» y su versión de una
+ * línea para la franja. Los dos salen de lo mismo que edita la persona (el anticipo y el texto de
+ * «Forma de pago»), para que no se contradigan. Antes el renglón era un texto fijo con «50% de
+ * anticipo» que seguía saliendo aunque el anticipo se hubiera quitado.
+ */
+export function pagoDeCotizacion(
+  quote: QuoteLike,
+  terminos: Terminos = terminosDelEditor(quote),
+): { texto: string; corto: string } {
+  const n = anticipoDeCotizacion(quote.depositPercent);
+  const porAnticipo = n >= 100 ? 'Contado' : n <= 0 ? 'Contra entrega' : `${n}% anticipo`;
+  const parte = terminos.partes.find((p) => p.clave === 'pago');
+  // Borró el texto: no se afirma nada que no escribió. Si dejó un anticipo, ese sí lo capturó.
+  if (!parte) return { texto: '', corto: n > 0 ? porAnticipo : '' };
+  if (!parte.personalizado) {
+    return { texto: parte.texto, corto: terminos.modalidad === 'LICITACION' ? 'Según bases' : porAnticipo };
+  }
+  // Texto propio: si es corto va tal cual; si no, el anticipo solo cuando el texto también lo dice.
+  const propio = parte.texto.replace(/\s+/g, ' ').trim().replace(/[.;]+$/, '');
+  let corto = 'Ver condiciones';
+  if (!parte.texto.includes('\n') && propio.length <= CABE_EN_FRANJA) corto = propio;
+  else if (n > 0 && n < 100 && /anticipo/i.test(propio) && new RegExp(`(^|\\D)${n}\\s*%`).test(propio)) corto = porAnticipo;
+  else if (n >= 100 && /contado/i.test(propio)) corto = porAnticipo;
+  else if (n <= 0 && /contra entrega/i.test(propio) && !/anticipo/i.test(propio)) corto = porAnticipo;
+  return { texto: parte.texto, corto };
 }
 
 /** De la cotización guardada (o del borrador de la vista previa) al formato impreso. */
@@ -206,6 +262,8 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
   const atencionExplicita = String(quote.atencion ?? '').trim();
   const dias = diasEntre(quote.issueDate, quote.validUntil);
   const vence = fechaCorta(quote.validUntil);
+  const terminos = terminosDelEditor(quote);
+  const pago = pagoDeCotizacion(quote, terminos);
   return {
     numero: String(quote.quoteNumber ?? '').trim() || 'COTIZACIÓN',
     fecha: fechaCorta(quote.issueDate) || fechaCorta(new Date()),
@@ -221,9 +279,9 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     proyecto: String(quote.projectName ?? '').trim(),
     responsable: String(quote.preparedBy ?? '').trim() || 'Christian Del Pozo',
     trabajo: String(quote.trabajo ?? '').trim() || 'Ventas',
-    pagoCorto: pagoCorto(quote.depositPercent),
+    pagoCorto: pago.corto,
     entrega: opciones.condiciones.tiempoEntrega.trim() || String(quote.deliveryTime ?? '').trim() || ENTREGA_DEFAULT,
-    condicionesPago: String(quote.paymentTerms ?? '').trim() || PAGO_DEFAULT,
+    condicionesPago: pago.texto,
     garantia: opciones.condiciones.garantia.trim() || GARANTIA_DEFAULT,
     partidas,
     subtotal,
@@ -231,7 +289,10 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     iva,
     total,
     letras: importeConLetra(total, moneda),
-    terminos: terminosDeNota(quote.note),
+    // La forma de pago ya va en su renglón; con los términos apagados en «Personalizar» no salen.
+    terminos: opciones.secciones.terminos
+      ? terminos.partes.filter((p) => p.clave !== 'pago').map((p) => `${p.titulo}: ${p.texto}`)
+      : [],
   };
 }
 
@@ -281,16 +342,34 @@ function hoja(p: Lapiz) {
     p.doc.image(membrete, 0, 0, { width: PAGE_W, height: PAGE_H });
   }
   const x = LM + 28;
+  // La primera hoja abre con los datos fiscales del emisor, arriba del título, y todo lo demás baja
+  // lo que ocupan. Las hojas de continuación conservan su encabezado corto.
+  const baja = p.pagina === 1 ? datosDelEmisor(p, x) : 0;
   p.doc.fillColor(TEAL).font(p.fb).fontSize(20);
-  p.doc.text('COTIZACIÓN', x, 52, { lineBreak: false });
+  p.doc.text('COTIZACIÓN', x, 52 + baja, { lineBreak: false });
   p.doc.fillColor(CARBON).font(p.fb).fontSize(10);
-  p.doc.text(p.pagina === 1 ? 'NEXARA' : `N° ${p.numero}  (continuación)`, x, 76, { lineBreak: false });
+  p.doc.text(p.pagina === 1 ? 'NEXARA' : `N° ${p.numero}  (continuación)`, x, 76 + baja, { lineBreak: false });
   p.doc.fillColor(GRIS).font(p.f).fontSize(8);
-  p.doc.text(p.pagina === 1 ? 'Conectando ecosistemas de tecnología' : '', x, 90, { lineBreak: false });
+  p.doc.text(p.pagina === 1 ? 'Conectando ecosistemas de tecnología' : '', x, 90 + baja, { lineBreak: false });
   p.doc.save();
-  p.doc.strokeColor(TEAL).lineWidth(1.2).moveTo(x, 106).lineTo(PAGE_W - LM - 150, 106).stroke();
+  p.doc.strokeColor(TEAL).lineWidth(1.2).moveTo(x, 106 + baja).lineTo(PAGE_W - LM - 150, 106 + baja).stroke();
   p.doc.restore();
-  p.y = TOP;
+  p.y = TOP + baja;
+}
+
+/**
+ * Datos fiscales del emisor en la primera hoja: cinco renglones chicos en gris, alineados con el
+ * título y la razón social en negritas. Quedan a la izquierda del logotipo del membrete (el renglón
+ * más largo termina antes de donde empieza). Devuelve cuánto baja el resto del encabezado.
+ */
+function datosDelEmisor(p: Lapiz, x: number): number {
+  const arriba = 17;
+  const renglon = 8.6;
+  RENGLONES_EMISOR.forEach((linea, i) => {
+    p.doc.fillColor(GRIS).font(i === 0 ? p.fb : p.f).fontSize(i === 0 ? 7 : 6.6);
+    p.doc.text(linea, x, arriba + i * renglon, { lineBreak: false });
+  });
+  return 22;
 }
 
 function texto(p: Lapiz, valor: string, x: number, y: number, ancho: number, opts: PDFKit.Mixins.TextOptions & { font?: string; size?: number; color?: string }) {
@@ -625,11 +704,9 @@ export async function generarCotizacionNexaraPdf(
   asegurar(p, 80);
   texto(p, 'CONDICIONES COMERCIALES', LM, p.y, AW, { font: p.fb, size: 10, color: TEAL_OSC });
   p.y += 16;
-  const condiciones: Array<[string, string]> = [
-    ['Tiempo de entrega:', q.entrega],
-    ['Condiciones de pago:', q.condicionesPago],
-    ['Vigencia:', q.vigencia],
-  ];
+  const condiciones: Array<[string, string]> = [['Tiempo de entrega:', q.entrega]];
+  if (q.condicionesPago) condiciones.push(['Condiciones de pago:', q.condicionesPago]);
+  condiciones.push(['Vigencia:', q.vigencia]);
   if (q.garantia) condiciones.push(['Garantía:', q.garantia]);
   condiciones.push([
     'Moneda:',

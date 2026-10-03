@@ -18,7 +18,7 @@ import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
-import { formatoDesdeCotizacion, generarCotizacionNexaraPdf } from './cotizacion-formato-nexara.js';
+import { formatoDesdeCotizacion, generarCotizacionNexaraPdf, pagoDeCotizacion } from './cotizacion-formato-nexara.js';
 import type { PlanoArchivo } from '../common/pdf/planos-pdf.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -53,6 +53,7 @@ import {
   transicionPermitida,
 } from './estado-cotizacion.js';
 import { agruparPartidas, incluyeInstalacion, totalesPorGrupo } from './partidas-grupos.js';
+import { MAX_FILAS_A_LEER, filtroDePartidas, partidasFrecuentes } from './partidas-frecuentes.js';
 import {
   ETIQUETA_SEGMENTO,
   diasDeVigencia,
@@ -1575,6 +1576,54 @@ export class CotizacionesService {
     }));
   }
 
+  /**
+   * Partidas que la empresa ya cotizó y coinciden con lo que se está escribiendo en «Nueva partida»:
+   * cada una con sus datos de la última vez (sin margen: en la cotización nueva puede ser otro).
+   *
+   * Solo lee cotizaciones de la empresa activa y sin borrar; sin empresa, `companyWhere` no deja
+   * pasar ninguna. `moneda` evita cargar un precio en dólares en una cotización en pesos, y
+   * `excluir` saca la cotización que se está editando (lo que ya está en pantalla no es «usada antes»).
+   */
+  async partidasFrecuentes(
+    q: string | undefined,
+    companyId?: number | null,
+    opciones: { moneda?: string | null; excluir?: number | null } = {},
+  ) {
+    const filtro = filtroDePartidas(q);
+    if (!filtro) return [];
+    const moneda = String(opciones.moneda ?? '').trim().toUpperCase();
+    const excluir = Number(opciones.excluir);
+    const filas = await this.db.cotizacionItem.findMany({
+      where: {
+        cotizacion: {
+          ...companyWhere(companyId ?? null),
+          deletedAt: null,
+          ...(moneda === 'MXN' || moneda === 'USD' ? { currency: { equals: moneda, mode: 'insensitive' as const } } : {}),
+          ...(Number.isInteger(excluir) && excluir > 0 ? { id: { not: excluir } } : {}),
+        },
+        AND: filtro,
+      },
+      // Las más recientes primero: de ellas salen los «últimos valores» de cada partida.
+      orderBy: { id: 'desc' },
+      take: MAX_FILAS_A_LEER,
+      select: {
+        id: true,
+        cotizacionId: true,
+        name: true,
+        description: true,
+        brand: true,
+        model: true,
+        unit: true,
+        unitCost: true,
+        unitPrice: true,
+        imagenUrl: true,
+        grupo: true,
+        createdAt: true,
+      },
+    });
+    return partidasFrecuentes(filas, q);
+  }
+
   /** Puntos de partida del editor por segmento: objetivo (entrada y cierre) y subsecciones de alcance. */
   plantillas() {
     // Con las condiciones comerciales del segmento: una cotización nueva las trae ya escritas.
@@ -2128,7 +2177,9 @@ export class CotizacionesService {
       clientAddress: quote.clientAddress,
       projectName: quote.projectName,
       scope: quote.scope,
-      paymentTerms: quote.paymentTerms,
+      // La forma de pago que quedó en el editor (anticipo y su texto), la misma del PDF del cliente:
+      // `paymentTerms` es un campo viejo que el editor de Core ya no escribe.
+      paymentTerms: pagoDeCotizacion(quote).texto || quote.paymentTerms,
       deliveryTime: quote.deliveryTime,
       preparedBy: quote.preparedBy,
       preparedRole: quote.preparedRole,
