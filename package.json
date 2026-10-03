@@ -75,9 +75,15 @@
     "class-validator": "^0.14.3",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "multer": "^2.0.2",
+    "multer": "^2.3.0",
     "socket.io": "^4.8.3",
     "winston": "^3.19.0",
     "zod": "^4.3.5"
+  },
+  "overrides": {
+    "@mapbox/node-pre-gyp": "^2.0.3",
+    "lodash": "^4.18.1",
+    "multer": "$multer",
+    "ws": "^8.21.3"
   }
 }
