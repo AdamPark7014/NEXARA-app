@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>Chat NEXARA — Dirección B «Compacto operativo»</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .chat { display: grid; grid-template-columns: 272px minmax(0, 1fr) 304px; gap: 12px; padding: 16px; width: 100%; min-height: 0; }
+  .card { background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 12px; box-shadow: var(--ui-elev-1); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+
+  /* ── Lista ── */
+  .lHead { padding: 14px 12px 0 16px; display: flex; align-items: center; }
+  .lHead h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.008em; }
+  .lHead .newBtn { margin-left: auto; height: 30px; padding: 0 10px 0 8px; border-radius: 8px; background: var(--ui-brand); color: #fff; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+  .lHead .newBtn svg.i { width: 14px; height: 14px; stroke-width: 2.25; }
+  .lSearch { margin: 12px 12px 0; height: 34px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface-2); display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; color: var(--ui-fg-3); font-size: 13px; }
+  .seg { margin: 10px 12px 4px; display: flex; gap: 4px; }
+  .seg span { white-space: nowrap; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--ui-fg-2); display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--ui-border); }
+  .seg span.on { background: var(--ui-fg); color: var(--ui-surface); border-color: var(--ui-fg); font-weight: 600; }
+  .seg span b { font-weight: 600; color: var(--ui-brand-text); }
+  .lab { padding: 12px 16px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ui-fg-label); display: flex; align-items: center; }
+  .lab .plus { margin-left: auto; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: var(--ui-fg-2); }
+  .lab .plus svg.i { width: 15px; height: 15px; stroke-width: 2; }
+  .conv { margin: 0 6px; padding: 7px 10px; border-radius: 9px; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: center; position: relative; }
+  .conv .l1, .conv .l2 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .conv .l1 .nm, .conv .l2 .pv { flex: 1; min-width: 0; }
+  .conv .badge { min-width: 17px; height: 17px; font-size: 10.5px; }
+  .conv .tile { width: 32px; height: 32px; border-radius: 9px; background: var(--ui-hover); color: var(--ui-fg-2); display: grid; place-items: center; }
+  .conv .tile svg.i { width: 15px; height: 15px; stroke-width: 2; }
+  .conv .nm { font-size: 13.5px; font-weight: 500; line-height: 1.3; color: var(--ui-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv .pv { font-size: 12px; line-height: 1.35; color: var(--ui-fg-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv .rt { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .conv time { font-size: 11px; color: var(--ui-fg-3); font-variant-numeric: tabular-nums; line-height: 1.3; }
+  .conv.unread .nm { font-weight: 700; }
+  .conv.unread .pv { color: var(--ui-fg-2); }
+  .conv.unread time { color: var(--ui-brand-text); font-weight: 600; }
+  .conv.on { background: color-mix(in srgb, var(--ui-brand) 9%, var(--ui-surface)); }
+  .conv.on .tile { background: var(--ui-brand); color: #fff; }
+  .conv.on .nm { font-weight: 600; }
+  .conv .av { width: 32px; height: 32px; }
+  .conv.on .pres { --pres-ring: color-mix(in srgb, var(--ui-brand) 9%, var(--ui-surface)); }
+
+  /* ── Conversación ── */
+  .cHead { height: 62px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ui-border); flex: 0 0 auto; }
+  .cHead .tile { width: 36px; height: 36px; border-radius: 10px; background: var(--ui-brand-soft); color: var(--ui-brand-text); display: grid; place-items: center; }
+  .cHead .tile svg.i { width: 17px; height: 17px; stroke-width: 2; }
+  .cHead h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.008em; line-height: 1.25; }
+  .cHead p { margin: 1px 0 0; font-size: 12.5px; color: var(--ui-fg-label); line-height: 1.3; }
+  .cHead .tools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+  .cHead .iconBtn svg.i { width: 17px; height: 17px; }
+  .detBtn { height: 30px; padding: 0 10px; border-radius: 8px; background: var(--ui-hover); color: var(--ui-fg); font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; }
+  .detBtn svg.i { width: 15px; height: 15px; }
+
+  .stream { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; padding: 0 0 6px; }
+  .day { text-align: center; margin: 4px 0 4px; }
+  .day span { font-size: 11.5px; font-weight: 500; color: var(--ui-fg-label); background: var(--ui-hover); border-radius: 999px; padding: 3px 12px; }
+  .msg { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 7px 20px; }
+  .hd { display: flex; align-items: baseline; gap: 8px; line-height: 1.3; margin-bottom: 1px; }
+  .hd b { font-size: 14px; font-weight: 600; }
+  .hd time { font-size: 11.5px; color: var(--ui-fg-3); font-variant-numeric: tabular-nums; }
+  .hd .ticks { align-self: center; }
+  .bd { font-size: 14px; line-height: 1.55; color: var(--ui-fg); }
+
+  /* Tarjetas incrustadas */
+  .ecard { margin-top: 8px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-surface); max-width: 540px; overflow: hidden; display: grid; grid-template-columns: 4px minmax(0, 1fr); }
+  .ecard .strip { background: var(--ui-brand); }
+  .ecard.quote .strip { background: var(--ui-warning); }
+  .ecard .in { padding: 10px 12px 10px 12px; }
+  .ecard .top { display: flex; align-items: center; gap: 8px; }
+  .ecard .kind { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--ui-fg-label); text-transform: uppercase; letter-spacing: 0.06em; }
+  .ecard .kind svg.i { width: 13px; height: 13px; }
+  .ecard .folio { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; font-weight: 600; color: var(--ui-fg-2); }
+  .ecard .top .chips { margin-left: auto; display: flex; gap: 5px; }
+  .ecard .tt { font-size: 14px; font-weight: 600; line-height: 1.35; margin-top: 4px; }
+  .ecard .meta { display: flex; align-items: center; gap: 14px; margin-top: 7px; font-size: 12.5px; color: var(--ui-fg-2); }
+  .ecard .meta > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .ecard .meta svg.i { width: 14px; height: 14px; color: var(--ui-icon); }
+  .ecard .meta b { font-weight: 600; color: var(--ui-fg); }
+  .ecard .meta .open { margin-left: auto; color: var(--ui-brand-text); font-weight: 600; gap: 4px; }
+  .ecard .meta .open svg.i { width: 13px; height: 13px; color: currentColor; }
+  .ecard .meta .num { font-variant-numeric: tabular-nums; }
+  .prog { width: 54px; height: 5px; border-radius: 999px; background: var(--ui-track); overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 50%; background: var(--ui-brand); border-radius: 999px; }
+  .ecard .foot { display: flex; align-items: center; gap: 6px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--ui-border-subtle); }
+  .ecard .foot .btnGhost svg.i { width: 13px; height: 13px; }
+  .ecard .foot .total { margin-left: auto; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ecard .foot .total small { font-size: 11.5px; font-weight: 500; color: var(--ui-fg-label); margin-left: 3px; }
+
+  /* Hilo en línea */
+  .inl { margin-top: 8px; border-left: 2px solid var(--ui-border); padding-left: 12px; display: flex; flex-direction: column; gap: 6px; max-width: 560px; }
+  .inl .r { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: start; font-size: 13.5px; line-height: 1.45; }
+  .inl .r .av { margin-top: 1px; width: 22px; height: 22px; font-size: 9.5px; }
+  .inl .r b { font-weight: 600; margin-right: 5px; }
+  .inl .r time { font-size: 11px; color: var(--ui-fg-3); font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .inl .rep { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  .inl .rep .box { flex: 1; height: 32px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface-2); padding: 0 10px; display: flex; align-items: center; font-size: 13px; color: var(--ui-fg-3); }
+  .inl .rep .lnk { font-size: 12.5px; font-weight: 500; color: var(--ui-brand-text); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .inl .rep .lnk svg.i { width: 13px; height: 13px; }
+  .inlHead { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ui-fg-label); }
+  .inlHead svg.i { width: 13px; height: 13px; }
+
+  /* Redactor calmado */
+  .comp { margin: 4px 16px 16px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface); display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 8px; box-shadow: var(--ui-elev-1); flex: 0 0 auto; }
+  .comp .add { width: 32px; height: 32px; border-radius: 8px; background: var(--ui-hover); color: var(--ui-fg-2); display: grid; place-items: center; }
+  .comp .ph { flex: 1; padding: 0 8px; font-size: 14px; color: var(--ui-fg-3); }
+  .comp .iconBtn { width: 32px; height: 32px; }
+  .comp .iconBtn svg.i { width: 17px; height: 17px; }
+  .comp .v { width: 1px; height: 18px; background: var(--ui-border); margin: 0 4px; }
+  .comp .go { width: 34px; height: 34px; border-radius: 9px; background: var(--ui-brand); color: #fff; display: grid; place-items: center; margin-left: 4px; }
+  .comp .go svg.i { width: 15px; height: 15px; }
+  .hintLine { padding: 0 22px 10px; font-size: 11.5px; color: var(--ui-fg-3); display: flex; gap: 14px; flex: 0 0 auto; }
+  .hintLine b { font-weight: 600; color: var(--ui-fg-label); }
+
+  /* ── Detalles ── */
+  .dHead { height: 52px; padding: 0 8px 0 16px; display: flex; align-items: center; border-bottom: 1px solid var(--ui-border); flex: 0 0 auto; }
+  .dHead h2 { margin: 0; font-size: 14px; font-weight: 600; }
+  .dTabs { display: flex; gap: 2px; margin-left: 12px; }
+  .dTabs span { height: 26px; padding: 0 9px; border-radius: 7px; font-size: 12.5px; font-weight: 500; color: var(--ui-fg-label); display: inline-flex; align-items: center; gap: 5px; }
+  .dTabs span.on { background: var(--ui-hover); color: var(--ui-fg); font-weight: 600; }
+  .dHead .iconBtn { margin-left: auto; }
+  .dBody { padding: 14px 16px 0; overflow: hidden; }
+  .about { font-size: 13px; line-height: 1.5; color: var(--ui-fg-2); }
+  .about small { display: block; margin-top: 5px; font-size: 12px; color: var(--ui-fg-label); }
+  .acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+  .acts span { height: 52px; border: 1px solid var(--ui-border); border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11.5px; font-weight: 500; color: var(--ui-fg-2); }
+  .acts svg.i { width: 16px; height: 16px; color: var(--ui-icon); }
+  .dSec { margin-top: 16px; }
+  .dSec h3 { margin: 0 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ui-fg-label); display: flex; align-items: center; }
+  .dSec h3 a { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 500; color: var(--ui-brand-text); }
+  .aRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 7px 0; border-bottom: 1px solid var(--ui-border-subtle); align-items: center; }
+  .aRow:last-child { border-bottom: 0; }
+  .aRow .f { font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; font-weight: 600; color: var(--ui-fg-label); }
+  .aRow .t { grid-column: 1 / -1; font-size: 13px; font-weight: 500; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pRow { display: flex; gap: 9px; align-items: flex-start; padding: 6px 0; font-size: 13px; line-height: 1.4; }
+  .pRow svg.i { width: 14px; height: 14px; color: var(--ui-warning-text); margin-top: 3px; }
+  .pRow small { display: block; font-size: 11.5px; color: var(--ui-fg-label); }
+  .mem { display: flex; align-items: center; }
+  .mem .av { border: 2px solid var(--ui-surface); margin-left: -6px; box-sizing: content-box; }
+  .mem .av:first-child { margin-left: -2px; }
+  .mem .more { margin-left: 8px; font-size: 12.5px; color: var(--ui-fg-label); }
+  .mem .inv { margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Menú del panel tal como está hoy (240 px) -->
+  <aside class="appSide">
+    <div class="brand"><div class="brandMark">N</div><span class="brandName">NEXARA</span><span class="brandPanel">Core</span></div>
+    <nav class="nav">
+      <div class="navGroup">
+        <p class="navTitle">Hoy</p>
+        <div class="navItem"><i data-i="home"></i><span>Resumen general</span></div>
+        <div class="navItem on"><i data-i="thread"></i><span>Chat</span><b class="navBadge">9</b></div>
+        <div class="navItem"><i data-i="task"></i><span>Mis actividades</span></div>
+        <div class="navItem"><i data-i="clock"></i><span>Asistencias</span></div>
+        <div class="navItem"><i data-i="filetext"></i><span>Cotizaciones</span></div>
+        <div class="navItem"><i data-i="folder"></i><span>Proyectos</span></div>
+        <div class="navItem"><i data-i="calendar"></i><span>Reuniones</span></div>
+        <div class="navItem"><i data-i="checkcircle"></i><span>Aprobaciones</span></div>
+      </div>
+      <div class="navGroup">
+        <p class="navTitle">Recursos</p>
+        <div class="navItem"><i data-i="box"></i><span>Almacén</span></div>
+        <div class="navItem"><i data-i="tool"></i><span>Herramientas</span></div>
+        <div class="navItem"><i data-i="truck"></i><span>Vehículos</span></div>
+      </div>
+      <div class="navGroup">
+        <p class="navTitle">Finanzas</p>
+        <div class="navItem"><i data-i="money"></i><span>Contabilidad</span></div>
+        <div class="navItem"><i data-i="chart"></i><span>Analítica</span></div>
+      </div>
+    </nav>
+    <div class="userBlock">
+      <div class="av round s28 h-teal">AP</div>
+      <div class="txt"><div class="who">Adam Pozo</div><div class="role">Dirección</div></div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <div class="crumb">Chat</div>
+    <div class="palette"><i data-i="search"></i>Buscar en NEXARA…<span class="kbd">Ctrl K</span></div>
+    <div class="topRight">
+      <span class="rolePill">Dirección</span>
+      <div class="topIcon"><i data-i="moon"></i></div>
+      <div class="topIcon"><i data-i="bell"></i><span class="n">3</span></div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="chat">
+
+      <!-- ═════ Conversaciones ═════ -->
+      <section class="card">
+        <div class="lHead"><h2>Conversaciones</h2><span class="newBtn"><i data-i="plus"></i>Nuevo</span></div>
+        <div class="lSearch"><i data-i="search"></i><span style="white-space:nowrap">Buscar canal o persona</span><span class="kbd">Ctrl K</span></div>
+        <div class="seg"><span class="on">Todo</span><span>No leídos <b>3</b></span><span>Menciones <b>2</b></span></div>
+
+        <div class="lab">Canales<span class="plus"><i data-i="plus"></i></span></div>
+        <div class="conv on">
+          <div class="tile"><i data-i="hash"></i></div>
+          <div><div class="l1"><div class="nm">soporte</div><time>11:44</time></div><div class="l2"><div class="pv">Tú: Autorizado, que quede hoy mismo.</div></div></div>
+        </div>
+        <div class="conv unread">
+          <div class="tile"><i data-i="hash"></i></div>
+          <div><div class="l1"><div class="nm">instalaciones</div><time>10:04</time></div><div class="l2"><div class="pv">Diego: Material recogido y firmado…</div><span class="badge">2</span></div></div>
+        </div>
+        <div class="conv unread">
+          <div class="tile"><i data-i="hash"></i></div>
+          <div><div class="l1"><div class="nm">anuncios</div><time>9:02</time></div><div class="l2"><div class="pv">Junta operativa el lunes a las 9:00</div><span class="badge">1</span></div></div>
+        </div>
+        <div class="conv">
+          <div class="tile"><i data-i="hash"></i></div>
+          <div><div class="l1"><div class="nm">general</div><time>Ayer</time></div><div class="l2"><div class="pv">Paola: Mañana llega el pedido de cable</div></div></div>
+        </div>
+        <div class="conv">
+          <div class="tile"><i data-i="hash"></i></div>
+          <div><div class="l1"><div class="nm">almacen</div><time>Ayer</time></div><div class="l2"><div class="pv">Jorge: Inventario de cámaras listo</div></div></div>
+        </div>
+        <div class="conv">
+          <div class="tile"><i data-i="lock"></i></div>
+          <div><div class="l1"><div class="nm">direccion</div><time>Mar</time></div><div class="l2"><div class="pv">Cierre de septiembre revisado</div></div></div>
+        </div>
+
+        <div class="lab">Directos<span class="plus"><i data-i="plus"></i></span></div>
+        <div class="conv unread">
+          <div class="av round h-blue">LH<span class="pres on"></span></div>
+          <div><div class="l1"><div class="nm">Luis Hernández</div><time>11:27</time></div><div class="l2"><div class="pv">Va, te aviso llegando al site</div><span class="badge">2</span></div></div>
+        </div>
+        <div class="conv">
+          <div class="av round h-violet">MT<span class="pres on"></span></div>
+          <div><div class="l1"><div class="nm">Mariana Torres</div><time>10:40</time></div><div class="l2"><div class="pv">Tú: Gracias, quedo al pendiente</div></div></div>
+        </div>
+        <div class="conv">
+          <div class="av round h-rose">PM<span class="pres away"></span></div>
+          <div><div class="l1"><div class="nm">Paola Méndez</div><time>Ayer</time></div><div class="l2"><div class="pv">Listo, ya está en tu correo</div></div></div>
+        </div>
+      </section>
+
+      <!-- ═════ Conversación ═════ -->
+      <section class="card">
+        <header class="cHead">
+          <div class="tile"><i data-i="hash"></i></div>
+          <div>
+            <h1>soporte</h1>
+            <p>7 miembros · Reportes de clientes y seguimiento de garantías</p>
+          </div>
+          <div class="tools">
+            <div class="iconBtn"><i data-i="search"></i></div>
+            <div class="iconBtn"><i data-i="bell"></i></div>
+            <span class="detBtn"><i data-i="panel"></i>Detalles</span>
+          </div>
+        </header>
+
+        <div class="stream">
+          <div class="day"><span>Hoy, viernes 2 de octubre</span></div>
+
+          <div class="msg">
+            <div class="av round h-violet">MT</div>
+            <div>
+              <div class="hd"><b>Mariana Torres</b><time>11:20</time></div>
+              <div class="bd">Reporte de Farmacia San Rafael, sucursal Centro: 3 cámaras sin imagen desde anoche y el NVR está pitando. Abrí la actividad y la asigné a <span class="mention">@Luis Hernández</span>.</div>
+              <div class="ecard">
+                <div class="strip"></div>
+                <div class="in">
+                  <div class="top">
+                    <span class="kind"><i data-i="task"></i>Actividad</span><span class="folio">AN-0031</span>
+                    <span class="chips"><span class="chip alta plain">Prioridad alta</span><span class="chip proc">En Proceso</span></span>
+                  </div>
+                  <div class="tt">Revisión de CCTV · Farmacia San Rafael Centro</div>
+                  <div class="meta">
+                    <span><div class="av round s20 h-blue">LH</div><b>Luis Hernández</b></span>
+                    <span><i data-i="clock"></i>Hoy 13:00</span>
+                    <span><i data-i="camera"></i>Evidencias 2 de 4 <span class="prog"><i></i></span></span>
+                    <span class="open">Abrir <i data-i="out"></i></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av round h-blue">LH</div>
+            <div>
+              <div class="hd"><b>Luis Hernández</b><time>11:26</time></div>
+              <div class="bd">Voy para allá saliendo de Plaza Dorada. Por los síntomas parece la fuente de 12 V del gabinete.</div>
+              <div class="inl">
+                <div class="r"><div class="av round h-violet">MT</div><div><b>Mariana</b>El cliente dice que ayer en la tarde hubo un apagón.</div><time>11:28</time></div>
+                <div class="r"><div class="av round h-blue">LH</div><div><b>Luis</b>Entonces casi seguro es la fuente. ¿Hay de 10 A en almacén?</div><time>11:31</time></div>
+                <div class="r"><div class="av round h-rose">PM</div><div><b>Paola</b>Quedan 2, te aparto una.</div><time>11:33</time></div>
+                <div class="rep"><div class="box">Responder en el hilo…</div><span class="lnk">3 respuestas · Abrir hilo <i data-i="panel"></i></span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av round h-rose">PM</div>
+            <div>
+              <div class="hd"><b>Paola Méndez</b><time>11:40</time></div>
+              <div class="bd">Por si hay que cambiarla, dejé lista la cotización:</div>
+              <div class="ecard quote">
+                <div class="strip"></div>
+                <div class="in">
+                  <div class="top">
+                    <span class="kind"><i data-i="filetext"></i>Cotización</span><span class="folio">COT-0187</span>
+                    <span class="chips"><span class="chip neu">Borrador</span></span>
+                  </div>
+                  <div class="tt">Fuente 12 V 10 A y mano de obra</div>
+                  <div class="meta">
+                    <span><i data-i="user"></i>Farmacia San Rafael</span>
+                    <span><b class="num">$2,340.00</b> MXN</span>
+                    <span class="open">Abrir <i data-i="out"></i></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av round h-teal">AP</div>
+            <div>
+              <div class="hd"><b>Adam Pozo</b><time>11:44</time><span class="ticks"><i data-i="checks"></i></span></div>
+              <div class="bd">Autorizado, que quede hoy mismo.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp">
+          <span class="add"><i data-i="plus"></i></span>
+          <span class="ph">Escribe en #soporte…</span><span class="kbd" style="margin:0 6px 0 0">Enter envía</span>
+          <span class="iconBtn"><i data-i="at"></i></span>
+          <span class="iconBtn"><i data-i="task"></i></span>
+          <span class="iconBtn"><i data-i="camera"></i></span>
+          <span class="iconBtn"><i data-i="smile"></i></span>
+          <span class="go"><i data-i="send"></i></span>
+        </div>
+      </section>
+
+      <!-- ═════ Detalles del canal ═════ -->
+      <section class="card">
+        <div class="dHead">
+          <h2>Detalles</h2>
+          <div class="iconBtn"><i data-i="x"></i></div>
+        </div>
+        <div class="dBody">
+          <div class="about">
+            Reportes de clientes, diagnósticos y seguimiento de garantías.
+            <small>Canal público · creado el 12 de marzo</small>
+          </div>
+          <div class="acts">
+            <span><i data-i="user"></i>Invitar</span>
+            <span><i data-i="belloff"></i>Silenciar</span>
+            <span><i data-i="edit"></i>Editar</span>
+          </div>
+
+          <div class="dSec">
+            <h3>Actividades en este canal<a>Ver 5</a></h3>
+            <div class="aRow"><span class="f">AN-0031</span><span class="chip proc">En Proceso</span><span class="t">Revisión de CCTV · Farmacia San Rafael</span></div>
+            <div class="aRow"><span class="f">AN-0029</span><span class="chip val">Por Validar</span><span class="t">Cambio de disco del NVR · Col. Benavente</span></div>
+            <div class="aRow"><span class="f">AN-0027</span><span class="chip fin">Finalizada</span><span class="t">Garantía de cámara PTZ · Gas. Atlixco</span></div>
+          </div>
+
+          <div class="dSec">
+            <h3>Fijados<a>Ver 2</a></h3>
+            <div class="pRow"><i data-i="pin"></i><div>Guardias de soporte de octubre<small>Mariana Torres · 30 sep</small></div></div>
+            <div class="pRow"><i data-i="pin"></i><div>formato-reporte-de-falla.pdf<small>Adam Pozo · 18 sep</small></div></div>
+          </div>
+
+          <div class="dSec">
+            <h3>Miembros · 7</h3>
+            <div class="mem">
+              <div class="av round s28 h-violet">MT</div><div class="av round s28 h-blue">LH</div><div class="av round s28 h-rose">PM</div><div class="av round s28 h-amber">DR</div><div class="av round s28 h-teal">AP</div>
+              <span class="more">+2</span>
+              <span class="btnGhost inv">Ver todos</span>
+            </div>
+          </div>
+
+          <div class="dSec">
+            <h3>Archivos recientes<a>Ver 8</a></h3>
+            <div class="pRow"><i data-i="image" style="color:var(--ui-icon)"></i><div>gabinete-fuente.jpg<small>Luis Hernández · ayer</small></div></div>
+            <div class="pRow"><i data-i="filetext" style="color:var(--ui-icon)"></i><div>poliza-garantia-ptz.pdf<small>Mariana Torres · 29 sep</small></div></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+<script src="iconos.js"></script>
+<script>
+  addEventListener("load", function () {
+    document.querySelectorAll(".stream, .sideBody, .dBody, .list, .card").forEach(function (el) {
+      var h = 0; Array.prototype.forEach.call(el.children, function (c) { var cs = getComputedStyle(c); h += c.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom); });
+      el.setAttribute("data-fit", Math.round(el.clientHeight - h));
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>Chat NEXARA — Dirección A «Slack clásico»</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .chat { display: grid; grid-template-columns: 272px minmax(0, 1fr) 368px; width: 100%; min-height: 0; }
+
+  /* ── Lista de canales ── */
+  .list { background: var(--ui-surface-2); border-right: 1px solid var(--ui-border); display: flex; flex-direction: column; min-height: 0; }
+  .listHead { height: 56px; padding: 0 10px 0 16px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--ui-border); flex: 0 0 auto; }
+  .ws { font-size: 15px; font-weight: 700; letter-spacing: -0.015em; display: flex; align-items: center; gap: 6px; }
+  .ws svg.i { width: 14px; height: 14px; color: var(--ui-fg-3); }
+  .listHead .sp { margin-left: auto; display: flex; gap: 2px; }
+  .newBtn { width: 30px; height: 30px; border-radius: 8px; background: var(--ui-surface); border: 1px solid var(--ui-border); display: grid; place-items: center; color: var(--ui-fg); box-shadow: var(--ui-elev-1); }
+  .jump { margin: 10px 10px 6px; height: 32px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface); display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; color: var(--ui-fg-3); font-size: 13px; }
+  .rows { padding: 0 8px; display: flex; flex-direction: column; gap: 1px; }
+  .row { height: 30px; padding: 0 8px; border-radius: 7px; display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--ui-fg-2); position: relative; }
+  .row > svg.i { color: var(--ui-fg-3); width: 16px; height: 16px; }
+  .row .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row.unread { color: var(--ui-fg); font-weight: 600; }
+  .row.unread > svg.i { color: var(--ui-fg-2); }
+  .row.muted { color: var(--ui-fg-3); }
+  .row.on { background: color-mix(in srgb, var(--ui-brand) 12%, var(--ui-surface)); color: var(--ui-fg); font-weight: 600; }
+  .row.on > svg.i { color: var(--ui-brand); }
+  .row.on::before { content: ""; position: absolute; left: -8px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: var(--ui-brand); }
+  .row .meta { display: flex; align-items: center; gap: 6px; color: var(--ui-fg-3); }
+  .row .meta svg.i { width: 13px; height: 13px; }
+  .row .starOn { color: #e0a100; }
+  .row .starOn svg.i { fill: currentColor; }
+  .row.add { color: var(--ui-fg-3); font-size: 13.5px; }
+  .row.add .plusBox { width: 18px; height: 18px; border-radius: 5px; background: var(--ui-active); display: grid; place-items: center; color: var(--ui-fg-2); margin-left: -1px; }
+  .row.add .plusBox svg.i { width: 12px; height: 12px; stroke-width: 2.25; }
+  .sec { height: 28px; margin-top: 10px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--ui-fg-label); }
+  .sec svg.i { width: 13px; height: 13px; stroke-width: 2.25; }
+  .sec .plus { margin-left: auto; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--ui-fg-2); }
+  .sec .plus svg.i { width: 15px; height: 15px; stroke-width: 2; }
+  .list .pres { --pres-ring: var(--ui-surface-2); }
+  .row.on .pres { --pres-ring: color-mix(in srgb, var(--ui-brand) 12%, var(--ui-surface)); }
+  .sepLine { height: 1px; background: var(--ui-border); margin: 8px 12px 0; }
+
+  /* ── Columna central ── */
+  .center { background: var(--ui-surface); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .chHead { height: 56px; padding: 0 12px 0 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ui-border); flex: 0 0 auto; }
+  .chTitle { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; }
+  .chTitle > svg.i { width: 16px; height: 16px; color: var(--ui-fg-2); stroke-width: 2.1; }
+  .chTitle .st { color: #e0a100; margin-left: 2px; }
+  .chTitle .st svg.i { width: 14px; height: 14px; fill: currentColor; }
+  .chTopic { font-size: 12.5px; color: var(--ui-fg-label); line-height: 1.3; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chTools { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+  .stack { display: flex; align-items: center; height: 30px; padding: 0 8px 0 4px; border: 1px solid var(--ui-border); border-radius: 8px; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ui-fg-2); margin-right: 4px; }
+  .stack .avs { display: flex; }
+  .stack .av { border: 2px solid var(--ui-surface); margin-left: -6px; box-sizing: content-box; }
+  .stack .av:first-child { margin-left: 0; }
+  .chSearch { width: 190px; height: 30px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface-2); display: flex; align-items: center; gap: 7px; padding: 0 9px; font-size: 12.5px; color: var(--ui-fg-3); margin-right: 2px; }
+  .chSearch svg.i { width: 14px; height: 14px; }
+  .tabs { height: 38px; padding: 0 20px; display: flex; align-items: stretch; gap: 20px; border-bottom: 1px solid var(--ui-border); flex: 0 0 auto; }
+  .tab { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ui-fg-label); position: relative; }
+  .tab svg.i { width: 14px; height: 14px; }
+  .tab .c { font-size: 11.5px; font-weight: 600; color: var(--ui-fg-3); }
+  .tab.on { color: var(--ui-fg); font-weight: 600; }
+  .tab.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ui-brand); border-radius: 2px 2px 0 0; }
+
+  .stream { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; padding-bottom: 4px; }
+  .day { display: flex; align-items: center; gap: 12px; margin: 6px 0 4px; padding: 0 20px; }
+  .day::before, .day::after { content: ""; flex: 1; height: 1px; background: var(--ui-border); }
+  .day span { font-size: 12px; font-weight: 600; color: var(--ui-fg-2); border: 1px solid var(--ui-border); border-radius: 999px; padding: 2px 12px; background: var(--ui-surface); }
+  .new { display: flex; align-items: center; gap: 10px; margin: 4px 0 2px; padding: 0 20px 0 20px; color: var(--ui-danger); font-size: 11.5px; font-weight: 700; }
+  .new::before { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--ui-danger) 45%, transparent); }
+
+  .msg { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; padding: 5px 20px; position: relative; }
+  .msg.cont { padding-top: 1px; padding-bottom: 3px; }
+  .msg.cont .t { font-size: 10.5px; color: var(--ui-fg-3); text-align: right; padding-top: 4px; font-variant-numeric: tabular-nums; }
+  .msg.hover { background: var(--ui-surface-2); }
+  .msg.pinned { background: var(--hl); box-shadow: inset 3px 0 0 var(--hl-line); }
+  .pinNote { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 500; color: var(--ui-warning-text); margin-bottom: 1px; }
+  .pinNote svg.i { width: 12px; height: 12px; }
+  .hd { display: flex; align-items: baseline; gap: 8px; line-height: 1.3; }
+  .hd b { font-size: 14px; font-weight: 700; }
+  .hd .rol { font-size: 11px; font-weight: 500; color: var(--ui-fg-label); border: 1px solid var(--ui-border); border-radius: 5px; padding: 0 5px; line-height: 16px; align-self: center; }
+  .hd time { font-size: 11.5px; color: var(--ui-fg-3); font-variant-numeric: tabular-nums; }
+  .hd .ed { font-size: 11.5px; color: var(--ui-fg-3); }
+  .hd .ticks { align-self: center; }
+  .bd { font-size: 14px; line-height: 1.5; color: var(--ui-fg); }
+  .bd code { font-family: "JetBrains Mono", Consolas, monospace; font-size: 12.5px; background: var(--ui-hover); border: 1px solid var(--ui-border); border-radius: 5px; padding: 0 4px; }
+
+  .tools { position: absolute; right: 20px; top: -16px; display: flex; align-items: center; gap: 1px; padding: 3px; border: 1px solid var(--ui-border); border-radius: 9px; background: var(--ui-surface-3); box-shadow: var(--ui-elev-2); z-index: 2; }
+  .tools .e { width: 28px; height: 28px; display: grid; place-items: center; font-size: 15px; border-radius: 6px; }
+  .tools .iconBtn { width: 28px; height: 28px; border-radius: 6px; }
+  .tools .iconBtn.on { background: var(--ui-hover); }
+  .tools .v { width: 1px; height: 18px; background: var(--ui-border); margin: 0 3px; }
+  .tip { position: absolute; right: 86px; top: -44px; background: #0f172a; color: #fff; font-size: 11.5px; font-weight: 500; padding: 3px 8px; border-radius: 6px; white-space: nowrap; z-index: 3; }
+  body.dark .tip { background: #e2e8f0; color: #0f172a; }
+
+  .thHint { margin-top: 6px; height: 30px; display: inline-flex; align-items: center; gap: 8px; padding: 0 10px 0 5px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface); font-size: 12.5px; }
+  .thHint .avs { display: flex; gap: 3px; }
+  .thHint b { color: var(--ui-brand-text); font-weight: 600; }
+  .thHint span { color: var(--ui-fg-3); }
+  .thHint.open { border-color: var(--ui-brand-border); background: var(--ui-brand-soft); }
+
+  .files { display: flex; gap: 8px; margin-top: 7px; align-items: stretch; }
+  .ph { width: 96px; height: 64px; border-radius: 8px; border: 1px solid var(--ui-border); display: grid; place-items: center; color: var(--ui-fg-3); position: relative; overflow: hidden; }
+  .ph svg.i { width: 20px; height: 20px; opacity: 0.8; }
+  .ph .cap { position: absolute; left: 6px; bottom: 5px; font-size: 10px; font-weight: 600; color: var(--ui-fg-2); background: color-mix(in srgb, var(--ui-surface) 82%, transparent); padding: 0 5px; border-radius: 4px; line-height: 15px; }
+  .ph.more { background: var(--ui-surface-2); font-size: 13px; font-weight: 600; color: var(--ui-fg-2); width: 60px; }
+  .fileChip { display: flex; align-items: center; gap: 10px; height: 64px; padding: 0 14px 0 12px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface); min-width: 0; }
+  .fileChip .ic { width: 36px; height: 36px; border-radius: 8px; background: var(--ui-danger-bg); color: var(--ui-danger-text); display: grid; place-items: center; }
+  .fileChip .ic svg.i { width: 18px; height: 18px; }
+  .fileChip .n { font-size: 13px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+  .fileChip .s { font-size: 11.5px; color: var(--ui-fg-3); line-height: 1.3; }
+
+  /* ── Redactor ── */
+  .typing { height: 20px; padding: 0 22px; font-size: 12px; color: var(--ui-fg-label); display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .dots { display: inline-flex; gap: 3px; }
+  .dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--ui-fg-3); display: block; }
+  .dots i:nth-child(2) { opacity: 0.7; } .dots i:nth-child(3) { opacity: 0.4; }
+  .comp { margin: 0 20px 16px; border: 1px solid var(--ui-border-strong); border-radius: 10px; background: var(--ui-surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 14%, transparent); border-color: var(--ui-brand); flex: 0 0 auto; overflow: hidden; }
+  .fmt { height: 34px; display: flex; align-items: center; gap: 1px; padding: 0 6px; background: var(--ui-surface-2); border-bottom: 1px solid var(--ui-border-subtle); color: var(--ui-fg-2); }
+  .fmt .f { width: 28px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-size: 13.5px; color: var(--ui-icon); }
+  .fmt .f svg.i { width: 15px; height: 15px; }
+  .fmt .f.on { background: var(--ui-active); color: var(--ui-fg); }
+  .fmt .v { width: 1px; height: 16px; background: var(--ui-border); margin: 0 5px; }
+  .ta { padding: 10px 14px 8px; font-size: 14px; line-height: 1.5; min-height: 44px; }
+  .bar { height: 40px; display: flex; align-items: center; gap: 2px; padding: 0 6px 0 6px; }
+  .bar .iconBtn svg.i { width: 17px; height: 17px; }
+  .bar .v { width: 1px; height: 18px; background: var(--ui-border); margin: 0 5px; }
+  .bar .ent { height: 28px; padding: 0 9px 0 7px; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--ui-fg-2); }
+  .bar .ent svg.i { width: 15px; height: 15px; color: var(--ui-icon); }
+  .bar .hint { margin-left: auto; font-size: 11.5px; color: var(--ui-fg-3); margin-right: 10px; white-space: nowrap; }
+  .sendGrp { display: flex; height: 30px; border-radius: 8px; overflow: hidden; background: var(--ui-brand); color: #fff; }
+  .sendGrp .s1 { display: flex; align-items: center; gap: 6px; padding: 0 11px 0 12px; font-size: 13px; font-weight: 600; }
+  .sendGrp .s1 svg.i { width: 14px; height: 14px; }
+  .sendGrp .s2 { width: 26px; display: grid; place-items: center; border-left: 1px solid rgba(255, 255, 255, 0.28); }
+  .sendGrp .s2 svg.i { width: 13px; height: 13px; stroke-width: 2.25; }
+
+  /* ── Panel de hilo ── */
+  .side { background: var(--ui-surface); border-left: 1px solid var(--ui-border); display: flex; flex-direction: column; min-height: 0; }
+  .sideHead { height: 56px; padding: 0 10px 0 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--ui-border); flex: 0 0 auto; }
+  .sideHead .tt { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+  .sideHead .sub { font-size: 12.5px; color: var(--ui-fg-label); display: flex; align-items: center; gap: 3px; line-height: 1.3; }
+  .sideHead .sub svg.i { width: 11px; height: 11px; stroke-width: 2.25; }
+  .sideHead .sp { margin-left: auto; display: flex; gap: 2px; }
+  .follow { height: 28px; padding: 0 9px; border: 1px solid var(--ui-border); border-radius: 7px; font-size: 12px; font-weight: 500; color: var(--ui-fg-2); display: inline-flex; align-items: center; gap: 5px; margin-right: 2px; }
+  .follow svg.i { width: 13px; height: 13px; color: var(--ui-brand); }
+  .sideBody { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 8px 0 0; }
+  .side .msg { padding: 6px 16px; }
+  .count { display: flex; align-items: center; gap: 10px; padding: 6px 16px; font-size: 12px; font-weight: 500; color: var(--ui-fg-label); }
+  .count::after { content: ""; flex: 1; height: 1px; background: var(--ui-border); }
+  .side .comp { margin: 0 14px 16px; }
+  .side .ta { min-height: 40px; color: var(--ui-fg-3); }
+  .also { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ui-fg-2); margin-left: 4px; }
+  .cb { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--ui-border-strong); background: var(--ui-surface); }
+  .side .comp { box-shadow: none; border-color: var(--ui-border-strong); }
+  .side .btnPrimary { opacity: 0.45; width: 30px; padding: 0; justify-content: center; }
+</style>
+</head>
+<body>
+<div class="shell rail">
+
+  <!-- Menú del panel, colapsado a iconos al entrar al chat -->
+  <aside class="appSide">
+    <div class="brand"><div class="brandMark">N</div></div>
+    <nav class="nav">
+      <div class="navGroup">
+        <div class="navItem"><i data-i="home"></i></div>
+        <div class="navItem on"><i data-i="thread"></i><b class="dot"></b></div>
+        <div class="navItem"><i data-i="task"></i></div>
+        <div class="navItem"><i data-i="clock"></i></div>
+        <div class="navItem"><i data-i="filetext"></i></div>
+        <div class="navItem"><i data-i="folder"></i></div>
+      </div>
+      <div class="navGroup">
+        <div class="navItem"><i data-i="box"></i></div>
+        <div class="navItem"><i data-i="tool"></i></div>
+        <div class="navItem"><i data-i="truck"></i></div>
+      </div>
+      <div class="navGroup">
+        <div class="navItem"><i data-i="money"></i></div>
+        <div class="navItem"><i data-i="chart"></i></div>
+      </div>
+    </nav>
+    <div class="userBlock"><div class="av round s28 h-teal">AP</div></div>
+  </aside>
+
+  <header class="topbar">
+    <div class="crumb">Chat <small>· Hoy</small></div>
+    <div class="palette"><i data-i="search"></i>Buscar en NEXARA…<span class="kbd">Ctrl K</span></div>
+    <div class="topRight">
+      <span class="rolePill">Dirección</span>
+      <div class="topIcon"><i data-i="moon"></i></div>
+      <div class="topIcon"><i data-i="bell"></i><span class="n">3</span></div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="chat">
+
+      <!-- ═════ Lista de canales ═════ -->
+      <aside class="list">
+        <div class="listHead">
+          <div class="ws">NEXARA <i data-i="down"></i></div>
+          <div class="sp">
+            <div class="iconBtn"><i data-i="filter"></i></div>
+            <div class="newBtn"><i data-i="compose"></i></div>
+          </div>
+        </div>
+        <div class="jump"><i data-i="search"></i>Ir a un canal o persona<span class="kbd">Ctrl K</span></div>
+
+        <div class="rows">
+          <div class="row unread"><i data-i="threads"></i><span class="nm">Hilos</span><span class="badge">3</span></div>
+          <div class="row unread"><i data-i="at"></i><span class="nm">Menciones</span><span class="badge">2</span></div>
+          <div class="row"><i data-i="edit"></i><span class="nm">Borradores</span><span class="badge soft">1</span></div>
+          <div class="row"><i data-i="bookmark"></i><span class="nm">Guardados</span></div>
+        </div>
+        <div class="sepLine"></div>
+
+        <div class="sec"><i data-i="down"></i>Favoritos</div>
+        <div class="rows">
+          <div class="row on"><i data-i="hash"></i><span class="nm">instalaciones</span><span class="meta"><span class="starOn"><i data-i="star"></i></span></span></div>
+        </div>
+
+        <div class="sec"><i data-i="down"></i>Canales<span class="plus"><i data-i="plus"></i></span></div>
+        <div class="rows">
+          <div class="row"><i data-i="hash"></i><span class="nm">general</span></div>
+          <div class="row unread"><i data-i="hash"></i><span class="nm">anuncios</span><span class="badge">1</span></div>
+          <div class="row unread"><i data-i="hash"></i><span class="nm">soporte</span><span class="badge">4</span></div>
+          <div class="row"><i data-i="hash"></i><span class="nm">almacen</span></div>
+          <div class="row muted"><i data-i="hash"></i><span class="nm">ventas-cotizaciones</span><span class="meta"><i data-i="belloff"></i></span></div>
+          <div class="row"><i data-i="lock"></i><span class="nm">direccion</span></div>
+          <div class="row"><i data-i="lock"></i><span class="nm">nomina</span></div>
+          <div class="row add"><span class="plusBox"><i data-i="plus"></i></span><span class="nm">Crear o explorar canales</span></div>
+        </div>
+
+        <div class="sec"><i data-i="down"></i>Mensajes directos<span class="plus"><i data-i="plus"></i></span></div>
+        <div class="rows">
+          <div class="row unread"><div class="av s20 h-blue">LH<span class="pres on"></span></div><span class="nm">Luis Hernández</span><span class="badge">2</span></div>
+          <div class="row"><div class="av s20 h-violet">MT<span class="pres on"></span></div><span class="nm">Mariana Torres</span></div>
+          <div class="row"><div class="av s20 h-amber">DR<span class="pres away"></span></div><span class="nm">Diego Ramírez</span></div>
+          <div class="row"><div class="av s20 h-rose">PM<span class="pres on"></span></div><span class="nm">Paola Méndez</span></div>
+          <div class="row muted"><div class="av s20 h-slate">JC<span class="pres"></span></div><span class="nm">Jorge Castillo</span></div>
+        </div>
+      </aside>
+
+      <!-- ═════ Conversación ═════ -->
+      <section class="center">
+        <header class="chHead">
+          <div style="min-width:0">
+            <div class="chTitle"><i data-i="hash"></i>instalaciones<span class="st"><i data-i="star"></i></span></div>
+            <div class="chTopic">Instalaciones en campo · material y evidencias</div>
+          </div>
+          <div class="chTools">
+            <div class="stack">
+              <div class="avs"><div class="av s20 round h-blue">LH</div><div class="av s20 round h-rose">PM</div><div class="av s20 round h-amber">DR</div></div>9
+            </div>
+            <div class="chSearch"><i data-i="search"></i>Buscar en el canal</div>
+            <div class="iconBtn"><i data-i="bell"></i></div>
+            <div class="iconBtn on"><i data-i="panel"></i></div>
+            <div class="iconBtn"><i data-i="more"></i></div>
+          </div>
+        </header>
+
+        <div class="tabs">
+          <div class="tab on"><i data-i="thread"></i>Mensajes</div>
+          <div class="tab"><i data-i="pin"></i>Fijados <span class="c">3</span></div>
+          <div class="tab"><i data-i="clip"></i>Archivos <span class="c">12</span></div>
+          <div class="tab"><i data-i="task"></i>Actividades <span class="c">5</span></div>
+        </div>
+
+        <div class="stream">
+          <div class="day"><span>Hoy · viernes 2 de octubre</span></div>
+
+          <div class="msg">
+            <div class="av h-blue">LH</div>
+            <div>
+              <div class="hd"><b>Luis Hernández</b><span class="rol">Técnico</span><time>9:12</time></div>
+              <div class="bd">Buenos días. Ya estamos en Plaza Dorada para las 16 cámaras de <span class="entity"><i data-i="task"></i>AN-0031 · Instalación CCTV Plaza Dorada</span>. El site está listo, pero solo traemos una bobina de UTP cat 6 exterior.</div>
+            </div>
+          </div>
+          <div class="msg cont">
+            <div class="t">9:13</div>
+            <div class="bd"><span class="mention">@Paola Méndez</span> ¿nos mandan otra bobina y 20 RJ45 blindados?</div>
+          </div>
+
+          <div class="msg hover">
+            <div class="tip">Responder en hilo</div>
+            <div class="tools">
+              <span class="e">✅</span><span class="e">👍</span><span class="e">👀</span>
+              <span class="v"></span>
+              <span class="iconBtn"><i data-i="smileplus"></i></span>
+              <span class="iconBtn on"><i data-i="thread"></i></span>
+              <span class="iconBtn"><i data-i="pin"></i></span>
+              <span class="iconBtn"><i data-i="bookmark"></i></span>
+              <span class="iconBtn"><i data-i="more"></i></span>
+            </div>
+            <div class="av h-rose">PM</div>
+            <div>
+              <div class="hd"><b>Paola Méndez</b><span class="rol">Almacén</span><time>9:15</time></div>
+              <div class="bd">Sí hay en existencia. <span class="mention">@Diego Ramírez</span> pasa por el material a las 10:00 y se lo lleva.</div>
+              <div class="reacts">
+                <span class="react mine">👍 3</span><span class="react">✅ 1</span><span class="react add"><i data-i="smileplus"></i></span>
+              </div>
+              <div class="thHint open">
+                <div class="avs"><div class="av s20 h-blue">LH</div><div class="av s20 h-amber">DR</div><div class="av s20 h-rose">PM</div></div>
+                <b>4 respuestas</b><span>Última hace 12 min</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av h-amber">DR</div>
+            <div>
+              <div class="hd"><b>Diego Ramírez</b><span class="rol">Técnico</span><time>10:04</time></div>
+              <div class="bd">Material recogido y firmado. Voy saliendo, llego en 25 min.</div>
+              <div class="files">
+                <div class="ph" style="background:var(--photo-a)"><i data-i="image"></i><span class="cap">bobina.jpg</span></div>
+                <div class="ph" style="background:var(--photo-b)"><i data-i="image"></i><span class="cap">conectores.jpg</span></div>
+                <div class="fileChip">
+                  <div class="ic"><i data-i="filetext"></i></div>
+                  <div><div class="n">salida-almacen-0412.pdf</div><div class="s">PDF · 184 KB</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="new">NUEVOS</div>
+
+          <div class="msg">
+            <div class="av h-violet">MT</div>
+            <div>
+              <div class="hd"><b>Mariana Torres</b><span class="rol">Soporte</span><time>10:21</time><span class="ed">(editado)</span></div>
+              <div class="bd">Ojo: el cliente pide que el NVR quede en el rack del site, no en recepción. La IP del grabador será <code>192.168.10.20</code>; ya lo anoté en la actividad.</div>
+            </div>
+          </div>
+
+          <div class="msg pinned">
+            <div class="av h-teal">AP</div>
+            <div>
+              <div class="pinNote"><i data-i="pin"></i>Fijado por ti</div>
+              <div class="hd"><b>Adam Pozo</b><span class="rol">Dirección</span><time>10:26</time><span class="ticks"><i data-i="checks"></i></span></div>
+              <div class="bd"><span class="mention">@Luis Hernández</span> al terminar suban las evidencias y dejen la actividad en <b>Por Validar</b>. La entrega con el cliente es mañana a las 11:00.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="typing"><span class="dots"><i></i><i></i><i></i></span><span><b style="font-weight:600;color:var(--ui-fg-2)">Luis Hernández</b> está escribiendo…</span></div>
+        <div class="comp">
+          <div class="fmt">
+            <span class="f on"><b>B</b></span><span class="f"><i style="font-style:italic;font-family:Georgia,serif">I</i></span><span class="f"><s>S</s></span>
+            <span class="v"></span>
+            <span class="f"><i data-i="link"></i></span><span class="f"><i data-i="ol"></i></span><span class="f"><i data-i="ul"></i></span>
+            <span class="v"></span>
+            <span class="f"><i data-i="quote"></i></span><span class="f"><i data-i="code"></i></span><span class="f"><i data-i="codeblock"></i></span>
+          </div>
+          <div class="ta">Enterado. <b>Mañana 11:00</b> confirmo la entrega con el cliente<span class="caret"></span></div>
+          <div class="bar">
+            <span class="iconBtn"><i data-i="plus"></i></span>
+            <span class="iconBtn"><i data-i="clip"></i></span>
+            <span class="iconBtn"><i data-i="smile"></i></span>
+            <span class="iconBtn"><i data-i="at"></i></span>
+            <span class="v"></span>
+            <span class="ent"><i data-i="task"></i>Actividad</span>
+            <span class="ent"><i data-i="camera"></i>Evidencia</span>
+            <span class="hint"><b style="font-weight:600">Enter</b> envía · <b style="font-weight:600">Shift + Enter</b> salto de línea</span>
+            <div class="sendGrp"><span class="s1"><i data-i="send"></i>Enviar</span><span class="s2"><i data-i="down"></i></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═════ Hilo ═════ -->
+      <aside class="side">
+        <div class="sideHead">
+          <div>
+            <div class="tt">Hilo</div>
+            <div class="sub"><i data-i="hash"></i>instalaciones</div>
+          </div>
+          <div class="sp">
+            <span class="follow"><i data-i="check2"></i>Siguiendo</span>
+            <div class="iconBtn"><i data-i="x"></i></div>
+          </div>
+        </div>
+        <div class="sideBody">
+          <div class="msg">
+            <div class="av h-rose">PM</div>
+            <div>
+              <div class="hd"><b>Paola Méndez</b><time>9:15</time></div>
+              <div class="bd">Sí hay en existencia. <span class="mention">@Diego Ramírez</span> pasa por el material a las 10:00 y se lo lleva.</div>
+              <div class="reacts"><span class="react mine">👍 3</span><span class="react">✅ 1</span></div>
+            </div>
+          </div>
+          <div class="count">4 respuestas</div>
+          <div class="msg">
+            <div class="av h-blue">LH</div>
+            <div>
+              <div class="hd"><b>Luis Hernández</b><time>9:18</time></div>
+              <div class="bd">Gracias. También faltan 4 cajas de registro de 10×10.</div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="av h-rose">PM</div>
+            <div>
+              <div class="hd"><b>Paola Méndez</b><time>9:24</time></div>
+              <div class="bd">Agregadas a la salida. Va: 1 bobina, 20 RJ45 y 4 cajas.</div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="av h-amber">DR</div>
+            <div>
+              <div class="hd"><b>Diego Ramírez</b><time>9:58</time></div>
+              <div class="bd">Recibido, ya firmé la salida en almacén.</div>
+              <div class="reacts"><span class="react">✅ 2</span></div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="av h-blue">LH</div>
+            <div>
+              <div class="hd"><b>Luis Hernández</b><time>10:14</time></div>
+              <div class="bd">Te espero en la entrada de proveedores, por el estacionamiento 2.</div>
+            </div>
+          </div>
+        </div>
+        <div class="comp">
+          <div class="ta">Responder en el hilo…</div>
+          <div class="bar">
+            <span class="iconBtn"><i data-i="clip"></i></span>
+            <span class="iconBtn"><i data-i="smile"></i></span>
+            <span class="iconBtn"><i data-i="at"></i></span>
+            <label class="also" style="margin-left:6px"><span class="cb"></span>Enviar también al canal</label>
+            <span style="margin-left:auto" class="btnPrimary"><i data-i="send" style="width:14px;height:14px"></i></span>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+</div>
+<script src="iconos.js"></script>
+<script>
+  addEventListener("load", function () {
+    document.querySelectorAll(".stream, .sideBody, .dBody, .list, .card").forEach(function (el) {
+      var h = 0; Array.prototype.forEach.call(el.children, function (c) { var cs = getComputedStyle(c); h += c.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom); });
+      el.setAttribute("data-fit", Math.round(el.clientHeight - h));
+    });
+  });
+</script>
+</body>
+</html>

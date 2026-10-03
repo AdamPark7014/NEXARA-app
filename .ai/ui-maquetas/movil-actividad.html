@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>NEXARA móvil · Actividad AN-0031</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="movil.css">
+<style>
+  .hdr { padding: 4px 4px 14px; }
+  .hdr-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .hdr-t { font-size: 21px; font-weight: 650; letter-spacing: -.02em; line-height: 1.25; }
+  .place { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-top: 12px; }
+  .place-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--ui-info-bg); color: var(--ui-info-text); flex: 0 0 auto; }
+  .place-t { font-size: 14px; font-weight: 600; }
+  .place-s { font-size: 12.5px; color: var(--ui-fg-3); }
+  .go { height: 38px; padding: 0 14px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 650; background: var(--ui-brand-soft); color: var(--ui-brand-text); }
+  .go .i { width: 17px; height: 17px; }
+  .evh { display: flex; align-items: center; padding: 14px 16px 6px; }
+  .evh h3 { font-size: 15.5px; font-weight: 650; }
+  .evh .muted { margin-left: auto; font-size: 13px; font-weight: 600; }
+  .evp { padding: 0 16px 8px; }
+  .evp .prog-bar { height: 8px; }
+  .dock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="status"><span>9:41</span><span class="sicons"><i data-i="wifi" class="sm"></i><span class="bat"></span></span></div>
+  <div class="abar">
+    <a class="m-ib"><i data-i="left"></i><span class="back-l">Actividades</span></a>
+    <div class="abar-t">AN-0031</div>
+    <a class="m-ib android-only"><i data-i="chat"></i></a>
+    <a class="m-ib"><i data-i="morev" class="android-only"></i><i data-i="more" class="ios-only"></i></a>
+  </div>
+
+  <div class="scroll">
+    <div class="hdr">
+      <div class="hdr-meta"><span class="kind k-cctv"><i data-i="cctv"></i>CCTV</span><span class="badge sm dot t-info">En curso</span><span class="badge sm t-success">En tiempo</span></div>
+      <div class="hdr-t">Mantenimiento preventivo de DVR y 12 cámaras</div>
+      <section class="m-card place">
+        <span class="place-ico"><i data-i="pin"></i></span>
+        <div class="grow"><div class="place-t">Farmacia San Rafael</div><div class="place-s">Sucursal Centro · a 12 m</div></div>
+        <a class="go"><i data-i="phone"></i>Llamar</a>
+      </section>
+    </div>
+
+    <section class="m-card facts" style="margin-bottom:12px">
+      <div class="fact"><div class="fact-l">En sitio</div><div class="fact-v">2 h 34</div></div>
+      <div class="fact"><div class="fact-l">Termina</div><div class="fact-v">13:00</div></div>
+      <div class="fact"><div class="fact-l">Apoyo</div><div class="fact-v row" style="gap:6px"><span data-av="Fernanda Ortiz" data-f data-s="20"></span>Fernanda</div></div>
+    </section>
+
+    <section class="m-card">
+      <div class="evh"><h3>Pasos de evidencia</h3><span class="muted">4 de 6</span></div>
+      <div class="evp"><div class="prog-bar"><span style="width:66%"></span></div></div>
+      <div class="stepl">
+        <div class="st-row"><span class="st-ico"><img src="fotos/campo-instalacion-rack.jpg" alt=""><span class="ok"><i data-i="check"></i></span></span><div class="grow"><div class="st-t">DVR y rack antes</div><div class="st-s">2 fotos · 10:12</div></div><i data-i="right" class="sm muted"></i></div>
+        <div class="st-row"><span class="st-ico"><img src="fotos/monitoreo-pantallas-cctv.jpg" alt=""><span class="ok"><i data-i="check"></i></span></span><div class="grow"><div class="st-t">Cámaras 1 a 7 después</div><div class="st-s">7 fotos · 12:05</div></div><i data-i="right" class="sm muted"></i></div>
+        <div class="st-row cur"><span class="st-ico"><i data-i="camera"></i></span><div class="grow"><div class="st-t">Cámaras 8 a 12 después</div><div class="st-s">Obligatorio · 0 de 5 fotos</div></div><span class="badge sm t-brand">Sigue</span></div>
+        <div class="st-row pend"><span class="st-ico"><i data-i="sig"></i></span><div class="grow"><div class="st-t">Firma del cliente</div><div class="st-s">Opcional · al terminar</div></div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="dock">
+    <a class="m-btn primary xl"><i data-i="camera"></i>Tomar fotos · cámaras 8 a 12</a>
+    <div class="dock-row">
+      <a class="m-btn outline"><i data-i="pause"></i>Pausar</a>
+      <a class="m-btn dis"><i data-i="send"></i>A revisión</a>
+    </div>
+    <div class="dock-hint">Faltan 5 fotos obligatorias para mandarla a revisión</div>
+  </div>
+</div>
+<script src="maqueta.js"></script>
+</body>
+</html>

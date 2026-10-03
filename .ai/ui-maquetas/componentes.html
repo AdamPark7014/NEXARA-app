@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>NEXARA · Componentes</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .btn-grid { display: grid; grid-template-columns: 120px repeat(3, auto) 1fr; gap: 14px 18px; align-items: center; }
+  .btn-grid .h { font-size: 12px; color: var(--ui-fg-3); font-weight: 600; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .sw { display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; color: var(--ui-fg-3); }
+  .sw span:first-child { width: 100%; height: 44px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+  .sw b { color: var(--ui-fg); font-weight: 600; font-size: 12px; }
+  .swatches { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; }
+  .type-row { display: flex; align-items: baseline; gap: 16px; padding: 6px 0; border-bottom: 1px solid var(--ui-border-subtle); }
+  .type-row:last-child { border-bottom: none; }
+  .type-row .muted { width: 140px; font-size: 12px; flex: 0 0 auto; }
+  .mini-kpis .kpi { padding: 14px 16px; }
+  .toasts { display: grid; gap: 12px; }
+  .toasts .toast { width: 100%; }
+  .tbl td { white-space: nowrap; }
+  .stack-12 { display: grid; gap: 12px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="sheet-h">
+    <img src="logo.png" alt="" style="width:44px;height:44px">
+    <div class="grow"><h1>Sistema visual NEXARA v2 · Componentes</h1><p>Lo que se cambia una vez en <code>components/base</code> y se propaga a todos los módulos.</p></div>
+    <span class="badge t-brand">Propuesta · 2 oct 2026</span>
+  </div>
+
+  <div class="sheet-grid">
+    <section class="card card-pad">
+      <div class="spec-label">Color y tipografía</div>
+      <div class="g2" style="gap:32px">
+        <div class="swatches">
+          <div class="sw"><span style="background:#1f9e84"></span><b>Marca</b>#1F9E84</div>
+          <div class="sw"><span style="background:#12715e"></span><b>Marca texto</b>#12715E</div>
+          <div class="sw"><span style="background:#e7f5f1"></span><b>Marca suave</b>#E7F5F1</div>
+          <div class="sw"><span style="background:#3aa9cc"></span><b>Cielo</b>Redes</div>
+          <div class="sw"><span style="background:#a64ca6"></span><b>Magenta</b>Acceso</div>
+          <div class="sw"><span style="background:#ee8a2a"></span><b>Naranja</b>Obra</div>
+          <div class="sw"><span style="background:#16a34a"></span><b>Éxito</b>Hecho</div>
+          <div class="sw"><span style="background:#e08a0b"></span><b>Aviso</b>Riesgo</div>
+          <div class="sw"><span style="background:#dc2626"></span><b>Peligro</b>Atraso</div>
+          <div class="sw"><span style="background:#0f1728"></span><b>Tinta</b>#0F1728</div>
+        </div>
+        <div>
+          <div class="type-row"><span class="muted">Display · 28/650</span><span style="font-size:28px;font-weight:650;letter-spacing:-.025em">$1.28 M cotizado</span></div>
+          <div class="type-row"><span class="muted">Título · 22/650</span><span style="font-size:22px;font-weight:650;letter-spacing:-.02em">Actividades</span></div>
+          <div class="type-row"><span class="muted">Sección · 16/650</span><span style="font-size:16px;font-weight:650">Equipo en campo ahora</span></div>
+          <div class="type-row"><span class="muted">Cuerpo · 14/400</span><span>Mantenimiento preventivo de DVR, Farmacia San Rafael</span></div>
+          <div class="type-row"><span class="muted">Meta · 12/500</span><span style="font-size:12px;font-weight:500;color:var(--ui-fg-3)">AN-0031 · hace 35 min · GPS ✓</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-pad">
+      <div class="spec-label">Botones: jerarquía, tamaños y estados</div>
+      <div class="btn-grid">
+        <span class="h">Variante</span><span class="h">Chico · 32</span><span class="h">Normal · 36</span><span class="h">Grande · 44</span><span class="h">Uso</span>
+        <span class="sec" style="font-weight:600">Primario</span>
+        <a class="btn btn-primary btn-sm"><i data-i="plus"></i>Nueva</a>
+        <a class="btn btn-primary"><i data-i="plus"></i>Nueva actividad</a>
+        <a class="btn btn-primary btn-lg"><i data-i="check"></i>Crear actividad</a>
+        <span class="note">Uno por pantalla. La acción que más se hace.</span>
+        <span class="sec" style="font-weight:600">Secundario</span>
+        <a class="btn btn-secondary btn-sm"><i data-i="download"></i>Exportar</a>
+        <a class="btn btn-secondary"><i data-i="users"></i>Reasignar</a>
+        <a class="btn btn-secondary btn-lg"><i data-i="copy"></i>Desde plantilla</a>
+        <span class="note">Acciones de apoyo junto al primario.</span>
+        <span class="sec" style="font-weight:600">Tonal</span>
+        <a class="btn btn-tonal btn-sm"><i data-i="check"></i>Aprobar</a>
+        <a class="btn btn-tonal"><i data-i="nav"></i>Cómo llegar</a>
+        <a class="btn btn-tonal btn-lg"><i data-i="camera"></i>Agregar foto</a>
+        <span class="note">Acción positiva dentro de filas y tarjetas.</span>
+        <span class="sec" style="font-weight:600">Terciario</span>
+        <a class="btn btn-ghost btn-sm">Cancelar</a>
+        <a class="btn btn-ghost"><i data-i="filter"></i>Filtros</a>
+        <a class="btn btn-ghost btn-lg">Ver todo<i data-i="right"></i></a>
+        <span class="note">Cancelar, navegar, opciones menores.</span>
+        <span class="sec" style="font-weight:600">Peligro</span>
+        <a class="btn btn-danger-ghost btn-sm"><i data-i="trash"></i>Descartar</a>
+        <a class="btn btn-danger"><i data-i="trash"></i>Eliminar</a>
+        <a class="btn btn-danger btn-lg"><i data-i="xc"></i>Cancelar actividad</a>
+        <span class="note">Siempre con confirmación en diálogo propio.</span>
+      </div>
+      <div class="spec-label" style="margin-top:22px">Estados</div>
+      <div class="wrap">
+        <a class="btn btn-primary"><span class="spin"></span>Guardando…</a>
+        <a class="btn btn-secondary"><span class="spin"></span>Subiendo 3 fotos</a>
+        <a class="btn btn-primary is-disabled"><i data-i="send"></i>A revisión</a>
+        <a class="btn btn-secondary is-disabled">Deshabilitado</a>
+        <a class="btn btn-primary focus">Con foco de teclado</a>
+        <span class="btn-split"><a class="btn btn-primary"><i data-i="send"></i>Enviar cotización</a><a class="btn btn-primary"><i data-i="down"></i></a></span>
+        <a class="btn btn-secondary btn-icon" title="Más"><i data-i="more"></i></a>
+        <a class="btn btn-ghost btn-icon" title="Editar"><i data-i="edit"></i></a>
+        <a class="btn btn-primary">Crear<span class="kbd">Ctrl ↵</span></a>
+      </div>
+    </section>
+
+    <div class="g2">
+      <section class="card card-pad">
+        <div class="spec-label">Campos</div>
+        <div class="g2" style="gap:18px 20px">
+          <div class="field"><div class="label">Título <span class="req">*</span></div><div class="ctl"><span class="ph-txt">Qué se va a hacer</span></div><div class="hint">Lo verá el técnico en su lista.</div></div>
+          <div class="field"><div class="label">Cliente <span class="req">*</span></div><div class="ctl focus">Farmacia San|</div><div class="hint">Escribe para buscar entre 214 clientes.</div></div>
+          <div class="field"><div class="label">Sucursal</div><div class="ctl"><i data-i="pin"></i>Sucursal Centro<i data-i="down" class="chev"></i></div></div>
+          <div class="field"><div class="label">Fecha <span class="req">*</span></div><div class="ctl"><i data-i="calendar"></i>Vie 2 oct 2026<i data-i="down" class="chev"></i></div></div>
+          <div class="field"><div class="label">Monto <span class="req">*</span></div><div class="ctl invalid"><span class="muted">$</span>0.00</div><div class="err"><i data-i="alert"></i>El monto debe ser mayor a cero.</div></div>
+          <div class="field"><div class="label">RFC</div><div class="ctl valid">FSR980312KT4<i data-i="checkc" style="margin-left:auto;color:var(--ui-success)"></i></div><div class="ok-msg"><i data-i="check" class="xs"></i>RFC válido</div></div>
+          <div class="field"><div class="label">Folio <span class="opt">Automático</span></div><div class="ctl disabled">AN-0036</div></div>
+          <div class="field"><div class="label">Buscar</div><div class="ctl"><i data-i="search"></i><span class="ph-txt">Folio, cliente o persona</span><span class="kbd" style="margin-left:auto">/</span></div></div>
+        </div>
+        <div class="row" style="gap:24px;margin-top:20px;flex-wrap:wrap">
+          <span class="row"><span class="check on"><i data-i="check"></i></span>Avisar al cliente</span>
+          <span class="row"><span class="check"></span>Requiere firma</span>
+          <span class="row"><span class="switch on"></span>Evidencia obligatoria</span>
+          <div class="seg"><span>Baja</span><span class="on">Normal</span><span>Urgente</span></div>
+        </div>
+      </section>
+
+      <section class="card card-pad">
+        <div class="spec-label">Insignias de estado y chips</div>
+        <div class="stack-12">
+          <div class="row" style="gap:10px"><span class="muted" style="width:96px;font-size:12px">Actividades</span><div class="wrap"><span class="badge dot">Pendiente</span><span class="badge dot t-info">En curso</span><span class="badge dot t-violet">En revisión</span><span class="badge dot t-success">Completada</span><span class="badge dot t-danger">Atrasada</span><span class="badge t-outline">Cancelada</span></div></div>
+          <div class="row" style="gap:10px"><span class="muted" style="width:96px;font-size:12px">Cotizaciones</span><div class="wrap"><span class="badge">Borrador</span><span class="badge t-info"><i data-i="send"></i>Enviada</span><span class="badge t-success"><i data-i="check"></i>Aceptada</span><span class="badge t-danger">Rechazada</span><span class="badge t-warning"><i data-i="clock"></i>Vence en 3 días</span></div></div>
+          <div class="row" style="gap:10px"><span class="muted" style="width:96px;font-size:12px">Asistencias</span><div class="wrap"><span class="badge dot t-success">A tiempo</span><span class="badge dot t-warning">Retardo 12 min</span><span class="badge dot t-danger">Falta</span><span class="badge dot t-info">En comida</span><span class="badge t-brand"><i data-i="pin"></i>En geocerca</span></div></div>
+          <div class="row" style="gap:10px"><span class="muted" style="width:96px;font-size:12px">Tipo de trabajo</span><div class="wrap" style="gap:16px"><span class="kind k-cctv"><i data-i="cctv"></i>CCTV</span><span class="kind k-red"><i data-i="wifi"></i>Redes</span><span class="kind k-acceso"><i data-i="key"></i>Control de acceso</span><span class="kind k-obra"><i data-i="hardhat"></i>Obra</span></div></div>
+          <div class="row" style="gap:10px"><span class="muted" style="width:96px;font-size:12px">Filtros</span><div class="wrap"><span class="chip on">Todas <span class="n">38</span></span><span class="chip">En curso <span class="n">14</span></span><span class="chip filter">Responsable: <b>José A.</b><i data-i="x"></i></span><span class="chip dashed"><i data-i="plus"></i>Filtro</span></div></div>
+          <div class="row" style="gap:10px"><span class="muted" style="width:96px;font-size:12px">Personas</span><div class="row" style="gap:18px"><div class="person"><span data-av="Christian Del Pozo" data-s="32" data-st="on"></span><div><div class="person-n">Christian Del Pozo</div><div class="person-r">Director general</div></div></div><div class="av-stack"><span data-av="José Antonio Ramírez" data-s="28"></span><span data-av="Paulina Tlapaltotoli" data-f data-s="28"></span><span data-av="Luis Joel Aguilar" data-s="28"></span><span data-av="Fernanda Ortiz" data-f data-s="28"></span></div><div class="prog" style="width:150px"><div class="prog-bar"><span style="width:66%"></span></div><span class="prog-n">4/6</span></div></div></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="mini-kpis">
+      <div class="spec-label">Tarjetas KPI (con tendencia, semáforo o composición)</div>
+      <div class="kpis" style="margin-bottom:0">
+        <div class="card kpi"><div class="kpi-top"><span class="kpi-ico t-brand"><i data-i="board"></i></span><span class="kpi-label">Actividades de hoy</span></div><div class="kpi-val num">27<small>/ 38</small></div><div class="meter"><span style="width:58%;background:var(--ui-success)"></span><span style="width:13%;background:var(--ui-info)"></span><span style="width:8%;background:var(--ui-danger)"></span></div></div>
+        <div class="card kpi"><div class="kpi-top"><span class="kpi-ico t-violet"><i data-i="quote"></i></span><span class="kpi-label">Cotizado este mes</span></div><div class="kpi-val num">$1.28<small>M</small></div><div class="kpi-foot"><span class="trend up"><i data-i="tup"></i>18%</span>vs. septiembre</div></div>
+        <div class="card kpi"><div class="kpi-top"><span class="kpi-ico t-warning"><i data-i="box"></i></span><span class="kpi-label">Artículos bajo mínimo</span></div><div class="kpi-val num" style="color:var(--ui-warning-text)">4</div><div class="kpi-foot"><span class="semaf s-ambar"></span>UTP Cat6, conectores RJ45…</div></div>
+        <div class="card kpi"><div class="kpi-top"><span class="kpi-ico t-danger"><i data-i="clock"></i></span><span class="kpi-label">Retardos del mes</span></div><div class="kpi-val num">9</div><div class="kpi-foot"><span class="trend down"><i data-i="tup"></i>3</span>más que agosto</div><div class="spark"><span style="height:40%"></span><span style="height:55%"></span><span style="height:35%"></span><span style="height:60%"></span><span style="height:70%"></span><span style="height:90%;background:var(--ui-danger)"></span></div></div>
+      </div>
+    </section>
+
+    <div class="g2" style="grid-template-columns:1.75fr 1fr">
+      <section class="card">
+        <div class="card-head"><div class="grow"><div class="card-title">Tabla · Cotizaciones recientes</div><div class="card-sub">Encabezado claro, importes a la derecha, estado con color y acciones al pasar el mouse</div></div><a class="btn btn-secondary btn-sm"><i data-i="sliders"></i>Columnas</a></div>
+        <table class="tbl">
+          <thead><tr><th>Folio</th><th>Cliente</th><th>Responsable</th><th class="r">Importe</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><span class="tbl-title num">NEX-2026-118</span><div class="tbl-sub">Hoy 12:40</div></td><td>Farmacia San Rafael</td><td><div class="person"><span data-av="Christian Del Pozo" data-s="24"></span>Christian D.</div></td><td class="r num" style="font-weight:600">$186,400.00</td><td><span class="badge">Borrador</span></td><td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="morev"></i></a></div></td></tr>
+            <tr class="hover"><td><span class="tbl-title num">NEX-2026-117</span><div class="tbl-sub">Ayer</div></td><td>Plaza Dorada</td><td><div class="person"><span data-av="José Antonio Ramírez" data-s="24"></span>José Antonio R.</div></td><td class="r num" style="font-weight:600">$94,250.00</td><td><span class="badge t-info"><i data-i="send"></i>Enviada</span></td><td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="copy"></i></a><a class="btn btn-ghost btn-sm btn-icon"><i data-i="download"></i></a><a class="btn btn-ghost btn-sm btn-icon"><i data-i="morev"></i></a></div></td></tr>
+            <tr><td><span class="tbl-title num">NEX-2026-112</span><div class="tbl-sub">28 sep</div></td><td>Clínica Los Ángeles</td><td><div class="person"><span data-av="Paulina Tlapaltotoli" data-f data-s="24"></span>Paulina T.</div></td><td class="r num" style="font-weight:600">$412,980.00</td><td><span class="badge t-success"><i data-i="check"></i>Aceptada</span></td><td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="morev"></i></a></div></td></tr>
+            <tr><td><span class="tbl-title num">NEX-2026-104</span><div class="tbl-sub">19 sep</div></td><td>Gimnasio Acrobat</td><td><div class="person"><span data-av="Luis Joel Aguilar" data-s="24"></span>Luis Joel A.</div></td><td class="r num" style="font-weight:600">$58,300.00</td><td><span class="badge t-warning"><i data-i="clock"></i>Vence en 3 días</span></td><td><div class="row-actions"><a class="btn btn-ghost btn-sm btn-icon"><i data-i="morev"></i></a></div></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <div class="spec-label">Avisos y toasts</div>
+        <div class="toasts">
+          <div class="toast"><span class="toast-ico t-success"><i data-i="checkc"></i></span><div class="grow"><div class="toast-t">Actividad AN-0036 creada</div><div class="toast-d">Se avisó a José Antonio en su teléfono.</div><div class="toast-a"><a>Ver actividad</a><a style="color:var(--ui-fg-3)">Deshacer</a></div></div><i data-i="x" class="sm x"></i></div>
+          <div class="toast"><span class="toast-ico t-danger"><i data-i="alert"></i></span><div class="grow"><div class="toast-t">No se pudo enviar la cotización</div><div class="toast-d">El correo del cliente no es válido.</div><div class="toast-a"><a>Corregir correo</a></div></div><i data-i="x" class="sm x"></i></div>
+          <div class="alert t-warning"><i data-i="alert"></i><div><div class="alert-t">Stock bajo en 4 artículos</div><div style="font-size:13px;margin-top:2px">Pide antes del lunes para la obra de Plaza Dorada.</div></div></div>
+          <div class="alert t-info"><i data-i="info"></i><div><div class="alert-t">Sin conexión</div><div style="font-size:13px;margin-top:2px">Tus 3 fotos se subirán al recuperar señal.</div></div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="maqueta.js"></script>
+</body>
+</html>

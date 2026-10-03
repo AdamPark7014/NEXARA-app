@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>NEXARA · Barra lateral y Resumen</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .hello { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
+  .hello h1 { font-size: 24px; font-weight: 650; letter-spacing: -.02em; }
+  .hello p { color: var(--ui-fg-2); margin-top: 4px; }
+  .cols { display: grid; grid-template-columns: 1.75fr 1fr; gap: 16px; }
+  .crew { display: grid; grid-template-columns: 1fr; }
+  .crew-row { display: grid; grid-template-columns: 196px minmax(0,1fr) 84px 104px; align-items: center; gap: 14px; padding: 11px 20px; border-bottom: 1px solid var(--ui-border-subtle); }
+  .crew-row > div:nth-child(2) > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crew-row .badge { justify-self: end; }
+  .crew-row:last-child { border-bottom: none; }
+  .att { display: flex; gap: 12px; padding: 13px 20px; border-bottom: 1px solid var(--ui-border-subtle); align-items: flex-start; }
+  .att:last-child { border-bottom: none; }
+  .att-ico { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: 0 0 auto; }
+  .att-t { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+  .att-d { font-size: 12.5px; color: var(--ui-fg-3); margin-top: 2px; }
+  .att .btn { margin-left: auto; flex: 0 0 auto; }
+  .stack { display: grid; gap: 16px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sb" data-active="resumen"></aside>
+  <div class="main">
+    <header class="top">
+      <div class="crumbs"><span>Hoy</span><i data-i="right"></i><b>Resumen</b></div>
+      <div class="top-actions">
+        <a class="icon-btn" title="Tema"><i data-i="moon"></i></a>
+        <a class="icon-btn" title="Notificaciones"><i data-i="bell"></i><span class="pip"></span></a>
+        <div class="divider-v"></div>
+        <a class="btn btn-primary btn-sm"><i data-i="plus"></i>Nueva actividad<span class="kbd">N</span></a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="hello">
+        <div class="grow">
+          <h1>Buenas tardes, Christian</h1>
+          <p>Viernes 2 de octubre · 11 de 14 técnicos en campo · 3 asuntos esperan tu decisión</p>
+        </div>
+        <div class="seg"><span class="on">Hoy</span><span>Semana</span><span>Mes</span></div>
+      </div>
+
+      <section class="kpis">
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-brand"><i data-i="board"></i></span><span class="kpi-label">Actividades de hoy</span></div>
+          <div class="kpi-val num">27<small>/ 38</small></div>
+          <div class="meter"><span style="width:58%;background:var(--ui-success)"></span><span style="width:13%;background:var(--ui-info)"></span><span style="width:8%;background:var(--ui-danger)"></span></div>
+          <div class="legend"><span style="--c:var(--ui-success)">22 hechas</span><span style="--c:var(--ui-info)">5 en curso</span><span style="--c:var(--ui-danger)">3 tarde</span></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-info"><i data-i="users"></i></span><span class="kpi-label">Personal presente</span></div>
+          <div class="kpi-val num">16<small>/ 17</small></div>
+          <div class="kpi-foot"><span class="trend flat">2 retardos</span><span>1 falta: Gerardo M.</span></div>
+          <div class="spark"><span style="height:60%"></span><span style="height:80%"></span><span style="height:70%"></span><span style="height:90%"></span><span style="height:85%"></span><span style="height:95%"></span></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-violet"><i data-i="quote"></i></span><span class="kpi-label">Cotizado este mes</span></div>
+          <div class="kpi-val num">$1.28<small>M</small></div>
+          <div class="kpi-foot"><span class="trend up"><i data-i="tup"></i>18%</span><span>vs. septiembre · 7 por cerrar</span></div>
+        </div>
+        <div class="card kpi">
+          <div class="kpi-top"><span class="kpi-ico t-warning"><i data-i="alert"></i></span><span class="kpi-label">Alertas abiertas</span></div>
+          <div class="kpi-val num">3</div>
+          <div class="kpi-foot"><span class="semaf s-rojo"></span><span>1 crítica · DVR sin señal, Plaza Dorada</span></div>
+        </div>
+      </section>
+
+      <div class="cols">
+        <section class="card">
+          <div class="card-head">
+            <div class="grow"><div class="card-title">Equipo en campo ahora</div><div class="card-sub">Actualizado hace 1 min · según checada y GPS</div></div>
+            <a class="btn btn-ghost btn-sm">Ver tablero<i data-i="right"></i></a>
+          </div>
+          <div class="crew">
+            <div class="crew-row">
+              <div class="person"><span data-av="José Antonio Ramírez" data-s="34" data-st="on"></span><div><div class="person-n">José Antonio Ramírez</div><div class="person-r">Técnico CCTV</div></div></div>
+              <div><div class="tbl-title" style="font-size:13px">Mantenimiento DVR · Farmacia San Rafael</div><div class="tbl-sub"><i data-i="pin" class="xs"></i>Sucursal Centro · AN-0031</div></div>
+              <div class="prog"><div class="prog-bar"><span style="width:66%"></span></div><span class="prog-n">4/6</span></div>
+              <span class="badge dot t-info">En curso</span>
+            </div>
+            <div class="crew-row">
+              <div class="person"><span data-av="Luis Joel Aguilar" data-s="34" data-st="on"></span><div><div class="person-n">Luis Joel Aguilar</div><div class="person-r">Técnico de redes</div></div></div>
+              <div><div class="tbl-title" style="font-size:13px">Enlace punto a punto · Plaza Dorada</div><div class="tbl-sub"><i data-i="pin" class="xs"></i>Azotea torre B · AN-0034</div></div>
+              <div class="prog"><div class="prog-bar"><span style="width:25%;background:var(--ui-warning)"></span></div><span class="prog-n">1/4</span></div>
+              <span class="badge dot t-warning">Retrasada</span>
+            </div>
+            <div class="crew-row">
+              <div class="person"><span data-av="Paulina Tlapaltotoli" data-f data-s="34" data-st="on"></span><div><div class="person-n">Paulina Tlapaltotoli</div><div class="person-r">Soporte</div></div></div>
+              <div><div class="tbl-title" style="font-size:13px">Alta de huellas · Control de acceso</div><div class="tbl-sub"><i data-i="pin" class="xs"></i>Oficinas Puebla · AN-0029</div></div>
+              <div class="prog"><div class="prog-bar"><span style="width:100%;background:var(--ui-success)"></span></div><span class="prog-n">3/3</span></div>
+              <span class="badge dot t-violet">En revisión</span>
+            </div>
+            <div class="crew-row">
+              <div class="person"><span data-av="Ricardo Hernández" data-s="34" data-st="away"></span><div><div class="person-n">Ricardo Hernández</div><div class="person-r">Obra civil</div></div></div>
+              <div><div class="tbl-title" style="font-size:13px">Canalización y registro · Bodega Atlixco</div><div class="tbl-sub"><i data-i="nav" class="xs"></i>En traslado · llega 15:40</div></div>
+              <div class="prog"><div class="prog-bar"><span style="width:0%"></span></div><span class="prog-n">0/5</span></div>
+              <span class="badge dot">Pendiente</span>
+            </div>
+            <div class="crew-row">
+              <div class="person"><span data-av="Fernanda Ortiz" data-f data-s="34" data-st="on"></span><div><div class="person-n">Fernanda Ortiz</div><div class="person-r">Técnico CCTV</div></div></div>
+              <div><div class="tbl-title" style="font-size:13px">Instalación 8 cámaras IP · Plaza Dorada</div><div class="tbl-sub"><i data-i="pin" class="xs"></i>Estacionamiento · AN-0033</div></div>
+              <div class="prog"><div class="prog-bar"><span style="width:50%"></span></div><span class="prog-n">4/8</span></div>
+              <span class="badge dot t-info">En curso</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="stack">
+          <section class="card">
+            <div class="card-head"><div class="grow"><div class="card-title">Requiere tu atención</div></div><span class="badge t-danger">3</span></div>
+            <div class="att">
+              <span class="att-ico t-warning"><i data-i="wallet"></i></span>
+              <div class="grow"><div class="att-t">Viático de $2,450 por aprobar</div><div class="att-d">Luis Joel Aguilar · Plaza Dorada</div></div>
+              <a class="btn btn-secondary btn-sm">Revisar</a>
+            </div>
+            <div class="att">
+              <span class="att-ico t-violet"><i data-i="quote"></i></span>
+              <div class="grow"><div class="att-t">NEX-2026-118 lista para enviar</div><div class="att-d">Farmacia San Rafael · $186,400</div></div>
+              <a class="btn btn-secondary btn-sm">Abrir</a>
+            </div>
+            <div class="att">
+              <span class="att-ico t-danger"><i data-i="box"></i></span>
+              <div class="grow"><div class="att-t">Stock bajo: cable UTP Cat6</div><div class="att-d">Quedan 2 bobinas · mínimo 5</div></div>
+              <a class="btn btn-secondary btn-sm">Pedir</a>
+            </div>
+          </section>
+          <section class="card card-pad">
+            <div class="row" style="margin-bottom:12px"><div class="card-title grow">Próximas visitas</div><span class="muted" style="font-size:12.5px">Hoy</span></div>
+            <div class="col" style="gap:12px">
+              <div class="row"><span class="kind k-cctv"><i data-i="cctv"></i></span><div class="grow"><div style="font-weight:600;font-size:13.5px">Levantamiento CCTV</div><div class="muted" style="font-size:12.5px">Clínica Los Ángeles · 16:00</div></div><span data-av="José Antonio Ramírez" data-s="26"></span></div>
+              <div class="row"><span class="kind k-acceso"><i data-i="key"></i></span><div class="grow"><div style="font-weight:600;font-size:13.5px">Torniquetes, ajuste</div><div class="muted" style="font-size:12.5px">Gimnasio Acrobat · 17:30</div></div><span data-av="Paulina Tlapaltotoli" data-f data-s="26"></span></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="maqueta.js"></script>
+</body>
+</html>

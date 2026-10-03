@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>NEXARA · Nueva actividad</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .main { position: relative; }
+  .form-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
+  .fsec { margin-bottom: 16px; }
+  .fsec .card-head { gap: 12px; }
+  .step { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 650; background: var(--ui-brand-soft); color: var(--ui-brand-text); flex: 0 0 auto; }
+  .step.done { background: var(--ui-brand); color: #fff; }
+  .step.done .i { width: 15px; height: 15px; stroke-width: 2.6; }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 20px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px 20px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .g4 .choice { flex-direction: column; gap: 10px; position: relative; }
+  .g4 .choice .radio { position: absolute; top: 12px; right: 12px; margin: 0; }
+  .g4 .choice .ico svg { width: 34px; height: 34px; padding: 8px; border-radius: 9px; }
+  .span2 { grid-column: span 2; }
+  .span3 { grid-column: span 3; }
+  .fields { display: grid; gap: 18px; }
+  .ev-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--ui-border-subtle); }
+  .ev-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .ev-row:first-child { padding-top: 0; }
+  .ev-ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-fg-2); flex: 0 0 auto; }
+  .ev-t { font-weight: 600; font-size: 13.5px; }
+  .ev-d { font-size: 12px; color: var(--ui-fg-3); }
+  .aside { position: sticky; top: 80px; display: grid; gap: 16px; }
+  .chk { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 0; }
+  .chk .tick { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; }
+  .chk .tick .i { width: 12px; height: 12px; stroke-width: 3; }
+  .chk.ok .tick { background: var(--ui-success); color: #fff; }
+  .chk.no .tick { border: 1.5px dashed var(--ui-border-strong); }
+  .chk.bad .tick { background: var(--ui-danger); color: #fff; }
+  .chk.ok span { color: var(--ui-fg-2); }
+  .chk.bad span { color: var(--ui-danger-text); font-weight: 500; }
+  .foot {
+    position: sticky; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 14px 32px;
+    background: color-mix(in srgb, var(--ui-surface) 94%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--ui-border);
+    box-shadow: 0 -6px 20px rgba(16,24,40,.05); margin-top: auto;
+  }
+  .saved { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ui-fg-3); }
+  .saved .i { width: 15px; height: 15px; color: var(--ui-success); }
+  .back { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; color: var(--ui-fg-3); margin-bottom: 8px; }
+  .back .i { width: 15px; height: 15px; }
+  .page { padding-bottom: 24px; }
+  .mini-map { height: 120px; border-radius: var(--r-lg); overflow: hidden; position: relative; background:
+      linear-gradient(90deg, transparent 49%, rgba(255,255,255,.7) 49% 51%, transparent 51%) 0 0 / 60px 60px,
+      linear-gradient(0deg, transparent 49%, rgba(255,255,255,.7) 49% 51%, transparent 51%) 0 0 / 60px 60px,
+      linear-gradient(135deg, #dfeee9, #e6eef5); border: 1px solid var(--ui-border); }
+  .mini-map .pinm { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -100%); color: var(--ui-brand); }
+  .mini-map .pinm .i { width: 30px; height: 30px; fill: var(--ui-brand); stroke: #fff; stroke-width: 1.4; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sb" data-active="pizarra"></aside>
+  <div class="main">
+    <header class="top">
+      <div class="crumbs"><span>Hoy</span><i data-i="right"></i><span>Actividades</span><i data-i="right"></i><b>Nueva actividad</b></div>
+      <div class="top-actions"><a class="icon-btn"><i data-i="bell"></i><span class="pip"></span></a></div>
+    </header>
+
+    <main class="page">
+      <a class="back"><i data-i="left"></i>Volver a Actividades</a>
+      <div class="ph" style="margin-bottom:20px">
+        <div class="ph-text">
+          <div class="ph-title">Nueva actividad</div>
+          <div class="ph-desc">Los campos con <b style="color:var(--ui-danger)">*</b> son obligatorios. El folio se asigna al guardar.</div>
+        </div>
+        <span class="badge t-outline"><i data-i="file"></i>Folio al guardar: AN-0036</span>
+      </div>
+
+      <div class="form-wrap">
+        <div>
+          <section class="card fsec">
+            <div class="card-head"><span class="step done"><i data-i="check"></i></span><div class="grow"><div class="card-title">¿Qué se va a hacer?</div><div class="card-sub">El tipo define qué evidencia se pide al técnico.</div></div></div>
+            <div class="card-body fields">
+              <div class="field">
+                <div class="label">Tipo de trabajo <span class="req">*</span></div>
+                <div class="g4">
+                  <div class="choice on"><span class="ico k-cctv kind"><i data-i="cctv"></i></span><div><div class="choice-t">CCTV</div><div class="choice-d">Cámaras y DVR</div></div><span class="radio"></span></div>
+                  <div class="choice"><span class="ico k-red kind"><i data-i="wifi"></i></span><div><div class="choice-t">Redes</div><div class="choice-d">Cableado y enlaces</div></div><span class="radio"></span></div>
+                  <div class="choice"><span class="ico k-acceso kind"><i data-i="key"></i></span><div><div class="choice-t">Acceso</div><div class="choice-d">Lectores y torniquetes</div></div><span class="radio"></span></div>
+                  <div class="choice"><span class="ico k-obra kind"><i data-i="hardhat"></i></span><div><div class="choice-t">Obra</div><div class="choice-d">Civil y eléctrica</div></div><span class="radio"></span></div>
+                </div>
+              </div>
+              <div class="field">
+                <div class="label">Título <span class="req">*</span></div>
+                <div class="ctl valid">Mantenimiento preventivo de DVR y 12 cámaras<i data-i="checkc" style="margin-left:auto;color:var(--ui-success)"></i></div>
+                <div class="hint">Lo que verá el técnico en su lista. Sé concreto: qué y cuánto.</div>
+              </div>
+              <div class="field">
+                <div class="label">Instrucciones <span class="opt">Opcional</span></div>
+                <div class="ctl area"><span class="ph-txt">Ej.: limpiar lentes, revisar disco duro, respaldar 7 días de grabación antes de actualizar firmware…</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card fsec">
+            <div class="card-head"><span class="step done"><i data-i="check"></i></span><div class="grow"><div class="card-title">¿Dónde y para quién?</div><div class="card-sub">Cliente, sitio y contacto que recibe al técnico.</div></div></div>
+            <div class="card-body g2">
+              <div class="field">
+                <div class="label">Cliente <span class="req">*</span></div>
+                <div class="ctl"><span class="tag" style="padding-left:8px"><i data-i="users"></i>Farmacia San Rafael</span><i data-i="down" class="chev"></i></div>
+              </div>
+              <div class="field">
+                <div class="label">Sucursal o sitio <span class="req">*</span></div>
+                <div class="ctl"><i data-i="pin"></i>Sucursal Centro<i data-i="down" class="chev"></i></div>
+              </div>
+              <div class="field">
+                <div class="label">Contacto en sitio <span class="opt">Opcional</span></div>
+                <div class="ctl"><i data-i="phone"></i>Lic. Mariana Soto · 222 318 4410</div>
+                <div class="hint">Se le avisará por WhatsApp cuando el técnico vaya en camino.</div>
+              </div>
+              <div class="field">
+                <div class="label">Ubicación</div>
+                <div class="mini-map"><span class="pinm"><i data-i="pin"></i></span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card fsec">
+            <div class="card-head"><span class="step">3</span><div class="grow"><div class="card-title">¿Quién y cuándo?</div><div class="card-sub">Se revisa que el responsable no tenga otra actividad a esa hora.</div></div></div>
+            <div class="card-body g3">
+              <div class="field span2">
+                <div class="label">Responsable <span class="req">*</span></div>
+                <div class="ctl"><span class="tag"><span data-av="José Antonio Ramírez" data-s="20"></span>José Antonio Ramírez</span><span class="muted" style="font-size:12.5px">Técnico CCTV · 2 actividades hoy</span><i data-i="down" class="chev"></i></div>
+              </div>
+              <div class="field">
+                <div class="label">Prioridad</div>
+                <div class="seg" style="width:fit-content"><span>Baja</span><span class="on">Normal</span><span>Urgente</span></div>
+              </div>
+              <div class="field">
+                <div class="label">Fecha <span class="req">*</span></div>
+                <div class="ctl"><i data-i="calendar"></i>Vie 2 oct 2026<i data-i="down" class="chev"></i></div>
+              </div>
+              <div class="field">
+                <div class="label">Hora de inicio <span class="req">*</span></div>
+                <div class="ctl invalid"><i data-i="clock" style="color:var(--ui-danger)"></i>11:00</div>
+                <div class="err"><i data-i="alert"></i>Esa hora ya pasó. Elige 15:30 o más tarde.</div>
+              </div>
+              <div class="field">
+                <div class="label">Duración estimada</div>
+                <div class="ctl"><i data-i="timer"></i>3 h<i data-i="down" class="chev"></i></div>
+                <div class="hint">Termina aprox. a las 18:30.</div>
+              </div>
+              <div class="field span3">
+                <div class="label">Personal de apoyo <span class="opt">Opcional</span></div>
+                <div class="ctl" style="height:auto;min-height:36px;padding:5px 10px;flex-wrap:wrap"><span class="tag"><span data-av="Fernanda Ortiz" data-f data-s="20"></span>Fernanda Ortiz<i data-i="x"></i></span><span class="ph-txt" style="font-size:13px">Agregar persona…</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card fsec">
+            <div class="card-head"><span class="step">4</span><div class="grow"><div class="card-title">Evidencia que se pedirá</div><div class="card-sub">Sugerida para CCTV. El técnico no podrá cerrar sin lo obligatorio.</div></div><a class="btn btn-ghost btn-sm"><i data-i="plus"></i>Agregar paso</a></div>
+            <div class="card-body">
+              <div class="ev-row"><span class="ev-ico"><i data-i="camera"></i></span><div class="grow"><div class="ev-t">Foto del equipo antes</div><div class="ev-d">DVR y rack, con etiqueta visible</div></div><span class="badge sm t-danger">Obligatorio</span><span class="switch on"></span></div>
+              <div class="ev-row"><span class="ev-ico"><i data-i="image"></i></span><div class="grow"><div class="ev-t">Foto de cada cámara después</div><div class="ev-d">12 fotos · se valida que tengan fecha y GPS</div></div><span class="badge sm t-danger">Obligatorio</span><span class="switch on"></span></div>
+              <div class="ev-row"><span class="ev-ico"><i data-i="sig"></i></span><div class="grow"><div class="ev-t">Firma de conformidad del cliente</div><div class="ev-d">En el teléfono del técnico, al terminar</div></div><span class="badge sm t-outline">Opcional</span><span class="switch on"></span></div>
+              <div class="ev-row"><span class="ev-ico"><i data-i="file"></i></span><div class="grow"><div class="ev-t">Reporte de servicio en PDF</div><div class="ev-d">Se genera solo con las fotos y la firma</div></div><span class="badge sm t-outline">Opcional</span><span class="switch"></span></div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="aside">
+          <section class="card card-pad">
+            <div class="row" style="margin-bottom:10px"><div class="card-title grow">Antes de crear</div><span class="badge sm t-warning">1 pendiente</span></div>
+            <div class="chk ok"><span class="tick"><i data-i="check"></i></span><span>Tipo y título</span></div>
+            <div class="chk ok"><span class="tick"><i data-i="check"></i></span><span>Cliente y sitio</span></div>
+            <div class="chk ok"><span class="tick"><i data-i="check"></i></span><span>Responsable disponible</span></div>
+            <div class="chk bad"><span class="tick"><i data-i="x"></i></span><span>Hora de inicio válida</span></div>
+            <div class="chk ok"><span class="tick"><i data-i="check"></i></span><span>2 evidencias obligatorias</span></div>
+          </section>
+          <section class="alert t-brand">
+            <i data-i="sparkle" style="color:var(--ui-brand)"></i>
+            <div><div class="alert-t">Última visita a este sitio</div><div style="color:var(--ui-fg-2);margin-top:2px;font-size:13px">AN-0027 · hace 12 días por José Antonio. Se cambió el disco del DVR.</div><a style="display:inline-block;margin-top:6px;font-weight:600;color:var(--ui-brand-text);font-size:13px">Ver historial del sitio</a></div>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <div class="foot">
+      <span class="saved"><i data-i="checkc"></i>Borrador guardado hace 5 s</span>
+      <div class="grow"></div>
+      <a class="btn btn-danger-ghost"><i data-i="trash"></i>Descartar</a>
+      <div class="divider-v"></div>
+      <a class="btn btn-ghost">Cancelar</a>
+      <a class="btn btn-secondary">Guardar y crear otra</a>
+      <a class="btn btn-primary"><i data-i="check"></i>Crear actividad<span class="kbd">Ctrl ↵</span></a>
+    </div>
+  </div>
+</div>
+<script src="maqueta.js"></script>
+</body>
+</html>

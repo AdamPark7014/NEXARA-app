@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<title>NEXARA · AN-0031</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .hero { padding: 20px 24px 0; margin-bottom: 20px; overflow: hidden; }
+  .hero-top { display: flex; gap: 16px; align-items: flex-start; }
+  .hero-ico { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: #e3f3ee; color: #12715e; flex: 0 0 auto; }
+  .hero-ico .i { width: 26px; height: 26px; }
+  .hero-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .hero-title { font-size: 21px; font-weight: 650; letter-spacing: -.02em; line-height: 1.25; }
+  .hero-sub { display: flex; gap: 16px; margin-top: 8px; color: var(--ui-fg-2); font-size: 13.5px; }
+  .hero-sub span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .stp-t, .stp-m { white-space: nowrap; }
+  .hero-sub .i { width: 15px; height: 15px; color: var(--ui-fg-3); }
+  .stepper { display: grid; grid-template-columns: repeat(6, 1fr); margin: 22px -24px 0; border-top: 1px solid var(--ui-border-subtle); background: var(--ui-surface-2); }
+  .stp { display: flex; align-items: center; gap: 10px; padding: 14px 20px; position: relative; font-size: 13px; }
+  .stp + .stp::before { content: ""; position: absolute; left: 0; top: 50%; width: 1px; height: 24px; transform: translateY(-50%); background: var(--ui-border); }
+  .stp .d { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; border: 1.5px solid var(--ui-border-strong); color: var(--ui-fg-3); font-size: 11px; font-weight: 650; background: var(--ui-surface); }
+  .stp .d .i { width: 13px; height: 13px; stroke-width: 2.8; }
+  .stp.done .d { background: var(--ui-success); border-color: var(--ui-success); color: #fff; }
+  .stp.now .d { background: var(--ui-brand); border-color: var(--ui-brand); color: #fff; box-shadow: 0 0 0 4px var(--ui-brand-soft); }
+  .stp-t { font-weight: 600; line-height: 1.2; }
+  .stp-m { font-size: 11.5px; color: var(--ui-fg-3); }
+  .stp.next .stp-t { color: var(--ui-fg-3); font-weight: 500; }
+  .stp.now { background: var(--ui-surface); box-shadow: inset 0 -2px 0 var(--ui-brand); }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+  .tabs { display: flex; gap: 22px; padding: 0 20px; border-bottom: 1px solid var(--ui-border-subtle); }
+  .tab { height: 46px; display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 500; color: var(--ui-fg-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.on { color: var(--ui-fg); font-weight: 600; border-bottom-color: var(--ui-brand); }
+  .tab .n { font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--ui-neutral-bg); color: var(--ui-neutral-text); }
+  .tab.on .n { background: var(--ui-brand-soft); color: var(--ui-brand-text); }
+  .gal { grid-template-columns: repeat(3, 1fr); }
+  .side { display: grid; gap: 16px; }
+  .mat { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--ui-border-subtle); font-size: 13.5px; }
+  .mat:last-child { border-bottom: none; }
+  .mat .q { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .who { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: var(--r-lg); background: var(--ui-surface-2); border: 1px solid var(--ui-border-subtle); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sb" data-active="pizarra"></aside>
+  <div class="main">
+    <header class="top">
+      <div class="crumbs"><span>Hoy</span><i data-i="right"></i><span>Actividades</span><i data-i="right"></i><b>AN-0031</b></div>
+      <div class="top-actions">
+        <a class="btn btn-ghost btn-sm btn-icon"><i data-i="up"></i></a><a class="btn btn-ghost btn-sm btn-icon"><i data-i="down"></i></a>
+        <span class="muted" style="font-size:12.5px;margin-right:6px">2 de 38</span>
+        <a class="icon-btn"><i data-i="bell"></i><span class="pip"></span></a>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="card hero">
+        <div class="hero-top">
+          <span class="hero-ico"><i data-i="cctv"></i></span>
+          <div class="grow">
+            <div class="hero-meta"><span class="folio" style="font-size:13px">AN-0031</span><span class="badge dot t-info">En curso</span><span class="badge t-success"><span class="semaf s-verde" style="width:7px;height:7px;box-shadow:none"></span>En tiempo</span><span class="badge t-outline">Prioridad normal</span></div>
+            <div class="hero-title">Mantenimiento preventivo de DVR y 12 cámaras</div>
+            <div class="hero-sub">
+              <span><i data-i="users"></i>Farmacia San Rafael</span>
+              <span><i data-i="pin"></i>Sucursal Centro</span>
+              <span><i data-i="calendar"></i>Hoy, 10:00 a 13:00</span>
+            </div>
+          </div>
+          <div class="ph-actions">
+            <a class="btn btn-ghost btn-icon" title="Más"><i data-i="more"></i></a>
+            <a class="btn btn-secondary"><i data-i="users"></i>Reasignar</a>
+            <a class="btn btn-secondary"><i data-i="chat"></i>Escribir a José</a>
+            <a class="btn btn-primary"><i data-i="eye"></i>Revisar evidencias</a>
+          </div>
+        </div>
+        <div class="stepper">
+          <div class="stp done"><span class="d"><i data-i="check"></i></span><div><div class="stp-t">Asignada</div><div class="stp-m">Ayer 18:20</div></div></div>
+          <div class="stp done"><span class="d"><i data-i="check"></i></span><div><div class="stp-t">Aceptada</div><div class="stp-m">Ayer 18:31</div></div></div>
+          <div class="stp done"><span class="d"><i data-i="check"></i></span><div><div class="stp-t">En camino</div><div class="stp-m">9:35</div></div></div>
+          <div class="stp now"><span class="d">4</span><div><div class="stp-t">En sitio</div><div class="stp-m">Desde 10:06</div></div></div>
+          <div class="stp next"><span class="d">5</span><div><div class="stp-t">En revisión</div><div class="stp-m">Tú apruebas</div></div></div>
+          <div class="stp next"><span class="d">6</span><div><div class="stp-t">Completada</div><div class="stp-m">—</div></div></div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <section class="card">
+          <div class="tabs">
+            <a class="tab on"><i data-i="camera" class="sm"></i>Evidencias<span class="n">4/6</span></a>
+            <a class="tab"><i data-i="clock" class="sm"></i>Historial</a>
+            <a class="tab"><i data-i="box" class="sm"></i>Materiales<span class="n">3</span></a>
+            <a class="tab"><i data-i="chat" class="sm"></i>Comentarios<span class="n">2</span></a>
+          </div>
+          <div class="card-body">
+            <div class="row" style="margin-bottom:14px">
+              <div class="grow"><div class="card-title">Evidencias</div><div class="card-sub">4 de 6 pasos · faltan 2 obligatorios para mandar a revisión</div></div>
+              <div class="prog" style="width:180px"><div class="prog-bar"><span style="width:66%"></span></div><span class="prog-n">66%</span></div>
+            </div>
+            <div class="gal">
+              <div class="ph-img"><img src="fotos/campo-instalacion-rack.jpg" alt=""><span class="flag badge sm t-success"><i data-i="check"></i>Validada</span><span class="cap"><i data-i="camera"></i>DVR antes · 10:12 · GPS ✓</span></div>
+              <div class="ph-img"><img src="fotos/rack-servidores-led.jpg" alt=""><span class="flag badge sm t-success"><i data-i="check"></i>Validada</span><span class="cap"><i data-i="camera"></i>Rack y etiquetas · 10:15</span></div>
+              <div class="ph-img"><img src="fotos/monitoreo-pantallas-cctv.jpg" alt=""><span class="cap"><i data-i="camera"></i>Vista de 12 canales · 11:40</span></div>
+              <div class="ph-img"><img src="fotos/campo-instalacion-ap-altura.jpg" alt=""><span class="cap"><i data-i="camera"></i>Cámara 7, limpieza · 12:05</span></div>
+              <div class="ph-slot"><i data-i="camera"></i>Cámaras 8 a 12 después<span class="badge sm t-danger">Obligatorio</span></div>
+              <div class="ph-slot"><i data-i="sig"></i>Firma del cliente<span class="badge sm t-outline">Opcional</span></div>
+            </div>
+
+            <div class="sect-title" style="margin:26px 0 14px">Línea de tiempo</div>
+            <div class="tl">
+              <div class="tl-item"><span class="tl-dot now"><i data-i="camera"></i></span><div class="grow"><div class="tl-t"><b>José Antonio</b> subió 2 fotos</div><div class="tl-m">Hace 35 min · desde el teléfono, dentro de la geocerca</div></div></div>
+              <div class="tl-item"><span class="tl-dot"><i data-i="chat"></i></span><div class="grow"><div class="tl-t"><b>Christian Del Pozo</b> comentó</div><div class="tl-m">11:20</div><div class="tl-note">Revisa también el respaldo de 7 días antes de actualizar firmware, el cliente lo pidió.</div></div></div>
+              <div class="tl-item"><span class="tl-dot done"><i data-i="pin"></i></span><div class="grow"><div class="tl-t"><b>José Antonio</b> llegó al sitio</div><div class="tl-m">10:06 · 12 m del punto registrado</div></div></div>
+              <div class="tl-item"><span class="tl-dot done"><i data-i="nav"></i></span><div class="grow"><div class="tl-t">Salió hacia el sitio desde <b>Oficinas Puebla</b></div><div class="tl-m">9:35 · vehículo NX-04</div></div></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side">
+          <section class="card card-pad">
+            <div class="who">
+              <span data-av="José Antonio Ramírez" data-s="44" data-st="on"></span>
+              <div class="grow"><div style="font-weight:650">José Antonio Ramírez</div><div class="muted" style="font-size:12.5px">Técnico CCTV · en sitio</div></div>
+              <a class="btn btn-secondary btn-sm btn-icon"><i data-i="phone"></i></a>
+            </div>
+            <dl class="dl" style="margin:18px 0 0">
+              <dt>Apoyo</dt><dd><div class="person"><span data-av="Fernanda Ortiz" data-f data-s="22"></span>Fernanda Ortiz</div></dd>
+              <dt>Contacto</dt><dd>Lic. Mariana Soto<div class="muted" style="font-size:12px;font-weight:400">222 318 4410</div></dd>
+              <dt>Cotización</dt><dd><a style="color:var(--ui-brand-text);font-weight:600">NEX-2026-104</a></dd>
+              <dt>Proyecto</dt><dd>Póliza anual 2026</dd>
+              <dt>Duración</dt><dd>3 h estimadas · <span style="color:var(--ui-success-text)">2 h 34 real</span></dd>
+              <dt>Vehículo</dt><dd>NX-04 · Nissan NP300</dd>
+            </dl>
+          </section>
+          <section class="card card-pad">
+            <div class="row" style="margin-bottom:6px"><div class="card-title grow">Materiales usados</div><a class="btn btn-ghost btn-sm"><i data-i="plus"></i>Agregar</a></div>
+            <div class="mat"><i data-i="box" class="sm muted"></i>Disco duro 4 TB WD Purple<span class="q">1</span></div>
+            <div class="mat"><i data-i="box" class="sm muted"></i>Conector RJ45 Cat6<span class="q">12</span></div>
+            <div class="mat"><i data-i="box" class="sm muted"></i>Fuente 12 V 2 A<span class="q">2</span></div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="maqueta.js"></script>
+</body>
+</html>
