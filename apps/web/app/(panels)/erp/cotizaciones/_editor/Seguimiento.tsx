@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import ForwardToInboxOutlinedIcon from "@mui/icons-material/ForwardToInboxOutlined";
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
+import { Alert, Button, Select, Textarea, Timeline, TimelineItem } from "@/components/base";
 import {
   aprobarCotizacion,
   asignarCotizacion,
@@ -16,7 +20,7 @@ import {
   type VersionCotizacion,
 } from "@/lib/cotizaciones-api";
 import { formatApiError } from "@/lib/erp-api";
-import { Ayuda } from "./campos";
+import { Ayuda, Campo } from "./campos";
 import Dialogo from "./Dialogo";
 import FolioExplicado from "./FolioExplicado";
 import styles from "./editor.module.css";
@@ -93,6 +97,9 @@ export default function Seguimiento({
   return (
     <section id="seguimiento" className={styles.seguimiento} aria-labelledby="seguimiento-titulo">
       <div className={styles.hojaCabeza}>
+        <span className={styles.numero} aria-hidden>
+          <HistoryRoundedIcon />
+        </span>
         <div className={styles.hojaTitulos}>
           <div className={styles.hojaLinea}>
             <h2 id="seguimiento-titulo" className={styles.tituloSeccion}>
@@ -102,145 +109,148 @@ export default function Seguimiento({
               Cómo se lee el folio, quién intervino y qué versiones salieron. Esto no va en el PDF.
             </Ayuda>
           </div>
+          <p className={styles.ayudaSeccion}>Historial, folio y decisiones. No va en el PDF.</p>
         </div>
         <div className={styles.hojaAcciones}>
+          {estado === "ENVIADA" || estado === "BORRADOR" ? (
+            <Button size="sm" variant="danger-ghost" disabled={ocupado} onClick={() => setRechazo("")}>
+              {estado === "BORRADOR" ? "Descartar" : "Marcar rechazada"}
+            </Button>
+          ) : null}
           {!detalle.bloqueada ? (
-            <button
-              type="button"
-              className={styles.secondaryBtn}
+            <Button
+              size="sm"
+              iconStart={<ForwardToInboxOutlinedIcon />}
               disabled={ocupado || !token}
               onClick={() => setTraspaso(true)}
             >
               Enviar a un compañero
-            </button>
+            </Button>
           ) : null}
           {estado !== "APROBADA" ? (
-            <button
-              type="button"
-              className={styles.secondaryBtn}
+            <Button
+              size="sm"
               disabled={ocupado}
               onClick={() => void hacer(() => marcarRevisada(token!, detalle.id), "Quedaste registrado como «Revisó».")}
             >
               Marcar revisada
-            </button>
+            </Button>
           ) : null}
           {estado === "ENVIADA" ? (
-            <button
-              type="button"
-              className={styles.secondaryBtn}
+            <Button
+              size="sm"
+              variant="tonal"
+              iconStart={<TaskAltOutlinedIcon />}
               disabled={ocupado}
               onClick={() => void hacer(() => aprobarCotizacion(token!, detalle.id), "Cotización aprobada.")}
             >
               Aprobar
-            </button>
-          ) : null}
-          {estado === "ENVIADA" || estado === "BORRADOR" ? (
-            <button type="button" className={styles.dangerBtn} disabled={ocupado} onClick={() => setRechazo("")}>
-              {estado === "BORRADOR" ? "Descartar" : "Marcar rechazada"}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
 
-      {detalle.necesitaRefolio ? (
-        <div className={`${styles.aviso} ${styles.avisoAlerta}`}>
-          <p>
+      <div className={styles.hojaCuerpo}>
+        {detalle.necesitaRefolio ? (
+          <Alert
+            tone="warning"
+            className={styles.avisoBloque}
+            action={
+              <Button
+                size="sm"
+                disabled={ocupado}
+                onClick={() => void hacer(() => refoliarCotizacion(token!, detalle.id), "Folio asignado con nomenclatura.")}
+              >
+                Asignar folio
+              </Button>
+            }
+          >
             Este borrador trae un folio viejo (<strong>{detalle.folio}</strong>) que no dice de quién es. Asígnale el folio
             con la nomenclatura de {detalle.elaboro?.nombre || "quien la hizo"}: el anterior queda en versiones.
-          </p>
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            disabled={ocupado}
-            onClick={() => void hacer(() => refoliarCotizacion(token!, detalle.id), "Folio asignado con nomenclatura.")}
-          >
-            Asignar folio
-          </button>
-        </div>
-      ) : null}
+          </Alert>
+        ) : null}
 
-      {detalle.asignadoA ? (
-        <div className={`${styles.aviso} ${styles.avisoInfo}`}>
-          <p>
+        {detalle.asignadoA ? (
+          <Alert tone="info" className={styles.avisoBloque}>
             Le toca a <strong>{detalle.asignadoA.nombre}</strong>
             {detalle.asignadoA.puesto ? ` (${detalle.asignadoA.puesto})` : ""}
             {detalle.asignadoPor ? `, se la pasó ${detalle.asignadoPor.nombre}` : ""}
             {detalle.asignadoEn ? ` el ${formatoFecha(detalle.asignadoEn)}` : ""}.
             {detalle.asignadoNota ? ` «${detalle.asignadoNota}»` : ""}
-          </p>
-        </div>
-      ) : null}
+          </Alert>
+        ) : null}
 
-      <FolioExplicado
-        folio={detalle.folio}
-        elaboro={detalle.elaboro}
-        intervinieron={detalle.participantes}
-        revision={detalle.revision}
-        pendientes={pendientesAlEnviar}
-      />
+        <FolioExplicado
+          folio={detalle.folio}
+          elaboro={detalle.elaboro}
+          intervinieron={detalle.participantes}
+          revision={detalle.revision}
+          pendientes={pendientesAlEnviar}
+        />
 
-      <hr className={styles.separador} />
+        <hr className={styles.separador} />
 
-      <h3 className={styles.etiqueta} style={{ margin: "0 0 10px" }}>
-        Quién intervino
-      </h3>
-      {detalle.participantes.length ? (
-        <ul className={styles.linea}>
-          {detalle.participantes.map((p) => (
-            <li className={styles.lineaItem} key={`${p.userId}-${p.rol}`}>
-              <span className={styles.lineaRol}>{p.rolEtiqueta}</span>
-              <span>
-                <span className={styles.siglas} title={p.clave}>
-                  {p.siglas}
-                </span>{" "}
-                {p.nombre}
-                {p.puesto ? <span className={styles.lineaFecha}> · {p.puesto}</span> : null}
-              </span>
-              <span className={styles.lineaFecha}>{formatoFecha(p.at)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={styles.pista}>
-          Nadie registrado todavía. Quien la elabora, revisa, aprueba o envía queda aquí solo, y sus siglas entran al folio.
-        </p>
-      )}
-
-      {versiones.length ? (
-        <>
-          <hr className={styles.separador} />
-          <h3 className={styles.etiqueta} style={{ margin: "0 0 10px" }}>
-            Versiones guardadas
-          </h3>
-          <ul className={styles.linea}>
-            {versiones.map((v) => (
-              <li className={styles.lineaItem} key={v.version}>
-                <span className={styles.lineaRol}>v{v.version}</span>
-                <span>
-                  <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700 }}>{v.folio ?? "—"}</span> ·{" "}
-                  {formatoMoneda(v.total)}
-                  {v.note ? ` · ${v.note}` : ""}
-                </span>
-                <span className={styles.lineaFecha}>
-                  {formatoFecha(v.at)}
-                  {v.por ? ` · ${v.por.nombre}` : ""}
-                </span>
-              </li>
+        <h3 className={styles.subtitulo}>Quién intervino</h3>
+        {detalle.participantes.length ? (
+          <Timeline ariaLabel="Quién intervino">
+            {detalle.participantes.map((p) => (
+              <TimelineItem
+                key={`${p.userId}-${p.rol}`}
+                state="done"
+                icon={
+                  <span className={styles.siglasPunto} title={p.clave ?? undefined}>
+                    {p.siglas}
+                  </span>
+                }
+                title={
+                  <>
+                    <b>{p.nombre}</b> · {p.rolEtiqueta}
+                  </>
+                }
+                meta={[p.puesto, formatoFecha(p.at)].filter(Boolean).join(" · ")}
+              />
             ))}
-          </ul>
-        </>
-      ) : null}
+          </Timeline>
+        ) : (
+          <p className={styles.pista}>
+            Nadie registrado todavía. Quien la elabora, revisa, aprueba o envía queda aquí solo, y sus siglas entran al folio.
+          </p>
+        )}
 
-      {detalle.actividades?.length ? (
-        <p className={styles.pista} style={{ marginTop: 14 }}>
-          Actividad comercial ligada:{" "}
-          {detalle.actividades.map((a) => (
-            <Link key={a.id} href={`/erp/actividades/${a.id}`} style={{ marginRight: 8 }}>
-              {a.anNumber || `#${a.id}`}
-            </Link>
-          ))}
-        </p>
-      ) : null}
+        {versiones.length ? (
+          <>
+            <hr className={styles.separador} />
+            <h3 className={styles.subtitulo}>Versiones guardadas</h3>
+            <ul className={styles.linea}>
+              {versiones.map((v) => (
+                <li className={styles.lineaItem} key={v.version}>
+                  <span className={styles.lineaRol}>v{v.version}</span>
+                  <span>
+                    <span className={styles.mono}>{v.folio ?? "—"}</span> ·{" "}
+                    <span className={styles.cifra}>{formatoMoneda(v.total)}</span>
+                    {v.note ? ` · ${v.note}` : ""}
+                  </span>
+                  <span className={styles.lineaFecha}>
+                    {formatoFecha(v.at)}
+                    {v.por ? ` · ${v.por.nombre}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+
+        {detalle.actividades?.length ? (
+          <p className={`${styles.pista} ${styles.ligadas}`}>
+            Actividad comercial ligada:{" "}
+            {detalle.actividades.map((a) => (
+              <Link key={a.id} href={`/erp/actividades/${a.id}`} className={styles.enlace}>
+                {a.anNumber || `#${a.id}`}
+              </Link>
+            ))}
+          </p>
+        ) : null}
+      </div>
 
       {traspaso ? (
         <Dialogo
@@ -249,13 +259,13 @@ export default function Seguimiento({
           ocupado={ocupado}
           pie={
             <>
-              <button type="button" className={styles.ghostBtn} onClick={cerrarTraspaso} disabled={ocupado}>
+              <Button variant="tertiary" onClick={cerrarTraspaso} disabled={ocupado}>
                 Cancelar
-              </button>
-              <button
-                type="button"
-                className={styles.primaryBtn}
-                disabled={ocupado || !destinatario}
+              </Button>
+              <Button
+                variant="primary"
+                loading={ocupado}
+                disabled={!destinatario}
                 onClick={async () => {
                   const ok = await hacer(
                     () => asignarCotizacion(token!, detalle.id, Number(destinatario), notaTraspaso),
@@ -265,17 +275,22 @@ export default function Seguimiento({
                 }}
               >
                 Enviar
-              </button>
+              </Button>
             </>
           }
         >
-          <div className={styles.campo}>
-            <label className={styles.etiqueta} htmlFor="destinatario-traspaso">
-              A quién
-            </label>
-            <select
+          <Campo
+            etiqueta="A quién"
+            htmlFor="destinatario-traspaso"
+            pista={
+              <>
+                Solo sale quien puede cotizar. La cotización sigue siendo de{" "}
+                {detalle.elaboro?.nombre || "quien la elaboró"}: el folio no cambia.
+              </>
+            }
+          >
+            <Select
               id="destinatario-traspaso"
-              className={styles.select}
               value={destinatario}
               disabled={!companeros}
               onChange={(e) => setDestinatario(e.target.value)}
@@ -287,28 +302,27 @@ export default function Seguimiento({
                   {c.puesto ? ` · ${c.puesto}` : ""}
                 </option>
               ))}
-            </select>
-            <p className={styles.pista}>
-              Solo sale quien puede cotizar. La cotización sigue siendo de{" "}
-              {detalle.elaboro?.nombre || "quien la elaboró"}: el folio no cambia.
-            </p>
-          </div>
+            </Select>
+          </Campo>
 
-          <div className={styles.campo}>
-            <label className={styles.etiqueta} htmlFor="nota-traspaso">
-              Nota <span style={{ fontWeight: 400 }}>(opcional)</span>
-            </label>
-            <textarea
+          <Campo
+            etiqueta={
+              <>
+                Nota <span className={styles.etiquetaOpcional}>(opcional)</span>
+              </>
+            }
+            htmlFor="nota-traspaso"
+            pista="Va en el aviso que le llega."
+          >
+            <Textarea
               id="nota-traspaso"
-              className={styles.textoCampo}
-              style={{ minHeight: "4.5rem", resize: "vertical", overflow: "auto" }}
+              className={styles.areaNota}
               maxLength={500}
               value={notaTraspaso}
               onChange={(e) => setNotaTraspaso(e.target.value)}
               placeholder="Ej. Falta el precio del NVR; revísalo y mándala tú."
             />
-            <p className={styles.pista}>Va en el aviso que le llega.</p>
-          </div>
+          </Campo>
 
           {companeros?.length === 0 ? (
             <p className={styles.pista}>No hay nadie más que pueda cotizar ahora mismo.</p>
@@ -323,13 +337,13 @@ export default function Seguimiento({
           ocupado={ocupado}
           pie={
             <>
-              <button type="button" className={styles.ghostBtn} onClick={() => setRechazo(null)} disabled={ocupado}>
+              <Button variant="tertiary" onClick={() => setRechazo(null)} disabled={ocupado}>
                 Cancelar
-              </button>
-              <button
-                type="button"
-                className={styles.dangerBtn}
-                disabled={ocupado || rechazo.trim().length < 5}
+              </Button>
+              <Button
+                variant="danger"
+                loading={ocupado}
+                disabled={rechazo.trim().length < 5}
                 onClick={async () => {
                   const ok = await hacer(
                     () => rechazarCotizacion(token!, detalle.id, rechazo.trim()),
@@ -339,24 +353,23 @@ export default function Seguimiento({
                 }}
               >
                 Confirmar
-              </button>
+              </Button>
             </>
           }
         >
-          <div className={styles.campo}>
-            <label className={styles.etiqueta} htmlFor="motivo-rechazo">
-              Motivo (queda en el historial y le llega a su cadena de mando)
-            </label>
-            <textarea
+          <Campo
+            etiqueta="Motivo (queda en el historial y le llega a su cadena de mando)"
+            htmlFor="motivo-rechazo"
+            pista="Al menos 5 caracteres."
+          >
+            <Textarea
               id="motivo-rechazo"
-              className={styles.textoCampo}
-              style={{ minHeight: "5rem", resize: "vertical", overflow: "auto" }}
+              className={styles.areaNota}
               value={rechazo}
               onChange={(e) => setRechazo(e.target.value)}
               placeholder="Ej. El cliente eligió otro proveedor por precio."
             />
-            <p className={styles.pista}>Al menos 5 caracteres.</p>
-          </div>
+          </Campo>
         </Dialogo>
       ) : null}
     </section>

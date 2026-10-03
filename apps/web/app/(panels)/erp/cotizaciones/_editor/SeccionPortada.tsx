@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import PersonAddAlt1OutlinedIcon from "@mui/icons-material/PersonAddAlt1Outlined";
+import { Badge, Button, DateInput, Input } from "@/components/base";
 import { DatosClienteOpcionales } from "@/components/erp/DatosCliente";
 import { useUser } from "@/components/UserContext";
 import { clientSectorsForUser } from "@/lib/client-sectors";
@@ -8,7 +11,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { createSalesClient, getClientPermissions, listSalesClients, type SalesClient } from "@/lib/sales-api";
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
-import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
+import { Ayuda, Campo, Hoja, Segmentado, TextoAuto } from "./campos";
 import styles from "./editor.module.css";
 
 const QUE_CAMBIA: Record<Segmento, string> = {
@@ -153,9 +156,8 @@ export function ClienteCombo({
 
   return (
     <div className={styles.combo}>
-      <input
+      <Input
         id={id}
-        className={styles.input}
         value={doc.clientName}
         autoComplete="off"
         autoFocus={autoFocus}
@@ -209,22 +211,34 @@ export function ClienteCombo({
       ) : null}
       {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto ? (
         puedeCrearComercial ? (
-          <button
-            type="button"
-            className={styles.ghostBtn}
-            disabled={creando || doc.clientName.trim().length < 2}
+          <Button
+            variant="tonal"
+            size="sm"
+            className={styles.comboAccion}
+            iconStart={<PersonAddAlt1OutlinedIcon />}
+            loading={creando}
+            disabled={doc.clientName.trim().length < 2}
             onMouseDown={(e) => e.preventDefault()}
             onClick={crearAhora}
           >
             {creando ? "Creando…" : "Crear cliente comercial"}
-          </button>
+          </Button>
         ) : (
-          <span className={styles.pastilla} title="Solo quien atiende el sector comercial puede dar de alta clientes aquí">
+          <Badge
+            tone="neutral"
+            size="sm"
+            className={styles.comboAccion}
+            title="Solo quien atiende el sector comercial puede dar de alta clientes aquí"
+          >
             Elige un cliente comercial que ya exista
-          </span>
+          </Badge>
         )
       ) : null}
-      {errorAlta ? <span className={styles.pastilla}>{errorAlta}</span> : null}
+      {errorAlta ? (
+        <p className={styles.pistaError} role="alert">
+          {errorAlta}
+        </p>
+      ) : null}
       <DatosClienteOpcionales
         token={token}
         clientId={doc.salesClientId}
@@ -255,13 +269,12 @@ export default function SeccionPortada({
       id="portada"
       numero=""
       titulo="Portada"
+      icono={<DescriptionOutlinedIcon />}
+      descripcion="Proyecto, cliente y datos fiscales: lo primero que ve el cliente."
       ayuda="Lo primero que ve el cliente: el título del proyecto, para quién es, la fecha y la versión. El folio lo emite el servidor al guardar."
     >
       <div className={styles.campos}>
-        <div className={styles.campo}>
-          <label htmlFor="cot-proyecto" className={styles.etiqueta}>
-            Título del proyecto
-          </label>
+        <Campo etiqueta="Título del proyecto" htmlFor="cot-proyecto">
           <TextoAuto
             id="cot-proyecto"
             variante="portada"
@@ -270,33 +283,24 @@ export default function SeccionPortada({
             placeholder="Renovación del sistema de CCTV"
             disabled={!editable}
           />
-        </div>
+        </Campo>
         <div className={styles.portadaCampos}>
-          <div className={styles.campo}>
-            <label className={styles.etiqueta} htmlFor="cot-cliente">
-              Cliente
-            </label>
+          <Campo etiqueta="Cliente" htmlFor="cot-cliente">
             <ClienteCombo doc={doc} cambiar={cambiar} token={token} editable={editable} id="cot-cliente" autoFocus={esNueva} />
-          </div>
-          <div className={styles.campo}>
-            <label className={styles.etiqueta} htmlFor="cot-fecha-portada">
-              Fecha
-            </label>
-            <input
+          </Campo>
+          <Campo etiqueta="Fecha" htmlFor="cot-fecha-portada">
+            <DateInput
               id="cot-fecha-portada"
-              type="date"
-              className={styles.input}
               value={doc.issueDate}
               disabled={!editable}
               onChange={(e) => cambiar((d) => ({ ...d, issueDate: e.target.value }))}
             />
-          </div>
-          <div className={styles.campo}>
-            <span className={styles.etiqueta}>Versión</span>
-            <span className={`${styles.input} ${styles.inputFijo}`} aria-live="polite">
+          </Campo>
+          <Campo etiqueta="Versión">
+            <span className={styles.inputFijo} aria-live="polite">
               {version}
             </span>
-          </div>
+          </Campo>
         </div>
         <div className={styles.campo}>
           <span className={styles.etiquetaConAyuda}>

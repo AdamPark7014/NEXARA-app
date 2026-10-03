@@ -71,9 +71,11 @@ describe("lista de cotizaciones", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<CotizacionesPage />);
 
-    const fila = (await screen.findByText("Plaza Norte")).closest("a")!;
+    // Cada cotización es un renglón de la tabla; el folio es el enlace a su ficha.
+    const fila = (await screen.findByText("Plaza Norte")).closest("tr")!;
     expect(String(fetchMock.mock.calls[0]![0])).toContain("cotizaciones/core");
-    expect(fila).toHaveAttribute("href", "/erp/cotizaciones/7");
+    expect(within(fila).getAllByRole("link")[0]).toHaveAttribute("href", "/erp/cotizaciones/7");
+    expect(within(fila).getByText("Enviada")).toBeInTheDocument();
     expect(within(fila).getByText("Luis Joel Aguilar · su #7 · revisión 2")).toBeInTheDocument();
     expect(within(fila).getByText("JA")).toHaveAttribute("title", "Jorge Alberto Méndez · Revisó");
     expect(within(fila).getByText("CE")).toBeInTheDocument();
@@ -83,9 +85,14 @@ describe("lista de cotizaciones", () => {
   it("el borrador viejo se marca y muestra al menos a quien lo hizo", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json(FILAS)));
     render(<CotizacionesPage />);
-    const fila = (await screen.findByText("Hotel Centro")).closest("a")!;
+    const fila = (await screen.findByText("Hotel Centro")).closest("tr")!;
     expect(within(fila).getByText("Sin nomenclatura")).toBeInTheDocument();
-    expect(within(fila).getByText("AK")).toHaveAttribute("title", expect.stringContaining("Ana Karen Ruiz"));
+    // Sin más registro, la celda «Elaboró» dice al menos quién la hizo (nombre e iniciales).
+    expect(within(fila).getByText("Ana Karen Ruiz").closest("[title]")).toHaveAttribute(
+      "title",
+      expect.stringContaining("Ana Karen Ruiz"),
+    );
+    expect(within(fila).getByText("AK")).toBeInTheDocument();
     expect(screen.getByText(/1 borrador con folio viejo/)).toBeInTheDocument();
   });
 

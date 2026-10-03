@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import KeyboardReturnRoundedIcon from "@mui/icons-material/KeyboardReturnRounded";
+import { Button } from "@/components/base";
 import { smartQuoteSearch, type SmartOffer } from "@/lib/smart-quote-api";
 import {
   GRUPOS_PARTIDA,
@@ -195,8 +198,10 @@ function MenuFila({
         if (e.key === "Escape") setAbierto(false);
       }}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
+        icon
         className={styles.menuFilaBtn}
         title={`Grupo: ${partida.grupo ? GRUPO_LABEL[partida.grupo as GrupoPartida] ?? partida.grupo : "automático"} · subir, bajar, quitar`}
         aria-label={`Opciones de la partida ${n}`}
@@ -204,8 +209,8 @@ function MenuFila({
         aria-expanded={abierto}
         onClick={() => setAbierto((v) => !v)}
       >
-        ⋯
-      </button>
+        <MoreHorizRoundedIcon aria-hidden="true" />
+      </Button>
       {abierto ? (
         <div className={styles.menuFilaLista} role="menu" aria-label={`Partida ${n}`}>
           <p className={styles.menuFilaTitulo}>Grupo</p>
@@ -657,7 +662,9 @@ export default function TablaPartidas({
           </div>
         ) : null}
         <div className={`${styles.filaTotal} ${styles.filaTotalFinal}`}>
-          <span>Total</span>
+          <span>
+            Total <small className={styles.totalMoneda}>{moneda}</small>
+          </span>
           <span data-testid="total-cotizacion">{formatoMoneda(totales.total, moneda)}</span>
         </div>
       </div>
@@ -1034,16 +1041,18 @@ function FilaNueva({
         {nombre.trim() ? formatoMoneda(cantidadSana * (Number.isFinite(precio) ? precio : 0), moneda) : ""}
       </span>
       <span role="cell" className={styles.celdaMenu} data-area="menu">
-        <button
-          type="button"
+        <Button
+          variant={nombre.trim() ? "tonal" : "ghost"}
+          size="sm"
+          icon
           className={`${styles.menuFilaBtn} ${nombre.trim() ? styles.menuFilaPendiente : ""}`}
           onClick={() => agregarLibre()}
           disabled={!nombre.trim()}
           aria-label="Agregar la partida"
           title="Agregar (Enter)"
         >
-          ↵
-        </button>
+          <KeyboardReturnRoundedIcon aria-hidden="true" />
+        </Button>
       </span>
     </div>
   );

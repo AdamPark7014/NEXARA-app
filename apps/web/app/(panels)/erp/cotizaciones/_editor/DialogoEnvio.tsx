@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import { Alert, Button, Input, Textarea } from "@/components/base";
 import type { CotizacionDetalle } from "@/lib/cotizaciones-api";
 import { esCorreo } from "@/lib/cotizacion-documento";
 import { folioAlEnviar } from "@/lib/cotizacion-folio";
 import { formatApiError } from "@/lib/erp-api";
+import { Campo } from "./campos";
 import Dialogo from "./Dialogo";
 import styles from "./editor.module.css";
 
@@ -85,68 +88,56 @@ export default function DialogoEnvio({
       ocupado={enviando}
       pie={
         <>
-          <button type="button" className={styles.ghostBtn} onClick={onCerrar} disabled={enviando}>
+          <Button variant="tertiary" onClick={onCerrar} disabled={enviando}>
             Cancelar
-          </button>
-          <button type="button" className={styles.primaryBtn} onClick={() => void enviar()} disabled={!puede}>
+          </Button>
+          <Button variant="primary" iconStart={<SendOutlinedIcon />} loading={enviando} onClick={() => void enviar()} disabled={!puede}>
             {enviando ? "Enviando…" : "Enviar"}
-          </button>
+          </Button>
         </>
       }
     >
       {faltas.length ? (
-        <div className={`${styles.aviso} ${styles.avisoAlerta}`} role="alert">
-          <p>Antes de enviarla falta: {faltas.join(" y ")}.</p>
-        </div>
+        <Alert tone="warning" role="alert" dense>
+          Antes de enviarla falta: {faltas.join(" y ")}.
+        </Alert>
       ) : null}
 
-      <div className={styles.campo}>
-        <label className={styles.etiqueta} htmlFor="envio-para">
-          Para
-        </label>
-        <input
+      <Campo
+        etiqueta="Para"
+        htmlFor="envio-para"
+        error={para && !paraValido ? "Ese correo no parece completo." : null}
+      >
+        <Input
           id="envio-para"
-          className={styles.input}
           type="email"
           value={para}
           onChange={(e) => setPara(e.target.value)}
           placeholder="compras@cliente.com"
           aria-invalid={Boolean(para) && !paraValido}
         />
-        {para && !paraValido ? <p className={styles.pista}>Ese correo no parece completo.</p> : null}
-      </div>
-      <div className={styles.campo}>
-        <label className={styles.etiqueta} htmlFor="envio-cc">
-          Con copia (opcional)
-        </label>
-        <input
+      </Campo>
+      <Campo
+        etiqueta="Con copia (opcional)"
+        htmlFor="envio-cc"
+        error={cc.invalidos.length ? `Revisa: ${cc.invalidos.join(", ")}` : null}
+        pista="Separa varios con coma."
+      >
+        <Input
           id="envio-cc"
-          className={styles.input}
           value={copias}
           onChange={(e) => setCopias(e.target.value)}
           placeholder="jefe@cliente.com, gerencia@nexara.com.mx"
           aria-invalid={cc.invalidos.length > 0}
         />
-        <p className={styles.pista}>
-          {cc.invalidos.length ? `Revisa: ${cc.invalidos.join(", ")}` : "Separa varios con coma."}
-        </p>
-      </div>
-      <div className={styles.campo}>
-        <label className={styles.etiqueta} htmlFor="envio-mensaje">
-          Mensaje
-        </label>
-        <textarea
-          id="envio-mensaje"
-          className={styles.textoCampo}
-          style={{ minHeight: "7rem", resize: "vertical", overflow: "auto" }}
-          value={mensaje}
-          onChange={(e) => setMensaje(e.target.value)}
-        />
-      </div>
+      </Campo>
+      <Campo etiqueta="Mensaje" htmlFor="envio-mensaje">
+        <Textarea id="envio-mensaje" className={styles.areaMensaje} value={mensaje} onChange={(e) => setMensaje(e.target.value)} />
+      </Campo>
 
       <div className={styles.resumenEnvio}>
         <span>
-          Sale como <strong style={{ fontFamily: "ui-monospace, monospace" }}>{folio}</strong>
+          Sale como <strong className={styles.mono}>{folio}</strong>
           {folio !== detalle.folio ? " (con las siglas de quienes intervinieron)" : ""}.
         </span>
         <span>Adjunta el PDF de la propuesta y un enlace para que el cliente la firme o la rechace.</span>
@@ -154,9 +145,9 @@ export default function DialogoEnvio({
       </div>
 
       {error ? (
-        <p className={`${styles.aviso} ${styles.avisoError}`} role="alert">
+        <Alert tone="danger" role="alert" dense>
           {error}
-        </p>
+        </Alert>
       ) : null}
     </Dialogo>
   );

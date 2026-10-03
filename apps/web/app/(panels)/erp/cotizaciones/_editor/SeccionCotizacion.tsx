@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import { Badge, Button, DateInput, Input, LinkButton } from "@/components/base";
 import {
   TITULO_TERMINO,
   type ClaveTermino,
@@ -21,7 +23,7 @@ import {
   fechaCortaMx,
   textoVigenciaPorOmision,
 } from "@/lib/cotizacion-personalizacion";
-import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
+import { Ayuda, Campo, Hoja, Segmentado, TextoAuto } from "./campos";
 import TablaPartidas from "./TablaPartidas";
 import styles from "./editor.module.css";
 
@@ -103,7 +105,7 @@ export default function SeccionCotizacion({
   const sinAnticipo = !esLicitacion && Number(doc.depositPercent) === 0;
   const avisoAnticipo = (texto: string) =>
     sinAnticipo && /anticipo/i.test(texto) ? (
-      <p className={styles.pista} role="note">
+      <p className={styles.pistaAviso} role="note">
         El anticipo está en 0 %, pero este texto todavía menciona un anticipo y así saldrá en el PDF.
       </p>
     ) : null;
@@ -113,159 +115,120 @@ export default function SeccionCotizacion({
       id="cotizacion"
       numero="04"
       titulo="Cotización"
+      descripcion="Datos del cliente, partidas con sus totales y condiciones comerciales."
       ayuda="La hoja de cotización del PDF: datos del cliente, tabla de partidas con subtotal, IVA y total, términos y firma. El folio y la moneda salen de la portada y de Personalizar."
       acciones={
         editable ? (
-          <button
-            type="button"
-            className={styles.secondaryBtn}
+          <Button
+            size="sm"
+            iconStart={<Inventory2OutlinedIcon />}
             onClick={() => setVerPaquetes((v) => !v)}
             aria-expanded={verPaquetes}
             disabled={!paquetes.length}
           >
             Paquetes
-          </button>
+          </Button>
         ) : null
       }
     >
+      <p className={styles.subtitulo}>Cliente y datos de la hoja</p>
       <div className={styles.campos3}>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-cliente-04">
-            Cliente
-          </label>
-          <input
+        <Campo etiqueta="Cliente" htmlFor="cot-cliente-04">
+          <Input
             id="cot-cliente-04"
-            className={styles.input}
             value={doc.clientName}
             disabled={!editable}
             placeholder="Nombre del cliente"
             onChange={(e) => cambiar((d) => ({ ...d, clientName: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-telefono">
-            Teléfono
-          </label>
-          <input
+        </Campo>
+        <Campo etiqueta="Teléfono" htmlFor="cot-telefono">
+          <Input
             id="cot-telefono"
-            className={styles.input}
             type="tel"
             value={doc.clientPhone}
             disabled={!editable}
             placeholder="222 000 0000"
             onChange={(e) => cambiar((d) => ({ ...d, clientPhone: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-empresa">
-            Empresa
-          </label>
-          <input
+        </Campo>
+        <Campo etiqueta="Empresa" htmlFor="cot-empresa">
+          <Input
             id="cot-empresa"
-            className={styles.input}
             value={doc.clientCompany}
             disabled={!editable}
             placeholder="Grupo Dice Puebla"
             onChange={(e) => cambiar((d) => ({ ...d, clientCompany: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-atencion">
-            Atención
-          </label>
-          <input
+        </Campo>
+        <Campo etiqueta="Atención" htmlFor="cot-atencion">
+          <Input
             id="cot-atencion"
-            className={styles.input}
             value={doc.atencion}
             disabled={!editable}
             placeholder="Eva Benavides"
             onChange={(e) => cambiar((d) => ({ ...d, atencion: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-ubicacion">
-            Ubicación
-          </label>
-          <input
+        </Campo>
+        <Campo etiqueta="Ubicación" htmlFor="cot-ubicacion">
+          <Input
             id="cot-ubicacion"
-            className={styles.input}
             value={doc.clientAddress}
             disabled={!editable}
             placeholder="Puebla, Pue."
             onChange={(e) => cambiar((d) => ({ ...d, clientAddress: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-trabajo">
-            Trabajo
-          </label>
-          <input
+        </Campo>
+        <Campo etiqueta="Trabajo" htmlFor="cot-trabajo">
+          <Input
             id="cot-trabajo"
-            className={styles.input}
             value={doc.trabajo}
             disabled={!editable}
             placeholder="Ventas"
             onChange={(e) => cambiar((d) => ({ ...d, trabajo: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-correo">
-            Correo
-          </label>
-          <input
+        </Campo>
+        <Campo etiqueta="Correo" htmlFor="cot-correo">
+          <Input
             id="cot-correo"
-            className={styles.input}
             type="email"
             value={doc.clientEmail}
             disabled={!editable}
             placeholder="compras@cliente.com"
             onChange={(e) => cambiar((d) => ({ ...d, clientEmail: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-emision">
-            Fecha de emisión
-          </label>
-          <input
+        </Campo>
+        <Campo etiqueta="Fecha de emisión" htmlFor="cot-emision">
+          <DateInput
             id="cot-emision"
-            type="date"
-            className={styles.input}
             value={doc.issueDate}
             disabled={!editable}
             onChange={(e) => cambiar((d) => ({ ...d, issueDate: e.target.value }))}
           />
-        </div>
-        <div className={styles.campo}>
-          <span className={styles.etiqueta}>Cotización N°</span>
-          <span className={`${styles.input} ${styles.inputFijo} ${styles.mono}`} title={detalle?.folio}>
+        </Campo>
+        <Campo etiqueta="Cotización N°">
+          <span className={`${styles.inputFijo} ${styles.mono}`} title={detalle?.folio}>
             {detalle?.folio ?? "Se emite al guardar"}
           </span>
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-validez">
-            Validez
-          </label>
-          <div className={styles.campoConAtajos}>
-            <input
-              id="cot-validez"
-              type="date"
-              className={styles.input}
-              value={doc.validUntil}
-              min={doc.issueDate}
-              disabled={!editable}
-              onChange={(e) => cambiar((d) => ({ ...d, validUntil: e.target.value }))}
+        </Campo>
+        <Campo etiqueta="Validez" htmlFor="cot-validez" className={styles.campoConAtajos}>
+          <DateInput
+            id="cot-validez"
+            value={doc.validUntil}
+            min={doc.issueDate}
+            disabled={!editable}
+            onChange={(e) => cambiar((d) => ({ ...d, validUntil: e.target.value }))}
+          />
+          {editable ? (
+            <Segmentado
+              etiqueta="Validez rápida"
+              opciones={validezRapida}
+              valor={doc.validUntil}
+              onValor={(v) => cambiar((d) => ({ ...d, validUntil: v }))}
+              chico
             />
-            {editable ? (
-              <Segmentado
-                etiqueta="Validez rápida"
-                opciones={validezRapida}
-                valor={doc.validUntil}
-                onValor={(v) => cambiar((d) => ({ ...d, validUntil: v }))}
-                chico
-              />
-            ) : null}
-          </div>
-        </div>
+          ) : null}
+        </Campo>
       </div>
 
       {verPaquetes && editable ? (
@@ -278,9 +241,9 @@ export default function SeccionCotizacion({
                 vuelves a aplicar, se recalcula.
               </Ayuda>
             </span>
-            <button type="button" className={styles.ghostBtn} onClick={() => setVerPaquetes(false)}>
+            <Button size="sm" variant="ghost" onClick={() => setVerPaquetes(false)}>
               Cerrar
-            </button>
+            </Button>
           </div>
           <div className={styles.paquetes}>
             {paquetes.map((paq) => (
@@ -288,17 +251,19 @@ export default function SeccionCotizacion({
                 <strong>{paq.titulo}</strong>
                 <p>{paq.descripcion}</p>
                 <div className={styles.paqueteFila}>
-                  <input
-                    className={styles.input}
+                  <Input
+                    controlSize="sm"
+                    className={styles.inputNumero}
                     type="number"
                     min={1}
                     aria-label={`Cantidad de «${paq.titulo}»`}
                     value={cantidades[paq.clave] ?? "1"}
                     onChange={(e) => setCantidades((c) => ({ ...c, [paq.clave]: e.target.value }))}
                   />
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
+                  <Button
+                    size="sm"
+                    variant="tonal"
+                    loading={aplicando === paq.clave}
                     disabled={Boolean(aplicando) || !detalle}
                     onClick={async () => {
                       const n = Math.max(1, Math.round(Number(cantidades[paq.clave] ?? "1") || 1));
@@ -311,7 +276,7 @@ export default function SeccionCotizacion({
                     }}
                   >
                     {aplicando === paq.clave ? "Agregando…" : "Agregar"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -335,7 +300,7 @@ export default function SeccionCotizacion({
       <div className={styles.bloque}>
         <div className={styles.bloqueCabeza}>
           <span className={styles.etiquetaConAyuda}>
-            <span className={styles.etiqueta}>Partidas</span>
+            <span className={styles.subtitulo}>Partidas</span>
             {editable ? (
               <Ayuda titulo="la tabla de partidas">
                 Enter agrega una fila (Mayús+Enter, un salto en el título) · Tab cambia de celda · ↑↓ cambian de fila ·
@@ -371,7 +336,7 @@ export default function SeccionCotizacion({
       <div className={styles.bloque}>
         <div className={styles.bloqueCabeza}>
           <span className={styles.etiquetaConAyuda}>
-            <span className={styles.etiqueta}>Términos y condiciones</span>
+            <span className={styles.subtitulo}>Términos y condiciones</span>
             <Ayuda titulo="los términos">
               {detalle
                 ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Cada término viene del segmento, del anticipo y de lo que cobras; si lo reescribes, se queda como lo escribiste («Restablecer» lo devuelve) y si lo dejas vacío no se imprime. La forma de pago es el renglón «Condiciones de pago» del PDF; con anticipo 0 ya no menciona ninguno. El tiempo de entrega, la garantía y la vigencia de abajo son el texto que sale en el PDF.`
@@ -384,9 +349,9 @@ export default function SeccionCotizacion({
             </span>
           ) : null}
           {!terminosIncluidos && editable && onIncluirTerminos ? (
-            <button type="button" className={styles.secondaryBtn} onClick={onIncluirTerminos}>
+            <Button size="sm" onClick={onIncluirTerminos}>
               Incluir
-            </button>
+            </Button>
           ) : null}
         </div>
 
@@ -404,12 +369,17 @@ export default function SeccionCotizacion({
                 <li key={clave} className={styles.termino}>
                   <div className={styles.terminoCabeza}>
                     <span className={styles.terminoTitulo}>{tituloDe(clave)}</span>
-                    {editado ? <span className={styles.editado}>Editado</span> : null}
+                    {editado ? (
+                      <Badge tone="brand" size="sm">
+                        Editado
+                      </Badge>
+                    ) : null}
                     {clave === "pago" && !esLicitacion ? (
                       <label className={styles.anticipo}>
                         Anticipo
-                        <input
-                          className={styles.input}
+                        <Input
+                          controlSize="sm"
+                          className={styles.inputNumero}
                           type="number"
                           min={0}
                           max={100}
@@ -421,9 +391,7 @@ export default function SeccionCotizacion({
                       </label>
                     ) : null}
                     {editado && editable ? (
-                      <button
-                        type="button"
-                        className={styles.linkBtn}
+                      <LinkButton
                         onClick={() =>
                           cambiar((d) => {
                             const terminos = { ...d.terminos };
@@ -433,7 +401,7 @@ export default function SeccionCotizacion({
                         }
                       >
                         Restablecer
-                      </button>
+                      </LinkButton>
                     ) : null}
                   </div>
                   <TextoAuto
@@ -459,7 +427,11 @@ export default function SeccionCotizacion({
             <li className={styles.termino}>
               <div className={styles.terminoCabeza}>
                 <span className={styles.terminoTitulo}>Tiempo de entrega</span>
-                {doc.opciones.condiciones.tiempoEntrega.trim() ? <span className={styles.editado}>Editado</span> : null}
+                {doc.opciones.condiciones.tiempoEntrega.trim() ? (
+                  <Badge tone="brand" size="sm">
+                    Editado
+                  </Badge>
+                ) : null}
               </div>
               <TextoAuto
                 value={entregaTexto}
@@ -472,7 +444,11 @@ export default function SeccionCotizacion({
             <li className={styles.termino}>
               <div className={styles.terminoCabeza}>
                 <span className={styles.terminoTitulo}>Garantía</span>
-                {doc.opciones.condiciones.garantia.trim() ? <span className={styles.editado}>Editado</span> : null}
+                {doc.opciones.condiciones.garantia.trim() ? (
+                  <Badge tone="brand" size="sm">
+                    Editado
+                  </Badge>
+                ) : null}
               </div>
               <TextoAuto
                 value={garantiaTexto}
@@ -485,7 +461,11 @@ export default function SeccionCotizacion({
             <li className={styles.termino}>
               <div className={styles.terminoCabeza}>
                 <span className={styles.terminoTitulo}>Vigencia</span>
-                {doc.opciones.condiciones.vigencia.trim() ? <span className={styles.editado}>Editado</span> : null}
+                {doc.opciones.condiciones.vigencia.trim() ? (
+                  <Badge tone="brand" size="sm">
+                    Editado
+                  </Badge>
+                ) : null}
               </div>
               <TextoAuto
                 value={vigenciaTexto}
@@ -525,9 +505,11 @@ function CampoMargen({
         Margen
       </label>
       <span className={styles.margenCaja}>
-        <input
+        <Input
           id="cot-margen"
-          className={styles.input}
+          className={styles.inputNumero}
+          wrapperClassName={styles.margenInput}
+          end={<span className={styles.unidad}>%</span>}
           inputMode="decimal"
           autoComplete="off"
           value={texto}
@@ -550,7 +532,6 @@ function CampoMargen({
             if (n != null) onValor(n);
           }}
         />
-        <span aria-hidden="true">%</span>
       </span>
     </div>
   );

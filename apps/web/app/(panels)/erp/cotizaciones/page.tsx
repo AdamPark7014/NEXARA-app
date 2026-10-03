@@ -1,36 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import {
   Alert,
   Badge,
   Button,
   ButtonLink,
+  DataTable,
   EmptyState,
+  FilterChip,
+  FilterChips,
   InfoPopover,
-  Kbd,
   LinkButton,
-  PageHead,
+  ModulePage,
+  ModuleToolbar,
+  PersonCell,
   SearchInput,
   Segmented,
-  SkeletonRows,
   Stat,
   StatRow,
-  Tabs,
-  Toolbar,
-  tabla,
+  StatusCell,
+  WhenCell,
+  statusTone,
+  type Column,
   type Tone,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import {
   ESTADOS,
   ESTADO_LABEL,
-  ESTADO_TONO,
   SEGMENTOS,
   SEGMENTO_LABEL,
   formatoFecha,
@@ -53,12 +60,7 @@ const ROL: Record<string, string> = {
   ENVIO: "Envió",
 };
 
-const TONO_ESTADO: Record<"neutral" | "info" | "ok" | "alerta", Tone> = {
-  neutral: "neutral",
-  info: "info",
-  ok: "success",
-  alerta: "danger",
-};
+const DIA = 24 * 60 * 60 * 1000;
 
 /** El folio con sus piezas: clave de quien la hizo, cadena y revisión. */
 function FolioColor({ folio }: { folio: string }) {
@@ -94,24 +96,19 @@ function folioEnPalabras(row: CotizacionRow): string {
     .join(" · ");
 }
 
-/** Quién intervino, en orden y sin repetir. Si nadie quedó registrado, al menos quien la hizo. */
+/**
+ * Quién intervino, en orden y sin repetir (sus siglas, con el rol al pasar el mouse). Quien la hizo ya
+ * va con nombre y foto en la misma celda: si nadie más quedó registrado, no se repite.
+ */
 function Intervinieron({ row }: { row: CotizacionRow }) {
   const vistas = new Map<string, string[]>();
   for (const p of row.intervinieron) {
-    if (!p.siglas) continue;
+    // Quien la elaboró ya sale con nombre y foto; sus siglas solo se repiten si hizo algo más.
+    if (!p.siglas || (p.rol === "ELABORO" && p.siglas === row.elaboro?.siglas)) continue;
     const titulo = `${p.nombre || p.siglas} · ${ROL[p.rol] ?? p.rol}`;
     vistas.set(p.siglas, [...(vistas.get(p.siglas) ?? []), titulo]);
   }
-  if (!vistas.size && row.elaboro?.siglas) {
-    return (
-      <span className={styles.siglasFila}>
-        <span className={styles.siglasTenue} title={`${row.elaboro.nombre} · la hizo (sin más registro)`}>
-          {row.elaboro.siglas}
-        </span>
-      </span>
-    );
-  }
-  if (!vistas.size) return <span className={tabla.tenue}>—</span>;
+  if (!vistas.size) return null;
   return (
     <span className={styles.siglasFila}>
       {[...vistas.entries()].map(([siglas, titulos]) => (
@@ -121,6 +118,19 @@ function Intervinieron({ row }: { row: CotizacionRow }) {
       ))}
     </span>
   );
+}
+
+/** Vigencia: la fecha límite, cuándo salió y un punto que avisa si ya venció o está por vencer. */
+function Vigencia({ row }: { row: CotizacionRow }) {
+  const salio = row.sentAt ? `enviada ${formatoFecha(row.sentAt)}` : `emitida ${formatoFecha(row.issueDate)}`;
+  let tono: Tone = "neutral";
+  if (row.estado === "VENCIDA") tono = "danger";
+  else if (row.estado === "APROBADA") tono = "success";
+  else if (row.estado === "ENVIADA") {
+    const limite = row.validUntil ? new Date(row.validUntil).getTime() : NaN;
+    tono = Number.isFinite(limite) && limite - Date.now() <= 3 * DIA ? "warning" : "info";
+  }
+  return <WhenCell time={row.validUntil ? formatoFecha(row.validUntil) : "Sin vigencia"} hint={salio} tone={tono} />;
 }
 
 export default function CotizacionesPage() {
@@ -242,197 +252,274 @@ export default function CotizacionesPage() {
     setEstado(null);
   };
 
-  const pestanasEstado = [
-    { id: "TODAS" as const, label: "Todas", count: ESTADOS.reduce((a, e) => a + (conteoEstado[e] ?? 0), 0) },
-    ...ESTADOS.map((e) => ({ id: e, label: ESTADO_LABEL[e], count: conteoEstado[e] ?? 0 })),
+  const totalEstados = ESTADOS.reduce((a, e) => a + (conteoEstado[e] ?? 0), 0);
+
+  const columnas: Column<CotizacionRow>[] = [
+    {
+      key: "folio",
+      label: "Folio",
+      render: (row) => (
+        <span className={styles.celda}>
+          <Link href={`/erp/cotizaciones/${row.id}`} className={styles.folioLink} onClick={(e) => e.stopPropagation()}>
+            <FolioColor folio={row.folio} />
+          </Link>
+          {row.necesitaRefolio || !partesDelFolio(row.folio) ? (
+            <Badge tone="warning" size="sm" className={styles.viejo} title="Borrador de antes de la nomenclatura">
+              Sin nomenclatura
+            </Badge>
+          ) : (
+            <span className={styles.tenue}>{folioEnPalabras(row)}</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "cliente",
+      label: "Cliente · proyecto",
+      render: (row) => (
+        <span className={styles.celda}>
+          <span className={styles.fuerte}>{row.clienteNombre || row.clienteEmpresa || "Sin cliente"}</span>
+          <span className={styles.tenue}>
+            {row.projectName || (row.clienteEmpresa !== row.clienteNombre ? row.clienteEmpresa : "") || "—"}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "vendedor",
+      label: "Elaboró · intervinieron",
+      render: (row) =>
+        row.elaboro?.nombre ? (
+          <PersonCell
+            name={row.elaboro.nombre}
+            size={26}
+            title={`${row.elaboro.nombre} · la elaboró`}
+            subtitle={<Intervinieron row={row} />}
+          />
+        ) : row.intervinieron.some((p) => p.siglas) ? (
+          <Intervinieron row={row} />
+        ) : (
+          <span className={styles.tenue}>—</span>
+        ),
+    },
+    {
+      key: "segmento",
+      label: "Segmento",
+      render: (row) => (
+        <Badge tone="outline" size="sm">
+          {row.segmentoEtiqueta}
+        </Badge>
+      ),
+    },
+    { key: "vigencia", label: "Vigencia", render: (row) => <Vigencia row={row} /> },
+    {
+      key: "estado",
+      label: "Estado",
+      render: (row) => <StatusCell status={row.estado} label={row.estadoEtiqueta} size="sm" />,
+    },
+    {
+      key: "total",
+      label: "Total",
+      numeric: true,
+      render: (row) => <span className={styles.total}>{formatoMoneda(row.total, row.currency ?? "MXN")}</span>,
+    },
   ];
 
-  return (
-    <div className={styles.wrap}>
-      <PageHead
-        title="Cotizaciones"
-        actions={
-          <>
-            <InfoPopover label="¿Cómo se lee un folio?" title="Cómo se lee un folio">
-              <FolioExplicado
-                folio={ejemplo?.folio ?? "NEX-LJ75100126-0007-JA.CE-R2"}
-                elaboro={ejemplo?.elaboro ?? null}
-                intervinieron={ejemplo?.intervinieron ?? []}
-                revision={ejemplo?.revision}
-              />
-              <p style={{ margin: "10px 0 0" }}>
-                El folio lo emite el servidor al crear la cotización, con la nomenclatura de RH de quien la hace y su
-                propio consecutivo. Al enviarla se agregan las siglas de quienes intervinieron (revisó, aprobó, envió)
-                y, desde el segundo envío, la revisión. El segmento no va en el folio: es un filtro.
-              </p>
-            </InfoPopover>
-            {/* Sin registros el primario vive en el vacío, que además explica de
-                dónde sale la primera: dos botones iguales no son dos caminos. */}
-            {sinRegistros && !error ? null : (
-              <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
-                Nueva cotización <Kbd>N</Kbd>
-              </ButtonLink>
-            )}
-          </>
-        }
+  const nueva = (
+    <ButtonLink variant="primary" href="/erp/cotizaciones/nueva" iconStart={<AddRoundedIcon />} kbd="N">
+      Nueva cotización
+    </ButtonLink>
+  );
+
+  let contenido: ReactNode = null;
+  if (visibles.length) {
+    contenido = (
+      <DataTable
+        className={styles.tabla}
+        ariaLabel="Cotizaciones"
+        caption="Cotizaciones"
+        columns={columnas}
+        rows={visibles}
+        rowKey={(row) => row.id}
+        onRowClick={(row) => router.push(`/erp/cotizaciones/${row.id}`)}
+        loading={cargando}
+        stickyHeader={false}
+        rowActionsLabel="Abrir"
+        rowActions={(row) => (
+          <ButtonLink size="sm" variant="ghost" href={`/erp/cotizaciones/${row.id}`} aria-label={`Abrir ${row.folio}`}>
+            Abrir
+          </ButtonLink>
+        )}
       />
+    );
+  } else if (items.length) {
+    contenido = (
+      <EmptyState
+        icon={<FilterAltOffOutlinedIcon />}
+        tone="neutral"
+        title="Nada con estos filtros"
+        action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
+      />
+    );
+  }
 
-      {/* Regla 7: la tira solo existe si hay registros. Cuatro celdas en cero
-          encima de un «no hay nada» ocupan el sitio de lo único que ayuda. */}
-      {items.length ? (
-        <StatRow>
-          <Stat
-            label="En la vista"
-            value={formatoMoneda(cifras.total)}
-            hint={hayFiltros ? `${visibles.length} de ${items.length} cotizaciones` : `${items.length} cotizaciones`}
+  return (
+    <ModulePage
+      className={styles.wrap}
+      title="Cotizaciones"
+      icon={<RequestQuoteOutlinedIcon />}
+      tertiaryActions={
+        <InfoPopover label="¿Cómo se lee un folio?" title="Cómo se lee un folio">
+          <FolioExplicado
+            folio={ejemplo?.folio ?? "NEX-LJ75100126-0007-JA.CE-R2"}
+            elaboro={ejemplo?.elaboro ?? null}
+            intervinieron={ejemplo?.intervinieron ?? []}
+            revision={ejemplo?.revision}
           />
-          <Stat label="Borradores" value={cifras.borradores} hint="por terminar" />
-          <Stat
-            label="Enviadas por cerrar"
-            value={formatoMoneda(cifras.porCerrar)}
-            hint={cifras.enviadas === 1 ? "1 enviada" : `${cifras.enviadas} enviadas`}
-            tone="brand"
-          />
-          <Stat
-            label="Aprobadas"
-            value={formatoMoneda(cifras.aprobadas)}
-            hint={cifras.nAprobadas === 1 ? "1 aprobada" : `${cifras.nAprobadas} aprobadas`}
-          />
-        </StatRow>
-      ) : null}
-
-      {viejos ? (
-        <Alert
-          tone="warning"
-          icon={<WarningAmberRoundedIcon aria-hidden="true" />}
-          action={
-            <LinkButton
-              onClick={() => {
-                setEstado("BORRADOR");
-                setQ("");
-              }}
-            >
-              Ver borradores
-            </LinkButton>
-          }
-        >
-          {viejos === 1 ? "1 borrador con folio viejo" : `${viejos} borradores con folio viejo`}, sin nomenclatura.
-        </Alert>
-      ) : null}
-
-      {/* Regla 9: el aviso vive fuera de la tarjeta de la tabla, no metido
-          dentro con su propio recuadro. Y no sustituye a la lista: si ya
-          había filas, siguen ahí. */}
-      {error ? (
-        <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
-          {error}
-        </Alert>
-      ) : null}
-
-      <div className={tabla.marco}>
-        <div className={tabla.barra}>
-          <div className={tabla.barraTabs}>
-            <Tabs
-              modo="filtro"
-              ariaLabel="Filtrar por estado"
-              items={pestanasEstado}
-              value={estado ?? "TODAS"}
-              onChange={(id) => setEstado(id === "TODAS" || id === estado ? null : id)}
+          <p className={styles.ayudaNota}>
+            El folio lo emite el servidor al crear la cotización, con la nomenclatura de RH de quien la hace y su
+            propio consecutivo. Al enviarla se agregan las siglas de quienes intervinieron (revisó, aprobó, envió)
+            y, desde el segundo envío, la revisión. El segmento no va en el folio: es un filtro.
+          </p>
+        </InfoPopover>
+      }
+      /* Sin registros el primario vive en el vacío, que además explica de
+         dónde sale la primera: dos botones iguales no son dos caminos. */
+      primaryAction={sinRegistros && !error ? undefined : nueva}
+      stats={
+        /* Regla 7: la tira solo existe si hay registros. Cuatro celdas en cero
+           encima de un «no hay nada» ocupan el sitio de lo único que ayuda. */
+        items.length ? (
+          <StatRow ariaLabel="Resumen de cotizaciones">
+            <Stat
+              label="En la vista"
+              icon={<RequestQuoteOutlinedIcon />}
+              value={formatoMoneda(cifras.total)}
+              hint={hayFiltros ? `${visibles.length} de ${items.length} cotizaciones` : `${items.length} cotizaciones`}
             />
+            <Stat label="Borradores" icon={<EditNoteOutlinedIcon />} iconTone="neutral" value={cifras.borradores} hint="por terminar" />
+            <Stat
+              label="Enviadas por cerrar"
+              icon={<SendOutlinedIcon />}
+              value={formatoMoneda(cifras.porCerrar)}
+              hint={cifras.enviadas === 1 ? "1 enviada" : `${cifras.enviadas} enviadas`}
+              tone="brand"
+            />
+            <Stat
+              label="Aprobadas"
+              icon={<TaskAltOutlinedIcon />}
+              iconTone="success"
+              value={formatoMoneda(cifras.aprobadas)}
+              hint={cifras.nAprobadas === 1 ? "1 aprobada" : `${cifras.nAprobadas} aprobadas`}
+            />
+          </StatRow>
+        ) : null
+      }
+      before={
+        viejos || error ? (
+          <div className={styles.avisos}>
+            {viejos ? (
+              <Alert
+                tone="warning"
+                icon={<WarningAmberRoundedIcon aria-hidden="true" />}
+                action={
+                  <LinkButton
+                    onClick={() => {
+                      setEstado("BORRADOR");
+                      setQ("");
+                    }}
+                  >
+                    Ver borradores
+                  </LinkButton>
+                }
+              >
+                {viejos === 1 ? "1 borrador con folio viejo" : `${viejos} borradores con folio viejo`}, sin nomenclatura.
+              </Alert>
+            ) : null}
+            {/* Regla 9: el aviso vive fuera de la tarjeta de la tabla. Y no
+                sustituye a la lista: si ya había filas, siguen ahí. */}
+            {error ? (
+              <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
+                {error}
+              </Alert>
+            ) : null}
           </div>
-          {/* El conteo y el importe ya están en la tira: repetirlos aquí es
-              texto que no informa. La barra solo lleva controles. */}
-          <Toolbar end={hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}>
-            <label htmlFor="buscar-cotizaciones" className={styles.soloLector}>
-              Buscar cotizaciones
-            </label>
-            <SearchInput
-              id="buscar-cotizaciones"
-              ref={buscador}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Folio, cliente, proyecto o persona"
-              shortcut="/"
-            />
-            <Segmented
-              ariaLabel="Filtrar por segmento"
-              items={[
-                { id: "TODOS" as const, label: "Todos" },
-                ...SEGMENTOS.map((s) => ({ id: s, label: SEGMENTO_LABEL[s], count: conteoSegmento[s] ?? 0 })),
-              ]}
-              value={segmento ?? "TODOS"}
-              onChange={(id) => setSegmento(id === "TODOS" || id === segmento ? null : id)}
-            />
-          </Toolbar>
-        </div>
-
-        {primeraCarga ? (
-          <SkeletonRows rows={5} label="Cargando cotizaciones" />
-        ) : sinRegistros && !error ? (
-          <EmptyState
-            icon={<RequestQuoteOutlinedIcon />}
-            title="Todavía no hay cotizaciones"
-            description="Una cotización nace del editor: eliges cliente y proyecto, capturas las partidas y el servidor emite el folio con tu nomenclatura. Desde ahí se envía por correo."
-            action={
-              <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
-                Crear la primera
-              </ButtonLink>
-            }
-          />
-        ) : visibles.length ? (
-          <nav className={styles.list} aria-label="Cotizaciones">
-            <div className={`${tabla.cabeza} ${styles.rejilla}`} aria-hidden>
-              <span>Folio</span>
-              <span>Cliente · proyecto</span>
-              <span>Segmento</span>
-              <span>Estado</span>
-              <span className={tabla.num}>Total</span>
-              <span>Intervinieron</span>
-              <span className={tabla.num}>Fecha</span>
-            </div>
-            {visibles.map((row) => (
-              <Link key={row.id} href={`/erp/cotizaciones/${row.id}`} className={`${tabla.fila} ${styles.rejilla} ${styles.row}`}>
-                <span className={tabla.celda}>
-                  <FolioColor folio={row.folio} />
-                  {row.necesitaRefolio || !partesDelFolio(row.folio) ? (
-                    <Badge tone="warning" className={styles.viejo} title="Borrador de antes de la nomenclatura">
-                      Sin nomenclatura
-                    </Badge>
-                  ) : (
-                    <span className={tabla.tenue}>{folioEnPalabras(row)}</span>
-                  )}
-                </span>
-                <span className={tabla.celda}>
-                  <span className={tabla.fuerte}>{row.clienteNombre || row.clienteEmpresa || "Sin cliente"}</span>
-                  <span className={tabla.tenue}>
-                    {row.projectName || (row.clienteEmpresa !== row.clienteNombre ? row.clienteEmpresa : "") || "—"}
-                  </span>
-                </span>
-                <span>
-                  <Badge tone="outline">{row.segmentoEtiqueta}</Badge>
-                </span>
-                <span>
-                  <Badge tone={TONO_ESTADO[ESTADO_TONO[row.estado]]} dot>
-                    {row.estadoEtiqueta}
-                  </Badge>
-                </span>
-                <span className={`${tabla.num} ${tabla.fuerte}`}>{formatoMoneda(row.total, row.currency ?? "MXN")}</span>
-                <Intervinieron row={row} />
-                <span className={`${tabla.celda} ${styles.derecha}`}>
-                  <span className={tabla.num}>{formatoFecha(row.sentAt ?? row.issueDate)}</span>
-                  <span className={tabla.tenue}>{row.sentAt ? "enviada" : "emitida"}</span>
-                </span>
-              </Link>
-            ))}
-          </nav>
-        ) : items.length ? (
-          <EmptyState
-            icon={<FilterAltOffOutlinedIcon />}
-            title="Nada con estos filtros"
-            action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
-          />
-        ) : null}
-      </div>
-    </div>
+        ) : null
+      }
+      listLabel="Lista de cotizaciones"
+      toolbar={
+        <ModuleToolbar
+          search={
+            <>
+              <label htmlFor="buscar-cotizaciones" className="ui-sr-only">
+                Buscar cotizaciones
+              </label>
+              <SearchInput
+                id="buscar-cotizaciones"
+                ref={buscador}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Folio, cliente o persona"
+                shortcut="/"
+              />
+            </>
+          }
+          chips={
+            <FilterChips ariaLabel="Filtrar por estado">
+              <FilterChip active={!estado} count={totalEstados} onClick={() => setEstado(null)}>
+                Todas
+              </FilterChip>
+              {ESTADOS.map((e) => (
+                <FilterChip
+                  key={e}
+                  active={estado === e}
+                  count={conteoEstado[e] ?? 0}
+                  dot={statusTone(e).tone}
+                  onClick={() => setEstado(estado === e ? null : e)}
+                >
+                  {ESTADO_LABEL[e]}
+                </FilterChip>
+              ))}
+            </FilterChips>
+          }
+          end={
+            <>
+              {hayFiltros ? (
+                <Button size="sm" variant="ghost" onClick={quitarFiltros}>
+                  Quitar filtros
+                </Button>
+              ) : null}
+              <span className={styles.segmentos}>
+                <Segmented
+                  ariaLabel="Filtrar por segmento"
+                  items={[
+                    { id: "TODOS" as const, label: "Todos" },
+                    ...SEGMENTOS.map((s) => ({ id: s, label: SEGMENTO_LABEL[s], count: conteoSegmento[s] ?? 0 })),
+                  ]}
+                  value={segmento ?? "TODOS"}
+                  onChange={(id) => setSegmento(id === "TODOS" || id === segmento ? null : id)}
+                />
+              </span>
+            </>
+          }
+        />
+      }
+      loading={primeraCarga}
+      loadingRows={5}
+      empty={sinRegistros && !error}
+      emptyState={{
+        icon: <RequestQuoteOutlinedIcon />,
+        title: "Todavía no hay cotizaciones",
+        description:
+          "Una cotización nace del editor: eliges cliente y proyecto, capturas las partidas y el servidor emite el folio con tu nomenclatura. Desde ahí se envía por correo.",
+        action: (
+          <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
+            Crear la primera
+          </ButtonLink>
+        ),
+      }}
+    >
+      {contenido}
+    </ModulePage>
   );
 }

@@ -12,6 +12,11 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import { Button, EmptyState } from "@/components/base";
 import { mover, nuevaClave, type ItemTexto } from "@/lib/cotizacion-documento";
 import styles from "./editor.module.css";
 
@@ -161,35 +166,38 @@ export function ListaEditable({
               />
               {editable ? (
                 <span className={styles.controles}>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon
                     onClick={() => moverA(i, -1)}
                     disabled={i === 0}
                     aria-label={`Subir ${etiquetaElemento} ${i + 1}`}
                     title="Subir (Alt+↑)"
                   >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
+                    <KeyboardArrowUpRoundedIcon aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon
                     onClick={() => moverA(i, 1)}
                     disabled={i === items.length - 1}
                     aria-label={`Bajar ${etiquetaElemento} ${i + 1}`}
                     title="Bajar (Alt+↓)"
                   >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${styles.iconBtnPeligro}`}
+                    <KeyboardArrowDownRoundedIcon aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="danger-ghost"
+                    size="sm"
+                    icon
                     onClick={() => quitar(i, false)}
                     aria-label={`Quitar ${etiquetaElemento} ${i + 1}`}
                     title="Quitar"
                   >
-                    ×
-                  </button>
+                    <CloseRoundedIcon aria-hidden="true" />
+                  </Button>
                 </span>
               ) : null}
             </li>
@@ -197,9 +205,9 @@ export function ListaEditable({
         </ol>
       ) : null}
       {editable ? (
-        <button type="button" className={styles.agregar} onClick={() => insertarDespues(items.length - 1)}>
+        <Button variant="tonal" size="sm" className={styles.agregar} onClick={() => insertarDespues(items.length - 1)}>
           + {etiquetaAgregar}
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -235,7 +243,7 @@ export function Ayuda({ titulo, children }: { titulo: string; children: ReactNod
         aria-expanded={abierta}
         onClick={() => setAbierta((v) => !v)}
       >
-        i
+        <InfoOutlinedIcon aria-hidden="true" />
       </button>
       {abierta ? (
         <span role="note" className={styles.ayudaGlobo}>
@@ -247,14 +255,17 @@ export function Ayuda({ titulo, children }: { titulo: string; children: ReactNod
 }
 
 /**
- * Una sección del documento. Todas con el mismo encabezado: número pequeño en verde, título y —si
- * hace falta— un ⓘ con la explicación; acciones secundarias a la derecha. `data-seccion` es lo que
- * usa la vista previa para saber dónde está el cursor.
+ * Una sección del documento, con la misma cabecera que las secciones de formulario del sistema:
+ * número en su pastilla, título, una línea que dice qué va ahí y —si hace falta— un ⓘ con la
+ * explicación; acciones secundarias a la derecha. `data-seccion` es lo que usa la vista previa
+ * para saber dónde está el cursor.
  */
 export function Hoja({
   id,
   numero,
   titulo,
+  icono,
+  descripcion,
   ayuda,
   acciones,
   children,
@@ -265,6 +276,10 @@ export function Hoja({
   /** «01»…«04»; vacío en la portada. */
   numero: string;
   titulo: string;
+  /** Lo que va en la pastilla cuando la sección no lleva número (portada). */
+  icono?: ReactNode;
+  /** Qué se captura aquí, en una línea («Proyecto, cliente y datos fiscales»). */
+  descripcion?: ReactNode;
   ayuda?: ReactNode;
   acciones?: ReactNode;
   children: ReactNode;
@@ -272,17 +287,18 @@ export function Hoja({
   excluida?: boolean;
   onIncluir?: () => void;
 }) {
+  const marca = (
+    <span className={styles.numero} aria-hidden>
+      {numero || icono || "·"}
+    </span>
+  );
   if (excluida) {
     return (
       <section id={id} data-seccion={id} className={`${styles.hoja} ${styles.hojaExcluida}`} aria-labelledby={`${id}-titulo`}>
-        <div className={styles.hojaCabeza} style={{ marginBottom: 0 }}>
+        <div className={`${styles.hojaCabeza} ${styles.hojaCabezaSola}`}>
+          {marca}
           <div className={styles.hojaTitulos}>
             <div className={styles.hojaLinea}>
-              {numero ? (
-                <span className={styles.numero} aria-hidden>
-                  {numero}
-                </span>
-              ) : null}
               <h2 id={`${id}-titulo`} className={styles.tituloSeccion}>
                 {numero ? <span className={styles.soloLector}>{numero}. </span> : null}
                 {titulo}
@@ -292,9 +308,9 @@ export function Hoja({
           </div>
           {onIncluir ? (
             <div className={styles.hojaAcciones}>
-              <button type="button" className={styles.secondaryBtn} onClick={onIncluir}>
+              <Button size="sm" onClick={onIncluir}>
                 Incluir
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
@@ -304,24 +320,65 @@ export function Hoja({
   return (
     <section id={id} data-seccion={id} className={styles.hoja} aria-labelledby={`${id}-titulo`}>
       <div className={styles.hojaCabeza}>
+        {marca}
         <div className={styles.hojaTitulos}>
           <div className={styles.hojaLinea}>
-            {numero ? (
-              <span className={styles.numero} aria-hidden>
-                {numero}
-              </span>
-            ) : null}
             <h2 id={`${id}-titulo`} className={styles.tituloSeccion}>
               {numero ? <span className={styles.soloLector}>{numero}. </span> : null}
               {titulo}
             </h2>
             {ayuda ? <Ayuda titulo={titulo}>{ayuda}</Ayuda> : null}
           </div>
+          {descripcion ? <p className={styles.ayudaSeccion}>{descripcion}</p> : null}
         </div>
         {acciones ? <div className={styles.hojaAcciones}>{acciones}</div> : null}
       </div>
-      {children}
+      <div className={styles.hojaCuerpo}>{children}</div>
     </section>
+  );
+}
+
+/**
+ * Campo del documento: etiqueta arriba, el control (los de `components/base`) y la pista o el
+ * error debajo. La etiqueta solo nombra al control: la pista no se pega al nombre accesible.
+ */
+export function Campo({
+  etiqueta,
+  htmlFor,
+  pista,
+  error,
+  ancho,
+  className,
+  children,
+}: {
+  etiqueta: ReactNode;
+  /** `id` del control; sin él la etiqueta es solo un rótulo (valores fijos, grupos). */
+  htmlFor?: string;
+  pista?: ReactNode;
+  error?: ReactNode;
+  /** Ocupa todo el renglón de la rejilla. */
+  ancho?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={[styles.campo, ancho ? styles.campoAncho : "", className].filter(Boolean).join(" ")}>
+      {htmlFor ? (
+        <label className={styles.etiqueta} htmlFor={htmlFor}>
+          {etiqueta}
+        </label>
+      ) : (
+        <span className={styles.etiqueta}>{etiqueta}</span>
+      )}
+      {children}
+      {error ? (
+        <p className={styles.pistaError} role="alert">
+          {error}
+        </p>
+      ) : pista ? (
+        <p className={styles.pista}>{pista}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -380,13 +437,7 @@ export function Segmentado<V extends string>({
   );
 }
 
-/** Vacío que enseña qué va aquí y ofrece el primer paso. */
+/** Vacío que enseña qué va aquí y ofrece el primer paso (el vacío del sistema, en compacto). */
 export function Vacio({ titulo, children, acciones }: { titulo: string; children: ReactNode; acciones?: ReactNode }) {
-  return (
-    <div className={styles.vacio}>
-      <p className={styles.vacioTitulo}>{titulo}</p>
-      <p className={styles.vacioTexto}>{children}</p>
-      {acciones ? <div className={styles.hojaAcciones}>{acciones}</div> : null}
-    </div>
-  );
+  return <EmptyState size="compact" tone="neutral" className={styles.vacio} title={titulo} description={children} action={acciones} />;
 }

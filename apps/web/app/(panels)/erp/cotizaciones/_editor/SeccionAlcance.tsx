@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import LibraryAddOutlinedIcon from "@mui/icons-material/LibraryAddOutlined";
+import { Badge, Button } from "@/components/base";
 import type { PlantillasSegmento } from "@/lib/cotizaciones-api";
 import {
   esBloqueDePaquete,
@@ -9,7 +14,7 @@ import {
   type BloqueEditor,
   type DocumentoCotizacion,
 } from "@/lib/cotizacion-documento";
-import { Hoja, ListaEditable, TextoAuto, Vacio } from "./campos";
+import { Campo, Hoja, ListaEditable, TextoAuto, Vacio } from "./campos";
 import styles from "./editor.module.css";
 
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
@@ -69,9 +74,9 @@ export default function SeccionAlcance({
     <div className={styles.panelPlantillas}>
       <div className={styles.panelPlantillasCabeza}>
         <span>Subsecciones del segmento</span>
-        <button type="button" className={styles.ghostBtn} onClick={() => setVerPlantillas(false)}>
+        <Button size="sm" variant="ghost" onClick={() => setVerPlantillas(false)}>
           Cerrar
-        </button>
+        </Button>
       </div>
       <div className={styles.plantillas}>
         {plantillas.map((p) => {
@@ -103,20 +108,18 @@ export default function SeccionAlcance({
       id="alcance"
       numero="02"
       titulo="Alcance del proyecto"
+      descripcion="Qué se hace, subsección por subsección."
       ayuda="Qué se hace, subsección por subsección: título, párrafos y viñetas. El PDF las numera; una subsección sin título sale como párrafo suelto. Sin subsecciones, el documento remite a la sección 04."
       acciones={
         editable ? (
-          <button type="button" className={styles.secondaryBtn} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>
+          <Button size="sm" iconStart={<LibraryAddOutlinedIcon />} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>
             Plantillas
-          </button>
+          </Button>
         ) : null
       }
     >
       <div className={styles.campos}>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="alc-titulo">
-            Título (el mismo de la portada)
-          </label>
+        <Campo etiqueta="Título (el mismo de la portada)" htmlFor="alc-titulo">
           <TextoAuto
             id="alc-titulo"
             variante="titulo"
@@ -125,11 +128,8 @@ export default function SeccionAlcance({
             placeholder="Título del proyecto"
             disabled={!editable}
           />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="alc-intro">
-            Párrafo de entrada (opcional)
-          </label>
+        </Campo>
+        <Campo etiqueta="Párrafo de entrada (opcional)" htmlFor="alc-intro">
           <TextoAuto
             id="alc-intro"
             value={doc.alcanceIntro}
@@ -137,7 +137,7 @@ export default function SeccionAlcance({
             placeholder="El presente proyecto tiene como objetivo…"
             disabled={!editable}
           />
-        </div>
+        </Campo>
       </div>
 
       {panel}
@@ -172,39 +172,46 @@ export default function SeccionAlcance({
                   />
                   {editable ? (
                     <span className={styles.controles}>
-                      <button
-                        type="button"
-                        className={styles.iconBtn}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon
                         aria-label={`Subir subsección ${i + 1}`}
                         title="Subir"
                         disabled={i === 0}
                         onClick={() => setBloques((lista) => mover(lista, i, i - 1))}
                       >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.iconBtn}
+                        <KeyboardArrowUpRoundedIcon aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon
                         aria-label={`Bajar subsección ${i + 1}`}
                         title="Bajar"
                         disabled={i === bloques.length - 1}
                         onClick={() => setBloques((lista) => mover(lista, i, i + 1))}
                       >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.iconBtn} ${styles.iconBtnPeligro}`}
+                        <KeyboardArrowDownRoundedIcon aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="danger-ghost"
+                        size="sm"
+                        icon
                         aria-label={`Quitar subsección ${i + 1}`}
                         title="Quitar"
                         onClick={() => setBloques((lista) => lista.filter((x) => x.key !== b.key))}
                       >
-                        ×
-                      </button>
+                        <CloseRoundedIcon aria-hidden="true" />
+                      </Button>
                     </span>
                   ) : null}
                 </div>
-                {nota ? <span className={styles.etiquetaOrigen}>{nota}</span> : null}
+                {nota ? (
+                  <Badge tone="info" size="sm" className={styles.etiquetaOrigen}>
+                    {nota}
+                  </Badge>
+                ) : null}
                 <TextoAuto
                   value={b.texto}
                   onValor={(v) => cambiarBloque(b.key, { texto: v })}
@@ -233,12 +240,12 @@ export default function SeccionAlcance({
             titulo="Todavía no hay subsecciones"
             acciones={
               <>
-                <button type="button" className={styles.secondaryBtn} onClick={() => setVerPlantillas(true)}>
+                <Button size="sm" variant="tonal" iconStart={<LibraryAddOutlinedIcon />} onClick={() => setVerPlantillas(true)}>
                   Elegir de las plantillas
-                </button>
-                <button type="button" className={styles.ghostBtn} onClick={() => agregar(nuevoBloque())}>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => agregar(nuevoBloque())}>
                   Subsección en blanco
-                </button>
+                </Button>
               </>
             }
           >
@@ -250,9 +257,9 @@ export default function SeccionAlcance({
       )}
 
       {bloques.length && editable ? (
-        <button type="button" className={`${styles.agregar} ${styles.agregarSolo}`} onClick={() => agregar(nuevoBloque())}>
+        <Button variant="tonal" size="sm" className={`${styles.agregar} ${styles.agregarSolo}`} onClick={() => agregar(nuevoBloque())}>
           + Subsección
-        </button>
+        </Button>
       ) : null}
     </Hoja>
   );

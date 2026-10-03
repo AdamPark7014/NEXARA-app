@@ -1,18 +1,37 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
+import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  ButtonLink,
+  StatusBadge,
+  Stepper,
+  Tabs,
+  focusField,
+  type RecordStep,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { triggerFileDownload } from "@/lib/file-download";
 import { formatApiError } from "@/lib/erp-api";
 import {
-  ESTADO_TONO,
   SEGMENTO_LABEL,
   actualizarCotizacion,
   aplicarPaquete,
   crearCotizacion,
   enviarCotizacion,
+  formatoFecha,
   guardarComoPlantilla,
   obtenerPlantillaGuardada,
   formatoMoneda,
@@ -23,7 +42,6 @@ import {
   urlPdfCotizacionInterno,
   versionesDeCotizacion,
   type CotizacionDetalle,
-  type EstadoCotizacion,
   type GuardarCotizacion,
   type PaqueteCotizacion,
   type PlantillasSegmento,
@@ -34,6 +52,7 @@ import {
   documentoDesdeDetalle,
   documentoDesdePlantilla,
   documentoVacio,
+  esCorreo,
   faltaParaEnviar,
   faltaParaGuardar,
   partidasDesdeApi,
@@ -58,15 +77,42 @@ import DialogoEnvio from "./DialogoEnvio";
 import Seguimiento from "./Seguimiento";
 import styles from "./editor.module.css";
 
-const TONO: Record<string, string> = {
-  info: styles.tonoInfo ?? "",
-  ok: styles.tonoOk ?? "",
-  alerta: styles.tonoAlerta ?? "",
-  neutral: "",
-};
-
-function claseEstado(estado: EstadoCotizacion) {
-  return `${styles.badge} ${TONO[ESTADO_TONO[estado]] ?? ""}`;
+/**
+ * Pasos de la cotización con lo que de verdad pasó: cuándo se emitió, cuándo salió al cliente y en
+ * qué terminó. Lo que no ha pasado queda pendiente, sin fecha inventada.
+ */
+function pasosDe(detalle: CotizacionDetalle, version: string): RecordStep[] {
+  const { estado, sentAt } = detalle;
+  const enBorrador = estado === "BORRADOR";
+  const aprobo = [...detalle.participantes].reverse().find((p) => p.rol === "APROBO");
+  const final: RecordStep =
+    estado === "APROBADA"
+      ? { id: "final", label: "Aprobada", hint: aprobo ? formatoFecha(aprobo.at) : undefined, state: "done" }
+      : estado === "RECHAZADA"
+        ? { id: "final", label: "Rechazada", hint: detalle.rejectedByName ? `Por ${detalle.rejectedByName}` : undefined, state: "current" }
+        : estado === "VENCIDA"
+          ? { id: "final", label: "Vencida", hint: detalle.validUntil ? formatoFecha(detalle.validUntil) : undefined, state: "current" }
+          : {
+              id: "final",
+              label: "Aprobada",
+              hint: detalle.validUntil ? `Vigente al ${formatoFecha(detalle.validUntil)}` : "La firma el cliente",
+              state: "pending",
+            };
+  return [
+    {
+      id: "borrador",
+      label: "Borrador",
+      hint: enBorrador && sentAt ? `Versión ${version}` : formatoFecha(detalle.issueDate),
+      state: enBorrador ? "current" : "done",
+    },
+    {
+      id: "enviada",
+      label: "Enviada",
+      hint: sentAt ? (enBorrador ? `Última: ${formatoFecha(sentAt)}` : formatoFecha(sentAt)) : "Sin enviar",
+      state: estado === "ENVIADA" ? "current" : sentAt && !enBorrador ? "done" : "pending",
+    },
+    final,
+  ];
 }
 
 function textoGuardado(estado: EstadoGuardado, guardadoEn: Date | null, pausa: string | null, error: string | null) {
@@ -496,19 +542,45 @@ export default function EditorCotizacion({
 
   const pausa = falta ?? (bloqueada && auto.hayPendientes() ? "En pausa: la cotización ya salió" : null);
 
+  /**
+   * Un solo primario: la siguiente acción lógica. Borrador o enviada → enviarla; aprobada → su PDF;
+   * rechazada o vencida → retomarla como borrador (el botón vive en su aviso).
+   */
+  const siguiente: "enviar" | "pdf" | "retomar" = aprobada
+    ? "pdf"
+    : bloqueada && detalle && detalle.estado !== "ENVIADA"
+      ? "retomar"
+      : "enviar";
+  const pasos = detalle ? pasosDe(detalle, version) : [];
+  const partidasConNombre = doc.partidas.filter((p) => p.name.trim()).length;
+  const pendientes =
+    detalle?.estado === "BORRADOR"
+      ? [
+          { id: "cliente", label: "Cliente", hecho: Boolean(doc.clientName.trim()), ir: () => focusField("cot-cliente") },
+          { id: "partida", label: "Una partida", hecho: completas.cotizacion, ir: () => irASeccion("cotizacion") },
+          { id: "correo", label: "Correo del cliente", hecho: esCorreo(doc.clientEmail), ir: () => focusField("cot-correo") },
+        ]
+      : [];
+
   return (
     <div className={styles.editor} ref={editorRef}>
       <header className={styles.barra}>
         <div className={styles.barraIzq}>
-          <Link href="/erp/cotizaciones" className={styles.volver} aria-label="Volver a cotizaciones" title="Cotizaciones">
-            ←
-          </Link>
+          <ButtonLink
+            href="/erp/cotizaciones"
+            icon
+            className={styles.volver}
+            aria-label="Volver a cotizaciones"
+            title="Cotizaciones"
+          >
+            <ArrowBackRoundedIcon aria-hidden="true" />
+          </ButtonLink>
           <div className={styles.barraFolio}>
             <div className={styles.barraFolioLinea}>
               <span className={styles.folioTexto} title={detalle?.folio}>
                 {detalle?.folio ?? "Nueva cotización"}
               </span>
-              {detalle ? <span className={claseEstado(detalle.estado)}>{detalle.estadoEtiqueta}</span> : null}
+              {detalle ? <StatusBadge status={detalle.estado} label={detalle.estadoEtiqueta} size="sm" /> : null}
             </div>
             <span className={styles.barraSub}>
               {[SEGMENTO_LABEL[doc.segmento], doc.clientName.trim() || "sin cliente", formatoMoneda(totales.total)].join(" · ")}
@@ -520,41 +592,109 @@ export default function EditorCotizacion({
             {textoGuardado(auto.estado, auto.guardadoEn, pausa, auto.error)}
           </span>
           {auto.estado === "error" ? (
-            <button type="button" className={styles.ghostBtn} onClick={() => void auto.guardarAhora()}>
+            <Button size="sm" variant="ghost" onClick={() => void auto.guardarAhora()}>
               Reintentar
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            onClick={() => void descargarPdf(false)}
-            disabled={!id}
-            title="PDF para el cliente: precios ya con margen, sin costo"
-          >
-            PDF final
-          </button>
           {veCostos ? (
-            <button
-              type="button"
-              className={styles.secondaryBtn}
+            <Button
+              variant="ghost"
+              className={styles.barraBoton}
+              iconStart={<PictureAsPdfOutlinedIcon />}
               onClick={() => void descargarPdf(true)}
               disabled={!id}
               title="PDF interno: costo, markup sobre el costo y precio. No se envía al cliente."
             >
               PDF interno
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className={styles.primaryBtn}
-            onClick={() => void abrirEnvio()}
-            disabled={!id || aprobada || (bloqueada && detalle?.estado !== "ENVIADA")}
-            title={aprobada ? "Ya está aprobada" : undefined}
+          <Button
+            variant={siguiente === "pdf" ? "primary" : "secondary"}
+            className={styles.barraBoton}
+            iconStart={<PictureAsPdfOutlinedIcon />}
+            onClick={() => void descargarPdf(false)}
+            disabled={!id}
+            title="PDF para el cliente: precios ya con margen, sin costo"
           >
-            Enviar por correo
-          </button>
+            PDF final
+          </Button>
+          {siguiente !== "pdf" ? (
+            <Button
+              variant={siguiente === "enviar" ? "primary" : "secondary"}
+              className={styles.barraBoton}
+              iconStart={<SendOutlinedIcon />}
+              onClick={() => void abrirEnvio()}
+              disabled={!id || aprobada || (bloqueada && detalle?.estado !== "ENVIADA")}
+            >
+              Enviar por correo
+            </Button>
+          ) : null}
         </div>
       </header>
+
+      {detalle ? (
+        <section className={styles.ficha} aria-label="Resumen de la cotización">
+          <div className={styles.fichaTop}>
+            <span className={styles.fichaIco} aria-hidden="true">
+              <RequestQuoteOutlinedIcon />
+            </span>
+            <div className={styles.fichaTexto}>
+              <h1 className={styles.fichaTitulo}>{doc.projectName.trim() || "Sin título de proyecto"}</h1>
+              <div className={styles.fichaDatos}>
+                <span className={styles.fichaDato}>
+                  <ApartmentOutlinedIcon aria-hidden="true" />
+                  {doc.clientName.trim() || "Sin cliente"}
+                </span>
+                {detalle.elaboro?.nombre ? (
+                  <span className={styles.fichaDato}>
+                    <Avatar name={detalle.elaboro.nombre} size={22} />
+                    {detalle.elaboro.nombre}
+                    <span className={styles.fichaTenue}>· elaboró</span>
+                  </span>
+                ) : null}
+                {doc.validUntil ? (
+                  <span className={styles.fichaDato}>
+                    <EventOutlinedIcon aria-hidden="true" />
+                    Vigencia {formatoFecha(doc.validUntil)}
+                  </span>
+                ) : null}
+                <Badge tone="outline" size="sm">
+                  {SEGMENTO_LABEL[doc.segmento]}
+                </Badge>
+                <Badge tone="outline" size="sm">
+                  Versión {version}
+                </Badge>
+              </div>
+              {pendientes.length ? (
+                <div className={styles.fichaPendientes} aria-label="Para enviarla">
+                  <span className={styles.fichaPendientesTitulo}>Para enviarla</span>
+                  {pendientes.map((p) =>
+                    p.hecho ? (
+                      <span key={p.id} className={styles.pendienteHecho}>
+                        <CheckRoundedIcon aria-hidden="true" />
+                        {p.label}
+                      </span>
+                    ) : (
+                      <Button key={p.id} size="sm" variant="tonal" className={styles.pendienteFalta} onClick={p.ir}>
+                        Falta: {p.label.toLowerCase()}
+                      </Button>
+                    ),
+                  )}
+                </div>
+              ) : null}
+            </div>
+            <div className={styles.fichaTotal}>
+              <span className={styles.fichaTotalEtiqueta}>Total</span>
+              <strong className={styles.fichaTotalCifra}>{formatoMoneda(totales.total, doc.moneda)}</strong>
+              <span className={styles.fichaTotalPie}>
+                {partidasConNombre === 1 ? "1 partida" : `${partidasConNombre} partidas`} · IVA{" "}
+                {formatoMoneda(totales.iva, doc.moneda)}
+              </span>
+            </div>
+          </div>
+          <Stepper steps={pasos} ariaLabel="Avance de la cotización" />
+        </section>
+      ) : null}
 
       <nav className={styles.indice} aria-label="Secciones del documento">
         <ol className={styles.indiceLista}>
@@ -591,62 +731,59 @@ export default function EditorCotizacion({
         </ol>
       </nav>
 
-      <div className={styles.pestanas} role="tablist" aria-label="Ver">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pestana === "documento"}
-          className={`${styles.pestana} ${pestana === "documento" ? styles.pestanaActiva : ""}`}
-          onClick={() => setPestana("documento")}
-        >
-          Documento
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={pestana === "vista"}
-          className={`${styles.pestana} ${pestana === "vista" ? styles.pestanaActiva : ""}`}
-          onClick={() => setPestana("vista")}
-        >
-          Vista previa (PDF)
-        </button>
+      <div className={styles.pestanas}>
+        <Tabs
+          ariaLabel="Ver"
+          items={[
+            { id: "documento", label: "Documento" },
+            { id: "vista", label: "Vista previa (PDF)" },
+          ]}
+          value={pestana}
+          onChange={setPestana}
+        />
       </div>
 
-      {aprobada ? (
-        <div className={`${styles.aviso} ${styles.avisoOk}`}>
-          <p>Aprobada: es el compromiso firmado con el cliente y ya no se edita. Puedes descargar el PDF cuando quieras.</p>
-        </div>
-      ) : bloqueada && detalle ? (
-        <div className={`${styles.aviso} ${styles.avisoInfo}`}>
-          <p>
-            {detalle.estado === "ENVIADA"
-              ? `Ya salió al cliente${detalle.sentToEmail ? ` (${detalle.sentToEmail})` : ""} como ${detalle.folio}. Para cambiarla se crea una revisión: la versión enviada se guarda y, al reenviarla, sale como R${(detalle.revision || 1) + 1}.`
-              : `Está ${detalle.estadoEtiqueta.toLowerCase()}. Puedes retomarla como borrador, ajustarla y volver a enviarla.`}
-          </p>
-          <button type="button" className={styles.primaryBtn} onClick={() => void desbloquear()} disabled={desbloqueando}>
-            {desbloqueando
-              ? "Un momento…"
-              : detalle.estado === "ENVIADA"
-                ? `Crear revisión R${(detalle.revision || 1) + 1}`
-                : "Retomar como borrador"}
-          </button>
-        </div>
-      ) : null}
+      {aprobada || (bloqueada && detalle) || detalle?.rejectedReason || error ? (
+        <div className={styles.avisos}>
+          {aprobada ? (
+            <Alert tone="success">
+              Aprobada: es el compromiso firmado con el cliente y ya no se edita. Puedes descargar el PDF cuando quieras.
+            </Alert>
+          ) : bloqueada && detalle ? (
+            <Alert
+              tone="info"
+              action={
+                <Button
+                  size="sm"
+                  variant={siguiente === "retomar" ? "primary" : "tonal"}
+                  loading={desbloqueando}
+                  onClick={() => void desbloquear()}
+                >
+                  {desbloqueando
+                    ? "Un momento…"
+                    : detalle.estado === "ENVIADA"
+                      ? `Crear revisión R${(detalle.revision || 1) + 1}`
+                      : "Retomar como borrador"}
+                </Button>
+              }
+            >
+              {detalle.estado === "ENVIADA"
+                ? `Ya salió al cliente${detalle.sentToEmail ? ` (${detalle.sentToEmail})` : ""} como ${detalle.folio}. Para cambiarla se crea una revisión: la versión enviada se guarda y, al reenviarla, sale como R${(detalle.revision || 1) + 1}.`
+                : `Está ${detalle.estadoEtiqueta.toLowerCase()}. Puedes retomarla como borrador, ajustarla y volver a enviarla.`}
+            </Alert>
+          ) : null}
 
-      {detalle?.rejectedReason ? (
-        <div className={`${styles.aviso} ${styles.avisoAlerta}`}>
-          <p>
-            Rechazada{detalle.rejectedByName ? ` por ${detalle.rejectedByName}` : ""}: {detalle.rejectedReason}
-          </p>
-        </div>
-      ) : null}
+          {detalle?.rejectedReason ? (
+            <Alert tone="warning">
+              Rechazada{detalle.rejectedByName ? ` por ${detalle.rejectedByName}` : ""}: {detalle.rejectedReason}
+            </Alert>
+          ) : null}
 
-      {error ? (
-        <div className={`${styles.aviso} ${styles.avisoError}`} role="alert">
-          <p>{error}</p>
-          <button type="button" className={styles.ghostBtn} onClick={() => setError(null)}>
-            Cerrar
-          </button>
+          {error ? (
+            <Alert tone="danger" role="alert" onDismiss={() => setError(null)} dismissLabel="Cerrar">
+              {error}
+            </Alert>
+          ) : null}
         </div>
       ) : null}
 
@@ -668,12 +805,10 @@ export default function EditorCotizacion({
             esNueva={!inicial}
           />
           {!id ? (
-            <div className={`${styles.aviso} ${styles.avisoInfo}`}>
-              <p>
-                Se guarda sola al escribir el cliente; ahí se emite el folio.
-                {activityId ? ` Queda ligada a la actividad #${activityId}.` : ""}
-              </p>
-            </div>
+            <Alert tone="info">
+              Se guarda sola al escribir el cliente; ahí se emite el folio.
+              {activityId ? ` Queda ligada a la actividad #${activityId}.` : ""}
+            </Alert>
           ) : null}
           <PanelPersonalizar
             doc={doc}
@@ -771,6 +906,7 @@ export default function EditorCotizacion({
 
       {aviso ? (
         <div className={styles.toast} role="status">
+          <CheckCircleRoundedIcon className={styles.toastIcono} aria-hidden="true" />
           {aviso}
         </div>
       ) : null}

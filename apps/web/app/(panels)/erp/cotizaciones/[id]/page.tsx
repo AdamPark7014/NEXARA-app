@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Alert, Button, ButtonLink, SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { obtenerCotizacion, type CotizacionDetalle } from "@/lib/cotizaciones-api";
 import { formatApiError } from "@/lib/erp-api";
@@ -38,23 +39,26 @@ export default function CotizacionDetallePage() {
   if (detalle) return <EditorCotizacion key={detalle.id} inicial={detalle} />;
 
   return (
-    <div className={styles.wrap}>
-      <Link className={styles.migas} href="/erp/cotizaciones">
-        ← Cotizaciones
-      </Link>
+    <div className={styles.carga}>
+      <ButtonLink className={styles.cargaVolver} variant="ghost" size="sm" href="/erp/cotizaciones" iconStart={<ArrowBackRoundedIcon />}>
+        Cotizaciones
+      </ButtonLink>
       {cargando ? (
-        <div className={styles.esqueleto} aria-busy="true" aria-label="Cargando la cotización">
-          <span />
-          <span />
-          <span />
+        <div className={styles.cargaTarjeta}>
+          <SkeletonRows rows={4} label="Cargando la cotización" />
         </div>
       ) : (
-        <div className={styles.errorBox} role="alert">
-          {error ?? "No se encontró la cotización."}{" "}
-          <button type="button" className={styles.linkBtn} onClick={() => void cargar()}>
-            Reintentar
-          </button>
-        </div>
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error ?? "No se encontró la cotización."}
+        </Alert>
       )}
     </div>
   );
