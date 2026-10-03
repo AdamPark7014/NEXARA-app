@@ -1,17 +1,30 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useRef, type KeyboardEvent } from "react";
 import { normalizarPrioridad } from "@/lib/actividad-tiempos";
+import s from "./PrioritySemaforo.module.css";
 
 /**
  * Prioridad normalizada del contrato: se guarda ALTA | MEDIA | BAJA y se muestra
  * Alta / Media / Baja. Un valor viejo («urgente», «P1») queda marcado igual.
+ *
+ * `color` se conserva para quien lo lea fuera de aquí; el control pinta el punto
+ * con los tokens del tema (`TONO`), que sí cambian en modo oscuro.
  */
 export const PRIORIDAD_SEMAFORO = [
   { value: "BAJA", label: "Baja", color: "#22c55e", hint: "Puede esperar" },
   { value: "MEDIA", label: "Media", color: "#eab308", hint: "Esta semana" },
   { value: "ALTA", label: "Alta", color: "#ef4444", hint: "Urgente" },
 ] as const;
+
+type PrioridadValor = (typeof PRIORIDAD_SEMAFORO)[number]["value"];
+
+/** Tono del punto de cada prioridad (se resuelve a --ui-success / --ui-warning / --ui-danger). */
+const TONO: Record<PrioridadValor, "success" | "warning" | "danger"> = {
+  BAJA: "success",
+  MEDIA: "warning",
+  ALTA: "danger",
+};
 
 type Props = {
   value: string;
@@ -21,69 +34,52 @@ type Props = {
   compact?: boolean;
 };
 
+type Opcion = { value: string; label: string; hint?: string; tone: "neutral" | "success" | "warning" | "danger" };
+
 export default function PrioritySemaforo({ value, onChange, allowEmpty = false, compact = false }: Props) {
   // Lo guardado puede venir en texto viejo: se marca la opción equivalente.
   const seleccion = value ? normalizarPrioridad(value) : "";
-  const wrap: CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: compact ? 6 : 8,
-    gridColumn: compact ? undefined : "1 / -1",
+  const pista = useRef<HTMLDivElement | null>(null);
+
+  const opciones: Opcion[] = [
+    ...(allowEmpty ? [{ value: "", label: "Sin definir", tone: "neutral" as const }] : []),
+    ...PRIORIDAD_SEMAFORO.map((p) => ({ value: p.value, label: p.label, hint: p.hint, tone: TONO[p.value] })),
+  ];
+  const marcada = (o: Opcion) => (o.value === "" ? !value : seleccion === o.value);
+  // Patrón de grupo de radios: una sola parada de Tab (la marcada, o la primera).
+  const indiceFoco = Math.max(0, opciones.findIndex(marcada));
+
+  const conFlechas = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const paso = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!paso) return;
+    e.preventDefault();
+    const siguiente = (i + paso + opciones.length) % opciones.length;
+    onChange(opciones[siguiente].value);
+    pista.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[siguiente]?.focus();
   };
 
   return (
-    <div style={wrap} role="radiogroup" aria-label="Prioridad">
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: "var(--text-secondary)",
-          letterSpacing: "0.02em",
-        }}
-      >
-        Prioridad
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {allowEmpty ? (
-          <button
-            type="button"
-            role="radio"
-            aria-checked={!value}
-            onClick={() => onChange("")}
-            style={chipStyle(!value, "#94a3b8")}
-          >
-            <span style={dotStyle("#94a3b8", !value)} />
-            Sin definir
-          </button>
-        ) : null}
-        {PRIORIDAD_SEMAFORO.map((p) => {
-          const on = seleccion === p.value;
+    <div className={s.wrap} data-compact={compact ? "true" : undefined} role="radiogroup" aria-label="Prioridad">
+      <div className={s.label}>Prioridad</div>
+      <div className={s.track} ref={pista}>
+        {opciones.map((o, i) => {
+          const on = marcada(o);
           return (
             <button
-              key={p.value}
+              key={o.value || "sin-definir"}
               type="button"
               role="radio"
               aria-checked={on}
-              title={p.hint}
-              onClick={() => onChange(p.value)}
-              style={chipStyle(on, p.color)}
+              tabIndex={i === indiceFoco ? 0 : -1}
+              title={o.hint}
+              onClick={() => onChange(o.value)}
+              onKeyDown={(e) => conFlechas(e, i)}
+              className={s.option}
             >
-              <span style={dotStyle(p.color, on)} />
-              <span>
-                <strong style={{ fontWeight: 750 }}>{p.label}</strong>
-                {!compact ? (
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: 10,
-                      fontWeight: 500,
-                      opacity: 0.85,
-                      marginTop: 1,
-                    }}
-                  >
-                    {p.hint}
-                  </span>
-                ) : null}
+              <span className={s.dot} data-tone={o.tone} aria-hidden="true" />
+              <span className={s.text}>
+                <span className={s.optionLabel}>{o.label}</span>
+                {!compact && o.hint ? <span className={s.hint}>{o.hint}</span> : null}
               </span>
             </button>
           );
@@ -91,34 +87,4 @@ export default function PrioritySemaforo({ value, onChange, allowEmpty = false, 
       </div>
     </div>
   );
-}
-
-function chipStyle(on: boolean, color: string): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "10px 14px",
-    borderRadius: 14,
-    border: on ? `2px solid ${color}` : "1px solid var(--border)",
-    background: on ? `color-mix(in srgb, ${color} 14%, var(--surface))` : "var(--surface)",
-    cursor: "pointer",
-    fontFamily: "inherit",
-    color: "inherit",
-    fontSize: 13,
-    textAlign: "left",
-    boxShadow: on ? `0 0 0 3px color-mix(in srgb, ${color} 18%, transparent)` : "none",
-    transition: "border-color 120ms ease, background 120ms ease, box-shadow 120ms ease",
-  };
-}
-
-function dotStyle(color: string, on: boolean): CSSProperties {
-  return {
-    width: 14,
-    height: 14,
-    borderRadius: "50%",
-    background: color,
-    boxShadow: on ? `0 0 0 3px color-mix(in srgb, ${color} 35%, transparent)` : `inset 0 0 0 1px rgba(0,0,0,0.08)`,
-    flexShrink: 0,
-  };
 }

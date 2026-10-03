@@ -1,0 +1,48 @@
+/* Reabastecimiento · «Qué comprar». Solo tokens `--ui-*` (claro y oscuro). */
+
+/* El aviso de error vive dentro de la tarjeta, con el mismo margen que la cabecera. */
+.aviso {
+  padding: var(--ui-s3) var(--ui-s5) 0;
+}
+
+.carga {
+  padding: var(--ui-s3) var(--ui-s5) var(--ui-s4);
+}
+
+/* Celda de dos renglones: nombre arriba, dato chico abajo. */
+.doble {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fuerte {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tenue {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.apagado {
+  color: var(--ui-fg-2);
+}
+
+.vacio {
+  color: var(--ui-fg-3);
+}
+
+.fecha {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+/* La cifra de la cobertura no se parte en dos renglones. */
+.semaforo {
+  white-space: nowrap;
+}

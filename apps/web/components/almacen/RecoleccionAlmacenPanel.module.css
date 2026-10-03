@@ -1,0 +1,130 @@
+/* Mostrador del almacén · entregar con código. Solo tokens `--ui-*` (claro y oscuro). */
+
+.panel {
+  display: grid;
+  gap: var(--ui-s6);
+  min-width: 0;
+}
+
+/* Cuerpo de la tarjeta del mostrador. */
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s4);
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s5);
+  min-width: 0;
+}
+
+/* Campo del código + «Verificar», alineados por abajo; en teléfono bajan a dos renglones. */
+.mostrador {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.campoCodigo {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+
+/*
+ * El código se lee en voz alta y se teclea: letra monoespaciada, grande y espaciada.
+ * El selector es largo a propósito: `Field` fija el tamaño de letra de los controles
+ * que lleva dentro y este tiene que ganarle.
+ */
+.mostrador .campoCodigo input.codigo:not([type="checkbox"]) {
+  font-family: var(--ui-font-mono);
+  font-size: 18px;
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Lo que se encontró: separado del buscador con aire y una regla, sin caja. */
+.hallazgo {
+  display: grid;
+  gap: var(--ui-s3);
+  padding-top: var(--ui-s4);
+  border-top: 1px solid var(--ui-border-subtle);
+  min-width: 0;
+}
+
+.hallazgoHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s3);
+  min-width: 0;
+}
+
+.hallazgoNombre {
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.hallazgoAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+/* El aviso de error vive dentro de la tarjeta, con el mismo margen que la cabecera. */
+.aviso {
+  padding: var(--ui-s3) var(--ui-s5) 0;
+}
+
+.carga {
+  padding: var(--ui-s3) var(--ui-s5) var(--ui-s4);
+}
+
+/* Celdas de la tabla. */
+.doble {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fuerte {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tenue {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.vacio {
+  color: var(--ui-fg-3);
+}
+
+.actividad {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.codigoCelda {
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.06em;
+  color: var(--ui-fg);
+}
+
+@media (max-width: 560px) {
+  .cuerpo {
+    padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
+  }
+  .campoCodigo {
+    flex: 1 1 180px;
+  }
+  .hallazgoAcciones > * {
+    flex: 1 1 auto;
+  }
+}

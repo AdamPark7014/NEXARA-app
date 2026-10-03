@@ -1,7 +1,9 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useId, useState, useCallback } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
+import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
 import { useUser } from './UserContext';
 import styles from './ToolRequestForm.module.css';
 import { Socket } from 'socket.io-client';
@@ -10,7 +12,20 @@ import {
   listarMisActividadesParaHerramienta,
   type ActividadSolicitable,
 } from '@/lib/almacen-api';
-import { FormField, FormGrid } from '@/components/ui/FormField';
+import {
+  Alert,
+  Badge,
+  Button,
+  DateInput,
+  Field,
+  FormFooter,
+  FormSection,
+  Input,
+  RequiredMark,
+  Select,
+  Textarea,
+  focusField,
+} from '@/components/base';
 
 interface ToolRequestFormProps {
   onSuccess?: () => void;
@@ -25,6 +40,9 @@ interface InventoryOption {
   panoramicPhotoUrl?: string | null;
   serialPhotoUrl?: string | null;
 }
+
+/** Campo al que pertenece el error de validación: ahí se pinta, en lugar de la ayuda. */
+type CampoConError = 'tool' | 'reason' | 'startDate' | 'expectedReturnDate';
 
 const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const { user } = useUser();
@@ -41,7 +59,18 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<CampoConError | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const uid = useId();
+  const ids = {
+    titulo: `${uid}-titulo`,
+    tool: `${uid}-herramienta`,
+    activity: `${uid}-actividad`,
+    reason: `${uid}-motivo`,
+    startDate: `${uid}-inicio`,
+    expectedReturnDate: `${uid}-devolucion`,
+  };
 
   const searchInventory = useCallback(async (rawQuery: string) => {
     const query = rawQuery.trim();
@@ -129,35 +158,47 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const inventoryHasPhotos = (item: InventoryOption) =>
     Boolean(item.panoramicPhotoUrl?.trim() && item.serialPhotoUrl?.trim());
 
+  /** Marca el error en su campo y lleva el foco ahí. */
+  const fail = (field: CampoConError, message: string) => {
+    setError(message);
+    setErrorField(field);
+    focusField(ids[field]);
+    return false;
+  };
+
   const validate = () => {
     if (!selectedInventoryItem) {
-      setError('Selecciona una herramienta del inventario');
-      return false;
+      return fail('tool', 'Selecciona una herramienta del inventario');
     }
     if (!inventoryHasPhotos(selectedInventoryItem)) {
-      setError(
+      return fail(
+        'tool',
         'La herramienta seleccionada no tiene fotos en inventario. Pide a operaciones que las registre antes de solicitarla.',
       );
-      return false;
     }
     if (!reason || reason.length < 10) {
-      setError('La razón debe tener al menos 10 caracteres');
-      return false;
+      return fail('reason', 'La razón debe tener al menos 10 caracteres');
     }
     if (!startDate) {
-      setError('La fecha de inicio es requerida');
-      return false;
+      return fail('startDate', 'La fecha de inicio es requerida');
     }
     if (!expectedReturnDate) {
-      setError('La fecha de devolución esperada es requerida');
-      return false;
+      return fail('expectedReturnDate', 'La fecha de devolución esperada es requerida');
     }
     if (new Date(expectedReturnDate) <= new Date(startDate)) {
-      setError('La fecha de devolución debe ser posterior a la fecha de inicio');
-      return false;
+      return fail('expectedReturnDate', 'La fecha de devolución debe ser posterior a la fecha de inicio');
     }
     setError(null);
+    setErrorField(null);
     return true;
+  };
+
+  /** Al corregir el campo marcado, vuelve su ayuda. */
+  const clearFieldError = (field: CampoConError) => {
+    if (errorField === field) {
+      setError(null);
+      setErrorField(null);
+    }
   };
 
   const clearSelection = () => {
@@ -172,6 +213,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
 
     if (!user) {
       setError('Usuario no autenticado');
+      setErrorField(null);
       return;
     }
 
@@ -210,6 +252,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       if (onSuccess) onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+      setErrorField(null);
     } finally {
       setLoading(false);
     }
@@ -222,163 +265,243 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     ? resolveAssetUrl(selectedInventoryItem.serialPhotoUrl)
     : '';
 
+  const errorDe = (field: CampoConError) => (errorField === field ? error : null);
+  // Errores que no son de un campo (sesión, respuesta de la API) van en el aviso del pie.
+  const generalError = error && !errorField ? error : null;
+  const toolReady = Boolean(selectedInventoryItem && inventoryHasPhotos(selectedInventoryItem));
+  const periodReady = reason.length >= 10 && Boolean(startDate) && Boolean(expectedReturnDate);
+
   return (
-    <form className={`card ${styles.form}`} onSubmit={handleSubmit}>
-      <div>
-        <h3 className={styles.headerTitle}>Solicitar herramienta</h3>
-        <div className={styles.headerText}>
-          Busca y elige una herramienta disponible. Las fotos salen del catálogo.
-        </div>
-      </div>
+    <form className={styles.form} onSubmit={handleSubmit} noValidate aria-labelledby={ids.titulo}>
+      <header className={styles.head}>
+        <h2 id={ids.titulo} className={styles.title}>Solicitar herramienta</h2>
+        <p className={styles.lead}>
+          Busca y elige una herramienta disponible. Las fotos salen del catálogo. Los campos con <RequiredMark /> son
+          obligatorios.
+        </p>
+      </header>
 
-      <FormField
-        label="Herramienta"
-        fullWidth
-        hint={
-          selectedInventoryItem
-            ? `Seleccionada: ${selectedInventoryItem.toolName} · ${selectedInventoryItem.model} · ${selectedInventoryItem.serialNumber}`
-            : 'Escribe al menos 2 letras: nombre, modelo o serie.'
-        }
-      >
-        <input
-          className="input"
-          type="text"
-          value={inventoryQuery}
-          onChange={(e) => {
-            setInventoryQuery(e.target.value);
-            if (selectedInventoryItem) {
-              setSelectedInventoryItem(null);
-            }
-          }}
-          placeholder="Busca por nombre, modelo o serie"
-        />
-        {inventoryLoading && (
-          <div className={styles.inventoryLoading}>Buscando herramientas…</div>
-        )}
-        {!selectedInventoryItem && inventoryOptions.length > 0 && (
-          <div className={styles.inventoryOptions}>
-            {inventoryOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => {
-                  setSelectedInventoryItem(option);
-                  setInventoryQuery(`${option.toolName} · ${option.model} · ${option.serialNumber}`);
-                  setInventoryOptions([]);
-                  setError(null);
+      <div className={styles.sections}>
+        <FormSection
+          step={1}
+          done={toolReady}
+          title="Herramienta"
+          description="Elige la pieza del inventario que vas a usar."
+        >
+          <div className={styles.toolSearch}>
+            <Field
+              label="Herramienta"
+              required
+              fullWidth
+              error={errorDe('tool')}
+              hint={
+                selectedInventoryItem
+                  ? `Seleccionada: ${selectedInventoryItem.toolName} · ${selectedInventoryItem.model} · ${selectedInventoryItem.serialNumber}`
+                  : 'Escribe al menos 2 letras: nombre, modelo o serie.'
+              }
+            >
+              <Input
+                id={ids.tool}
+                type="text"
+                autoComplete="off"
+                iconStart={<SearchIcon fontSize="inherit" />}
+                valid={toolReady}
+                value={inventoryQuery}
+                onChange={(e) => {
+                  setInventoryQuery(e.target.value);
+                  if (selectedInventoryItem) {
+                    setSelectedInventoryItem(null);
+                  }
+                  clearFieldError('tool');
                 }}
-                className={styles.inventoryOptionButton}
-              >
-                <span className={styles.inventoryOptionText}>
-                  {option.toolName} · {option.model} · {option.serialNumber}
-                </span>
-                {!inventoryHasPhotos(option) && (
-                  <span className={styles.inventoryOptionWarning}>Sin fotos en inventario</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </FormField>
+                placeholder="Busca por nombre, modelo o serie"
+              />
+            </Field>
 
-      {selectedInventoryItem && (
-        <div className={styles.selectedCard}>
-          <div className={styles.selectedHeader}>
-            <div>
-              <div className={styles.selectedTitle}>{selectedInventoryItem.toolName}</div>
-              <div className={styles.selectedMeta}>
-                {selectedInventoryItem.model} · Serie {selectedInventoryItem.serialNumber}
-              </div>
-            </div>
-            <button type="button" className="button-secondary" onClick={clearSelection}>
-              Cambiar
-            </button>
+            {inventoryLoading && (
+              <p className={styles.searching} role="status">Buscando herramientas…</p>
+            )}
+
+            {!selectedInventoryItem && inventoryOptions.length > 0 && (
+              <ul className={styles.options} aria-label="Herramientas encontradas">
+                {inventoryOptions.map((option) => {
+                  const thumb = option.panoramicPhotoUrl ? resolveAssetUrl(option.panoramicPhotoUrl) : '';
+                  return (
+                    <li key={option.id}>
+                      <Button
+                        variant="ghost"
+                        fullWidth
+                        className={styles.option}
+                        onClick={() => {
+                          setSelectedInventoryItem(option);
+                          setInventoryQuery(`${option.toolName} · ${option.model} · ${option.serialNumber}`);
+                          setInventoryOptions([]);
+                          setError(null);
+                          setErrorField(null);
+                        }}
+                      >
+                        <span className={styles.optionThumb} aria-hidden="true">
+                          {thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={thumb} alt="" />
+                          ) : (
+                            <HandymanOutlinedIcon fontSize="inherit" />
+                          )}
+                        </span>
+                        <span className={styles.optionText}>
+                          <span className={styles.optionName}>{option.toolName}</span>
+                          <span className={styles.optionMeta}>
+                            {option.model} · {option.serialNumber}
+                          </span>
+                        </span>
+                        {!inventoryHasPhotos(option) && (
+                          <Badge tone="danger" size="sm">Sin fotos en inventario</Badge>
+                        )}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
 
-          {inventoryHasPhotos(selectedInventoryItem) ? (
-            <div className={styles.photoGrid}>
-              <div className={styles.photoCard}>
-                <div className={styles.photoTitle}>Foto panorámica (inventario)</div>
-                <div className={styles.previewBox}>
-                  <img
-                    src={panoramicSrc}
-                    alt={`Vista panorámica de ${selectedInventoryItem.toolName}`}
-                    className={styles.previewImage}
-                  />
+          {selectedInventoryItem && (
+            <div className={styles.selected}>
+              <div className={styles.selectedHeader}>
+                <div className={styles.selectedText}>
+                  <p className={styles.selectedTitle}>{selectedInventoryItem.toolName}</p>
+                  <p className={styles.selectedMeta}>
+                    {selectedInventoryItem.model} · Serie {selectedInventoryItem.serialNumber}
+                  </p>
                 </div>
+                <Button variant="tertiary" size="sm" onClick={clearSelection}>
+                  Cambiar
+                </Button>
               </div>
-              <div className={styles.photoCard}>
-                <div className={styles.photoTitle}>Foto de serie / modelo (inventario)</div>
-                <div className={styles.previewBox}>
-                  <img
-                    src={serialSrc}
-                    alt={`Serie de ${selectedInventoryItem.toolName}`}
-                    className={styles.previewImage}
-                  />
+
+              {inventoryHasPhotos(selectedInventoryItem) ? (
+                <div className={styles.photoGrid}>
+                  <figure className={styles.photoCard}>
+                    <div className={styles.previewBox}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={panoramicSrc}
+                        alt={`Vista panorámica de ${selectedInventoryItem.toolName}`}
+                        className={styles.previewImage}
+                      />
+                    </div>
+                    <figcaption className={styles.photoTitle}>Foto panorámica (inventario)</figcaption>
+                  </figure>
+                  <figure className={styles.photoCard}>
+                    <div className={styles.previewBox}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={serialSrc}
+                        alt={`Serie de ${selectedInventoryItem.toolName}`}
+                        className={styles.previewImage}
+                      />
+                    </div>
+                    <figcaption className={styles.photoTitle}>Foto de serie / modelo (inventario)</figcaption>
+                  </figure>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.missingPhotos}>
-              Esta herramienta no tiene fotos registradas en inventario. Contacta a operaciones para completar el catálogo.
+              ) : (
+                <Alert tone="danger">
+                  Esta herramienta no tiene fotos registradas en inventario. Contacta a operaciones para completar el catálogo.
+                </Alert>
+              )}
             </div>
           )}
-        </div>
+        </FormSection>
+
+        <FormSection
+          step={2}
+          done={periodReady}
+          title="Uso y periodo"
+          description="Para qué la necesitas y cuándo la devuelves."
+          columns={2}
+        >
+          <Field
+            label="Actividad"
+            optional
+            fullWidth
+            hint="Déjala vacía si es un préstamo suelto, sin orden de trabajo."
+          >
+            <Select
+              id={ids.activity}
+              value={activityId}
+              onChange={(e) => setActivityId(e.target.value)}
+            >
+              <option value="">Sin actividad (préstamo suelto)</option>
+              {actividades.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.anNumber} — {a.titulo}
+                  {a.client ? ` · ${a.client.name}` : ''}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Motivo del uso"
+            required
+            fullWidth
+            error={errorDe('reason')}
+            hint="Para qué la necesitas en el periodo. Mínimo 10 caracteres."
+          >
+            <Textarea
+              id={ids.reason}
+              className={styles.reasonInput}
+              rows={3}
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                clearFieldError('reason');
+              }}
+              placeholder="Describe el motivo…"
+            />
+          </Field>
+          <Field label="Inicio" required error={errorDe('startDate')} hint="Día en que la recoges.">
+            <DateInput
+              id={ids.startDate}
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                clearFieldError('startDate');
+              }}
+            />
+          </Field>
+          <Field
+            label="Devolución esperada"
+            required
+            error={errorDe('expectedReturnDate')}
+            hint="Debe ser después del inicio."
+          >
+            <DateInput
+              id={ids.expectedReturnDate}
+              min={startDate || undefined}
+              value={expectedReturnDate}
+              onChange={(e) => {
+                setExpectedReturnDate(e.target.value);
+                clearFieldError('expectedReturnDate');
+              }}
+            />
+          </Field>
+        </FormSection>
+      </div>
+
+      {generalError && (
+        <Alert tone="danger" role="alert">
+          {generalError}
+        </Alert>
+      )}
+      {success && (
+        <Alert tone="success" role="status">
+          {success}
+        </Alert>
       )}
 
-      <FormGrid>
-        <FormField
-          label="Actividad"
-          optional
-          hint="Vacío = préstamo suelto, sin OT."
-        >
-          <select
-            className="input"
-            value={activityId}
-            onChange={(e) => setActivityId(e.target.value)}
-          >
-            <option value="">Sin actividad (préstamo suelto)</option>
-            {actividades.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.anNumber} — {a.titulo}
-                {a.client ? ` · ${a.client.name}` : ''}
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Motivo del uso" hint="Para qué la necesitas en el periodo.">
-          <textarea
-            className={`input ${styles.reasonInput}`}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Describe el motivo…"
-          />
-        </FormField>
-        <FormField label="Inicio" hint="Día en que la recoges.">
-          <input
-            className="input"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-        </FormField>
-        <FormField label="Devolución esperada" hint="Debe ser después del inicio.">
-          <input
-            className="input"
-            type="date"
-            value={expectedReturnDate}
-            onChange={(e) => setExpectedReturnDate(e.target.value)}
-          />
-        </FormField>
-      </FormGrid>
-
-      <div className={styles.actionsRow}>
-        <button className="button-primary" type="submit" disabled={loading}>
-          {loading ? 'Enviando…' : 'Solicitar herramienta'}
-        </button>
-        <button
-          className="button-secondary"
-          type="button"
+      <FormFooter className={styles.footer}>
+        <Button
+          variant="tertiary"
           onClick={() => {
             clearSelection();
             setActivityId('');
@@ -386,14 +509,16 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             setStartDate('');
             setExpectedReturnDate('');
             setError(null);
+            setErrorField(null);
             setSuccess(null);
           }}
         >
           Limpiar
-        </button>
-        {error && <span className={styles.feedbackError}>{error}</span>}
-        {success && <span className={styles.feedbackSuccess}>{success}</span>}
-      </div>
+        </Button>
+        <Button variant="primary" type="submit" loading={loading}>
+          {loading ? 'Enviando…' : 'Solicitar herramienta'}
+        </Button>
+      </FormFooter>
     </form>
   );
 };

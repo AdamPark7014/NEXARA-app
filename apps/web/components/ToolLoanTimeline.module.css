@@ -1,0 +1,117 @@
+/* Línea de tiempo del préstamo: cinco pasos en barras, solo tokens --ui-*. */
+
+.timeline {
+  list-style: none;
+  margin: var(--ui-s2) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--ui-s1);
+  min-width: 0;
+}
+
+.step {
+  min-width: 0;
+  text-align: center;
+}
+
+.bar {
+  display: block;
+  height: 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-border);
+  transition: background var(--ui-duration-fast) ease;
+}
+
+.step[data-state="done"] .bar {
+  background: color-mix(in srgb, var(--ui-brand) 70%, var(--ui-surface));
+}
+
+.step[data-state="current"] .bar {
+  background: var(--ui-brand);
+  box-shadow: 0 0 0 2px var(--ui-brand-soft);
+}
+
+.step[data-state="rejected"] .bar {
+  background: color-mix(in srgb, var(--ui-danger) 75%, var(--ui-surface));
+}
+
+.label {
+  display: block;
+  margin-top: var(--ui-s1);
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-medium);
+  line-height: 1.3;
+  color: var(--ui-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step[data-state="done"] .label {
+  color: var(--ui-fg-2);
+}
+
+.step[data-state="current"] .label {
+  color: var(--ui-fg);
+  font-weight: var(--ui-fw-semibold);
+}
+
+.step[data-state="rejected"] .label {
+  color: var(--ui-danger-text);
+}
+
+.stamp {
+  display: block;
+  font-size: calc(var(--ui-fs-caption) - 1px);
+  line-height: 1.3;
+  color: var(--ui-fg-muted);
+  font-feature-settings: var(--ui-numeric);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Versión de tabla ─────────────────────────────────────────────── */
+
+.compact {
+  display: grid;
+  gap: var(--ui-s1);
+  margin-top: var(--ui-s2);
+  min-width: 0;
+  max-width: 220px;
+}
+
+.compactBars {
+  margin: 0;
+  gap: 3px;
+}
+
+.compactBars .bar {
+  height: 5px;
+}
+
+.caption {
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-medium);
+  line-height: 1.3;
+  color: var(--ui-fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caption[data-rejected="true"] {
+  color: var(--ui-danger-text);
+}
+
+.captionStamp {
+  color: var(--ui-fg-3);
+  font-feature-settings: var(--ui-numeric);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
+}

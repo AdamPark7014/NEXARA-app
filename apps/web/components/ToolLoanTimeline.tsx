@@ -1,6 +1,7 @@
 "use client";
 
 import type { ToolRequestStatus } from "@/lib/tool-requests-api";
+import s from "./ToolLoanTimeline.module.css";
 
 type TimelineProps = {
   status: ToolRequestStatus;
@@ -9,6 +10,11 @@ type TimelineProps = {
   pickedUpAt?: string | null;
   deliveryDate?: string | null;
   returnDate?: string | null;
+  /**
+   * Versión de tabla: solo las barras y, debajo, el paso en curso con su hora.
+   * Las etiquetas de cada paso quedan para el lector de pantalla y el `title`.
+   */
+  compact?: boolean;
 };
 
 const STEPS = [
@@ -18,6 +24,8 @@ const STEPS = [
   { key: "deliver", label: "Entrega" },
   { key: "return", label: "Devolución" },
 ] as const;
+
+type StepState = "done" | "current" | "todo" | "rejected";
 
 function stepIndex(status: ToolRequestStatus): number {
   switch (status) {
@@ -58,6 +66,7 @@ export default function ToolLoanTimeline({
   pickedUpAt,
   deliveryDate,
   returnDate,
+  compact = false,
 }: TimelineProps) {
   const active = stepIndex(status);
   const rejected = status === "REJECTED";
@@ -69,49 +78,54 @@ export default function ToolLoanTimeline({
     fmt(returnDate),
   ];
 
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, 1fr))`,
-        gap: 4,
-        marginTop: 6,
-      }}
-      aria-label="Línea de tiempo del préstamo"
-    >
+  const stateOf = (i: number): StepState => {
+    if (rejected) return "rejected";
+    if (i === active) return "current";
+    return i < active ? "done" : "todo";
+  };
+
+  const steps = (
+    <ol className={compact ? `${s.timeline} ${s.compactBars}` : s.timeline} aria-label="Línea de tiempo del préstamo">
       {STEPS.map((step, i) => {
-        const done = !rejected && i <= active;
-        const current = !rejected && i === active;
+        const state = stateOf(i);
+        const stamp = stamps[i];
         return (
-          <div key={step.key} style={{ textAlign: "center" }}>
-            <div
-              style={{
-                height: 6,
-                borderRadius: 99,
-                background: rejected
-                  ? "var(--danger)"
-                  : done
-                    ? "var(--primary)"
-                    : "var(--border)",
-                opacity: current ? 1 : done ? 0.85 : 0.5,
-              }}
-            />
-            <div
-              style={{
-                fontSize: 10,
-                marginTop: 4,
-                fontWeight: current ? 700 : 500,
-                color: done ? "var(--foreground)" : "var(--text-secondary)",
-              }}
-            >
-              {step.label}
-            </div>
-            {stamps[i] && (
-              <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>{stamps[i]}</div>
+          <li
+            key={step.key}
+            className={s.step}
+            data-state={state}
+            aria-current={state === "current" ? "step" : undefined}
+            title={compact ? [step.label, stamp].filter(Boolean).join(" · ") : undefined}
+          >
+            <span className={s.bar} aria-hidden="true" />
+            {compact ? (
+              <span className="ui-sr-only">
+                {step.label}
+                {stamp ? `, ${stamp}` : ""}
+              </span>
+            ) : (
+              <>
+                <span className={s.label}>{step.label}</span>
+                {stamp ? <span className={s.stamp}>{stamp}</span> : null}
+              </>
             )}
-          </div>
+          </li>
         );
       })}
+    </ol>
+  );
+
+  if (!compact) return steps;
+
+  const actual = STEPS[active];
+  const sello = stamps[active];
+  return (
+    <div className={s.compact}>
+      {steps}
+      <span className={s.caption} data-rejected={rejected ? "true" : undefined} aria-hidden="true">
+        {rejected ? `Detenida en ${STEPS[0].label.toLowerCase()}` : actual.label}
+        {!rejected && sello ? <span className={s.captionStamp}> · {sello}</span> : null}
+      </span>
     </div>
   );
 }

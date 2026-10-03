@@ -1,0 +1,87 @@
+/* NEXARA · Asistencias: recorrido del día y enlaces a mapa. Solo tokens --ui-*. */
+
+.timeline {
+  padding-top: var(--ui-s1);
+}
+
+/* «Ver en mapa»: enlace de texto con pin, del alto de un toque cómodo. */
+.lugar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  color: var(--ui-brand-text);
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--ui-radius-sm);
+}
+
+.lugar:hover {
+  text-decoration: underline;
+}
+
+.lugar:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.lugar svg {
+  width: 15px;
+  height: 15px;
+  font-size: 15px !important;
+  flex: 0 0 auto;
+}
+
+.sinLugar {
+  color: var(--ui-fg-3);
+}
+
+.vacio {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+  line-height: 1.45;
+}
+
+/* ─── Panel de mapas de una persona (AttendanceGpsDayPanel) ──────────── */
+
+.panel {
+  display: grid;
+  gap: var(--ui-s3);
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.accionFin {
+  margin-left: auto;
+}
+
+.nota {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+@media (pointer: coarse) {
+  .lugar {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .accionFin {
+    margin-left: 0;
+  }
+}

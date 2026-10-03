@@ -1,12 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import DataTable, { type Column } from "@/components/ui/DataTable";
-import StatusDot from "@/components/ui/StatusDot";
-import InlineAlert from "@/components/ui/InlineAlert";
-import { SkeletonRows } from "@/components/base";
+import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  Field,
+  Input,
+  PersonCell,
+  SkeletonRows,
+  StatusBadge,
+  type Column,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -18,30 +26,21 @@ import {
   type PendienteDeRecoleccion,
 } from "@/lib/almacen-api";
 import InfoBreve from "./InfoBreve";
+import s from "./RecoleccionAlmacenPanel.module.css";
 
 const INFO =
   "Código de 6 caracteres (48 h). Teclea aquí para entregar; queda quién y cuándo.";
 
-const inp: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "9px 12px",
-  minHeight: 44,
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  font: "inherit",
-  fontSize: 16,
-};
-
+/** Vigencia del código con su tono: rojo caducó, ámbar caduca pronto, verde vigente. */
 function vigencia(p: { vencido: boolean; horasRestantes: number | null }) {
-  if (p.vencido) return <StatusDot tone="danger" label="Caducó" title="Hay que volver a pedirla" />;
-  if (p.horasRestantes == null) return <StatusDot label="Sin caducidad" />;
-  if (p.horasRestantes <= 6) {
-    return <StatusDot tone="warning" label={`Caduca en ${p.horasRestantes} h`} />;
+  if (p.vencido) {
+    return <StatusBadge size="sm" tone="danger" label="Caducó" title="Hay que volver a pedirla" />;
   }
-  return <StatusDot label={`${p.horasRestantes} h`} />;
+  if (p.horasRestantes == null) return <StatusBadge size="sm" tone="neutral" label="Sin caducidad" />;
+  if (p.horasRestantes <= 6) {
+    return <StatusBadge size="sm" tone="warning" label={`Caduca en ${p.horasRestantes} h`} />;
+  }
+  return <StatusBadge size="sm" tone="success" label={`${p.horasRestantes} h`} />;
 }
 
 /**
@@ -115,172 +114,188 @@ export default function RecoleccionAlmacenPanel() {
       key: "codigo",
       label: "Código",
       width: 92,
-      render: (p) => (
-        <strong style={{ fontFamily: "ui-monospace, monospace", fontSize: 13, letterSpacing: "0.06em" }}>
-          {p.pickupCode ?? "—"}
-        </strong>
-      ),
+      render: (p) => <strong className={s.codigoCelda}>{p.pickupCode ?? "—"}</strong>,
     },
     {
       key: "herramienta",
       label: "Herramienta",
       width: 220,
       render: (p) => (
-        <div style={{ display: "grid", gap: 1, minWidth: 0 }}>
-          <strong style={{ fontSize: 12.5 }}>{p.toolName}</strong>
-          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+        <div className={s.doble}>
+          <strong className={s.fuerte}>{p.toolName}</strong>
+          <span className={s.tenue}>
             {p.model} · {p.serialNumber}
           </span>
         </div>
       ),
     },
-    { key: "quien", label: "Para", width: 150, accessor: (p) => p.usuario?.nombre ?? "—" },
+    {
+      key: "quien",
+      label: "Para",
+      width: 170,
+      render: (p) =>
+        p.usuario?.nombre ? <PersonCell name={p.usuario.nombre} size={24} /> : <span className={s.vacio}>—</span>,
+    },
     {
       key: "ot",
       label: "Actividad",
       width: 150,
       render: (p) =>
         p.activity ? (
-          <span style={{ fontSize: 11.5 }} title={p.activity.titulo}>
+          <span className={s.actividad} title={p.activity.titulo}>
             {p.activity.anNumber}
           </span>
         ) : (
-          <span style={{ color: "var(--text-tertiary)" }}>Préstamo suelto</span>
+          <span className={s.vacio}>Préstamo suelto</span>
         ),
     },
     { key: "vigencia", label: "Código válido", width: 132, render: (p) => vigencia(p) },
-    {
-      key: "acciones",
-      label: "",
-      width: 96,
-      render: (p) => (
-        <Button
-          size="sm"
-          variant="secondary"
-          aria-label={`Entregar ${p.toolName} a ${p.usuario?.nombre ?? "quien la pidió"}`}
-          disabled={p.vencido || !p.pickupCode || entregando}
-          onClick={() => void entregar(p.id, p.pickupCode ?? "", p.usuario?.id)}
-        >
-          Entregar
-        </Button>
-      ),
-    },
   ];
 
+  const caducados = pendientes.filter((p) => p.vencido).length;
+
   return (
-    <div style={{ display: "grid", gap: 24 }}>
-      <Section
-        title="Entregar con código"
-        actions={<InfoBreve etiqueta="Código de recolección" texto={INFO} />}
-      >
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
-          <input
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void buscar();
-            }}
-            placeholder="A3F7KD"
-            aria-label="Código de recolección"
-            maxLength={10}
-            style={{
-              ...inp,
-              width: 160,
-              fontFamily: "ui-monospace, monospace",
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-            }}
-          />
-          {/* Mientras no hay hallazgo, verificar es la acción a la que vino;
-              en cuanto lo hay, el primario pasa a la entrega y este baja a gris. */}
-          <Button
-            variant={hallazgo?.valido ? "secondary" : "primary"}
-            size="lg"
-            onClick={() => void buscar()}
-            loading={buscando}
-            disabled={!codigo.trim()}
-          >
-            Verificar
-          </Button>
-        </div>
-
-        {hallazgo && (
-          // Sin recuadro: los datos de la solicitud se separan del buscador con
-          // aire, y lo que sí necesita caja es el motivo del rechazo.
-          <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
-              <strong style={{ fontSize: 15 }}>{hallazgo.solicitud.toolName}</strong>
-              <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                {hallazgo.solicitud.model} · {hallazgo.solicitud.serialNumber}
-              </span>
-              {vigencia(hallazgo.solicitud)}
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-              Para {hallazgo.solicitud.usuario?.nombre ?? "—"}
-              {hallazgo.solicitud.activity
-                ? ` · ${hallazgo.solicitud.activity.anNumber} ${hallazgo.solicitud.activity.titulo}`
-                : " · préstamo suelto"}
-            </div>
-            {!hallazgo.valido && hallazgo.mensaje && (
-              <InlineAlert variant="danger" message={hallazgo.mensaje} />
-            )}
-            {hallazgo.valido && (
-              <div>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  loading={entregando}
-                  onClick={() =>
-                    void entregar(
-                      hallazgo.solicitud.id,
-                      hallazgo.solicitud.pickupCode ?? codigo,
-                      hallazgo.solicitud.usuario?.id,
-                    )
-                  }
-                >
-                  Entregar herramienta
-                </Button>
-              </div>
-            )}
+    <div className={s.panel}>
+      <Card>
+        <CardHead
+          title="Entregar con código"
+          actions={<InfoBreve etiqueta="Código de recolección" texto={INFO} />}
+        />
+        <div className={s.cuerpo}>
+          <div className={s.mostrador}>
+            <Field label="Código de recolección" className={s.campoCodigo}>
+              <Input
+                controlSize="lg"
+                className={s.codigo}
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void buscar();
+                }}
+                placeholder="A3F7KD"
+                aria-label="Código de recolección"
+                maxLength={10}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+              />
+            </Field>
+            {/* Mientras no hay hallazgo, verificar es la acción a la que vino;
+                en cuanto lo hay, el primario pasa a la entrega y este baja a gris. */}
+            <Button
+              variant={hallazgo?.valido ? "secondary" : "primary"}
+              size="lg"
+              onClick={() => void buscar()}
+              loading={buscando}
+              disabled={!codigo.trim()}
+            >
+              Verificar
+            </Button>
           </div>
-        )}
-      </Section>
 
-      <Section
-        title="Esperando a que las recojan"
-        subtitle={
-          pendientes.length > 0
-            ? `${pendientes.length} herramienta${pendientes.length === 1 ? "" : "s"}, ${pendientes.filter((p) => p.vencido).length} con el código caducado`
-            : undefined
-        }
-        flush
-      >
+          {hallazgo && (
+            // Sin recuadro: los datos de la solicitud se separan del buscador con
+            // aire, y lo que sí necesita caja es el motivo del rechazo.
+            <div className={s.hallazgo}>
+              <div className={s.hallazgoHead}>
+                <strong className={s.hallazgoNombre}>{hallazgo.solicitud.toolName}</strong>
+                <span className={s.tenue}>
+                  {hallazgo.solicitud.model} · {hallazgo.solicitud.serialNumber}
+                </span>
+                {vigencia(hallazgo.solicitud)}
+              </div>
+              <PersonCell
+                name={hallazgo.solicitud.usuario?.nombre ?? "—"}
+                title={`Para ${hallazgo.solicitud.usuario?.nombre ?? "—"}`}
+                subtitle={
+                  hallazgo.solicitud.activity
+                    ? `${hallazgo.solicitud.activity.anNumber} ${hallazgo.solicitud.activity.titulo}`
+                    : "Préstamo suelto"
+                }
+                size={32}
+              />
+              {!hallazgo.valido && hallazgo.mensaje && (
+                <Alert tone="danger" role="alert">
+                  {hallazgo.mensaje}
+                </Alert>
+              )}
+              {hallazgo.valido && (
+                <div className={s.hallazgoAcciones}>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    iconStart={<HandshakeOutlinedIcon />}
+                    loading={entregando}
+                    onClick={() =>
+                      void entregar(
+                        hallazgo.solicitud.id,
+                        hallazgo.solicitud.pickupCode ?? codigo,
+                        hallazgo.solicitud.usuario?.id,
+                      )
+                    }
+                  >
+                    Entregar herramienta
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHead
+          title="Esperando a que las recojan"
+          subtitle={
+            pendientes.length > 0
+              ? `${pendientes.length} herramienta${pendientes.length === 1 ? "" : "s"}, ${caducados} con el código caducado`
+              : undefined
+          }
+        />
         {error && (
-          <div style={{ marginBottom: 12 }}>
-            <InlineAlert
-              variant={pendientes.length > 0 ? "warning" : "danger"}
-              message={pendientes.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+          <div className={s.aviso}>
+            <Alert
+              tone={pendientes.length > 0 ? "warning" : "danger"}
+              role="alert"
               action={
                 <Button size="sm" variant="secondary" onClick={() => void cargar()}>
                   Reintentar
                 </Button>
               }
-            />
+            >
+              {pendientes.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+            </Alert>
           </div>
         )}
         {cargando && pendientes.length === 0 ? (
-          <SkeletonRows rows={4} label="Cargando herramientas por entregar" />
+          <div className={s.carga}>
+            <SkeletonRows rows={4} label="Cargando herramientas por entregar" />
+          </div>
         ) : error && pendientes.length === 0 ? null : (
           <DataTable
             columns={columnas}
             rows={pendientes}
             rowKey={(p) => p.id}
             density="compact"
+            flush
+            ariaLabel="Herramientas esperando a que las recojan"
+            rowActionsLabel="Entregar"
+            rowActions={(p) => (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Entregar ${p.toolName} a ${p.usuario?.nombre ?? "quien la pidió"}`}
+                disabled={p.vencido || !p.pickupCode || entregando}
+                onClick={() => void entregar(p.id, p.pickupCode ?? "", p.usuario?.id)}
+              >
+                Entregar
+              </Button>
+            )}
             emptyTitle="Nadie tiene nada que recoger"
             emptyDescription="Cuando se apruebe un préstamo, la herramienta aparecerá aquí con el código que trae quien viene por ella."
           />
         )}
-      </Section>
+      </Card>
     </div>
   );
 }
