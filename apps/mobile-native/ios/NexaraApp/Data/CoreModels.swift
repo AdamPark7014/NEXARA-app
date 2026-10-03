@@ -129,6 +129,22 @@ enum CoreEvidence {
         }
     }
 
+    static func isComercial(_ coreKind: String?) -> Bool {
+        (coreKind ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "comercial"
+    }
+
+    /// Lo comercial no es trabajo «en sitio»: su primer y último paso se llaman
+    /// «Inicio de actividad» y «Conclusión de actividad» (espejo de
+    /// `textosDeInicioYCierre` en la web). Los demás tipos conservan su nombre.
+    static func label(_ step: String, coreKind: String?) -> String {
+        guard isComercial(coreKind) else { return label(step) }
+        switch step {
+        case entryPhoto: return "Inicio de actividad"
+        case exitPhoto: return "Conclusión de actividad"
+        default: return label(step)
+        }
+    }
+
     /// Campos del formulario digital por tipo (espejo de `digitalFormLabels`).
     static func formFields(for coreKind: String?) -> [CoreFormField] {
         switch (coreKind ?? "tarea").lowercased() {

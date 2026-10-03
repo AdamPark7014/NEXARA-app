@@ -331,7 +331,7 @@ extension DemoStore {
     private func fxGeofence(_ id: Int) -> DemoJSON {
         var json = dj([
             "activityId": id,
-            "radioM": 100,
+            "radioM": 500,
             "seguimientoActivo": false,
             "puntos": [DemoJSON](),
             "alertas": [DemoJSON](),
@@ -759,7 +759,6 @@ extension DemoStore {
 
     private func routeUsers(method: String, parts: [String], json: DemoJSON) -> DemoReply {
         let sub = parts.count > 1 ? parts[1] : ""
-        if sub == "orgchart" { return reply(fxOrgchart()) }
         if sub == "profile" {
             if method == "PATCH" {
                 for (key, value) in json {
