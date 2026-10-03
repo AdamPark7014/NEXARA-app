@@ -8,11 +8,18 @@ import { WarehouseController } from './warehouse.controller.js';
 import { StockController } from './stock.controller.js';
 import { ReabastecimientoService } from './reabastecimiento.service.js';
 import { ReabastecimientoCronService } from './reabastecimiento-cron.service.js';
+import { CatalogModule } from '../catalog/catalog.module.js';
+import { CodigosBarrasService } from './codigos-barras.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, NotificationsModule, AccountingModule],
+  imports: [PrismaModule, AuthModule, NotificationsModule, AccountingModule, CatalogModule],
   controllers: [WarehouseController, StockController],
-  providers: [WarehouseService, ReabastecimientoService, ReabastecimientoCronService],
+  providers: [
+    WarehouseService,
+    ReabastecimientoService,
+    ReabastecimientoCronService,
+    CodigosBarrasService,
+  ],
   exports: [WarehouseService, ReabastecimientoService],
 })
 export class WarehouseModule {}

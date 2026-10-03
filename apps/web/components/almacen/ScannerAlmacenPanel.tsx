@@ -1,32 +1,38 @@
 "use client";
 
 /**
- * Entrada por cuña USB (HID): ráfaga rápida de teclas + Enter = escaneo;
- * tras el lookup el operador elige el tipo de movimiento y confirma.
+ * Almacén por código de barras. El lector USB es un teclado: una ráfaga rápida de
+ * teclas + Enter es un escaneo (`useLectorDeCodigos`), esté o no el foco en el campo.
+ *
+ * - Código conocido → aparece el producto y el operador dice qué pasó y cuántas.
+ * - Código desconocido → se ofrece darlo de alta (con los datos del catálogo
+ *   internacional si es un UPC/EAN) o ligarlo a un producto que ya existe.
  */
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
 import { createStockMovement, listWarehouses } from "@/lib/stock-api";
+import { listCatalogProducts, type CatalogProduct } from "@/lib/catalog-api";
 import { formatApiError } from "@/lib/erp-api";
+import {
+  altaProductoPorCodigo,
+  asignarCodigoAProducto,
+  buscarPorCodigoDeBarras,
+  consultarUpcInternacional,
+  type HallazgoDeCodigo,
+} from "@/lib/almacen-api";
+import {
+  clasificarCodigo,
+  esConsultableInternacional,
+  motivoCodigoInvalido,
+  nombreDeTipoCodigo,
+  type TipoCodigo,
+} from "@/lib/codigo-barras";
+import { ATRIBUTO_CAMPO_LECTOR, useLectorDeCodigos } from "@/lib/lector-codigos";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
 import EmptyState from "@/components/ui/EmptyState";
 import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
-
-type Match =
-  | {
-      match: "empaque";
-      codigoBarras: string;
-      packaging: { id: number; nombre: string; piezasPorUnidad: number };
-      product: { id: number; sku: string; name: string };
-    }
-  | {
-      match: "producto";
-      codigoBarras: string;
-      product: { id: number; sku: string; name: string };
-    };
 
 type OpType = "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN";
 
@@ -53,13 +59,14 @@ const OP_UI: Record<OpType, string> = {
   RETURN: "Devuelven material",
 };
 
-/** Gap máximo entre teclas para tratarlas como ráfaga HID. */
-const SCAN_CHAR_MS = 45;
-/** Longitud mínima del código para aceptar Enter como escaneo. */
+/** Longitud mínima del código para buscarlo. */
 const MIN_SCAN_LEN = 3;
 
 /** El error va atado al campo del código: sin esto se anuncia suelto. */
 const ERROR_ID = "escaner-almacen-error";
+
+/** Marca del campo que el lector puede tomar aunque tenga el foco. */
+const CAMPO_LECTOR = { [ATRIBUTO_CAMPO_LECTOR]: "" };
 
 /** Se usa de pie, con guantes o en tableta: 44 px de alto y 16 px (iOS no hace zoom). */
 const campo: React.CSSProperties = {
@@ -75,12 +82,15 @@ const campo: React.CSSProperties = {
   fontSize: 16,
 };
 
+type Desconocido = { codigo: string; tipo: TipoCodigo };
+type ModoDesconocido = "elegir" | "alta" | "ligar";
+
+const ALTA_VACIA = { name: "", marca: "", modelo: "", descripcion: "", imagenUrl: "", categoria: "" };
+
 export default function ScannerAlmacenPanel() {
   const { user } = useUser();
   const token = user?.token ?? "";
   const inputRef = useRef<HTMLInputElement>(null);
-  const bufferRef = useRef("");
-  const lastKeyAtRef = useRef(0);
   const busyRef = useRef(false);
 
   const [code, setCode] = useState("");
@@ -88,12 +98,22 @@ export default function ScannerAlmacenPanel() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
-  const [hit, setHit] = useState<Match | null>(null);
+  const [hit, setHit] = useState<HallazgoDeCodigo | null>(null);
   const [warehouses, setWarehouses] = useState<Array<{ id: number; name: string }>>([]);
   const [opType, setOpType] = useState<OpType>("RECEIPT");
   const [fromWarehouseId, setFromWarehouseId] = useState<number | "">("");
   const [toWarehouseId, setToWarehouseId] = useState<number | "">("");
   const [qty, setQty] = useState("1");
+
+  // Código que el almacén no conoce: alta o liga.
+  const [desconocido, setDesconocido] = useState<Desconocido | null>(null);
+  const [modo, setModo] = useState<ModoDesconocido>("elegir");
+  const [alta, setAlta] = useState(ALTA_VACIA);
+  const [notaUpc, setNotaUpc] = useState<string | null>(null);
+  const [consultando, setConsultando] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [candidatos, setCandidatos] = useState<CatalogProduct[]>([]);
+  const [buscandoProducto, setBuscandoProducto] = useState(false);
 
   useEffect(() => {
     busyRef.current = loading || saving;
@@ -122,9 +142,18 @@ export default function ScannerAlmacenPanel() {
   const needsTo =
     opType === "RECEIPT" || opType === "TRANSFER" || opType === "ADJUSTMENT" || opType === "RETURN";
 
+  const cerrarDesconocido = useCallback(() => {
+    setDesconocido(null);
+    setModo("elegir");
+    setAlta(ALTA_VACIA);
+    setNotaUpc(null);
+    setBusqueda("");
+    setCandidatos([]);
+  }, []);
+
   const buscarCodigo = useCallback(
     async (raw: string) => {
-      const q = raw.trim();
+      const { codigo: q, tipo } = clasificarCodigo(raw);
       if (!q || !token || busyRef.current) return;
       if (q.length < MIN_SCAN_LEN) {
         setError(`Código demasiado corto (mín. ${MIN_SCAN_LEN})`);
@@ -134,18 +163,15 @@ export default function ScannerAlmacenPanel() {
       setError(null);
       setOkMsg(null);
       setHit(null);
+      cerrarDesconocido();
+      // Cada código empieza en una unidad: lo que hubiera en «Cantidad» era del anterior
+      // (o lo que el lector tecleó ahí si el foco estaba en ese campo).
+      setQty("1");
       try {
-        const res = await fetch(buildApiUrl(`stock/barcode/${encodeURIComponent(q)}`), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 404) {
-          setError(`No encontramos el código ${q}. Revisa que esté dado de alta en el producto o su empaque.`);
-          return;
-        }
-        if (!res.ok) throw new Error(await res.text());
-        setHit((await res.json()) as Match);
+        const hallazgo = await buscarPorCodigoDeBarras(token, q);
+        if (hallazgo) setHit(hallazgo);
+        else setDesconocido({ codigo: q, tipo });
         setCode("");
-        bufferRef.current = "";
       } catch (e) {
         setError(formatApiError(e, "No se pudo buscar el código. Intenta de nuevo."));
       } finally {
@@ -153,35 +179,24 @@ export default function ScannerAlmacenPanel() {
         inputRef.current?.focus();
       }
     },
-    [token],
+    [token, cerrarDesconocido],
   );
 
-  const onScanKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    const now = Date.now();
-
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (busyRef.current) return;
-      const candidate = (bufferRef.current || code).trim();
-      bufferRef.current = "";
-      lastKeyAtRef.current = 0;
-      if (candidate.length < MIN_SCAN_LEN) {
-        if (candidate.length > 0) setError(`Código demasiado corto (mín. ${MIN_SCAN_LEN})`);
+  // El lector dispara aunque nadie haya hecho clic en el campo. Siempre encendido: así
+  // su Enter nunca «pulsa» un botón de la pantalla; lo que se decide aquí es si se atiende.
+  useLectorDeCodigos({
+    onEscaneo: (codigo) => {
+      if (desconocido && modo !== "elegir") {
+        // A medio capturar un alta, otro escaneo borraría lo tecleado. Volver a
+        // disparar sobre el mismo código no es un error: simplemente no hace nada.
+        if (clasificarCodigo(codigo).codigo !== desconocido.codigo) {
+          setError("Termina o cancela lo que estás capturando antes de escanear otro código.");
+        }
         return;
       }
-      void buscarCodigo(candidate);
-      return;
-    }
-
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const gap = now - lastKeyAtRef.current;
-      if (lastKeyAtRef.current > 0 && gap > SCAN_CHAR_MS) {
-        bufferRef.current = "";
-      }
-      bufferRef.current += e.key;
-      lastKeyAtRef.current = now;
-    }
-  };
+      void buscarCodigo(codigo);
+    },
+  });
 
   const confirmarMovimiento = async () => {
     if (!hit || !token) return;
@@ -233,16 +248,128 @@ export default function ScannerAlmacenPanel() {
     }
   };
 
+  // ── Código desconocido: alta ──────────────────────────────────────
+
+  const abrirAlta = async () => {
+    if (!desconocido || !token) return;
+    setModo("alta");
+    setNotaUpc(null);
+    // Solo un UPC/EAN de verdad se pregunta fuera; lo demás se captura a mano.
+    if (!esConsultableInternacional(desconocido.codigo)) return;
+    setConsultando(true);
+    const r = await consultarUpcInternacional(token, desconocido.codigo);
+    setConsultando(false);
+    if (r.encontrado) {
+      // Solo rellena lo que siga vacío: no pisa lo que la persona ya tecleó.
+      setAlta((a) => ({
+        name: a.name || r.producto.nombre || "",
+        marca: a.marca || r.producto.marca || "",
+        modelo: a.modelo || r.producto.modelo || "",
+        descripcion: a.descripcion || r.producto.descripcion || "",
+        imagenUrl: a.imagenUrl || r.producto.imagenUrl || "",
+        categoria: a.categoria || r.producto.categoria || "",
+      }));
+      setNotaUpc("Datos sugeridos por el catálogo internacional. Revísalos antes de guardar.");
+    } else {
+      setNotaUpc(r.mensaje);
+    }
+  };
+
+  const guardarAlta = async () => {
+    if (!desconocido || !token) return;
+    if (!alta.name.trim()) {
+      setError("Escribe el nombre del producto");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const producto = await altaProductoPorCodigo(token, {
+        codigo: desconocido.codigo,
+        name: alta.name.trim(),
+        marca: alta.marca.trim() || undefined,
+        modelo: alta.modelo.trim() || undefined,
+        descripcion: alta.descripcion.trim() || undefined,
+        imagenUrl: alta.imagenUrl.trim() || undefined,
+        categoria: alta.categoria.trim() || undefined,
+      });
+      // Recién dado de alta, lo normal es que esté entrando: queda listo para la entrada.
+      setHit({ match: "producto", codigoBarras: desconocido.codigo, product: producto, existencias: [] });
+      setOpType("RECEIPT");
+      setOkMsg(`Producto dado de alta con la clave ${producto.sku}. Registra cuántas piezas entran.`);
+      cerrarDesconocido();
+    } catch (e) {
+      setError(formatApiError(e, "No se pudo dar de alta el producto"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Código desconocido: ligar a un producto que ya existe ─────────
+
+  useEffect(() => {
+    if (modo !== "ligar" || !token) return;
+    const q = busqueda.trim();
+    if (q.length < 2) {
+      setCandidatos([]);
+      return;
+    }
+    let vigente = true;
+    setBuscandoProducto(true);
+    const espera = setTimeout(() => {
+      listCatalogProducts(token, { q, take: 8 })
+        .then((r) => {
+          if (vigente) setCandidatos(r.data ?? []);
+        })
+        .catch(() => {
+          if (vigente) setCandidatos([]);
+        })
+        .finally(() => {
+          if (vigente) setBuscandoProducto(false);
+        });
+    }, 280);
+    return () => {
+      vigente = false;
+      clearTimeout(espera);
+    };
+  }, [busqueda, modo, token]);
+
+  const ligar = async (producto: CatalogProduct) => {
+    if (!desconocido || !token) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const actualizado = await asignarCodigoAProducto(token, producto.id, {
+        codigo: desconocido.codigo,
+      });
+      setHit({
+        match: "producto",
+        codigoBarras: desconocido.codigo,
+        product: actualizado,
+        existencias: [],
+      });
+      setOkMsg(`Código ligado a ${actualizado.name}. Desde ahora el lector lo reconoce.`);
+      cerrarDesconocido();
+    } catch (e) {
+      setError(formatApiError(e, "No se pudo ligar el código al producto"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const confirmDisabled =
     saving ||
     (needsFrom && fromWarehouseId === "") ||
     (needsTo && toWarehouseId === "") ||
     (opType === "TRANSFER" && fromWarehouseId !== "" && fromWarehouseId === toWarehouseId);
 
+  const motivoNoGuardable = desconocido ? motivoCodigoInvalido(desconocido.codigo) : null;
+  const existencias = hit?.existencias ?? [];
+
   return (
     <Section
       title="Escanear"
-      subtitle="Dispara el lector sobre el código. El producto aparece abajo y ahí decides qué pasó con él."
+      subtitle="Dispara el lector sobre el código, sin hacer clic en ningún campo. El producto aparece abajo y ahí decides qué pasó con él."
     >
       <form
         onSubmit={(e) => {
@@ -254,9 +381,9 @@ export default function ScannerAlmacenPanel() {
       >
         <input
           ref={inputRef}
+          {...CAMPO_LECTOR}
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          onKeyDown={onScanKeyDown}
           placeholder="Código de barras…"
           aria-label="Código de barras"
           aria-invalid={error ? true : undefined}
@@ -282,7 +409,159 @@ export default function ScannerAlmacenPanel() {
         </div>
       )}
 
-      {hit ? (
+      {desconocido ? (
+        <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+          <div style={{ display: "grid", gap: 2 }}>
+            <strong style={{ fontSize: 15 }}>Este código no está dado de alta</strong>
+            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              {nombreDeTipoCodigo(desconocido.tipo)} ·{" "}
+              <span style={{ fontFamily: "ui-monospace, monospace" }}>{desconocido.codigo}</span>
+            </span>
+          </div>
+
+          {motivoNoGuardable ? (
+            <InlineAlert variant="warning" message={motivoNoGuardable} />
+          ) : modo === "elegir" ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="primary" size="lg" onClick={() => void abrirAlta()}>
+                Dar de alta este producto
+              </Button>
+              <Button variant="secondary" size="lg" onClick={() => setModo("ligar")}>
+                Es un producto que ya tengo
+              </Button>
+              <Button variant="ghost" size="lg" onClick={cerrarDesconocido}>
+                Cancelar
+              </Button>
+            </div>
+          ) : modo === "alta" ? (
+            // Sin <form>: si el lector dispara con el foco en un campo, su Enter no
+            // debe guardar el alta a medias. Se guarda solo con el botón.
+            <div style={{ display: "grid", gap: 12 }}>
+              {(consultando || notaUpc) && (
+                <p role="status" style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+                  {consultando ? "Buscando el código en el catálogo internacional…" : notaUpc}
+                </p>
+              )}
+              <FinanceFormGrid>
+                <FinanceField label="Nombre del producto" fullWidth>
+                  <input
+                    className="input"
+                    value={alta.name}
+                    onChange={(e) => setAlta((a) => ({ ...a, name: e.target.value }))}
+                    autoFocus
+                  />
+                </FinanceField>
+                <FinanceField label="Marca" optional>
+                  <input
+                    className="input"
+                    value={alta.marca}
+                    onChange={(e) => setAlta((a) => ({ ...a, marca: e.target.value }))}
+                  />
+                </FinanceField>
+                <FinanceField label="Modelo" optional>
+                  <input
+                    className="input"
+                    value={alta.modelo}
+                    onChange={(e) => setAlta((a) => ({ ...a, modelo: e.target.value }))}
+                  />
+                </FinanceField>
+                <FinanceField label="Categoría" optional>
+                  <input
+                    className="input"
+                    value={alta.categoria}
+                    onChange={(e) => setAlta((a) => ({ ...a, categoria: e.target.value }))}
+                  />
+                </FinanceField>
+                <FinanceField label="Descripción" optional fullWidth>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={alta.descripcion}
+                    onChange={(e) => setAlta((a) => ({ ...a, descripcion: e.target.value }))}
+                  />
+                </FinanceField>
+              </FinanceFormGrid>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
+                }}
+              >
+                <Button variant="ghost" size="lg" onClick={cerrarDesconocido} disabled={saving}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={() => void guardarAlta()}
+                  loading={saving}
+                  disabled={!alta.name.trim()}
+                >
+                  Dar de alta
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              <input
+                className="input"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Busca el producto por nombre o clave"
+                aria-label="Busca el producto por nombre o clave"
+                autoFocus
+              />
+              {buscandoProducto && (
+                <p role="status" style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+                  Buscando…
+                </p>
+              )}
+              {!buscandoProducto && busqueda.trim().length >= 2 && candidatos.length === 0 && (
+                <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+                  Ningún producto coincide. Puedes darlo de alta.
+                </p>
+              )}
+              <div style={{ display: "grid", gap: 6 }}>
+                {candidatos.map((p) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span style={{ fontSize: 13, minWidth: 0 }}>
+                      {p.name}{" "}
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>· Clave {p.sku}</span>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={saving}
+                      aria-label={`Ligar el código a ${p.name}`}
+                      onClick={() => void ligar(p)}
+                    >
+                      Ligar a este
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button variant="ghost" onClick={() => setModo("elegir")} disabled={saving}>
+                  Volver
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : hit ? (
         // El hallazgo no va en una caja verde: el producto ya es el protagonista
         // y el color se reserva para lo que pide acción o salió mal.
         <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
@@ -293,6 +572,11 @@ export default function ScannerAlmacenPanel() {
               {hit.match === "empaque"
                 ? ` · ${hit.packaging.nombre} de ${hit.packaging.piezasPorUnidad} piezas`
                 : ""}
+            </span>
+            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              {existencias.length > 0
+                ? `Hay ${existencias.map((e) => `${e.cantidad} en ${e.almacen}`).join(" · ")}`
+                : "Sin existencia registrada"}
             </span>
           </div>
 
@@ -349,7 +633,10 @@ export default function ScannerAlmacenPanel() {
               label="Cantidad"
               hint={hit.match === "empaque" ? hit.packaging.nombre : undefined}
             >
+              {/* También es campo del lector: si disparan con el foco aquí, el código
+                  no se queda escrito como cantidad; se busca el producto siguiente. */}
               <input
+                {...CAMPO_LECTOR}
                 type="number"
                 min={0.001}
                 step="any"

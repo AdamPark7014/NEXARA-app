@@ -2,6 +2,11 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res, UseGuard
 import type { Response } from 'express';
 import { WarehouseService } from './warehouse.service.js';
 import { ReabastecimientoService } from './reabastecimiento.service.js';
+import {
+  CodigosBarrasService,
+  type AltaPorCodigoDto,
+  type MovimientoPorCodigoDto,
+} from './codigos-barras.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -14,6 +19,7 @@ export class StockController {
   constructor(
     private readonly service: WarehouseService,
     private readonly reabastecimiento: ReabastecimientoService,
+    private readonly codigos: CodigosBarrasService,
   ) {}
 
   // ── Reabastecimiento ──────────────────────────────────────────────
@@ -60,7 +66,21 @@ export class StockController {
     return this.service.listPackagings(productId, companyId);
   }
 
-  /** Lookup por cuña de código de barras (HID). */
+  /**
+   * Igual que `barcode/:code` pero con el código en la query: un código con «/» no
+   * cabe en un segmento de ruta.
+   */
+  @Get('barcode')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
+  findByBarcodeQuery(
+    @Query('code') code: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.findByBarcode(code, companyId);
+  }
+
+  /** Lookup por código de barras: cuña USB en la web, cámara en las apps. */
   @Get('barcode/:code')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
@@ -69,6 +89,37 @@ export class StockController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.service.findByBarcode(code, companyId);
+  }
+
+  /**
+   * Catálogo internacional de UPC/EAN, para prellenar un alta. Siempre responde 200:
+   * si el servicio externo falla, `encontrado` viene en false con el motivo.
+   */
+  @Get('upc-lookup/:code')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  consultarUpc(@Param('code') code: string) {
+    return this.codigos.consultarUpc(code);
+  }
+
+  /** «Dar de alta este producto» desde el lector, con el código ya puesto. */
+  @Post('products/por-codigo')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  altaPorCodigo(@Body() dto: AltaPorCodigoDto, @CurrentCompanyId() companyId: number | null) {
+    return this.codigos.altaPorCodigo(dto, companyId);
+  }
+
+  /** Liga un código de barras a un producto que ya existe. */
+  @Patch('products/:productId/codigo-barras')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  asignarCodigo(
+    @Param('productId', ParseIntPipe) productId: number,
+    @Body() dto: { codigo?: string; reemplazar?: boolean },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.codigos.asignarCodigo(productId, dto, companyId);
   }
 
   @Post('products/:productId/empaques')
@@ -132,6 +183,18 @@ export class StockController {
   @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
   createMovement(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Body() dto: any) {
     return this.service.createStockMovement(dto, user.id, companyId);
+  }
+
+  /** Movimiento con solo el código escaneado: lo que usan las apps con la cámara. */
+  @Post('movements/por-codigo')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  createMovementByCode(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: MovimientoPorCodigoDto,
+  ) {
+    return this.codigos.movimientoPorCodigo(dto, user.id, companyId);
   }
 
   /** Kardex PDF — debe ir antes de movements/:id */

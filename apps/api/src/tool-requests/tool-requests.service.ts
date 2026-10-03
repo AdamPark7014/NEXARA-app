@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -24,7 +24,11 @@ import {
   assertCanManageTools,
   hasToolsManageAccess,
 } from './tools-access.js';
-import { buildCodigoInterno } from './tool-nomenclature.js';
+import {
+  buildCodigoInterno,
+  codigoDeEtiqueta,
+  normalizarCodigoEtiqueta,
+} from './tool-nomenclature.js';
 import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
 
 const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
@@ -852,10 +856,13 @@ export class ToolRequestsService {
         { toolName: { contains: q, mode: 'insensitive' } },
         { model: { contains: q, mode: 'insensitive' } },
         { serialNumber: { contains: q, mode: 'insensitive' } },
+        // El lector escribe en el buscador el código de la etiqueta.
+        { codigoInterno: { contains: q, mode: 'insensitive' } },
+        { barcode: { contains: q, mode: 'insensitive' } },
       ];
     }
 
-    return (this.prisma as any).toolInventoryItem.findMany({
+    const items = await (this.prisma as any).toolInventoryItem.findMany({
       where,
       include: {
         replacementOf: {
@@ -876,6 +883,166 @@ export class ToolRequestsService {
       },
       orderBy: [{ toolName: 'asc' }, { model: 'asc' }, { serialNumber: 'asc' }],
     });
+    return this.completarCodigosDeEtiqueta(items);
+  }
+
+  /**
+   * Toda herramienta lleva su código interno. Las que se dieron de alta antes de la
+   * nomenclatura (o entraron como reemplazo) lo tienen vacío: se les calcula con la
+   * misma regla y se guarda, para que la etiqueta impresa y el lector hablen del mismo
+   * código. No inventa una numeración: es `buildCodigoInterno`, la de siempre.
+   */
+  private async completarCodigosDeEtiqueta<
+    T extends {
+      id: number;
+      toolName: string;
+      serialNumber: string;
+      codigoInterno?: string | null;
+      barcode?: string | null;
+    },
+  >(items: T[]): Promise<T[]> {
+    const pendientes = (items ?? []).filter((i) => !i.codigoInterno || !i.barcode);
+    for (const item of pendientes) {
+      const codigoInterno =
+        (item.codigoInterno || '').trim() ||
+        buildCodigoInterno({ toolName: item.toolName, serialNumber: item.serialNumber });
+      const barcode = (item.barcode || '').trim() || codigoInterno;
+      try {
+        await (this.prisma as any).toolInventoryItem.update({
+          where: { id: item.id },
+          data: { codigoInterno, barcode },
+        });
+      } catch {
+        // Si no se pudo guardar, la lista sale igual: el código se vuelve a calcular.
+      }
+      item.codigoInterno = codigoInterno;
+      item.barcode = barcode;
+    }
+    return items;
+  }
+
+  /**
+   * La herramienta de una etiqueta escaneada, con quién la tiene ahora. Es lo que
+   * consultan el mostrador de almacén (lector USB) y las apps (cámara) antes de
+   * entregar, recibir o asignar: el código decide la herramienta, no una lista.
+   */
+  async buscarHerramientaPorCodigo(
+    codigo: unknown,
+    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const code = normalizarCodigoEtiqueta(codigo);
+    if (code.length < 3) {
+      throw new BadRequestException('Escanea la etiqueta de la herramienta');
+    }
+
+    const modelo = (this.prisma as any).toolInventoryItem;
+    let candidatas: any[] = await modelo.findMany({
+      where: {
+        ...companyWhere(tenantId),
+        OR: [
+          { barcode: { equals: code, mode: 'insensitive' } },
+          { codigoInterno: { equals: code, mode: 'insensitive' } },
+          { serialNumber: { equals: code, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { id: 'asc' },
+      take: 10,
+    });
+
+    if (candidatas.length === 0) {
+      // Herramientas sin código guardado: su etiqueta lleva el calculado.
+      const sinCodigo: any[] = await modelo.findMany({
+        where: { ...companyWhere(tenantId), OR: [{ codigoInterno: null }, { barcode: null }] },
+        orderBy: { id: 'asc' },
+        take: 1000,
+      });
+      candidatas = await this.completarCodigosDeEtiqueta(
+        sinCodigo.filter((i) => codigoDeEtiqueta(i).toUpperCase() === code),
+      );
+    }
+
+    // Una serie retirada puede compartir código con su reemplazo: gana la que sigue viva.
+    const vivas = candidatas.filter((i) => i.status !== 'RETIRED');
+    const elegibles = vivas.length > 0 ? vivas : candidatas;
+    if (elegibles.length === 0) {
+      throw new NotFoundException(`Ninguna herramienta tiene la etiqueta «${code}»`);
+    }
+    if (elegibles.length > 1) {
+      throw new ConflictException(
+        `Hay ${elegibles.length} herramientas con el código «${code}». Corrige el código de una de ellas en el inventario.`,
+      );
+    }
+    const item = elegibles[0];
+
+    const [prestamo, kit] = await Promise.all([
+      this.prisma.toolRequest.findFirst({
+        where: {
+          inventoryItemId: item.id,
+          status: { in: ['PENDING', 'APPROVED', 'IN_USE'] },
+          ...companyWhere(tenantId),
+        },
+        include: {
+          usuario: { select: { id: true, nombre: true, email: true } },
+          activity: { select: { id: true, anNumber: true, titulo: true } },
+        },
+        orderBy: { requestDate: 'desc' },
+      }),
+      (this.prisma as any).toolKitAssignment.findFirst({
+        where: { inventoryItemId: item.id, isActive: true, ...companyWhere(tenantId) },
+        include: { user: { select: { id: true, nombre: true, email: true } } },
+        orderBy: { assignedAt: 'desc' },
+      }),
+    ]);
+
+    const gestiona = Boolean(
+      currentUser.isSuperAdmin || hasToolsManageAccess(currentUser.email, currentUser.permissions),
+    );
+    const ahora = new Date();
+
+    return {
+      codigo: code,
+      item: {
+        id: item.id,
+        toolName: item.toolName,
+        model: item.model,
+        serialNumber: item.serialNumber,
+        codigoInterno: item.codigoInterno ?? null,
+        barcode: item.barcode ?? null,
+        status: item.status,
+        panoramicPhotoUrl: item.panoramicPhotoUrl ?? null,
+        serialPhotoUrl: item.serialPhotoUrl ?? null,
+      },
+      prestamo: prestamo
+        ? {
+            id: prestamo.id,
+            status: prestamo.status,
+            usuario: prestamo.usuario ?? null,
+            activity: prestamo.activity ?? null,
+            expectedReturnDate: prestamo.expectedReturnDate,
+            // El código de recolección es la llave de la entrega: solo lo ve quien entrega.
+            pickupCode: gestiona ? (prestamo.pickupCode ?? null) : null,
+            pickupExpiresAt: prestamo.pickupExpiresAt ?? null,
+            vencido: Boolean(
+              prestamo.pickupExpiresAt && prestamo.pickupExpiresAt.getTime() < ahora.getTime(),
+            ),
+          }
+        : null,
+      kit: kit
+        ? {
+            id: kit.id,
+            assignmentType: kit.assignmentType,
+            assignedAt: kit.assignedAt,
+            user: kit.user ?? null,
+          }
+        : null,
+      /** ¿La tiene (o la pidió) quien escanea? Las apps lo usan para «confirmar mi kit». */
+      esMia: Boolean(
+        (prestamo && prestamo.usuarioId === currentUser.id) ||
+          (kit && kit.userId === currentUser.id),
+      ),
+    };
   }
 
   async searchInventoryOptions(search: string, companyId?: number | null) {
@@ -891,6 +1058,8 @@ export class ToolRequestsService {
             { toolName: { contains: q, mode: 'insensitive' } },
             { model: { contains: q, mode: 'insensitive' } },
             { serialNumber: { contains: q, mode: 'insensitive' } },
+            { codigoInterno: { contains: q, mode: 'insensitive' } },
+            { barcode: { contains: q, mode: 'insensitive' } },
           ],
         },
         tenantId,
@@ -900,6 +1069,8 @@ export class ToolRequestsService {
         toolName: true,
         model: true,
         serialNumber: true,
+        codigoInterno: true,
+        barcode: true,
         status: true,
         panoramicPhotoUrl: true,
         serialPhotoUrl: true,
@@ -1003,6 +1174,13 @@ export class ToolRequestsService {
     });
     assertCompanyAccess(current, tenantId, 'Herramienta de inventario');
 
+    // El reemplazo es otra pieza física, con otra serie: lleva su propio código y su
+    // propia etiqueta. Antes entraba sin código y no había qué imprimirle.
+    const codigoInterno = buildCodigoInterno({
+      toolName: data.toolName,
+      serialNumber: data.serialNumber,
+    });
+
     return (this.prisma as any).$transaction(async (tx: any) => {
       const replacement = await tx.toolInventoryItem.create({
         data: {
@@ -1010,6 +1188,8 @@ export class ToolRequestsService {
           toolName: data.toolName,
           model: data.model,
           serialNumber: data.serialNumber,
+          codigoInterno,
+          barcode: codigoInterno,
           panoramicPhotoUrl: data.panoramicPhotoUrl,
           serialPhotoUrl: data.serialPhotoUrl,
           replacementOfId: id,
@@ -1053,7 +1233,7 @@ export class ToolRequestsService {
 
   async getMyKit(userId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
-    return (this.prisma as any).toolKitAssignment.findMany({
+    const asignaciones = await (this.prisma as any).toolKitAssignment.findMany({
       where: { userId, isActive: true, ...companyWhere(tenantId) },
       include: {
         inventoryItem: true,
@@ -1064,6 +1244,15 @@ export class ToolRequestsService {
       },
       orderBy: { assignedAt: 'desc' },
     });
+    return this.conCodigosDeKit(asignaciones);
+  }
+
+  /** Las herramientas de un kit salen con su código: la etiqueta se imprime desde aquí. */
+  private async conCodigosDeKit<T extends { inventoryItem?: any }>(asignaciones: T[]): Promise<T[]> {
+    await this.completarCodigosDeEtiqueta(
+      (asignaciones ?? []).map((a) => a.inventoryItem).filter((i) => i && typeof i.id === 'number'),
+    );
+    return asignaciones;
   }
 
   private async kitVisibilityUserFilter(
@@ -1135,7 +1324,7 @@ export class ToolRequestsService {
       whereUser.id = userId;
     }
 
-    const assignments = await (this.prisma as any).toolKitAssignment.findMany({
+    const assignments: any[] = await (this.prisma as any).toolKitAssignment.findMany({
       where: {
         ...companyWhere(tenantId),
         ...(userId ? { userId } : {}),
@@ -1163,7 +1352,7 @@ export class ToolRequestsService {
       orderBy: [{ userId: 'asc' }, { assignedAt: 'desc' }],
     });
 
-    return assignments;
+    return this.conCodigosDeKit(assignments);
   }
 
   async assignKitItem(

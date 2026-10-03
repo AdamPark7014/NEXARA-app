@@ -22,6 +22,7 @@ import ToolMyKitPanel from "@/components/ToolMyKitPanel";
 import ToolRequestsTable from "@/components/ToolRequestsTable";
 import ToolRenewalsTable from "@/components/ToolRenewalsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
+import HerramientasPorEtiquetaPanel from "@/components/almacen/HerramientasPorEtiquetaPanel";
 
 type ManagerTab = "inventory" | "kits" | "requests" | "renewals" | "approvals";
 type LoanTab = "mykit" | "myrequests";
@@ -148,7 +149,13 @@ export default function ToolsPage() {
       )}
       {showManagePane && managerTab === "inventory" && <ToolInventoryPanel />}
       {showManagePane && managerTab === "kits" && <ToolUserKitPanel />}
-      {showManagePane && managerTab === "requests" && <ToolRequestsTable highlightId={highlightId} />}
+      {showManagePane && managerTab === "requests" && (
+        // Entregar y recibir con la etiqueta; la tabla de abajo se recarga sola por socket.
+        <div style={{ display: "grid", gap: 16 }}>
+          <HerramientasPorEtiquetaPanel />
+          <ToolRequestsTable highlightId={highlightId} />
+        </div>
+      )}
       {showManagePane && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
 
       {showLoanPane && loanTab === "mykit" && <ToolMyKitPanel />}

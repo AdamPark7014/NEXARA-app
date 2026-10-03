@@ -11,6 +11,7 @@ import ReabastecimientoPanel from "@/components/almacen/ReabastecimientoPanel";
 import RecoleccionAlmacenPanel from "@/components/almacen/RecoleccionAlmacenPanel";
 import KitInspeccionesPanel from "@/components/almacen/KitInspeccionesPanel";
 import ScannerAlmacenPanel from "@/components/almacen/ScannerAlmacenPanel";
+import HerramientasPorEtiquetaPanel from "@/components/almacen/HerramientasPorEtiquetaPanel";
 import ToolRequestsTable from "@/components/ToolRequestsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
@@ -57,6 +58,9 @@ export default function AlmacenPage() {
 
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [tab, setTab] = useState<Pestana>("inventario");
+  // Cada entrega o devolución por etiqueta vuelve a montar el mostrador de
+  // recolección: su lista de «esperando a que las recojan» no escucha el socket.
+  const [movimientosPorEtiqueta, setMovimientosPorEtiqueta] = useState(0);
 
   // Los avisos traen `?tab=`: reabastecimiento, una recolección o una revisión de kit.
   useEffect(() => {
@@ -110,7 +114,10 @@ export default function AlmacenPage() {
         <div style={{ display: "grid", gap: 16 }}>
           {gestionaHerramientas && (
             <>
-              <RecoleccionAlmacenPanel />
+              <HerramientasPorEtiquetaPanel
+                onCambio={() => setMovimientosPorEtiqueta((n) => n + 1)}
+              />
+              <RecoleccionAlmacenPanel key={movimientosPorEtiqueta} />
               <ToolInventoryPanel />
               <ToolRequestsTable highlightId={highlightId} />
             </>

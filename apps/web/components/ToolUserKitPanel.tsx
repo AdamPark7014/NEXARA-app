@@ -7,6 +7,10 @@ import KpiCard from './ui/KpiCard';
 import styles from './ToolUserKitPanel.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { buscarHerramientaPorCodigo } from '@/lib/almacen-api';
+import { ATRIBUTO_CAMPO_LECTOR, useLectorDeCodigos } from '@/lib/lector-codigos';
+import EtiquetasHerramientaDialog from '@/components/almacen/EtiquetasHerramientaDialog';
+import type { HerramientaEtiquetable } from '@/lib/etiquetas-herramienta';
 
 interface AssignableUser {
   id: number;
@@ -32,9 +36,12 @@ interface UserKitRow {
   replacementCount: number;
   user: { id: number; nombre: string; email: string; role?: { nombre?: string } };
   inventoryItem: {
+    id: number;
     toolName: string;
     model: string;
     serialNumber: string;
+    codigoInterno?: string | null;
+    barcode?: string | null;
     status: string;
     panoramicPhotoUrl?: string | null;
     serialPhotoUrl?: string | null;
@@ -65,6 +72,9 @@ const ToolUserKitPanel: React.FC = () => {
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [resolutionFineAmount, setResolutionFineAmount] = useState<string>('500');
   const [resolvingSubmit, setResolvingSubmit] = useState(false);
+  // Etiquetas del kit de una persona: las herramientas y a quién pertenecen.
+  const [etiquetas, setEtiquetas] = useState<{ de: string; herramientas: HerramientaEtiquetable[] } | null>(null);
+  const [avisoLector, setAvisoLector] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -253,6 +263,44 @@ const ToolUserKitPanel: React.FC = () => {
     }
   };
 
+  /**
+   * Armar un kit con el lector: se escanea la etiqueta de cada herramienta y queda
+   * elegida, sin buscarla por nombre. Solo se elige si está en almacén; si la tiene
+   * alguien, se dice quién, que es justo lo que hay que saber antes de reasignarla.
+   */
+  const elegirPorEtiqueta = useCallback(
+    async (codigo: string) => {
+      if (!user?.token) return;
+      setAvisoLector(null);
+      try {
+        const hallazgo = await buscarHerramientaPorCodigo(user.token, codigo);
+        if (!hallazgo) {
+          setAvisoLector(`Ninguna herramienta tiene la etiqueta «${codigo.trim().toUpperCase()}».`);
+          return;
+        }
+        const { item, kit, prestamo } = hallazgo;
+        if (item.status !== 'AVAILABLE') {
+          const quien = kit?.user?.nombre ?? prestamo?.usuario?.nombre;
+          setAvisoLector(
+            quien
+              ? `${item.toolName} (${hallazgo.codigo}) la tiene ${quien}: no está en almacén para asignarla.`
+              : `${item.toolName} (${hallazgo.codigo}) no está disponible para asignar.`,
+          );
+          return;
+        }
+        setSelectedInventory(item);
+        setInventoryQuery(`${item.toolName} · ${item.model} · ${item.serialNumber}`);
+        setInventoryOptions([]);
+      } catch (err) {
+        setAvisoLector(err instanceof Error ? err.message : 'No se pudo leer la etiqueta');
+      }
+    },
+    [user?.token],
+  );
+
+  // Apagado mientras el diálogo de etiquetas está abierto: ahí no se asigna nada.
+  useLectorDeCodigos({ onEscaneo: (codigo) => void elegirPorEtiqueta(codigo), activo: !etiquetas });
+
   const assign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.token || !selectedInventory || !selectedUserId) return;
@@ -341,12 +389,16 @@ const ToolUserKitPanel: React.FC = () => {
           <div className={styles.searchWrap}>
             <input
               className="input"
+              // Campo del lector: escanear la etiqueta con el foco aquí elige la
+              // herramienta, en vez de enviar el formulario con el Enter del lector.
+              {...{ [ATRIBUTO_CAMPO_LECTOR]: '' }}
               value={inventoryQuery}
               onChange={(e) => {
                 setInventoryQuery(e.target.value);
                 if (selectedInventory) setSelectedInventory(null);
               }}
-              placeholder="Buscar herramienta de inventario"
+              placeholder="Escanea la etiqueta o busca la herramienta"
+              aria-label="Escanea la etiqueta o busca la herramienta"
             />
             {!selectedInventory && inventoryOptions.length > 0 && (
               <div className={styles.suggestionBox}>
@@ -382,6 +434,11 @@ const ToolUserKitPanel: React.FC = () => {
 
           <button className="button-primary" type="submit">Asignar</button>
         </div>
+        {avisoLector && (
+          <div className={styles.error} role="alert">
+            {avisoLector}
+          </div>
+        )}
       </form>
 
       <div className={`card ${styles.listCard}`}>
@@ -406,6 +463,22 @@ const ToolUserKitPanel: React.FC = () => {
             <div key={group.user.id} className={styles.userGroup}>
               <div className={styles.userName}>{group.user.nombre}</div>
               <div className={styles.userEmail}>{group.user.email}</div>
+              {group.rows.some((row) => row.isActive) && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className={`button-secondary ${styles.smallBtn}`}
+                    onClick={() =>
+                      setEtiquetas({
+                        de: group.user.nombre,
+                        herramientas: group.rows.filter((row) => row.isActive).map((row) => row.inventoryItem),
+                      })
+                    }
+                  >
+                    Imprimir etiquetas del kit
+                  </button>
+                </div>
+              )}
 
               <div className={styles.rowsList}>
                 {group.rows.map((row) => {
@@ -521,6 +594,12 @@ const ToolUserKitPanel: React.FC = () => {
           ))
         )}
       </div>
+
+      <EtiquetasHerramientaDialog
+        herramientas={etiquetas?.herramientas ?? null}
+        titulo={etiquetas ? `Kit de ${etiquetas.de}: una etiqueta por herramienta.` : undefined}
+        onClose={() => setEtiquetas(null)}
+      />
     </div>
   );
 };

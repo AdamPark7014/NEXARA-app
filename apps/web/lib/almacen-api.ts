@@ -311,3 +311,189 @@ export function listarInspeccionesKit(token: string, assignmentId: number) {
     "No se pudo cargar el historial de revisiones",
   );
 }
+
+// ── Lector de códigos de barras ─────────────────────────────────────
+
+/** Como `pedir`, pero un 404 no es un error: es «ese código no existe» (`null`). */
+async function pedirONulo<T>(path: string, token: string, fallback: string): Promise<T | null> {
+  const res = await fetch(buildApiUrl(path), {
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(await mensajeDeError(res, fallback));
+  const texto = await res.text();
+  return (texto ? JSON.parse(texto) : null) as T | null;
+}
+
+export type ProductoDeCodigo = {
+  id: number;
+  sku: string;
+  name: string;
+  ean?: string | null;
+  upc?: string | null;
+  codigoBarras?: string | null;
+  unitName?: string | null;
+  imageUrl?: string | null;
+};
+
+export type ExistenciaPorAlmacen = {
+  warehouseId: number;
+  almacen: string;
+  cantidad: number;
+  reservado: number;
+};
+
+export type HallazgoDeCodigo =
+  | {
+      match: "empaque";
+      codigoBarras: string;
+      packaging: { id: number; nombre: string; piezasPorUnidad: number };
+      product: ProductoDeCodigo;
+      existencias?: ExistenciaPorAlmacen[];
+    }
+  | {
+      match: "producto";
+      codigoBarras: string;
+      product: ProductoDeCodigo;
+      existencias?: ExistenciaPorAlmacen[];
+    };
+
+/** El producto (o su caja) de un código escaneado. `null` si el almacén no lo conoce. */
+export function buscarPorCodigoDeBarras(token: string, codigo: string) {
+  return pedirONulo<HallazgoDeCodigo>(
+    `stock/barcode?code=${encodeURIComponent(codigo)}`,
+    token,
+    "No se pudo buscar el código",
+  );
+}
+
+export type ProductoInternacional = {
+  codigo: string;
+  nombre: string | null;
+  marca: string | null;
+  modelo: string | null;
+  descripcion: string | null;
+  imagenUrl: string | null;
+  categoria: string | null;
+};
+
+export type ResultadoUpc =
+  | { encontrado: true; codigo: string; fuente: string; producto: ProductoInternacional }
+  | { encontrado: false; codigo: string; motivo: string; mensaje: string };
+
+/**
+ * Catálogo internacional de UPC/EAN (lo consulta el servidor, no el navegador).
+ * Nunca lanza: si algo falla, el alta sigue con el formulario vacío y una nota.
+ */
+export async function consultarUpcInternacional(token: string, codigo: string): Promise<ResultadoUpc> {
+  try {
+    return await pedir<ResultadoUpc>(
+      `stock/upc-lookup/${encodeURIComponent(codigo)}`,
+      token,
+      {},
+      "No se pudo consultar el catálogo internacional",
+    );
+  } catch {
+    return {
+      encontrado: false,
+      codigo,
+      motivo: "SIN_SERVICIO",
+      mensaje: "No se pudo consultar el catálogo internacional. Captura los datos a mano.",
+    };
+  }
+}
+
+export function altaProductoPorCodigo(
+  token: string,
+  payload: {
+    codigo: string;
+    name: string;
+    sku?: string;
+    marca?: string;
+    modelo?: string;
+    descripcion?: string;
+    imagenUrl?: string;
+    categoria?: string;
+    unidad?: string;
+  },
+) {
+  return pedir<ProductoDeCodigo>(
+    "stock/products/por-codigo",
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+    "No se pudo dar de alta el producto",
+  );
+}
+
+/** Liga un código a un producto que ya existe en el catálogo. */
+export function asignarCodigoAProducto(
+  token: string,
+  productId: number,
+  payload: { codigo: string; reemplazar?: boolean },
+) {
+  return pedir<ProductoDeCodigo>(
+    `stock/products/${productId}/codigo-barras`,
+    token,
+    { method: "PATCH", body: JSON.stringify(payload) },
+    "No se pudo ligar el código al producto",
+  );
+}
+
+// ── Herramientas por etiqueta ───────────────────────────────────────
+
+export type HerramientaDeEtiqueta = {
+  id: number;
+  toolName: string;
+  model: string;
+  serialNumber: string;
+  codigoInterno: string | null;
+  barcode: string | null;
+  status: "AVAILABLE" | "ASSIGNED" | "IN_REPAIR" | "RETIRED" | string;
+  panoramicPhotoUrl: string | null;
+  serialPhotoUrl: string | null;
+};
+
+export type HallazgoDeHerramienta = {
+  codigo: string;
+  item: HerramientaDeEtiqueta;
+  prestamo: {
+    id: number;
+    status: "PENDING" | "APPROVED" | "IN_USE" | string;
+    usuario: { id: number; nombre: string; email: string } | null;
+    activity: { id: number; anNumber: string; titulo: string } | null;
+    expectedReturnDate: string | null;
+    pickupCode: string | null;
+    pickupExpiresAt: string | null;
+    vencido: boolean;
+  } | null;
+  kit: {
+    id: number;
+    assignmentType: "KIT" | "LOAN" | string;
+    assignedAt: string;
+    user: { id: number; nombre: string; email: string } | null;
+  } | null;
+  esMia: boolean;
+};
+
+/** La herramienta de una etiqueta escaneada y quién la tiene. `null` si no existe. */
+export function buscarHerramientaPorCodigo(token: string, codigo: string) {
+  return pedirONulo<HallazgoDeHerramienta>(
+    `tool-requests/inventory/por-codigo?code=${encodeURIComponent(codigo)}`,
+    token,
+    "No se pudo buscar la herramienta",
+  );
+}
+
+/** Devolución de un préstamo. Con `damageDescription` la herramienta pasa a reparación. */
+export function devolverHerramienta(token: string, toolRequestId: number, damageDescription?: string) {
+  return pedir<unknown>(
+    `tool-requests/${toolRequestId}/return`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({ damageDescription: damageDescription?.trim() || undefined }),
+    },
+    "No se pudo registrar la devolución",
+  );
+}

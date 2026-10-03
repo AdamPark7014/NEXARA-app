@@ -13,6 +13,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { FinanceField, FinanceFormGrid } from '@/components/finance/FinanceModuleShell';
 import styles from './ToolInventoryPanel.module.css';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import EtiquetasHerramientaDialog from '@/components/almacen/EtiquetasHerramientaDialog';
 
 interface InventoryItem {
   id: number;
@@ -86,6 +87,9 @@ const ToolInventoryPanel: React.FC = () => {
   const [editSerial, setEditSerial] = useState("");
   const [editStatus, setEditStatus] = useState<InventoryItem["status"]>("AVAILABLE");
   const [editSaving, setEditSaving] = useState(false);
+  // Etiquetas: las marcadas para imprimir juntas y las que están en el diálogo.
+  const [seleccion, setSeleccion] = useState<number[]>([]);
+  const [porEtiquetar, setPorEtiquetar] = useState<InventoryItem[] | null>(null);
 
 
   useEffect(() => {
@@ -206,29 +210,38 @@ const ToolInventoryPanel: React.FC = () => {
     };
   }, [user?.token, query, includeRetired]);
 
-  const printLabel = async (item: InventoryItem, format: 'pdf' | 'zpl' = 'pdf') => {
+  /**
+   * Archivo ZPL para una impresora Zebra. La etiqueta de todos los días ya no pasa por
+   * aquí: se imprime desde el navegador (`EtiquetasHerramientaDialog`), con su código
+   * de barras de verdad, en la impresora de etiquetas que tenga el equipo.
+   */
+  const descargarZpl = async (item: InventoryItem) => {
     if (!user?.token) return;
     try {
       const res = await fetch(
-        buildApiUrl(`tool-requests/inventory/${item.id}/label?format=${format}`),
+        buildApiUrl(`tool-requests/inventory/${item.id}/label?format=zpl`),
         { headers: { Authorization: `Bearer ${user.token}` } },
       );
       if (!res.ok) throw new Error(await res.text());
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      if (format === 'pdf') {
-        window.open(url, '_blank', 'noopener,noreferrer');
-      } else {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `etiqueta-${item.codigoInterno || item.serialNumber}.zpl`;
-        a.click();
-      }
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `etiqueta-${item.codigoInterno || item.serialNumber}.zpl`;
+      a.click();
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo generar la etiqueta');
     }
   };
+
+  const alternarSeleccion = (id: number) => {
+    setSeleccion((actual) =>
+      actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id],
+    );
+  };
+  // Solo cuentan las que siguen a la vista: un filtro no deja etiquetas «fantasma».
+  const seleccionadas = items.filter((i) => seleccion.includes(i.id));
 
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -677,10 +690,21 @@ const ToolInventoryPanel: React.FC = () => {
         title="Herramientas dadas de alta"
         actions={
           <div className={styles.topBar}>
+            {items.length > 0 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setPorEtiquetar(seleccionadas.length > 0 ? seleccionadas : items)}
+              >
+                {seleccionadas.length > 0
+                  ? `Imprimir ${seleccionadas.length} etiqueta${seleccionadas.length === 1 ? '' : 's'}`
+                  : 'Imprimir todas las etiquetas'}
+              </Button>
+            )}
             <input
               className={`input ${styles.searchInput} ${isMobile ? styles.searchInputMobile : ''}`}
-              placeholder="Buscar por herramienta, modelo o serie"
-              aria-label="Buscar por herramienta, modelo o serie"
+              placeholder="Buscar por herramienta, modelo, serie o código"
+              aria-label="Buscar por herramienta, modelo, serie o código"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -713,7 +737,7 @@ const ToolInventoryPanel: React.FC = () => {
             <EmptyState
               variant="compact"
               title={`Ninguna herramienta coincide con «${query.trim()}»`}
-              description="Se busca por nombre, modelo y número de serie. Prueba con una parte del texto."
+              description="Se busca por nombre, modelo, número de serie y código de la etiqueta. Prueba con una parte del texto."
               action={
                 <Button size="sm" variant="secondary" onClick={() => setQuery('')}>
                   Quitar la búsqueda
@@ -771,8 +795,16 @@ const ToolInventoryPanel: React.FC = () => {
                       </span>
                     )}
                   </div>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={seleccion.includes(item.id)}
+                      onChange={() => alternarSeleccion(item.id)}
+                    />
+                    Imprimir con otras
+                  </label>
                   <div className={styles.galleryActions}>
-                    <Button size="sm" variant="secondary" fullWidth onClick={() => void printLabel(item, 'pdf')}>
+                    <Button size="sm" variant="secondary" fullWidth onClick={() => setPorEtiquetar([item])}>
                       Imprimir etiqueta
                     </Button>
                     <Button
@@ -780,7 +812,7 @@ const ToolInventoryPanel: React.FC = () => {
                       variant="secondary"
                       fullWidth
                       title="Descarga el archivo que entiende una impresora Zebra"
-                      onClick={() => void printLabel(item, 'zpl')}
+                      onClick={() => void descargarZpl(item)}
                     >
                       Etiqueta Zebra
                     </Button>
@@ -798,6 +830,8 @@ const ToolInventoryPanel: React.FC = () => {
           </div>
         )}
       </Section>
+
+      <EtiquetasHerramientaDialog herramientas={porEtiquetar} onClose={() => setPorEtiquetar(null)} />
     </div>
   );
 };

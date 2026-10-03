@@ -46,3 +46,34 @@ export function buildCodigoInterno(input: {
   const serial = normalizeSerialForCode(input.serialNumber) || 'SINSERIE';
   return `${prefix}-${serial}`;
 }
+
+/**
+ * Lo que leyó el lector de una etiqueta, sin lo que mete alrededor (espacios, saltos de
+ * línea). Se compara sin distinguir mayúsculas: hay lectores con Bloq Mayús invertido.
+ */
+export function normalizarCodigoEtiqueta(valor: unknown): string {
+  return String(valor ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+/**
+ * El identificador que va en las barras de la etiqueta de una herramienta.
+ *
+ * No hay una numeración nueva: es la nomenclatura interna que ya existía (`barcode`,
+ * que por defecto es el `codigoInterno`). Solo se calcula para las herramientas dadas
+ * de alta antes de la nomenclatura, que tienen las dos columnas vacías.
+ */
+export function codigoDeEtiqueta(item: {
+  barcode?: string | null;
+  codigoInterno?: string | null;
+  toolName: string;
+  serialNumber: string;
+}): string {
+  return (
+    (item.barcode || '').trim() ||
+    (item.codigoInterno || '').trim() ||
+    buildCodigoInterno({ toolName: item.toolName, serialNumber: item.serialNumber })
+  );
+}
