@@ -557,7 +557,7 @@ export function middleware(request: NextRequest) {
     }
 
     // No reescribir archivos estáticos
-    const staticFileExtensions = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
+    const staticFileExtensions = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|mjs|json)$/i;
     if (staticFileExtensions.test(pathname)) {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
