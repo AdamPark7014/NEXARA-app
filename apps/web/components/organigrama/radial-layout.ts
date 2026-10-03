@@ -808,6 +808,15 @@ export function calcularRadial(roots: OrgChartNode[], opciones: OpcionesRadial =
     const desde = porId.get(enlazaCon);
     if (!desde) continue;
     enlaces.push({ de: enlazaCon, a: c.rama.persona.id, tipo, trazo: trazoDe(desde, c, tipo, elegido, m) });
+    // El lateral no pierde a su jefe: el puente punteado se suma a su línea de mando
+    // cuando el jefe queda un anillo adentro (si no, la curva cruzaría el dibujo).
+    const jefeId = c.rama.persona.managerId;
+    if (tipo === "lateral" && jefeId != null) {
+      const jefe = porId.get(jefeId);
+      if (jefe && jefe.rama.nivel === c.rama.nivel - 1) {
+        enlaces.push({ de: jefeId, a: c.rama.persona.id, tipo: "mando", trazo: trazoDe(jefe, c, "mando", elegido, m) });
+      }
+    }
   }
 
   return {
