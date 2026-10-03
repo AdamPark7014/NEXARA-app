@@ -1,7 +1,7 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ToolRequestsService } from './tool-requests.service.js';
 import { TOOLS_MANAGE_EMAILS } from './tools-access.js';
-import { codigoDeEtiqueta, normalizarCodigoEtiqueta } from './tool-nomenclature.js';
+import { codigoDeEtiqueta, normalizarCodigoEtiqueta, pistaDeSerie } from './tool-nomenclature.js';
 
 /**
  * Herramientas por etiqueta.
@@ -29,7 +29,7 @@ const MULTIMETRO = {
   companyId: EMPRESA,
 };
 
-function build(over: { items?: any[][]; prestamo?: any; kit?: any } = {}) {
+function build(over: { items?: any[][]; prestamo?: any; kit?: any; kits?: any[] } = {}) {
   const findMany = jest.fn();
   for (const lote of over.items ?? [[MULTIMETRO]]) findMany.mockResolvedValueOnce(lote);
   findMany.mockResolvedValue([]);
@@ -44,6 +44,7 @@ function build(over: { items?: any[][]; prestamo?: any; kit?: any } = {}) {
     toolRequest: { findFirst: jest.fn().mockResolvedValue(over.prestamo ?? null) },
     toolKitAssignment: {
       findFirst: jest.fn().mockResolvedValue(over.kit ?? null),
+      findMany: jest.fn().mockResolvedValue(over.kits ?? []),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: jest.fn(async (fn: any) => fn(prisma)),
@@ -66,6 +67,15 @@ describe('código de la etiqueta', () => {
   it('lo que entrega el lector se limpia y se compara en mayúsculas', () => {
     expect(normalizarCodigoEtiqueta('  mul-12345\r\n')).toBe('MUL-12345');
     expect(normalizarCodigoEtiqueta(null)).toBe('');
+  });
+
+  it('de un código calculado se saca la pista de serie con la que acotar la búsqueda', () => {
+    expect(pistaDeSerie('TAL-SN-99-A')).toBe('SN');
+    expect(pistaDeSerie('TAL-B-778')).toBe('778');
+    expect(pistaDeSerie('HER-SINSERIE')).toBe('');
+    // Sin la forma PREFIJO-SERIE no puede ser un código calculado.
+    expect(pistaDeSerie('FLK0001')).toBeUndefined();
+    expect(pistaDeSerie('mul-12345')).toBeUndefined();
   });
 });
 
@@ -152,7 +162,7 @@ describe('buscarHerramientaPorCodigo', () => {
     expect(r.kit).toMatchObject({ id: 12, assignmentType: 'KIT', user: { nombre: 'José Antonio' } });
   });
 
-  it('una herramienta sin código guardado se encuentra por el calculado, y se le guarda', async () => {
+  it('una herramienta sin código guardado se encuentra por el calculado, sin escribir y sin leer el inventario entero', async () => {
     const vieja = { ...MULTIMETRO, id: 50, toolName: 'Taladro Bosch', serialNumber: 'B-778', codigoInterno: null, barcode: null };
     const otra = { ...vieja, id: 51, serialNumber: 'B-900' };
     const { service, prisma } = build({ items: [[], [vieja, otra]] });
@@ -160,11 +170,37 @@ describe('buscarHerramientaPorCodigo', () => {
     const r = await service.buscarHerramientaPorCodigo('TAL-B-778', ENCARGADO, EMPRESA);
 
     expect(r.item).toMatchObject({ id: 50, codigoInterno: 'TAL-B-778', barcode: 'TAL-B-778' });
-    expect(prisma.toolInventoryItem.update).toHaveBeenCalledTimes(1);
-    expect(prisma.toolInventoryItem.update).toHaveBeenCalledWith({
-      where: { id: 50 },
-      data: { codigoInterno: 'TAL-B-778', barcode: 'TAL-B-778' },
+    // Un GET no escribe: guardar el código es el paso explícito «Completar códigos».
+    expect(prisma.toolInventoryItem.update).not.toHaveBeenCalled();
+    // Y la segunda lectura va acotada por la serie del código, no `take: 1000` a ciegas.
+    const segunda = prisma.toolInventoryItem.findMany.mock.calls[1][0];
+    expect(segunda.where).toMatchObject({
+      companyId: EMPRESA,
+      OR: [{ codigoInterno: null }, { barcode: null }],
+      serialNumber: { contains: '778', mode: 'insensitive' },
     });
+    expect(segunda.take).toBeLessThanOrEqual(50);
+  });
+
+  it('una etiqueta que no tiene forma de código calculado no recorre las herramientas sin código', async () => {
+    const { service, prisma } = build({ items: [[]] });
+    await expect(
+      service.buscarHerramientaPorCodigo('FLK0001', ENCARGADO, EMPRESA),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.toolInventoryItem.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.toolInventoryItem.update).not.toHaveBeenCalled();
+  });
+
+  it('código de 65+ caracteres → 400 sin consultar la base', async () => {
+    const { service, prisma } = build();
+    await expect(
+      service.buscarHerramientaPorCodigo('X'.repeat(65), ENCARGADO, EMPRESA),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.toolInventoryItem.findMany).not.toHaveBeenCalled();
+    // 64 exactos sí se buscan: es el largo de la columna.
+    await expect(
+      service.buscarHerramientaPorCodigo('X'.repeat(64), ENCARGADO, EMPRESA),
+    ).resolves.toBeDefined();
   });
 
   it('entre una retirada y su reemplazo gana la que sigue viva', async () => {
@@ -181,11 +217,11 @@ describe('buscarHerramientaPorCodigo', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('etiqueta desconocida → 404; código vacío → 400', async () => {
+  it('etiqueta desconocida → 404 que sugiere completar los códigos; código vacío → 400', async () => {
     const { service } = build({ items: [[], []] });
     await expect(
       service.buscarHerramientaPorCodigo('XXX-000', ENCARGADO, EMPRESA),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toThrow(/Completar códigos/);
     await expect(service.buscarHerramientaPorCodigo(' ', ENCARGADO, EMPRESA)).rejects.toThrow(
       /Escanea la etiqueta/,
     );
@@ -193,16 +229,51 @@ describe('buscarHerramientaPorCodigo', () => {
 });
 
 describe('códigos que faltaban', () => {
-  it('el inventario completa y guarda el código de las herramientas que no lo tenían', async () => {
-    const sinCodigo = { ...MULTIMETRO, id: 60, codigoInterno: null, barcode: null };
-    const { service, prisma } = build({ items: [[MULTIMETRO, sinCodigo]] });
+  // Fábrica, no constante: el servicio completa el código en memoria sobre el mismo objeto.
+  const sinCodigo = () => ({ ...MULTIMETRO, id: 60, codigoInterno: null, barcode: null });
+
+  it('el inventario enseña el código calculado de las que no lo tenían, pero un GET no escribe', async () => {
+    const { service, prisma } = build({ items: [[MULTIMETRO, sinCodigo()]] });
 
     const lista = await service.getInventory(undefined, false, EMPRESA);
 
     expect(lista.map((i: any) => i.codigoInterno)).toEqual(['MUL-12345', 'MUL-12345']);
-    // Solo se escribe la que no tenía: la otra no se toca.
-    expect(prisma.toolInventoryItem.update).toHaveBeenCalledTimes(1);
-    expect(prisma.toolInventoryItem.update.mock.calls[0][0].where).toEqual({ id: 60 });
+    expect(lista[1]).toMatchObject({ id: 60, barcode: 'MUL-12345' });
+    expect(prisma.toolInventoryItem.update).not.toHaveBeenCalled();
+  });
+
+  it('el kit tampoco escribe al listarse', async () => {
+    const { service, prisma } = build({
+      kits: [{ id: 1, userId: 3, isActive: true, inventoryItem: sinCodigo(), events: [] }],
+    });
+
+    const kit = await service.getMyKit(3, EMPRESA);
+
+    expect(kit[0].inventoryItem).toMatchObject({ codigoInterno: 'MUL-12345', barcode: 'MUL-12345' });
+    expect(prisma.toolInventoryItem.update).not.toHaveBeenCalled();
+  });
+
+  it('«Completar códigos» es el paso que guarda: por lotes, acotado a la empresa, y sigue si una falla', async () => {
+    const otra = { ...sinCodigo(), id: 61, serialNumber: '67890' };
+    const tercera = { ...sinCodigo(), id: 62, serialNumber: '11111' };
+    const { service, prisma } = build({ items: [[sinCodigo()], [otra], [tercera]] });
+    prisma.toolInventoryItem.update.mockRejectedValueOnce(new Error('bloqueada'));
+
+    const r = await service.completarCodigosPendientes(EMPRESA, { lote: 1 });
+
+    expect(r).toEqual({ revisadas: 3, completadas: 2, errores: [60] });
+    const llamadas = prisma.toolInventoryItem.update.mock.calls.map((c: any[]) => c[0]);
+    expect(llamadas).toEqual([
+      { where: { id: 60 }, data: { codigoInterno: 'MUL-12345', barcode: 'MUL-12345' } },
+      { where: { id: 61 }, data: { codigoInterno: 'MUL-67890', barcode: 'MUL-67890' } },
+      { where: { id: 62 }, data: { codigoInterno: 'MUL-11111', barcode: 'MUL-11111' } },
+    ]);
+    // Cursor por id: el segundo lote arranca después del último del primero, siempre con empresa.
+    const lotes = prisma.toolInventoryItem.findMany.mock.calls.map((c: any[]) => c[0]);
+    expect(lotes[0].where).toMatchObject({ companyId: EMPRESA, id: { gt: 0 } });
+    expect(lotes[1].where).toMatchObject({ companyId: EMPRESA, id: { gt: 60 } });
+    expect(lotes[2].where).toMatchObject({ id: { gt: 61 } });
+    expect(lotes.every((l: any) => l.take === 1)).toBe(true);
   });
 
   it('el buscador del inventario también busca por el código de la etiqueta', async () => {

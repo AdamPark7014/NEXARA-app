@@ -100,6 +100,17 @@ export class ToolRequestsController {
   }
 
   /**
+   * Guarda el código calculado a las herramientas anteriores a la nomenclatura (las que
+   * tienen `codigoInterno`/`barcode` vacíos). Es un paso explícito de quien gestiona el
+   * inventario: los GET del inventario y del lector solo leen. Por lotes, idempotente.
+   */
+  @Post('inventory/codigos/completar')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async completarCodigosInventario(@CurrentCompanyId() companyId: number | null) {
+    return this.toolRequestsService.completarCodigosPendientes(companyId);
+  }
+
+  /**
    * La herramienta de una etiqueta escaneada y quién la tiene. Lo consultan el lector
    * USB del mostrador y la cámara de las apps. Va antes de `inventory/:id/label` para
    * que ninguna ruta con parámetro se la quede. La variante con `?code=` existe porque

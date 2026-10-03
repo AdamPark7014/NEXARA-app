@@ -444,6 +444,21 @@ export class WarehouseService {
     });
     if (!product) throw new NotFoundException('Producto no encontrado');
 
+    // La OT a la que se carga el material tiene que ser de esta empresa: si no se
+    // comprueba, un movimiento de la empresa A queda ligado a una actividad de la B.
+    let activityId: number | null = null;
+    if (dto.activityId != null) {
+      activityId = Number(dto.activityId);
+      if (!Number.isInteger(activityId) || activityId <= 0) {
+        throw new BadRequestException('Actividad inválida');
+      }
+      const activity = await this.prisma.activity.findFirst({
+        where: { id: activityId, ...companyWhere(tenantId) },
+        select: { id: true },
+      });
+      if (!activity) throw new NotFoundException('Actividad no encontrada');
+    }
+
     // Todo el movimiento — validación de stock disponible, ajuste de niveles y
     // registro del folio — corre en una sola transacción para que nunca quede
     // un StockMovement sin su contraparte en StockLevel (o viceversa).
@@ -505,7 +520,7 @@ export class WarehouseService {
           notes: dto.notes?.trim() || null,
           purchaseOrderId: dto.purchaseOrderId ?? null,
           productionOrderId: dto.productionOrderId ?? null,
-          activityId: dto.activityId ?? null,
+          activityId,
           createdById: userId,
           companyId: tenantId,
         },

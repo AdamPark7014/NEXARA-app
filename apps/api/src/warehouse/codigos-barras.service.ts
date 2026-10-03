@@ -15,32 +15,11 @@ import {
   variantesDeBusqueda,
 } from './codigo-barras.js';
 import { ConsultaUpc, proveedorDesdeEntorno, type ResultadoUpc } from './upc-lookup.js';
+import { AltaPorCodigoDto, MovimientoPorCodigoDto } from './dto/codigos-barras.dto.js';
 
-export type AltaPorCodigoDto = {
-  codigo: string;
-  name: string;
-  sku?: string;
-  marca?: string;
-  modelo?: string;
-  descripcion?: string;
-  imagenUrl?: string;
-  categoria?: string;
-  unidad?: string;
-};
-
-export type MovimientoPorCodigoDto = {
-  codigo: string;
-  /** RECEIPT | DISPATCH | TRANSFER | ADJUSTMENT | RETURN (o IN / OUT). */
-  type: string;
-  /** En la unidad de lo escaneado: cajas si el código es de una caja, piezas si no. */
-  quantity: number;
-  fromWarehouseId?: number;
-  toWarehouseId?: number;
-  unitCost?: number;
-  notes?: string;
-  reference?: string;
-  activityId?: number;
-};
+// Los cuerpos viven en `dto/codigos-barras.dto.ts` como clases con class-validator;
+// se re-exportan para quien ya los importaba de aquí.
+export { AltaPorCodigoDto, MovimientoPorCodigoDto };
 
 const SELECT_PRODUCTO = {
   id: true,
@@ -231,8 +210,9 @@ export class CodigosBarrasService {
         packagingId: esEmpaque ? hallazgo.packaging.id : undefined,
         cantidadCapturada: esEmpaque ? cantidad : undefined,
         unidadCaptura: esEmpaque ? hallazgo.packaging.nombre : undefined,
-        reference: dto.reference?.trim() || hallazgo.codigoBarras,
-        notes: dto.notes?.trim() || `Lector de códigos · ${hallazgo.codigoBarras}`,
+        // El DTO ya garantiza cadena o nada; `String()` cubre a quien llame sin pasar por el pipe.
+        reference: String(dto.reference ?? '').trim() || hallazgo.codigoBarras,
+        notes: String(dto.notes ?? '').trim() || `Lector de códigos · ${hallazgo.codigoBarras}`,
       },
       userId,
       companyId,

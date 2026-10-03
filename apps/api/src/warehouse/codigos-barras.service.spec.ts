@@ -1,6 +1,9 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { CodigosBarrasService } from './codigos-barras.service';
 import { WarehouseService } from './warehouse.service';
+import { AltaPorCodigoDto, MovimientoPorCodigoDto } from './dto/codigos-barras.dto';
 
 /**
  * Almacén por código de barras.
@@ -325,5 +328,160 @@ describe('movimientoPorCodigo', () => {
       service.movimientoPorCodigo({ codigo: UPC, type: 'RECEIPT', quantity: 0, toWarehouseId: 2 }, 11, EMPRESA),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(crear).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * La OT a la que se carga el material tiene que ser de la empresa del movimiento. Aquí
+ * no se espía `createStockMovement`: corre el real, con Prisma simulado, porque la
+ * comprobación vive ahí (y así también cubre a `POST stock/movements`).
+ */
+function buildConMovimientoReal(actividad: { id: number } | null) {
+  const tx = {
+    stockLevel: { findFirst: jest.fn().mockResolvedValue(null) },
+    stockMovement: {
+      create: jest.fn(async ({ data }: any) => ({
+        id: 600,
+        movementNumber: 'SM-0600',
+        totalCost: 0,
+        createdAt: new Date('2026-10-02T12:00:00.000Z'),
+        product: PRODUCTO,
+        activityId: data.activityId,
+      })),
+    },
+  };
+  const prisma = {
+    product: { findFirst: jest.fn().mockResolvedValue(PRODUCTO) },
+    productPackaging: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    stockLevel: { findMany: jest.fn().mockResolvedValue([]) },
+    warehouse: { findFirst: jest.fn().mockResolvedValue({ id: 2, companyId: EMPRESA }) },
+    activity: { findFirst: jest.fn().mockResolvedValue(actividad) },
+    $transaction: jest.fn(async (fn: any) => fn(tx)),
+  };
+  const warehouse = new WarehouseService(
+    prisma as any,
+    { notifyStockMovementPosted: jest.fn().mockResolvedValue(undefined) } as any,
+    { postInventoryIssueCogs: jest.fn() } as any,
+    { next: jest.fn().mockResolvedValue('SM-0600') } as any,
+    { publish: jest.fn() } as any,
+  );
+  (warehouse as any).readOnHandQty = jest.fn().mockResolvedValue(0);
+  (warehouse as any).incrementStockLevel = jest.fn().mockResolvedValue(undefined);
+  (warehouse as any).emitRealtimeLowStockAlerts = jest.fn().mockResolvedValue(undefined);
+  const service = new CodigosBarrasService(prisma as any, warehouse, {} as any);
+  return { service, prisma, tx };
+}
+
+describe('movimientoPorCodigo · la actividad es de la empresa', () => {
+  const cuerpo = { codigo: UPC, type: 'RECEIPT', quantity: 3, toWarehouseId: 2, activityId: 999 };
+
+  it('una actividad de otra empresa (o inexistente) → 404 y no se mueve nada', async () => {
+    const { service, prisma, tx } = buildConMovimientoReal(null);
+
+    await expect(service.movimientoPorCodigo(cuerpo, 11, EMPRESA)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    // Se busca acotada a la empresa, nunca por id a secas.
+    expect(prisma.activity.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 999, companyId: EMPRESA } }),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.stockMovement.create).not.toHaveBeenCalled();
+  });
+
+  it('una actividad propia se liga al movimiento', async () => {
+    const { service, tx } = buildConMovimientoReal({ id: 999 });
+
+    const r = await service.movimientoPorCodigo(cuerpo, 11, EMPRESA);
+
+    expect(tx.stockMovement.create.mock.calls[0][0].data).toMatchObject({ activityId: 999 });
+    expect(r.movement).toMatchObject({ id: 600, activityId: 999 });
+  });
+
+  it('sin actividad no se consulta nada', async () => {
+    const { service, prisma } = buildConMovimientoReal(null);
+    await service.movimientoPorCodigo({ codigo: UPC, type: 'RECEIPT', quantity: 1, toWarehouseId: 2 }, 11, EMPRESA);
+    expect(prisma.activity.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Los cuerpos del lector son clases con class-validator: lo que llega por HTTP pasa por
+ * el `ValidationPipe` global (whitelist + forbidNonWhitelisted + conversión implícita).
+ * `erroresDe` reproduce ese pipe; `validate` directo cubre al que llame sin él.
+ */
+async function erroresDe(cls: any, cuerpo: Record<string, unknown>) {
+  const dto = plainToInstance(cls, cuerpo, { enableImplicitConversion: true });
+  const errs = await validate(dto as object, { whitelist: true, forbidNonWhitelisted: true });
+  return errs.flatMap((e) => Object.values(e.constraints ?? {}));
+}
+
+describe('DTOs del lector', () => {
+  it('acepta tal cual el cuerpo que mandan las apps (Android/iOS) para un movimiento', async () => {
+    // Las apps mandan los opcionales en null, no los omiten.
+    const cuerpoApp = { codigo: UPC, type: 'RECEIPT', quantity: 3, fromWarehouseId: null, toWarehouseId: 2, notes: null };
+    expect(await erroresDe(MovimientoPorCodigoDto, cuerpoApp)).toEqual([]);
+    expect(await erroresDe(MovimientoPorCodigoDto, { codigo: EAN, type: 'DISPATCH', quantity: 1.5, fromWarehouseId: 2, notes: 'Obra 12' })).toEqual([]);
+  });
+
+  it('acepta tal cual el cuerpo del alta que manda la web', async () => {
+    const cuerpoWeb = {
+      codigo: EAN,
+      name: 'Cámara bala 2 MP',
+      sku: 'CAM-0001',
+      marca: 'Hikvision',
+      modelo: 'DS-2CD1023G0E-I',
+      descripcion: 'Lente 2.8 mm',
+      imagenUrl: 'https://cdn.example/camara.jpg',
+      categoria: 'CCTV',
+      unidad: 'pieza',
+    };
+    expect(await erroresDe(AltaPorCodigoDto, cuerpoWeb)).toEqual([]);
+    expect(await erroresDe(AltaPorCodigoDto, { codigo: UPC, name: 'Switch' })).toEqual([]);
+  });
+
+  it('`notes` que no es texto → 400, no un 500 en `.trim()`', async () => {
+    // Sin conversión implícita (quien llame al servicio sin el pipe): el tipo se exige.
+    const dto = Object.assign(new MovimientoPorCodigoDto(), {
+      codigo: UPC,
+      type: 'RECEIPT',
+      quantity: 1,
+      toWarehouseId: 2,
+      notes: 123,
+    });
+    const errs = await validate(dto);
+    expect(errs.map((e) => e.property)).toEqual(['notes']);
+
+    // Con el pipe, un objeto en `notes` tampoco pasa a `.trim()` como objeto.
+    const conObjeto = plainToInstance(MovimientoPorCodigoDto, { ...dto, notes: ['a'] }, { enableImplicitConversion: true });
+    expect((await validate(conObjeto)).map((e) => e.property)).toEqual(['notes']);
+  });
+
+  it('`sku` de 1,000 caracteres → 400 con el tope en el mensaje', async () => {
+    const msgs = await erroresDe(AltaPorCodigoDto, { codigo: EAN, name: 'Cable', sku: 'a'.repeat(1000) });
+    expect(msgs.join(' ')).toMatch(/100 caracteres/);
+  });
+
+  it('código de 65 caracteres → 400 en el alta y en el movimiento', async () => {
+    const largo = '9'.repeat(65);
+    expect((await erroresDe(AltaPorCodigoDto, { codigo: largo, name: 'X' })).join(' ')).toMatch(/64 caracteres/);
+    expect(
+      (await erroresDe(MovimientoPorCodigoDto, { codigo: largo, type: 'RECEIPT', quantity: 1, toWarehouseId: 2 })).join(' '),
+    ).toMatch(/64 caracteres/);
+  });
+
+  it('cantidad cero, tipo desconocido, actividad no entera o campo de más → 400', async () => {
+    const base = { codigo: UPC, type: 'RECEIPT', quantity: 1, toWarehouseId: 2 };
+    expect(await erroresDe(MovimientoPorCodigoDto, { ...base, quantity: 0 })).not.toEqual([]);
+    expect(await erroresDe(MovimientoPorCodigoDto, { ...base, quantity: 'tres' })).not.toEqual([]);
+    expect(await erroresDe(MovimientoPorCodigoDto, { ...base, type: 'VENTA' })).not.toEqual([]);
+    expect(await erroresDe(MovimientoPorCodigoDto, { ...base, activityId: 'abc' })).not.toEqual([]);
+    expect(await erroresDe(MovimientoPorCodigoDto, { ...base, productId: 31 })).not.toEqual([]);
+    expect(await erroresDe(MovimientoPorCodigoDto, { ...base, imagenUrl: 'x'.repeat(501) })).not.toEqual([]);
+    expect(await erroresDe(AltaPorCodigoDto, { codigo: EAN, name: 'X', imagenUrl: 'https://c/' + 'x'.repeat(500) })).not.toEqual([]);
   });
 });

@@ -47,6 +47,23 @@ export function buildCodigoInterno(input: {
   return `${prefix}-${serial}`;
 }
 
+/** Largo de las columnas `codigoInterno` y `barcode` de la herramienta (`@db.VarChar(64)`). */
+export const LARGO_MAXIMO_CODIGO_ETIQUETA = 64;
+
+/**
+ * Para una etiqueta que no está guardada: el trozo más largo de la serie que lleva un
+ * código calculado (`PREFIJO-SERIE`, con la serie en mayúsculas y guiones). Sirve para
+ * acotar la búsqueda entre las herramientas sin código en vez de recorrer el inventario
+ * entero. `undefined` si el código no tiene esa forma (entonces no puede ser calculado);
+ * `''` si la serie es `SINSERIE` (hay forma, pero nada que buscar en la serie).
+ */
+export function pistaDeSerie(code: string): string | undefined {
+  const m = /^[A-Z]{3}-([A-Z0-9-]{1,32})$/.exec(String(code ?? ''));
+  if (!m) return undefined;
+  if (m[1] === 'SINSERIE') return '';
+  return m[1].split('-').filter(Boolean).reduce((a, b) => (b.length > a.length ? b : a), '');
+}
+
 /**
  * Lo que leyó el lector de una etiqueta, sin lo que mete alrededor (espacios, saltos de
  * línea). Se compara sin distinguir mayúsculas: hay lectores con Bloq Mayús invertido.
