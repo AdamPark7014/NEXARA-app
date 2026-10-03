@@ -1391,6 +1391,14 @@ export class ToolRequestsService {
       throw new Error('No tienes permisos para asignar herramientas');
     }
 
+    const destinatario = await (this.prisma as any).user.findUnique({
+      where: { id: data.userId },
+      select: { isActive: true },
+    });
+    if (destinatario && destinatario.isActive === false) {
+      throw new Error('Esa persona está desactivada; no se le pueden asignar herramientas');
+    }
+
     if (!isSuperAdmin) {
       const target = await (this.prisma as any).user.findUnique({
         where: { id: data.userId },

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -162,6 +162,15 @@ export class MaintenanceService {
       assertCompanyAccess(schedule, tenantId, 'Programa de mantenimiento');
       if (schedule.assetId !== dto.assetId) {
         throw new NotFoundException('Programa de mantenimiento no encontrado');
+      }
+    }
+    if (dto.assignedToId) {
+      const tecnico = await this.prisma.user.findUnique({
+        where: { id: dto.assignedToId },
+        select: { isActive: true },
+      });
+      if (tecnico && tecnico.isActive === false) {
+        throw new BadRequestException('Esa persona está desactivada; no se le puede asignar la orden');
       }
     }
     const orderNumber = await this.generateWONumber(tenantId);

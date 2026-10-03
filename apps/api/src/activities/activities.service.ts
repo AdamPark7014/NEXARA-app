@@ -92,7 +92,23 @@ export class ActivitiesService {
     return this.generateNextAnNumber(resolvedCompanyId);
   }
 
+  /** A quien se le desactivó el perfil no se le asigna nada (su historial se queda). */
+  private async assertResponsableActivo(userId: number | null | undefined) {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) return;
+    const persona = await this.prisma.user.findUnique({
+      where: { id },
+      select: { isActive: true, nombre: true },
+    });
+    if (persona && persona.isActive === false) {
+      throw new BadRequestException(
+        `${persona.nombre || 'Esta persona'} está desactivado; no se le puede asignar trabajo`,
+      );
+    }
+  }
+
   async create(createActivityDto: CreateActivityDto, companyId?: number | null) {
+    await this.assertResponsableActivo(createActivityDto.responsableId);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     const trimmed = createActivityDto.anNumber?.trim();
     const anNumber = trimmed ? trimmed : await this.generateNextAnNumber(resolvedCompanyId);
@@ -1051,6 +1067,12 @@ export class ActivitiesService {
       },
     });
     assertCompanyAccess(prev, companyId, 'Actividad');
+    if (
+      updateActivityDto.responsableId != null &&
+      Number(updateActivityDto.responsableId) !== Number(prev.responsableId)
+    ) {
+      await this.assertResponsableActivo(updateActivityDto.responsableId);
+    }
 
     // La cancelación documentada no se puede saltar editando el estatus.
     const { cancelReason, ...rest } = updateActivityDto;
