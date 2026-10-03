@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useId, useState } from "react";
 import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import EditCalendarOutlinedIcon from "@mui/icons-material/EditCalendarOutlined";
 import CheckIcon from "@mui/icons-material/Check";
+import { Button, DateInput, Input, Textarea } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import { reprogramarDespacho } from "@/lib/my-activities-api";
+import c from "./comun.module.css";
+import s from "./ReprogramarDespacho.module.css";
 
 function toLocalParts(iso?: string | null): { fecha: string; hora: string } {
   const d = iso ? new Date(iso) : null;
@@ -29,38 +33,6 @@ function formatAgenda(iso?: string | null): string {
   });
 }
 
-const btn: CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  fontWeight: 650,
-  fontSize: 13,
-  padding: "8px 12px",
-  minHeight: 40,
-  borderRadius: 10,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
-const btnPrimary: CSSProperties = {
-  ...btn,
-  border: "none",
-  background: "var(--primary)",
-  color: "#fff",
-  fontWeight: 750,
-};
-
-const input: CSSProperties = {
-  padding: "10px 12px",
-  minHeight: 44,
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  fontSize: 16,
-  fontFamily: "inherit",
-  background: "var(--surface)",
-  color: "inherit",
-};
-
 type Props = {
   token: string;
   activityId: number;
@@ -78,6 +50,7 @@ export default function ReprogramarDespacho({ token, activityId, fechaActual, on
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const ids = useId();
 
   const abrir = () => {
     const p = toLocalParts(fechaActual);
@@ -117,80 +90,63 @@ export default function ReprogramarDespacho({ token, activityId, fechaActual, on
   };
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          flexWrap: "wrap",
-          fontSize: 13,
-          color: "var(--text-secondary)",
-        }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-          <EventOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-          <span>
-            Programada: <strong style={{ color: "inherit" }}>{formatAgenda(fechaActual)}</strong>
+    <div className={c.pila}>
+      <div className={c.fila}>
+        <span className={c.dato}>
+          <EventOutlinedIcon aria-hidden="true" />
+          <span className={c.tenue}>
+            Programada: <strong className={s.fuerte}>{formatAgenda(fechaActual)}</strong>
           </span>
         </span>
         {!open ? (
-          <button type="button" onClick={abrir} style={btn}>
+          <Button size="sm" variant="ghost" className={c.tap} iconStart={<EditCalendarOutlinedIcon />} onClick={abrir}>
             Cambiar fecha y hora
-          </button>
+          </Button>
         ) : null}
       </div>
       {ok && !open ? (
-        <div style={{ fontSize: 12.5, color: "#15803d", display: "flex", alignItems: "center", gap: 5 }}>
-          <CheckIcon aria-hidden="true" sx={{ fontSize: 15 }} />
+        <p className={c.ok} role="status">
+          <CheckIcon aria-hidden="true" />
           <span>{ok}</span>
-        </div>
+        </p>
       ) : null}
       {open ? (
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            padding: 12,
-            borderRadius: 12,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-              Día
-              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={input} />
+        <div className={c.panel}>
+          <div className={s.campos}>
+            <label className={s.campo} htmlFor={`${ids}-dia`}>
+              <span className={s.etiqueta}>Día</span>
+              <DateInput id={`${ids}-dia`} value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </label>
-            <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-              Hora
-              <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} style={input} />
+            <label className={s.campo} htmlFor={`${ids}-hora`}>
+              <span className={s.etiqueta}>Hora</span>
+              <Input id={`${ids}-hora`} type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
             </label>
           </div>
-          <label style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-            Motivo (opcional)
-            <textarea
+          <label className={s.campo} htmlFor={`${ids}-motivo`}>
+            <span className={s.etiqueta}>
+              Motivo <span className={s.opcional}>· opcional</span>
+            </span>
+            <Textarea
+              id={`${ids}-motivo`}
               rows={2}
               maxLength={500}
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Ej. El cliente pidió cambiar la visita"
-              style={{ ...input, minHeight: 64, resize: "vertical" }}
             />
           </label>
-          {error ? <div style={{ fontSize: 12.5, color: "#b91c1c" }}>{error}</div> : null}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => void guardar()}
-              disabled={saving}
-              style={{ ...btnPrimary, opacity: saving ? 0.7 : 1 }}
-            >
-              {saving ? "Guardando…" : "Guardar nueva fecha"}
-            </button>
-            <button type="button" onClick={() => setOpen(false)} disabled={saving} style={btn}>
+          {error ? (
+            <p className={c.error} role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className={s.botones}>
+            <Button variant="ghost" className={c.tap} onClick={() => setOpen(false)} disabled={saving}>
               Cancelar
-            </button>
+            </Button>
+            <Button variant="primary" className={c.tap} loading={saving} onClick={() => void guardar()}>
+              {saving ? "Guardando…" : "Guardar nueva fecha"}
+            </Button>
           </div>
         </div>
       ) : null}

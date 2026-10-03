@@ -1,0 +1,43 @@
+/* Reprogramar un despacho: día, hora y motivo (tokens --ui-*). */
+
+.fuerte {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-s3);
+}
+
+.campo {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-label);
+  line-height: var(--ui-lh-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg-label, var(--ui-fg));
+}
+
+.opcional {
+  font-weight: var(--ui-fw-regular, 400);
+  color: var(--ui-fg-3);
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+@media (max-width: 420px) {
+  .campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

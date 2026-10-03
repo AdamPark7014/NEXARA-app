@@ -1,107 +1,67 @@
 "use client";
 
-import type { ReactNode } from "react";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
+import { Stat, StatRow } from "@/components/base";
 import { resumenEquipo, type EstadoAro } from "@/components/pizarra/equipo-estado";
 import type { TeamBoardUser } from "@/lib/team-board-api";
-import s from "./ResumenEquipo.module.css";
 
 export type FiltroEquipo = EstadoAro | "todos";
 
 /**
- * Las tres cifras de «Mi equipo»: trabajando, con retraso, libres.
- *
- * Con `onFiltro` cada cifra es un filtro (y aparece «Todos» para volver).
+ * Franja de KPI de «Mi equipo»: quién trabaja (de cuántos), quién va con
+ * retraso (semáforo), quién está libre y cuántas entregas esperan revisión.
+ * El filtro vive en los chips de la lista.
  *
  * Regla 7: sin nadie en el tablero, una fila de ceros no informa y no se pinta;
- * lo que ayuda ahí es el vacío con el primer paso, no tres ceros encima.
+ * lo que ayuda ahí es el vacío con el primer paso, no cuatro ceros encima.
  */
-export default function ResumenEquipo({
-  users,
-  filtro = "todos",
-  onFiltro,
-}: {
-  users: readonly TeamBoardUser[];
-  filtro?: FiltroEquipo;
-  onFiltro?: (f: FiltroEquipo) => void;
-}) {
+export default function ResumenEquipo({ users }: { users: readonly TeamBoardUser[] }) {
   if (users.length === 0) return null;
   const r = resumenEquipo(users);
-  const desgloseRetraso = `${r.atrasados} atrasadas · ${r.sinActividad} sin nada abierto`;
-
-  const celda = (id: FiltroEquipo, clase: string, title: string, children: ReactNode) => {
-    const className = [s.celda, clase, onFiltro ? s.boton : "", onFiltro && filtro === id ? s.activa : ""]
-      .filter(Boolean)
-      .join(" ");
-    if (!onFiltro) {
-      return (
-        <div className={className} title={title}>
-          {children}
-        </div>
-      );
-    }
-    return (
-      <button
-        type="button"
-        className={className}
-        title={title}
-        aria-pressed={filtro === id}
-        onClick={() => onFiltro(filtro === id && id !== "todos" ? "todos" : id)}
-      >
-        {children}
-      </button>
-    );
-  };
+  const espera = users.reduce((n, u) => n + (u.enEsperaAprobacion ?? 0), 0);
+  const corrigiendo = users.filter((u) => (u.enCorreccion ?? 0) > 0).length;
+  const desgloseRetraso = `${r.atrasados} atrasados · ${r.sinActividad} sin nada abierto`;
 
   return (
-    <div
-      className={[s.fila, onFiltro ? s.filaFiltro : ""].filter(Boolean).join(" ")}
-      role={onFiltro ? "group" : undefined}
-      aria-label={onFiltro ? "Filtrar al equipo por estado" : "Resumen del equipo"}
-    >
-      {onFiltro
-        ? celda(
-            "todos",
-            s.todos,
-            "Ver a todo el equipo",
-            <>
-              <span className={s.etiqueta}>Todos</span>
-              <span className={s.cifra}>{r.total}</span>
-              <span className={s.pista}>en el equipo</span>
-            </>,
-          )
-        : null}
-      {celda(
-        "trabajando",
-        s.trabajando,
-        "Con una actividad en curso",
-        <>
-          <span className={s.etiqueta}>Trabajando</span>
-          <span className={s.cifra}>{r.trabajando}</span>
-          <span className={s.pista}>de {r.total} en el equipo</span>
-        </>,
-      )}
-      {celda(
-        "retraso",
-        s.retraso,
-        desgloseRetraso,
-        <>
-          <span className={s.etiqueta}>Con retraso</span>
-          <span className={s.cifra}>{r.retraso}</span>
-          <span className={s.pista}>
-            {r.atrasados} atrasados · {r.sinActividad} sin nada
-          </span>
-        </>,
-      )}
-      {celda(
-        "libre",
-        s.libres,
-        "Ya cerraron lo que tenían",
-        <>
-          <span className={s.etiqueta}>Libres</span>
-          <span className={s.cifra}>{r.libres}</span>
-          <span className={s.pista}>terminaron lo suyo</span>
-        </>,
-      )}
-    </div>
+    <StatRow cols={4} ariaLabel="Resumen del equipo">
+      <Stat
+        label="Trabajando"
+        value={r.trabajando}
+        suffix={`/ ${r.total}`}
+        hint="con una actividad en curso"
+        icon={<PlayCircleOutlineIcon />}
+        iconTone="success"
+        meter={[{ value: r.trabajando, tone: "success" }]}
+        meterMax={r.total}
+      />
+      <Stat
+        label="Con retraso"
+        value={r.retraso}
+        tone={r.atrasados > 0 ? "danger" : r.retraso > 0 ? "warning" : "default"}
+        hint={desgloseRetraso}
+        title={desgloseRetraso}
+        icon={<AccessTimeIcon />}
+        iconTone={r.atrasados > 0 ? "danger" : r.retraso > 0 ? "warning" : "neutral"}
+        semaforo={r.atrasados > 0 ? "rojo" : r.retraso > 0 ? "ambar" : "verde"}
+      />
+      <Stat
+        label="Libres"
+        value={r.libres}
+        hint="terminaron lo suyo"
+        icon={<GroupsOutlinedIcon />}
+        iconTone="info"
+      />
+      <Stat
+        label="Esperan revisión"
+        value={espera}
+        tone={espera > 0 ? "brand" : "default"}
+        hint={corrigiendo > 0 ? `${corrigiendo} corrigiendo evidencia` : "entregadas que nadie ha aprobado"}
+        icon={<RateReviewOutlinedIcon />}
+        iconTone={espera > 0 ? "violet" : "neutral"}
+      />
+    </StatRow>
   );
 }

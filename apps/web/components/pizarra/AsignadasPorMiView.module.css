@@ -1,0 +1,76 @@
+/* «Asignadas por mí»: KPI + tarjeta de lista con tabla (tokens --ui-*). */
+
+.vista {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.vista.vista > * {
+  margin-bottom: 0;
+}
+
+.lista {
+  overflow: clip;
+  min-width: 0;
+}
+
+.relleno {
+  padding: var(--ui-s4);
+}
+
+.actividad {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.tipo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.actividadTexto {
+  display: grid;
+  min-width: 0;
+}
+
+.titulo {
+  font-weight: 600;
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.sub {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+}
+
+.estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.persona {
+  min-width: 180px;
+}
+
+@media (max-width: 480px) {
+  .relleno {
+    padding: var(--ui-s3);
+  }
+  .persona {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}

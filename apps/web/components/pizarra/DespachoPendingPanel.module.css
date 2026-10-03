@@ -1,0 +1,163 @@
+/* «Te toca repartir»: despachos pendientes de quien reparte (tokens --ui-*). */
+
+.panel {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-warning-border);
+  border-left: 4px solid var(--ui-warning);
+  border-radius: var(--ui-card-radius, 16px);
+  background: var(--ui-warning-bg);
+  min-width: 0;
+}
+
+.cabeza {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.icono {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-surface);
+  color: var(--ui-warning-text);
+}
+
+.icono svg {
+  font-size: 20px !important;
+  width: 20px;
+  height: 20px;
+}
+
+.cabezaTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.despacho {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+  min-width: 0;
+}
+
+.despacho[data-activa="true"] {
+  border-color: var(--ui-brand-border, var(--ui-brand));
+  box-shadow: 0 0 0 1px var(--ui-brand-border, var(--ui-brand)) inset, var(--ui-elev-1);
+}
+
+.grupo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.leyenda {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--ui-s2);
+  font-size: var(--ui-fs-label);
+  line-height: var(--ui-lh-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg-label, var(--ui-fg));
+}
+
+.candidatos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: var(--ui-s2);
+}
+
+.candidato {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-height: var(--ui-control-h-touch, 44px);
+  padding: var(--ui-s2) var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-surface);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color var(--ui-duration-fast) var(--ui-ease-standard),
+    background var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.candidato:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.candidato[data-checked="true"] {
+  border-color: var(--ui-brand-border, var(--ui-brand));
+  background: var(--ui-brand-soft);
+}
+
+.candidato:focus-within {
+  box-shadow: var(--ui-ring);
+}
+
+.persona {
+  display: grid;
+  min-width: 0;
+}
+
+.nombre {
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-label);
+  font-weight: 600;
+  color: var(--ui-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.puesto {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.empuje {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 480px) {
+  .panel,
+  .despacho {
+    padding: var(--ui-s3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .candidato {
+    transition: none;
+  }
+}

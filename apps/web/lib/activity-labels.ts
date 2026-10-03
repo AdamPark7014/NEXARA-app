@@ -6,12 +6,15 @@
 import { ACTIVITY_KINDS, type ActivityIconKey, type ActivityKind } from "@/lib/activity-kinds";
 import { normalizarPrioridad } from "@/lib/actividad-tiempos";
 
-export type LabelUi = { label: string; color?: string };
+/** Tono de insignia del sistema visual (mismo nombre que `Tone` de `components/base`). */
+export type LabelTone = "neutral" | "success" | "warning" | "danger" | "info" | "violet";
 
-export const PRIORITY_UI: Record<string, { color: string; label: string }> = {
-  ALTA: { color: "#dc2626", label: "Urgente" },
-  MEDIA: { color: "#d97706", label: "Esta semana" },
-  BAJA: { color: "#16a34a", label: "Puede esperar" },
+export type LabelUi = { label: string; color?: string; tone?: LabelTone };
+
+export const PRIORITY_UI: Record<string, { color: string; label: string; tone: LabelTone }> = {
+  ALTA: { color: "#dc2626", label: "Urgente", tone: "danger" },
+  MEDIA: { color: "#d97706", label: "Esta semana", tone: "warning" },
+  BAJA: { color: "#16a34a", label: "Puede esperar", tone: "neutral" },
 };
 
 export function priorityUi(p?: string | null) {
@@ -20,17 +23,17 @@ export function priorityUi(p?: string | null) {
 
 /** Estatus del backend → etiqueta clara para campo. */
 export const ESTATUS_UI: Array<[RegExp, LabelUi]> = [
-  [/proceso/i, { label: "En curso", color: "#2563eb" }],
-  [/validar/i, { label: "En revisión", color: "#7c3aed" }],
-  [/rechazada/i, { label: "Te la regresaron", color: "#dc2626" }],
-  [/finalizada|completada|aprobada/i, { label: "Terminada", color: "#16a34a" }],
-  [/cancelada/i, { label: "Cancelada" }],
+  [/proceso/i, { label: "En curso", color: "#2563eb", tone: "info" }],
+  [/validar/i, { label: "En revisión", color: "#7c3aed", tone: "violet" }],
+  [/rechazada/i, { label: "Te la regresaron", color: "#dc2626", tone: "danger" }],
+  [/finalizada|completada|aprobada/i, { label: "Terminada", color: "#16a34a", tone: "success" }],
+  [/cancelada/i, { label: "Cancelada", tone: "neutral" }],
 ];
 
 export function estatusUi(estatus?: string | null): LabelUi {
   const e = estatus ?? "";
   for (const [re, ui] of ESTATUS_UI) if (re.test(e)) return ui;
-  return { label: "Por empezar" };
+  return { label: "Por empezar", tone: "neutral" };
 }
 
 type ConTipo = { coreKind?: string | null; ticketTypeCustom?: string | null };

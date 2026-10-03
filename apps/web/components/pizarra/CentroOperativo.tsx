@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
+import { Button } from "@/components/base";
 import { AvatarAro } from "@/components/pizarra/EquipoPersonaCard";
 import {
   ARO_DE_ESTADO,
@@ -208,7 +209,7 @@ export default function CentroOperativo({
   return createPortal(
     <div ref={capaRef} className={s.capa} role="dialog" aria-modal="true" aria-label="Centro operativo">
       <header className={s.barra}>
-        <div style={{ minWidth: 0 }}>
+        <div className={s.barraTexto}>
           <h2 className={s.titulo}>Centro operativo</h2>
           <p className={s.leyenda}>
             <span className={s.cuenta}>
@@ -229,11 +230,9 @@ export default function CentroOperativo({
           <span className={s.reloj} aria-label="Hora">
             {horaLarga(ahora)}
           </span>
-          <button type="button" className={s.salir} onClick={cerrar}>
-            <CloseFullscreenIcon aria-hidden="true" fontSize="small" />
+          <Button size="lg" iconStart={<CloseFullscreenIcon />} kbd="Esc" onClick={cerrar}>
             Salir
-            <span className={s.tecla}>Esc</span>
-          </button>
+          </Button>
         </div>
       </header>
 

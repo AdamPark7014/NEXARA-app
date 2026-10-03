@@ -1,0 +1,380 @@
+/* «Mis actividades»: saludo, KPI, cola numerada, seguimiento y hechas hoy.
+   Sistema visual v2: solo tokens --ui-* (claro y oscuro salen de ellos). */
+
+.vista {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+/* La franja de KPI trae su propio margen; dentro de la rejilla manda el `gap`. */
+.vista.vista > * {
+  margin-bottom: 0;
+}
+
+/* ─── Saludo ─────────────────────────────────────────────────────────── */
+
+.saludo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.saludoTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hola {
+  margin: 0;
+  font-size: var(--ui-text-xl, 20px);
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ui-fg);
+}
+
+.saludoAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+/* ─── Cola numerada ──────────────────────────────────────────────────── */
+
+.cola {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.tarea {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ui-s3) var(--ui-s4);
+  padding: var(--ui-s4) var(--ui-s4) var(--ui-s4) calc(var(--ui-s4) + 4px);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Franja de estado a la izquierda: se lee de un vistazo. */
+.tarea::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--ui-success);
+}
+
+.tarea[data-franja="rojo"]::before { background: var(--ui-danger); }
+.tarea[data-franja="amarillo"]::before { background: var(--ui-warning); }
+.tarea[data-franja="sinIniciar"]::before { background: var(--ui-info); }
+
+.tarea[data-primera="true"] {
+  border-color: var(--ui-brand-border, var(--ui-border-strong));
+  background: color-mix(in srgb, var(--ui-brand-soft) 45%, var(--ui-surface));
+}
+
+.tarea[data-resaltada="true"] {
+  border-color: var(--ui-brand);
+  box-shadow: 0 0 0 1px var(--ui-brand) inset, var(--ui-card-shadow, var(--ui-elev-1));
+}
+
+.lugar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: var(--ui-fs-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.tarea[data-primera="true"] .lugar {
+  background: var(--ui-brand);
+  color: var(--ui-fg-on-brand);
+}
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.empieza {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-brand-text);
+}
+
+.cabeza {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s3);
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.cabezaTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tipo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-bg-2, var(--ui-surface-sunken));
+  color: var(--ui-fg-2);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.insignias {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.excedida {
+  color: var(--ui-danger-text);
+  font-weight: 600;
+}
+
+.excedida svg {
+  color: var(--ui-danger-text);
+}
+
+.porque {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.porque svg {
+  flex: 0 0 auto;
+  font-size: 16px !important;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--ui-fg-3);
+}
+
+.orden {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: var(--ui-s2);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+/* ─── Seguimiento y hechas hoy ───────────────────────────────────────── */
+
+.bloque {
+  overflow: clip;
+  min-width: 0;
+}
+
+.bloqueCabeza {
+  padding: var(--ui-s4) var(--ui-s4) 0;
+}
+
+.renglones {
+  display: grid;
+}
+
+.renglon {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s4);
+  border-top: 1px solid var(--ui-border-subtle);
+  min-width: 0;
+}
+
+.bloqueCabeza + .renglones > .renglon:first-child {
+  margin-top: var(--ui-s3);
+}
+
+.bloque .plegable {
+  justify-content: flex-start;
+  min-height: 52px;
+  padding: 0 var(--ui-s4);
+  border-radius: 0;
+}
+
+.plegableTexto {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.bloque .plegable > :last-child {
+  margin-left: auto;
+}
+
+.hechas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.hecha {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-height: var(--ui-control-h-touch, 44px);
+  padding: 0 var(--ui-s4);
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--ui-fs-meta);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.hechas > li:first-child .hecha {
+  border-top: 0;
+}
+
+.hecha:hover {
+  background: var(--ui-hover);
+}
+
+.hecha:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring) inset;
+}
+
+.hechaIco {
+  flex: 0 0 auto;
+  font-size: 16px !important;
+  color: var(--ui-success);
+}
+
+.hechaTitulo {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hechaHora {
+  flex: 0 0 auto;
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Diálogo para cambiar el orden ──────────────────────────────────── */
+
+.velo {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-modal, 1000);
+  display: grid;
+  place-items: center;
+  padding: var(--ui-s4);
+  background: var(--ui-scrim);
+}
+
+.dialogo {
+  display: grid;
+  gap: var(--ui-s4);
+  width: 100%;
+  max-width: 480px;
+  padding: var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl, 16px);
+  background: var(--ui-surface-raised, var(--ui-surface));
+  box-shadow: var(--ui-elev-3);
+}
+
+.dialogoEyebrow {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.dialogoTitulo {
+  margin: 4px 0 0;
+  font-size: var(--ui-fs-section);
+  line-height: var(--ui-lh-section);
+  font-weight: var(--ui-fw-section);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.campo {
+  display: grid;
+  gap: 6px;
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-label);
+  line-height: var(--ui-lh-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg-label, var(--ui-fg));
+}
+
+.req {
+  color: var(--ui-danger-text);
+}
+
+.dialogoPie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+@media (max-width: 520px) {
+  .tarea {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--ui-s3) var(--ui-s3) var(--ui-s3) calc(var(--ui-s3) + 4px);
+  }
+  .lugar {
+    position: absolute;
+    top: var(--ui-s3);
+    right: var(--ui-s3);
+    width: 28px;
+    height: 28px;
+    font-size: var(--ui-fs-meta);
+  }
+  .cabeza {
+    padding-right: 36px;
+  }
+  .renglon,
+  .bloqueCabeza {
+    padding-left: var(--ui-s3);
+    padding-right: var(--ui-s3);
+  }
+  .dialogo {
+    padding: var(--ui-s4);
+  }
+}

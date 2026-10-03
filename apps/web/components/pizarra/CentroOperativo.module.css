@@ -111,39 +111,8 @@
   color: var(--ui-fg);
 }
 
-.salir {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 var(--ui-s4);
-  font-family: inherit;
-  font-size: var(--ui-fs-label);
-  font-weight: var(--ui-fw-label);
-  color: var(--ui-fg);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius);
-  cursor: pointer;
-  transition: background-color var(--ui-duration-fast) var(--ui-ease-standard);
-}
-
-.salir:hover {
-  background: var(--ui-hover);
-}
-
-.salir:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-ring);
-}
-
-.tecla {
-  padding: 1px 6px;
-  font-size: var(--ui-fs-caption);
-  font-family: var(--ui-font-mono);
-  color: var(--ui-fg-2);
-  background: var(--ui-active);
-  border-radius: var(--ui-radius-sm);
+.barraTexto {
+  min-width: 0;
 }
 
 /* ─── Avance del día ───────────────────────────────────────────────────── */
@@ -283,11 +252,5 @@
   }
   .actividad {
     font-size: 15px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .salir {
-    transition: none;
   }
 }

@@ -1,0 +1,43 @@
+/* Flujo de actividades y su detalle por número (tokens --ui-*). */
+
+.pagina {
+  max-width: var(--ui-content-max, 1280px);
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.bloques {
+  display: grid;
+  gap: var(--ui-page-gap, var(--ui-s5));
+}
+
+.bloque {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.bloque.bloque > * {
+  margin-bottom: 0;
+}
+
+.relleno {
+  padding: var(--ui-s4);
+}
+
+.actividad {
+  display: grid;
+  min-width: 0;
+}
+
+.titulo {
+  font-weight: 600;
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.detalle {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+}

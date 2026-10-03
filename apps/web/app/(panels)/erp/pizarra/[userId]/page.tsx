@@ -1,18 +1,43 @@
 "use client";
 
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
+import ScheduleIcon from "@mui/icons-material/Schedule";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import HistoryIcon from "@mui/icons-material/History";
+import PersonOffOutlinedIcon from "@mui/icons-material/PersonOffOutlined";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
 import { IconLabel } from "@/components/ui/IconBadge";
-import { Skeleton } from "@/components/base";
+import {
+  Alert,
+  AsideCard,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  EmptyState,
+  RecordPage,
+  RecordSection,
+  Skeleton,
+  StatusBadge,
+  Tabs,
+  buttonClass,
+  type RecordFact,
+  type RecordMetaItem,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import {
-  STATUS_COLORS,
   STATUS_LABELS,
   fetchTeamBoardHistory,
   fetchTeamBoardUser,
@@ -23,115 +48,43 @@ import {
   type TeamBoardHistoryItem,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
-import {
-  Chip,
-  KpiStrip,
-  PrioridadChip,
-  RangoSelector,
-  SemaforoDot,
-} from "@/components/pizarra/PizarraKpi";
+import { KpiStrip, PrioridadChip, RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
+import { AvatarAro } from "@/components/pizarra/EquipoPersonaCard";
+import { ARO_DE_ESTADO } from "@/components/pizarra/equipo-estado";
+import { ESTADO_EQUIPO_TONE } from "@/components/pizarra/tonos";
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
-import { chargeLabel, estatusUi, formatHourMinute, initials, kindLabel } from "@/lib/activity-labels";
+import { chargeLabel, estatusUi, formatHourMinute, kindLabel } from "@/lib/activity-labels";
 import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
 import { PausarDeEquipo } from "@/components/pizarra/SesionActividad";
 import { textoPausa } from "@/lib/sesion-actividad";
 import { FotoProtegida, VisorPdf } from "@/components/ops/EquipoEvidencias";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
+import c from "@/components/pizarra/comun.module.css";
+import f from "./ficha.module.css";
 
-const btnPrimary: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  minHeight: 48,
-  padding: "12px 16px",
-  borderRadius: 14,
-  border: "none",
-  background: "var(--primary)",
-  color: "#fff",
-  fontWeight: 750,
-  fontSize: 15,
-  textDecoration: "none",
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
+type Pestana = "ahora" | "historial";
 
-const btnSecondary: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  minHeight: 44,
-  padding: "8px 14px",
-  borderRadius: 12,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  fontWeight: 650,
-  fontSize: 14,
-  textDecoration: "none",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  whiteSpace: "nowrap",
-};
-
-const card: CSSProperties = {
-  padding: 18,
-  borderRadius: 18,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  display: "grid",
-  gap: 12,
-};
-
-const cardTitle: CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  fontWeight: 750,
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  color: "var(--text-secondary)",
-};
-
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div
-      style={{
-        padding: "16px 14px",
-        borderRadius: 16,
-        border: "1px solid var(--border)",
-        background: "var(--surface)",
-      }}
-    >
-      <div style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>{label}</div>
-      <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>{value}</div>
-      {hint ? <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-secondary)" }}>{hint}</div> : null}
-    </div>
-  );
-}
+/** `FotoProtegida` pide su estilo como prop: la miniatura llena su marco de 104 px. */
+const FOTO_MINIATURA: CSSProperties = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 
 function FichaCargando() {
   return (
-    <div
-      aria-busy="true"
-      aria-label="Cargando perfil"
-      style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 16 }}
-    >
-      <Skeleton width={150} height={20} />
-      <div style={{ ...card, gridTemplateColumns: "auto 1fr", alignItems: "center", gap: 16 }}>
-        <Skeleton width={80} height={80} radius={40} />
-        <div style={{ display: "grid", gap: 8 }}>
-          <Skeleton width="60%" height={22} />
-          <Skeleton width="40%" height={14} />
-          <Skeleton width={110} height={26} radius={999} />
+    <div className={f.cargando} aria-busy="true" aria-label="Cargando perfil">
+      <Skeleton width={180} height={14} />
+      <Card>
+        <div className={f.cargandoCabeza}>
+          <Skeleton width={52} height={52} radius={26} />
+          <div className={f.cargandoTexto}>
+            <Skeleton width="40%" height={12} />
+            <Skeleton width="60%" height={22} />
+            <Skeleton width="30%" height={12} />
+          </div>
         </div>
-      </div>
-      <Skeleton height={48} radius={14} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-        <Skeleton height={92} radius={16} />
-        <Skeleton height={92} radius={16} />
-        <Skeleton height={92} radius={16} />
+      </Card>
+      <div className={f.cargandoCuerpo}>
+        <Skeleton height={320} radius={16} />
+        <Skeleton height={320} radius={16} />
       </div>
     </div>
   );
@@ -139,7 +92,6 @@ function FichaCargando() {
 
 export default function PizarraPersonaPage() {
   const params = useParams();
-  const router = useRouter();
   const { token, user: me } = useUser();
   const userId = Number(params?.userId);
   const isSelf = me?.id != null && me.id === userId;
@@ -155,6 +107,7 @@ export default function PizarraPersonaPage() {
   const [asignada, setAsignada] = useState(false);
   const [preset, setPreset] = useState<RangoPreset>("hoy");
   const [rango, setRango] = useState<BoardRange>({});
+  const [pestana, setPestana] = useState<Pestana>("ahora");
   const hayDatos = useRef(false);
   const desde = rango.desde ?? null;
   const hasta = rango.hasta ?? null;
@@ -236,22 +189,30 @@ export default function PizarraPersonaPage() {
 
   if (!user) {
     return (
-      <div style={{ maxWidth: 480, margin: "24px auto", display: "grid", gap: 12, textAlign: "center" }}>
-        <p style={{ margin: 0, fontSize: 16, fontWeight: 750 }}>No pudimos abrir este perfil</p>
-        <p style={{ margin: 0, fontSize: 14, color: "var(--text-secondary)" }}>{error || "No encontramos a esta persona."}</p>
-        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-          <button type="button" style={{ ...btnPrimary, minHeight: 44 }} onClick={() => void load()} disabled={loading}>
-            {loading ? "Cargando…" : "Reintentar"}
-          </button>
-          <Link href="/erp/pizarra" style={btnSecondary}>
-            ← Volver al equipo
-          </Link>
-        </div>
+      <div className={f.noEncontrada}>
+        <Card>
+          <EmptyState
+            icon={<PersonOffOutlinedIcon />}
+            tone="danger"
+            titleAs="h2"
+            title="No pudimos abrir este perfil"
+            description={error || "No encontramos a esta persona."}
+            action={
+              <Button variant="primary" className={c.tap} onClick={() => void load()} loading={loading}>
+                {loading ? "Cargando…" : "Reintentar"}
+              </Button>
+            }
+            secondaryAction={
+              <ButtonLink href="/erp/pizarra" className={c.tap}>
+                Volver al equipo
+              </ButtonLink>
+            }
+          />
+        </Card>
       </div>
     );
   }
 
-  const color = STATUS_COLORS[user.status];
   const act = user.currentActivity;
   const actEstatus = act ? estatusUi(act.estatus) : null;
   // Sesiones de trabajo: la fila completa de lo que está haciendo (corre / en pausa) y
@@ -260,276 +221,99 @@ export default function PizarraPersonaPage() {
   const actAbierta = act ? abiertas.find((a) => a.id === act.id) : undefined;
   const otrasCorriendo = abiertas.filter((a) => a.enCurso && a.id !== act?.id);
   const puedoPausar = Boolean(!isSelf && token && user.puedePausar);
-  const src = user.avatarUrl ? resolveAssetUrl(user.avatarUrl) : null;
   const actCfg = getActivitiesSectionConfig(me);
   const canAssign =
     hasPermission(me, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
+  const espera = user.enEsperaAprobacion ?? 0;
 
-  return (
-    <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
-      <button
-        type="button"
-        onClick={() => router.push("/erp/pizarra")}
-        style={{
-          alignSelf: "flex-start",
-          minHeight: 44,
-          border: "none",
-          background: "transparent",
-          color: "var(--text-secondary)",
-          fontWeight: 650,
-          fontSize: 14,
-          cursor: "pointer",
-          padding: "8px 0",
-          fontFamily: "inherit",
-        }}
-      >
-        ← Volver al equipo
-      </button>
+  const meta: RecordMetaItem[] = [
+    { icon: <WorkOutlineIcon aria-hidden="true" />, label: user.puesto || "Equipo NEXARA" },
+    {
+      icon: <LoginIcon aria-hidden="true" />,
+      label: user.clockInAt ? `Entrada ${formatClock(user.clockInAt)}` : "Sin entrada registrada",
+    },
+    ...(updatedAt
+      ? [{ icon: <ScheduleIcon aria-hidden="true" />, label: `Actualizado ${formatHourMinute(updatedAt)}` }]
+      : []),
+  ];
 
-      {asignada ? (
-        <div
-          role="status"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            padding: "10px 8px 10px 14px",
-            borderRadius: 14,
-            border: "1px solid color-mix(in srgb, var(--success) 40%, var(--border))",
-            background: "color-mix(in srgb, var(--success) 10%, var(--surface))",
-            color: "var(--success)",
-            fontWeight: 750,
-            fontSize: 14,
-          }}
-        >
-          <span>✅ Actividad asignada</span>
-          <button
-            type="button"
-            onClick={cerrarAviso}
-            aria-label="Cerrar aviso"
-            style={{
-              minWidth: 40,
-              minHeight: 40,
-              border: "none",
-              background: "transparent",
-              color: "inherit",
-              fontSize: 18,
-              cursor: "pointer",
-              borderRadius: 10,
-            }}
-          >
-            ✕
-          </button>
-        </div>
-      ) : null}
+  const facts: RecordFact[] = [
+    {
+      label: preset === "hoy" ? "Entrada hoy" : "Última entrada",
+      value: formatClock(user.clockInAt),
+      hint: user.clockInAt ? "Entrada registrada" : "Sin registro",
+    },
+    { label: "Horas trabajadas", value: formatMinutes(user.workedMinutes), hint: "Entrada a salida, sin la comida" },
+    {
+      label: "En actividad",
+      value: formatMinutes(user.activityElapsedMinutes),
+      hint: actAbierta?.enPausa
+        ? "En pausa"
+        : user.activityStartedAt
+          ? `Desde las ${formatClock(user.activityStartedAt)}`
+          : "Sin actividad iniciada",
+    },
+    ...(user.kpis
+      ? [
+          {
+            label: "Horas productivas",
+            value: formatMinutes(user.kpis.minutosEnActividad),
+            hint: "Con una actividad corriendo, dentro de su jornada",
+          },
+        ]
+      : []),
+  ];
 
-      <header
-        style={{
-          display: "flex",
-          gap: 16,
-          alignItems: "center",
-          padding: "18px 16px",
-          borderRadius: 20,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={src}
-            alt=""
-            width={80}
-            height={80}
-            style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", flex: "0 0 auto" }}
-          />
-        ) : (
-          <div
-            aria-hidden
-            style={{
-              width: 80,
-              height: 80,
-              flex: "0 0 auto",
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              fontSize: 26,
-              fontWeight: 800,
-              color: "var(--primary)",
-              background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
-            }}
-          >
-            {initials(user.nombre)}
-          </div>
-        )}
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-            {user.nombre}
-          </h1>
-          <div style={{ marginTop: 4, fontSize: 14, color: "var(--text-secondary)" }}>
-            {user.puesto || "Equipo NEXARA"}
-          </div>
-          <div
-            style={{
-              marginTop: 10,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "5px 12px",
-              borderRadius: 999,
-              background: `color-mix(in srgb, ${color} 14%, transparent)`,
-              color,
-              fontWeight: 750,
-              fontSize: 13,
-            }}
-          >
-            <span aria-hidden style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
-            {STATUS_LABELS[user.status]}
-          </div>
-        </div>
-      </header>
-
-      {!isSelf && canAssign ? (
-        <Link href={`/erp/pizarra/${user.id}/asignar`} style={btnPrimary}>
-          ＋ Asignar actividad
-        </Link>
-      ) : isSelf ? (
-        <Link href="/erp/pizarra?vista=mias" style={{ ...btnSecondary, minHeight: 48 }}>
-          Ver mis actividades →
-        </Link>
-      ) : null}
-
-      {refreshError ? (
-        <div
-          role="status"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            flexWrap: "wrap",
-            padding: "8px 8px 8px 14px",
-            borderRadius: 12,
-            background: "color-mix(in srgb, #d97706 10%, var(--surface))",
-            border: "1px solid color-mix(in srgb, #d97706 35%, var(--border))",
-            fontSize: 13,
-          }}
-        >
-          <span>No se pudo actualizar. Ves lo de las {formatHourMinute(updatedAt)}.</span>
-          <button type="button" style={btnSecondary} onClick={() => void load()} disabled={loading}>
-            Reintentar
-          </button>
-        </div>
-      ) : null}
-
-      <RangoSelector
-        preset={preset}
-        rango={rango}
-        onChange={(p, r) => {
-          setPreset(p);
-          setRango(p === "hoy" ? {} : r);
-        }}
+  const pestanas = (
+    <div className={f.pestanas}>
+      <Tabs
+        ariaLabel="Secciones de la ficha"
+        items={[
+          { id: "ahora" as const, label: "Ahora", icon: BoltOutlinedIcon, count: abiertas.length || undefined },
+          { id: "historial" as const, label: "Historial", icon: HistoryIcon, count: history.length },
+        ]}
+        value={pestana}
+        onChange={setPestana}
       />
+      <div className={f.rango}>
+        <RangoSelector
+          preset={preset}
+          rango={rango}
+          onChange={(p, r) => {
+            setPreset(p);
+            setRango(p === "hoy" ? {} : r);
+          }}
+        />
+      </div>
+    </div>
+  );
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-        <Stat
-          label={preset === "hoy" ? "Entrada hoy" : "Última entrada"}
-          value={formatClock(user.clockInAt)}
-          hint={user.clockInAt ? "Entrada registrada" : "Sin registro"}
-        />
-        <Stat label="Horas trabajadas" value={formatMinutes(user.workedMinutes)} hint="Entrada a salida, sin la comida" />
-        <Stat
-          label="En actividad"
-          value={formatMinutes(user.activityElapsedMinutes)}
-          hint={
-            actAbierta?.enPausa
-              ? "En pausa"
-              : user.activityStartedAt
-                ? `Desde las ${formatClock(user.activityStartedAt)}`
-                : "Sin actividad iniciada"
-          }
-        />
-        {user.kpis ? (
-          <Stat
-            label="Horas productivas"
-            value={formatMinutes(user.kpis.minutosEnActividad)}
-            hint="Con una actividad corriendo, dentro de su jornada"
-          />
+  const avisos =
+    asignada || refreshError ? (
+      <div className={c.pila}>
+        {asignada ? (
+          <Alert tone="success" role="status" onDismiss={cerrarAviso} dismissLabel="Cerrar aviso">
+            Actividad asignada
+          </Alert>
+        ) : null}
+        {refreshError ? (
+          <Alert
+            tone="warning"
+            role="status"
+            action={
+              <Button size="sm" className={c.tap} onClick={() => void load()} disabled={loading}>
+                Reintentar
+              </Button>
+            }
+          >
+            No se pudo actualizar. Ves lo de las {formatHourMinute(updatedAt)}.
+          </Alert>
         ) : null}
       </div>
+    ) : null;
 
-      <KpiStrip kpis={user.kpis} />
-
-      <section style={card}>
-        <h2 style={cardTitle}>Actividad en curso</h2>
-        {act && actEstatus ? (
-          <>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.3 }}>{act.titulo}</div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>Folio {act.anNumber}</div>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-              <Chip color={actEstatus.color ?? "var(--text-secondary)"} style={{ fontSize: 12, fontWeight: 650 }}>
-                {actEstatus.label}
-              </Chip>
-              {act.periodo ? (
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 650,
-                    color: act.periodo.estado === "vencida" ? "var(--danger)" : "var(--text-secondary)",
-                  }}
-                >
-                  {act.periodo.etiqueta}
-                </span>
-              ) : null}
-              {actAbierta?.enPausa ? (
-                <Chip color="#d97706" style={{ fontSize: 12, fontWeight: 650 }}>
-                  En pausa
-                </Chip>
-              ) : actAbierta?.enCurso ? (
-                <Chip color="#16a34a" style={{ fontSize: 12, fontWeight: 650 }}>
-                  Reloj corriendo
-                </Chip>
-              ) : null}
-            </div>
-            {actAbierta?.enPausa ? (
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                {textoPausa(actAbierta, { miId: me?.id, propia: isSelf })}
-              </div>
-            ) : null}
-            {puedoPausar && token && actAbierta?.enCurso ? (
-              <PausarDeEquipo
-                token={token}
-                userId={user.id}
-                activityId={act.id}
-                nombre={user.nombre}
-                onDone={() => void load()}
-              />
-            ) : null}
-            <Link href={`/erp/actividades/${act.id}`} style={{ ...btnSecondary, justifySelf: "start" }}>
-              Abrir actividad →
-            </Link>
-          </>
-        ) : (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>No tiene nada abierto en este momento.</div>
-        )}
-        {puedoPausar && token && otrasCorriendo.length ? (
-          <div style={{ display: "grid", gap: 10, paddingTop: 6, borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>También tiene el reloj corriendo en</div>
-            {otrasCorriendo.map((a) => (
-              <div key={a.id} style={{ display: "grid", gap: 6 }}>
-                <div style={{ fontSize: 14, fontWeight: 650 }}>
-                  {a.titulo} <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 500 }}>Folio {a.anNumber}</span>
-                </div>
-                <PausarDeEquipo token={token} userId={user.id} activityId={a.id} nombre={user.nombre} onDone={() => void load()} />
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
+  const ahora = (
+    <>
       {isSelf && token ? (
         <DespachoPendingPanel
           token={token}
@@ -540,22 +324,105 @@ export default function PizarraPersonaPage() {
         />
       ) : null}
 
-      <section style={card}>
-        <h2 style={cardTitle}>Historial de actividades</h2>
-        {historyError && history.length === 0 ? (
-          <div
-            role="alert"
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}
-          >
-            <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>No se pudo cargar el historial.</span>
-            <button type="button" style={btnSecondary} onClick={() => void load()} disabled={loading}>
-              Reintentar
-            </button>
+      <RecordSection title="Actividad en curso">
+        {act && actEstatus ? (
+          <div className={f.actual}>
+            <div className={c.filaEntre}>
+              <div className={f.actualTexto}>
+                <h3 className={f.actualTitulo}>{act.titulo}</h3>
+                <span className={c.folio}>{act.anNumber}</span>
+              </div>
+              <ButtonLink
+                href={`/erp/actividades/${act.id}`}
+                size="sm"
+                className={c.tap}
+                iconEnd={<ArrowForwardIcon />}
+              >
+                Abrir actividad
+              </ButtonLink>
+            </div>
+            <div className={f.insignias}>
+              <StatusBadge size="sm" label={actEstatus.label} tone={actEstatus.tone ?? "neutral"} />
+              {actAbierta?.enPausa ? (
+                <Badge size="sm" dot tone="warning">
+                  En pausa
+                </Badge>
+              ) : actAbierta?.enCurso ? (
+                <Badge size="sm" dot tone="success">
+                  Reloj corriendo
+                </Badge>
+              ) : null}
+              {act.periodo ? (
+                <span className={act.periodo.estado === "vencida" ? f.vencida : c.tenue}>{act.periodo.etiqueta}</span>
+              ) : null}
+            </div>
+            {actAbierta?.enPausa ? (
+              <p className={c.cita}>{textoPausa(actAbierta, { miId: me?.id, propia: isSelf })}</p>
+            ) : null}
+            {puedoPausar && token && actAbierta?.enCurso ? (
+              <PausarDeEquipo
+                token={token}
+                userId={user.id}
+                activityId={act.id}
+                nombre={user.nombre}
+                onDone={() => void load()}
+              />
+            ) : null}
           </div>
-        ) : history.length === 0 ? (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Todavía no tiene actividades registradas.</div>
         ) : (
-          history.map((h) => {
+          <p className={c.tenue}>No tiene nada abierto en este momento.</p>
+        )}
+      </RecordSection>
+
+      {puedoPausar && token && otrasCorriendo.length ? (
+        <RecordSection title="También tiene el reloj corriendo en" subtitle={`${otrasCorriendo.length} más`}>
+          <div className={f.otras}>
+            {otrasCorriendo.map((a) => (
+              <div key={a.id} className={f.otra}>
+                <div>
+                  <h3 className={c.tituloFila}>{a.titulo}</h3>
+                  <span className={c.folio}>{a.anNumber}</span>
+                </div>
+                <PausarDeEquipo token={token} userId={user.id} activityId={a.id} nombre={user.nombre} onDone={() => void load()} />
+              </div>
+            ))}
+          </div>
+        </RecordSection>
+      ) : null}
+    </>
+  );
+
+  const historial = (
+    <RecordSection title="Historial de actividades" subtitle={history.length ? `${history.length} en total` : undefined}>
+      {historyError && history.length === 0 ? (
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" className={c.tap} onClick={() => void load()} disabled={loading}>
+              Reintentar
+            </Button>
+          }
+        >
+          No se pudo cargar el historial.
+        </Alert>
+      ) : history.length === 0 ? (
+        <EmptyState
+          icon={<HistoryIcon />}
+          tone="neutral"
+          title="Todavía no tiene actividades registradas"
+          description="Cuando cierre su primera actividad, aquí quedan sus fotos, su hoja y sus tiempos."
+        />
+      ) : (
+        <ul className={f.historial}>
+          {historyError ? (
+            <li>
+              <Alert tone="warning" role="status" dense>
+                {historyError}. Se muestra lo último que cargó.
+              </Alert>
+            </li>
+          ) : null}
+          {history.map((h) => {
             const ev = h.evidence;
             const open = Boolean(ev) && expandedId === h.id;
             const est = estatusUi(h.estatus);
@@ -572,73 +439,56 @@ export default function PizarraPersonaPage() {
             ].filter(Boolean);
             const resumen = (
               <>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-                  <span style={{ paddingTop: 6 }}>
+                <span className={f.itemCabeza}>
+                  <span className={f.itemSemaforo}>
                     <SemaforoDot semaforo={h.semaforo} />
                   </span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1.35 }}>{h.titulo}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 1 }}>Folio {h.anNumber}</div>
-                  </div>
+                  <span className={f.itemTexto}>
+                    <span className={f.itemTitulo}>{h.titulo}</span>
+                    <span className={c.folio}>
+                      {h.anNumber} · {kindLabel(h)}
+                    </span>
+                  </span>
                   {ev ? (
-                    <span aria-hidden style={{ fontSize: 14, color: "var(--text-secondary)", paddingTop: 2 }}>
-                      {open ? "▾" : "▸"}
+                    <span className={f.itemFlecha} aria-hidden="true">
+                      {open ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                     </span>
                   ) : null}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
-                  <Chip color={est.color ?? "var(--text-secondary)"} style={{ fontSize: 12 }}>
-                    {est.label}
-                  </Chip>
-                  <Chip color="var(--text-secondary)" style={{ fontSize: 12 }}>
-                    {kindLabel(h)}
-                  </Chip>
+                </span>
+                <span className={f.insignias}>
+                  <StatusBadge size="sm" label={est.label} tone={est.tone ?? "neutral"} />
                   {encargo ? (
-                    <Chip color="var(--text-secondary)" style={{ fontSize: 12 }}>
+                    <Badge size="sm" tone="outline">
                       {encargo}
-                    </Chip>
+                    </Badge>
                   ) : null}
                   <PrioridadChip prioridad={h.prioridad} />
                   {h.retirado ? (
-                    <Chip color="#64748b" title="La sacaron del equipo de esta actividad" style={{ fontSize: 12 }}>
+                    <Badge size="sm" tone="neutral" title="La sacaron del equipo de esta actividad">
                       Ya no está en el equipo
-                    </Chip>
+                    </Badge>
                   ) : null}
-                </div>
-                {meta.length ? (
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 6 }}>{meta.join(" · ")}</div>
-                ) : null}
+                  {meta.length ? <span className={c.pista}>{meta.join(" · ")}</span> : null}
+                </span>
               </>
             );
             return (
-              <div
-                key={h.id}
-                style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, display: "grid", gap: 10 }}
-              >
+              <li key={h.id} className={f.item} data-abierto={open ? "true" : undefined}>
                 {ev ? (
                   <button
                     type="button"
+                    className={f.itemBoton}
                     onClick={() => setExpandedId(open ? null : h.id)}
                     aria-expanded={open}
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      padding: 0,
-                      fontFamily: "inherit",
-                      color: "inherit",
-                      minHeight: 44,
-                    }}
                   >
                     {resumen}
                   </button>
                 ) : (
-                  <div>{resumen}</div>
+                  <div className={f.itemEstatico}>{resumen}</div>
                 )}
                 {open && ev ? (
-                  <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  <div className={f.detalle}>
+                    <div className={f.fotos}>
                       {[
                         ...(ev.entryPhotoUrl ? [{ url: ev.entryPhotoUrl, label: "Entrada", icon: LoginIcon }] : []),
                         ...(ev.evidencePhotos || []).map((url, i) => ({
@@ -648,26 +498,16 @@ export default function PizarraPersonaPage() {
                         })),
                         ...(ev.exitPhotoUrl ? [{ url: ev.exitPhotoUrl, label: "Salida", icon: LogoutIcon }] : []),
                       ].map((foto, i) => (
-                        <figure key={`${h.id}-foto-${i}`} style={{ margin: 0, display: "grid", gap: 4, width: 104 }}>
-                          <div
-                            style={{
-                              width: 104,
-                              height: 104,
-                              borderRadius: 10,
-                              overflow: "hidden",
-                              border: "1px solid var(--border)",
-                            }}
-                          >
+                        <figure key={`${h.id}-foto-${i}`} className={f.foto}>
+                          <div className={f.fotoMarco}>
                             <FotoProtegida
                               url={foto.url}
                               alt={`${foto.label} · ${h.titulo}`}
                               alto={104}
-                              style={{ width: 104, height: 104, objectFit: "cover", display: "block" }}
+                              style={FOTO_MINIATURA}
                             />
                           </div>
-                          <figcaption
-                            style={{ fontSize: 11.5, fontWeight: 700, textAlign: "center", color: "var(--text-secondary)" }}
-                          >
+                          <figcaption className={f.fotoPie}>
                             <IconLabel icon={foto.icon} size={14} gap={4}>
                               {foto.label}
                             </IconLabel>
@@ -676,52 +516,148 @@ export default function PizarraPersonaPage() {
                       ))}
                     </div>
                     {labels.some((l) => formData[l.key]) ? (
-                      <dl style={{ margin: 0, display: "grid", gap: 4 }}>
+                      <dl className={f.hoja}>
                         {labels.map((l) =>
                           formData[l.key] ? (
-                            <div key={l.key}>
-                              <dt style={{ fontWeight: 700, display: "inline" }}>{l.label}: </dt>
-                              <dd style={{ display: "inline", margin: 0 }}>{formData[l.key]}</dd>
+                            <div key={l.key} className={f.hojaFila}>
+                              <dt>{l.label}</dt>
+                              <dd>{formData[l.key]}</dd>
                             </div>
                           ) : null,
                         )}
                       </dl>
                     ) : null}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <div className={c.fila}>
                       {ev.serviceSheetPdfUrl ? (
                         <>
                           <a
                             href={resolveAssetUrl(ev.serviceSheetPdfUrl) ?? ev.serviceSheetPdfUrl}
                             target="_blank"
                             rel="noreferrer"
-                            style={btnSecondary}
+                            className={[buttonClass("secondary", { size: "sm" }), f.enlaceBoton, c.tap].join(" ")}
                           >
-                            📄 Abrir hoja de servicio
+                            <DescriptionOutlinedIcon aria-hidden="true" />
+                            Abrir hoja de servicio
                           </a>
-                          <button
-                            type="button"
-                            style={btnSecondary}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={c.tap}
                             aria-expanded={pdfAbierto === h.id}
                             onClick={() => setPdfAbierto(pdfAbierto === h.id ? null : h.id)}
                           >
                             {pdfAbierto === h.id ? "Ocultar vista previa" : "Ver aquí"}
-                          </button>
+                          </Button>
                         </>
                       ) : null}
-                      <Link href={`/erp/actividades/${h.id}`} style={btnSecondary}>
-                        Abrir actividad →
-                      </Link>
+                      <ButtonLink
+                        href={`/erp/actividades/${h.id}`}
+                        size="sm"
+                        variant="ghost"
+                        className={c.tap}
+                        iconEnd={<ArrowForwardIcon />}
+                      >
+                        Abrir actividad
+                      </ButtonLink>
                     </div>
                     {ev.serviceSheetPdfUrl && pdfAbierto === h.id ? (
                       <VisorPdf url={ev.serviceSheetPdfUrl} alto="500px" />
                     ) : null}
                   </div>
                 ) : null}
-              </div>
+              </li>
             );
-          })
-        )}
-      </section>
+          })}
+        </ul>
+      )}
+    </RecordSection>
+  );
+
+  return (
+    <div className={f.ficha}>
+      <RecordPage
+        breadcrumbs={[
+          { label: "Actividades", href: "/erp/pizarra" },
+          { label: "Mi equipo", href: "/erp/pizarra?vista=equipo" },
+          { label: user.nombre },
+        ]}
+        icon={
+          <AvatarAro
+            nombre={user.nombre}
+            avatarUrl={user.avatarUrl}
+            estado={ARO_DE_ESTADO[user.status] ?? null}
+            atrasada={user.status === "atrasado"}
+            size={52}
+            className={f.fotoHero}
+          />
+        }
+        statusLabel={STATUS_LABELS[user.status]}
+        statusTone={ESTADO_EQUIPO_TONE[user.status]}
+        badges={
+          isSelf || user.enCorreccion || espera > 0 ? (
+            <>
+              {isSelf ? (
+                <Badge size="sm" tone="brand">
+                  Tú
+                </Badge>
+              ) : null}
+              {user.enCorreccion ? (
+                <Badge size="sm" tone="warning" title="Está corrigiendo evidencia devuelta">
+                  Corrigiendo
+                </Badge>
+              ) : null}
+              {espera > 0 ? (
+                <Badge size="sm" tone="violet" title="Entregadas que nadie ha aprobado">
+                  {espera > 1 ? `${espera} en espera` : "En espera"}
+                </Badge>
+              ) : null}
+            </>
+          ) : undefined
+        }
+        title={user.nombre}
+        meta={meta}
+        tertiaryActions={
+          <Button
+            variant="ghost"
+            className={c.tap}
+            iconStart={<RefreshIcon className={loading ? f.girando : undefined} />}
+            onClick={() => void load()}
+            disabled={loading}
+            aria-busy={loading}
+          >
+            {loading ? "Actualizando…" : "Actualizar"}
+          </Button>
+        }
+        primaryAction={
+          !isSelf && canAssign ? (
+            <ButtonLink
+              href={`/erp/pizarra/${user.id}/asignar`}
+              variant="primary"
+              className={c.tap}
+              iconStart={<AddIcon />}
+            >
+              Asignar actividad
+            </ButtonLink>
+          ) : isSelf ? (
+            <ButtonLink href="/erp/pizarra?vista=mias" className={c.tap} iconEnd={<ArrowForwardIcon />}>
+              Ver mis actividades
+            </ButtonLink>
+          ) : undefined
+        }
+        tabs={pestanas}
+        facts={facts}
+        factsTitle="Jornada"
+        aside={
+          user.kpis ? (
+            <AsideCard title="Rendimiento del periodo">
+              <KpiStrip kpis={user.kpis} />
+            </AsideCard>
+          ) : undefined
+        }
+      >
+        {avisos}
+        {pestana === "ahora" ? ahora : historial}
+      </RecordPage>
     </div>
   );
 }

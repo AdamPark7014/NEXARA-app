@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { SvgIconComponent } from "@mui/icons-material";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
@@ -17,15 +16,39 @@ import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CheckIcon from "@mui/icons-material/Check";
-import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
+import ListAltOutlinedIcon from "@mui/icons-material/ListAltOutlined";
+import PriorityHighIcon from "@mui/icons-material/PriorityHigh";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  EmptyState,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  StatusBadge,
+  Textarea,
+  type Tone,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
 import IniciarActividad from "@/components/pizarra/IniciarActividad";
 import { SesionPropia } from "@/components/pizarra/SesionActividad";
-import { colorBordeActividad, puedeIniciar, SEMAFORO_UI, textoChipSemaforo, textoPlanVsReal } from "@/lib/actividad-tiempos";
+import { SemaforoBadge } from "@/components/pizarra/PizarraKpi";
+import { puedeIniciar, textoChipSemaforo, textoPlanVsReal } from "@/lib/actividad-tiempos";
 import {
   estatusUi,
   formatMinutes,
@@ -36,103 +59,44 @@ import {
   shortName,
 } from "@/lib/activity-labels";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
-import { IconBadge, IconLabel } from "@/components/ui/IconBadge";
 import {
   fetchMyActivities,
   reorderMyActivities,
   type MyActivitiesResponse,
   type MyActivityItem,
 } from "@/lib/my-activities-api";
+import c from "./comun.module.css";
+import m from "./MisActividadesView.module.css";
 
 const MIN_REASON = 10;
 
 /** Avance de quien ejecuta, según su evidencia. */
-function avanceUi(status?: string | null): { label: string; color?: string } {
+function avanceUi(status?: string | null): { label: string; tone: Tone } {
   switch (status) {
     case "COMPLETED":
-      return { label: "Evidencia lista", color: "#16a34a" };
+      return { label: "Evidencia lista", tone: "success" };
     case "EXIT_PHOTO":
-      return { label: "Por cerrar", color: "#2563eb" };
+      return { label: "Por cerrar", tone: "info" };
     case "SERVICE_SHEET_PDF":
     case "SERVICE_SHEET_DATA":
-      return { label: "Llenando hoja", color: "#2563eb" };
+      return { label: "Llenando hoja", tone: "info" };
     case "EVIDENCE_PHOTOS":
-      return { label: "Trabajando en sitio", color: "#2563eb" };
+      return { label: "Trabajando en sitio", tone: "info" };
     default:
-      return { label: "Sin empezar" };
+      return { label: "Sin empezar", tone: "neutral" };
   }
 }
 
-/** Icono en línea con texto corrido (se alinea con la línea base). */
-const INLINE_ICON_SX = { fontSize: 16, verticalAlign: "-0.22em", mr: "5px" } as const;
-
-const btnPrimary: CSSProperties = {
-  border: "none",
-  background: "var(--primary)",
-  color: "#fff",
-  fontWeight: 750,
-  fontSize: 13.5,
-  padding: "10px 16px",
-  borderRadius: 12,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  whiteSpace: "nowrap",
-};
-
-const btnSecondary: CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  fontWeight: 650,
-  fontSize: 13,
-  padding: "8px 14px",
-  minHeight: 40,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: 10,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  textDecoration: "none",
-  whiteSpace: "nowrap",
-};
-
-function Chip({ children, color, icon: Icon }: { children: ReactNode; color?: string; icon?: SvgIconComponent }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "3px 9px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 650,
-        border: `1px solid ${color ? `color-mix(in srgb, ${color} 35%, var(--border))` : "var(--border)"}`,
-        background: color ? `color-mix(in srgb, ${color} 10%, var(--surface))` : "var(--surface)",
-        color: color ?? "var(--text-secondary)",
-      }}
-    >
-      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 15, flex: "0 0 auto" }} /> : null}
-      {children}
-    </span>
-  );
+/** Franja de la tarjeta: rojo atrasada, ámbar por vencer, azul sin iniciar, verde en tiempo. */
+function franja(a: MyActivityItem): "rojo" | "amarillo" | "sinIniciar" | "verde" {
+  if (a.semaforo === "rojo") return "rojo";
+  if (a.semaforo === "amarillo") return "amarillo";
+  if (!a.inicioRealAt) return "sinIniciar";
+  return "verde";
 }
 
-function Stat({ label, value, color }: { label: string; value: number; color?: string }) {
-  return (
-    <div
-      style={{
-        padding: "12px 14px",
-        borderRadius: 14,
-        border: "1px solid var(--border)",
-        background: "var(--surface)",
-      }}
-    >
-      <div style={{ fontSize: 24, fontWeight: 800, color: color ?? "inherit", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{label}</div>
-    </div>
-  );
+function horaCorta(iso: string): string {
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
 type PendingMove = { item: MyActivityItem; from: number; to: number };
@@ -181,6 +145,9 @@ export default function MisActividadesPage() {
   const seguimiento = data?.seguimiento ?? [];
   const urgentes = open.filter((a) => priorityUi(a.prioridad).label === "Urgente").length;
   const canReorder = Boolean(data?.canReorder) && open.length > 1;
+  const atrasadas = open.filter((a) => a.semaforo === "rojo").length;
+  const porVencer = open.filter((a) => a.semaforo === "amarillo").length;
+  const enTiempo = open.length - atrasadas - porVencer;
 
   const askMove = (from: number, to: number) => {
     const item = open[from];
@@ -219,50 +186,30 @@ export default function MisActividadesPage() {
 
   if (isCeo) {
     return (
-      <div style={{ maxWidth: 620, margin: "40px auto", textAlign: "center", display: "grid", gap: 10 }}>
-        <h1 style={{ margin: 0, fontSize: 22 }}>Mis actividades</h1>
-        <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-          Este módulo es para el equipo: cada quien ve y ordena su propia cola. Para ver a todos entra a{" "}
-          <Link href="/erp/pizarra" style={{ color: "var(--primary)", fontWeight: 700 }}>
-            Actividades
-          </Link>
-          .
-        </p>
-      </div>
+      <Card>
+        <EmptyState
+          icon={<GroupsOutlinedIcon />}
+          titleAs="h2"
+          title="Mis actividades es para el equipo"
+          description="Cada quien ve y ordena su propia cola. Para ver a todos entra a Actividades."
+          action={
+            <ButtonLink href="/erp/pizarra" variant="primary" className={c.tap}>
+              Ir a Actividades
+            </ButtonLink>
+          }
+        />
+      </Card>
     );
   }
 
+  const autoAsignarme = () => router.push("/erp/mis-actividades/nueva");
+
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 14,
-          flexWrap: "wrap",
-          padding: 18,
-          borderRadius: 20,
-          border: "1px solid var(--border)",
-          background: "color-mix(in srgb, var(--primary) 6%, var(--surface))",
-        }}
-      >
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 750,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              color: "var(--text-tertiary)",
-            }}
-          >
-            Mis actividades
-          </div>
-          <h1 style={{ margin: "4px 0 0", fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            {firstName ? `Hola, ${firstName}` : "Tu día"}
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--text-secondary)" }}>
+    <div className={m.vista}>
+      <header className={m.saludo}>
+        <div className={m.saludoTexto}>
+          <h2 className={m.hola}>{firstName ? `Hola, ${firstName}` : "Tu día"}</h2>
+          <p className={c.tenue}>
             {loading
               ? "Cargando tus actividades…"
               : open.length === 0
@@ -270,505 +217,468 @@ export default function MisActividadesPage() {
                 : `Tienes ${open.length} por hacer. Empieza por la #1.`}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" style={btnSecondary} onClick={() => void load()}>
-            ↻ Actualizar
-          </button>
+        <div className={m.saludoAcciones}>
+          <Button variant="ghost" className={c.tap} iconStart={<RefreshIcon />} onClick={() => void load()}>
+            Actualizar
+          </Button>
           {data?.canSelfAssign ? (
-            <button type="button" style={btnPrimary} onClick={() => router.push("/erp/mis-actividades/nueva")}>
-              ＋ Auto-asignarme
-            </button>
+            <Button variant="primary" className={c.tap} iconStart={<AddIcon />} onClick={autoAsignarme}>
+              Auto-asignarme
+            </Button>
           ) : null}
         </div>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
-        <Stat label="Por hacer" value={open.length} />
-        <Stat label="Urgentes" value={urgentes} color={urgentes ? "#dc2626" : undefined} />
-        <Stat label="Hechas hoy" value={done.length} color={done.length ? "#16a34a" : undefined} />
-        {seguimiento.length ? <Stat label="En seguimiento" value={seguimiento.length} /> : null}
-      </div>
+      {data ? (
+        <StatRow cols={seguimiento.length ? 4 : 3} ariaLabel="Resumen de tu día">
+          <Stat
+            label="Por hacer"
+            value={open.length}
+            icon={<ListAltOutlinedIcon />}
+            meter={
+              open.length
+                ? [
+                    { value: enTiempo, tone: "success", label: `${enTiempo} en tiempo` },
+                    { value: porVencer, tone: "warning", label: `${porVencer} por vencer` },
+                    { value: atrasadas, tone: "danger", label: `${atrasadas} atrasadas` },
+                  ]
+                : undefined
+            }
+            meterMax={open.length || undefined}
+            hint={open.length ? undefined : "nada pendiente"}
+          />
+          <Stat
+            label="Urgentes"
+            value={urgentes}
+            tone={urgentes ? "danger" : "default"}
+            hint={atrasadas ? `${atrasadas} ya van tarde` : "ninguna va tarde"}
+            icon={<PriorityHighIcon />}
+            iconTone={urgentes ? "danger" : "neutral"}
+            semaforo={atrasadas ? "rojo" : porVencer ? "ambar" : "verde"}
+          />
+          <Stat
+            label="Hechas hoy"
+            value={done.length}
+            tone={done.length ? "brand" : "default"}
+            hint={done.length ? "bien hecho" : "todavía ninguna"}
+            icon={<TaskAltIcon />}
+            iconTone="success"
+          />
+          {seguimiento.length ? (
+            <Stat
+              label="En seguimiento"
+              value={seguimiento.length}
+              hint="ya las repartiste"
+              icon={<VisibilityOutlinedIcon />}
+              iconTone="info"
+            />
+          ) : null}
+        </StatRow>
+      ) : null}
 
-      {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 13 }}>{error}</p> : null}
+      {error ? (
+        <Alert
+          tone={data ? "warning" : "danger"}
+          role="alert"
+          action={
+            <Button size="sm" className={c.tap} onClick={() => void load()}>
+              Reintentar
+            </Button>
+          }
+        >
+          {data ? `${error}. Sigues viendo lo último que cargó.` : error}
+        </Alert>
+      ) : null}
 
       {canReorder ? (
-        <div
-          role="note"
-          style={{
-            padding: "10px 14px",
-            borderRadius: 14,
-            border: "1px solid color-mix(in srgb, var(--primary) 30%, var(--border))",
-            background: "color-mix(in srgb, var(--primary) 7%, var(--surface))",
-            fontSize: 13,
-            lineHeight: 1.45,
-          }}
-        >
-          <strong>Tú decides el orden.</strong> Usa «Subir» y «Bajar». Cada cambio te pide un motivo corto de por
-          qué la harás en ese lugar.
-        </div>
+        <Alert tone="brand" title="Tú decides el orden.">
+          Usa «Subir» y «Bajar». Cada cambio te pide un motivo corto de por qué la harás en ese lugar.
+        </Alert>
       ) : !loading && open.length > 1 && !data?.canReorder ? (
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-          El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.
-        </p>
+        <p className={c.pista}>El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.</p>
+      ) : null}
+
+      {loading && !data ? (
+        <Card>
+          <SkeletonRows rows={4} label="Cargando tus actividades" />
+        </Card>
       ) : null}
 
       {!loading && open.length === 0 && !error ? (
-        <div
-          style={{
-            padding: "32px 20px",
-            textAlign: "center",
-            borderRadius: 20,
-            border: "1px dashed var(--border)",
-            background: "var(--surface)",
-            display: "grid",
-            gap: 8,
-            justifyItems: "center",
-          }}
-        >
-          <IconBadge icon={CelebrationIcon} size={56} />
-          <div style={{ fontWeight: 800, fontSize: 16 }}>Todo al día</div>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-            Cuando te asignen algo aparecerá aquí.
-          </p>
-          {data?.canSelfAssign ? (
-            <button type="button" style={btnPrimary} onClick={() => router.push("/erp/mis-actividades/nueva")}>
-              ＋ Auto-asignarme una actividad
-            </button>
-          ) : null}
-        </div>
+        <Card>
+          <EmptyState
+            icon={<CelebrationIcon />}
+            tone="success"
+            titleAs="h2"
+            title="Todo al día"
+            description="Cuando te asignen algo aparecerá aquí."
+            action={
+              data?.canSelfAssign ? (
+                <Button className={c.tap} iconStart={<AddIcon />} onClick={autoAsignarme}>
+                  Auto-asignarme una actividad
+                </Button>
+              ) : undefined
+            }
+          />
+        </Card>
       ) : null}
 
-      <div style={{ display: "grid", gap: 12 }}>
-        {open.map((a, i) => {
-          const pr = priorityUi(a.prioridad);
-          // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
-          const when = a.periodo?.etiqueta ?? formatWhen(a.fechaInicio ?? a.fechaMaxima);
-          const est = formatMinutes(a.tiempoEstimadoMin);
-          const max = formatMinutes(a.tiempoMaximoMin);
-          // «Plan 2 h · real 2 h 35 min» (el tiempo estimado por persona manda sobre el viejo).
-          const plan = textoPlanVsReal(a.minutosPlan, a.minutosReales);
-          const lugar = a.cliente || a.proyecto;
-          const first = i === 0;
-          const highlighted = highlightId === a.id;
-          return (
-            <article
-              key={a.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "auto minmax(0, 1fr)",
-                gap: 14,
-                padding: 16,
-                borderRadius: 18,
-                border: highlighted
-                  ? "2px solid var(--primary)"
-                  : first
-                    ? "1.5px solid color-mix(in srgb, var(--primary) 40%, var(--border))"
-                    : "1px solid var(--border)",
-                background: first ? "color-mix(in srgb, var(--primary) 5%, var(--surface))" : "var(--surface)",
-                boxShadow: `inset 5px 0 0 ${colorBordeActividad(a.semaforo, Boolean(a.inicioRealAt))}`,
-              }}
-            >
-              <div
-                aria-label={`Lugar ${i + 1}`}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  display: "grid",
-                  placeItems: "center",
-                  fontWeight: 800,
-                  fontSize: 16,
-                  background: first ? "var(--primary)" : "color-mix(in srgb, var(--primary) 12%, var(--surface))",
-                  color: first ? "#fff" : "var(--primary)",
-                }}
+      {open.length ? (
+        <section className={m.cola} aria-label="Por hacer">
+          {open.map((a, i) => {
+            const pr = priorityUi(a.prioridad);
+            const est = estatusUi(a.estatus);
+            // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
+            const when = a.periodo?.etiqueta ?? formatWhen(a.fechaInicio ?? a.fechaMaxima);
+            const estimado = formatMinutes(a.tiempoEstimadoMin);
+            const max = formatMinutes(a.tiempoMaximoMin);
+            // «Plan 2 h · real 2 h 35 min» (el tiempo estimado por persona manda sobre el viejo).
+            const plan = textoPlanVsReal(a.minutosPlan, a.minutosReales);
+            const lugar = a.cliente || a.proyecto;
+            const first = i === 0;
+            const highlighted = highlightId === a.id;
+            return (
+              <article
+                key={a.id}
+                className={m.tarea}
+                data-primera={first ? "true" : undefined}
+                data-resaltada={highlighted ? "true" : undefined}
+                data-franja={franja(a)}
               >
-                {i + 1}
-              </div>
-              <div style={{ minWidth: 0, display: "grid", gap: 8 }}>
-                {first ? (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "var(--primary)",
-                    }}
-                  >
-                    Empieza por aquí
-                  </div>
-                ) : null}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.3 }}>{a.titulo}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
-                      Folio {a.anNumber}
+                <div className={m.lugar} aria-label={`Lugar ${i + 1}`}>
+                  {i + 1}
+                </div>
+                <div className={m.cuerpo}>
+                  {first ? <span className={m.empieza}>Empieza por aquí</span> : null}
+                  <div className={c.filaEntre}>
+                    <div className={m.cabeza}>
+                      <span className={m.tipo} aria-hidden="true">
+                        <ActivityKindIcon kind={kindIcon(a)} size={18} />
+                      </span>
+                      <div className={m.cabezaTexto}>
+                        <h3 className={c.tituloFila}>{a.titulo}</h3>
+                        <span className={c.folio}>
+                          {a.anNumber} · {kindLabel(a)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={m.acciones}>
+                      {a.porRepartir && myId ? (
+                        <ButtonLink
+                          href={`/erp/pizarra/${myId}`}
+                          variant="tonal"
+                          size="sm"
+                          className={c.tap}
+                          iconStart={<SendOutlinedIcon />}
+                        >
+                          Repartir
+                        </ButtonLink>
+                      ) : null}
+                      <ButtonLink
+                        href={`/erp/actividades/${a.id}`}
+                        size="sm"
+                        className={c.tap}
+                        iconEnd={<ArrowForwardIcon />}
+                      >
+                        Abrir
+                      </ButtonLink>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {a.porRepartir && myId ? (
-                      <Link href={`/erp/pizarra/${myId}`} style={{ ...btnPrimary, textDecoration: "none" }}>
-                        Repartir →
-                      </Link>
+
+                  <div className={m.insignias}>
+                    {a.porRepartir ? (
+                      <Badge size="sm" tone="warning" icon={<SendOutlinedIcon />}>
+                        Te toca repartirla
+                      </Badge>
                     ) : null}
-                    <Link href={`/erp/actividades/${a.id}`} style={btnSecondary}>
-                      Abrir →
-                    </Link>
+                    <StatusBadge size="sm" label={est.label} tone={est.tone ?? "neutral"} />
+                    <Badge size="sm" dot tone={pr.tone}>
+                      {pr.label}
+                    </Badge>
+                    {a.semaforo ? (
+                      <SemaforoBadge
+                        semaforo={a.semaforo}
+                        label={textoChipSemaforo(a.semaforo, a.minutosAtraso, a.minutosParaVencer, a.motivoSemaforo)}
+                      />
+                    ) : null}
+                    {puedeIniciar(a) && a.semaforo === "verde" ? (
+                      <Badge size="sm" tone="info">
+                        Sin iniciar
+                      </Badge>
+                    ) : null}
+                    {a.enPausa ? (
+                      <Badge size="sm" tone="warning" icon={<PauseCircleOutlineIcon />}>
+                        En pausa
+                      </Badge>
+                    ) : null}
+                    <Badge size="sm" tone="outline" icon={a.autoAsignada ? <PanToolOutlinedIcon /> : undefined}>
+                      {a.autoAsignada
+                        ? "Auto-asignada"
+                        : a.asignadaPor
+                          ? `De ${shortName(a.asignadaPor.nombre)}`
+                          : "Asignada"}
+                    </Badge>
                   </div>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {a.porRepartir ? (
-                    <Chip color="#d97706" icon={SendOutlinedIcon}>
-                      Te toca repartirla
-                    </Chip>
-                  ) : null}
-                  <Chip color={estatusUi(a.estatus).color}>{estatusUi(a.estatus).label}</Chip>
-                  <Chip color={pr.color}>
-                    <FiberManualRecordIcon aria-hidden="true" sx={{ fontSize: 9 }} />
-                    {pr.label}
-                  </Chip>
-                  {a.semaforo ? (
-                    <Chip color={SEMAFORO_UI[a.semaforo].color}>
-                      <FiberManualRecordIcon aria-hidden="true" sx={{ fontSize: 9 }} />
-                      {textoChipSemaforo(a.semaforo, a.minutosAtraso, a.minutosParaVencer, a.motivoSemaforo)}
-                    </Chip>
-                  ) : null}
-                  {puedeIniciar(a) && a.semaforo === "verde" ? <Chip color="#2563eb">Sin iniciar</Chip> : null}
-                  {a.enPausa ? (
-                    <Chip color="#d97706" icon={PauseCircleOutlineIcon}>
-                      En pausa
-                    </Chip>
-                  ) : null}
-                  <Chip>
-                    <ActivityKindIcon kind={kindIcon(a)} size={15} />
-                    {kindLabel(a)}
-                  </Chip>
-                  <Chip icon={a.autoAsignada ? PanToolOutlinedIcon : undefined}>
-                    {a.autoAsignada
-                      ? "Auto-asignada"
-                      : a.asignadaPor
-                        ? `De ${shortName(a.asignadaPor.nombre)}`
-                        : "Asignada"}
-                  </Chip>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "4px 14px",
-                    fontSize: 13,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  <IconLabel icon={EventOutlinedIcon} gap={5}>
-                    {when ?? "Sin fecha"}
-                  </IconLabel>
-                  {plan ? (
-                    <IconLabel icon={TimerOutlinedIcon} gap={5}>
-                      <span style={a.excedida ? { color: "#dc2626", fontWeight: 700 } : undefined}>
+
+                  <div className={c.datos}>
+                    <span className={c.dato}>
+                      <EventOutlinedIcon aria-hidden="true" />
+                      {when ?? "Sin fecha"}
+                    </span>
+                    {plan ? (
+                      <span className={[c.dato, a.excedida ? m.excedida : ""].filter(Boolean).join(" ")}>
+                        <TimerOutlinedIcon aria-hidden="true" />
                         {plan}
                         {a.excedida ? " · excedida" : ""}
                       </span>
-                    </IconLabel>
-                  ) : est ? (
-                    <IconLabel icon={TimerOutlinedIcon} gap={5}>
-                      {est}
-                      {max ? ` · tope ${max}` : ""}
-                    </IconLabel>
-                  ) : null}
-                  {lugar ? (
-                    <IconLabel icon={PlaceOutlinedIcon} gap={5}>
-                      {lugar}
-                    </IconLabel>
-                  ) : null}
-                </div>
-                {a.indicaciones ? (
-                  <p
-                    style={{
-                      margin: 0,
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      background: "color-mix(in srgb, var(--text-secondary) 7%, var(--surface))",
-                      fontSize: 13,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {a.indicaciones}
-                  </p>
-                ) : null}
-                {a.ordenJustificacion ? (
-                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                    <EditNoteOutlinedIcon aria-hidden="true" sx={INLINE_ICON_SX} />
-                    <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
-                  </p>
-                ) : null}
-                {/* Quien la recibe no la acepta ni la rechaza: únicamente la inicia. */}
-                {token && puedeIniciar(a) ? (
-                  <IniciarActividad token={token} activityId={a.id} onDone={() => void load()} />
-                ) : null}
-                {/* Ya iniciada: su reloj corre (Pausar) o está detenido (En pausa · Reanudar). */}
-                {token && !puedeIniciar(a) ? (
-                  <SesionPropia token={token} activityId={a.id} actividad={a} miId={myId} onDone={() => void load()} />
-                ) : null}
-                {canReorder ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    <button
-                      type="button"
-                      style={{ ...btnSecondary, opacity: i === 0 ? 0.45 : 1 }}
-                      disabled={i === 0}
-                      onClick={() => askMove(i, i - 1)}
-                    >
-                      ↑ Subir
-                    </button>
-                    <button
-                      type="button"
-                      style={{ ...btnSecondary, opacity: i === open.length - 1 ? 0.45 : 1 }}
-                      disabled={i === open.length - 1}
-                      onClick={() => askMove(i, i + 1)}
-                    >
-                      ↓ Bajar
-                    </button>
-                    {i > 1 ? (
-                      <button type="button" style={btnSecondary} onClick={() => askMove(i, 0)}>
-                        ⤒ Hacerla primero
-                      </button>
+                    ) : estimado ? (
+                      <span className={c.dato}>
+                        <TimerOutlinedIcon aria-hidden="true" />
+                        {estimado}
+                        {max ? ` · tope ${max}` : ""}
+                      </span>
+                    ) : null}
+                    {lugar ? (
+                      <span className={c.dato}>
+                        <PlaceOutlinedIcon aria-hidden="true" />
+                        {lugar}
+                      </span>
                     ) : null}
                   </div>
-                ) : null}
-              </div>
-            </article>
-          );
-        })}
-      </div>
 
-      {seguimiento.length ? (
-        <section style={{ display: "grid", gap: 10 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
-              <IconLabel icon={VisibilityOutlinedIcon} size={18}>
-                En seguimiento ({seguimiento.length})
-              </IconLabel>
-            </h2>
-            <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-              Ya las repartiste: aquí ves a quién se las pasaste y cómo va quien las ejecuta.
-            </p>
-          </div>
-          {seguimiento.map((s) => {
-            const est = estatusUi(s.estatus);
-            const ejecutor = [...s.pasadaA].reverse().find((p) => p.rol !== "LEAD") ?? null;
-            const avance = ejecutor ? avanceUi(ejecutor.evidenceStatus) : null;
-            const primera = s.pasadaA[0];
-            return (
-              <article
-                key={s.id}
-                style={{
-                  padding: 14,
-                  borderRadius: 16,
-                  border: "1px solid var(--border)",
-                  background: "var(--surface)",
-                  display: "grid",
-                  gap: 8,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.3 }}>{s.titulo}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>Folio {s.anNumber}</div>
-                  </div>
-                  <Link href={`/erp/actividades/${s.id}/historial`} style={btnSecondary}>
-                    Ver registro →
-                  </Link>
+                  {a.indicaciones ? <p className={c.cita}>{a.indicaciones}</p> : null}
+                  {a.ordenJustificacion ? (
+                    <p className={[c.tenue, m.porque].join(" ")}>
+                      <EditNoteOutlinedIcon aria-hidden="true" />
+                      <span>
+                        <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
+                      </span>
+                    </p>
+                  ) : null}
+
+                  {/* Quien la recibe no la acepta ni la rechaza: únicamente la inicia. */}
+                  {token && puedeIniciar(a) ? (
+                    <IniciarActividad
+                      token={token}
+                      activityId={a.id}
+                      variant={first ? "primary" : "tonal"}
+                      onDone={() => void load()}
+                    />
+                  ) : null}
+                  {/* Ya iniciada: su reloj corre (Pausar) o está detenido (En pausa · Reanudar). */}
+                  {token && !puedeIniciar(a) ? (
+                    <SesionPropia token={token} activityId={a.id} actividad={a} miId={myId} onDone={() => void load()} />
+                  ) : null}
+
+                  {canReorder ? (
+                    <div className={m.orden} role="group" aria-label={`Cambiar el lugar de «${a.titulo}»`}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className={c.tap}
+                        iconStart={<ArrowUpwardIcon />}
+                        disabled={i === 0}
+                        onClick={() => askMove(i, i - 1)}
+                      >
+                        Subir
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className={c.tap}
+                        iconStart={<ArrowDownwardIcon />}
+                        disabled={i === open.length - 1}
+                        onClick={() => askMove(i, i + 1)}
+                      >
+                        Bajar
+                      </Button>
+                      {i > 1 ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={c.tap}
+                          iconStart={<VerticalAlignTopIcon />}
+                          onClick={() => askMove(i, 0)}
+                        >
+                          Hacerla primero
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <Chip color={est.color}>{est.label}</Chip>
-                  <Chip>
-                    <ActivityKindIcon kind={kindIcon(s)} size={15} />
-                    {kindLabel(s)}
-                  </Chip>
-                  {avance ? (
-                    <Chip color={avance.color}>
-                      {shortName(ejecutor?.nombre)}: {avance.label}
-                    </Chip>
-                  ) : (
-                    <Chip color="#d97706">Falta que la asignen</Chip>
-                  )}
-                </div>
-                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                  <SendOutlinedIcon aria-hidden="true" sx={INLINE_ICON_SX} />
-                  Enviada a {s.pasadaA.map((p) => shortName(p.nombre)).join(" → ")}
-                  {primera ? ` · ${formatWhen(primera.at) ?? ""}` : ""}
-                </div>
-                {s.ultimaReprogramacion ? (
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                    <EventRepeatIcon aria-hidden="true" sx={INLINE_ICON_SX} />
-                    Reprogramada por {shortName(s.ultimaReprogramacion.por) || "alguien"} ·{" "}
-                    {formatWhen(s.ultimaReprogramacion.at) ?? ""}
-                  </div>
-                ) : null}
-                {token ? (
-                  <ReprogramarDespacho
-                    token={token}
-                    activityId={s.id}
-                    fechaActual={s.fechaInicio}
-                    onDone={() => void load()}
-                  />
-                ) : null}
               </article>
             );
           })}
         </section>
       ) : null}
 
+      {seguimiento.length ? (
+        <Card pad={false} className={m.bloque}>
+          <div className={m.bloqueCabeza}>
+            <CardHead
+              title={`En seguimiento (${seguimiento.length})`}
+              subtitle="Ya las repartiste: aquí ves a quién se las pasaste y cómo va quien las ejecuta."
+            />
+          </div>
+          <div className={m.renglones}>
+            {seguimiento.map((s) => {
+              const est = estatusUi(s.estatus);
+              const ejecutor = [...s.pasadaA].reverse().find((p) => p.rol !== "LEAD") ?? null;
+              const avance = ejecutor ? avanceUi(ejecutor.evidenceStatus) : null;
+              const primera = s.pasadaA[0];
+              return (
+                <article key={s.id} className={m.renglon}>
+                  <div className={c.filaEntre}>
+                    <div className={m.cabeza}>
+                      <span className={m.tipo} aria-hidden="true">
+                        <ActivityKindIcon kind={kindIcon(s)} size={18} />
+                      </span>
+                      <div className={m.cabezaTexto}>
+                        <h3 className={c.tituloFila}>{s.titulo}</h3>
+                        <span className={c.folio}>
+                          {s.anNumber} · {kindLabel(s)}
+                        </span>
+                      </div>
+                    </div>
+                    <ButtonLink
+                      href={`/erp/actividades/${s.id}/historial`}
+                      size="sm"
+                      variant="ghost"
+                      className={c.tap}
+                      iconEnd={<ArrowForwardIcon />}
+                    >
+                      Ver registro
+                    </ButtonLink>
+                  </div>
+                  <div className={m.insignias}>
+                    <StatusBadge size="sm" label={est.label} tone={est.tone ?? "neutral"} />
+                    {avance ? (
+                      <Badge size="sm" dot tone={avance.tone}>
+                        {shortName(ejecutor?.nombre)}: {avance.label}
+                      </Badge>
+                    ) : (
+                      <Badge size="sm" dot tone="warning">
+                        Falta que la asignen
+                      </Badge>
+                    )}
+                  </div>
+                  <div className={c.datos}>
+                    <span className={c.dato}>
+                      <SendOutlinedIcon aria-hidden="true" />
+                      Enviada a {s.pasadaA.map((p) => shortName(p.nombre)).join(" → ")}
+                      {primera ? ` · ${formatWhen(primera.at) ?? ""}` : ""}
+                    </span>
+                    {s.ultimaReprogramacion ? (
+                      <span className={c.dato}>
+                        <EventRepeatIcon aria-hidden="true" />
+                        Reprogramada por {shortName(s.ultimaReprogramacion.por) || "alguien"} ·{" "}
+                        {formatWhen(s.ultimaReprogramacion.at) ?? ""}
+                      </span>
+                    ) : null}
+                  </div>
+                  {token ? (
+                    <ReprogramarDespacho
+                      token={token}
+                      activityId={s.id}
+                      fechaActual={s.fechaInicio}
+                      onDone={() => void load()}
+                    />
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
       {done.length ? (
-        <section style={{ display: "grid", gap: 8 }}>
-          <button
-            type="button"
+        <Card pad={false} className={m.bloque}>
+          <Button
+            variant="ghost"
+            fullWidth
+            className={m.plegable}
+            iconStart={<TaskAltIcon />}
+            iconEnd={showDone ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             onClick={() => setShowDone((v) => !v)}
-            style={{ ...btnSecondary, justifySelf: "start", fontSize: 13, gap: 6 }}
             aria-expanded={showDone}
           >
-            <TaskAltIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-            <span>Hechas hoy ({done.length})</span>
-            {showDone ? (
-              <ExpandLessIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-            ) : (
-              <ExpandMoreIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-            )}
-          </button>
-          {showDone
-            ? done.map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/erp/actividades/${a.id}`}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    padding: "10px 14px",
-                    borderRadius: 12,
-                    border: "1px solid var(--border)",
-                    background: "var(--surface)",
-                    color: "inherit",
-                    textDecoration: "none",
-                    fontSize: 13,
-                  }}
-                >
-                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <CheckIcon aria-hidden="true" sx={{ ...INLINE_ICON_SX, fontSize: 15, mr: "6px" }} />
-                    {a.titulo}
-                  </span>
-                  <span style={{ color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-                    {a.fechaFinalizacion
-                      ? new Date(a.fechaFinalizacion).toLocaleTimeString("es-MX", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : a.estatus}
-                  </span>
-                </Link>
-              ))
-            : null}
-        </section>
+            <span className={m.plegableTexto}>Hechas hoy</span>
+            <Badge size="sm" tone="success">
+              {done.length}
+            </Badge>
+          </Button>
+          {showDone ? (
+            <ul className={m.hechas}>
+              {done.map((a) => (
+                <li key={a.id}>
+                  <Link className={m.hecha} href={`/erp/actividades/${a.id}`}>
+                    <CheckIcon aria-hidden="true" className={m.hechaIco} />
+                    <span className={m.hechaTitulo}>{a.titulo}</span>
+                    <span className={m.hechaHora}>{a.fechaFinalizacion ? horaCorta(a.fechaFinalizacion) : a.estatus}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Card>
       ) : null}
 
       {pending ? (
         <div
+          className={m.velo}
           role="dialog"
           aria-modal="true"
           aria-labelledby="mover-titulo"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.45)",
-            zIndex: 9999,
-            display: "grid",
-            placeItems: "center",
-            padding: 16,
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !saving) setPending(null);
           }}
         >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 460,
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 18,
-              padding: 20,
-              display: "grid",
-              gap: 12,
-            }}
-          >
+          <div className={m.dialogo}>
             <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 750,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                Cambiar orden
-              </div>
-              <h2 id="mover-titulo" style={{ margin: "4px 0 0", fontSize: 17, lineHeight: 1.35 }}>
+              <span className={m.dialogoEyebrow}>Cambiar orden</span>
+              <h2 id="mover-titulo" className={m.dialogoTitulo}>
                 «{pending.item.titulo}» pasa del lugar #{pending.from + 1} al #{pending.to + 1}
               </h2>
             </div>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 650 }}>¿Por qué la harás en ese lugar? *</span>
-              <textarea
+            <div className={m.campo}>
+              <label className={m.etiqueta} htmlFor="mover-motivo">
+                ¿Por qué la harás en ese lugar? <span className={m.req}>*</span>
+              </label>
+              <Textarea
+                id="mover-motivo"
                 autoFocus
                 rows={3}
                 maxLength={500}
                 value={reason}
+                invalid={Boolean(moveError)}
+                aria-describedby="mover-ayuda"
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Ej. El cliente la necesita antes de las 12; la otra puede esperar a la tarde."
-                style={{
-                  width: "100%",
-                  padding: 10,
-                  borderRadius: 12,
-                  border: "1px solid var(--border)",
-                  fontFamily: "inherit",
-                  fontSize: 16,
-                  resize: "vertical",
-                  background: "var(--surface)",
-                  color: "inherit",
-                }}
               />
-              <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                {Math.min(reason.trim().length, MIN_REASON)}/{MIN_REASON} caracteres mínimo · queda guardado junto a
-                la actividad.
-              </span>
-            </label>
-            {moveError ? <p style={{ margin: 0, color: "#dc2626", fontSize: 13 }}>{moveError}</p> : null}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" style={btnSecondary} onClick={() => setPending(null)} disabled={saving}>
+              {moveError ? (
+                <span id="mover-ayuda" className={c.error} role="alert">
+                  {moveError}
+                </span>
+              ) : (
+                <span id="mover-ayuda" className={c.pista}>
+                  {Math.min(reason.trim().length, MIN_REASON)}/{MIN_REASON} caracteres mínimo · queda guardado junto a
+                  la actividad.
+                </span>
+              )}
+            </div>
+            <div className={m.dialogoPie}>
+              <Button variant="ghost" className={c.tap} onClick={() => setPending(null)} disabled={saving}>
                 Cancelar
-              </button>
-              <button
-                type="button"
-                style={{ ...btnPrimary, opacity: saving || reason.trim().length < MIN_REASON ? 0.6 : 1 }}
+              </Button>
+              <Button
+                variant="primary"
+                className={c.tap}
+                loading={saving}
                 onClick={() => void confirmMove()}
-                disabled={saving || reason.trim().length < MIN_REASON}
+                disabled={reason.trim().length < MIN_REASON}
               >
                 {saving ? "Guardando…" : "Guardar orden"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

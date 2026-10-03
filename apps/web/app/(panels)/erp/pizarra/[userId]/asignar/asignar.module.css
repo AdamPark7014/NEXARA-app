@@ -1,0 +1,126 @@
+/* Asignar una actividad a una persona: pasos numerados + avance a la derecha.
+   Sistema visual v2 (FormSection, Field, PendingList), solo tokens --ui-*. */
+
+.pagina {
+  max-width: 1120px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.aviso {
+  margin-bottom: var(--ui-s4);
+}
+
+.disposicion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--ui-s5);
+  align-items: start;
+}
+
+.pasos {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+/* Las secciones traen su propio margen; aquí manda el gap. */
+.pasos.pasos > * {
+  margin: 0;
+}
+
+.lateral {
+  position: sticky;
+  top: calc(var(--ui-topbar-h, 56px) + var(--ui-s4));
+  min-width: 0;
+}
+
+.esqueletos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: var(--ui-s3);
+  margin-bottom: var(--ui-s3);
+}
+
+.campos {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.campoCorto {
+  max-width: 220px;
+}
+
+.seccionAviso {
+  border-color: var(--ui-warning-border);
+}
+
+.faltaTiempo {
+  margin: var(--ui-s3) 0 0;
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  font-weight: 600;
+  color: var(--ui-warning-text);
+}
+
+.personas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.indicaciones {
+  display: grid;
+  gap: var(--ui-s3);
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.tituloDatos {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nota {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+}
+
+.sumando {
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.siguiente {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-2);
+  text-align: center;
+}
+
+/* En tableta y teléfono el avance va arriba, compacto, y los pasos debajo. */
+@media (max-width: 960px) {
+  .disposicion {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lateral {
+    position: static;
+    order: -1;
+  }
+}
+
+/* En el teléfono los pasos ya van numerados: la lista de avance sobra. */
+@media (max-width: 600px) {
+  .lateral {
+    display: none;
+  }
+}
