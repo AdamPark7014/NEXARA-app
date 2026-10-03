@@ -25,6 +25,7 @@ function build(prev: Record<string, unknown> | null = null) {
   const prisma = {
     $queryRaw: jest.fn().mockResolvedValue([{ anNumber: 'AN-0041' }]),
     activity: { create, update, findFirst: jest.fn().mockResolvedValue(prev) },
+    user: { findUnique: jest.fn().mockResolvedValue({ isActive: true, nombre: 'Ana' }) },
     activityAssignee: { upsert: jest.fn().mockResolvedValue({}) },
     activityEvidence: { upsert: jest.fn().mockResolvedValue({}) },
   };
