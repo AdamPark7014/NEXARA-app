@@ -1,6 +1,8 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import { Button, Checkbox, Input, LinkButton, Switch } from "@/components/base";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
 import { sumarDias } from "@/lib/cotizacion-documento";
 import {
@@ -16,7 +18,7 @@ import styles from "./editor.module.css";
 
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
 
-/** Interruptor tranquilo (casilla con estilo de switch), con su ayuda en una línea. */
+/** Interruptor del sistema (`Switch`), con su ayuda en una línea debajo. */
 function Interruptor({
   activo,
   onCambio,
@@ -32,24 +34,15 @@ function Interruptor({
   bloqueado?: boolean;
   deshabilitado?: boolean;
 }) {
-  const id = useId();
   return (
-    <label
+    <Switch
       className={`${styles.interruptor} ${bloqueado ? styles.interruptorBloqueado : ""}`}
-      htmlFor={id}
-      title={ayuda}
-    >
-      <input
-        id={id}
-        type="checkbox"
-        role="switch"
-        className={styles.interruptorCaja}
-        checked={activo}
-        disabled={bloqueado || deshabilitado}
-        onChange={(e) => onCambio?.(e.target.checked)}
-      />
-      <span className={styles.interruptorEtiqueta}>{etiqueta}</span>
-    </label>
+      label={etiqueta}
+      description={ayuda}
+      checked={activo}
+      disabled={bloqueado || deshabilitado}
+      onChange={(e) => onCambio?.(e.target.checked)}
+    />
   );
 }
 
@@ -106,30 +99,35 @@ export default function PanelPersonalizar({
 
   return (
     <section id="personalizar" data-seccion="portada" className={styles.hoja} aria-labelledby="personalizar-titulo">
-      <div className={styles.hojaCabeza}>
+      <div className={`${styles.hojaCabeza} ${abierto ? "" : styles.hojaCabezaSola}`}>
+        <span className={styles.numero} aria-hidden>
+          <TuneRoundedIcon />
+        </span>
         <div className={styles.hojaTitulos}>
           <div className={styles.hojaLinea}>
             <h2 id="personalizar-titulo" className={styles.tituloSeccion}>
               Personalizar
             </h2>
           </div>
-          {!abierto ? <p className={styles.ayudaSeccion}>{resumenOpciones(o, doc.moneda)}</p> : null}
+          <p className={styles.ayudaSeccion}>
+            {abierto ? "Qué secciones, columnas, firmas y condiciones lleva el PDF." : resumenOpciones(o, doc.moneda)}
+          </p>
         </div>
         <div className={styles.hojaAcciones}>
-          <button
-            type="button"
-            className={styles.secondaryBtn}
+          <Button
+            size="sm"
+            variant={abierto ? "ghost" : "secondary"}
             aria-expanded={abierto}
             aria-controls="personalizar-cuerpo"
             onClick={() => setAbierto((v) => !v)}
           >
             {abierto ? "Cerrar" : "Ajustar"}
-          </button>
+          </Button>
         </div>
       </div>
 
       {abierto ? (
-        <div id="personalizar-cuerpo" className={styles.opcionesCuerpo}>
+        <div id="personalizar-cuerpo" className={`${styles.hojaCuerpo} ${styles.opcionesCuerpo}`}>
           <Grupo titulo="Secciones incluidas" ayuda="Lo que se apaga no se imprime; en el editor queda su cabecera con «Incluir». La portada y la cotización van siempre.">
             <div className={styles.rejillaInterruptores}>
               <Interruptor activo bloqueado etiqueta="Portada" ayuda="Siempre va" />
@@ -177,9 +175,8 @@ export default function PanelPersonalizar({
                     <label className={styles.etiqueta} htmlFor="carta-dirigida">
                       Dirigida a
                     </label>
-                    <input
+                    <Input
                       id="carta-dirigida"
-                      className={styles.input}
                       value={o.carta.dirigidaA}
                       disabled={!editable}
                       placeholder="Ing. Laura Pérez"
@@ -190,9 +187,8 @@ export default function PanelPersonalizar({
                     <label className={styles.etiqueta} htmlFor="carta-cargo">
                       Cargo
                     </label>
-                    <input
+                    <Input
                       id="carta-cargo"
-                      className={styles.input}
                       value={o.carta.cargo ?? ""}
                       disabled={!editable}
                       placeholder="Cargo"
@@ -223,9 +219,7 @@ export default function PanelPersonalizar({
             ayuda="Alimentan los términos del PDF: la forma de pago completa el renglón del anticipo, y el tiempo de entrega y la garantía salen como renglones propios. Lo que dejes vacío no se imprime."
             accion={
               editable && sugeridas ? (
-                <button
-                  type="button"
-                  className={styles.linkBtn}
+                <LinkButton
                   onClick={() =>
                     cambiar((d) => ({
                       ...d,
@@ -244,7 +238,7 @@ export default function PanelPersonalizar({
                   }
                 >
                   Usar las del segmento
-                </button>
+                </LinkButton>
               ) : null
             }
           >
@@ -253,9 +247,8 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="cond-pago">
                   Forma de pago
                 </label>
-                <input
+                <Input
                   id="cond-pago"
-                  className={styles.input}
                   value={o.condiciones.formaPago}
                   disabled={!editable}
                   placeholder={sugeridas?.formaPago ?? "Transferencia electrónica"}
@@ -266,9 +259,9 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="cond-anticipo">
                   Anticipo %
                 </label>
-                <input
+                <Input
                   id="cond-anticipo"
-                  className={`${styles.input} ${styles.inputNumero}`}
+                  className={styles.inputNumero}
                   type="number"
                   min={0}
                   max={100}
@@ -281,9 +274,9 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="cond-vigencia">
                   Vigencia (días)
                 </label>
-                <input
+                <Input
                   id="cond-vigencia"
-                  className={`${styles.input} ${styles.inputNumero}`}
+                  className={styles.inputNumero}
                   type="number"
                   min={1}
                   max={365}
@@ -300,9 +293,8 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="cond-entrega">
                   Tiempo de entrega
                 </label>
-                <input
+                <Input
                   id="cond-entrega"
-                  className={styles.input}
                   value={o.condiciones.tiempoEntrega}
                   disabled={!editable}
                   placeholder={sugeridas?.tiempoEntrega ?? "5 días hábiles"}
@@ -313,9 +305,8 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="cond-garantia">
                   Garantía
                 </label>
-                <input
+                <Input
                   id="cond-garantia"
-                  className={styles.input}
                   value={o.condiciones.garantia}
                   disabled={!editable}
                   placeholder={sugeridas?.garantia ?? "Garantía del fabricante"}
@@ -341,9 +332,8 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="tipo-cambio">
                   Nota de tipo de cambio
                 </label>
-                <input
+                <Input
                   id="tipo-cambio"
-                  className={styles.input}
                   value={o.tipoCambioNota}
                   disabled={!editable}
                   placeholder="Tipo de cambio DOF del día de pago"
@@ -366,9 +356,8 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="firma-elaboro">
                   Elaboró
                 </label>
-                <input
+                <Input
                   id="firma-elaboro"
-                  className={styles.input}
                   list={listaPersonas}
                   value={o.elaboro?.nombre ?? ""}
                   disabled={!editable}
@@ -382,9 +371,8 @@ export default function PanelPersonalizar({
                 <label className={styles.etiqueta} htmlFor="firma-elaboro-cargo">
                   Cargo
                 </label>
-                <input
+                <Input
                   id="firma-elaboro-cargo"
-                  className={styles.input}
                   value={o.elaboro?.cargo ?? ""}
                   disabled={!editable || !o.elaboro}
                   placeholder={autor?.cargo || "Puesto"}
@@ -405,9 +393,8 @@ export default function PanelPersonalizar({
                   <label className={styles.etiqueta} htmlFor="firma-autorizo">
                     Autorizó
                   </label>
-                  <input
+                  <Input
                     id="firma-autorizo"
-                    className={styles.input}
                     list={listaPersonas}
                     value={o.autorizo.nombre}
                     disabled={!editable}
@@ -430,9 +417,8 @@ export default function PanelPersonalizar({
                   <label className={styles.etiqueta} htmlFor="firma-autorizo-cargo">
                     Cargo
                   </label>
-                  <input
+                  <Input
                     id="firma-autorizo-cargo"
-                    className={styles.input}
                     value={o.autorizo.cargo ?? ""}
                     disabled={!editable}
                     placeholder="Cargo"
@@ -445,21 +431,18 @@ export default function PanelPersonalizar({
 
           <Grupo titulo="Plantilla" ayuda="Guarda los textos, las secciones, las columnas y los términos de esta cotización para empezar otras desde aquí. No guarda cliente ni folio; con «Con partidas» también guarda los precios.">
             <div className={styles.filaPlantilla}>
-              <input
-                className={styles.input}
+              <Input
+                wrapperClassName={styles.filaPlantillaNombre}
+                className={styles.filaPlantillaNombre}
                 aria-label="Nombre de la plantilla"
                 placeholder="Nombre de la plantilla"
                 value={nombrePlantilla}
                 onChange={(e) => setNombrePlantilla(e.target.value)}
               />
-              <label className={styles.casilla}>
-                <input type="checkbox" checked={conPartidas} onChange={(e) => setConPartidas(e.target.checked)} />
-                Con partidas
-              </label>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                disabled={!puedeGuardarPlantilla || nombrePlantilla.trim().length < 2 || guardando}
+              <Checkbox label="Con partidas" checked={conPartidas} onChange={(e) => setConPartidas(e.target.checked)} />
+              <Button
+                loading={guardando}
+                disabled={!puedeGuardarPlantilla || nombrePlantilla.trim().length < 2}
                 onClick={async () => {
                   setGuardando(true);
                   try {
@@ -471,7 +454,7 @@ export default function PanelPersonalizar({
                 }}
               >
                 {guardando ? "Guardando…" : "Guardar como plantilla"}
-              </button>
+              </Button>
             </div>
             {!puedeGuardarPlantilla ? <p className={styles.pista}>Se habilita al guardarse el borrador.</p> : null}
           </Grupo>

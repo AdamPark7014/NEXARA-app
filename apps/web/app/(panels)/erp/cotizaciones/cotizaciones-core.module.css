@@ -1,19 +1,89 @@
-/* Cotizaciones Core: lista («Minimalista», tokens --ui-*). El editor ([id]) usa wrap, migas, esqueleto, errorBox y linkBtn. */
+/*
+ * Cotizaciones Core (v2): lista sobre `ModulePage` + `DataTable` y la carga de la ficha ([id]).
+ * Solo tokens --ui-*: claro y oscuro (body.dark) salen de los tokens.
+ */
 
 .wrap {
-  max-width: 1200px;
+  width: 100%;
+  max-width: var(--ui-content-max, 1280px);
   margin: 0 auto;
+  min-width: 0;
+}
+
+.ayudaNota {
+  margin: 10px 0 0;
+}
+
+.avisos {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.avisos > * {
+  margin: 0;
+}
+
+/* Los segmentos no empujan la página: si no caben, se desplazan dentro. */
+.segmentos {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* ─── Celdas ───────────────────────────────────────────────────────────── */
+
+.celda {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
+}
+
+.fuerte {
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tenue {
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}
+
+.total {
+  font-weight: var(--ui-fw-semibold);
+  font-feature-settings: var(--ui-numeric);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ui-fg);
 }
 
 /* ─── Folio ────────────────────────────────────────────────────────────── */
 
+.folioLink {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: var(--ui-radius-xs, 4px);
+  color: inherit;
+  text-decoration: none;
+}
+
+.folioLink:hover .folio {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.folioLink:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
 .folio {
   font-family: var(--ui-font-mono);
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: var(--ui-fw-semibold);
   letter-spacing: 0;
   color: var(--ui-fg);
   overflow: hidden;
@@ -38,8 +108,7 @@
 }
 
 .viejo {
-  height: 20px;
-  font-size: 11px;
+  align-self: flex-start;
 }
 
 .siglasFila {
@@ -59,139 +128,108 @@
   color: var(--ui-fg-2);
   font-family: var(--ui-font-mono);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: var(--ui-fw-medium);
 }
 
-.siglasTenue {
-  composes: siglas;
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--ui-border-strong);
-  color: var(--ui-fg-3);
+/* ─── Tabla: anchos y versión de teléfono ──────────────────────────────── */
+
+.tabla table td:first-child {
+  min-width: 13rem;
 }
 
-/* ─── Lista (rejilla con los estilos de `tabla`) ───────────────────────── */
-
-.list {
-  display: flex;
-  flex-direction: column;
-  font-size: var(--ui-text-sm);
+/* Tableta: el segmento es un filtro de la barra; la columna sobra. */
+@media (max-width: 1100px) {
+  .tabla table :is(th, td):nth-child(4) {
+    display: none;
+  }
 }
 
-.rejilla {
-  grid-template-columns:
-    minmax(12.5rem, 1.3fr) minmax(0, 1.4fr) 6.5rem 6.5rem minmax(6.5rem, 0.7fr) minmax(5.5rem, 0.7fr)
-    6rem;
-  column-gap: var(--ui-s4);
-}
-
-.rejilla.row {
-  min-height: 52px;
-}
-
-.derecha {
-  align-items: flex-end;
-  text-align: right;
-}
-
-.soloLector {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* Teléfono y tableta: cada cotización es una tarjeta de tres renglones. */
-@media (max-width: 960px) {
-  .list > :first-child {
+/* Teléfono: cada cotización es una tarjeta de tres renglones, sin desplazamiento lateral. */
+@media (max-width: 720px) {
+  .tabla table thead {
+    display: none;
+  }
+  .tabla table,
+  .tabla table tbody {
+    display: block;
+    width: 100%;
+  }
+  .tabla table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "folio estado"
+      "cliente total"
+      "vendedor vigencia";
+    gap: 8px 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ui-border-subtle);
+  }
+  .tabla table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .tabla table tbody td {
+    display: block;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    text-align: left !important;
+  }
+  .tabla table tbody td:nth-child(1) {
+    grid-area: folio;
+  }
+  .tabla table tbody td:nth-child(2) {
+    grid-area: cliente;
+  }
+  .tabla table tbody td:nth-child(3) {
+    grid-area: vendedor;
+  }
+  .tabla table tbody td:nth-child(5) {
+    grid-area: vigencia;
+    justify-self: end;
+  }
+  .tabla table tbody td:nth-child(6) {
+    grid-area: estado;
+    justify-self: end;
+  }
+  .tabla table tbody td:nth-child(7) {
+    grid-area: total;
+    justify-self: end;
+    align-self: start;
+  }
+  /* Toda la tarjeta abre la cotización: «Abrir» sobra. */
+  .tabla table tbody td:nth-child(n + 8) {
     display: none;
   }
   .folio {
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .rejilla {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "folio folio estado"
-      "cliente cliente total"
-      "segmento siglas fecha";
-    gap: 6px 8px;
-  }
-  .rejilla.row {
-    padding-top: 12px;
-    padding-bottom: 12px;
-  }
-  .row > :nth-child(1) { grid-area: folio; }
-  .row > :nth-child(2) { grid-area: cliente; }
-  .row > :nth-child(3) { grid-area: segmento; }
-  .row > :nth-child(4) { grid-area: estado; justify-self: end; }
-  .row > :nth-child(5) { grid-area: total; justify-self: end; }
-  .row > :nth-child(6) { grid-area: siglas; }
-  .row > :nth-child(7) { grid-area: fecha; justify-self: end; }
 }
 
-/* ─── Editor ([id]): migas, carga y error ──────────────────────────────── */
+/* ─── Ficha ([id]) mientras carga o si falla ───────────────────────────── */
 
-.migas {
-  font-size: var(--ui-text-xs);
-  font-weight: 500;
-  color: var(--ui-fg-3);
-  text-decoration: none;
+.carga {
+  display: grid;
+  gap: var(--ui-s4);
+  width: 100%;
+  max-width: var(--ui-content-max, 1280px);
+  margin: 0 auto;
+  min-width: 0;
 }
 
-.migas:hover {
-  color: var(--ui-fg);
-}
-
-.linkBtn {
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-weight: 500;
-  color: var(--ui-brand-text);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.errorBox {
+.carga > * {
   margin: 0;
-  padding: 10px var(--ui-s4);
-  border-radius: var(--ui-radius);
-  background: var(--ui-danger-bg);
-  color: var(--ui-danger-text);
-  font-size: var(--ui-text-sm);
 }
 
-.esqueleto {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.cargaVolver {
+  justify-self: start;
 }
 
-.esqueleto span {
-  display: block;
-  height: 3.2rem;
-  border-radius: var(--ui-radius-lg);
-  background: linear-gradient(90deg, var(--ui-hover) 0%, var(--ui-surface-2) 50%, var(--ui-hover) 100%);
-  background-size: 200% 100%;
-  animation: brillo 1.4s ease-in-out infinite;
-}
-
-@keyframes brillo {
-  to {
-    background-position: -200% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .esqueleto span {
-    animation: none;
-  }
+.cargaTarjeta {
+  padding: var(--ui-s4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
 }

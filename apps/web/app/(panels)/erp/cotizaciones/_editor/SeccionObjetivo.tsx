@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import { Alert, Button, LinkButton } from "@/components/base";
 import type { ObjetivoPartes } from "@/lib/cotizaciones-api";
 import { itemsDesdeTextos, textosDeItems, type DocumentoCotizacion } from "@/lib/cotizacion-documento";
-import { Hoja, ListaEditable, TextoAuto, Vacio } from "./campos";
+import { Campo, Hoja, ListaEditable, TextoAuto, Vacio } from "./campos";
 import styles from "./editor.module.css";
 
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
@@ -61,27 +63,34 @@ export default function SeccionObjetivo({
       id="objetivo"
       numero="01"
       titulo="Objetivo del proyecto"
+      descripcion="Qué gana el cliente: introducción, beneficios y cierre."
       ayuda="Qué gana el cliente. El PDF lo imprime como introducción, «Entre los principales beneficios se encuentran:» con la lista, y cierre. Lo que dejes vacío lo completa con la plantilla del segmento y las cifras de tus partidas."
       acciones={
         editable ? (
-          <button type="button" className={styles.secondaryBtn} onClick={pedirBorrador}>
+          <Button size="sm" iconStart={<AutoAwesomeOutlinedIcon />} onClick={pedirBorrador}>
             Redactar borrador
-          </button>
+          </Button>
         ) : null
       }
     >
       {confirmar ? (
-        <div className={`${styles.aviso} ${styles.avisoAlerta}`} role="alert">
-          <p>¿Reemplazar lo que escribiste con el borrador del segmento y tus partidas?</p>
-          <span className={styles.hojaAcciones}>
-            <button type="button" className={styles.secondaryBtn} onClick={redactar}>
-              Reemplazar
-            </button>
-            <button type="button" className={styles.ghostBtn} onClick={() => setConfirmar(false)}>
-              Conservar lo mío
-            </button>
-          </span>
-        </div>
+        <Alert
+          tone="warning"
+          role="alert"
+          className={styles.avisoBloque}
+          action={
+            <span className={styles.hojaAcciones}>
+              <Button size="sm" variant="tertiary" onClick={() => setConfirmar(false)}>
+                Conservar lo mío
+              </Button>
+              <Button size="sm" onClick={redactar}>
+                Reemplazar
+              </Button>
+            </span>
+          }
+        >
+          ¿Reemplazar lo que escribiste con el borrador del segmento y tus partidas?
+        </Alert>
       ) : null}
 
       {vacio && editable ? (
@@ -90,12 +99,12 @@ export default function SeccionObjetivo({
             titulo="Empieza con un borrador y ajústalo"
             acciones={
               <>
-                <button type="button" className={styles.secondaryBtn} onClick={redactar}>
+                <Button size="sm" variant="tonal" iconStart={<AutoAwesomeOutlinedIcon />} onClick={redactar}>
                   Redactar borrador
-                </button>
-                <button type="button" className={styles.ghostBtn} onClick={() => introRef.current?.focus()}>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => introRef.current?.focus()}>
                   Escribir desde cero
-                </button>
+                </Button>
               </>
             }
           >
@@ -105,69 +114,60 @@ export default function SeccionObjetivo({
       ) : null}
 
       <div className={styles.campos}>
-      <div className={styles.campo}>
-      <label className={styles.etiqueta} htmlFor="obj-intro">
-        Introducción
-      </label>
-      <TextoAuto
-        id="obj-intro"
-        ref={introRef}
-        value={objetivo.intro}
-        onValor={(v) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, intro: v } }))}
-        placeholder={plantilla?.intro ?? "Este proyecto permitirá contar con…"}
-        disabled={!editable}
-      />
-      </div>
+        <Campo etiqueta="Introducción" htmlFor="obj-intro">
+          <TextoAuto
+            id="obj-intro"
+            ref={introRef}
+            value={objetivo.intro}
+            onValor={(v) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, intro: v } }))}
+            placeholder={plantilla?.intro ?? "Este proyecto permitirá contar con…"}
+            disabled={!editable}
+          />
+        </Campo>
 
-      <div className={styles.campo}>
-      <span className={styles.etiqueta}>Beneficios</span>
-      <ListaEditable
-        items={objetivo.beneficios}
-        onCambio={(beneficios) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, beneficios } }))}
-        numerada
-        editable={editable}
-        placeholder="Mayor cobertura de vigilancia mediante la incorporación de…"
-        etiquetaAgregar="Agregar beneficio"
-        etiquetaElemento="Beneficio"
-      />
-      {!beneficiosEscritos.length && sugerido?.beneficios.length ? (
-        <div className={styles.sugerido}>
-          El PDF pondría:
-          <ol>
-            {sugerido.beneficios.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ol>
-          {editable ? (
-            <button
-              type="button"
-              className={styles.linkBtn}
-              onClick={() =>
-                cambiar((d) => ({
-                  ...d,
-                  objetivo: { ...d.objetivo, beneficios: itemsDesdeTextos(sugerido.beneficios) },
-                }))
-              }
-            >
-              Usar estos y editarlos
-            </button>
+        <Campo etiqueta="Beneficios">
+          <ListaEditable
+            items={objetivo.beneficios}
+            onCambio={(beneficios) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, beneficios } }))}
+            numerada
+            editable={editable}
+            placeholder="Mayor cobertura de vigilancia mediante la incorporación de…"
+            etiquetaAgregar="Agregar beneficio"
+            etiquetaElemento="Beneficio"
+          />
+          {!beneficiosEscritos.length && sugerido?.beneficios.length ? (
+            <div className={styles.sugerido}>
+              El PDF pondría:
+              <ol>
+                {sugerido.beneficios.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ol>
+              {editable ? (
+                <LinkButton
+                  onClick={() =>
+                    cambiar((d) => ({
+                      ...d,
+                      objetivo: { ...d.objetivo, beneficios: itemsDesdeTextos(sugerido.beneficios) },
+                    }))
+                  }
+                >
+                  Usar estos y editarlos
+                </LinkButton>
+              ) : null}
+            </div>
           ) : null}
-        </div>
-      ) : null}
-      </div>
+        </Campo>
 
-      <div className={styles.campo}>
-        <label className={styles.etiqueta} htmlFor="obj-cierre">
-          Cierre
-        </label>
-        <TextoAuto
-          id="obj-cierre"
-          value={objetivo.cierre}
-          onValor={(v) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, cierre: v } }))}
-          placeholder={plantilla?.cierre ?? "Como resultado, el cliente dispondrá de…"}
-          disabled={!editable}
-        />
-      </div>
+        <Campo etiqueta="Cierre" htmlFor="obj-cierre">
+          <TextoAuto
+            id="obj-cierre"
+            value={objetivo.cierre}
+            onValor={(v) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, cierre: v } }))}
+            placeholder={plantilla?.cierre ?? "Como resultado, el cliente dispondrá de…"}
+            disabled={!editable}
+          />
+        </Campo>
       </div>
     </Hoja>
   );

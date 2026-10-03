@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import { Button, LinkButton, buttonClass } from "@/components/base";
 import { vistaPreviaEnVivo, type GuardarCotizacion } from "@/lib/cotizaciones-api";
 import { formatApiError } from "@/lib/erp-api";
 import {
@@ -257,6 +261,7 @@ export default function VistaPrevia({
     <aside className={styles.vista} aria-label="Vista previa del PDF">
       <div className={styles.vistaCabeza}>
         <div className={styles.vistaTitulo}>
+          <PictureAsPdfOutlinedIcon className={styles.vistaIcono} aria-hidden="true" />
           <strong>Vista previa</strong>
           {estado === "actualizando" || estado === "cargando" ? (
             <span className={`${styles.vistaEstado} ${styles.vistaEstadoVivo}`} role="status" aria-live="polite">
@@ -269,17 +274,19 @@ export default function VistaPrevia({
           ) : null}
         </div>
         <span className={styles.hojaAcciones}>
-          <button
-            type="button"
-            className={styles.ghostBtn}
+          <Button
+            variant="ghost"
+            size="sm"
+            iconStart={<RefreshRoundedIcon />}
             onClick={() => programador.current?.ahora(borradorRef.current)}
             disabled={!cotizacionId || !token}
             title="Volver a armar el PDF ahora"
           >
             Actualizar
-          </button>
+          </Button>
           {urlAbrir ? (
-            <a className={styles.ghostBtn} href={urlAbrir} target="_blank" rel="noreferrer" title="Abrir en otra pestaña">
+            <a className={buttonClass("ghost", { size: "sm" })} href={urlAbrir} target="_blank" rel="noreferrer" title="Abrir en otra pestaña">
+              <OpenInNewRoundedIcon aria-hidden="true" />
               Abrir
             </a>
           ) : null}
@@ -288,9 +295,7 @@ export default function VistaPrevia({
       {error && paginas ? (
         <div className={styles.vistaAviso} role="alert">
           <span>{error}</span>
-          <button type="button" className={styles.linkBtn} onClick={() => programador.current?.ahora(borradorRef.current)}>
-            Reintentar
-          </button>
+          <LinkButton onClick={() => programador.current?.ahora(borradorRef.current)}>Reintentar</LinkButton>
         </div>
       ) : null}
       <div className={styles.vistaMarco} data-testid="vista-previa-pdf" data-estado={estado ?? "sin-cotizacion"}>
@@ -299,6 +304,7 @@ export default function VistaPrevia({
         </div>
         {!cotizacionId ? (
           <div className={styles.vistaCapa}>
+            <PictureAsPdfOutlinedIcon className={styles.vistaCapaIcono} aria-hidden="true" />
             <p>
               La vista previa aparece en cuanto el borrador se guarda: escribe para quién es la cotización.
             </p>
@@ -306,12 +312,13 @@ export default function VistaPrevia({
         ) : error && !paginas ? (
           <div className={styles.vistaCapa} role="alert">
             <p>{error}</p>
-            <button type="button" className={styles.secondaryBtn} onClick={() => programador.current?.ahora(borradorRef.current)}>
+            <Button size="sm" onClick={() => programador.current?.ahora(borradorRef.current)}>
               Reintentar
-            </button>
+            </Button>
           </div>
         ) : !paginas ? (
           <div className={styles.vistaCapa}>
+            <span className={styles.vistaGiro} aria-hidden="true" />
             <p>Armando el PDF…</p>
           </div>
         ) : null}

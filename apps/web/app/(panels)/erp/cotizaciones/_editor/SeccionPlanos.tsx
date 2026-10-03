@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
+import { Button, Input } from "@/components/base";
 import {
   ordenarPlanos,
   quitarPlano,
@@ -113,8 +118,8 @@ export default function SeccionPlanos({
         )}
       </a>
       {propio && puede ? (
-        <input
-          className={styles.input}
+        <Input
+          controlSize="sm"
           value={nombres[p.url] ?? ""}
           aria-label={`Nombre del plano ${i + 1}`}
           placeholder="Nombre en el PDF"
@@ -135,32 +140,38 @@ export default function SeccionPlanos({
         </span>
         {propio && puede ? (
           <span className={styles.controles}>
-            <button
-              type="button"
-              className={styles.iconBtn}
+            <Button
+              variant="ghost"
+              size="sm"
+              icon
               aria-label={`Mover antes el plano ${i + 1}`}
+              title="Mover antes"
               disabled={i === 0}
               onClick={() => void guardarOrden(mover(propios, i, i - 1))}
             >
-              ←
-            </button>
-            <button
-              type="button"
-              className={styles.iconBtn}
+              <ChevronLeftRoundedIcon aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon
               aria-label={`Mover después el plano ${i + 1}`}
+              title="Mover después"
               disabled={i === propios.length - 1}
               onClick={() => void guardarOrden(mover(propios, i, i + 1))}
             >
-              →
-            </button>
-            <button
-              type="button"
-              className={`${styles.iconBtn} ${styles.iconBtnPeligro}`}
+              <ChevronRightRoundedIcon aria-hidden="true" />
+            </Button>
+            <Button
+              variant="danger-ghost"
+              size="sm"
+              icon
               aria-label={`Quitar el plano ${i + 1}`}
+              title="Quitar"
               onClick={() => void quitar(p.url)}
             >
-              ×
-            </button>
+              <CloseRoundedIcon aria-hidden="true" />
+            </Button>
           </span>
         ) : null}
       </div>
@@ -174,6 +185,7 @@ export default function SeccionPlanos({
       id="planos"
       numero="03"
       titulo="Planos"
+      descripcion="Anexos: plano CAD, sembrado de cámaras o fotos del levantamiento."
       ayuda="Plano CAD, sembrado de cámaras o fotos del levantamiento: cada imagen sale a página completa, en este orden. Acepta PNG, JPG o PDF hasta 20 MB; si la cotización está ligada a la actividad comercial, su evidencia entra sola."
     >
       <label
@@ -198,7 +210,11 @@ export default function SeccionPlanos({
             if (archivos.length) void subir(archivos);
           }}
         />
+        <span className={styles.zonaIcono} aria-hidden="true">
+          <UploadFileOutlinedIcon />
+        </span>
         <strong>{subiendo ? `Subiendo «${subiendo}»…` : "Arrastra un plano o haz clic"}</strong>
+        <span className={styles.pista}>PNG, JPG o PDF · hasta 20 MB</span>
         {!cotizacionId || !editable ? (
           <span className={styles.pista}>
             {!cotizacionId ? "Se habilita al guardarse el borrador." : "Ya salió: crea una revisión para cambiarlos."}
