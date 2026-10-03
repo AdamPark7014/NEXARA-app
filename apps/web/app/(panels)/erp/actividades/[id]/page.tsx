@@ -1,62 +1,54 @@
 "use client";
 
 // Detalle de la actividad. Vivía en /ops/activities/[id] y Core la reexportaba;
-// ahora vive aquí, que es la única superficie alcanzable.
+// ahora vive aquí, que es la única superficie alcanzable. La cabecera (folio, estado,
+// pasos, pestañas y datos clave) la pinta `ActivityDetailShell`; aquí va el contenido.
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import Button from "@/components/ui/Button";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import KpiCard from "@/components/ui/KpiCard";
-import { Tag } from "@/components/ui/DataTable";
-import InlineAlert from "@/components/ui/InlineAlert";
 import { buildApiUrl } from "@/lib/api-base";
-import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
-import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
+import { formatDateTime } from "@/components/detail/DetailFrame";
+import EquipoEvidencias, { Visor, type Foto } from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
 import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
-import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
+import { quienMira, useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
-import { activityStatusVariant } from "@/lib/activity-status";
-import { countEvidenceFiles } from "@/lib/evidence-display";
 import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 import { formatApiError } from "@/lib/erp-api";
-import { chargeLabel, estatusUi } from "@/lib/activity-labels";
 import { esCeoChristian } from "@/lib/ceo-user";
 import { deleteActivity } from "@/lib/ops-activities-api";
-import Link from "next/link";
-import CrossPanelLink from "@/components/CrossPanelLink";
+import { evidenceStepsForKind, textosDeInicioYCierre } from "@/lib/evidence-flow-helpers";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
-import IniciarActividad from "@/components/pizarra/IniciarActividad";
 import { SesionPropia } from "@/components/pizarra/SesionActividad";
+import { normalizarPrioridad } from "@/lib/actividad-tiempos";
 import {
-  normalizarPrioridad,
-  PRIORIDAD_UI,
-  puedeIniciar,
-  textoChipSemaforo,
-  textoPlanVsReal,
-} from "@/lib/actividad-tiempos";
-import type { SvgIconComponent } from "@mui/icons-material";
-import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
-import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
-import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
-import TaskAltIcon from "@mui/icons-material/TaskAlt";
-import CheckIcon from "@mui/icons-material/Check";
-import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
-import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
-import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
-import EngineeringOutlinedIcon from "@mui/icons-material/EngineeringOutlined";
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  DateInput,
+  EvidenceGallery,
+  EvidenceSlot,
+  Field,
+  FieldGrid,
+  Input,
+  Progress,
+  RecordSection,
+  Select,
+  Textarea,
+} from "@/components/base";
+import { IcoCamara, IcoDocumento, IcoFormulario, ProtectedEvidencePhoto, type MenuAction } from "@/components/ops/_piezas";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import s from "./detalle.module.css";
 
 const STATUSES = [
   "Pendiente",
@@ -67,17 +59,6 @@ const STATUSES = [
   "Rechazada",
   "Cancelada",
 ];
-
-function workTypeLabel(workType?: string | null): string {
-  if (workType === "PREVENTIVE_INVENTORY") return "Inventario preventivo";
-  return "Incidencia / servicio";
-}
-
-/** Prioridad normalizada (ALTA|MEDIA|BAJA) en el texto que lee la gente. */
-function normalizePriorityDisplay(raw?: string | null): string {
-  if (!raw) return "";
-  return PRIORIDAD_UI[normalizarPrioridad(raw)].label;
-}
 
 function flowStepForStatus(estatus: string): string {
   if (/cancel/i.test(estatus)) return "Cancelada";
@@ -113,8 +94,15 @@ type EditForm = {
   fechaFinalizacion: string;
 };
 
+function hora(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function ActivityDetailPage() {
-  const { activity, error, reload, id, hrefs, core } = useActivityDetail();
+  const { activity, error, reload, id, hrefs, core, actionsSlot } = useActivityDetail();
   const { user } = useUser();
   const router = useRouter();
   const token = user?.token ?? "";
@@ -142,6 +130,7 @@ export default function ActivityDetailPage() {
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [missingEvidence, setMissingEvidence] = useState<string[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ConfirmState | null>(null);
+  const [visor, setVisor] = useState<number | null>(null);
 
   const toDateLocal = (iso?: string | null) => {
     if (!iso) return "";
@@ -218,42 +207,11 @@ export default function ActivityDetailPage() {
     }
   }, [token, id, form, reload]);
 
-  if (!activity) {
-    if (error) return <DetailError message={error} onRetry={reload} />;
-    return null;
-  }
+  // La ficha (shell) ya pinta la carga y el error cuando la actividad no llegó.
+  if (!activity) return null;
 
   const branch = [activity.branchName, activity.branchCity, activity.branchState].filter(Boolean).join(" · ");
-
-  const inp: React.CSSProperties = {
-    width: "100%", padding: "8px 12px", borderRadius: 8,
-    border: "1px solid var(--border)", background: "var(--surface-2)",
-    color: "var(--foreground)", fontSize: 16, minHeight: 44, boxSizing: "border-box",
-  };
-  const campos2: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 };
-  const estatusLabel = estatusUi(activity.estatus).label;
-
-  const evidenceCount = countEvidenceFiles(activity.activityEvidence);
-
-  const isCancelOrReschedule = /cancel|rechaz/i.test(activity.estatus);
-  const activityFlow: { key: string; label: string; icon: SvgIconComponent }[] = isCancelOrReschedule
-    ? [
-        { key: "Pendiente", label: "Por empezar", icon: EventOutlinedIcon },
-        { key: flowStepForStatus(activity.estatus), label: /cancel/i.test(activity.estatus) ? "Cancelada" : "Regresada", icon: /cancel/i.test(activity.estatus) ? CancelOutlinedIcon : BlockOutlinedIcon },
-      ]
-    : [
-        { key: "Pendiente", label: "Por empezar", icon: EventOutlinedIcon },
-        { key: "En Proceso", label: "En curso", icon: SettingsOutlinedIcon },
-        { key: "Por Validar", label: "En revisión", icon: RateReviewOutlinedIcon },
-        { key: "Finalizada", label: "Terminada", icon: TaskAltIcon },
-      ];
-  const activeFlowKey = flowStepForStatus(activity.estatus);
-  const activeFlowIdx = Math.max(0, activityFlow.findIndex((s) => s.key === activeFlowKey));
-  const priorityDisplay = normalizePriorityDisplay(activity.prioridad) || activity.prioridad || "—";
-  // Mi fila del equipo: de ahí salen el inicio real, el semáforo y el tiempo planeado vs real.
-  const miFila = (activity.assignees ?? []).find(
-    (m) => (m.userId ?? m.user?.id) === user?.id && !m.retiradoAt,
-  );
+  const { miFila, despacho, mostrarIniciar } = quienMira(activity, user, core);
   const puedeSubirPuntos = puedeSubirFotoDePunto({
     userId: user?.id,
     responsableId: activity.responsable?.id,
@@ -264,39 +222,116 @@ export default function ActivityDetailPage() {
       retirado: Boolean(m.retiradoAt),
     })),
   });
-  const semaforo = miFila?.semaforo ?? activity.semaforo ?? null;
-  const chipSemaforo = semaforo
-    ? textoChipSemaforo(
-        semaforo,
-        miFila?.minutosAtraso ?? activity.minutosAtraso,
-        miFila?.minutosParaVencer ?? activity.minutosParaVencer,
-        miFila?.motivoSemaforo ?? activity.motivoSemaforo,
-      )
-    : null;
-  const planVsReal = textoPlanVsReal(
-    miFila?.minutosPlan ?? activity.minutosPlan,
-    miFila?.minutosReales ?? activity.minutosReales,
-  );
-  const excedida = Boolean(miFila?.excedida ?? activity.excedida);
-  const hasProject = Boolean(activity.projectId || activity.project?.id);
-  // Despacho a equipo: el responsable (y los LEAD) coordinan; ejecuta el resto del equipo.
-  const despacho = activity.assignmentCharge === "despacho";
-  const nombres = (rows: NonNullable<typeof activity.assignees>) =>
-    rows.map((m) => m.user?.nombre).filter((n): n is string => Boolean(n));
-  const coordinan = nombres((activity.assignees ?? []).filter((m) => m.rol === "LEAD"));
-  const ejecutores = nombres((activity.assignees ?? []).filter((m) => m.rol !== "LEAD"));
-  const ejecutaLabel = ejecutores.length ? ejecutores.join(", ") : "Por asignar";
-  // Quien la recibe no la acepta ni la rechaza: únicamente la inicia (el LEAD de un despacho solo reparte).
-  const mostrarIniciar = Boolean(
-    token &&
-      miFila &&
-      puedeIniciar({
-        aceptacion: miFila.aceptacion,
-        inicioRealAt: miFila.inicioRealAt,
-        despachador: despacho && miFila.rol === "LEAD",
-        estatus: activity.estatus,
-      }),
-  );
+
+  /* Galería: la evidencia del flujo (la del responsable o la primera que llegó). */
+  const ev = activity.activityEvidence ?? null;
+  const textos = textosDeInicioYCierre(activity.coreKind);
+  const pasos = evidenceStepsForKind(activity.coreKind).filter((p) => p !== "COMPLETED");
+  const devueltos = new Set([...(ev?.rejectedSteps ?? []), ...(ev?.rejectedStep ? [ev.rejectedStep] : [])]);
+  const aprobada = ev?.reviewStatus === "APPROVED";
+  const fotos: Foto[] = [];
+  if (ev?.entryPhotoUrl) {
+    fotos.push({ url: ev.entryPhotoUrl, titulo: textos.inicio.nombre, at: ev.entryPhotoUploadedAt, lat: num(ev.entryLatitude), lng: num(ev.entryLongitude) });
+  }
+  (ev?.evidencePhotos ?? []).forEach((url, i) => {
+    fotos.push({ url, titulo: `Foto en sitio ${i + 1}`, at: ev?.evidencePhotosUploadedAt });
+  });
+  if (ev?.exitPhotoUrl) {
+    fotos.push({ url: ev.exitPhotoUrl, titulo: textos.cierre.nombre, at: ev.exitPhotoUploadedAt, lat: num(ev.exitLatitude), lng: num(ev.exitLongitude) });
+  }
+  const hecho: Record<string, boolean> = {
+    ENTRY_PHOTO: Boolean(ev?.entryPhotoUrl),
+    EVIDENCE_PHOTOS: (ev?.evidencePhotos?.length ?? 0) > 0,
+    SERVICE_SHEET_PDF: Boolean(ev?.serviceSheetPdfUrl),
+    SERVICE_SHEET_DATA: Boolean(ev?.serviceSheetData),
+    EXIT_PHOTO: Boolean(ev?.exitPhotoUrl),
+  };
+  const pasosHechos = pasos.filter((p) => hecho[p]).length;
+  const faltan = pasos.length - pasosHechos;
+  const bandera = (paso: string) =>
+    devueltos.has(paso) ? (
+      <Badge tone="danger" size="sm">
+        Devuelta
+      </Badge>
+    ) : aprobada ? (
+      <Badge tone="success" size="sm">
+        Validada
+      </Badge>
+    ) : undefined;
+  const pie = (titulo: string, at?: string | null, gps?: boolean) =>
+    [titulo, hora(at), gps ? "GPS ✓" : null].filter(Boolean).join(" · ");
+  const indiceDe = (url: string) => fotos.findIndex((f) => f.url === url);
+
+  const piezasGaleria = pasos.flatMap((paso) => {
+    if (paso === "ENTRY_PHOTO" || paso === "EXIT_PHOTO") {
+      const entrada = paso === "ENTRY_PHOTO";
+      const url = entrada ? ev?.entryPhotoUrl : ev?.exitPhotoUrl;
+      const nombre = entrada ? textos.inicio.nombre : textos.cierre.nombre;
+      if (!url) return [<EvidenceSlot key={paso} label={nombre} required />];
+      const gps = entrada ? ev?.entryLatitude != null && ev?.entryLongitude != null : ev?.exitLatitude != null && ev?.exitLongitude != null;
+      return [
+        <ProtectedEvidencePhoto
+          key={paso}
+          url={url}
+          alt={nombre}
+          caption={pie(nombre, entrada ? ev?.entryPhotoUploadedAt : ev?.exitPhotoUploadedAt, gps)}
+          flag={bandera(paso)}
+          onClick={() => setVisor(indiceDe(url))}
+        />,
+      ];
+    }
+    if (paso === "EVIDENCE_PHOTOS") {
+      const lista = ev?.evidencePhotos ?? [];
+      if (lista.length === 0) return [<EvidenceSlot key={paso} label="Fotos en sitio" required />];
+      return lista.map((url, i) => (
+        <ProtectedEvidencePhoto
+          key={`${paso}-${i}`}
+          url={url}
+          alt={`Foto en sitio ${i + 1}`}
+          caption={pie(`Foto en sitio ${i + 1}`, ev?.evidencePhotosUploadedAt)}
+          flag={bandera(paso)}
+          onClick={() => setVisor(indiceDe(url))}
+        />
+      ));
+    }
+    if (paso === "SERVICE_SHEET_PDF") {
+      return [
+        ev?.serviceSheetPdfUrl ? (
+          <EvidenceSlot
+            key={paso}
+            icon={<IcoDocumento />}
+            label="Hoja de servicio (PDF)"
+            badge={bandera(paso) ?? <Badge tone="success" size="sm">Subida</Badge>}
+            onClick={() => window.open(resolveAssetUrl(ev.serviceSheetPdfUrl), "_blank", "noopener")}
+          />
+        ) : (
+          <EvidenceSlot key={paso} icon={<IcoDocumento />} label="Hoja de servicio (PDF)" required />
+        ),
+      ];
+    }
+    return [
+      <EvidenceSlot
+        key={paso}
+        icon={<IcoFormulario />}
+        label="Formulario"
+        required={!hecho.SERVICE_SHEET_DATA}
+        badge={hecho.SERVICE_SHEET_DATA ? bandera(paso) ?? <Badge tone="success" size="sm">Llenado</Badge> : undefined}
+      />,
+    ];
+  });
+
+  const menu: MenuAction[] =
+    puedeEliminar && !editing
+      ? [
+          {
+            id: "eliminar",
+            label: "Eliminar actividad",
+            danger: true,
+            icon: <DeleteOutlineIcon fontSize="inherit" />,
+            onSelect: pedirEliminar,
+          },
+        ]
+      : [];
 
   return (
     <>
@@ -304,326 +339,115 @@ export default function ActivityDetailPage() {
         activityId={activity.id}
         token={token}
         onDone={reload}
+        actionsTarget={actionsSlot}
+        menuItems={menu}
         extra={
-          <>
-            {canEdit && !editing ? (
-              <Button size="sm" variant="ghost" onClick={openEdit} iconLeft={<EditOutlinedIcon fontSize="inherit" aria-hidden="true" />}>
-                Editar
-              </Button>
-            ) : null}
-            {puedeEliminar && !editing ? (
-              <Button
-                size="sm"
-                variant="danger"
-                onClick={pedirEliminar}
-                iconLeft={<DeleteOutlineIcon fontSize="inherit" aria-hidden="true" />}
-              >
-                Eliminar actividad
-              </Button>
-            ) : null}
-          </>
+          canEdit && !editing ? (
+            <Button variant="secondary" onClick={openEdit} iconStart={<EditOutlinedIcon fontSize="inherit" />}>
+              Editar
+            </Button>
+          ) : null
         }
       />
       {error ? (
-        <div style={{ marginBottom: 14 }}>
-          <InlineAlert
-            variant="danger"
-            message={`No se pudo actualizar: ${error}`}
-            action={
-              <Button size="sm" variant="ghost" onClick={reload}>
-                Reintentar
-              </Button>
-            }
-          />
-        </div>
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" variant="tertiary" onClick={reload}>
+              Reintentar
+            </Button>
+          }
+        >
+          No se pudo actualizar: {error}
+        </Alert>
       ) : null}
       {saveErr && !editing ? (
-        <div style={{ marginBottom: 14 }}>
-          <InlineAlert variant="danger" message={saveErr} onDismiss={() => setSaveErr(null)} />
-        </div>
+        <Alert tone="danger" role="alert" onDismiss={() => setSaveErr(null)}>
+          {saveErr}
+        </Alert>
       ) : null}
       {mostrarIniciar ? (
-        <div
-          style={{
-            marginBottom: 14,
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
-            background: "color-mix(in srgb, var(--primary) 6%, var(--surface))",
-            display: "grid",
-            gap: 8,
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700 }}>Te asignaron esta actividad</div>
-          <IniciarActividad token={token} activityId={activity.id} onDone={reload} />
-        </div>
+        <Alert tone="brand" title="Te asignaron esta actividad">
+          Pulsa «Iniciar actividad» en la cabecera: queda registrada tu hora real de inicio.
+        </Alert>
       ) : null}
       {/* Ya la inicié: mi reloj corre (Pausar) o está detenido (En pausa · Reanudar). */}
       {token && miFila && !mostrarIniciar ? (
-        <div style={{ marginBottom: 14 }}>
-          <SesionPropia
-            token={token}
-            activityId={activity.id}
-            actividad={{ ...miFila, despachador: despacho && miFila.rol === "LEAD", estatus: activity.estatus }}
-            miId={user?.id}
-            onDone={reload}
-          />
-        </div>
+        <SesionPropia
+          token={token}
+          activityId={activity.id}
+          actividad={{ ...miFila, despachador: despacho && miFila.rol === "LEAD", estatus: activity.estatus }}
+          miId={user?.id}
+          onDone={reload}
+        />
       ) : null}
       {/cancel/i.test(activity.estatus) && (activity.cancelReason || activity.cancelledAt) ? (
-        <div
+        <Alert
+          tone="danger"
           role="status"
-          style={{
-            marginBottom: 14,
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "1px solid color-mix(in srgb, var(--danger) 40%, var(--border))",
-            background: "color-mix(in srgb, var(--danger) 7%, var(--surface))",
-            display: "flex",
-            gap: 10,
-            alignItems: "flex-start",
-          }}
+          title={`Cancelada${activity.cancelledBy?.nombre ? ` por ${activity.cancelledBy.nombre}` : ""}${
+            activity.cancelledAt ? ` · ${formatDateTime(activity.cancelledAt)}` : ""
+          }`}
         >
-          <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 20, color: "var(--danger)", mt: "1px" }} />
-          <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-            <div style={{ fontWeight: 700 }}>
-              Cancelada
-              {activity.cancelledBy?.nombre ? ` por ${activity.cancelledBy.nombre}` : ""}
-              {activity.cancelledAt ? ` · ${formatDateTime(activity.cancelledAt)}` : ""}
-            </div>
-            {activity.cancelReason ? (
-              <div style={{ color: "var(--text-secondary)" }}>Motivo: {activity.cancelReason}</div>
-            ) : null}
-          </div>
-        </div>
+          {activity.cancelReason ? `Motivo: ${activity.cancelReason}` : null}
+        </Alert>
       ) : null}
-      {missingEvidence && missingEvidence.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <InlineAlert
-            variant="warning"
-            message="Faltan evidencias para marcar la actividad como terminada"
-            onDismiss={() => setMissingEvidence(null)}
-          />
-          <ul style={{ margin: "0 0 10px", paddingLeft: 20, fontSize: 13, color: "var(--text-secondary)" }}>
+      {missingEvidence && missingEvidence.length > 0 ? (
+        <Alert
+          tone="warning"
+          title="Faltan evidencias para marcar la actividad como terminada"
+          onDismiss={() => setMissingEvidence(null)}
+          action={
+            <ButtonLink href={hrefs.evidences} size="sm" variant="primary" iconStart={<IcoCamara />}>
+              Subir evidencias
+            </ButtonLink>
+          }
+        >
+          <ul className={s.lista}>
             {missingEvidence.map((m) => (
               <li key={m}>{m}</li>
             ))}
           </ul>
-          <Link href={hrefs.evidences} style={{ textDecoration: "none" }}>
-            <Button size="sm" variant="primary" iconLeft={<PhotoCameraOutlinedIcon fontSize="inherit" aria-hidden="true" />}>Subir evidencias</Button>
-          </Link>
-        </div>
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
-        <KpiCard label="Estado" value={estatusLabel} variant={activityStatusVariant(activity.estatus)} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
-        <KpiCard label="Prioridad" value={priorityDisplay} variant={/urgente|alta/i.test(priorityDisplay) ? (/urgente/i.test(priorityDisplay) ? "danger" : "warning") : "default"} icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
-        <KpiCard label="Evidencias" value={evidenceCount} icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} hint="Archivos adjuntos" />
-        {planVsReal ? (
-          <KpiCard
-            label="Tiempo"
-            value={planVsReal}
-            variant={excedida ? "danger" : semaforo === "amarillo" ? "warning" : "default"}
-            icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-            hint={
-              excedida
-                ? "Excedió el tiempo estimado"
-                : chipSemaforo ?? "Estimado vs real"
-            }
-          />
-        ) : null}
-        {despacho ? (
-          <KpiCard
-            label="La hace"
-            value={ejecutaLabel}
-            icon={<EngineeringOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-            hint={activity.responsable?.nombre ? `La reparte ${activity.responsable.nombre}` : "Se reparte al equipo"}
-          />
-        ) : (
-          <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon={<EngineeringOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
-        )}
-      </div>
+        </Alert>
+      ) : null}
 
-      <DetailSection title="De qué se trata">
-        <DetailFieldGrid>
-          <DetailField
-            label="Encargo"
-            value={chargeLabel(activity.assignmentCharge) ?? "—"}
-          />
-          <DetailField
-            label="Proyecto"
-            value={
-              activity.project?.id && core ? (
-                activity.project.title
-              ) : activity.project?.id ? (
-                <Link href={`/ops/projects/${activity.project.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
-                  {activity.project.title} →
-                </Link>
-              ) : (
-                "Sin proyecto operativo"
-              )
-            }
-          />
-          <DetailField label="Tipo" value={activity.ticketTypeCustom || activity.ticketType || "—"} />
-          <DetailField label="Tipo de trabajo" value={workTypeLabel(activity.workType)} />
-        </DetailFieldGrid>
-      </DetailSection>
-
-      {/* Status flow stepper */}
-      <div style={{ marginBottom: 16, padding: "14px 20px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Avance de la actividad</div>
-        <div style={{ display: "flex", alignItems: "center" }}>
-          {activityFlow.map((step, idx) => {
-            const done = idx < activeFlowIdx;
-            const active = idx === activeFlowIdx;
-            const isBad = active && (step.key === "Cancelada" || step.key === "Rechazada");
-            const color = isBad ? "var(--danger)" : (done || active) ? "var(--success)" : "var(--text-tertiary)";
-            const bg = isBad
-              ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))"
-              : (done || active)
-                ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))"
-                : "var(--surface)";
-            return (
-              <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < activityFlow.length - 1 ? 1 : undefined }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 72 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: "50%", background: bg,
-                    border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: done ? 14 : 16, fontWeight: 700, color,
-                  }}>
-                    {done ? (
-                      <CheckIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    ) : (
-                      <step.icon aria-hidden="true" sx={{ fontSize: 18 }} />
-                    )}
-                  </div>
-                  <span style={{ fontSize: 11, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>
-                    {step.label}
-                  </span>
-                </div>
-                {idx < activityFlow.length - 1 && (
-                  <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 20 }} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <DetailSection title="Información general">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Tag variant={activityStatusVariant(activity.estatus)}>{estatusLabel}</Tag>
-            {priorityDisplay !== "—" && <Tag variant="warning">{priorityDisplay}</Tag>}
-            {activity.ticketTypeCustom || activity.ticketType ? (
-              <Tag variant="neutral">{activity.ticketTypeCustom || activity.ticketType}</Tag>
-            ) : null}
-            {despacho && <Tag variant="accent">{chargeLabel("despacho")}</Tag>}
-            <Tag variant={hasProject ? "accent" : "neutral"}>{hasProject ? "Con proyecto" : "Sin proyecto"}</Tag>
-          </div>
-        </div>
-
-        {!editing ? (
-          <>
-            <DetailFieldGrid>
-              <DetailField label="Cliente" value={activity.client?.id && !core ? (
-                <CrossPanelLink
-                  href={
-                    activity.client.salesClients?.[0]?.id
-                      ? `/crm/clients/${activity.client.salesClients[0].id}`
-                      : `/ops/service-clients/${activity.client.id}`
-                  }
-                  style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
-                >
-                  {activity.client.name} →
-                </CrossPanelLink>
-              ) : (activity.client?.name ?? "—")} />
-              <DetailField label="Sucursal" value={branch || activity.branchAddress} />
-              {despacho ? (
-                <>
-                  <DetailField
-                    label="La reparte"
-                    value={coordinan.join(" → ") || activity.responsable?.nombre}
-                  />
-                  <DetailField label="La hace" value={ejecutaLabel} />
-                </>
-              ) : (
-                <DetailField label="Responsable" value={activity.responsable?.nombre} />
-              )}
-              <DetailField label="Creador" value={activity.creador?.nombre} />
-              <DetailField label="Asignación" value={formatDateTime(activity.fechaAsignacion)} />
-              <DetailField label="Inicio" value={formatDateTime(activity.fechaInicio)} />
-              {activity.periodo ? (
-                <DetailField
-                  label={activity.projectMilestone ? `Periodo · ${activity.projectMilestone.name}` : "Periodo"}
-                  value={
-                    <span style={activity.periodo.estado === "vencida" ? { color: "#dc2626", fontWeight: 600 } : undefined}>
-                      {activity.periodo.etiqueta}
-                    </span>
-                  }
-                />
-              ) : null}
-              {activity.acsEnteredAt && (
-                <DetailField
-                  label="Llegada al sitio"
-                  value={
-                    <span style={{ color: "var(--success, #15803d)", fontWeight: 600 }}>
-                      {(() => {
-                        try {
-                          const hhmm = new Intl.DateTimeFormat("es-MX", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false,
-                            timeZone: "America/Mexico_City",
-                          }).format(new Date(activity.acsEnteredAt));
-                          const who = activity.acsEnteredByUser?.nombre
-                            ? ` · ${activity.acsEnteredByUser.nombre}`
-                            : "";
-                          const door = activity.acsEntryDoor ? ` (${activity.acsEntryDoor})` : "";
-                          return `Entró por el control de acceso a las ${hhmm}${who}${door}`;
-                        } catch {
-                          return "Entró por el control de acceso";
-                        }
-                      })()}
-                      {activity.acsLeftSite && activity.acsExitedAt
-                        ? ` · Salió ${formatDateTime(activity.acsExitedAt)}`
-                        : ""}
-                    </span>
-                  }
-                />
-              )}
-              <DetailField label="Entrega esperada" value={formatDate(activity.fechaEntregaEsperada)} />
-              <DetailField label="Finalización" value={formatDateTime(activity.fechaFinalizacion)} />
-            </DetailFieldGrid>
-            {activity.descripcion && (
-              <div style={{ marginTop: 12 }}>
-                <DetailField label="Descripción" value={activity.descripcion} />
-              </div>
-            )}
-            {activity.indicaciones && (
-              <div style={{ marginTop: 12 }}>
-                <DetailField label="Indicaciones" value={activity.indicaciones} />
-              </div>
-            )}
-          </>
-        ) : (
-          <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
-            {/* Read-only context */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12, color: "var(--text-secondary)" }}>
-              <div><strong>Cliente:</strong> {activity.client?.name ?? "—"}</div>
-              <div><strong>Sucursal:</strong> {branch || activity.branchAddress || "—"}</div>
+      <RecordSection
+        title="Evidencias"
+        subtitle={
+          pasos.length === 0
+            ? "Esta actividad no pide evidencia por pasos."
+            : faltan === 0
+              ? `${pasosHechos} de ${pasos.length} pasos · completas`
+              : `${pasosHechos} de ${pasos.length} pasos · faltan ${faltan} obligatorio${faltan === 1 ? "" : "s"} para mandar a revisión`
+        }
+        end={
+          pasos.length ? (
+            <div className={s.galeriaFin}>
+              <Progress value={pasosHechos} max={pasos.length} ariaLabel="Avance de evidencias" />
+              <ButtonLink href={hrefs.evidences} size="sm" variant="tertiary">
+                Ver todo
+              </ButtonLink>
             </div>
+          ) : null
+        }
+      >
+        {pasos.length ? <EvidenceGallery>{piezasGaleria}</EvidenceGallery> : null}
+      </RecordSection>
 
-            <div style={campos2}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Estado *</span>
-                <select value={form.estatus} onChange={(e) => setForm((f) => ({ ...f, estatus: e.target.value }))} style={inp}>
+      {editing ? (
+        <RecordSection title="Editar actividad" subtitle={`${activity.client?.name ?? "Sin cliente"} · ${branch || activity.branchAddress || "Sin sucursal"}`}>
+          <div className={s.edicion}>
+            <FieldGrid>
+              <Field label="Estado" required>
+                <Select value={form.estatus} onChange={(e) => setForm((f) => ({ ...f, estatus: e.target.value }))}>
                   {/* Cancelar tiene su propio botón con motivo obligatorio (solo superiores). */}
-                  {STATUSES.filter((s) => s !== "Cancelada" || /cancel/i.test(activity.estatus)).map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                  {STATUSES.filter((st) => st !== "Cancelada" || /cancel/i.test(activity.estatus)).map((st) => (
+                    <option key={st} value={st}>{st}</option>
                   ))}
-                </select>
-              </label>
-              <div style={{ display: "grid", gap: 4 }}>
+                </Select>
+              </Field>
+              <div className={s.prioridad}>
                 <PrioritySemaforo
                   compact
                   allowEmpty
@@ -631,80 +455,105 @@ export default function ActivityDetailPage() {
                   onChange={(prioridad) => setForm((f) => ({ ...f, prioridad }))}
                 />
               </div>
-            </div>
-
-            <div style={campos2}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha inicio</span>
-                <input type="datetime-local" value={form.fechaInicio} onChange={(e) => setForm((f) => ({ ...f, fechaInicio: e.target.value }))} style={inp} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Entrega esperada</span>
-                <input type="date" value={form.fechaEntregaEsperada} onChange={(e) => setForm((f) => ({ ...f, fechaEntregaEsperada: e.target.value }))} style={inp} />
-              </label>
-            </div>
-
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha finalización</span>
-              <input type="datetime-local" value={form.fechaFinalizacion} onChange={(e) => setForm((f) => ({ ...f, fechaFinalizacion: e.target.value }))} style={inp} />
-            </label>
-
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
-              <textarea value={form.descripcion} onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
-                rows={3} placeholder="Descripción de la actividad…"
-                style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }} />
-            </label>
-
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>Indicaciones / Notas internas</span>
-              <textarea value={form.indicaciones} onChange={(e) => setForm((f) => ({ ...f, indicaciones: e.target.value }))}
-                rows={3} placeholder="Instrucciones para el ingeniero, accesos, contactos…"
-                style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }} />
-            </label>
-
-            {saveErr && <InlineAlert variant="danger" message={saveErr} />}
-
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-              <Button size="lg" variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
-              <Button size="lg" variant="primary" onClick={() => void saveEdit()} disabled={!form.estatus} loading={saving}>
+              <Field label="Fecha inicio">
+                <Input type="datetime-local" value={form.fechaInicio} onChange={(e) => setForm((f) => ({ ...f, fechaInicio: e.target.value }))} />
+              </Field>
+              <Field label="Entrega esperada">
+                <DateInput value={form.fechaEntregaEsperada} onChange={(e) => setForm((f) => ({ ...f, fechaEntregaEsperada: e.target.value }))} />
+              </Field>
+              <Field label="Fecha finalización">
+                <Input type="datetime-local" value={form.fechaFinalizacion} onChange={(e) => setForm((f) => ({ ...f, fechaFinalizacion: e.target.value }))} />
+              </Field>
+            </FieldGrid>
+            <Field label="Descripción" fullWidth>
+              <Textarea
+                value={form.descripcion}
+                onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+                rows={3}
+                placeholder="Descripción de la actividad…"
+              />
+            </Field>
+            <Field label="Indicaciones / Notas internas" fullWidth>
+              <Textarea
+                value={form.indicaciones}
+                onChange={(e) => setForm((f) => ({ ...f, indicaciones: e.target.value }))}
+                rows={3}
+                placeholder="Instrucciones para el ingeniero, accesos, contactos…"
+              />
+            </Field>
+            {saveErr ? (
+              <Alert tone="danger" role="alert">
+                {saveErr}
+              </Alert>
+            ) : null}
+            <div className={s.edicionPie}>
+              <Button variant="tertiary" size="lg" onClick={() => setEditing(false)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button variant="primary" size="lg" onClick={() => void saveEdit()} disabled={!form.estatus} loading={saving}>
                 {saving ? "Guardando…" : "Guardar cambios"}
               </Button>
             </div>
           </div>
-        )}
-      </DetailSection>
+        </RecordSection>
+      ) : activity.descripcion || activity.indicaciones ? (
+        <RecordSection title="Qué hay que hacer">
+          <div className={s.textos}>
+            {activity.descripcion ? (
+              <div>
+                <h3 className={s.textoT}>Descripción</h3>
+                <p className={s.texto}>{activity.descripcion}</p>
+              </div>
+            ) : null}
+            {activity.indicaciones ? (
+              <div>
+                <h3 className={s.textoT}>Indicaciones</h3>
+                <p className={s.texto}>{activity.indicaciones}</p>
+              </div>
+            ) : null}
+          </div>
+        </RecordSection>
+      ) : null}
 
       {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
-        <DetailSection title="Cotización">
+        <RecordSection title="Cotización">
           <CotizacionDeActividad
             activityId={activity.id}
             coreKind={activity.coreKind}
             cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
             onLigada={() => void reload()}
           />
-        </DetailSection>
+        </RecordSection>
       ) : null}
 
       {/* El checklist va antes de la evidencia: se revisa lo que se lleva y luego se trabaja. */}
-      <HerramientasChecklist activityId={activity.id} style={{ margin: "20px 0" }} />
+      <HerramientasChecklist activityId={activity.id} />
 
-      <DetailSection title="Evidencias del equipo">
+      <RecordSection title="Evidencias del equipo" subtitle="Lo que subió cada persona y su revisión.">
         <EquipoEvidencias activityId={activity.id} compact verMasHref={hrefs.evidences} />
-      </DetailSection>
+      </RecordSection>
 
       <EvidenciaPorCampos
         activityId={activity.id}
         anNumber={activity.anNumber}
         titulo={activity.titulo}
         puedeSubir={puedeSubirPuntos}
-        style={{ margin: "20px 0" }}
       />
 
-      <DetailSection title="Incidencias y recomendaciones">
+      <RecordSection title="Incidencias y recomendaciones">
         <ActivityIssuesPanel activityId={Number(id)} token={token} canManage={Boolean(canEdit)} />
-      </DetailSection>
+      </RecordSection>
+
+      {visor != null && visor >= 0 && fotos.length > 0 ? (
+        <Visor fotos={fotos} index={Math.min(visor, fotos.length - 1)} onClose={() => setVisor(null)} onIndex={setVisor} />
+      ) : null}
       <ConfirmDialog state={confirmDelete} onClose={() => setConfirmDelete(null)} />
     </>
   );
+}
+
+function num(v?: number | string | null): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }

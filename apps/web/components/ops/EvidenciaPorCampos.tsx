@@ -6,7 +6,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
-import Button from "@/components/ui/Button";
+import { Alert, Badge, Button, Progress } from "@/components/base";
+import s from "./EvidenciaPorCampos.module.css";
 import { useUser } from "@/components/UserContext";
 import DescargarEvidenciaZip from "@/components/ops/DescargarEvidenciaZip";
 import EvidenciaCamposEditor from "@/components/ops/EvidenciaCamposEditor";
@@ -101,8 +102,6 @@ function leerUbicacionOpcional(): Promise<{ latitude: number; longitude: number 
   });
 }
 
-const VERDE = "#16a34a";
-const NARANJA = "#d97706";
 
 function fmt(iso?: string | null): string | null {
   if (!iso) return null;
@@ -121,48 +120,20 @@ function listaNombres(nombres: string[]): string {
   return `${q.slice(0, -1).join(", ")} y ${q[q.length - 1]}`;
 }
 
-const tarjeta: CSSProperties = {
-  display: "grid",
-  gap: 10,
-  alignContent: "start",
-  padding: 14,
-  borderRadius: 16,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  minWidth: 0,
-};
-
 function Progreso({ cumplidas, requeridas }: { cumplidas: number; requeridas: number }) {
-  const pct = requeridas ? Math.round((cumplidas / requeridas) * 100) : 100;
   const texto = `${cumplidas} de ${requeridas} foto${requeridas === 1 ? "" : "s"}`;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <div
-        role="progressbar"
-        aria-label="Fotos por campo documentadas"
-        aria-valuemin={0}
-        aria-valuemax={requeridas}
-        aria-valuenow={cumplidas}
-        aria-valuetext={texto}
-        style={{
-          flex: "1 1 160px",
-          maxWidth: 360,
-          height: 8,
-          borderRadius: 999,
-          background: "color-mix(in srgb, var(--border) 80%, transparent)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            borderRadius: 999,
-            background: cumplidas >= requeridas ? VERDE : "var(--primary)",
-          }}
+    <div className={s.progreso}>
+      <span className={s.progresoBarra}>
+        <Progress
+          value={cumplidas}
+          max={requeridas || 1}
+          tone={cumplidas >= requeridas ? "success" : "brand"}
+          ariaLabel="Fotos por campo documentadas"
+          label=""
         />
-      </div>
-      <strong style={{ fontSize: 13 }}>{texto}</strong>
+      </span>
+      <strong className={s.progresoN}>{texto}</strong>
     </div>
   );
 }
@@ -212,9 +183,9 @@ function Hueco({
       onFocus={ofrecer ? onEntrar : undefined}
       onDragOver={ofrecer ? (event) => event.preventDefault() : undefined}
       onDrop={soltar}
-      style={{ margin: 0, display: "grid", gap: 6, minWidth: 0 }}
+      className={s.hueco}
     >
-      <figcaption style={{ fontSize: 13, fontWeight: 750, color: pedido ? "inherit" : "var(--text-tertiary)" }}>
+      <figcaption className={s.huecoT} data-pedido={pedido ? undefined : "false"}>
         {etiqueta}
       </figcaption>
       {foto ? (
@@ -222,53 +193,27 @@ function Hueco({
           type="button"
           onClick={onAbrir}
           aria-label={`Ver en grande: ${campo.nombre}, ${MOMENTO_LABEL[momento].toLowerCase()}`}
-          style={{
-            padding: 0,
-            border: "1px solid var(--border)",
-            borderRadius: 14,
-            overflow: "hidden",
-            background: "color-mix(in srgb, var(--text-secondary) 8%, var(--surface))",
-            cursor: "zoom-in",
-            height: alto,
-            minHeight: 280,
-            display: "block",
-            width: "100%",
-          }}
+          className={s.huecoFoto}
         >
           <FotoProtegida
             url={foto.photoUrl}
             alt={`${campo.nombre} · ${MOMENTO_LABEL[momento]}`}
             alto={alto}
-            style={{ width: "100%", height: alto, objectFit: "cover", display: "block" }}
+            className={s.huecoImg}
           />
         </button>
       ) : (
-        <div
-          style={{
-            height: alto,
-            minHeight: 280,
-            display: "grid",
-            placeContent: "center",
-            justifyItems: "center",
-            gap: 4,
-            borderRadius: 14,
-            border: `1px dashed color-mix(in srgb, ${NARANJA} 45%, var(--border))`,
-            background: `color-mix(in srgb, ${NARANJA} 6%, var(--surface))`,
-            color: NARANJA,
-            fontSize: 12.5,
-            fontWeight: 700,
-          }}
-        >
-          <HourglassEmptyIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+        <div className={s.huecoVacio}>
+          <HourglassEmptyIcon aria-hidden="true" fontSize="inherit" className={s.huecoVacioIco} />
           Pendiente
         </div>
       )}
-      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.35, minHeight: 16 }}>
+      <span className={s.huecoM}>
         {foto ? [corto(foto.por?.nombre), fmt(foto.capturedAt)].filter(Boolean).join(" · ") || "Tomada" : "Sin foto aún"}
       </span>
       {ofrecer ? (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Button size="sm" variant="primary" onClick={onTomar} disabled={ocupado} iconLeft={<PhotoCameraOutlinedIcon fontSize="inherit" />}>
+        <div className={s.huecoAcciones}>
+          <Button size="sm" variant="tonal" onClick={onTomar} disabled={ocupado} iconStart={<PhotoCameraOutlinedIcon fontSize="inherit" />}>
             Tomar foto
           </Button>
           <Button size="sm" variant="secondary" onClick={onAdjuntar} disabled={ocupado}>
@@ -507,13 +452,16 @@ export default function EvidenciaPorCampos({
   const fotosPorBorrar = (porBorrar ?? []).reduce((n, c) => n + fotosDeCampo(c).length, 0);
 
   return (
-    <section aria-labelledby={tituloId} style={{ display: "grid", gap: 12, ...style }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "grid", gap: 4, minWidth: 0, flex: "1 1 240px" }}>
-          <h2 id={tituloId} style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>
+    <section aria-labelledby={tituloId} className={s.caja} style={style}>
+      <div className={s.cabeza}>
+        <div className={s.cabezaTexto}>
+          <h2 id={tituloId} className={s.titulo}>
+            <span className={s.ico} aria-hidden="true">
+              <PhotoCameraOutlinedIcon fontSize="inherit" />
+            </span>
             Evidencia por campos
           </h2>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+          <p className={s.sub}>
             {cargando && !campos
               ? "Cargando…"
               : lista.length === 0
@@ -521,13 +469,13 @@ export default function EvidenciaPorCampos({
                 : "Qué hay que fotografiar y en qué momento. El responsable y los asignados toman la foto aquí o adjuntan un archivo, una captura, con Ctrl+V o arrastrándola."}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div className={s.cabezaAcciones}>
           {puedeEditar && !editando && campos ? (
             <Button
               size="sm"
-              variant={lista.length ? "secondary" : "primary"}
+              variant={lista.length ? "secondary" : "tonal"}
               onClick={abrirEditor}
-              iconLeft={
+              iconStart={
                 lista.length ? (
                   <EditOutlinedIcon fontSize="inherit" />
                 ) : (
@@ -543,18 +491,21 @@ export default function EvidenciaPorCampos({
       </div>
 
       {error && !campos ? (
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <span role="alert" style={{ fontSize: 13, color: "var(--danger)" }}>
-            {error}
-          </span>
-          <Button size="sm" variant="secondary" onClick={() => void cargar()}>
-            Reintentar
-          </Button>
-        </div>
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
       ) : null}
 
       {errorFoto ? (
-        <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>
+        <p role="alert" className={s.error}>
           {errorFoto}
         </p>
       ) : null}
@@ -569,7 +520,7 @@ export default function EvidenciaPorCampos({
             aria-hidden="true"
             tabIndex={-1}
             onChange={alElegirArchivo}
-            style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+            className={s.archivoOculto}
           />
           <input
             ref={adjuntarRef}
@@ -578,40 +529,20 @@ export default function EvidenciaPorCampos({
             aria-hidden="true"
             tabIndex={-1}
             onChange={alElegirArchivo}
-            style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+            className={s.archivoOculto}
           />
         </>
       ) : null}
 
       {aviso ? (
-        <p
-          role="status"
-          style={{
-            margin: 0,
-            padding: "10px 12px",
-            borderRadius: 12,
-            fontSize: 13.5,
-            fontWeight: 650,
-            background: `color-mix(in srgb, ${VERDE} 10%, var(--surface))`,
-            border: `1px solid color-mix(in srgb, ${VERDE} 35%, var(--border))`,
-          }}
-        >
+        <p role="status" className={s.aviso}>
           {aviso}
         </p>
       ) : null}
 
       {editando ? (
-        <div
-          style={{
-            display: "grid",
-            gap: 12,
-            padding: 14,
-            borderRadius: 16,
-            border: "1px solid color-mix(in srgb, var(--primary) 30%, var(--border))",
-            background: "color-mix(in srgb, var(--primary) 4%, var(--surface))",
-          }}
-        >
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+        <div className={s.editor}>
+          <p className={s.sub}>
             Una fila por cosa que hay que documentar y, en cada una, los momentos en que se pide foto. Renombrar un
             punto conserva sus fotos; <strong>quitarlo borra las fotos que ya tenga</strong>.
           </p>
@@ -625,56 +556,45 @@ export default function EvidenciaPorCampos({
             disabled={guardando}
           />
           {borrador.length === 0 && lista.length > 0 ? (
-            <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
-              Sin puntos, la actividad vuelve a pedir fotos libres.
-            </p>
+            <p className={s.nota}>Sin puntos, la actividad vuelve a pedir fotos libres.</p>
           ) : null}
 
           {porBorrar && porBorrar.length > 0 ? (
-            <div
+            <Alert
+              tone="danger"
               role="alert"
-              style={{
-                display: "grid",
-                gap: 10,
-                padding: "12px 14px",
-                borderRadius: 12,
-                border: "1px solid color-mix(in srgb, var(--danger) 45%, var(--border))",
-                background: "color-mix(in srgb, var(--danger) 7%, var(--surface))",
-              }}
-            >
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13.5, lineHeight: 1.45 }}>
-                <WarningAmberOutlinedIcon aria-hidden="true" sx={{ fontSize: 20, color: "var(--danger)", flex: "0 0 auto" }} />
-                <span>
-                  Vas a quitar {listaNombres(porBorrar.map((c) => c.nombre))}. Se borran{" "}
-                  <strong>
-                    {fotosPorBorrar} foto{fotosPorBorrar === 1 ? "" : "s"}
-                  </strong>{" "}
-                  que ya se tomaron y no se pueden recuperar.
+              icon={<WarningAmberOutlinedIcon fontSize="inherit" />}
+              action={
+                <span className={s.alertaAcciones}>
+                  <Button size="sm" variant="secondary" onClick={() => setPorBorrar(null)} disabled={guardando}>
+                    Volver
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => void guardar(true)} loading={guardando}>
+                    Quitar y guardar
+                  </Button>
                 </span>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                <Button size="sm" variant="secondary" onClick={() => setPorBorrar(null)} disabled={guardando}>
-                  Volver
-                </Button>
-                <Button size="sm" variant="danger" onClick={() => void guardar(true)} loading={guardando}>
-                  Quitar y guardar
-                </Button>
-              </div>
-            </div>
+              }
+            >
+              Vas a quitar {listaNombres(porBorrar.map((c) => c.nombre))}. Se borran{" "}
+              <strong>
+                {fotosPorBorrar} foto{fotosPorBorrar === 1 ? "" : "s"}
+              </strong>{" "}
+              que ya se tomaron y no se pueden recuperar.
+            </Alert>
           ) : null}
 
           {errorGuardar ? (
-            <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>
+            <p role="alert" className={s.error}>
               {errorGuardar}
             </p>
           ) : null}
 
           {!porBorrar ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <Button size="sm" variant="secondary" onClick={cerrarEditor} disabled={guardando}>
+            <div className={s.editorPie}>
+              <Button variant="tertiary" onClick={cerrarEditor} disabled={guardando}>
                 Cancelar
               </Button>
-              <Button size="sm" variant="primary" onClick={() => void guardar()} loading={guardando}>
+              <Button variant="primary" onClick={() => void guardar()} loading={guardando}>
                 {guardando ? "Guardando…" : "Guardar puntos"}
               </Button>
             </div>
@@ -684,6 +604,7 @@ export default function EvidenciaPorCampos({
 
       {!editando && lista.length > 0 ? (
         <div
+          className={s.cuerpo}
           onDragOver={puedeSubir ? (event) => event.preventDefault() : undefined}
           onDrop={
             puedeSubir
@@ -702,58 +623,24 @@ export default function EvidenciaPorCampos({
           }
         >
           <Progreso cumplidas={cumplidas} requeridas={requeridas} />
-          <ul
-            style={{
-              listStyle: "none",
-              margin: 0,
-              padding: 0,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 360px), 1fr))",
-              gap: 14,
-            }}
-          >
+          <ul className={s.lista}>
             {lista.map((campo) => {
               const faltan = campo.momentos.filter((m) => !campo.fotos?.[m]).length;
               const momentosVisibles = MOMENTOS.filter((m) => campo.momentos.includes(m) || campo.fotos?.[m]);
               return (
-                <li key={campo.id} style={tarjeta}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-                    <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 800, minWidth: 0, overflowWrap: "anywhere" }}>
-                      {campo.nombre}
-                    </h3>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        flex: "0 0 auto",
-                        padding: "2px 9px",
-                        borderRadius: 999,
-                        fontSize: 11.5,
-                        fontWeight: 700,
-                        color: faltan ? NARANJA : VERDE,
-                        border: `1px solid color-mix(in srgb, ${faltan ? NARANJA : VERDE} 35%, var(--border))`,
-                        background: `color-mix(in srgb, ${faltan ? NARANJA : VERDE} 9%, var(--surface))`,
-                      }}
+                <li key={campo.id} className={s.tarjeta}>
+                  <div className={s.tarjetaCabeza}>
+                    <h3 className={s.tarjetaT}>{campo.nombre}</h3>
+                    <Badge
+                      tone={faltan ? "warning" : "success"}
+                      size="sm"
+                      icon={faltan ? <HourglassEmptyIcon fontSize="inherit" /> : <CheckCircleOutlineIcon fontSize="inherit" />}
                     >
-                      {faltan ? (
-                        <HourglassEmptyIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-                      ) : (
-                        <CheckCircleOutlineIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-                      )}
                       {faltan ? `Falta${faltan === 1 ? "" : "n"} ${faltan}` : "Completo"}
-                    </span>
+                    </Badge>
                   </div>
-                  {campo.notas ? (
-                    <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>{campo.notas}</p>
-                  ) : null}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr",
-                      gap: 12,
-                    }}
-                  >
+                  {campo.notas ? <p className={s.nota}>{campo.notas}</p> : null}
+                  <div className={s.momentos}>
                     {momentosVisibles.map((m) => {
                       const foto = campo.fotos?.[m] ?? null;
                       return (

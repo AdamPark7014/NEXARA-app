@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import Button from "@/components/ui/Button";
+import { createPortal } from "react-dom";
 import Modal from "@/components/ui/Modal";
-import InlineAlert from "@/components/ui/InlineAlert";
-import { erpInputStyle } from "@/lib/erp-api";
+import { Alert, Button, Field, Select, Textarea } from "@/components/base";
 import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { fetchTeamBoard } from "@/lib/team-board-api";
 import {
@@ -17,6 +16,8 @@ import {
 } from "@/lib/ops-activities-api";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { MoreMenu, type MenuAction } from "./_piezas";
+import s from "./ActivitySuperiorActions.module.css";
 
 type Companero = { id: number; nombre: string };
 
@@ -25,8 +26,15 @@ type Props = {
   token: string;
   /** Recargar la actividad después de cancelar o pasarla. */
   onDone: () => void;
-  /** Misma fila que Pasar y Cancelar (Editar, Eliminar). */
+  /** Misma fila que Pasar y Cancelar (Editar). */
   extra?: ReactNode;
+  /** Más acciones del menú «···», junto a «Cancelar actividad» (p. ej. Eliminar). */
+  menuItems?: ReadonlyArray<MenuAction>;
+  /**
+   * Hueco de la cabecera de la ficha: si se da, los botones se pintan ahí (portal) y aquí
+   * solo quedan el aviso y los diálogos.
+   */
+  actionsTarget?: HTMLElement | null;
 };
 
 const MOTIVO_MIN = 10;
@@ -35,7 +43,7 @@ const MOTIVO_MIN = 10;
  * «Cancelar actividad» y «Pasar a otro compañero». Solo se muestran a los superiores de quien la
  * ejecuta (la API responde qué puede hacer quien consulta y vuelve a validarlo al guardar).
  */
-export default function ActivitySuperiorActions({ activityId, token, onDone, extra }: Props) {
+export default function ActivitySuperiorActions({ activityId, token, onDone, extra, menuItems, actionsTarget }: Props) {
   const [acciones, setAcciones] = useState<Acciones | null>(null);
   const [dialogo, setDialogo] = useState<"cancelar" | "pasar" | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -138,47 +146,49 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
   };
 
   const haySuperiores = Boolean(acciones && (acciones.puedeCancelar || acciones.puedePasar));
-  if (!haySuperiores && !aviso && !extra) return null;
+  const menu: MenuAction[] = [
+    ...(acciones?.puedeCancelar
+      ? [
+          {
+            id: "cancelar",
+            label: "Cancelar actividad",
+            danger: true,
+            icon: <BlockOutlinedIcon fontSize="inherit" />,
+            onSelect: () => abrir("cancelar"),
+          },
+        ]
+      : []),
+    ...(menuItems ?? []),
+  ];
+  const hayBotones = haySuperiores || Boolean(extra) || menu.length > 0;
+  if (!hayBotones && !aviso) return null;
 
-  const etiqueta: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" };
   const contador = (
-    <span style={{ fontSize: 11, color: motivoOk ? "var(--text-tertiary)" : "var(--danger)" }}>
+    <span className={motivoOk ? undefined : s.corto}>
       {motivo.trim().length}/{minimo} caracteres mínimo
     </span>
   );
 
+  const botones = hayBotones ? (
+    <>
+      <MoreMenu items={menu} label="Más acciones de la actividad" />
+      {extra}
+      {acciones?.puedePasar ? (
+        <Button variant="secondary" onClick={() => abrir("pasar")} iconStart={<SwapHorizIcon fontSize="inherit" />}>
+          Pasar a otro compañero
+        </Button>
+      ) : null}
+    </>
+  ) : null;
+
   return (
-    <div style={{ marginBottom: 14 }}>
+    <>
       {aviso ? (
-        <div style={{ marginBottom: 10 }}>
-          <InlineAlert variant="success" message={aviso} onDismiss={() => setAviso(null)} />
-        </div>
+        <Alert tone="success" role="status" onDismiss={() => setAviso(null)}>
+          {aviso}
+        </Alert>
       ) : null}
-      {haySuperiores || extra ? (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {acciones?.puedePasar ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => abrir("pasar")}
-              iconLeft={<SwapHorizIcon fontSize="inherit" aria-hidden="true" />}
-            >
-              Pasar a otro compañero
-            </Button>
-          ) : null}
-          {acciones?.puedeCancelar ? (
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => abrir("cancelar")}
-              iconLeft={<BlockOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-            >
-              Cancelar actividad
-            </Button>
-          ) : null}
-          {extra}
-        </div>
-      ) : null}
+      {botones ? (actionsTarget ? createPortal(botones, actionsTarget) : <div className={s.fila}>{botones}</div>) : null}
 
       <Modal
         open={dialogo === "cancelar"}
@@ -186,7 +196,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
         title="Cancelar actividad"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setDialogo(null)} disabled={guardando}>
+            <Button variant="tertiary" onClick={() => setDialogo(null)} disabled={guardando}>
               Volver
             </Button>
             <Button variant="danger" onClick={() => void confirmarCancelar()} disabled={!motivoOk} loading={guardando}>
@@ -195,24 +205,25 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
           </>
         }
       >
-        <div style={{ display: "grid", gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <div className={s.cuerpo}>
+          <p className={s.nota}>
             La actividad quedará como «Cancelada» con tu motivo en el historial. Se avisa a quienes la ejecutan, al
             responsable, a sus jefes y a Christian.
           </p>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={etiqueta}>Motivo *</span>
-            <textarea
+          <Field label="Motivo" required hint={contador}>
+            <Textarea
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               rows={4}
               maxLength={400}
               placeholder="Ej. El cliente pospuso el servicio hasta nuevo aviso."
-              style={{ ...erpInputStyle, resize: "vertical", fontFamily: "inherit" }}
             />
-            {contador}
-          </label>
-          {error ? <InlineAlert variant="danger" message={error} /> : null}
+          </Field>
+          {error ? (
+            <Alert tone="danger" role="alert">
+              {error}
+            </Alert>
+          ) : null}
         </div>
       </Modal>
 
@@ -222,7 +233,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
         title="Pasar a otro compañero"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setDialogo(null)} disabled={guardando}>
+            <Button variant="tertiary" onClick={() => setDialogo(null)} disabled={guardando}>
               Volver
             </Button>
             <Button
@@ -236,18 +247,13 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
           </>
         }
       >
-        <div style={{ display: "grid", gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <div className={s.cuerpo}>
+          <p className={s.nota}>
             Quien la recibe continúa donde se quedó: ve el avance anterior y toma sus propias fotos de entrada y
             salida. El avance de quien sale queda guardado.
           </p>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={etiqueta}>Quién la deja *</span>
-            <select
-              value={deUsuarioId}
-              onChange={(e) => setDeUsuarioId(e.target.value ? Number(e.target.value) : "")}
-              style={erpInputStyle}
-            >
+          <Field label="Quién la deja" required>
+            <Select value={deUsuarioId} onChange={(e) => setDeUsuarioId(e.target.value ? Number(e.target.value) : "")}>
               <option value="">Elige a la persona</option>
               {(acciones?.personas ?? []).map((p) => (
                 <option key={p.userId} value={p.userId}>
@@ -255,14 +261,16 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
                   {p.responsable ? " · responsable" : p.rol === "APOYO" ? " · apoyo" : ""}
                 </option>
               ))}
-            </select>
-          </label>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={etiqueta}>Compañero que la continúa *</span>
-            <select
+            </Select>
+          </Field>
+          <Field
+            label="Compañero que la continúa"
+            required
+            hint={!cargandoCompaneros && opciones.length === 0 ? "No encontramos compañeros disponibles para ti." : undefined}
+          >
+            <Select
               value={aUsuarioId}
               onChange={(e) => setAUsuarioId(e.target.value ? Number(e.target.value) : "")}
-              style={erpInputStyle}
               disabled={cargandoCompaneros}
             >
               <option value="">{cargandoCompaneros ? "Cargando compañeros…" : "Elige al compañero"}</option>
@@ -271,28 +279,24 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
                   {c.nombre}
                 </option>
               ))}
-            </select>
-            {!cargandoCompaneros && opciones.length === 0 ? (
-              <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                No encontramos compañeros disponibles para ti.
-              </span>
-            ) : null}
-          </label>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span style={etiqueta}>Motivo *</span>
-            <textarea
+            </Select>
+          </Field>
+          <Field label="Motivo" required hint={contador}>
+            <Textarea
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               rows={3}
               maxLength={400}
               placeholder="Ej. Se enfermó y no puede terminar hoy."
-              style={{ ...erpInputStyle, resize: "vertical", fontFamily: "inherit" }}
             />
-            {contador}
-          </label>
-          {error ? <InlineAlert variant="danger" message={error} /> : null}
+          </Field>
+          {error ? (
+            <Alert tone="danger" role="alert">
+              {error}
+            </Alert>
+          ) : null}
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

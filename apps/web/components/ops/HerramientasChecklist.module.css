@@ -1,0 +1,189 @@
+/* «Herramientas a llevar» en la ficha de actividad (v2). Solo tokens --ui-*. */
+
+.caja {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+  min-width: 0;
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.ico {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-size: 17px;
+}
+
+.tituloT {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.cuantas {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-3);
+}
+
+.ayuda {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+.editor {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-brand-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.editorPie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+.avance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.avanceN {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.lista {
+  display: grid;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2) var(--ui-s3);
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  min-width: 0;
+}
+
+.fila[data-estado="success"] {
+  border-left-color: var(--ui-success);
+}
+
+.fila[data-estado="warning"] {
+  border-left-color: var(--ui-warning);
+}
+
+.fila[data-estado="danger"] {
+  border-left-color: var(--ui-danger);
+}
+
+.filaTexto {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.filaT {
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.cantidad {
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+
+.filaM {
+  font-size: var(--ui-fs-meta);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.filaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.nota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  width: 100%;
+}
+
+.notaInput {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.error {
+  margin: 0;
+  width: 100%;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-danger-text);
+}
+
+.vacio {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 767px) {
+  .caja {
+    padding: var(--ui-s3) var(--ui-s4);
+    border-radius: var(--ui-radius-lg);
+  }
+  .filaAcciones {
+    width: 100%;
+  }
+}

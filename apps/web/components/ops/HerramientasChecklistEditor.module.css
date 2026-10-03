@@ -1,0 +1,119 @@
+/* Editor de «herramientas a llevar» (v2). Solo tokens --ui-*. */
+
+.editor {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.kit {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.kitLista {
+  display: grid;
+  gap: 6px;
+}
+
+.kitChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.45;
+  color: var(--ui-fg-3);
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+
+.filas,
+.resultados {
+  display: grid;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.fila[data-error="true"] {
+  border-color: var(--ui-danger-border);
+}
+
+.filaArriba {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+}
+
+.filaTexto {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.filaT {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.filaM {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.cantidad {
+  display: grid;
+  gap: var(--ui-s1);
+  width: 96px;
+}
+
+.cantidadInput {
+  text-align: center;
+}
+
+.error {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-danger-text);
+}
+
+.almacen {
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.resultado {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+}

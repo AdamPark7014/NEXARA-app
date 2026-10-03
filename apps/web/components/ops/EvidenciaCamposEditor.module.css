@@ -1,0 +1,105 @@
+/* Editor de «qué hay que fotografiar» (v2). Solo tokens --ui-*. */
+
+.editor {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.rapido {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.rapidoT {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+
+.chip:is(button) {
+  border-radius: var(--ui-radius-pill);
+}
+
+.chip:is(button)[aria-pressed="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.chip:is(button)[aria-pressed="false"] {
+  color: var(--ui-fg-2);
+}
+
+.filas {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.fila[data-error="true"] {
+  border-color: var(--ui-danger-border);
+}
+
+.filaArriba {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ui-s2);
+}
+
+.nombre {
+  display: grid;
+  gap: var(--ui-s1);
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+
+.momentos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.error {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-danger-text);
+}
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.agregar:is(button) {
+  border-style: dashed;
+  border-radius: var(--ui-radius-pill);
+}
+
+.cuenta {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}

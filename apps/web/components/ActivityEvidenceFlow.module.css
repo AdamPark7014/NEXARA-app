@@ -1,3 +1,862 @@
-.flowCard {  margin-bottom: 24px;}.flowTitle {  color: var(--primary);  margin: 0 0 12px;}.flowSubtitle,.progressMeta,.stepDescription,.smallHint,.progressLabel,.inventoryDropLabel {  color: var(--text-secondary);}.flowSubtitle,.stepDescription {  margin: 0 0 20px;}.activitySelect {  border-width: 2px;  border-color: var(--primary);  font-size: 16px;}.alertError,.alertSuccess {  padding: 12px;  border-radius: 6px;  margin-bottom: 12px;}.alertError {  background: var(--state-danger-bg);  color: var(--state-danger-text);}.alertSuccess {  background: var(--state-success-bg);  color: #060;}.rejectedBanner {  padding: 20px;  background: var(--state-danger-bg);  border: 3px solid var(--danger);  border-radius: 8px;  margin-bottom: 20px;}.rejectedTitle {  margin: 0 0 12px;  color: var(--danger);  display: flex;  align-items: center;  gap: 8px;}.rejectedEmoji {  font-size: 24px;}.rejectedStepRow {  margin-bottom: 12px;}.rejectedStrong {  color: var(--danger);}.rejectedStepText {  color: #991b1b;}.rejectedNotes {  margin: 8px 0 0;  padding: 12px;  background: rgba(255, 255, 255, 0.7);  border-radius: 4px;  color: #374151;}.rejectedHint {  margin-top: 16px;  padding: 12px;  background: rgba(254, 243, 199, 0.5);  border-radius: 4px;  font-size: 14px;  color: #92400e;}.progressWrap,.inventorySection,.serviceForm {  margin-bottom: 20px;}.progressMeta {  font-size: 12px;  margin-bottom: 8px;}.progressRow {  display: flex;  gap: 8px;  align-items: center;}.progressDivider {  flex: 1;  height: 2px;  background: var(--border);}.progressStep {  text-align: center;}.progressCircle {  width: 36px;  height: 36px;  border-radius: 50%;  display: flex;  align-items: center;  justify-content: center;  background: var(--border);  color: white;  font-weight: 700;  margin: 0 auto 4px;}.progressCircleActive {  background: var(--primary);}.progressCircleCompleted {  background: var(--success);}.progressLabel {  font-size: 11px;}.stepCard {  padding: 20px;  border-radius: 8px;  border: 2px solid var(--border);}.stepEntry {  border-color: var(--primary);}.stepEvidence {  border-color: var(--accent);}.stepPdf {  border-color: #f90;}.stepData {  border-color: #060;}.stepExit {  border-color: var(--state-danger-text);}.stepTitle {  margin: 0 0 12px;  color: var(--text-primary);}.stepEntry .stepTitle {  color: var(--primary);}.stepEvidence .stepTitle {  color: var(--accent);}.stepPdf .stepTitle {  color: #f90;}.stepData .stepTitle {  color: #060;}.stepExit .stepTitle {  color: var(--state-danger-text);}.actionGrid {  display: grid;  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));  gap: 12px;  width: 100%;}.actionGridBottom {  margin-bottom: 20px;}.actionButton {  min-height: 52px;  padding: 14px 12px;  border-radius: 12px;  font-size: 15px;  font-weight: 700;  display: flex;  align-items: center;  justify-content: center;  gap: 6px;  border: 1px solid transparent;  cursor: pointer;  transition: transform 0.15s ease;}.actionButton:active {  transform: scale(0.98);}.actionButton:disabled {  opacity: 0.6;  cursor: not-allowed;}.actionPrimary {  color: #fff;}.actionSecondary {  background: var(--surface-light);  color: var(--foreground);  border-color: var(--border);}.actionEntry {  background: var(--primary);}.actionEvidence {  background: var(--accent);}.actionSuccess {  background: var(--success);}.actionExit {  background: var(--state-danger-text);}.inventorySection {  display: grid;  gap: 10px;}.inventoryHeaderRow,.inventoryFooterRow {  display: flex;  justify-content: space-between;  align-items: center;  gap: 10px;  flex-wrap: wrap;}.inventoryItemCard {  border: 1px solid var(--border);  border-radius: 8px;  padding: 10px;  display: grid;  gap: 8px;}.inventoryFieldsGrid {  display: grid;  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));  gap: 8px;}.inventoryDropzone {  border: 1px dashed var(--border);  border-radius: 8px;  padding: 8px;  display: grid;  gap: 8px;}.hiddenInput {  display: none;}.inventoryDropLabel {  font-size: 12px;}.inventoryPreviewImage {  width: 100%;  height: 120px;  object-fit: cover;  border-radius: 8px;}.evidenceGalleryWrap {  margin-bottom: 20px;}.evidenceGalleryGrid {  display: grid;  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));  gap: 8px;}.evidencePhotoTile {  position: relative;  width: 100%;  padding-bottom: 100%;  border-radius: 4px;  overflow: hidden;  border: 2px solid var(--border);}.evidencePhotoImg {  position: absolute;  inset: 0;  width: 100%;  height: 100%;  object-fit: cover;}.removePhotoButton {  position: absolute;  top: 4px;  right: 4px;  width: 36px;  height: 36px;  border: none;  border-radius: 50%;  background: rgba(255, 0, 0, 0.8);  color: #fff;  cursor: pointer;  font-size: 16px;  font-weight: 700;  padding: 0;}.pdfDropzone {  border: 2px dashed var(--border);  border-radius: 8px;  padding: 12px;  margin-bottom: 16px;  background: transparent;}.pdfDropzoneDragging {  border-color: var(--primary);  background: rgba(15, 106, 214, 0.08);}.pdfInputHidden {  display: none;}.pdfInputLabel {  display: flex;  align-items: center;  justify-content: center;  gap: 16px;  padding: 24px;  cursor: pointer;  transition: all 0.2s ease;  border-radius: 8px;  background: linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%);}.pdfInputLabel:hover {  background: linear-gradient(135deg, rgba(249, 144, 0, 0.12) 0%, rgba(249, 144, 0, 0.08) 100%);  transform: translateY(-2px);}.pdfIconContainer {  display: flex;  align-items: center;  justify-content: center;  width: 64px;  height: 64px;  border-radius: 12px;  background: rgba(249, 144, 0, 0.15);  font-size: 32px;  flex-shrink: 0;}.pdfInputLabel:hover .pdfIconContainer {  background: rgba(249, 144, 0, 0.25);  transform: scale(1.1);}.pdfLabelText {  display: flex;  flex-direction: column;  gap: 4px;}.pdfLabelMain {  font-size: 16px;  font-weight: 700;  color: var(--text-primary);}.pdfLabelHint {  font-size: 13px;  color: var(--text-secondary);}.smallHint {  font-size: 12px;}.pdfPreviewCard {  padding: 12px;  background: var(--bg-secondary);  border-radius: 4px;  margin-bottom: 16px;  display: grid;  gap: 8px;}.completedCard {  padding: 24px;  background: var(--state-success-bg);  border: 3px solid #060;  border-radius: 8px;  text-align: center;}.completedTitle,.completedText {  color: #060;}.completedTitle {  margin: 0 0 12px;}.completedText {  margin: 0 0 20px;}.completedButton {  padding: 12px 24px;  background: #060;  color: #fff;  border: none;  border-radius: 4px;  cursor: pointer;  font-size: 16px;  font-weight: 700;}.serviceForm {  display: grid;  gap: 12px;}.serviceTextarea {  min-height: 100px;  font-family: inherit;}.serviceSubmit {  background: #060;}@media (max-width: 768px) {  .progressDivider {    display: none;  }  .progressRow {    display: grid;    grid-template-columns: repeat(3, minmax(0, 1fr));    gap: 10px;  }  .inventoryFooterRow {    flex-direction: column;    align-items: stretch;  }}@media (pointer: coarse) {  .flowCard :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {    font-size: 16px;    min-height: 44px;  }  .completedButton {    min-height: 48px;  }  .removePhotoButton {    width: 40px;    height: 40px;  }}
+/*
+ * Flujo de evidencias de quien ejecuta (v2).
+ *
+ * Pensado para el teléfono en campo: pasos claros arriba, una tarjeta por paso con su
+ * título y explicación, botones grandes al alcance del pulgar (52 px) y la galería de lo
+ * que ya se subió. Solo tokens --ui-*: claro y oscuro salen de los tokens.
+ */
 
+.flowCard {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
 
+.flowTitle {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.flowSubtitle {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.muted {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+/* Botón grande táctil: 52 px de alto, texto que puede partirse en dos renglones. */
+.tap:is(button, a) {
+  height: auto;
+  min-height: 52px;
+  padding: 10px 16px;
+  border-radius: var(--ui-radius-lg);
+  font-size: 15px;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+}
+
+/* ─── Diálogos de cámara, vista previa y visor ─────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--ui-s4);
+  background: var(--ui-scrim);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  display: grid;
+  gap: var(--ui-s3);
+  padding: 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  box-shadow: var(--ui-elev-3);
+}
+
+.dialogWide {
+  max-width: 560px;
+}
+
+.dialogXl {
+  max-width: 640px;
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-fg);
+}
+
+.dialogSub {
+  margin: 2px 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.dialogMeta {
+  font-size: var(--ui-fs-meta);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+.dialogMeta a {
+  color: var(--ui-brand-text);
+  font-weight: var(--ui-fw-semibold);
+}
+
+.dialogError {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-medium);
+  color: var(--ui-danger-text);
+}
+
+/* La foto se ve sobre fondo de visor (negro de foto, no de tema). */
+.previewImg {
+  display: block;
+  width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+  border-radius: var(--ui-radius-lg);
+  background: #000;
+}
+
+.lightboxImg {
+  max-height: 70vh;
+}
+
+.videoBox {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: var(--ui-radius-lg);
+  background: #000;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+}
+
+/* Frontal en espejo, como un espejo real; la foto se guarda sin espejo. */
+.videoMirror {
+  transform: scaleX(-1);
+}
+
+.videoWait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: var(--ui-fs-body);
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.grow {
+  flex: 1 1 160px;
+}
+
+.growSm {
+  flex: 1 1 120px;
+}
+
+/* ─── Indicaciones y avance de quien la tenía antes ────────────────────── */
+
+.infoCard {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+  min-width: 0;
+}
+
+.infoTitle {
+  display: block;
+  margin: 0 0 2px;
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.infoText {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  line-height: 1.5;
+  color: var(--ui-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.thumb {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+}
+
+.link {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-brand-text);
+}
+
+.prevList {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+}
+
+.prevList dt {
+  color: var(--ui-fg-3);
+}
+
+.prevList dd {
+  margin: 0;
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+/* ─── Rechazo ──────────────────────────────────────────────────────────── */
+
+.rejectedBody {
+  display: grid;
+  gap: var(--ui-s2);
+  margin-top: var(--ui-s1);
+}
+
+.rejectedStrong {
+  font-weight: var(--ui-fw-semibold);
+}
+
+.rejectedNotes {
+  display: block;
+  margin: var(--ui-s1) 0 0;
+  padding: 10px 12px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  white-space: pre-wrap;
+}
+
+.rejectedHint {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+/* ─── Pasos del flujo ──────────────────────────────────────────────────── */
+
+.progressWrap {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.progressMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.progressMeta strong {
+  color: var(--ui-fg);
+  font-weight: var(--ui-fw-semibold);
+}
+
+.progressRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progressDivider {
+  flex: 1 1 auto;
+  height: 2px;
+  margin-top: 17px;
+  border-radius: 2px;
+  background: var(--ui-border);
+}
+
+.progressDividerDone {
+  background: var(--ui-success);
+}
+
+.progressStep {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 64px;
+  text-align: center;
+}
+
+.progressCircle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: var(--ui-surface);
+  color: var(--ui-fg-3);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressCircleActive {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  box-shadow: var(--ui-ring);
+}
+
+.progressCircleCompleted {
+  border-color: var(--ui-success);
+  background: var(--ui-success);
+  color: var(--ui-success-fg);
+}
+
+.progressLabel {
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-medium);
+  line-height: 1.25;
+  color: var(--ui-fg-3);
+}
+
+.progressStepActive .progressLabel {
+  color: var(--ui-fg);
+  font-weight: var(--ui-fw-semibold);
+}
+
+/* ─── Tarjeta de cada paso ─────────────────────────────────────────────── */
+
+.stepCard {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-top: 3px solid var(--ui-brand);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+  min-width: 0;
+}
+
+/* Los pasos se distinguen por su número y título; el color es siempre el de marca. */
+.stepEntry,
+.stepEvidence,
+.stepPdf,
+.stepData,
+.stepExit {
+  border-top-color: var(--ui-brand);
+}
+
+.stepTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  line-height: 1.3;
+  color: var(--ui-fg);
+}
+
+.stepIco {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.stepDescription {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--ui-s3);
+  width: 100%;
+}
+
+.actionGridBottom {
+  margin-top: var(--ui-s1);
+}
+
+/* ─── Fotos por campo ──────────────────────────────────────────────────── */
+
+.campoList {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.campoCard {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+  min-width: 0;
+}
+
+.campoHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.campoName {
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.campoNote {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.momentos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-s2);
+}
+
+.momentos[data-cols="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.momentos[data-cols="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.momento {
+  display: grid;
+  gap: var(--ui-s1);
+  min-width: 0;
+}
+
+.momentoLabel {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+
+.campoFoto {
+  position: relative;
+}
+
+.campoFotoBtn {
+  display: block;
+  width: 100%;
+  height: 96px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+  cursor: pointer;
+}
+
+.campoFotoBtn:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+.campoFotoImg {
+  display: block;
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+}
+
+/* Hueco que falta: punteado en ámbar para que se vea pendiente. */
+.campoTomar:is(button) {
+  height: 72px;
+  border: 1px dashed var(--ui-warning-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+}
+
+.campoTomar:is(button):hover:not(:disabled) {
+  background: var(--ui-warning-bg);
+  border-color: var(--ui-warning);
+}
+
+/* Botón «quitar» sobre la foto. */
+.removePhotoButton:is(button) {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+}
+
+/* ─── Inventario comparativo ───────────────────────────────────────────── */
+
+.inventorySection {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.inventoryHeaderRow,
+.inventoryFooterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+}
+
+.inventoryFooterRow > :first-child {
+  flex: 1 1 240px;
+}
+
+.inventoryItemCard {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.inventoryFieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--ui-s2);
+}
+
+.inventoryDropzone {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s2);
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.inventoryDropLabel {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.inventoryPreviewImage {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--ui-radius);
+}
+
+/* ─── Galería de fotos libres ──────────────────────────────────────────── */
+
+.evidenceGalleryWrap {
+  min-width: 0;
+}
+
+.evidenceGalleryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--ui-s2);
+}
+
+.evidencePhotoTile {
+  position: relative;
+  width: 100%;
+  padding-bottom: 100%;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+  cursor: zoom-in;
+}
+
+.evidencePhotoTile:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+.evidencePhotoImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ─── Hoja de servicio (PDF) ───────────────────────────────────────────── */
+
+.pdfDropzone {
+  padding: var(--ui-s2);
+  border: 2px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  background: transparent;
+  transition: border-color var(--ui-duration-fast) ease, background-color var(--ui-duration-fast) ease;
+}
+
+.pdfDropzoneDragging {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+
+.pdfInputHidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pdfInputLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-s4);
+  padding: var(--ui-s5);
+  border-radius: var(--ui-radius-lg);
+  cursor: pointer;
+  transition: background-color var(--ui-duration-fast) ease;
+}
+
+.pdfInputLabel:hover {
+  background: var(--ui-hover);
+}
+
+.pdfInputLabel[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pdfIconContainer {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.pdfLabelText {
+  display: grid;
+  gap: 2px;
+}
+
+.pdfLabelMain {
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.pdfLabelHint {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.pdfPreviewCard {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+/* ─── Terminado ────────────────────────────────────────────────────────── */
+
+.completedCard {
+  display: grid;
+  justify-items: center;
+  gap: var(--ui-s3);
+  padding: var(--ui-s6) var(--ui-s5);
+  border: 1px solid var(--ui-success-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-success-bg);
+  text-align: center;
+}
+
+.completedIco {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--ui-success);
+  color: var(--ui-success-fg);
+}
+
+.completedCard[data-locked="true"] {
+  border-color: var(--ui-violet-border);
+  background: var(--ui-violet-bg);
+}
+
+.completedCard[data-locked="true"] .completedIco {
+  background: var(--ui-violet);
+  color: var(--ui-violet-fg);
+}
+
+.completedTitle {
+  margin: 0;
+  font-size: var(--ui-text-xl);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-fg);
+}
+
+.completedText {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--ui-fs-body);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+/* ─── Formularios del paso ─────────────────────────────────────────────── */
+
+.serviceForm {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.serviceSubmit {
+  justify-self: stretch;
+}
+
+.sec {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.secOk {
+  border-color: var(--ui-success-border);
+}
+
+.secTitle {
+  margin: 0;
+  padding-bottom: var(--ui-s2);
+  border-bottom: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.secOk .secTitle {
+  color: var(--ui-success-text);
+}
+
+.narrow {
+  max-width: 160px;
+}
+
+/* Firma: el lienzo es blanco papel en los dos temas (la tinta es oscura). */
+.sigCanvas {
+  display: block;
+  width: 100%;
+  height: 150px;
+  border: 1.5px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  background: #fbfcfd;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.sigCanvas[data-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.sigFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  margin-top: 6px;
+}
+
+.sigHint {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 767px) {
+  .stepCard {
+    padding: var(--ui-s4);
+    border-radius: var(--ui-radius-lg);
+  }
+  .progressRow {
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .progressRow::-webkit-scrollbar {
+    display: none;
+  }
+  .progressDivider {
+    min-width: 12px;
+  }
+  .actionGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .momentos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inventoryFooterRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dialogActions > * {
+    flex: 1 1 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .flowCard :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+    font-size: 16px;
+    min-height: 44px;
+  }
+}

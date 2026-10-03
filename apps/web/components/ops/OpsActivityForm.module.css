@@ -1,0 +1,266 @@
+/*
+ * Alta / edición de actividad (v2) dentro de la plantilla FormPage.
+ * Las secciones numeradas, los campos, la lista de pendientes y el pie fijo salen de
+ * `components/base`; aquí solo vive lo propio: tarjetas de opción, chips de tipo de
+ * tarea, alta rápida de proyecto y el contador de fotos. Solo tokens --ui-*.
+ */
+
+.wrap {
+  min-width: 0;
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  margin-bottom: var(--ui-s4);
+}
+
+.cabezaT {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.cabezaD {
+  margin: 2px 0 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg-3);
+}
+
+.req {
+  color: var(--ui-danger);
+  font-weight: var(--ui-fw-bold);
+}
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.grupo {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.errorCampo {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-medium);
+  color: var(--ui-danger-text);
+}
+
+/* ─── Tarjetas de opción (Proyecto / Tarea) ────────────────────────────── */
+
+.opciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.opcion:is(button) {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 4px;
+  height: auto;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: var(--ui-radius-lg);
+  text-align: left;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.opcion:is(button)[aria-pressed="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  box-shadow: 0 0 0 1px var(--ui-brand) inset;
+}
+
+.opcionT {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.opcionD {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-regular);
+  color: var(--ui-fg-2);
+}
+
+/* ─── Chips de tipo de tarea ───────────────────────────────────────────── */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.chip:is(button) {
+  border-radius: var(--ui-radius-pill);
+}
+
+.chip:is(button)[aria-pressed="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+/* ─── Proyecto: alta rápida ────────────────────────────────────────────── */
+
+.linkInicio:is(button) {
+  justify-self: start;
+}
+
+.alta {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.altaPie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s3);
+}
+
+/* ─── Quién y cuándo ───────────────────────────────────────────────────── */
+
+.prioridad {
+  min-width: 0;
+}
+
+.resumen {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+.resumenMal {
+  color: var(--ui-danger-text);
+  font-weight: var(--ui-fw-medium);
+}
+
+.duraciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--ui-s4);
+}
+
+/* ─── Evidencia ────────────────────────────────────────────────────────── */
+
+.fotos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s3);
+}
+
+.contador {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.contadorN {
+  min-width: 28px;
+  text-align: center;
+  font-size: var(--ui-fs-section);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.subseccion {
+  display: grid;
+  gap: var(--ui-s3);
+  padding-top: var(--ui-s4);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.subseccion:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.subseccionT {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+/* ─── Reintentos y estado del pie ──────────────────────────────────────── */
+
+.reintento {
+  display: grid;
+  gap: var(--ui-s2);
+  margin-top: 2px;
+}
+
+.reintentoAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.statusError {
+  color: var(--ui-danger-text);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-medium);
+}
+
+.statusOk {
+  color: var(--ui-success-text);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-medium);
+}
+
+.cargando {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+}
+
+.cargandoT {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+@media (max-width: 640px) {
+  .opciones,
+  .duraciones {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

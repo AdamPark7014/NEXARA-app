@@ -12,7 +12,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import Button from "@/components/ui/Button";
+import { Badge, Button, EmptyState, Field, FieldGrid, Input, Select, SkeletonRows, Textarea, type Tone } from "@/components/base";
+import s from "./ActivityIssuesPanel.module.css";
 import { toast } from "@/components/Toast";
 import {
   INCIDENT_TYPES,
@@ -40,22 +41,12 @@ import {
   type RecommendationType,
 } from "@/lib/activity-issues-api";
 
-const inp: React.CSSProperties = {
-  width: "100%",
-  padding: "7px 9px",
-  border: "1px solid var(--border)",
-  borderRadius: 7,
-  background: "var(--surface-2)",
-  color: "var(--foreground)",
-  fontSize: 12.5,
-  boxSizing: "border-box",
-};
-
-const SEVERITY_COLOR: Record<IncidentSeverity, string> = {
-  BAJA: "#64748b",
-  MEDIA: "#ca8a04",
-  ALTA: "#ea580c",
-  CRITICA: "#dc2626",
+/** Severidad → tono de la insignia (y del borde de la tarjeta). */
+const SEVERITY_TONE: Record<IncidentSeverity, Tone> = {
+  BAJA: "neutral",
+  MEDIA: "warning",
+  ALTA: "warning",
+  CRITICA: "danger",
 };
 
 export default function ActivityIssuesPanel({
@@ -200,104 +191,91 @@ export default function ActivityIssuesPanel({
   };
 
   if (cargando) {
-    return <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Cargando…</p>;
+    return <SkeletonRows rows={3} label="Cargando…" />;
   }
 
   return (
-    <div style={{ display: "grid", gap: 22 }}>
+    <div className={s.panel}>
       {/* ── Incidencias ──────────────────────────────────────────────── */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
-            Incidencias ({incidencias.length})
-          </p>
+      <section className={s.bloque} aria-label="Incidencias">
+        <div className={s.cabeza}>
+          <h3 className={s.titulo}>
+            Incidencias <span className={s.cuantas}>({incidencias.length})</span>
+          </h3>
           {canManage && (
-            <Button size="sm" variant="secondary" onClick={() => setAbriendoIncidencia((v) => !v)}>
+            <Button size="sm" variant={abriendoIncidencia ? "tertiary" : "secondary"} onClick={() => setAbriendoIncidencia((v) => !v)}>
               {abriendoIncidencia ? "Cancelar" : "Registrar incidencia"}
             </Button>
           )}
         </div>
 
-        <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <p className={s.ayuda}>
           Lo que impidió o retrasó el trabajo. Tipificarlo permite contar: si
           &ldquo;faltó material&rdquo; encabeza la lista del mes, el problema está en almacén,
           no en campo.
         </p>
 
         {abriendoIncidencia && (
-          <div
-            style={{
-              display: "grid",
-              gap: 8,
-              padding: 12,
-              marginBottom: 12,
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-              background: "var(--surface-2)",
-            }}
-          >
-            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr 120px" }}>
-              <select
-                value={formIncidencia.tipo}
-                onChange={(e) =>
-                  setFormIncidencia({ ...formIncidencia, tipo: e.target.value as IncidentType })
-                }
-                style={inp}
-              >
-                {INCIDENT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {INCIDENT_TYPE_LABEL[t]}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={formIncidencia.severidad}
-                onChange={(e) =>
-                  setFormIncidencia({
-                    ...formIncidencia,
-                    severidad: e.target.value as IncidentSeverity,
-                  })
-                }
-                style={inp}
-              >
-                {INCIDENT_SEVERITIES.map((s) => (
-                  <option key={s} value={s}>
-                    Severidad {SEVERITY_LABEL[s].toLowerCase()}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                placeholder="Horas perdidas"
-                value={formIncidencia.horasPerdidas}
-                onChange={(e) =>
-                  setFormIncidencia({ ...formIncidencia, horasPerdidas: e.target.value })
-                }
-                style={inp}
+          <div className={s.alta}>
+            <FieldGrid columns={3}>
+              <Field label="Tipo">
+                <Select
+                  value={formIncidencia.tipo}
+                  onChange={(e) => setFormIncidencia({ ...formIncidencia, tipo: e.target.value as IncidentType })}
+                >
+                  {INCIDENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {INCIDENT_TYPE_LABEL[t]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Severidad">
+                <Select
+                  value={formIncidencia.severidad}
+                  onChange={(e) =>
+                    setFormIncidencia({
+                      ...formIncidencia,
+                      severidad: e.target.value as IncidentSeverity,
+                    })
+                  }
+                >
+                  {INCIDENT_SEVERITIES.map((sev) => (
+                    <option key={sev} value={sev}>
+                      Severidad {SEVERITY_LABEL[sev].toLowerCase()}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Horas perdidas" optional>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  placeholder="Horas perdidas"
+                  value={formIncidencia.horasPerdidas}
+                  onChange={(e) => setFormIncidencia({ ...formIncidencia, horasPerdidas: e.target.value })}
+                />
+              </Field>
+            </FieldGrid>
+            <Field label="Qué pasó" required>
+              <Textarea
+                rows={2}
+                placeholder="Qué pasó"
+                value={formIncidencia.descripcion}
+                onChange={(e) => setFormIncidencia({ ...formIncidencia, descripcion: e.target.value })}
               />
-            </div>
-            <textarea
-              rows={2}
-              placeholder="Qué pasó"
-              value={formIncidencia.descripcion}
-              onChange={(e) =>
-                setFormIncidencia({ ...formIncidencia, descripcion: e.target.value })
-              }
-              style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
-            />
-            <input
-              placeholder="Qué se hizo en el momento (opcional)"
-              value={formIncidencia.accionTomada}
-              onChange={(e) =>
-                setFormIncidencia({ ...formIncidencia, accionTomada: e.target.value })
-              }
-              style={inp}
-            />
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            </Field>
+            <Field label="Qué se hizo en el momento" optional>
+              <Input
+                placeholder="Qué se hizo en el momento (opcional)"
+                value={formIncidencia.accionTomada}
+                onChange={(e) => setFormIncidencia({ ...formIncidencia, accionTomada: e.target.value })}
+              />
+            </Field>
+            <div className={s.altaPie}>
               <Button
-                size="sm"
+                variant="primary"
                 onClick={registrarIncidencia}
                 loading={guardandoIncidencia}
                 disabled={!formIncidencia.descripcion.trim()}
@@ -309,145 +287,114 @@ export default function ActivityIssuesPanel({
         )}
 
         {incidencias.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-            Sin incidencias registradas en este servicio.
-          </p>
+          <EmptyState tone="success" size="compact" title="Sin incidencias registradas en este servicio." />
         ) : (
-          <div style={{ display: "grid", gap: 8 }}>
+          <ul className={s.lista}>
             {incidencias.map((i) => (
-              <div
+              <li
                 key={i.id}
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "flex-start",
-                  padding: "10px 12px",
-                  border: "1px solid var(--border)",
-                  borderLeft: `3px solid ${i.resueltoAt ? "var(--border)" : SEVERITY_COLOR[i.severidad]}`,
-                  borderRadius: 10,
-                  background: "var(--surface)",
-                  opacity: i.resueltoAt ? 0.7 : 1,
-                }}
+                className={s.item}
+                data-tono={i.resueltoAt ? "resuelta" : SEVERITY_TONE[i.severidad]}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+                <div className={s.itemTexto}>
+                  <p className={s.itemT}>
                     {INCIDENT_TYPE_LABEL[i.tipo]}
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: SEVERITY_COLOR[i.severidad],
-                      }}
-                    >
+                    <Badge tone={i.resueltoAt ? "neutral" : SEVERITY_TONE[i.severidad]} size="sm">
                       {SEVERITY_LABEL[i.severidad]}
-                    </span>
+                    </Badge>
+                    {i.resueltoAt ? (
+                      <Badge tone="success" size="sm">
+                        Resuelta
+                      </Badge>
+                    ) : null}
                   </p>
-                  <p style={{ margin: "3px 0 0", fontSize: 12.5, lineHeight: 1.45 }}>
-                    {i.descripcion}
-                  </p>
-                  {i.accionTomada && (
-                    <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-secondary)" }}>
-                      Acción: {i.accionTomada}
-                    </p>
-                  )}
-                  <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                  <p className={s.itemD}>{i.descripcion}</p>
+                  {i.accionTomada && <p className={s.itemA}>Acción: {i.accionTomada}</p>}
+                  <p className={s.itemM}>
                     {i.reportadoPor ? `Reportó ${i.reportadoPor.nombre}` : "Sin reportante"}
                     {Number(i.horasPerdidas ?? 0) > 0 && ` · ${Number(i.horasPerdidas)} h perdidas`}
-                    {i.resueltoAt &&
-                      ` · resuelta${i.resueltoPor ? ` por ${i.resueltoPor.nombre}` : ""}`}
+                    {i.resueltoAt && ` · resuelta${i.resueltoPor ? ` por ${i.resueltoPor.nombre}` : ""}`}
                   </p>
                 </div>
                 {canManage && (
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant={i.resueltoAt ? "ghost" : "tonal"}
                     onClick={() => (i.resueltoAt ? reabrir(i) : cerrarIncidencia(i))}
                   >
                     {i.resueltoAt ? "Reabrir" : "Resolver"}
                   </Button>
                 )}
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </div>
+      </section>
 
       {/* ── Recomendaciones ──────────────────────────────────────────── */}
-      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
-            Recomendaciones al cliente ({recomendaciones.length})
-          </p>
+      <section className={`${s.bloque} ${s.bloqueSep}`} aria-label="Recomendaciones al cliente">
+        <div className={s.cabeza}>
+          <h3 className={s.titulo}>
+            Recomendaciones al cliente <span className={s.cuantas}>({recomendaciones.length})</span>
+          </h3>
           {canManage && (
-            <Button size="sm" variant="secondary" onClick={() => setAbriendoRec((v) => !v)}>
+            <Button size="sm" variant={abriendoRec ? "tertiary" : "secondary"} onClick={() => setAbriendoRec((v) => !v)}>
               {abriendoRec ? "Cancelar" : "Registrar recomendación"}
             </Button>
           )}
         </div>
 
-        <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <p className={s.ayuda}>
           Lo que hay que cambiar y el técnico ve en sitio. Al enlazarse con una
           cotización, llega a Ventas en vez de quedarse en el reporte.
         </p>
 
         {abriendoRec && (
-          <div
-            style={{
-              display: "grid",
-              gap: 8,
-              padding: 12,
-              marginBottom: 12,
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-              background: "var(--surface-2)",
-            }}
-          >
-            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr 140px" }}>
-              <select
-                value={formRec.tipo}
-                onChange={(e) => setFormRec({ ...formRec, tipo: e.target.value as RecommendationType })}
-                style={inp}
-              >
-                {RECOMMENDATION_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {RECOMMENDATION_TYPE_LABEL[t]}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={formRec.prioridad}
-                onChange={(e) =>
-                  setFormRec({ ...formRec, prioridad: e.target.value as RecommendationPriority })
-                }
-                style={inp}
-              >
-                {RECOMMENDATION_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    Prioridad {PRIORITY_LABEL[p].toLowerCase()}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                placeholder="Costo estimado"
-                value={formRec.costoEstimado}
-                onChange={(e) => setFormRec({ ...formRec, costoEstimado: e.target.value })}
-                style={inp}
+          <div className={s.alta}>
+            <FieldGrid columns={3}>
+              <Field label="Tipo">
+                <Select value={formRec.tipo} onChange={(e) => setFormRec({ ...formRec, tipo: e.target.value as RecommendationType })}>
+                  {RECOMMENDATION_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {RECOMMENDATION_TYPE_LABEL[t]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Prioridad">
+                <Select
+                  value={formRec.prioridad}
+                  onChange={(e) => setFormRec({ ...formRec, prioridad: e.target.value as RecommendationPriority })}
+                >
+                  {RECOMMENDATION_PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      Prioridad {PRIORITY_LABEL[p].toLowerCase()}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Costo estimado" optional>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="Costo estimado"
+                  value={formRec.costoEstimado}
+                  onChange={(e) => setFormRec({ ...formRec, costoEstimado: e.target.value })}
+                />
+              </Field>
+            </FieldGrid>
+            <Field label="Qué se recomienda y por qué" required>
+              <Textarea
+                rows={2}
+                placeholder="Qué se recomienda y por qué"
+                value={formRec.descripcion}
+                onChange={(e) => setFormRec({ ...formRec, descripcion: e.target.value })}
               />
-            </div>
-            <textarea
-              rows={2}
-              placeholder="Qué se recomienda y por qué"
-              value={formRec.descripcion}
-              onChange={(e) => setFormRec({ ...formRec, descripcion: e.target.value })}
-              style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
-            />
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            </Field>
+            <div className={s.altaPie}>
               <Button
-                size="sm"
+                variant="primary"
                 onClick={registrarRecomendacion}
                 loading={guardandoRec}
                 disabled={!formRec.descripcion.trim()}
@@ -459,38 +406,22 @@ export default function ActivityIssuesPanel({
         )}
 
         {recomendaciones.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-            Sin recomendaciones registradas en este servicio.
-          </p>
+          <EmptyState tone="neutral" size="compact" title="Sin recomendaciones registradas en este servicio." />
         ) : (
-          <div style={{ display: "grid", gap: 8 }}>
+          <ul className={s.lista}>
             {recomendaciones.map((r) => (
-              <div
-                key={r.id}
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "flex-start",
-                  padding: "10px 12px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 10,
-                  background: "var(--surface)",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+              <li key={r.id} className={s.item} data-tono="info">
+                <div className={s.itemTexto}>
+                  <p className={s.itemT}>
                     {RECOMMENDATION_TYPE_LABEL[r.tipo]}
-                    <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-secondary)" }}>
+                    <Badge tone="outline" size="sm">
                       {PRIORITY_LABEL[r.prioridad]} · {RECOMMENDATION_STATUS_LABEL[r.estado]}
-                    </span>
+                    </Badge>
                   </p>
-                  <p style={{ margin: "3px 0 0", fontSize: 12.5, lineHeight: 1.45 }}>
-                    {r.descripcion}
-                  </p>
-                  <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                  <p className={s.itemD}>{r.descripcion}</p>
+                  <p className={s.itemM}>
                     {r.creadoPor ? `Propuso ${r.creadoPor.nombre}` : "Sin autor"}
-                    {Number(r.costoEstimado ?? 0) > 0 &&
-                      ` · estimado $${Number(r.costoEstimado).toLocaleString("es-MX")}`}
+                    {Number(r.costoEstimado ?? 0) > 0 && ` · estimado $${Number(r.costoEstimado).toLocaleString("es-MX")}`}
                     {r.cotizacion && ` · cotización ${r.cotizacion.quoteNumber}`}
                   </p>
                 </div>
@@ -499,11 +430,11 @@ export default function ActivityIssuesPanel({
                     Descartar
                   </Button>
                 )}
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </div>
+      </section>
     </div>
   );
 }

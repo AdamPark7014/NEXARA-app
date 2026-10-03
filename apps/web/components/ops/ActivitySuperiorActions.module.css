@@ -1,0 +1,25 @@
+/* Acciones de superiores (v2): pasar a otro compañero y cancelar con motivo. Solo tokens --ui-*. */
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.corto {
+  color: var(--ui-danger-text);
+}

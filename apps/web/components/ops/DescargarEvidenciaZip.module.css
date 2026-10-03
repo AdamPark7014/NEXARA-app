@@ -1,0 +1,16 @@
+/* Botón de descarga de la evidencia en .zip (v2). Solo tokens --ui-*. */
+
+.caja {
+  display: grid;
+  gap: var(--ui-s1);
+  justify-items: start;
+}
+
+.estado {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.estado[data-error="true"] {
+  color: var(--ui-danger-text);
+}

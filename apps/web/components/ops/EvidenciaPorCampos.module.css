@@ -1,0 +1,267 @@
+/* «Evidencia por campos» en la ficha de actividad (v2). Solo tokens --ui-*. */
+
+.caja {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-xl);
+  background: var(--ui-surface);
+  min-width: 0;
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+}
+
+.cabezaTexto {
+  display: grid;
+  gap: var(--ui-s1);
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.cabezaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--ui-s2);
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.ico {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-size: 17px;
+}
+
+.sub {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.4;
+  color: var(--ui-fg-2);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-danger-text);
+}
+
+.archivoOculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.aviso {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-success-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+}
+
+.editor {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  border: 1px solid var(--ui-brand-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+}
+
+.editorPie,
+.alertaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.progreso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s3);
+}
+
+.progresoBarra {
+  flex: 1 1 160px;
+  max-width: 360px;
+  min-width: 0;
+}
+
+.progresoN {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: var(--ui-s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tarjeta {
+  display: grid;
+  align-content: start;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-2);
+  min-width: 0;
+}
+
+.tarjetaCabeza {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+}
+
+.tarjetaT {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.momentos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ui-s3);
+}
+
+/* ─── Hueco por momento ────────────────────────────────────────────────── */
+
+.hueco {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+
+.huecoT {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.huecoT[data-pedido="false"] {
+  color: var(--ui-fg-3);
+}
+
+.huecoFoto {
+  display: block;
+  width: 100%;
+  height: 320px;
+  min-height: 280px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  cursor: zoom-in;
+}
+
+.huecoFoto:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+.huecoImg {
+  display: block;
+  width: 100%;
+  height: 320px;
+  object-fit: cover;
+}
+
+.huecoVacio {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--ui-s1);
+  height: 320px;
+  min-height: 280px;
+  border: 1px dashed var(--ui-warning-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+}
+
+.huecoVacioIco {
+  font-size: 20px !important;
+}
+
+.huecoM {
+  min-height: 16px;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.huecoAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+@media (max-width: 767px) {
+  .caja {
+    padding: var(--ui-s3) var(--ui-s4);
+    border-radius: var(--ui-radius-lg);
+  }
+  .huecoFoto,
+  .huecoImg,
+  .huecoVacio {
+    height: 240px;
+    min-height: 200px;
+  }
+}
