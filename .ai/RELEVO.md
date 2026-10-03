@@ -25,6 +25,14 @@
   - **Pendiente de Adam:** pie del membrete del PDF de cotización (imagen) trae «Malltertaiment,
     Explanada Puebla…» y «(22) 01 79 18 71»; si ya no van, que diga cuáles y se edita la imagen.
     Las apps nativas (sin organigrama, comercial, geocerca 500 m) necesitan su propio build/release.
+- **Hecho (organigrama, 21:20):** Adam lo aprobó en producción y pidió una «rayita» secundaria de Luis
+  a José Antonio. `d47732f9`: un lateral conserva su línea de mando y suma el puente punteado (cuando
+  el jefe queda un anillo adentro). Desplegado; en BD `User.id=7` (Luis) `lateralDeId=39` (Antonio).
+- **FALTA del pedido grande de las 12:50 (verificado contra el código):** (1) **guardias de fin de
+  semana** — nada (ni API ni web ni apps); (2) **sugerencia de nómina** (horas laboradas vs productivas
+  × pago por hora en Pagos a empleados) — nada; (3) **chat tipo Slack** — solo maquetas A/B, Adam
+  elige; (4) **apps**: pausar/reanudar y escáner con cámara en Android/iOS — nada (web sí tiene
+  pausar y lector USB); (5) build/release de las apps. Todo lo demás del pedido está en producción.
 - **Contexto del paquete (02-10, ~13:25), por área:**
   1. **Cotizaciones — TERMINADO por su agente, falta mi revisión:** el PDF ya toma `depositPercent`/`note`
      del editor (antes `paymentTerms`→`PAGO_DEFAULT`, por eso el 50 % no se quitaba); datos fiscales del
