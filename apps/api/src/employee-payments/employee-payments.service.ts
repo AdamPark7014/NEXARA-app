@@ -8,7 +8,19 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { generateEmployeePaymentsReportPdf } from './employee-payments-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { KpisEquipoService } from '../me/kpis-equipo.service.js';
+import { KPI_MAX_DIAS, KpisEquipoService } from '../me/kpis-equipo.service.js';
+import { diasDelRango } from '../me/kpis-equipo.js';
+import { workDateKey } from '../common/time/workday.js';
+import { NOMINA_SETTING_KEY, parsearConfigNomina } from './nomina-calendario.js';
+import {
+  filaSugerencia,
+  formulaSugerencia,
+  ordenaSugerencias,
+  periodoManual,
+  periodoSugerencia,
+  totalesSugerencia,
+  ventanaDeCalculo,
+} from './sugerencia-nomina.js';
 import {
   avisosDeFila,
   filaPreNomina,
@@ -215,6 +227,85 @@ export class EmployeePaymentsService {
       resumen: resumenPreNomina(filas),
       /** `true` cuando esta empresa reserva los montos de pagos y a quien consulta no le tocan. */
       montosOcultos: !verMontos,
+    };
+  }
+
+  /**
+   * Sugerencia de nómina: horas laboradas contra productivas puestas en pesos, por persona.
+   *
+   * Solo lectura. Las horas son las de los KPI (mismo alcance que la pre-nómina, sin inactivos
+   * ni cuentas que no son empleados); el sueldo es `UserProfile.sueldoSemanal`. Quien no tiene
+   * sueldo o no checó sale igual, con el motivo. Las cuentas viven en `sugerencia-nomina.ts`.
+   */
+  async sugerenciaNomina(
+    viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
+    opciones: { desde?: string; hasta?: string; periodo?: 'vigente' | 'anterior' },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const hoy = workDateKey(new Date());
+
+    let periodo;
+    if (opciones.desde && opciones.hasta) {
+      if (diasDelRango(opciones.desde, opciones.hasta).length > KPI_MAX_DIAS) {
+        throw new BadRequestException(`El rango máximo es de ${KPI_MAX_DIAS} días`);
+      }
+      periodo = periodoManual(opciones.desde, opciones.hasta);
+    } else {
+      const ajustes = await this.prisma.systemSetting.findMany({
+        where: { key: NOMINA_SETTING_KEY, OR: [{ companyId: null }, { companyId: tenantId }] },
+        select: { companyId: true, value: true },
+      });
+      const propio = ajustes.find((a) => a.companyId === tenantId) ?? ajustes.find((a) => a.companyId == null);
+      periodo = periodoSugerencia(hoy, parsearConfigNomina(propio?.value), opciones.periodo ?? 'vigente');
+    }
+
+    const rango = { desde: periodo.desde, hasta: periodo.hasta };
+    const datos = await this.kpis.getEquipo(viewer, tenantId, rango, null);
+    const userIds = datos.personas.map((p) => p.persona.id);
+    const ids = userIds.length ? userIds : [-1];
+
+    const [usuarios, perfiles] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, employeeNumber: true, fechaIngreso: true },
+      }),
+      this.prisma.userProfile.findMany({
+        where: { userId: { in: ids } },
+        select: { userId: true, sueldoSemanal: true },
+      }),
+    ]);
+    const usuarioPor = new Map(usuarios.map((u) => [u.id, u]));
+    const sueldoPor = new Map(
+      perfiles.map((p) => [p.userId, p.sueldoSemanal != null ? Number(p.sueldoSemanal) : null]),
+    );
+
+    const filas = ordenaSugerencias(
+      datos.personas.map((p) => {
+        const u = usuarioPor.get(p.persona.id);
+        return filaSugerencia({
+          userId: p.persona.id,
+          nombre: p.persona.nombre,
+          puesto: p.persona.puesto,
+          numeroEmpleado: u?.employeeNumber ?? null,
+          horario: p.horario,
+          totales: p.totales,
+          sueldoSemanal: sueldoPor.get(p.persona.id) ?? null,
+          periodo: rango,
+          hoy,
+          fechaIngreso: u?.fechaIngreso ? workDateKey(u.fechaIngreso) : null,
+        });
+      }),
+    );
+    const ventana = ventanaDeCalculo(rango, hoy);
+
+    return {
+      periodo: { ...periodo, enCurso: ventana.enCurso, calculadoHasta: ventana.hasta },
+      generadoAt: datos.generadoAt,
+      scope: datos.scope,
+      formula: formulaSugerencia(),
+      filas,
+      totales: totalesSugerencia(filas),
     };
   }
 
