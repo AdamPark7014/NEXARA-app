@@ -1,4 +1,4 @@
-/* NEXARA · Base («Minimalista»): insignias, tarjetas, cifras y control segmentado. */
+/* NEXARA · Base (v2): insignias, tipos de trabajo, avance, tarjetas, cifras y control segmentado. */
 
 /* ─── Insignias (estado) ───────────────────────────────────────────────── */
 
@@ -7,24 +7,41 @@
   align-items: center;
   gap: 6px;
   width: fit-content;
-  height: 22px;
-  padding: 0 8px;
+  height: 24px;
+  padding: 0 9px;
   border-radius: var(--ui-radius-pill);
   font-size: var(--ui-text-xs);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   background: var(--ui-neutral-bg);
   color: var(--ui-neutral-text);
 }
 
+.badgeSm {
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11.5px;
+  gap: 5px;
+}
+
 .badgeDot::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: currentColor;
   flex: 0 0 auto;
+}
+
+.badgeSm.badgeDot::before {
+  width: 6px;
+  height: 6px;
+}
+
+.badgeIco {
+  display: inline-flex;
+  line-height: 1;
 }
 
 .badge svg {
@@ -37,19 +54,81 @@
 .toneInfo { background: var(--ui-info-bg); color: var(--ui-info-text); }
 .toneViolet { background: var(--ui-violet-bg); color: var(--ui-violet-text); }
 .toneBrand { background: var(--ui-brand-soft); color: var(--ui-brand-text); }
-.toneOutline { background: transparent; color: var(--ui-fg-2); box-shadow: inset 0 0 0 1px var(--ui-border); }
+.toneOutline { background: transparent; color: var(--ui-fg-2); box-shadow: inset 0 0 0 1px var(--ui-border-strong); }
+
+/* ─── Tipo de trabajo (categoría) ──────────────────────────────────────── */
+
+.kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ui-fg-2);
+}
+
+.kindIco {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+
+.kindIco svg {
+  font-size: 14px !important;
+}
+
+.kind[data-kind="cctv"] .kindIco { background: var(--ui-kind-cctv-bg); color: var(--ui-kind-cctv-fg); }
+.kind[data-kind="red"] .kindIco { background: var(--ui-kind-red-bg); color: var(--ui-kind-red-fg); }
+.kind[data-kind="acceso"] .kindIco { background: var(--ui-kind-acceso-bg); color: var(--ui-kind-acceso-fg); }
+.kind[data-kind="obra"] .kindIco { background: var(--ui-kind-obra-bg); color: var(--ui-kind-obra-fg); }
+
+/* ─── Avance ───────────────────────────────────────────────────────────── */
+
+.prog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.progBar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-track);
+  overflow: hidden;
+}
+
+.progBar > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--ui-radius-pill);
+}
+
+.progN {
+  min-width: 34px;
+  text-align: right;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ─── Tarjeta ──────────────────────────────────────────────────────────── */
 
 .card {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
   min-width: 0;
 }
 
 .cardPad {
-  padding: var(--ui-s4);
+  padding: var(--ui-card-pad, 20px);
 }
 
 .cardHead {
@@ -58,47 +137,95 @@
   justify-content: space-between;
   gap: var(--ui-s3);
   flex-wrap: wrap;
-  padding: var(--ui-s3) var(--ui-s4);
-  border-bottom: 1px solid var(--ui-border);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .cardTitle {
   margin: 0;
-  font-size: var(--ui-text-base);
-  font-weight: 600;
-  line-height: 1.4;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
   color: var(--ui-fg);
 }
 
 .cardSub {
   margin: 2px 0 0;
-  font-size: var(--ui-text-xs);
+  font-size: 12.5px;
   color: var(--ui-fg-3);
 }
 
 /* ─── Cifras (Stat) ────────────────────────────────────────────────────── */
 
+/* Por defecto, una tarjeta por cifra (franja de KPI). */
 .stats {
   display: grid;
   grid-template-columns: repeat(var(--stat-cols, 4), minmax(0, 1fr));
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  margin-bottom: var(--ui-s5);
-  overflow: hidden;
+  gap: var(--ui-s4);
+  margin-bottom: var(--ui-page-gap, var(--ui-s5));
 }
 
 .stat {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: var(--ui-s4) var(--ui-s5) var(--ui-s4) var(--ui-s4);
+  gap: 10px;
+  padding: 16px 18px;
   min-width: 0;
-  border-left: 1px solid var(--ui-border);
+  overflow: hidden;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+  color: var(--ui-fg);
+  text-align: left;
+  font: inherit;
+  transition:
+    border-color var(--ui-duration-fast) ease,
+    box-shadow var(--ui-duration-fast) ease,
+    background-color var(--ui-duration-fast) ease;
 }
 
-.stat:first-child {
-  border-left: none;
+/* Tira: una sola tarjeta con divisiones finas. La sombra de cada celda dibuja la
+   raya izquierda y la de arriba; las de la orilla se recortan con overflow. */
+.statsStrip {
+  gap: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+}
+
+.statsStrip:not([data-cols]) {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.statsStrip > .stat {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: -1px 0 0 var(--ui-border-subtle), 0 -1px 0 var(--ui-border-subtle);
+}
+
+.statsStrip > .statLink:hover,
+.statsStrip > .statLink:focus-visible {
+  background: var(--ui-hover);
+  box-shadow: -1px 0 0 var(--ui-border-subtle), 0 -1px 0 var(--ui-border-subtle);
+}
+
+.statCompact {
+  gap: 4px;
+  padding: 12px 16px;
 }
 
 .statLink {
@@ -107,9 +234,26 @@
   cursor: pointer;
 }
 
-.statLink:hover,
+.statLink:hover {
+  color: inherit;
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-elev-2);
+  transform: none;
+}
+
 .statLink:focus-visible {
-  background: var(--ui-hover);
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.statsStrip > .statLink:focus-visible {
+  outline-offset: -2px;
+}
+
+.stat[aria-pressed="true"],
+.stat[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--ui-brand) 55%, var(--ui-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-brand) 45%, transparent), var(--ui-elev-1);
 }
 
 .statLink .statLabel {
@@ -132,13 +276,46 @@
   vertical-align: middle;
 }
 
+.statTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.statIco {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--ui-neutral-bg);
+  color: var(--ui-neutral-text);
+}
+
+.statIco svg {
+  font-size: 18px !important;
+}
+
+.statCompact .statIco {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
 .statLabel {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--ui-text-xs);
+  min-width: 0;
+  font-size: var(--ui-text-sm);
   font-weight: 500;
   color: var(--ui-fg-2);
+}
+
+.statCompact .statLabel {
+  font-size: var(--ui-text-xs);
 }
 
 .statDot {
@@ -149,42 +326,182 @@
 }
 
 .statValue {
-  font-size: var(--ui-text-stat);
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-size: var(--ui-fs-stat, 28px);
+  font-weight: var(--ui-fw-stat, 650);
+  line-height: var(--ui-lh-stat, 1.05);
+  letter-spacing: var(--ui-tracking-stat, -0.025em);
   color: var(--ui-fg);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-height: 1.05em;
+}
+
+.statCompact .statValue {
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.statSuffix {
+  margin-left: 3px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ui-fg-3);
+}
+
+.statCompact .statSuffix {
+  font-size: 12px;
+}
+
+.statSkeleton {
+  display: inline-block;
+  width: 58%;
+  height: 0.9em;
+  border-radius: 6px;
+  vertical-align: middle;
 }
 
 .statValueBrand { color: var(--ui-brand-text); }
+.statValueSuccess { color: var(--ui-success-text); }
 .statValueWarning { color: var(--ui-warning-text); }
 .statValueDanger { color: var(--ui-danger-text); }
 
+.statFoot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
 .statHint {
-  font-size: var(--ui-text-xs);
+  font-size: 12.5px;
   color: var(--ui-fg-3);
   line-height: 1.4;
+}
+
+.statCompact .statHint {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.statFooter {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ui-border);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--ui-neutral-bg);
+  color: var(--ui-fg-2);
+}
+
+.trend[data-tone="success"] { background: var(--ui-success-bg); color: var(--ui-success-text); }
+.trend[data-tone="danger"] { background: var(--ui-danger-bg); color: var(--ui-danger-text); }
+
+.meter {
+  display: flex;
+  height: 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-track);
+  overflow: hidden;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.semaf {
+  margin-left: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.semaf[data-s="verde"] { color: var(--ui-success); }
+.semaf[data-s="ambar"] { color: var(--ui-warning); }
+.semaf[data-s="rojo"] { color: var(--ui-danger); }
+.semaf[data-s="gris"] { color: var(--ui-fg-4); }
+
+.spark {
+  position: absolute;
+  right: 16px;
+  top: 18px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 30px;
+  pointer-events: none;
+}
+
+.spark > span {
+  width: 5px;
+  border-radius: 2px;
+  background: var(--ui-brand-soft-2);
+}
+
+.spark > span:last-child {
+  background: var(--ui-brand);
 }
 
 @media (max-width: 720px) {
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ui-s3);
+  }
+  .statsStrip {
+    gap: 0;
   }
   .stat {
     padding: var(--ui-s3) var(--ui-s4);
   }
-  .stat:nth-child(odd) {
-    border-left: none;
-  }
-  .stat:nth-child(n + 3) {
-    border-top: 1px solid var(--ui-border);
-  }
   .statValue {
-    font-size: 20px;
+    font-size: 22px;
+  }
+  .statCompact .statValue {
+    font-size: 18px;
+  }
+  .spark {
+    display: none;
   }
 }
 
@@ -195,9 +512,9 @@
   align-items: center;
   gap: 2px;
   height: var(--ui-control-h);
-  padding: 2px;
-  border-radius: var(--ui-radius);
-  background: var(--ui-hover);
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--ui-active);
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
@@ -212,9 +529,9 @@
   align-items: center;
   gap: 6px;
   height: 100%;
-  padding: 0 10px;
+  padding: 0 12px;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--ui-fg-2);
   font: inherit;
@@ -234,12 +551,13 @@
 .segment[aria-selected="true"] {
   background: var(--ui-surface);
   color: var(--ui-fg);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 0 0 1px var(--ui-border);
+  font-weight: 600;
+  box-shadow: var(--ui-elev-1), 0 0 0 1px var(--ui-border);
 }
 
 .segment:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-ring);
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
 }
 
 .segmentCount {

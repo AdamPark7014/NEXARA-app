@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { ReactNode } from "react";
+import { Stat, StatRow } from "@/components/base/piezas";
 
 /**
- * NEXARA · Tira de cifras.
+ * NEXARA · Tira de cifras (envoltorio de `components/base/piezas` StatRow + Stat).
  *
- * Sustituye a las rejillas de `KpiCard` en las pantallas financieras. Una
- * tarjeta con resplandor, elevación al pasar el ratón y minigráfica ocupa
- * cuatro veces el alto y dice lo mismo: el número. Aquí el dato manda, el
- * adorno desaparece, y la tira entera ocupa lo que antes una sola tarjeta.
+ * Para las pantallas financieras: una sola tarjeta con divisiones finas y cifras
+ * compactas (20 px). El dato manda, el adorno desaparece, y la tira entera ocupa
+ * lo que antes una sola tarjeta de KPI.
  *
  * El color solo entra cuando pide acción (`tone`), nunca como decoración: si
  * todo va bien, la tira es neutra y la vista se lee sin ruido.
@@ -35,13 +34,6 @@ export type Metric = {
   href?: string;
 };
 
-const TONE_COLOR: Record<MetricTone, string> = {
-  default: "var(--text-primary)",
-  warning: "var(--state-warning-text, #b45309)",
-  danger: "var(--state-danger-text, #b91c1c)",
-  success: "var(--state-success-text, #15803d)",
-};
-
 export default function MetricStrip({
   metrics,
   ariaLabel = "Resumen del periodo",
@@ -52,89 +44,19 @@ export default function MetricStrip({
   if (metrics.length === 0) return null;
 
   return (
-    <div
-      aria-label={ariaLabel}
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`,
-        background: "var(--surface-2, var(--surface))",
-        border: "1px solid var(--nx-panel-hairline, var(--border))",
-        borderRadius: 10,
-        overflow: "hidden",
-      }}
-    >
-      {metrics.map((m, i) => {
-        const color = TONE_COLOR[m.tone ?? "default"];
-        const inner = (
-          <>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 3 }}>
-              {m.label}
-            </div>
-            <div
-              style={{
-                fontSize: 20,
-                fontWeight: 600,
-                fontVariantNumeric: "tabular-nums",
-                lineHeight: 1.15,
-                color,
-              }}
-            >
-              {m.value}
-            </div>
-            {m.hint ? (
-              <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
-                {m.hint}
-              </div>
-            ) : null}
-          </>
-        );
-
-        const cellStyle = {
-          padding: "12px 16px",
-          borderRight:
-            i < metrics.length - 1
-              ? "1px solid var(--nx-panel-hairline, var(--border))"
-              : undefined,
-          textAlign: "left" as const,
-        };
-
-        const interactiveStyle = {
-          ...cellStyle,
-          background: "transparent",
-          // Solo propiedades largas. Mezclar el atajo `border` con `borderRight`
-          // en el mismo objeto deja el resultado a merced del orden de claves:
-          // una clave repetida conserva su posición original pero el valor
-          // último, así que el atajo acababa aplicándose DESPUÉS y las celdas
-          // con `onClick` se quedaban con el borde por defecto del navegador
-          // —pastillas dentro de la tira—. Medido en el DOM, no deducido.
-          borderTop: "none",
-          borderBottom: "none",
-          borderLeft: "none",
-          borderRight: cellStyle.borderRight ?? "none",
-          cursor: "pointer",
-          font: "inherit",
-          display: "block",
-          textDecoration: "none",
-          color: "inherit",
-          // `border: none` se lleva por delante el anillo del navegador: sin
-          // esto, al tabular no se ve dónde estás.
-          outlineOffset: -2,
-        };
-
-        return m.href ? (
-          <Link key={i} href={m.href} style={interactiveStyle}>
-            {inner}
-          </Link>
-        ) : m.onClick ? (
-          <button key={i} type="button" onClick={m.onClick} style={interactiveStyle}>
-            {inner}
-          </button>
-        ) : (
-          <div key={i} style={cellStyle}>
-            {inner}
-          </div>
-        );
-      })}
-    </div>
+    <StatRow variant="strip" ariaLabel={ariaLabel}>
+      {metrics.map((m, i) => (
+        <Stat
+          key={i}
+          density="compact"
+          label={m.label}
+          value={m.value}
+          hint={m.hint}
+          tone={m.tone ?? "default"}
+          href={m.href}
+          onClick={m.href ? undefined : m.onClick}
+        />
+      ))}
+    </StatRow>
   );
 }

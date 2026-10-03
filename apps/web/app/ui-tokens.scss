@@ -1,15 +1,18 @@
 /* ============================================================
-   NEXARA · Tokens de la interfaz de los paneles (dirección «Minimalista»)
+   NEXARA · Tokens de la interfaz de los paneles (sistema visual v2)
    ------------------------------------------------------------
    Prefijo `--ui-*`: no choca con los del sitio público (`--ds-*`, `--nx-*`)
    ni con los semánticos viejos (`--surface`, `--primary`…), que siguen igual
    para los módulos que aún no se migran.
 
-   Reglas de uso:
-   - Neutros para todo; el teal de marca solo en botón primario, foco,
-     navegación activa y cifras clave.
-   - Bordes de 1 px, sin sombras pesadas. Radio 8 px (tarjetas 12 px).
-   - Espaciado 4 / 8 / 12 / 16 / 24 / 32.
+   Reglas de uso (v2, maquetas aprobadas en `.ai/ui-maquetas/`):
+   - Neutros para todo; el teal de marca en el botón primario, foco,
+     navegación activa, pasos, avance y cifras clave.
+   - Acentos del logotipo (cielo, magenta, naranja) = color de CATEGORÍA,
+     nunca de estado.
+   - Controles de 36 px (32 compacto en tablas, 44 táctil). Radio 8 en
+     controles, 12 en avisos, 16 en tarjetas. Tarjeta = borde + `elev-1`.
+   - Espaciado 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40.
    El modo oscuro sigue siendo `body.dark` (ThemeContext).
 
    Documentación de uso: `.ai/DISENO-TOKENS.md`
@@ -37,21 +40,20 @@
   --ui-text-sm: 13px;
   --ui-text-base: 14px;
   --ui-text-lg: 16px;
-  --ui-text-title: 20px;
-  --ui-text-stat: 24px;
+  --ui-text-title: 22px;
+  --ui-text-stat: 28px;
 
   /* ----------------------------------------------------------
      Tipografía · escala POR PAPEL (la que hay que usar)
      Seis papeles, ni uno más. Cada papel = tamaño + interlineado +
-     peso + tracking. Los tamaños apuntan a la escala cruda de arriba,
-     así que esto NO cambia ningún píxel de lo que ya existe.
+     peso + tracking. Los tamaños apuntan a la escala cruda de arriba.
      ---------------------------------------------------------- */
 
   /* Título de página — el H1 de cada pantalla, uno por vista */
-  --ui-fs-page: var(--ui-text-title); /* 20px */
-  --ui-lh-page: 1.25;
+  --ui-fs-page: var(--ui-text-title); /* 22px */
+  --ui-lh-page: 1.2;
   --ui-fw-page: 650;
-  --ui-tracking-page: -0.015em;
+  --ui-tracking-page: -0.02em;
 
   /* Título de sección — encabezado de tarjeta, bloque o grupo */
   --ui-fs-section: var(--ui-text-lg); /* 16px */
@@ -84,10 +86,10 @@
   --ui-tracking-caption: 0.02em;
 
   /* Cifra — KPI / métrica destacada (no es un papel de texto, es un dato) */
-  --ui-fs-stat: var(--ui-text-stat); /* 24px */
-  --ui-lh-stat: 1.15;
+  --ui-fs-stat: var(--ui-text-stat); /* 28px */
+  --ui-lh-stat: 1.05;
   --ui-fw-stat: 650;
-  --ui-tracking-stat: -0.02em;
+  --ui-tracking-stat: -0.025em;
 
   /* Números tabulares para columnas de importes */
   --ui-numeric: "tnum" on, "lnum" on;
@@ -97,13 +99,13 @@
      surface-0 (fondo de página) < surface (tarjeta) < surface-3 (elevada)
      `--ui-surface-2` es la superficie *hundida* (zebra, thead, wells).
      ---------------------------------------------------------- */
-  --ui-bg: #f4f7fa; /* fondo de página */
+  --ui-bg: #f5f7f9; /* fondo de página */
   --ui-surface: #ffffff; /* superficie 1 — tarjeta, panel, modal */
-  --ui-surface-2: #f8fafc; /* superficie hundida — thead, zebra, well */
+  --ui-surface-2: #f8fafb; /* superficie hundida — thead, zebra, well */
   --ui-surface-3: #ffffff; /* superficie elevada — popover, dropdown, tooltip */
-  --ui-hover: #f1f5f9;
-  --ui-active: #e7edf4;
-  --ui-track: #eef2f6;
+  --ui-hover: #f1f4f7;
+  --ui-active: #e8edf2;
+  --ui-track: #e8edf2;
 
   /* Alias de lectura (mismo valor, nombre por papel) */
   --ui-surface-0: var(--ui-bg);
@@ -115,19 +117,15 @@
   /* ----------------------------------------------------------
      Texto · cuatro niveles
      ---------------------------------------------------------- */
-  --ui-fg: #0f172a; /* primario */
-  --ui-fg-2: #475569; /* secundario */
-  --ui-fg-3: #94a3b8; /* terciario / apagado */
-  --ui-fg-4: #b6c1cf; /* deshabilitado */
+  --ui-fg: #0f1728; /* primario */
+  --ui-fg-2: #4a5768; /* secundario */
+  --ui-fg-3: #6b7889; /* terciario / apagado (≈4.6:1 sobre blanco: sirve para texto) */
+  --ui-fg-4: #a3adba; /* deshabilitado y placeholder; nunca texto que hay que leer */
   --ui-fg-disabled: var(--ui-fg-4);
   --ui-fg-muted: var(--ui-fg-3);
   --ui-fg-on-brand: #ffffff;
 
   /* Tintas de chrome de navegación.
-     `--ui-fg-3` (#94a3b8) da 2.8:1 sobre blanco: sirve para un separador, no
-     para texto ni para un icono que hay que reconocer. Tres agentes lo
-     resolvieron por su cuenta con mezclas locales; se sube aquí para que no
-     haya tres respuestas distintas a la misma pregunta.
      Micro-etiqueta de grupo (HOY, FINANZAS): ~6.5:1. Icono inactivo: ~4.8:1. */
   --ui-fg-label: #5b6b80;
   --ui-icon: #64748b;
@@ -135,62 +133,79 @@
   /* ----------------------------------------------------------
      Bordes · tres pesos
      ---------------------------------------------------------- */
-  --ui-border-subtle: #eef2f6; /* separadores internos, filas de tabla */
-  --ui-border: #e2e8f0; /* borde por defecto de tarjeta / control */
-  --ui-border-strong: #cbd5e1; /* hover, control enfocado, divisor mayor */
+  --ui-border-subtle: #eef1f4; /* separadores internos, filas de tabla */
+  --ui-border: #e3e8ee; /* borde por defecto de tarjeta */
+  --ui-border-strong: #cdd5de; /* borde de control, hover, divisor mayor */
 
   /* ----------------------------------------------------------
      Marca
      ---------------------------------------------------------- */
   --ui-brand: #1f9e84;
-  --ui-brand-hover: #1a8972;
+  --ui-brand-hover: #188a73;
+  --ui-brand-press: #147a65;
   --ui-brand-fg: #ffffff;
-  --ui-brand-text: #147a65;
-  --ui-brand-soft: #e8f6f2;
+  --ui-brand-text: #12715e;
+  --ui-brand-soft: #e7f5f1;
+  --ui-brand-soft-2: #cfece4;
   --ui-brand-bg: var(--ui-brand-soft);
   --ui-brand-border: color-mix(in srgb, #1f9e84 30%, transparent);
-  --ui-ring: 0 0 0 3px color-mix(in srgb, #1f9e84 26%, transparent);
-  --ui-ring-danger: 0 0 0 3px color-mix(in srgb, #dc2626 24%, transparent);
+  --ui-ring: 0 0 0 3px rgba(31, 158, 132, 0.25);
+  --ui-ring-danger: 0 0 0 3px rgba(220, 38, 38, 0.2);
   --ui-focus-ring: var(--ui-ring);
+
+  /* Acentos del logotipo — color de CATEGORÍA (tipo de trabajo), nunca de
+     estado. CCTV usa la marca. */
+  --ui-accent-sky: #3aa9cc;
+  --ui-accent-orange: #ee8a2a;
+  --ui-accent-magenta: #a64ca6;
+  --ui-accent-wine: #7a2430;
+  --ui-kind-cctv-bg: #e3f3ee;
+  --ui-kind-cctv-fg: #12715e;
+  --ui-kind-red-bg: #e4f2f8;
+  --ui-kind-red-fg: #1f7ea0;
+  --ui-kind-acceso-bg: #f4eaf4;
+  --ui-kind-acceso-fg: #8a3a8a;
+  --ui-kind-obra-bg: #fdf0e3;
+  --ui-kind-obra-fg: #b0600f;
 
   /* ----------------------------------------------------------
      Semánticos · cada estado trae relleno, fondo tenue, borde y
      dos textos: `-text` (sobre fondo tenue) y `-fg` (sobre relleno).
      ---------------------------------------------------------- */
   --ui-success: #16a34a;
-  --ui-success-text: #15803d;
-  --ui-success-bg: #f0fdf4;
+  --ui-success-text: #12733a;
+  --ui-success-bg: #ecfaf1;
   --ui-success-border: color-mix(in srgb, #16a34a 30%, transparent);
   --ui-success-fg: #ffffff;
 
-  --ui-warning: #d97706;
-  --ui-warning-text: #b45309;
-  --ui-warning-bg: #fffbeb;
-  --ui-warning-border: color-mix(in srgb, #d97706 32%, transparent);
+  --ui-warning: #e08a0b;
+  --ui-warning-text: #9a5b06;
+  --ui-warning-bg: #fff6e6;
+  --ui-warning-border: color-mix(in srgb, #e08a0b 32%, transparent);
   --ui-warning-fg: #241503;
 
   --ui-danger: #dc2626;
-  --ui-danger-text: #b91c1c;
-  --ui-danger-bg: #fef2f2;
-  --ui-danger-border: color-mix(in srgb, #dc2626 30%, transparent);
+  --ui-danger-text: #b42020;
+  --ui-danger-bg: #fdeeee;
+  --ui-danger-border: color-mix(in srgb, #dc2626 26%, transparent);
   --ui-danger-fg: #ffffff;
 
-  --ui-info: #0284c7;
-  --ui-info-text: #0369a1;
-  --ui-info-bg: #f0f9ff;
-  --ui-info-border: color-mix(in srgb, #0284c7 30%, transparent);
+  --ui-info: #2f86c9;
+  --ui-info-text: #1d6aa6;
+  --ui-info-bg: #ebf4fc;
+  --ui-info-border: color-mix(in srgb, #2f86c9 28%, transparent);
   --ui-info-fg: #ffffff;
 
-  --ui-violet: #7c3aed;
-  --ui-violet-text: #6d28d9;
-  --ui-violet-bg: #f5f3ff;
-  --ui-violet-border: color-mix(in srgb, #7c3aed 30%, transparent);
+  --ui-violet: #8b4fc2;
+  --ui-violet-text: #6f3aa3;
+  --ui-violet-bg: #f4eefb;
+  --ui-violet-border: color-mix(in srgb, #8b4fc2 28%, transparent);
   --ui-violet-fg: #ffffff;
 
-  --ui-neutral: #64748b;
-  --ui-neutral-text: #475569;
-  --ui-neutral-bg: #f1f5f9;
-  --ui-neutral-border: #e2e8f0;
+  --ui-neutral: #6b7889;
+  --ui-neutral-text: #4a5768;
+  --ui-neutral-bg: #eff2f5;
+  --ui-neutral-border: #e3e8ee;
   --ui-neutral-fg: #ffffff;
 
   /* ----------------------------------------------------------
@@ -208,9 +223,9 @@
      superficie + borde, y la sombra solo la remata.
      ---------------------------------------------------------- */
   --ui-elev-0: none;
-  --ui-elev-1: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --ui-elev-2: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 10px rgba(15, 23, 42, 0.06);
-  --ui-elev-pop: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.1);
+  --ui-elev-1: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --ui-elev-2: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 12px rgba(16, 24, 40, 0.06);
+  --ui-elev-pop: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
   --ui-shadow-sm: var(--ui-elev-1);
   --ui-shadow-pop: var(--ui-elev-pop);
 
@@ -239,8 +254,8 @@
   /* ----------------------------------------------------------
      Medidas
      ---------------------------------------------------------- */
-  --ui-control-h: 32px;
-  --ui-control-h-lg: 36px;
+  --ui-control-h: 36px; /* por defecto */
+  --ui-control-h-lg: 44px; /* grande y táctil */
   --ui-row-h: 40px;
   --ui-topbar-h: 52px;
   --ui-nav-item-h: 32px;
@@ -292,8 +307,8 @@
   --ui-radius-xs: 4px;
   --ui-radius-md: var(--ui-radius);
 
-  /* Elevación · cuarto peldaño, solo para modales y hojas */
-  --ui-elev-3: 0 2px 4px rgba(15, 23, 42, 0.06), 0 24px 56px rgba(15, 23, 42, 0.16);
+  /* Elevación · cuarto peldaño: diálogos, hojas y toasts */
+  --ui-elev-3: 0 2px 4px rgba(16, 24, 40, 0.06), 0 16px 40px rgba(16, 24, 40, 0.14);
   --ui-shadow-md: var(--ui-elev-2);
   --ui-shadow-lg: var(--ui-elev-3);
 
@@ -315,12 +330,31 @@
   --ui-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
 
   /* Controles y layout */
-  --ui-control-h-sm: 28px;
+  --ui-control-h-sm: 32px; /* compacto: tablas y barras de herramientas */
   --ui-control-h-xl: 44px;
+  --ui-control-h-compact: var(--ui-control-h-sm);
+  --ui-control-h-touch: 44px;
   --ui-touch-min: 44px; /* objetivo táctil mínimo (WCAG 2.5.5) */
-  --ui-sidebar-w: 240px;
-  --ui-sidebar-w-collapsed: 60px;
+  --ui-sidebar-w: 264px;
+  --ui-sidebar-w-collapsed: 68px;
   --ui-content-max: 1440px;
+  --ui-page-pad-x: 32px;
+  --ui-page-gap: 24px;
+
+  /* Tarjeta · radio 16, borde de 1 px y elevación mínima */
+  --ui-card-radius: var(--ui-radius-xl);
+  --ui-card-shadow: var(--ui-elev-1);
+  --ui-card-pad: 20px;
+
+  /* Barra lateral (claro por defecto) */
+  --ui-sb-bg: #fbfcfd;
+  --ui-sb-fg: #3d4a5c;
+  --ui-sb-fg-2: #6b7889;
+  --ui-sb-label: #8592a3;
+  --ui-sb-hover: #f0f3f6;
+  --ui-sb-active-bg: #e7f5f1;
+  --ui-sb-active-fg: #0f5f4f;
+  --ui-sb-border: #e6ebf0;
 
   /* Foco · anillo único para todo lo nuevo */
   --ui-focus-outline: 2px solid var(--ui-brand);
@@ -342,45 +376,68 @@
 
 body.dark {
   /* Superficies — el mismo orden: fondo < superficie < elevada */
-  --ui-bg: #0b1120;
-  --ui-surface: #0f172a;
-  --ui-surface-2: #111a2e; /* hundida */
-  --ui-surface-3: #16213a; /* elevada: un peldaño POR ENCIMA de surface */
-  --ui-hover: #172136;
-  --ui-active: #1d2942;
-  --ui-track: #1b2438;
+  --ui-bg: #0a0f1a;
+  --ui-surface: #111827;
+  --ui-surface-2: #0e1522; /* hundida */
+  --ui-surface-3: #172133; /* elevada: un peldaño POR ENCIMA de surface */
+  --ui-hover: #172131;
+  --ui-active: #1d2a3d;
+  --ui-track: #1d2a3d;
 
   /* Texto */
-  --ui-fg: #e2e8f0;
-  --ui-fg-2: #94a3b8;
-  --ui-fg-3: #64748b;
-  --ui-fg-4: #4a5569;
+  --ui-fg: #e6ebf2;
+  --ui-fg-2: #a8b3c3;
+  --ui-fg-3: #8390a3;
+  --ui-fg-4: #566275;
   --ui-fg-on-brand: #ffffff;
   /* En oscuro la tinta sube en vez de bajar; mismos papeles, mismo contraste. */
   --ui-fg-label: #9aa8bd;
   --ui-icon: #8b9ab0;
 
   /* Bordes */
-  --ui-border-subtle: #16202f;
-  --ui-border: #1e293b;
-  --ui-border-strong: #334155;
+  --ui-border-subtle: #182233;
+  --ui-border: #1f2b3d;
+  --ui-border-strong: #2e3c52;
 
-  /* Marca */
+  /* Marca — el relleno se queda en #1f9e84 para que el texto blanco del
+     primario no pierda contraste; lo que aclara es el texto y el hover. */
   --ui-brand: #1f9e84;
-  --ui-brand-hover: #25b193;
+  --ui-brand-hover: #22a98c;
+  --ui-brand-press: #188a73;
   --ui-brand-fg: #ffffff;
-  --ui-brand-text: #3cc9a9;
-  --ui-brand-soft: color-mix(in srgb, #1f9e84 16%, transparent);
+  --ui-brand-text: #4fd1b2;
+  --ui-brand-soft: rgba(34, 169, 140, 0.14);
+  --ui-brand-soft-2: rgba(34, 169, 140, 0.24);
   --ui-brand-bg: var(--ui-brand-soft);
-  --ui-brand-border: color-mix(in srgb, #3cc9a9 34%, transparent);
-  --ui-ring: 0 0 0 3px color-mix(in srgb, #3cc9a9 32%, transparent);
+  --ui-brand-border: color-mix(in srgb, #4fd1b2 34%, transparent);
+  --ui-ring: 0 0 0 3px color-mix(in srgb, #4fd1b2 32%, transparent);
   --ui-ring-danger: 0 0 0 3px color-mix(in srgb, #ef4444 34%, transparent);
+
+  /* Categorías */
+  --ui-kind-cctv-bg: rgba(34, 169, 140, 0.16);
+  --ui-kind-cctv-fg: #4fd1b2;
+  --ui-kind-red-bg: rgba(58, 169, 204, 0.16);
+  --ui-kind-red-fg: #7fcde6;
+  --ui-kind-acceso-bg: rgba(166, 76, 166, 0.18);
+  --ui-kind-acceso-fg: #d79ad7;
+  --ui-kind-obra-bg: rgba(238, 138, 42, 0.16);
+  --ui-kind-obra-fg: #f5b26e;
+
+  /* Barra lateral */
+  --ui-sb-bg: #0c1220;
+  --ui-sb-fg: #c3ccd8;
+  --ui-sb-fg-2: #8692a5;
+  --ui-sb-label: #6f7c90;
+  --ui-sb-hover: #152033;
+  --ui-sb-active-bg: rgba(34, 169, 140, 0.16);
+  --ui-sb-active-fg: #6ee0c3;
+  --ui-sb-border: #182233;
 
   /* Semánticos — en oscuro el relleno aclara, así que el texto que va
      ENCIMA del relleno (`-fg`) se oscurece para seguir siendo legible. */
   --ui-success: #22c55e;
   --ui-success-text: #4ade80;
-  --ui-success-bg: color-mix(in srgb, #22c55e 12%, transparent);
+  --ui-success-bg: color-mix(in srgb, #22c55e 13%, transparent);
   --ui-success-border: color-mix(in srgb, #22c55e 34%, transparent);
   --ui-success-fg: #052e14;
 
@@ -396,29 +453,29 @@ body.dark {
   --ui-danger-border: color-mix(in srgb, #ef4444 34%, transparent);
   --ui-danger-fg: #2a0707;
 
-  --ui-info: #38bdf8;
-  --ui-info-text: #7dd3fc;
-  --ui-info-bg: color-mix(in srgb, #38bdf8 12%, transparent);
+  --ui-info: #3898e6;
+  --ui-info-text: #7cc4f5;
+  --ui-info-bg: color-mix(in srgb, #3898e6 14%, transparent);
   --ui-info-border: color-mix(in srgb, #38bdf8 34%, transparent);
   --ui-info-fg: #04202e;
 
-  --ui-violet: #a78bfa;
-  --ui-violet-text: #c4b5fd;
-  --ui-violet-bg: color-mix(in srgb, #a78bfa 14%, transparent);
+  --ui-violet: #a064dc;
+  --ui-violet-text: #c7a2f0;
+  --ui-violet-bg: color-mix(in srgb, #a064dc 15%, transparent);
   --ui-violet-border: color-mix(in srgb, #a78bfa 34%, transparent);
   --ui-violet-fg: #1b1132;
 
-  --ui-neutral: #94a3b8;
-  --ui-neutral-text: #cbd5e1;
-  --ui-neutral-bg: #1e293b;
-  --ui-neutral-border: #334155;
+  --ui-neutral: #8390a3;
+  --ui-neutral-text: #b4bfcd;
+  --ui-neutral-bg: #1c2636;
+  --ui-neutral-border: #2e3c52;
   --ui-neutral-fg: #0f172a;
 
   /* Elevación — en oscuro la sombra pesa más porque el contraste
      de superficie es menor, pero sigue sin marcarse. */
   --ui-elev-0: none;
-  --ui-elev-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --ui-elev-2: 0 1px 2px rgba(0, 0, 0, 0.34), 0 6px 16px rgba(0, 0, 0, 0.38);
+  --ui-elev-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --ui-elev-2: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px rgba(0, 0, 0, 0.35);
   --ui-elev-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.45);
   --ui-elev-3: 0 2px 6px rgba(0, 0, 0, 0.45), 0 28px 64px rgba(0, 0, 0, 0.55);
   --ui-shadow-sm: var(--ui-elev-1);
