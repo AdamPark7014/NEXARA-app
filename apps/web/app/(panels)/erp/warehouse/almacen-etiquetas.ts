@@ -3,7 +3,19 @@
  * y las exportaciones digan lo mismo.
  */
 
+import type { Tone } from "@/components/base";
+
 export type VarianteTag = "default" | "positive" | "warning" | "danger" | "accent" | "neutral";
+
+/** Variante vieja de `Tag` → tono de las insignias v2 (`Badge`/`StatusBadge`). */
+export const TONO_DE_VARIANTE: Record<VarianteTag, Tone> = {
+  default: "neutral",
+  positive: "success",
+  warning: "warning",
+  danger: "danger",
+  accent: "brand",
+  neutral: "neutral",
+};
 
 export const MOVEMENT_TYPE_LABEL: Record<string, string> = {
   RECEIPT: "Entrada",
@@ -55,10 +67,10 @@ export function nivelStock(existencia: number, minimo: number): NivelStock {
   return "ok";
 }
 
-export const NIVEL_STOCK: Record<NivelStock, { texto: string; variante: VarianteTag; color: string }> = {
-  agotado: { texto: "Agotado", variante: "danger", color: "var(--danger)" },
-  bajo: { texto: "Bajo mínimo", variante: "warning", color: "var(--warning)" },
-  ok: { texto: "Suficiente", variante: "positive", color: "var(--success)" },
+export const NIVEL_STOCK: Record<NivelStock, { texto: string; variante: VarianteTag; tono: Tone; color: string }> = {
+  agotado: { texto: "Agotado", variante: "danger", tono: "danger", color: "var(--ui-danger)" },
+  bajo: { texto: "Bajo mínimo", variante: "warning", tono: "warning", color: "var(--ui-warning)" },
+  ok: { texto: "Suficiente", variante: "positive", tono: "success", color: "var(--ui-success)" },
 };
 
 /** Días que faltan para caducar (negativo = ya caducó). */

@@ -9,13 +9,42 @@ import {
   rejectToolRenewal,
   type ToolRenewalRow,
 } from "@/lib/tool-requests-api";
+import AutorenewOutlined from "@mui/icons-material/AutorenewOutlined";
+import HourglassBottomOutlined from "@mui/icons-material/HourglassBottomOutlined";
+import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
+import CheckCircleOutline from "@mui/icons-material/CheckCircleOutline";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
-import FilterToolbar from "./FilterToolbar";
-import Button from "./ui/Button";
-import KpiCard from "./ui/KpiCard";
-import Section from "./ui/Section";
-import DataTable, { Tag, type Column } from "./ui/DataTable";
+import Modal from "./ui/Modal";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  Field,
+  FilterChip,
+  FilterChips,
+  ListFooter,
+  ModuleToolbar,
+  PersonCell,
+  SearchInput,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  StatusBadge,
+  Textarea,
+  type Column,
+} from "./base";
+import { tonoDeVariante } from "./almacen/PiezasAlmacen";
 import { useUser } from "./UserContext";
+import s from "./ToolRequestsTable.module.css";
+
+const FILTROS = [
+  { value: "PENDING", label: "Pendientes", dot: "warning" },
+  { value: "APPROVED", label: "Aprobadas", dot: "success" },
+  { value: "REJECTED", label: "Rechazadas", dot: "danger" },
+  { value: "all", label: "Todos", dot: undefined },
+] as const;
 
 interface ToolRenewalsTableProps {
   refreshTrigger?: number;
@@ -131,171 +160,223 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
     }
   };
 
+  /** Lo que queda tras la búsqueda: sobre esto cuentan los chips. */
+  const buscadas = useMemo(() => {
+    if (!searchQ.trim()) return items;
+    const q = searchQ.toLowerCase();
+    return items.filter(
+      (r) =>
+        r.toolName.toLowerCase().includes(q) ||
+        r.userName.toLowerCase().includes(q) ||
+        (r.renewalReason ?? "").toLowerCase().includes(q),
+    );
+  }, [items, searchQ]);
+
   const columns: Column<ToolRenewalRow>[] = [
     {
       key: "user",
       label: "Usuario",
-      render: (r) => (
-        <div>
-          <div>{r.userName}</div>
-          {r.userEmail && (
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.userEmail}</div>
-          )}
-        </div>
-      ),
-      width: 150,
+      render: (r) => <PersonCell name={r.userName} subtitle={r.userEmail || undefined} size={28} />,
+      width: 200,
     },
-    { key: "tool", label: "Herramienta", accessor: (r) => r.toolName },
-    { key: "prev", label: "Fecha actual", accessor: (r) => fmtDate(r.previousReturnDate), width: 110 },
-    { key: "new", label: "Nueva fecha", accessor: (r) => fmtDate(r.newReturnDate), width: 110 },
+    { key: "tool", label: "Herramienta", render: (r) => <span className={s.fuerte}>{r.toolName}</span> },
+    { key: "prev", label: "Fecha actual", render: (r) => <span className={s.fecha}>{fmtDate(r.previousReturnDate)}</span>, width: 116 },
+    { key: "new", label: "Nueva fecha", render: (r) => <span className={s.fecha}>{fmtDate(r.newReturnDate)}</span>, width: 116 },
     {
       key: "overdue",
       label: "Vencimiento",
       render: (r) => (
-        <div>
-          <span style={{ fontWeight: r.daysOverdue >= 1 ? 700 : 400, color: r.daysOverdue >= 1 ? "var(--danger)" : undefined }}>
-            {r.daysOverdue >= 1 ? "⚠️ " : ""}{r.daysOverdue} días
-          </span>
-          {r.renewalReason && (
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.renewalReason}</div>
+        <span className={s.doble}>
+          {r.daysOverdue >= 1 ? (
+            <StatusBadge label={`${r.daysOverdue} días`} tone="danger" size="sm" dot />
+          ) : (
+            <span className={s.fecha}>{r.daysOverdue} días</span>
           )}
-        </div>
+          {r.renewalReason && <span className={s.tenue}>{r.renewalReason}</span>}
+        </span>
       ),
-      width: 130,
+      width: 160,
     },
     {
       key: "status",
       label: "Estado",
       render: (r) => (
-        <Tag variant={renewalStatusVariant(r.status)}>
-          {r.status === "PENDING" ? "Pendiente" : r.status === "APPROVED" ? "Aprobada" : "Rechazada"}
-        </Tag>
+        <StatusBadge
+          label={r.status === "PENDING" ? "Pendiente" : r.status === "APPROVED" ? "Aprobada" : "Rechazada"}
+          tone={tonoDeVariante(renewalStatusVariant(r.status))}
+          size="sm"
+          dot
+        />
       ),
-      width: 100,
+      width: 120,
     },
     {
-      key: "actions",
-      label: "Acciones",
-      width: 160,
+      key: "processed",
+      label: "Resolvió",
       render: (r) =>
         r.status === "PENDING" ? (
-          <div style={{ display: "flex", gap: 6 }}>
-            <Button size="sm" onClick={() => setModal({ id: r.id, type: "approve" })}>Aprobar</Button>
-            <Button size="sm" variant="ghost" onClick={() => setModal({ id: r.id, type: "reject" })}>
-              Rechazar
-            </Button>
-          </div>
+          <span className={s.tenue}>—</span>
         ) : (
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            {r.approverName ? `Por ${r.approverName}` : "Procesado"}
-          </span>
+          <span className={s.tenue}>{r.approverName ? `Por ${r.approverName}` : "Procesado"}</span>
         ),
+      width: 140,
     },
   ];
 
+  const acciones = (r: ToolRenewalRow) =>
+    r.status === "PENDING" ? (
+      <>
+        <Button size="sm" variant="ghost" onClick={() => setModal({ id: r.id, type: "reject" })}>
+          Rechazar
+        </Button>
+        <Button size="sm" variant="tonal" onClick={() => setModal({ id: r.id, type: "approve" })}>
+          Aprobar
+        </Button>
+      </>
+    ) : null;
+
+  const cerrarModal = () => {
+    if (!actionLoading) setModal(null);
+  };
+
   return (
-    <div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <KpiCard label="Total" value={counts.total} icon="🔁" />
-        <KpiCard
-          label="Pendientes"
-          value={counts.pending}
-          icon="⏳"
-          variant={counts.pending > 0 ? "warning" : "default"}
-        />
-        <KpiCard
-          label="Urgentes"
-          value={counts.urgent}
-          icon="⚠️"
-          variant={counts.urgent > 0 ? "danger" : "positive"}
-        />
-        <KpiCard label="Aprobadas" value={counts.approved} icon="✅" variant="positive" />
-      </div>
+    <div className={s.pila}>
+      {!loading || items.length > 0 ? (
+        <StatRow ariaLabel="Resumen de renovaciones" cols={4}>
+          <Stat label="Total" value={counts.total} icon={<AutorenewOutlined />} iconTone="neutral" onClick={() => setFilterStatus("all")} pressed={filterStatus === "all"} />
+          <Stat
+            label="Pendientes"
+            value={counts.pending}
+            tone={counts.pending > 0 ? "warning" : "default"}
+            icon={<HourglassBottomOutlined />}
+            iconTone={counts.pending > 0 ? "warning" : "neutral"}
+            onClick={() => setFilterStatus("PENDING")}
+            pressed={filterStatus === "PENDING"}
+          />
+          <Stat
+            label="Urgentes"
+            value={counts.urgent}
+            hint="pendientes y ya vencidas"
+            tone={counts.urgent > 0 ? "danger" : "success"}
+            icon={<ReportProblemOutlined />}
+            iconTone={counts.urgent > 0 ? "danger" : "success"}
+            semaforo={counts.urgent > 0 ? "rojo" : "verde"}
+          />
+          <Stat
+            label="Aprobadas"
+            value={counts.approved}
+            tone="success"
+            icon={<CheckCircleOutline />}
+            iconTone="success"
+            onClick={() => setFilterStatus("APPROVED")}
+            pressed={filterStatus === "APPROVED"}
+          />
+        </StatRow>
+      ) : null}
 
-      <Section title="Renovaciones de herramientas">
-        {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      <Card aria-label="Renovaciones de herramientas">
+        <CardHead title="Renovaciones de herramientas" subtitle="Quien necesita la herramienta más días pide una nueva fecha de devolución." />
+        {error && (
+          <div className={s.avisos}>
+            <Alert tone="danger" role="alert" action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}>
+              {error}
+            </Alert>
+          </div>
+        )}
 
-        <FilterToolbar
-          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar herramienta o usuario…" }}
-          selects={[
-            {
-              label: "Estado",
-              value: filterStatus,
-              onChange: setFilterStatus,
-              options: [
-                { value: "PENDING", label: "Pendientes" },
-                { value: "APPROVED", label: "Aprobadas" },
-                { value: "REJECTED", label: "Rechazadas" },
-                { value: "all", label: "Todos" },
-              ],
-              allowAll: false,
-            },
-          ]}
-          onClear={() => {
-            setSearchQ("");
-            setFilterStatus("PENDING");
-          }}
-          resultCount={loading ? null : visibleItems.length}
-        />
-
-        <DataTable<ToolRenewalRow>
-          columns={columns}
-          rows={loading ? [] : visibleItems}
-          rowKey={(r) => r.id}
-          emptyTitle={loading ? "Cargando…" : "Sin renovaciones"}
-          emptyDescription={
-            loading ? "Obteniendo renovaciones pendientes" : "No hay renovaciones con los filtros actuales"
+        <ModuleToolbar
+          search={
+            <SearchInput
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Buscar herramienta o usuario…"
+              aria-label="Buscar renovaciones"
+            />
+          }
+          chips={
+            <FilterChips ariaLabel="Estado de la renovación">
+              {FILTROS.map((f) => (
+                <FilterChip
+                  key={f.value}
+                  active={filterStatus === f.value}
+                  count={loading ? undefined : f.value === "all" ? buscadas.length : buscadas.filter((r) => r.status === f.value).length}
+                  dot={f.dot}
+                  onClick={() => setFilterStatus(f.value)}
+                >
+                  {f.label}
+                </FilterChip>
+              ))}
+            </FilterChips>
           }
         />
-      </Section>
 
-      {modal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(8,24,38,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 50,
-            padding: 16,
-          }}
-          onClick={() => !actionLoading && setModal(null)}
-        >
-          <div
-            className="card"
-            style={{ maxWidth: 420, width: "100%", padding: 20 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: "0 0 12px" }}>
-              {modal.type === "approve" ? "Aprobar renovación" : "Rechazar renovación"}
-            </h3>
-            {modal.type === "reject" && (
-              <textarea
-                className="input"
-                style={{ width: "100%", minHeight: 80, marginBottom: 12 }}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Motivo del rechazo (opcional)"
-              />
-            )}
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button loading={actionLoading} onClick={() => void runModalAction()}>Confirmar</Button>
-              <Button variant="secondary" disabled={actionLoading} onClick={() => setModal(null)}>
-                Cancelar
-              </Button>
-            </div>
+        {loading && items.length === 0 ? (
+          <div className={s.carga}>
+            <SkeletonRows rows={4} label="Obteniendo renovaciones pendientes" />
           </div>
-        </div>
-      )}
+        ) : (
+          <DataTable<ToolRenewalRow>
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(r) => r.id}
+            flush
+            ariaLabel="Renovaciones de herramientas"
+            rowActions={acciones}
+            rowActionsLabel="Acciones"
+            emptyTitle="Sin renovaciones"
+            emptyDescription="No hay renovaciones con los filtros actuales"
+            emptyAction={
+              searchQ || filterStatus !== "PENDING" ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setSearchQ("");
+                    setFilterStatus("PENDING");
+                  }}
+                >
+                  Quitar filtros
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+        {!loading && visibleItems.length > 0 ? <ListFooter total={visibleItems.length} unit="renovaciones" /> : null}
+      </Card>
+
+      <Modal
+        open={Boolean(modal)}
+        onClose={cerrarModal}
+        title={modal?.type === "reject" ? "Rechazar renovación" : "Aprobar renovación"}
+        maxWidth={440}
+        footer={
+          <>
+            <Button variant="secondary" disabled={actionLoading} onClick={cerrarModal}>
+              Cancelar
+            </Button>
+            <Button
+              variant={modal?.type === "reject" ? "danger" : "primary"}
+              loading={actionLoading}
+              onClick={() => void runModalAction()}
+            >
+              Confirmar
+            </Button>
+          </>
+        }
+      >
+        {modal?.type === "reject" ? (
+          <Field label="Motivo del rechazo" optional>
+            <Textarea
+              rows={3}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Motivo del rechazo (opcional)"
+            />
+          </Field>
+        ) : (
+          <p className={s.tenue}>La herramienta queda prestada hasta la nueva fecha de devolución.</p>
+        )}
+      </Modal>
     </div>
   );
 };

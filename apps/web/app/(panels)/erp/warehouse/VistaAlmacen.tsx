@@ -1,19 +1,58 @@
 "use client";
 
-import { useEffect, useState, useCallback, useDeferredValue, useMemo } from "react";
+import { useEffect, useState, useCallback, useDeferredValue, useMemo, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
-import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
-import PanelTabs from "@/components/ui/PanelTabs";
-import ContextRail from "@/components/ui/ContextRail";
-import InlineAlert from "@/components/ui/InlineAlert";
+import AddOutlined from "@mui/icons-material/AddOutlined";
+import RefreshOutlined from "@mui/icons-material/RefreshOutlined";
+import WarehouseOutlined from "@mui/icons-material/WarehouseOutlined";
+import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
+import PictureAsPdfOutlined from "@mui/icons-material/PictureAsPdfOutlined";
+import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
+import EditOutlined from "@mui/icons-material/EditOutlined";
+import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
+import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
+import TrendingDownOutlined from "@mui/icons-material/TrendingDownOutlined";
+import PaidOutlined from "@mui/icons-material/PaidOutlined";
+import EventBusyOutlined from "@mui/icons-material/EventBusyOutlined";
+import InsightsOutlined from "@mui/icons-material/InsightsOutlined";
+import SwapHorizOutlined from "@mui/icons-material/SwapHorizOutlined";
+import FactCheckOutlined from "@mui/icons-material/FactCheckOutlined";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import { SkeletonRows } from "@/components/base";
+import ContextRail from "@/components/ui/ContextRail";
+import { Money } from "@/components/ui/DataTable";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  Field,
+  FieldGrid,
+  FilterChip,
+  FilterChips,
+  FormSection,
+  Input,
+  LinkButton,
+  ListFooter,
+  ModulePage,
+  ModuleToolbar,
+  PageHead,
+  PersonCell,
+  Progress,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  Tabs,
+  type Column,
+  type TabItem,
+} from "@/components/base";
+import { CeldaExistencia, CeldaProducto, claseMono } from "@/components/almacen/PiezasAlmacen";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { ALMACEN_PATH, HERRAMIENTAS_PATH } from "@/lib/recursos-core";
@@ -52,7 +91,6 @@ import { formatApiError } from "@/lib/erp-api";
 import { crearEmpaque, listarEmpaques, type Empaque } from "@/lib/almacen-api";
 import { etiquetaCantidad, previsualizarConversion } from "@/lib/empaque";
 import { toast } from "@/components/Toast";
-import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { cantidad, fechaCorta, fechaHoraCorta } from "@/lib/recursos-ui";
 import {
@@ -60,6 +98,7 @@ import {
   MOVEMENT_TYPE_LABEL,
   NIVEL_STOCK,
   RESERVATION_STATUS_LABEL,
+  TONO_DE_VARIANTE,
   diasParaCaducar,
   etiquetaMovimiento,
   nivelStock,
@@ -76,7 +115,8 @@ const InteligenciaInventario = dynamic(() => import("./InteligenciaInventario"),
 });
 const HistorialProducto = dynamic(() => import("./HistorialProducto"), { ssr: false });
 
-type StockRow = ReturnType<typeof mapStockLevelToRow>;
+/** Fila de stock; `foto` llega cuando la API de niveles trae la imagen del producto. */
+type StockRow = ReturnType<typeof mapStockLevelToRow> & { foto?: string | null };
 
 const TABS = [
   { key: "dashboard", label: "Resumen" },
@@ -90,6 +130,15 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 /** Las vistas que sabe pintar esta pantalla. La landing de Core (`/erp/almacen`) elige cuáles monta. */
 export type WarehouseView = TabKey;
+
+const ICONO_VISTA: Record<TabKey, TabItem<TabKey>["icon"]> = {
+  dashboard: InsightsOutlined,
+  inventario: Inventory2Outlined,
+  movimientos: SwapHorizOutlined,
+  lotes: EventBusyOutlined,
+  valuacion: PaidOutlined,
+  conteos: FactCheckOutlined,
+};
 
 type TipoMovimiento = "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN";
 
@@ -117,14 +166,32 @@ const TITULO_MOVIMIENTO: Record<TipoMovimiento, string> = {
 
 const LOTE_VACIO = { lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" };
 
-function Campo({ label, children, ancho }: { label: string; children: React.ReactNode; ancho?: boolean }) {
+/** Grupo con título dentro de un diálogo: el formulario se lee por partes. */
+function Grupo({ titulo, paso, children }: { titulo: string; paso: number; children: ReactNode }) {
   return (
-    <label className={`${s.campo} ${ancho ? s.ancho : ""}`}>
-      <span className={s.etiqueta}>{label}</span>
-      {children}
-    </label>
+    <fieldset className={s.grupo}>
+      <legend className={s.grupoTitulo}>
+        <span className={s.grupoPaso} aria-hidden="true">
+          {paso}
+        </span>
+        {titulo}
+      </legend>
+      <FieldGrid>{children}</FieldGrid>
+    </fieldset>
   );
 }
+
+/** Nombre del producto en dos renglones (nombre + SKU), sin foto: listas secundarias. */
+function NombreProducto({ nombre, meta }: { nombre: ReactNode; meta?: ReactNode }) {
+  return (
+    <span className={s.doble}>
+      <span className={s.fuerte}>{nombre}</span>
+      {meta ? <span className={s.tenue}>{meta}</span> : null}
+    </span>
+  );
+}
+
+const sinDato = <span className={s.vacio}>—</span>;
 
 export function VistaAlmacen({
   embedded,
@@ -267,7 +334,12 @@ export function VistaAlmacen({
     setLoadError(null);
     try {
       const levels = await listStockLevels(token);
-      setItems(levels.map(mapStockLevelToRow));
+      setItems(
+        levels.map((level) => ({
+          ...mapStockLevelToRow(level),
+          foto: (level.product as { imageUrl?: string | null } | null | undefined)?.imageUrl ?? null,
+        })),
+      );
       setCargadoUnaVez(true);
     } catch (e) {
       // Un refresco fallido deja a la vista lo que ya estaba cargado.
@@ -795,11 +867,16 @@ export function VistaAlmacen({
       const cat = row.categoria || "Sin categoría";
       porCategoria[cat] = (porCategoria[cat] ?? 0) + 1;
     }
-    const categorias = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    // «—» es la categoría que pone la API cuando no la manda: no es un dato que graficar.
+    const categorias = Object.entries(porCategoria)
+      .filter(([cat]) => cat !== "—")
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
     return { sinStock, bajoMinimo, valorTotal, categorias };
   }, [items]);
 
-  const visibleItems = useMemo(() => {
+  /** Lo que queda tras el aviso (`?productId=`) y la búsqueda: sobre esto cuentan los chips. */
+  const filasBuscadas = useMemo(() => {
     let rows = items;
     if (productFilter) {
       const pid = Number(productFilter);
@@ -813,229 +890,283 @@ export function VistaAlmacen({
         (r.categoria ?? "").toLowerCase().includes(q)
       );
     }
-    if (filterEstado === "sin_stock") rows = rows.filter((r) => nivelStock(r.existencia, r.minimo) === "agotado");
-    else if (filterEstado === "bajo_minimo") rows = rows.filter((r) => nivelStock(r.existencia, r.minimo) === "bajo");
-    else if (filterEstado === "ok") rows = rows.filter((r) => r.existencia >= r.minimo);
     return rows;
-  }, [items, productFilter, busqueda, filterEstado]);
+  }, [items, productFilter, busqueda]);
+
+  const conteoEstado = useMemo(() => {
+    let agotado = 0;
+    let bajo = 0;
+    let ok = 0;
+    for (const r of filasBuscadas) {
+      const nivel = nivelStock(r.existencia, r.minimo);
+      if (nivel === "agotado") agotado += 1;
+      else if (nivel === "bajo") bajo += 1;
+      if (r.existencia >= r.minimo) ok += 1;
+    }
+    return { agotado, bajo, ok };
+  }, [filasBuscadas]);
+
+  const visibleItems = useMemo(() => {
+    const rows = filasBuscadas;
+    if (filterEstado === "sin_stock") return rows.filter((r) => nivelStock(r.existencia, r.minimo) === "agotado");
+    if (filterEstado === "bajo_minimo") return rows.filter((r) => nivelStock(r.existencia, r.minimo) === "bajo");
+    if (filterEstado === "ok") return rows.filter((r) => r.existencia >= r.minimo);
+    return rows;
+  }, [filasBuscadas, filterEstado]);
+
+  const quitarFiltrosInventario = () => {
+    setSearchQ("");
+    setFilterEstado("");
+  };
+  const alternarEstado = (valor: string) => setFilterEstado((f) => (f === valor ? "" : valor));
 
   const columns: Column<StockRow>[] = [
-    { key: "sku", label: "SKU", render: (r) => <code style={{ fontSize: 11.5 }}>{r.sku}</code>, width: 110 },
     {
       key: "nombre",
       label: "Producto",
-      render: (r) => (
-        <button
-          type="button"
-          className={s.productoBtn}
-          onClick={() => r.productId && void openProductTrace(r.productId, r.sku, r.nombre)}
-          title="Ver historial de movimientos"
-        >
-          <div className={s.productoNombre}>{r.nombre}</div>
-          <div className={s.productoMeta}>
-            {r.categoria} · {r.ubicacion}
-          </div>
-        </button>
-      ),
+      render: (r) => {
+        const meta = [r.categoria !== "—" ? r.categoria : null, r.ubicacion].filter(Boolean).join(" · ");
+        return (
+          <CeldaProducto
+            nombre={r.nombre}
+            meta={meta}
+            foto={r.foto}
+            onClick={r.productId ? () => void openProductTrace(r.productId!, r.sku, r.nombre) : undefined}
+            title="Ver historial de movimientos"
+          />
+        );
+      },
     },
+    { key: "sku", label: "SKU", render: (r) => <code className={claseMono}>{r.sku}</code>, width: 120 },
     {
       key: "existencia",
       label: "Existencia",
       render: (r) => {
         const nivel = NIVEL_STOCK[nivelStock(r.existencia, r.minimo)];
-        const pct = r.minimo > 0 ? Math.min(100, (r.existencia / (r.minimo * 2)) * 100) : (r.existencia > 0 ? 50 : 0);
-        return (
-          <div className={s.stock}>
-            <div className={s.stockFila}>
-              <span className={s.stockNum}>{cantidad(r.existencia)}</span>
-              <Tag variant={nivel.variante} size="sm">{nivel.texto}</Tag>
-            </div>
-            <div className={s.stockBarra} aria-hidden="true">
-              <div className={s.stockRelleno} style={{ width: `${pct}%`, background: nivel.color }} />
-            </div>
-          </div>
-        );
+        return <CeldaExistencia existencia={r.existencia} minimo={r.minimo} texto={nivel.texto} tono={nivel.tono} formato={cantidad} />;
       },
-      width: 170,
+      width: 180,
     },
-    { key: "minimo", label: "Mínimo", accessor: (r) => cantidad(r.minimo), width: 80, numeric: true },
-    { key: "costo", label: "Costo unit.", render: (r) => <Money value={r.costo} />, width: 110, numeric: true },
-    {
-      key: "id",
-      label: <span className={s.srOnly}>Acciones</span>,
-      render: (r) => (
-        <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-          {r.productId ? (
-            <button
-              type="button"
-              className={s.iconBtn}
-              onClick={() => void openProductTrace(r.productId!, r.sku, r.nombre)}
-              title="Historial"
-              aria-label={`Ver historial de ${r.nombre}`}
-            >
-              ⏱
-            </button>
-          ) : null}
-          {cfg.canEdit ? (
-            <button
-              type="button"
-              className={s.iconBtn}
-              onClick={() => openEdit(r)}
-              title="Editar mínimo"
-              aria-label={`Editar mínimo de ${r.nombre}`}
-            >
-              ✎
-            </button>
-          ) : null}
-        </div>
-      ),
-      width: 84,
-    },
+    { key: "minimo", label: "Mínimo", accessor: (r) => cantidad(r.minimo), width: 84, numeric: true },
+    { key: "costo", label: "Costo unit.", render: (r) => (r.costo > 0 ? <Money value={r.costo} /> : sinDato), width: 110, numeric: true },
   ];
 
-  const movementColumns: Column<StockMovementRow>[] = [
-    { key: "movementNumber", label: "Folio", render: (m) => <code style={{ fontSize: 11.5 }}>{m.movementNumber}</code>, width: 100 },
-    { key: "type", label: "Tipo", render: (m) => <Tag variant={varianteMovimiento(m.type)}>{etiquetaMovimiento(m.type)}</Tag>, width: 110 },
-    { key: "sku", label: "SKU", render: (m) => <code style={{ fontSize: 11 }}>{m.product?.sku ?? "—"}</code>, width: 88 },
-    { key: "product", label: "Producto", render: (m) => (
-      <button
-        type="button"
-        className={s.productoBtn}
-        disabled={!m.product?.id}
-        onClick={() => m.product?.id && void openProductTrace(m.product.id, m.product.sku, m.product.name)}
-      >
-        <div style={{ fontSize: 13, color: m.product?.id ? "var(--primary)" : undefined }}>{m.product?.name ?? "—"}</div>
-        {m.lot ? <div className={s.productoMeta}>Lote {m.lot.lotNumber}</div> : null}
-      </button>
-    ) },
-    { key: "route", label: "Almacén", render: (m) => (
-      <span style={{ fontSize: 12 }}>{m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}</span>
-    ), width: 160 },
-    // «2 cajas · 24 pz»: lo que se tecleó y lo que de verdad se movió.
-    { key: "quantity", label: "Cantidad", render: (m) => (
-      <strong style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>{etiquetaCantidad(m)}</strong>
-    ), width: 118, numeric: true },
-    { key: "balance", label: "Saldo", render: (m) => (
-      <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }} title="Existencia antes → después">
-        {stockMovementBalanceLabel(m)}
-      </span>
-    ), width: 90, numeric: true },
-    { key: "document", label: "Referencia", render: (m) => (
-      <span style={{ fontSize: 11.5 }} title={m.notes ?? undefined}>{stockMovementDocumentLabel(m)}</span>
-    ), width: 130 },
-    { key: "createdAt", label: "Fecha", render: (m) => (
-      <time dateTime={m.createdAt} style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{fechaHoraCorta(m.createdAt)}</time>
-    ), width: 120 },
-    { key: "createdBy", label: "Registró", accessor: (m) => m.createdBy?.nombre ?? "—", width: 100 },
-    {
-      key: "actions",
-      label: <span className={s.srOnly}>Comprobante</span>,
-      width: 64,
-      render: (m) => (
+  const accionesStock = (r: StockRow) => (
+    <>
+      {r.productId ? (
         <Button
           size="sm"
           variant="ghost"
-          aria-label={`Descargar comprobante ${m.movementNumber}`}
-          onClick={(e) => { e.stopPropagation(); void downloadMovementSlip(m.id); }}
+          icon
+          onClick={() => void openProductTrace(r.productId!, r.sku, r.nombre)}
+          title="Historial"
+          aria-label={`Ver historial de ${r.nombre}`}
         >
-          PDF
+          <HistoryOutlined fontSize="small" />
         </Button>
+      ) : null}
+      {cfg.canEdit ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon
+          onClick={() => openEdit(r)}
+          title="Editar mínimo"
+          aria-label={`Editar mínimo de ${r.nombre}`}
+        >
+          <EditOutlined fontSize="small" />
+        </Button>
+      ) : null}
+    </>
+  );
+
+  const movementColumns: Column<StockMovementRow>[] = [
+    { key: "movementNumber", label: "Folio", render: (m) => <code className={claseMono}>{m.movementNumber}</code>, width: 108 },
+    {
+      key: "type",
+      label: "Tipo",
+      render: (m) => (
+        <Badge tone={TONO_DE_VARIANTE[varianteMovimiento(m.type)]} size="sm" dot>
+          {etiquetaMovimiento(m.type)}
+        </Badge>
       ),
+      width: 120,
+    },
+    {
+      key: "product",
+      label: "Producto",
+      render: (m) => {
+        const meta = [m.product?.sku, m.lot ? `Lote ${m.lot.lotNumber}` : null].filter(Boolean).join(" · ");
+        return (
+          <span className={s.doble}>
+            {m.product?.id ? (
+              <LinkButton
+                className={s.nombreEnlace}
+                onClick={() => m.product?.id && void openProductTrace(m.product.id, m.product.sku, m.product.name)}
+                title="Ver historial de movimientos"
+              >
+                {m.product?.name ?? "—"}
+              </LinkButton>
+            ) : (
+              <span className={s.fuerte}>{m.product?.name ?? "—"}</span>
+            )}
+            {meta ? <span className={s.tenue}>{meta}</span> : null}
+          </span>
+        );
+      },
+    },
+    {
+      key: "route",
+      label: "Almacén",
+      render: (m) => (
+        <span className={s.ruta}>
+          {m.fromWarehouse?.name ?? "—"} <span aria-hidden="true">→</span> {m.toWarehouse?.name ?? "—"}
+        </span>
+      ),
+      width: 170,
+    },
+    // «2 cajas · 24 pz»: lo que se tecleó y lo que de verdad se movió.
+    { key: "quantity", label: "Cantidad", render: (m) => <strong className={s.cifra}>{etiquetaCantidad(m)}</strong>, width: 118, numeric: true },
+    {
+      key: "balance",
+      label: "Saldo",
+      render: (m) => (
+        <span className={s.tenueNum} title="Existencia antes → después">
+          {stockMovementBalanceLabel(m)}
+        </span>
+      ),
+      width: 96,
+      numeric: true,
+    },
+    {
+      key: "document",
+      label: "Referencia",
+      render: (m) => (
+        <span className={s.meta} title={m.notes ?? undefined}>
+          {stockMovementDocumentLabel(m)}
+        </span>
+      ),
+      width: 130,
+    },
+    {
+      key: "createdAt",
+      label: "Fecha",
+      render: (m) => (
+        <time dateTime={m.createdAt} className={s.fecha}>
+          {fechaHoraCorta(m.createdAt)}
+        </time>
+      ),
+      width: 124,
+    },
+    {
+      key: "createdBy",
+      label: "Registró",
+      render: (m) => (m.createdBy?.nombre ? <PersonCell name={m.createdBy.nombre} size={24} /> : sinDato),
+      width: 150,
     },
   ];
 
   const ahora = Date.now();
   const lotColumns: Column<LotRow>[] = [
-    { key: "lotNumber", label: "Lote", render: (l) => <code style={{ fontSize: 12 }}>{l.lotNumber}</code>, width: 130 },
-    { key: "product", label: "Producto", render: (l) => (
-      <div>
-        <div style={{ fontSize: 13 }}>{l.product?.name ?? "—"}</div>
-        <div className={s.productoMeta}>{l.product?.sku}</div>
-      </div>
-    ) },
-    { key: "manufacturingDate", label: "Fabricación", render: (l) => l.manufacturingDate ? <span style={{ fontSize: 12 }}>{fechaCorta(l.manufacturingDate)}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 120 },
-    { key: "expirationDate", label: "Caducidad", width: 160, render: (l) => {
-      const dias = diasParaCaducar(l.expirationDate, ahora);
-      if (dias == null) return <span style={{ color: "var(--text-tertiary)" }}>Sin caducidad</span>;
-      if (dias < 0) return <Tag variant="danger">Caducó hace {Math.abs(dias)} días</Tag>;
-      if (dias <= 30) return <Tag variant="warning">{dias === 0 ? "Caduca hoy" : `Caduca en ${dias} días`}</Tag>;
-      return <span style={{ fontSize: 12 }}>{fechaCorta(l.expirationDate)}</span>;
-    } },
-    { key: "notes", label: "Notas", accessor: (l) => l.notes ?? "—" },
+    { key: "lotNumber", label: "Lote", render: (l) => <code className={claseMono}>{l.lotNumber}</code>, width: 140 },
+    { key: "product", label: "Producto", render: (l) => <NombreProducto nombre={l.product?.name ?? "—"} meta={l.product?.sku} /> },
+    {
+      key: "manufacturingDate",
+      label: "Fabricación",
+      render: (l) => (l.manufacturingDate ? <span className={s.fecha}>{fechaCorta(l.manufacturingDate)}</span> : sinDato),
+      width: 120,
+    },
+    {
+      key: "expirationDate",
+      label: "Caducidad",
+      width: 170,
+      render: (l) => {
+        const dias = diasParaCaducar(l.expirationDate, ahora);
+        if (dias == null) return <span className={s.vacio}>Sin caducidad</span>;
+        if (dias < 0) return <Badge tone="danger" size="sm" dot>Caducó hace {Math.abs(dias)} días</Badge>;
+        if (dias <= 30) return <Badge tone="warning" size="sm" dot>{dias === 0 ? "Caduca hoy" : `Caduca en ${dias} días`}</Badge>;
+        return <span className={s.fecha}>{fechaCorta(l.expirationDate)}</span>;
+      },
+    },
+    { key: "notes", label: "Notas", render: (l) => (l.notes ? <span className={s.meta}>{l.notes}</span> : sinDato) },
   ];
 
   const valuationColumns: Column<ValuationRow>[] = [
-    { key: "product", label: "Producto", render: (v) => (
-      <div>
-        <div style={{ fontSize: 13 }}>{v.product?.name ?? "—"}</div>
-        <div className={s.productoMeta}>{v.product?.sku}</div>
-      </div>
-    ) },
+    { key: "product", label: "Producto", render: (v) => <NombreProducto nombre={v.product?.name ?? "—"} meta={v.product?.sku} /> },
     { key: "warehouse", label: "Almacén", accessor: (v) => v.warehouse?.name ?? "—", width: 150 },
     { key: "quantity", label: "Cantidad", render: (v) => cantidad(v.quantity), width: 90, numeric: true },
     { key: "availableQty", label: "Disponible", render: (v) => cantidad(v.availableQty), width: 100, numeric: true },
     { key: "unitCost", label: "Costo unit.", render: (v) => <Money value={Number(v.unitCost ?? 0)} />, width: 110, numeric: true },
-    { key: "totalValue", label: "Valor total", render: (v) => <Money value={v.totalValue} />, width: 130, numeric: true },
+    { key: "totalValue", label: "Valor total", render: (v) => <strong className={s.cifra}><Money value={v.totalValue} /></strong>, width: 130, numeric: true },
   ];
 
   const cycleCountColumns: Column<CycleCountRow>[] = [
-    { key: "countNumber", label: "Folio", render: (c) => <code style={{ fontSize: 11.5 }}>{c.countNumber}</code>, width: 110 },
+    { key: "countNumber", label: "Folio", render: (c) => <code className={claseMono}>{c.countNumber}</code>, width: 110 },
     { key: "warehouse", label: "Almacén", accessor: (c) => c.warehouse?.name ?? "—", width: 150 },
     {
-      key: "status", label: "Estado", width: 130,
-      render: (c) => <Tag variant={varianteConteo(c.status)}>{CYCLE_COUNT_STATUS_LABEL[c.status] ?? "Sin estado"}</Tag>,
+      key: "status",
+      label: "Estado",
+      width: 130,
+      render: (c) => (
+        <Badge tone={TONO_DE_VARIANTE[varianteConteo(c.status)]} size="sm" dot>
+          {CYCLE_COUNT_STATUS_LABEL[c.status] ?? "Sin estado"}
+        </Badge>
+      ),
     },
-    { key: "scheduledFor", label: "Fecha", render: (c) => <span style={{ fontSize: 12 }}>{fechaCorta(c.scheduledFor)}</span>, width: 110 },
+    { key: "scheduledFor", label: "Fecha", render: (c) => <span className={s.fecha}>{fechaCorta(c.scheduledFor)}</span>, width: 110 },
     {
-      key: "progress", label: "Contados", width: 110, numeric: true,
+      key: "progress",
+      label: "Contados",
+      width: 150,
       render: (c) => {
         const total = c._count?.items ?? c.items?.length ?? 0;
         const done = (c.items ?? []).filter((i) => i.countedQty != null).length;
-        return <span style={{ fontSize: 12 }}>{done} de {total}</span>;
+        return (
+          <span className={s.avance}>
+            <Progress value={done} max={Math.max(1, total)} tone={total > 0 && done >= total ? "success" : "brand"} ariaLabel={`${done} de ${total} contados`} />
+            <span className={s.tenueNum}>
+              {done} de {total}
+            </span>
+          </span>
+        );
       },
-    },
-    {
-      key: "actions", label: <span className={s.srOnly}>Acciones</span>, width: 200,
-      render: (c) => (
-        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-          {(c.status === "SCHEDULED" || c.status === "IN_PROGRESS") && (
-            <>
-              <Button size="sm" variant="secondary" onClick={() => openCapture(c)}>Capturar</Button>
-              <Button size="sm" variant="ghost" onClick={() => pedirCancelarConteo(c)}>Cancelar</Button>
-            </>
-          )}
-          {c.status === "CLOSED" && (
-            <Button size="sm" variant="ghost" onClick={() => openCapture(c)}>Ver detalle</Button>
-          )}
-        </div>
-      ),
     },
   ];
 
+  const accionesConteo = (c: CycleCountRow) => (
+    <>
+      {(c.status === "SCHEDULED" || c.status === "IN_PROGRESS") && (
+        <>
+          <Button size="sm" variant="secondary" onClick={() => openCapture(c)}>Capturar</Button>
+          <Button size="sm" variant="ghost" onClick={() => pedirCancelarConteo(c)}>Cancelar</Button>
+        </>
+      )}
+      {c.status === "CLOSED" && (
+        <Button size="sm" variant="ghost" onClick={() => openCapture(c)}>Ver detalle</Button>
+      )}
+    </>
+  );
+
   const reservationColumns: Column<StockReservationRow>[] = [
-    { key: "product", label: "Producto", render: (r) => (
-      <div>
-        <div style={{ fontSize: 13 }}>{r.product?.name ?? "—"}</div>
-        <div className={s.productoMeta}>{r.product?.sku}</div>
-      </div>
-    ) },
+    { key: "product", label: "Producto", render: (r) => <NombreProducto nombre={r.product?.name ?? "—"} meta={r.product?.sku} /> },
     { key: "warehouse", label: "Almacén", accessor: (r) => r.warehouse?.name ?? "—", width: 140 },
-    { key: "quantity", label: "Cantidad", render: (r) => <strong style={{ fontSize: 13 }}>{cantidad(r.quantity)}</strong>, width: 90, numeric: true },
+    { key: "quantity", label: "Cantidad", render: (r) => <strong className={s.cifra}>{cantidad(r.quantity)}</strong>, width: 90, numeric: true },
     { key: "reason", label: "Motivo", accessor: (r) => r.reason },
     {
-      key: "status", label: "Estado", width: 110,
+      key: "status",
+      label: "Estado",
+      width: 120,
       render: (r) => (
-        <Tag variant={r.status === "ACTIVE" ? "warning" : r.status === "CONSUMED" ? "positive" : "default"}>
+        <Badge tone={r.status === "ACTIVE" ? "warning" : r.status === "CONSUMED" ? "success" : "neutral"} size="sm" dot>
           {RESERVATION_STATUS_LABEL[r.status] ?? "Liberada"}
-        </Tag>
+        </Badge>
       ),
     },
-    { key: "expiresAt", label: "Vence", render: (r) => r.expiresAt ? <span style={{ fontSize: 12 }}>{fechaCorta(r.expiresAt)}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 110 },
-    {
-      key: "actions", label: <span className={s.srOnly}>Acciones</span>, width: 90,
-      render: (r) => r.status === "ACTIVE" ? <Button size="sm" variant="ghost" onClick={() => pedirLiberarReserva(r)}>Liberar</Button> : null,
-    },
+    { key: "expiresAt", label: "Vence", render: (r) => (r.expiresAt ? <span className={s.fecha}>{fechaCorta(r.expiresAt)}</span> : sinDato), width: 110 },
   ];
+
+  const accionesReserva = (r: StockReservationRow) =>
+    r.status === "ACTIVE" ? <Button size="sm" variant="ghost" onClick={() => pedirLiberarReserva(r)}>Liberar</Button> : null;
 
   const activeCountItems = activeCount?.items ?? [];
   const activeCountClosed = activeCount?.status === "CLOSED" || activeCount?.status === "CANCELLED";
@@ -1052,21 +1183,33 @@ export function VistaAlmacen({
   const recargando = loading && cargadoUnaVez;
   const abrirEntrada = () => setShowMovementForm(true);
 
-  const acciones = (
-    <div style={{ display: "flex", gap: embedded ? 6 : 8, flexWrap: "wrap" }}>
-      <Button variant="ghost" size="sm" onClick={refrescar} disabled={recargando}>
-        {recargando ? "Actualizando…" : "Actualizar"}
-      </Button>
-      {cfg.canCreate && (
-        <>
-          <Button variant="secondary" size="sm" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
-          <Button variant="primary" size="sm" onClick={abrirEntrada}>
-            {embedded ? "Entrada" : "Entrada de stock"}
-          </Button>
-        </>
-      )}
-    </div>
+  // La fila de acciones solo se pinta con encabezado propio o con varias vistas.
+  const mostrarAcciones = !embedded || vistasVisibles.length > 1;
+  const accionTerciaria = (
+    <Button variant="ghost" iconStart={<RefreshOutlined fontSize="small" />} onClick={refrescar} disabled={recargando}>
+      {recargando ? "Actualizando…" : "Actualizar"}
+    </Button>
   );
+  const accionSecundaria = cfg.canCreate ? (
+    <Button variant="secondary" iconStart={<WarehouseOutlined fontSize="small" />} onClick={() => setShowWarehouseForm(true)}>
+      Nuevo almacén
+    </Button>
+  ) : null;
+  const accionPrimaria = cfg.canCreate ? (
+    <Button variant="primary" iconStart={<AddOutlined fontSize="small" />} onClick={abrirEntrada}>
+      {embedded ? "Entrada" : "Entrada de stock"}
+    </Button>
+  ) : null;
+
+  const pestanas =
+    vistasVisibles.length > 1 ? (
+      <Tabs
+        ariaLabel="Vistas de almacén"
+        value={tab}
+        onChange={setTab}
+        items={vistasVisibles.map((t) => ({ id: t.key, label: t.label, icon: ICONO_VISTA[t.key] }))}
+      />
+    ) : null;
 
   const elegido = empaques.find((e) => String(e.id) === movement.packagingId);
   const previa = previsualizarConversion(
@@ -1077,15 +1220,21 @@ export function VistaAlmacen({
   const movimientoIncompleto =
     !movement.productId || !movement.warehouseId || movement.quantity <= 0 || (movement.type === "TRANSFER" && !movement.toWarehouseId);
 
+  const opcionesProducto = products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>);
+  const opcionesAlmacen = warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>);
+
   return (
-    <>
+    <div className={s.vista}>
       {!embedded && (
-        <PageHeader
+        <PageHead
           eyebrow="ERP · Almacén"
           title="Inventario y stock"
-          subtitle="Existencias, reorden y valuación por almacén."
-          density="ops"
-          actions={acciones}
+          description="Existencias, reorden y valuación por almacén."
+          icon={<Inventory2Outlined />}
+          tertiaryActions={accionTerciaria}
+          secondaryActions={accionSecundaria}
+          primaryAction={accionPrimaria}
+          tabs={pestanas}
         />
       )}
 
@@ -1106,28 +1255,16 @@ export function VistaAlmacen({
         }
       />}
 
-      {/* Embedded: acciones van en la misma fila que las sub-pestañas (sin barra extra bajo PageHeader). */}
-      {vistasVisibles.length > 1 ? (
-        embedded ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-              <PanelTabs
-                ariaLabel="Vistas de almacén"
-                value={tab}
-                onChange={setTab}
-                tabs={vistasVisibles.map((t) => ({ key: t.key, label: t.label }))}
-              />
-            </div>
-            {acciones}
+      {/* Embedded: las acciones van en la misma fila que las sub-pestañas (sin barra extra). */}
+      {embedded && mostrarAcciones ? (
+        <div className={s.barraVistas}>
+          <div className={s.barraPestanas}>{pestanas}</div>
+          <div className={s.barraAcciones}>
+            {accionTerciaria}
+            {accionSecundaria}
+            {accionPrimaria}
           </div>
-        ) : (
-          <PanelTabs
-            ariaLabel="Vistas de almacén"
-            value={tab}
-            onChange={setTab}
-            tabs={vistasVisibles.map((t) => ({ key: t.key, label: t.label }))}
-          />
-        )
+        </div>
       ) : null}
 
       {/* ── Nuevo almacén (disponible desde cualquier pestaña) ── */}
@@ -1145,19 +1282,21 @@ export function VistaAlmacen({
           </>
         }
       >
-        <form className={s.rejilla} onSubmit={(e) => { e.preventDefault(); void createWarehouse(); }}>
-          <Campo label="Nombre" ancho>
-            <input className={s.input} value={warehouseForm.name} onChange={(e) => setWarehouseForm((f) => ({ ...f, name: e.target.value }))} placeholder="Almacén Central, Bodega Norte…" required />
-          </Campo>
-          <Campo label="Código (opcional)">
-            <input className={s.input} value={warehouseForm.code} onChange={(e) => setWarehouseForm((f) => ({ ...f, code: e.target.value }))} placeholder="ALM-01" autoCapitalize="characters" />
-          </Campo>
-          <Campo label="Ciudad (opcional)">
-            <input className={s.input} value={warehouseForm.city} onChange={(e) => setWarehouseForm((f) => ({ ...f, city: e.target.value }))} placeholder="CDMX, Monterrey…" />
-          </Campo>
-          <Campo label="Dirección (opcional)" ancho>
-            <input className={s.input} value={warehouseForm.address} onChange={(e) => setWarehouseForm((f) => ({ ...f, address: e.target.value }))} placeholder="Av. Insurgentes 123…" />
-          </Campo>
+        <form onSubmit={(e) => { e.preventDefault(); void createWarehouse(); }}>
+          <FieldGrid>
+            <Field label="Nombre" required fullWidth>
+              <Input value={warehouseForm.name} onChange={(e) => setWarehouseForm((f) => ({ ...f, name: e.target.value }))} placeholder="Almacén Central, Bodega Norte…" required />
+            </Field>
+            <Field label="Código" optional hint="Si lo dejas vacío se arma con el nombre.">
+              <Input value={warehouseForm.code} onChange={(e) => setWarehouseForm((f) => ({ ...f, code: e.target.value }))} placeholder="ALM-01" autoCapitalize="characters" />
+            </Field>
+            <Field label="Ciudad" optional>
+              <Input value={warehouseForm.city} onChange={(e) => setWarehouseForm((f) => ({ ...f, city: e.target.value }))} placeholder="CDMX, Monterrey…" />
+            </Field>
+            <Field label="Dirección" optional fullWidth>
+              <Input value={warehouseForm.address} onChange={(e) => setWarehouseForm((f) => ({ ...f, address: e.target.value }))} placeholder="Av. Insurgentes 123…" />
+            </Field>
+          </FieldGrid>
         </form>
       </Modal>
 
@@ -1176,109 +1315,114 @@ export function VistaAlmacen({
           </>
         }
       >
-        <form className={s.rejilla} onSubmit={(e) => { e.preventDefault(); void saveMovement(); }}>
-          <Campo label="Tipo de movimiento">
-            <select
-              className={s.input}
-              value={movement.type}
-              onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as TipoMovimiento, toWarehouseId: "" }))}
-            >
-              <option value="RECEIPT">Entrada (recepción)</option>
-              <option value="DISPATCH">Salida (despacho)</option>
-              <option value="TRANSFER">Traspaso</option>
-              <option value="RETURN">Devolución</option>
-              <option value="ADJUSTMENT">Ajuste (alta)</option>
-              <option value="ADJUSTMENT_OUT">Ajuste (baja)</option>
-            </select>
-          </Campo>
-          <Campo label="Producto">
-            <select className={s.input} value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value, packagingId: "" }))}>
-              <option value="">{products.length ? "Elige el producto" : "No hay productos en el catálogo"}</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-            </select>
-          </Campo>
-          <Campo label={esEntrada ? "Almacén destino" : "Almacén origen"}>
-            <select className={s.input} value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))}>
-              <option value="">{warehouses.length ? "Elige el almacén" : "Primero crea un almacén"}</option>
-              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-          </Campo>
-          {movement.type === "TRANSFER" && (
-            <Campo label="Almacén destino">
-              <select className={s.input} value={movement.toWarehouseId} onChange={(e) => setMovement((m) => ({ ...m, toWarehouseId: e.target.value }))}>
-                <option value="">Elige el almacén</option>
-                {warehouses.filter((w) => String(w.id) !== movement.warehouseId).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </Campo>
-          )}
-          <Campo label="Cantidad">
-            <input className={`${s.input} ${s.num}`} type="number" inputMode="decimal" min={0} step="any" value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} />
-          </Campo>
-          {movement.productId && (
-            <div className={s.campo}>
-              <Campo label="Presentación">
-                <select
-                  className={s.input}
-                  value={movement.packagingId}
-                  onChange={(e) => setMovement((m) => ({ ...m, packagingId: e.target.value }))}
-                  disabled={empaques.length === 0}
-                >
-                  <option value="">Piezas</option>
-                  {empaques.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre} ({Number(e.piezasPorUnidad)} pz)
-                    </option>
-                  ))}
-                </select>
-              </Campo>
-              {previa ? <span className={s.ayuda}>{previa.texto}</span> : null}
-              {nuevoEmpaque ? (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    className={s.input}
-                    value={nuevoEmpaque.nombre}
-                    onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, nombre: e.target.value } : n))}
-                    placeholder="Caja"
-                    aria-label="Nombre de la presentación"
-                    style={{ flex: "1 1 96px", minWidth: 0, width: "auto" }}
-                  />
-                  <input
-                    className={s.input}
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="any"
-                    value={nuevoEmpaque.piezas}
-                    onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, piezas: e.target.value } : n))}
-                    placeholder="Piezas"
-                    aria-label="Piezas que trae"
-                    style={{ flex: "0 1 96px", minWidth: 0, width: "auto" }}
-                  />
-                  <Button size="sm" variant="secondary" onClick={() => void guardarEmpaque()} loading={guardandoEmpaque}>
-                    Guardar
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setNuevoEmpaque(null)}>
-                    Cancelar
-                  </Button>
-                </div>
-              ) : (
-                cfg.canCreate && (
-                  <button type="button" className={s.enlace} onClick={() => setNuevoEmpaque({ nombre: "", piezas: "" })}>
-                    {empaques.length === 0 ? "+ Registrar una presentación (caja, paquete…)" : "+ Nueva presentación"}
-                  </button>
-                )
-              )}
-            </div>
-          )}
-          <Campo label="Costo unitario (opcional)">
-            <input className={`${s.input} ${s.num}`} type="number" inputMode="decimal" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} placeholder="$0.00" />
-          </Campo>
-          <Campo label="Referencia o documento (opcional)">
-            <input className={s.input} value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, venta, ajuste inicial…" />
-          </Campo>
-          <Campo label="Motivo o notas (opcional)" ancho>
-            <input className={s.input} value={movement.notes} onChange={(e) => setMovement((m) => ({ ...m, notes: e.target.value }))} placeholder="Por qué se mueve el stock…" />
-          </Campo>
+        <form className={s.formDialogo} onSubmit={(e) => { e.preventDefault(); void saveMovement(); }}>
+          <Grupo paso={1} titulo="Qué se mueve">
+            <Field label="Tipo de movimiento" required>
+              <Select
+                value={movement.type}
+                onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as TipoMovimiento, toWarehouseId: "" }))}
+              >
+                <option value="RECEIPT">Entrada (recepción)</option>
+                <option value="DISPATCH">Salida (despacho)</option>
+                <option value="TRANSFER">Traspaso</option>
+                <option value="RETURN">Devolución</option>
+                <option value="ADJUSTMENT">Ajuste (alta)</option>
+                <option value="ADJUSTMENT_OUT">Ajuste (baja)</option>
+              </Select>
+            </Field>
+            <Field label="Producto" required>
+              <Select value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value, packagingId: "" }))}>
+                <option value="">{products.length ? "Elige el producto" : "No hay productos en el catálogo"}</option>
+                {opcionesProducto}
+              </Select>
+            </Field>
+            <Field label="Cantidad" required>
+              <Input className={s.num} type="number" inputMode="decimal" min={0} step="any" value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} />
+            </Field>
+            {movement.productId ? (
+              <div className={s.campoPresentacion}>
+                <Field label="Presentación" hint={previa ? previa.texto : undefined}>
+                  <Select
+                    value={movement.packagingId}
+                    onChange={(e) => setMovement((m) => ({ ...m, packagingId: e.target.value }))}
+                    disabled={empaques.length === 0}
+                  >
+                    <option value="">Piezas</option>
+                    {empaques.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nombre} ({Number(e.piezasPorUnidad)} pz)
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                {nuevoEmpaque ? (
+                  <div className={s.altaEmpaque}>
+                    <Input
+                      controlSize="sm"
+                      className={s.altaNombre}
+                      value={nuevoEmpaque.nombre}
+                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, nombre: e.target.value } : n))}
+                      placeholder="Caja"
+                      aria-label="Nombre de la presentación"
+                    />
+                    <Input
+                      controlSize="sm"
+                      className={s.altaPiezas}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      value={nuevoEmpaque.piezas}
+                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, piezas: e.target.value } : n))}
+                      placeholder="Piezas"
+                      aria-label="Piezas que trae"
+                    />
+                    <Button size="sm" variant="secondary" onClick={() => void guardarEmpaque()} loading={guardandoEmpaque}>
+                      Guardar
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setNuevoEmpaque(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  cfg.canCreate && (
+                    <LinkButton className={s.enlace} onClick={() => setNuevoEmpaque({ nombre: "", piezas: "" })}>
+                      {empaques.length === 0 ? "+ Registrar una presentación (caja, paquete…)" : "+ Nueva presentación"}
+                    </LinkButton>
+                  )
+                )}
+              </div>
+            ) : null}
+          </Grupo>
+
+          <Grupo paso={2} titulo="Dónde">
+            <Field label={esEntrada ? "Almacén destino" : "Almacén origen"} required>
+              <Select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))}>
+                <option value="">{warehouses.length ? "Elige el almacén" : "Primero crea un almacén"}</option>
+                {opcionesAlmacen}
+              </Select>
+            </Field>
+            {movement.type === "TRANSFER" && (
+              <Field label="Almacén destino" required>
+                <Select value={movement.toWarehouseId} onChange={(e) => setMovement((m) => ({ ...m, toWarehouseId: e.target.value }))}>
+                  <option value="">Elige el almacén</option>
+                  {warehouses.filter((w) => String(w.id) !== movement.warehouseId).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </Select>
+              </Field>
+            )}
+          </Grupo>
+
+          <Grupo paso={3} titulo="Documento">
+            <Field label="Costo unitario" optional>
+              <Input className={s.num} type="number" inputMode="decimal" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} placeholder="$0.00" />
+            </Field>
+            <Field label="Referencia o documento" optional>
+              <Input value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, venta, ajuste inicial…" />
+            </Field>
+            <Field label="Motivo o notas" optional fullWidth>
+              <Input value={movement.notes} onChange={(e) => setMovement((m) => ({ ...m, notes: e.target.value }))} placeholder="Por qué se mueve el stock…" />
+            </Field>
+          </Grupo>
         </form>
       </Modal>
 
@@ -1296,13 +1440,11 @@ export function VistaAlmacen({
         }
       >
         {editing && (
-          <form className={s.rejilla} style={{ gridTemplateColumns: "minmax(0, 1fr)" }} onSubmit={(e) => { e.preventDefault(); void saveMinimo(); }}>
-            <p className={s.nota} style={{ margin: 0 }}>
-              <strong>{editing.nombre}</strong> · {editing.ubicacion} · hoy hay {cantidad(editing.existencia)}
-            </p>
-            <Campo label="Avisar cuando queden menos de">
-              <input className={`${s.input} ${s.num}`} type="number" inputMode="numeric" min={0} value={minimo} onChange={(e) => setMinimo(+e.target.value)} autoFocus />
-            </Campo>
+          <form className={s.formDialogo} onSubmit={(e) => { e.preventDefault(); void saveMinimo(); }}>
+            <CeldaProducto nombre={editing.nombre} meta={`${editing.ubicacion} · hoy hay ${cantidad(editing.existencia)}`} foto={editing.foto} />
+            <Field label="Avisar cuando queden menos de" hint="Debajo de esta cifra el producto sale como «Bajo mínimo».">
+              <Input className={s.num} type="number" inputMode="numeric" min={0} value={minimo} onChange={(e) => setMinimo(+e.target.value)} autoFocus />
+            </Field>
           </form>
         )}
       </Modal>
@@ -1312,395 +1454,513 @@ export function VistaAlmacen({
       )}
 
       {tab === "inventario" && (
-        <>
-          <div className={s.kpis}>
-            <KpiCard label="Agotados" value={resumen.sinStock} variant={resumen.sinStock > 0 ? "danger" : "positive"} hint={resumen.sinStock > 0 ? "Hay que reponerlos ya" : "Todo tiene existencia"} />
-            <KpiCard label="Bajo mínimo" value={resumen.bajoMinimo} variant={resumen.bajoMinimo > 0 ? "warning" : "positive"} hint={resumen.bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles sanos"} />
-            <KpiCard label="Valor del inventario" value={<Money value={resumen.valorTotal} compact />} hint={`${cantidad(items.length)} registros de stock`} variant="accent" />
-            <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" />
-          </div>
-
-          {resumen.categorias.length > 0 && (
-            <div className={s.panel} style={{ padding: "10px 14px", marginBottom: 16 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Productos por categoría</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {resumen.categorias.map(([cat, count]) => (
-                  <div key={cat} style={{ display: "grid", gridTemplateColumns: "minmax(0, 130px) 1fr 36px", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={cat}>{cat}</span>
-                    <div className={s.stockBarra} style={{ height: 6 }} aria-hidden="true">
-                      <div className={s.stockRelleno} style={{ width: `${(count / items.length) * 100}%`, background: "var(--panel-accent, var(--primary))" }} />
-                    </div>
-                    <span className={s.num} style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                  </div>
-                ))}
+        <ModulePage
+          listLabel="Existencias"
+          stats={
+            cargadoUnaVez && items.length > 0 ? (
+              <StatRow ariaLabel="Resumen del inventario" cols={4}>
+                <Stat
+                  label="Agotados"
+                  value={resumen.sinStock}
+                  hint={resumen.sinStock > 0 ? "Hay que reponerlos ya" : "Todo tiene existencia"}
+                  tone={resumen.sinStock > 0 ? "danger" : "default"}
+                  icon={<ReportProblemOutlined />}
+                  iconTone={resumen.sinStock > 0 ? "danger" : "neutral"}
+                  semaforo={resumen.sinStock > 0 ? "rojo" : "verde"}
+                  onClick={() => alternarEstado("sin_stock")}
+                  pressed={filterEstado === "sin_stock"}
+                />
+                <Stat
+                  label="Bajo mínimo"
+                  value={resumen.bajoMinimo}
+                  hint={resumen.bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles sanos"}
+                  tone={resumen.bajoMinimo > 0 ? "warning" : "default"}
+                  icon={<TrendingDownOutlined />}
+                  iconTone={resumen.bajoMinimo > 0 ? "warning" : "neutral"}
+                  semaforo={resumen.bajoMinimo > 0 ? "ambar" : "verde"}
+                  onClick={() => alternarEstado("bajo_minimo")}
+                  pressed={filterEstado === "bajo_minimo"}
+                />
+                {resumen.valorTotal > 0 ? (
+                  <Stat
+                    label="Valor del inventario"
+                    value={<Money value={resumen.valorTotal} compact />}
+                    hint={`${cantidad(items.length)} registros de stock`}
+                    icon={<PaidOutlined />}
+                  />
+                ) : (
+                  <Stat label="Registros de stock" value={cantidad(items.length)} hint="Producto por almacén" icon={<Inventory2Outlined />} />
+                )}
+                <Stat label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon={<WarehouseOutlined />} iconTone="neutral" />
+              </StatRow>
+            ) : undefined
+          }
+          before={
+            productFilter || (loadError && cargadoUnaVez) || resumen.categorias.length > 0 ? (
+              <div className={s.avisos}>
+                {productFilter && (
+                  <Alert
+                    tone="info"
+                    dense
+                    action={<Button size="sm" variant="ghost" onClick={() => limpiarFiltroUrl()}>Ver todo el inventario</Button>}
+                  >
+                    Mostrando un solo producto.
+                  </Alert>
+                )}
+                {loadError && cargadoUnaVez && (
+                  <Alert
+                    tone="warning"
+                    role="alert"
+                    action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+                  >
+                    {`${loadError}. Se muestra lo último que cargó.`}
+                  </Alert>
+                )}
+                {resumen.categorias.length > 0 && (
+                  <Card pad aria-label="Productos por categoría">
+                    <p className={s.rotulo}>Productos por categoría</p>
+                    <ul className={s.categorias}>
+                      {resumen.categorias.map(([cat, count]) => (
+                        <li key={cat} className={s.categoria}>
+                          <span className={s.categoriaNombre} title={cat}>{cat}</span>
+                          <Progress value={count} max={Math.max(1, items.length)} ariaLabel={`${cat}: ${count}`} />
+                          <span className={s.tenueNum}>{count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
               </div>
-            </div>
-          )}
-
-          <FilterToolbar
-            search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por SKU, nombre o categoría…" }}
-            selects={[{
-              label: "Estado",
-              value: filterEstado,
-              onChange: setFilterEstado,
-              options: [
-                { value: "sin_stock", label: "Agotado" },
-                { value: "bajo_minimo", label: "Bajo mínimo" },
-                { value: "ok", label: "Suficiente" },
-              ],
-              allowAll: true,
-            }]}
-            onClear={() => { setSearchQ(""); setFilterEstado(""); }}
-            resultCount={cargadoUnaVez ? visibleItems.length : null}
-            rightActions={items.length > 0 ? (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
-                { key: "sku", label: "SKU" },
-                { key: "nombre", label: "Producto" },
-                { key: "categoria", label: "Categoría" },
-                { key: "existencia", label: "Existencia" },
-                { key: "minimo", label: "Mínimo" },
-                { key: "costo", label: "Costo unit." },
-                { key: "ubicacion", label: "Ubicación" },
-              ], "inventario")}>Excel</Button>
-            ) : undefined}
-          />
-
-          <Section title={cargadoUnaVez ? `Existencias · ${cantidad(visibleItems.length)}` : "Cargando existencias…"}>
-            {productFilter && (
-              <p className={s.nota}>
-                Mostrando un solo producto.{" "}
-                <button type="button" className={s.enlace} onClick={() => limpiarFiltroUrl()}>Ver todo el inventario</button>
-              </p>
-            )}
-            {loadError && (
-              <InlineAlert
-                variant={cargadoUnaVez ? "warning" : "danger"}
-                message={cargadoUnaVez ? `${loadError}. Se muestra lo último que cargó.` : loadError}
-                action={<Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>}
-              />
-            )}
-            {!cargadoUnaVez ? (
-              loadError ? null : <SkeletonRows rows={6} label="Cargando existencias" />
-            ) : (
-              <DataTable
-                columns={columns}
-                rows={visibleItems}
-                rowKey={(r) => r.id}
-                ariaLabel="Existencias"
-                emptyTitle={items.length ? "Ningún producto coincide" : "Aún no hay stock registrado"}
-                emptyDescription={
-                  items.length
-                    ? "Prueba con otra búsqueda o quita el filtro de estado."
-                    : "Crea un almacén y registra la primera entrada para empezar el inventario."
+            ) : undefined
+          }
+          toolbar={
+            <ModuleToolbar
+              search={
+                <SearchInput
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder="Buscar por SKU, nombre o categoría…"
+                  aria-label="Buscar en el inventario"
+                />
+              }
+              chips={
+                <FilterChips ariaLabel="Estado de las existencias">
+                  <FilterChip active={filterEstado === ""} count={cargadoUnaVez ? filasBuscadas.length : undefined} onClick={() => setFilterEstado("")}>
+                    Todos
+                  </FilterChip>
+                  <FilterChip active={filterEstado === "sin_stock"} count={cargadoUnaVez ? conteoEstado.agotado : undefined} dot="danger" onClick={() => alternarEstado("sin_stock")}>
+                    Agotado
+                  </FilterChip>
+                  <FilterChip active={filterEstado === "bajo_minimo"} count={cargadoUnaVez ? conteoEstado.bajo : undefined} dot="warning" onClick={() => alternarEstado("bajo_minimo")}>
+                    Bajo mínimo
+                  </FilterChip>
+                  <FilterChip active={filterEstado === "ok"} count={cargadoUnaVez ? conteoEstado.ok : undefined} dot="success" onClick={() => alternarEstado("ok")}>
+                    Suficiente
+                  </FilterChip>
+                </FilterChips>
+              }
+              end={
+                items.length > 0 ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconStart={<FileDownloadOutlined fontSize="small" />}
+                    onClick={() => exportToExcel(visibleItems, [
+                      { key: "sku", label: "SKU" },
+                      { key: "nombre", label: "Producto" },
+                      { key: "categoria", label: "Categoría" },
+                      { key: "existencia", label: "Existencia" },
+                      { key: "minimo", label: "Mínimo" },
+                      { key: "costo", label: "Costo unit." },
+                      { key: "ubicacion", label: "Ubicación" },
+                    ], "inventario")}
+                  >
+                    Excel
+                  </Button>
+                ) : undefined
+              }
+            />
+          }
+          loading={!cargadoUnaVez && !loadError}
+          empty={cargadoUnaVez ? visibleItems.length === 0 : Boolean(loadError)}
+          emptyState={
+            !cargadoUnaVez
+              ? {
+                  title: "No se pudo cargar el inventario",
+                  description: loadError,
+                  tone: "danger",
+                  action: <Button variant="secondary" onClick={() => void load()}>Reintentar</Button>,
                 }
-                emptyAction={
-                  items.length ? (
-                    <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterEstado(""); }}>Quitar filtros</Button>
-                  ) : cfg.canCreate ? (
-                    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+              : items.length
+                ? {
+                    title: "Ningún producto coincide",
+                    description: "Prueba con otra búsqueda o quita el filtro de estado.",
+                    tone: "neutral",
+                    action: <Button size="sm" variant="secondary" onClick={quitarFiltrosInventario}>Quitar filtros</Button>,
+                  }
+                : {
+                    icon: <Inventory2Outlined />,
+                    title: "Aún no hay stock registrado",
+                    description: "Crea un almacén y registra la primera entrada para empezar el inventario.",
+                    action: cfg.canCreate ? (
+                      <Button size="sm" variant="primary" iconStart={<AddOutlined fontSize="small" />} onClick={abrirEntrada}>Entrada de stock</Button>
+                    ) : undefined,
+                    secondaryAction: cfg.canCreate ? (
                       <Button size="sm" variant="secondary" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
-                      <Button size="sm" variant="primary" onClick={abrirEntrada}>Entrada de stock</Button>
-                    </div>
-                  ) : undefined
-                }
-              />
-            )}
-          </Section>
-        </>
-      )}
-
-      {tab === "movimientos" && (
-        <Section
-          title="Movimientos de inventario"
-          subtitle="Quién, cuándo, de qué almacén a cuál y cómo quedó el saldo."
-          actions={
-            cfg.canCreate ? (
-              <Button variant="primary" size="sm" iconLeft="+" onClick={abrirEntrada}>
-                Registrar
-              </Button>
+                    ) : undefined,
+                  }
+          }
+          footer={
+            cargadoUnaVez && visibleItems.length > 0 ? (
+              <ListFooter total={visibleItems.length} unit={visibleItems.length === 1 ? "producto" : "productos"} />
             ) : undefined
           }
         >
-          <div className={s.filtros} role="group" aria-label="Filtros de movimientos">
-            <select className={s.input} aria-label="Producto" value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)}>
-              <option value="">Todos los productos</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-            </select>
-            <select className={s.input} aria-label="Almacén" value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)}>
-              <option value="">Todos los almacenes</option>
-              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-            <select className={s.input} aria-label="Tipo de movimiento" value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)}>
-              <option value="">Todos los tipos</option>
-              {Object.entries(MOVEMENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <input className={s.input} type="date" aria-label="Desde" title="Desde" value={movementFromDate} onChange={(e) => setMovementFromDate(e.target.value)} />
-            <input className={s.input} type="date" aria-label="Hasta" title="Hasta" value={movementToDate} min={movementFromDate || undefined} onChange={(e) => setMovementToDate(e.target.value)} />
-            {hasMovementFilters && (
-              <Button variant="ghost" size="sm" onClick={clearMovementFilters}>Limpiar filtros</Button>
-            )}
-            <span style={{ flex: 1 }} />
-            {visibleMovements.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                iconLeft="⬇"
-                onClick={() => exportToExcel(
-                  visibleMovements.map((m) => ({
-                    folio: m.movementNumber,
-                    tipo: etiquetaMovimiento(m.type),
-                    sku: m.product?.sku ?? "",
-                    producto: m.product?.name ?? "",
-                    origen: m.fromWarehouse?.name ?? "",
-                    destino: m.toWarehouse?.name ?? "",
-                    cantidad: Number(m.quantity),
-                    saldo: stockMovementBalanceLabel(m),
-                    documento: stockMovementDocumentLabel(m),
-                    notas: m.notes ?? "",
-                    costo: Number(m.totalCost ?? 0),
-                    fecha: new Date(m.createdAt).toLocaleString("es-MX"),
-                    quien: m.createdBy?.nombre ?? "",
-                  })),
-                  [
-                    { key: "folio", label: "Folio" },
-                    { key: "tipo", label: "Tipo" },
-                    { key: "sku", label: "SKU" },
-                    { key: "producto", label: "Producto" },
-                    { key: "origen", label: "Origen" },
-                    { key: "destino", label: "Destino" },
-                    { key: "cantidad", label: "Cantidad" },
-                    { key: "saldo", label: "Saldo antes → después" },
-                    { key: "documento", label: "Documento" },
-                    { key: "notas", label: "Notas" },
-                    { key: "costo", label: "Costo" },
-                    { key: "fecha", label: "Fecha" },
-                    { key: "quien", label: "Registró" },
-                  ],
-                  "movimientos-inventario",
-                  "Movimientos de inventario",
-                )}
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(r) => r.id}
+            ariaLabel="Existencias"
+            rowActions={accionesStock}
+            rowActionsLabel="Acciones"
+          />
+        </ModulePage>
+      )}
+
+      {tab === "movimientos" && (
+        <ModulePage
+          listLabel="Movimientos de inventario"
+          before={
+            movementId ? (
+              <Alert
+                tone="info"
+                dense
+                action={<Button size="sm" variant="ghost" onClick={() => limpiarFiltroUrl("?tab=movimientos")}>Quitar resaltado</Button>}
               >
-                Excel
+                El movimiento del aviso aparece primero.
+              </Alert>
+            ) : undefined
+          }
+          toolbar={
+            <ModuleToolbar
+              end={
+                <>
+                  {visibleMovements.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconStart={<FileDownloadOutlined fontSize="small" />}
+                      onClick={() => exportToExcel(
+                        visibleMovements.map((m) => ({
+                          folio: m.movementNumber,
+                          tipo: etiquetaMovimiento(m.type),
+                          sku: m.product?.sku ?? "",
+                          producto: m.product?.name ?? "",
+                          origen: m.fromWarehouse?.name ?? "",
+                          destino: m.toWarehouse?.name ?? "",
+                          cantidad: Number(m.quantity),
+                          saldo: stockMovementBalanceLabel(m),
+                          documento: stockMovementDocumentLabel(m),
+                          notas: m.notes ?? "",
+                          costo: Number(m.totalCost ?? 0),
+                          fecha: new Date(m.createdAt).toLocaleString("es-MX"),
+                          quien: m.createdBy?.nombre ?? "",
+                        })),
+                        [
+                          { key: "folio", label: "Folio" },
+                          { key: "tipo", label: "Tipo" },
+                          { key: "sku", label: "SKU" },
+                          { key: "producto", label: "Producto" },
+                          { key: "origen", label: "Origen" },
+                          { key: "destino", label: "Destino" },
+                          { key: "cantidad", label: "Cantidad" },
+                          { key: "saldo", label: "Saldo antes → después" },
+                          { key: "documento", label: "Documento" },
+                          { key: "notas", label: "Notas" },
+                          { key: "costo", label: "Costo" },
+                          { key: "fecha", label: "Fecha" },
+                          { key: "quien", label: "Registró" },
+                        ],
+                        "movimientos-inventario",
+                        "Movimientos de inventario",
+                      )}
+                    >
+                      Excel
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    iconStart={<PictureAsPdfOutlined fontSize="small" />}
+                    onClick={() => void downloadMovementsPdf()}
+                    disabled={movementsLoading || visibleMovements.length === 0}
+                    loading={exportingPdf}
+                  >
+                    Kárdex PDF
+                  </Button>
+                  {/* Sin fila de acciones arriba, registrar vive aquí (es el único primario). */}
+                  {!mostrarAcciones && cfg.canCreate ? (
+                    <Button variant="primary" size="sm" iconStart={<AddOutlined fontSize="small" />} onClick={abrirEntrada}>
+                      Registrar
+                    </Button>
+                  ) : null}
+                </>
+              }
+            >
+              <div className={s.filtros} role="group" aria-label="Filtros de movimientos">
+                <Select controlSize="sm" wrapperClassName={s.filtroAncho} aria-label="Producto" value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)}>
+                  <option value="">Todos los productos</option>
+                  {opcionesProducto}
+                </Select>
+                <Select controlSize="sm" wrapperClassName={s.filtro} aria-label="Almacén" value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)}>
+                  <option value="">Todos los almacenes</option>
+                  {opcionesAlmacen}
+                </Select>
+                <Select controlSize="sm" wrapperClassName={s.filtro} aria-label="Tipo de movimiento" value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)}>
+                  <option value="">Todos los tipos</option>
+                  {Object.entries(MOVEMENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </Select>
+                <DateInput controlSize="sm" className={s.fechaFiltro} aria-label="Desde" title="Desde" value={movementFromDate} onChange={(e) => setMovementFromDate(e.target.value)} />
+                <DateInput controlSize="sm" className={s.fechaFiltro} aria-label="Hasta" title="Hasta" value={movementToDate} min={movementFromDate || undefined} onChange={(e) => setMovementToDate(e.target.value)} />
+                {hasMovementFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearMovementFilters}>Limpiar filtros</Button>
+                )}
+              </div>
+            </ModuleToolbar>
+          }
+          loading={movementsLoading && movements.length === 0}
+          empty={visibleMovements.length === 0}
+          emptyState={{
+            icon: <SwapHorizOutlined />,
+            title: hasMovementFilters ? "Ningún movimiento con esos filtros" : "Aún no hay movimientos",
+            description: hasMovementFilters ? "Cambia las fechas o quita algún filtro." : "Registra una entrada, salida o traspaso para ver el historial aquí.",
+            tone: hasMovementFilters ? "neutral" : "brand",
+            action: hasMovementFilters ? (
+              <Button size="sm" variant="secondary" onClick={clearMovementFilters}>Limpiar filtros</Button>
+            ) : cfg.canCreate ? (
+              <Button size="sm" variant="primary" onClick={abrirEntrada}>Registrar movimiento</Button>
+            ) : undefined,
+          }}
+          footer={visibleMovements.length > 0 ? <ListFooter total={visibleMovements.length} unit="movimientos" /> : undefined}
+        >
+          <DataTable
+            columns={movementColumns}
+            rows={visibleMovements}
+            rowKey={(m) => m.id}
+            ariaLabel="Movimientos de inventario"
+            rowActionsLabel="Comprobante"
+            rowActions={(m) => (
+              <Button
+                size="sm"
+                variant="ghost"
+                iconStart={<PictureAsPdfOutlined fontSize="small" />}
+                aria-label={`Descargar comprobante ${m.movementNumber}`}
+                onClick={(e) => { e.stopPropagation(); void downloadMovementSlip(m.id); }}
+              >
+                PDF
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void downloadMovementsPdf()}
-              disabled={movementsLoading || visibleMovements.length === 0}
-              loading={exportingPdf}
-            >
-              Kárdex PDF
-            </Button>
-          </div>
-          {movementId && (
-            <p className={s.nota}>
-              El movimiento del aviso aparece primero.{" "}
-              <button type="button" className={s.enlace} onClick={() => limpiarFiltroUrl("?tab=movimientos")}>Quitar resaltado</button>
-            </p>
-          )}
-          {movementsLoading && movements.length === 0 ? (
-            <SkeletonRows rows={6} label="Cargando movimientos" />
-          ) : (
-            <DataTable
-              columns={movementColumns}
-              rows={visibleMovements}
-              rowKey={(m) => m.id}
-              ariaLabel="Movimientos de inventario"
-              emptyTitle={hasMovementFilters ? "Ningún movimiento con esos filtros" : "Aún no hay movimientos"}
-              emptyDescription={hasMovementFilters ? "Cambia las fechas o quita algún filtro." : "Registra una entrada, salida o traspaso para ver el historial aquí."}
-              emptyAction={
-                hasMovementFilters ? (
-                  <Button size="sm" variant="secondary" onClick={clearMovementFilters}>Limpiar filtros</Button>
-                ) : cfg.canCreate ? (
-                  <Button size="sm" variant="primary" onClick={abrirEntrada}>Registrar movimiento</Button>
-                ) : undefined
-              }
-            />
-          )}
-        </Section>
+          />
+        </ModulePage>
       )}
 
       {tab === "lotes" && (
-        <Section
-          title="Lotes y caducidad"
-          subtitle="Trazabilidad por lote, con aviso cuando se acerca la fecha de caducidad."
-          actions={
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {lots.length > 0 && (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(
-                  lots.map((l) => ({
-                    lote: l.lotNumber,
-                    sku: l.product?.sku ?? "",
-                    producto: l.product?.name ?? "",
-                    fabricacion: l.manufacturingDate ? String(l.manufacturingDate).slice(0, 10) : "",
-                    caducidad: l.expirationDate ? String(l.expirationDate).slice(0, 10) : "",
-                    notas: l.notes ?? "",
-                  })),
-                  [
-                    { key: "lote", label: "Lote" },
-                    { key: "sku", label: "SKU" },
-                    { key: "producto", label: "Producto" },
-                    { key: "fabricacion", label: "Fabricación" },
-                    { key: "caducidad", label: "Caducidad" },
-                    { key: "notas", label: "Notas" },
-                  ],
-                  "lotes-inventario",
-                  "Lotes",
-                )}>Excel</Button>
-              )}
-              {cfg.canCreate ? (
-                <Button variant="primary" size="sm" iconLeft="+" onClick={abrirNuevoLote}>Nuevo lote</Button>
-              ) : null}
-            </div>
+        <ModulePage
+          listLabel="Lotes"
+          stats={
+            !lotsLoading || lots.length > 0 ? (
+              <StatRow ariaLabel="Resumen de lotes" cols={2}>
+                <Stat label="Lotes registrados" value={lots.length} icon={<Inventory2Outlined />} />
+                <Stat
+                  label="Por caducar o caducados"
+                  value={expiringLotsCount}
+                  hint="Caducan en 30 días o menos"
+                  tone={expiringLotsCount > 0 ? "warning" : "default"}
+                  icon={<EventBusyOutlined />}
+                  iconTone={expiringLotsCount > 0 ? "warning" : "neutral"}
+                  semaforo={expiringLotsCount > 0 ? "ambar" : "verde"}
+                />
+              </StatRow>
+            ) : undefined
           }
+          before={
+            showLotForm ? (
+              <form onSubmit={(e) => { e.preventDefault(); void saveLot(); }}>
+                <FormSection title="Nuevo lote" description="Trazabilidad por lote, con aviso cuando se acerca la fecha de caducidad.">
+                  <FieldGrid>
+                    <Field label="Número de lote" required>
+                      <Input value={lotForm.lotNumber} onChange={(e) => setLotForm((f) => ({ ...f, lotNumber: e.target.value }))} placeholder="LOTE-2026-001" autoFocus />
+                    </Field>
+                    <Field label="Producto" required>
+                      <Select value={lotForm.productId} onChange={(e) => setLotForm((f) => ({ ...f, productId: e.target.value }))}>
+                        <option value="">Elige el producto</option>
+                        {opcionesProducto}
+                      </Select>
+                    </Field>
+                    <Field label="Fecha de fabricación" optional>
+                      <DateInput value={lotForm.manufacturingDate} onChange={(e) => setLotForm((f) => ({ ...f, manufacturingDate: e.target.value }))} />
+                    </Field>
+                    <Field label="Fecha de caducidad" optional>
+                      <DateInput value={lotForm.expirationDate} min={lotForm.manufacturingDate || undefined} onChange={(e) => setLotForm((f) => ({ ...f, expirationDate: e.target.value }))} />
+                    </Field>
+                    <Field label="Notas" optional fullWidth>
+                      <Input value={lotForm.notes} onChange={(e) => setLotForm((f) => ({ ...f, notes: e.target.value }))} />
+                    </Field>
+                  </FieldGrid>
+                  {lotSaveErr && (
+                    <Alert tone="danger" role="alert" dense className={s.avisoForm}>
+                      {lotSaveErr}
+                    </Alert>
+                  )}
+                  <div className={s.acciones}>
+                    <Button variant="secondary" onClick={() => { setShowLotForm(false); setLotSaveErr(null); }}>Cancelar</Button>
+                    <Button type="submit" variant="primary" loading={savingLot}>Crear lote</Button>
+                  </div>
+                </FormSection>
+              </form>
+            ) : undefined
+          }
+          toolbar={
+            <ModuleToolbar
+              end={
+                <>
+                  {lots.length > 0 && (
+                    <Button variant="ghost" size="sm" iconStart={<FileDownloadOutlined fontSize="small" />} onClick={() => exportToExcel(
+                      lots.map((l) => ({
+                        lote: l.lotNumber,
+                        sku: l.product?.sku ?? "",
+                        producto: l.product?.name ?? "",
+                        fabricacion: l.manufacturingDate ? String(l.manufacturingDate).slice(0, 10) : "",
+                        caducidad: l.expirationDate ? String(l.expirationDate).slice(0, 10) : "",
+                        notas: l.notes ?? "",
+                      })),
+                      [
+                        { key: "lote", label: "Lote" },
+                        { key: "sku", label: "SKU" },
+                        { key: "producto", label: "Producto" },
+                        { key: "fabricacion", label: "Fabricación" },
+                        { key: "caducidad", label: "Caducidad" },
+                        { key: "notas", label: "Notas" },
+                      ],
+                      "lotes-inventario",
+                      "Lotes",
+                    )}>Excel</Button>
+                  )}
+                  {cfg.canCreate && !showLotForm ? (
+                    <Button variant="tonal" size="sm" iconStart={<AddOutlined fontSize="small" />} onClick={abrirNuevoLote}>Nuevo lote</Button>
+                  ) : null}
+                </>
+              }
+            >
+              <p className={s.toolbarTexto}>Trazabilidad por lote, con aviso cuando se acerca la fecha de caducidad.</p>
+            </ModuleToolbar>
+          }
+          loading={lotsLoading && lots.length === 0}
+          empty={lots.length === 0}
+          emptyState={{
+            icon: <EventBusyOutlined />,
+            title: "Aún no hay lotes",
+            description: "Registra el primer lote para rastrear fabricación y caducidad.",
+            action: cfg.canCreate && !showLotForm ? <Button size="sm" variant="tonal" onClick={abrirNuevoLote}>Nuevo lote</Button> : undefined,
+          }}
         >
-          <div className={s.kpis}>
-            <KpiCard label="Lotes registrados" value={lots.length} />
-            <KpiCard
-              label="Por caducar o caducados"
-              value={expiringLotsCount}
-              variant={expiringLotsCount > 0 ? "warning" : "positive"}
-              hint="Caducan en 30 días o menos"
-            />
-          </div>
-          {showLotForm && (
-            <form className={s.panel} onSubmit={(e) => { e.preventDefault(); void saveLot(); }}>
-              <p className={s.panelTitulo}>Nuevo lote</p>
-              <div className={s.rejilla}>
-                <Campo label="Número de lote">
-                  <input className={s.input} value={lotForm.lotNumber} onChange={(e) => setLotForm((f) => ({ ...f, lotNumber: e.target.value }))} placeholder="LOTE-2026-001" autoFocus />
-                </Campo>
-                <Campo label="Producto">
-                  <select className={s.input} value={lotForm.productId} onChange={(e) => setLotForm((f) => ({ ...f, productId: e.target.value }))}>
-                    <option value="">Elige el producto</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-                  </select>
-                </Campo>
-                <Campo label="Fecha de fabricación (opcional)">
-                  <input className={s.input} type="date" value={lotForm.manufacturingDate} onChange={(e) => setLotForm((f) => ({ ...f, manufacturingDate: e.target.value }))} />
-                </Campo>
-                <Campo label="Fecha de caducidad (opcional)">
-                  <input className={s.input} type="date" value={lotForm.expirationDate} min={lotForm.manufacturingDate || undefined} onChange={(e) => setLotForm((f) => ({ ...f, expirationDate: e.target.value }))} />
-                </Campo>
-                <Campo label="Notas (opcional)" ancho>
-                  <input className={s.input} value={lotForm.notes} onChange={(e) => setLotForm((f) => ({ ...f, notes: e.target.value }))} />
-                </Campo>
-                {lotSaveErr && <div className={s.error} role="alert">{lotSaveErr}</div>}
-              </div>
-              <div className={s.acciones}>
-                <Button variant="secondary" onClick={() => { setShowLotForm(false); setLotSaveErr(null); }}>Cancelar</Button>
-                <Button type="submit" variant="primary" loading={savingLot}>Crear lote</Button>
-              </div>
-            </form>
-          )}
-          {lotsLoading && lots.length === 0 ? (
-            <SkeletonRows rows={5} label="Cargando lotes" />
-          ) : (
-            <DataTable
-              columns={lotColumns}
-              rows={lots}
-              rowKey={(l) => l.id}
-              ariaLabel="Lotes"
-              emptyTitle="Aún no hay lotes"
-              emptyDescription="Registra el primer lote para rastrear fabricación y caducidad."
-              emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={abrirNuevoLote}>Nuevo lote</Button> : undefined}
-            />
-          )}
-        </Section>
+          <DataTable columns={lotColumns} rows={lots} rowKey={(l) => l.id} ariaLabel="Lotes" />
+        </ModulePage>
       )}
 
       {tab === "valuacion" && (
-        <Section
-          title="Valuación de inventario"
-          subtitle="Costo unitario y valor total por producto y almacén, con el método de valuación configurado."
-          actions={
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <select className={s.input} aria-label="Almacén" value={valuationWarehouseFilter} onChange={(e) => setValuationWarehouseFilter(e.target.value)} style={{ width: 200 }}>
-                <option value="">Todos los almacenes</option>
-                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-              {valuationWarehouseFilter && (
-                <Button variant="ghost" size="sm" onClick={() => setValuationWarehouseFilter("")}>Limpiar filtro</Button>
-              )}
-              {valuation.length > 0 && (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(
-                  valuation.map((v) => ({
-                    sku: v.product?.sku ?? "",
-                    producto: v.product?.name ?? "",
-                    almacen: v.warehouse?.name ?? "",
-                    cantidad: Number(v.quantity),
-                    disponible: Number(v.availableQty),
-                    costoUnit: Number(v.unitCost ?? 0),
-                    valor: v.totalValue,
-                  })),
-                  [
-                    { key: "sku", label: "SKU" },
-                    { key: "producto", label: "Producto" },
-                    { key: "almacen", label: "Almacén" },
-                    { key: "cantidad", label: "Cantidad" },
-                    { key: "disponible", label: "Disponible" },
-                    { key: "costoUnit", label: "Costo unit." },
-                    { key: "valor", label: "Valor total" },
-                  ],
-                  "valuacion-inventario",
-                  "Valuación",
-                )}>Excel</Button>
-              )}
-            </div>
+        <ModulePage
+          listLabel="Valuación"
+          stats={
+            !valuationLoading || valuation.length > 0 ? (
+              <StatRow ariaLabel="Resumen de valuación" cols={2}>
+                <Stat label="Valor total" value={<Money value={totalValuation} compact />} tone="brand" icon={<PaidOutlined />} />
+                <Stat label="Productos valuados" value={valuation.length} icon={<Inventory2Outlined />} iconTone="neutral" />
+              </StatRow>
+            ) : undefined
           }
-        >
-          <div className={s.kpis}>
-            <KpiCard label="Valor total" value={<Money value={totalValuation} compact />} variant="accent" />
-            <KpiCard label="Productos valuados" value={valuation.length} />
-          </div>
-          {valuationLoading && valuation.length === 0 ? (
-            <SkeletonRows rows={5} label="Cargando valuación" />
-          ) : (
-            <DataTable
-              columns={valuationColumns}
-              rows={valuation}
-              rowKey={(v) => v.id}
-              ariaLabel="Valuación"
-              emptyTitle="Sin datos de valuación"
-              emptyDescription="Registra stock en un almacén para calcular el valor del inventario."
-              emptyAction={
-                cfg.canCreate ? (
-                  <Button size="sm" variant="secondary" onClick={abrirEntrada}>Entrada de stock</Button>
+          toolbar={
+            <ModuleToolbar
+              end={
+                valuation.length > 0 ? (
+                  <Button variant="ghost" size="sm" iconStart={<FileDownloadOutlined fontSize="small" />} onClick={() => exportToExcel(
+                    valuation.map((v) => ({
+                      sku: v.product?.sku ?? "",
+                      producto: v.product?.name ?? "",
+                      almacen: v.warehouse?.name ?? "",
+                      cantidad: Number(v.quantity),
+                      disponible: Number(v.availableQty),
+                      costoUnit: Number(v.unitCost ?? 0),
+                      valor: v.totalValue,
+                    })),
+                    [
+                      { key: "sku", label: "SKU" },
+                      { key: "producto", label: "Producto" },
+                      { key: "almacen", label: "Almacén" },
+                      { key: "cantidad", label: "Cantidad" },
+                      { key: "disponible", label: "Disponible" },
+                      { key: "costoUnit", label: "Costo unit." },
+                      { key: "valor", label: "Valor total" },
+                    ],
+                    "valuacion-inventario",
+                    "Valuación",
+                  )}>Excel</Button>
                 ) : undefined
               }
-            />
-          )}
-        </Section>
+            >
+              <div className={s.filtros}>
+                <Select controlSize="sm" wrapperClassName={s.filtroAncho} aria-label="Almacén" value={valuationWarehouseFilter} onChange={(e) => setValuationWarehouseFilter(e.target.value)}>
+                  <option value="">Todos los almacenes</option>
+                  {opcionesAlmacen}
+                </Select>
+                {valuationWarehouseFilter && (
+                  <Button variant="ghost" size="sm" onClick={() => setValuationWarehouseFilter("")}>Limpiar filtro</Button>
+                )}
+              </div>
+              <p className={s.toolbarTexto}>Costo unitario y valor total por producto y almacén, con el método de valuación configurado.</p>
+            </ModuleToolbar>
+          }
+          loading={valuationLoading && valuation.length === 0}
+          empty={valuation.length === 0}
+          emptyState={{
+            icon: <PaidOutlined />,
+            title: "Sin datos de valuación",
+            description: "Registra stock en un almacén para calcular el valor del inventario.",
+            action: cfg.canCreate ? <Button size="sm" variant="secondary" onClick={abrirEntrada}>Entrada de stock</Button> : undefined,
+          }}
+          footer={valuation.length > 0 ? <ListFooter total={valuation.length} unit="registros" /> : undefined}
+        >
+          <DataTable columns={valuationColumns} rows={valuation} rowKey={(v) => v.id} ariaLabel="Valuación" />
+        </ModulePage>
       )}
 
       {tab === "conteos" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <Section
-            title="Conteos cíclicos"
-            subtitle="Programa un conteo físico, captura lo que encuentres y ciérralo: la diferencia se ajusta sola en el stock."
-            actions={cfg.canCreate ? (
-              <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowScheduleForm(true)}>Programar conteo</Button>
-            ) : undefined}
-          >
+        <div className={s.pila}>
+          <Card aria-label="Conteos cíclicos">
+            <CardHead
+              title="Conteos cíclicos"
+              subtitle="Programa un conteo físico, captura lo que encuentres y ciérralo: la diferencia se ajusta sola en el stock."
+              actions={cfg.canCreate && !showScheduleForm ? (
+                <Button variant="tonal" size="sm" iconStart={<AddOutlined fontSize="small" />} onClick={() => setShowScheduleForm(true)}>Programar conteo</Button>
+              ) : undefined}
+            />
             {showScheduleForm && (
-              <form className={s.panel} onSubmit={(e) => { e.preventDefault(); void submitSchedule(); }}>
-                <p className={s.panelTitulo}>Programar conteo</p>
-                <div className={s.rejilla}>
-                  <Campo label="Almacén">
-                    <select className={s.input} value={scheduleForm.warehouseId} onChange={(e) => setScheduleForm((f) => ({ ...f, warehouseId: e.target.value }))}>
+              <form className={s.subpanel} onSubmit={(e) => { e.preventDefault(); void submitSchedule(); }}>
+                <p className={s.subpanelTitulo}>Programar conteo</p>
+                <FieldGrid>
+                  <Field label="Almacén" required>
+                    <Select value={scheduleForm.warehouseId} onChange={(e) => setScheduleForm((f) => ({ ...f, warehouseId: e.target.value }))}>
                       <option value="">Elige el almacén</option>
-                      {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  </Campo>
-                  <Campo label="Fecha">
-                    <input className={s.input} type="date" value={scheduleForm.scheduledFor} onChange={(e) => setScheduleForm((f) => ({ ...f, scheduledFor: e.target.value }))} />
-                  </Campo>
-                  <Campo label="Notas (opcional)" ancho>
-                    <input className={s.input} value={scheduleForm.notes} onChange={(e) => setScheduleForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Conteo trimestral, auditoría sorpresa…" />
-                  </Campo>
-                  <span className={`${s.ayuda} ${s.ancho}`}>Se toma la existencia de hoy como punto de partida para comparar.</span>
-                </div>
+                      {opcionesAlmacen}
+                    </Select>
+                  </Field>
+                  <Field label="Fecha" required>
+                    <DateInput value={scheduleForm.scheduledFor} onChange={(e) => setScheduleForm((f) => ({ ...f, scheduledFor: e.target.value }))} />
+                  </Field>
+                  <Field label="Notas" optional fullWidth hint="Se toma la existencia de hoy como punto de partida para comparar.">
+                    <Input value={scheduleForm.notes} onChange={(e) => setScheduleForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Conteo trimestral, auditoría sorpresa…" />
+                  </Field>
+                </FieldGrid>
                 <div className={s.acciones}>
                   <Button variant="secondary" onClick={() => setShowScheduleForm(false)}>Cancelar</Button>
                   <Button type="submit" variant="primary" disabled={!scheduleForm.warehouseId || !scheduleForm.scheduledFor} loading={savingSchedule}>
@@ -1711,15 +1971,17 @@ export function VistaAlmacen({
             )}
 
             {activeCount && (
-              <div className={s.panel}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                  <p className={s.panelTitulo} style={{ margin: 0 }}>
+              <div className={s.subpanel}>
+                <div className={s.subpanelCabeza}>
+                  <p className={s.subpanelTitulo}>
                     Conteo {activeCount.countNumber} · {activeCount.warehouse?.name}{" "}
-                    <Tag variant={varianteConteo(activeCount.status)}>{CYCLE_COUNT_STATUS_LABEL[activeCount.status] ?? "Sin estado"}</Tag>
+                    <Badge tone={TONO_DE_VARIANTE[varianteConteo(activeCount.status)]} size="sm" dot>
+                      {CYCLE_COUNT_STATUS_LABEL[activeCount.status] ?? "Sin estado"}
+                    </Badge>
                   </p>
                   <Button variant="ghost" size="sm" onClick={() => setActiveCount(null)}>Cerrar panel</Button>
                 </div>
-                <div className={s.conteoFila} style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }} aria-hidden="true">
+                <div className={`${s.conteoFila} ${s.conteoCabeza}`} aria-hidden="true">
                   <span>Producto</span><span>Sistema</span><span>Contado</span><span>Diferencia</span>
                 </div>
                 <div className={s.conteoLista}>
@@ -1727,15 +1989,14 @@ export function VistaAlmacen({
                     const counted = captureQty[it.productId] ?? "";
                     const variance = counted !== "" ? Number(counted) - Number(it.expectedQty) : (it.varianceQty != null ? Number(it.varianceQty) : null);
                     const nombre = it.product?.name ?? "Producto";
+                    const signo = variance == null ? "nulo" : variance === 0 ? "cero" : variance > 0 ? "mas" : "menos";
                     return (
                       <div key={it.id} className={s.conteoFila}>
-                        <div style={{ minWidth: 0 }}>
-                          <strong>{nombre}</strong>
-                          <div className={s.productoMeta}>{it.product?.sku}</div>
-                        </div>
-                        <span className={s.num} style={{ color: "var(--text-tertiary)" }}>{cantidad(it.expectedQty)}</span>
-                        <input
-                          className={`${s.input} ${s.num}`}
+                        <NombreProducto nombre={nombre} meta={it.product?.sku} />
+                        <span className={s.tenueNum}>{cantidad(it.expectedQty)}</span>
+                        <Input
+                          controlSize="sm"
+                          className={s.num}
                           type="number"
                           inputMode="decimal"
                           disabled={activeCountClosed}
@@ -1744,7 +2005,7 @@ export function VistaAlmacen({
                           placeholder="Contado"
                           aria-label={`Cantidad contada de ${nombre}`}
                         />
-                        <span className={s.num} style={{ fontWeight: 700, color: variance == null ? "var(--text-tertiary)" : variance === 0 ? "var(--success)" : variance > 0 ? "var(--primary)" : "var(--danger)" }}>
+                        <span className={s.diferencia} data-signo={signo}>
                           {variance == null ? "—" : variance > 0 ? `+${variance}` : variance}
                         </span>
                       </div>
@@ -1761,53 +2022,59 @@ export function VistaAlmacen({
             )}
 
             {cycleCountsLoading && cycleCounts.length === 0 ? (
-              <SkeletonRows rows={4} label="Cargando conteos" />
+              <div className={s.carga}>
+                <SkeletonRows rows={4} label="Cargando conteos" />
+              </div>
             ) : (
               <DataTable
                 columns={cycleCountColumns}
                 rows={cycleCounts}
                 rowKey={(c) => c.id}
+                flush
                 ariaLabel="Conteos cíclicos"
+                rowActions={accionesConteo}
+                rowActionsLabel="Acciones"
                 emptyTitle="Sin conteos programados"
                 emptyDescription="Programa un conteo para comparar el stock físico contra el sistema."
-                emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowScheduleForm(true)}>Programar conteo</Button> : undefined}
+                emptyAction={cfg.canCreate && !showScheduleForm ? <Button size="sm" variant="tonal" onClick={() => setShowScheduleForm(true)}>Programar conteo</Button> : undefined}
               />
             )}
-          </Section>
+          </Card>
 
-          <Section
-            title="Reservas de stock"
-            subtitle="Aparta stock para una cotización u orden sin sacarlo del almacén."
-            actions={cfg.canCreate ? (
-              <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowReservationForm(true)}>Nueva reserva</Button>
-            ) : undefined}
-          >
+          <Card aria-label="Reservas de stock">
+            <CardHead
+              title="Reservas de stock"
+              subtitle="Aparta stock para una cotización u orden sin sacarlo del almacén."
+              actions={cfg.canCreate && !showReservationForm ? (
+                <Button variant="tonal" size="sm" iconStart={<AddOutlined fontSize="small" />} onClick={() => setShowReservationForm(true)}>Nueva reserva</Button>
+              ) : undefined}
+            />
             {showReservationForm && (
-              <form className={s.panel} onSubmit={(e) => { e.preventDefault(); void submitReservation(); }}>
-                <p className={s.panelTitulo}>Nueva reserva</p>
-                <div className={s.rejilla}>
-                  <Campo label="Producto">
-                    <select className={s.input} value={reservationForm.productId} onChange={(e) => setReservationForm((f) => ({ ...f, productId: e.target.value }))}>
+              <form className={s.subpanel} onSubmit={(e) => { e.preventDefault(); void submitReservation(); }}>
+                <p className={s.subpanelTitulo}>Nueva reserva</p>
+                <FieldGrid>
+                  <Field label="Producto" required>
+                    <Select value={reservationForm.productId} onChange={(e) => setReservationForm((f) => ({ ...f, productId: e.target.value }))}>
                       <option value="">Elige el producto</option>
-                      {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-                    </select>
-                  </Campo>
-                  <Campo label="Almacén">
-                    <select className={s.input} value={reservationForm.warehouseId} onChange={(e) => setReservationForm((f) => ({ ...f, warehouseId: e.target.value }))}>
+                      {opcionesProducto}
+                    </Select>
+                  </Field>
+                  <Field label="Almacén" required>
+                    <Select value={reservationForm.warehouseId} onChange={(e) => setReservationForm((f) => ({ ...f, warehouseId: e.target.value }))}>
                       <option value="">Elige el almacén</option>
-                      {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  </Campo>
-                  <Campo label="Cantidad">
-                    <input className={`${s.input} ${s.num}`} type="number" inputMode="decimal" min={1} value={reservationForm.quantity} onChange={(e) => setReservationForm((f) => ({ ...f, quantity: +e.target.value }))} />
-                  </Campo>
-                  <Campo label="Vence (opcional)">
-                    <input className={s.input} type="date" value={reservationForm.expiresAt} onChange={(e) => setReservationForm((f) => ({ ...f, expiresAt: e.target.value }))} />
-                  </Campo>
-                  <Campo label="Motivo" ancho>
-                    <input className={s.input} value={reservationForm.reason} onChange={(e) => setReservationForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Cotización COT-000123, orden de cliente…" />
-                  </Campo>
-                </div>
+                      {opcionesAlmacen}
+                    </Select>
+                  </Field>
+                  <Field label="Cantidad" required>
+                    <Input className={s.num} type="number" inputMode="decimal" min={1} value={reservationForm.quantity} onChange={(e) => setReservationForm((f) => ({ ...f, quantity: +e.target.value }))} />
+                  </Field>
+                  <Field label="Vence" optional>
+                    <DateInput value={reservationForm.expiresAt} onChange={(e) => setReservationForm((f) => ({ ...f, expiresAt: e.target.value }))} />
+                  </Field>
+                  <Field label="Motivo" required fullWidth>
+                    <Input value={reservationForm.reason} onChange={(e) => setReservationForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Cotización COT-000123, orden de cliente…" />
+                  </Field>
+                </FieldGrid>
                 <div className={s.acciones}>
                   <Button variant="secondary" onClick={() => setShowReservationForm(false)}>Cancelar</Button>
                   <Button type="submit" variant="primary" disabled={!reservationForm.productId || !reservationForm.warehouseId || !reservationForm.reason.trim()} loading={savingReservation}>
@@ -1817,19 +2084,24 @@ export function VistaAlmacen({
               </form>
             )}
             {reservationsLoading && reservations.length === 0 ? (
-              <SkeletonRows rows={4} label="Cargando reservas" />
+              <div className={s.carga}>
+                <SkeletonRows rows={4} label="Cargando reservas" />
+              </div>
             ) : (
               <DataTable
                 columns={reservationColumns}
                 rows={reservations}
                 rowKey={(r) => r.id}
+                flush
                 ariaLabel="Reservas de stock"
+                rowActions={accionesReserva}
+                rowActionsLabel="Acciones"
                 emptyTitle="Sin reservas activas"
                 emptyDescription="Reserva stock para apartarlo a una cotización u orden sin despacharlo todavía."
-                emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowReservationForm(true)}>Nueva reserva</Button> : undefined}
+                emptyAction={cfg.canCreate && !showReservationForm ? <Button size="sm" variant="tonal" onClick={() => setShowReservationForm(true)}>Nueva reserva</Button> : undefined}
               />
             )}
-          </Section>
+          </Card>
         </div>
       )}
 
@@ -1844,6 +2116,6 @@ export function VistaAlmacen({
       )}
 
       <ConfirmDialog state={confirmar} onClose={() => setConfirmar(null)} />
-    </>
+    </div>
   );
 }

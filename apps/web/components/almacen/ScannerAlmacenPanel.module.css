@@ -1,0 +1,75 @@
+/* Escáner de almacén (mostrador). Controles de 44 px; solo tokens `--ui-*`. */
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s4);
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s5);
+  min-width: 0;
+}
+
+.bloque {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.hay {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.cantidad {
+  font-variant-numeric: tabular-nums;
+}
+
+.candidatos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ui-s1);
+}
+
+.candidato {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  flex-wrap: wrap;
+  padding: var(--ui-s2) 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.candidato:last-child {
+  border-bottom: 0;
+}
+
+.candidatoTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.candidatoNombre {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.candidatoClave {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 640px) {
+  .cuerpo {
+    padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
+  }
+}

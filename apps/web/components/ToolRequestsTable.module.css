@@ -1,0 +1,110 @@
+/* Solicitudes de herramientas: cola de aprobación y lista. Solo tokens `--ui-*`. */
+
+.pila {
+  display: grid;
+  gap: var(--ui-s5);
+  min-width: 0;
+}
+
+.avisos {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3) var(--ui-s5) 0;
+}
+
+.carga {
+  padding: var(--ui-s3) var(--ui-s5) var(--ui-s4);
+}
+
+.doble {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fuerte {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tenue {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}
+
+.fecha {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.estado {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 220px;
+}
+
+.insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+}
+
+/* ─── Cola de aprobación ───────────────────────────────────────────────── */
+
+.cola {
+  list-style: none;
+  margin: 0;
+  padding: var(--ui-s2) var(--ui-s5) var(--ui-s4);
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.colaFila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px solid var(--ui-warning-border);
+  border-left: 3px solid var(--ui-warning);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-warning-bg);
+}
+
+.colaTexto {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.colaAcciones {
+  display: flex;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .cola {
+    padding: var(--ui-s2) var(--ui-s3) var(--ui-s3);
+  }
+
+  .avisos {
+    padding: var(--ui-s3) var(--ui-s4) 0;
+  }
+
+  .colaAcciones {
+    width: 100%;
+  }
+
+  .colaAcciones > * {
+    flex: 1 1 0;
+    min-height: var(--ui-control-h-touch, 44px);
+  }
+}

@@ -297,3 +297,19 @@ export function estadoHerramienta(status: string, fuera?: "kit" | "prestamo" | n
 
 /** Clase para texto monoespaciado (claves y códigos). */
 export const claseMono = s.mono;
+
+/** Variante vieja de `Tag` (`positive`, `accent`…) → tono v2 de las insignias. */
+export function tonoDeVariante(variante: string): Tone {
+  switch (variante) {
+    case "positive":
+      return "success";
+    case "accent":
+      return "brand";
+    case "warning":
+      return "warning";
+    case "danger":
+      return "danger";
+    default:
+      return "neutral";
+  }
+}

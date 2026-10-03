@@ -3,17 +3,50 @@ import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
+import AddOutlined from '@mui/icons-material/AddOutlined';
+import PrintOutlined from '@mui/icons-material/PrintOutlined';
+import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined';
+import EditOutlined from '@mui/icons-material/EditOutlined';
+import AutorenewOutlined from '@mui/icons-material/AutorenewOutlined';
+import HandymanOutlined from '@mui/icons-material/HandymanOutlined';
+import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline';
+import LocalShippingOutlined from '@mui/icons-material/LocalShippingOutlined';
+import BuildOutlined from '@mui/icons-material/BuildOutlined';
+import AutoFixHighOutlined from '@mui/icons-material/AutoFixHighOutlined';
 import { useUser } from './UserContext';
-import MetricStrip, { type Metric } from '@/components/ui/MetricStrip';
-import Section from '@/components/ui/Section';
-import Button from '@/components/ui/Button';
-import StatusDot, { type StatusTone } from '@/components/ui/StatusDot';
-import InlineAlert from '@/components/ui/InlineAlert';
-import EmptyState from '@/components/ui/EmptyState';
-import { FinanceField, FinanceFormGrid } from '@/components/finance/FinanceModuleShell';
+import {
+  Alert,
+  Button,
+  Card,
+  CardHead,
+  Checkbox,
+  DataTable,
+  EmptyState,
+  Field,
+  FieldGrid,
+  FilterChip,
+  FilterChips,
+  FormSection,
+  Input,
+  ListFooter,
+  ModuleToolbar,
+  PersonCell,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  StatusBadge,
+  type Column,
+} from '@/components/base';
+import { FotoAlmacen, claseMono, estadoHerramienta } from '@/components/almacen/PiezasAlmacen';
 import styles from './ToolInventoryPanel.module.css';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import EtiquetasHerramientaDialog from '@/components/almacen/EtiquetasHerramientaDialog';
+import { completarCodigosHerramientas } from '@/lib/almacen-api';
+import { formatApiError } from '@/lib/erp-api';
+import { PERMISSIONS, hasPermission } from '@/lib/permissions';
+import { toast } from '@/components/Toast';
 
 interface InventoryItem {
   id: number;
@@ -35,20 +68,13 @@ const STATUS_LABEL: Record<InventoryItem["status"], string> = {
   RETIRED: "Retirada",
 };
 
-/**
- * Color solo donde pide acción: una herramienta en reparación es la que
- * alguien tiene que ir a recuperar. Disponible y asignada son el día normal.
- */
-const STATUS_TONE: Record<InventoryItem["status"], StatusTone> = {
-  AVAILABLE: "neutral",
-  ASSIGNED: "neutral",
-  IN_REPAIR: "warning",
-  RETIRED: "neutral",
-};
+/** Quién tiene una herramienta fuera del almacén (de los kits y préstamos activos). */
+type Poseedor = { nombre: string; tipo: 'kit' | 'prestamo' };
+
+type FiltroEstado = 'todas' | InventoryItem['status'];
 
 const ToolInventoryPanel: React.FC = () => {
   const { user } = useUser();
-  const [isMobile, setIsMobile] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [query, setQuery] = useState('');
   const [includeRetired, setIncludeRetired] = useState(false);
@@ -91,14 +117,14 @@ const ToolInventoryPanel: React.FC = () => {
   const [seleccion, setSeleccion] = useState<number[]>([]);
   const [porEtiquetar, setPorEtiquetar] = useState<InventoryItem[] | null>(null);
 
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 900px)');
-    const sync = () => setIsMobile(mediaQuery.matches);
-    sync();
-    mediaQuery.addEventListener('change', sync);
-    return () => mediaQuery.removeEventListener('change', sync);
-  }, []);
+  // Presentación: filtro por estado, alta plegada y quién tiene cada herramienta.
+  const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstado>('todas');
+  const [altaAbierta, setAltaAbierta] = useState(false);
+  const [poseedores, setPoseedores] = useState<Map<number, Poseedor>>(() => new Map());
+  // «Completar códigos»: confirmación ligera en línea y la llamada en curso.
+  const [confirmarCodigos, setConfirmarCodigos] = useState(false);
+  const [completando, setCompletando] = useState(false);
+  const puedeCompletarCodigos = hasPermission(user, PERMISSIONS.TOOLS_MANAGE);
 
   useEffect(() => {
     return () => {
@@ -177,11 +203,45 @@ const ToolInventoryPanel: React.FC = () => {
     }
   };
 
+  /**
+   * Quién la tiene: sale de los kits y préstamos activos (la misma lista de «Kits por
+   * persona»). Es solo para enseñarlo; si no carga, la columna queda en «—».
+   */
+  const fetchPoseedores = async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(buildApiUrl('tool-requests/kits/users'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!response.ok) return;
+      const payload: unknown = await response.json();
+      const mapa = new Map<number, Poseedor>();
+      for (const fila of Array.isArray(payload) ? payload : []) {
+        const f = fila as {
+          isActive?: boolean;
+          assignmentType?: string;
+          user?: { nombre?: string } | null;
+          inventoryItem?: { id?: number } | null;
+        };
+        if (f.isActive === false || !f.inventoryItem?.id || !f.user?.nombre) continue;
+        mapa.set(f.inventoryItem.id, { nombre: f.user.nombre, tipo: f.assignmentType === 'LOAN' ? 'prestamo' : 'kit' });
+      }
+      setPoseedores(mapa);
+    } catch {
+      /* sin el dato de quién la tiene, la lista sigue igual */
+    }
+  };
+
   useEffect(() => {
     const background = items.length > 0;
     void fetchItems(background ? { background: true } : undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch al cambiar filtros; background si ya hay filas
   }, [user?.token, query, includeRetired]);
+
+  useEffect(() => {
+    void fetchPoseedores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cambia con la sesión
+  }, [user?.token]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -194,6 +254,7 @@ const ToolInventoryPanel: React.FC = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
         void fetchItems({ background: true });
+        void fetchPoseedores();
       }, 250);
     };
 
@@ -235,13 +296,24 @@ const ToolInventoryPanel: React.FC = () => {
     }
   };
 
-  const alternarSeleccion = (id: number) => {
-    setSeleccion((actual) =>
-      actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id],
-    );
+  /** Guarda el código de etiqueta a las que no lo tienen; avisa cuántas revisó y completó. */
+  const completarCodigos = async () => {
+    if (!user?.token) return;
+    setCompletando(true);
+    try {
+      const r = await completarCodigosHerramientas(user.token);
+      const errores = r.errores?.length ?? 0;
+      const texto = `Códigos: ${r.revisadas} revisadas · ${r.completadas} completadas${errores ? ` · ${errores} con error` : ''}`;
+      if (errores) toast.warning(texto);
+      else toast.success(texto);
+      setConfirmarCodigos(false);
+      await fetchItems({ background: true });
+    } catch (err) {
+      toast.error(formatApiError(err, 'No se pudieron completar los códigos'));
+    } finally {
+      setCompletando(false);
+    }
   };
-  // Solo cuentan las que siguen a la vista: un filtro no deja etiquetas «fantasma».
-  const seleccionadas = items.filter((i) => seleccion.includes(i.id));
 
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -392,19 +464,14 @@ const ToolInventoryPanel: React.FC = () => {
     inRepair: items.filter((i) => i.status === 'IN_REPAIR').length,
     retired: items.filter((i) => i.status === 'RETIRED').length,
   };
+  const enKit = items.filter((i) => i.status === 'ASSIGNED' && poseedores.get(i.id)?.tipo === 'kit').length;
+  const prestadas = items.filter((i) => i.status === 'ASSIGNED' && poseedores.get(i.id)?.tipo === 'prestamo').length;
 
-  const inventoryMetrics: Metric[] = [
-    { label: 'herramientas', value: counts.total, hint: 'dadas de alta' },
-    { label: 'disponibles', value: counts.available, hint: 'se pueden prestar' },
-    { label: 'asignadas', value: counts.assigned, hint: 'en manos de alguien' },
-    {
-      label: 'en reparación',
-      value: counts.inRepair,
-      hint: 'fuera de servicio',
-      tone: counts.inRepair > 0 ? 'warning' : 'default',
-    },
-    { label: 'retiradas', value: counts.retired, hint: 'ya no vuelven' },
-  ];
+  // El filtro por estado es de la vista; la búsqueda y «Ver retiradas» van a la API.
+  const filas = estadoFiltro === 'todas' ? items : items.filter((i) => i.status === estadoFiltro);
+  // Solo cuentan las que siguen a la vista: un filtro no deja etiquetas «fantasma».
+  const seleccionadas = filas.filter((i) => seleccion.includes(i.id));
+  const alternarFiltro = (f: FiltroEstado) => setEstadoFiltro((actual) => (actual === f ? 'todas' : f));
 
   /**
    * Una zona de soltar tiene que ser un botón de verdad: el `div` con
@@ -421,7 +488,7 @@ const ToolInventoryPanel: React.FC = () => {
     onDragLeave: () => void;
     onFile: (file: File) => void;
   }) => (
-    <div>
+    <div className={styles.zona}>
       <button
         type="button"
         onDragOver={(e) => {
@@ -438,13 +505,20 @@ const ToolInventoryPanel: React.FC = () => {
         onClick={() => opciones.inputRef.current?.click()}
         className={`${styles.dropzone} ${opciones.activa ? styles.dropzoneActive : ''}`}
       >
-        <span className={styles.dropzoneLabel}>{opciones.etiqueta}</span>
-        <span className={styles.dropzoneHint}>
-          {opciones.archivo ? opciones.archivo.name : 'Arrastra una imagen o haz clic'}
-        </span>
-        {opciones.preview && (
+        {opciones.preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={opciones.preview} alt="" className={styles.previewImage} />
+        ) : (
+          <span className={styles.dropzoneIcono} aria-hidden="true">
+            <HandymanOutlined fontSize="small" />
+          </span>
         )}
+        <span className={styles.dropzoneTexto}>
+          <span className={styles.dropzoneLabel}>{opciones.etiqueta}</span>
+          <span className={styles.dropzoneHint}>
+            {opciones.archivo ? opciones.archivo.name : 'Arrastra una imagen o haz clic'}
+          </span>
+        </span>
       </button>
       <input
         ref={opciones.inputRef}
@@ -463,279 +537,479 @@ const ToolInventoryPanel: React.FC = () => {
 
   const editandoAlgo = Boolean(editTarget || replacementTarget);
   const buscando = query.trim().length > 0;
+  // Sin herramientas no hay nada que esconder: el alta se enseña sola.
+  const mostrarAlta = altaAbierta || (!loading && items.length === 0 && !buscando);
+
+  const columnas: Column<InventoryItem>[] = [
+    {
+      key: 'herramienta',
+      label: 'Herramienta',
+      render: (item) => {
+        const panoramicSrc = resolveAssetUrl(item.panoramicPhotoUrl);
+        return (
+          <span className={styles.celdaHerramienta}>
+            <FotoAlmacen
+              src={item.panoramicPhotoUrl}
+              tipo="herramienta"
+              size={44}
+              href={panoramicSrc || null}
+              alt={`${item.toolName}, equipo completo`}
+            />
+            <span className={styles.celdaTexto}>
+              <span className={styles.nombre}>{item.toolName}</span>
+              <span className={styles.meta}>{item.model}</span>
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'serie',
+      label: 'Serie',
+      width: 190,
+      render: (item) => {
+        const serialSrc = resolveAssetUrl(item.serialPhotoUrl);
+        return (
+          <span className={styles.celdaSerie}>
+            <FotoAlmacen
+              src={item.serialPhotoUrl}
+              tipo="herramienta"
+              size={32}
+              href={serialSrc || null}
+              alt={`${item.toolName}, número de serie`}
+            />
+            <span className={styles.meta}>{item.serialNumber}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'codigo',
+      label: 'Código',
+      width: 150,
+      render: (item) => (item.codigoInterno ? <code className={claseMono}>{item.codigoInterno}</code> : <span className={styles.vacio}>—</span>),
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      width: 150,
+      render: (item) => {
+        const fuera = item.status === 'ASSIGNED' ? poseedores.get(item.id)?.tipo ?? null : null;
+        const estado = estadoHerramienta(item.status, fuera);
+        const reemplazos = item.replacements?.length ?? 0;
+        return (
+          <span className={styles.celdaEstado}>
+            <StatusBadge label={estado.etiqueta} tone={estado.tono} size="sm" dot />
+            {reemplazos > 0 && (
+              <span className={styles.meta}>
+                {reemplazos} reemplazo{reemplazos === 1 ? '' : 's'}
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'quien',
+      label: 'Quién la tiene',
+      width: 190,
+      render: (item) => {
+        const p = item.status === 'ASSIGNED' ? poseedores.get(item.id) : undefined;
+        if (p) return <PersonCell name={p.nombre} subtitle={p.tipo === 'kit' ? 'En su kit' : 'Préstamo'} size={28} />;
+        if (item.status === 'AVAILABLE') return <span className={styles.meta}>En almacén</span>;
+        return <span className={styles.vacio}>—</span>;
+      },
+    },
+  ];
+
+  const accionesFila = (item: InventoryItem) => (
+    <>
+      <Button size="sm" variant="ghost" icon title="Imprimir etiqueta" aria-label={`Imprimir etiqueta de ${item.toolName}`} onClick={() => setPorEtiquetar([item])}>
+        <PrintOutlined fontSize="small" />
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon
+        title="Etiqueta Zebra: descarga el archivo que entiende una impresora Zebra"
+        aria-label={`Etiqueta Zebra de ${item.toolName}`}
+        onClick={() => void descargarZpl(item)}
+      >
+        <FileDownloadOutlined fontSize="small" />
+      </Button>
+      <Button size="sm" variant="ghost" icon title="Editar" aria-label={`Editar ${item.toolName}`} onClick={() => startEdit(item)}>
+        <EditOutlined fontSize="small" />
+      </Button>
+      <Button size="sm" variant="ghost" icon title="Reemplazar" aria-label={`Reemplazar ${item.toolName}`} onClick={() => startReplacement(item)}>
+        <AutorenewOutlined fontSize="small" />
+      </Button>
+    </>
+  );
 
   return (
     <div className={styles.wrapper}>
       {!loading && items.length > 0 && (
-        <MetricStrip ariaLabel="Resumen de inventario" metrics={inventoryMetrics} />
+        <StatRow ariaLabel="Resumen de inventario" cols={4}>
+          <Stat
+            label="Herramientas"
+            value={counts.total}
+            hint={includeRetired && counts.retired > 0 ? `dadas de alta · ${counts.retired} retiradas` : 'dadas de alta'}
+            icon={<HandymanOutlined />}
+            onClick={() => setEstadoFiltro('todas')}
+            pressed={estadoFiltro === 'todas'}
+          />
+          <Stat
+            label="Disponibles"
+            value={counts.available}
+            hint="se pueden prestar"
+            tone={counts.available > 0 ? 'success' : 'default'}
+            icon={<CheckCircleOutline />}
+            iconTone="success"
+            onClick={() => alternarFiltro('AVAILABLE')}
+            pressed={estadoFiltro === 'AVAILABLE'}
+          />
+          <Stat
+            label="Asignadas"
+            value={counts.assigned}
+            hint={enKit + prestadas > 0 ? `${enKit} en kit · ${prestadas} prestadas` : 'en manos de alguien'}
+            icon={<LocalShippingOutlined />}
+            iconTone="info"
+            onClick={() => alternarFiltro('ASSIGNED')}
+            pressed={estadoFiltro === 'ASSIGNED'}
+          />
+          <Stat
+            label="En reparación"
+            value={counts.inRepair}
+            hint="fuera de servicio"
+            tone={counts.inRepair > 0 ? 'warning' : 'default'}
+            icon={<BuildOutlined />}
+            iconTone={counts.inRepair > 0 ? 'warning' : 'neutral'}
+            semaforo={counts.inRepair > 0 ? 'ambar' : 'verde'}
+            onClick={() => alternarFiltro('IN_REPAIR')}
+            pressed={estadoFiltro === 'IN_REPAIR'}
+          />
+        </StatRow>
       )}
 
-      <Section title="Dar de alta una herramienta" tone="muted">
-        <form onSubmit={createItem} style={{ display: 'grid', gap: 12 }}>
-          <FinanceFormGrid>
-            <FinanceField label="Herramienta">
-              <input className="input" value={toolName} onChange={(e) => setToolName(e.target.value)} />
-            </FinanceField>
-            <FinanceField label="Modelo">
-              <input className="input" value={model} onChange={(e) => setModel(e.target.value)} />
-            </FinanceField>
-            <FinanceField label="Número de serie" hint="El que trae grabado el equipo">
-              <input className="input" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
-            </FinanceField>
-          </FinanceFormGrid>
+      {mostrarAlta && (
+        <form onSubmit={createItem}>
+          <FormSection
+            title="Dar de alta una herramienta"
+            description="Nombre, modelo, serie y las dos fotos: así se reconoce al entregarla y al recibirla."
+            actions={
+              altaAbierta ? (
+                <Button size="sm" variant="ghost" onClick={() => setAltaAbierta(false)}>
+                  Ocultar
+                </Button>
+              ) : undefined
+            }
+          >
+            <div className={styles.formCuerpo}>
+              <FieldGrid columns={3}>
+                <Field label="Herramienta" required>
+                  <Input value={toolName} onChange={(e) => setToolName(e.target.value)} />
+                </Field>
+                <Field label="Modelo" required>
+                  <Input value={model} onChange={(e) => setModel(e.target.value)} />
+                </Field>
+                <Field label="Número de serie" required hint="El que trae grabado el equipo">
+                  <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
+                </Field>
+              </FieldGrid>
 
-          <div className={`${styles.fieldsGrid} ${isMobile ? styles.fieldsGridMobile : ''}`}>
-            {zonaFoto({
-              etiqueta: 'Foto del equipo completo',
-              activa: dragOverCreate === 'panoramic',
-              inputRef: createPanoramicInputRef,
-              archivo: panoramicPhotoFile,
-              preview: panoramicPhotoPreview,
-              onDragOver: () => setDragOverCreate('panoramic'),
-              onDragLeave: () =>
-                setDragOverCreate((current) => (current === 'panoramic' ? null : current)),
-              onFile: (file) => setCreateFile('panoramic', file),
-            })}
-            {zonaFoto({
-              etiqueta: 'Foto del número de serie',
-              activa: dragOverCreate === 'serial',
-              inputRef: createSerialInputRef,
-              archivo: serialPhotoFile,
-              preview: serialPhotoPreview,
-              onDragOver: () => setDragOverCreate('serial'),
-              onDragLeave: () =>
-                setDragOverCreate((current) => (current === 'serial' ? null : current)),
-              onFile: (file) => setCreateFile('serial', file),
-            })}
-          </div>
+              <div className={styles.fieldsGrid}>
+                {zonaFoto({
+                  etiqueta: 'Foto del equipo completo',
+                  activa: dragOverCreate === 'panoramic',
+                  inputRef: createPanoramicInputRef,
+                  archivo: panoramicPhotoFile,
+                  preview: panoramicPhotoPreview,
+                  onDragOver: () => setDragOverCreate('panoramic'),
+                  onDragLeave: () =>
+                    setDragOverCreate((current) => (current === 'panoramic' ? null : current)),
+                  onFile: (file) => setCreateFile('panoramic', file),
+                })}
+                {zonaFoto({
+                  etiqueta: 'Foto del número de serie',
+                  activa: dragOverCreate === 'serial',
+                  inputRef: createSerialInputRef,
+                  archivo: serialPhotoFile,
+                  preview: serialPhotoPreview,
+                  onDragOver: () => setDragOverCreate('serial'),
+                  onDragLeave: () =>
+                    setDragOverCreate((current) => (current === 'serial' ? null : current)),
+                  onFile: (file) => setCreateFile('serial', file),
+                })}
+              </div>
 
-          <details className={styles.urlDetails}>
-            <summary className={styles.urlSummary}>Las fotos ya están en la web</summary>
-            <FinanceFormGrid>
-              <FinanceField label="Dirección de la foto del equipo" optional>
-                <input
-                  className="input"
-                  value={panoramicPhotoUrl}
-                  onChange={(e) => setPanoramicPhotoUrl(e.target.value)}
-                />
-              </FinanceField>
-              <FinanceField label="Dirección de la foto de la serie" optional>
-                <input
-                  className="input"
-                  value={serialPhotoUrl}
-                  onChange={(e) => setSerialPhotoUrl(e.target.value)}
-                />
-              </FinanceField>
-            </FinanceFormGrid>
-          </details>
+              <details className={styles.urlDetails}>
+                <summary className={styles.urlSummary}>Las fotos ya están en la web</summary>
+                <FieldGrid>
+                  <Field label="Dirección de la foto del equipo" optional>
+                    <Input value={panoramicPhotoUrl} onChange={(e) => setPanoramicPhotoUrl(e.target.value)} />
+                  </Field>
+                  <Field label="Dirección de la foto de la serie" optional>
+                    <Input value={serialPhotoUrl} onChange={(e) => setSerialPhotoUrl(e.target.value)} />
+                  </Field>
+                </FieldGrid>
+              </details>
 
-          <div className={styles.formActions} style={{ justifyContent: 'flex-end' }}>
-            {/* Mientras hay una edición o un reemplazo abiertos, el primario es
-                el de esa tarea; este baja a gris para no competir. */}
-            <Button type="submit" variant={editandoAlgo ? 'secondary' : 'primary'}>
-              Agregar herramienta
-            </Button>
-          </div>
+              <div className={styles.formActions}>
+                {/* Mientras hay una edición o un reemplazo abiertos, el primario es
+                    el de esa tarea; este baja a gris para no competir. */}
+                <Button type="submit" variant={editandoAlgo ? 'secondary' : 'primary'} iconStart={<AddOutlined fontSize="small" />}>
+                  Agregar herramienta
+                </Button>
+              </div>
+            </div>
+          </FormSection>
         </form>
-      </Section>
+      )}
 
       {editTarget && (
-        <Section title={`Editar ${editTarget.toolName}`} tone="muted">
-          <form onSubmit={submitEdit} style={{ display: 'grid', gap: 12 }}>
-            <FinanceFormGrid>
-              <FinanceField label="Modelo">
-                <input className="input" value={editModel} onChange={(e) => setEditModel(e.target.value)} />
-              </FinanceField>
-              <FinanceField label="Número de serie">
-                <input className="input" value={editSerial} onChange={(e) => setEditSerial(e.target.value)} />
-              </FinanceField>
-              <FinanceField label="Dónde está" hint="«Retirada» la saca del inventario activo">
-                <select
-                  className="input"
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value as InventoryItem["status"])}
-                >
-                  {(Object.keys(STATUS_LABEL) as InventoryItem["status"][]).map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABEL[s]}
-                    </option>
-                  ))}
-                </select>
-              </FinanceField>
-            </FinanceFormGrid>
-            <div
-              className={styles.formActions}
-              style={{
-                justifyContent: 'flex-end',
-                paddingTop: 12,
-                borderTop: '1px solid var(--nx-panel-hairline, var(--border))',
-              }}
-            >
-              <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="primary" loading={editSaving}>
-                Guardar cambios
-              </Button>
+        <form onSubmit={submitEdit}>
+          <FormSection title={`Editar ${editTarget.toolName}`}>
+            <div className={styles.formCuerpo}>
+              <FieldGrid columns={3}>
+                <Field label="Modelo">
+                  <Input value={editModel} onChange={(e) => setEditModel(e.target.value)} />
+                </Field>
+                <Field label="Número de serie">
+                  <Input value={editSerial} onChange={(e) => setEditSerial(e.target.value)} />
+                </Field>
+                <Field label="Dónde está" hint="«Retirada» la saca del inventario activo">
+                  <Select value={editStatus} onChange={(e) => setEditStatus(e.target.value as InventoryItem["status"])}>
+                    {(Object.keys(STATUS_LABEL) as InventoryItem["status"][]).map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABEL[s]}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </FieldGrid>
+              <div className={`${styles.formActions} ${styles.formActionsLinea}`}>
+                <Button type="button" variant="ghost" onClick={() => setEditTarget(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary" loading={editSaving}>
+                  Guardar cambios
+                </Button>
+              </div>
             </div>
-          </form>
-        </Section>
+          </FormSection>
+        </form>
       )}
 
       {replacementTarget && (
-        <Section
-          title={`Reemplazar ${replacementTarget.toolName}`}
-          subtitle={`Se retira la serie ${replacementTarget.serialNumber} y entra una nueva en su lugar.`}
-          tone="muted"
-        >
-          <form onSubmit={submitReplacement} style={{ display: 'grid', gap: 12 }}>
-            <FinanceFormGrid>
-              <FinanceField label="Modelo que entra">
-                <input
-                  className="input"
-                  value={replacementModel}
-                  onChange={(e) => setReplacementModel(e.target.value)}
-                />
-              </FinanceField>
-              <FinanceField label="Serie que entra">
-                <input
-                  className="input"
-                  value={replacementSerialNumber}
-                  onChange={(e) => setReplacementSerialNumber(e.target.value)}
-                />
-              </FinanceField>
-              <FinanceField
-                label="Por qué se retira la anterior"
-                fullWidth
-                hint="Queda en el historial de la herramienta"
-              >
-                <input
-                  className="input"
-                  value={replacementRetiredReason}
-                  onChange={(e) => setReplacementRetiredReason(e.target.value)}
-                />
-              </FinanceField>
-            </FinanceFormGrid>
+        <form onSubmit={submitReplacement}>
+          <FormSection
+            title={`Reemplazar ${replacementTarget.toolName}`}
+            description={`Se retira la serie ${replacementTarget.serialNumber} y entra una nueva en su lugar.`}
+          >
+            <div className={styles.formCuerpo}>
+              <FieldGrid>
+                <Field label="Modelo que entra">
+                  <Input value={replacementModel} onChange={(e) => setReplacementModel(e.target.value)} />
+                </Field>
+                <Field label="Serie que entra" required>
+                  <Input value={replacementSerialNumber} onChange={(e) => setReplacementSerialNumber(e.target.value)} />
+                </Field>
+                <Field label="Por qué se retira la anterior" fullWidth hint="Queda en el historial de la herramienta">
+                  <Input value={replacementRetiredReason} onChange={(e) => setReplacementRetiredReason(e.target.value)} />
+                </Field>
+              </FieldGrid>
 
-            <div className={`${styles.fieldsGrid} ${isMobile ? styles.fieldsGridMobile : ''}`}>
-              {zonaFoto({
-                etiqueta: 'Foto del equipo que entra',
-                activa: dragOverReplace === 'panoramic',
-                inputRef: replacePanoramicInputRef,
-                archivo: replacementPanoramicPhotoFile,
-                preview: replacementPanoramicPhotoPreview,
-                onDragOver: () => setDragOverReplace('panoramic'),
-                onDragLeave: () =>
-                  setDragOverReplace((current) => (current === 'panoramic' ? null : current)),
-                onFile: (file) => setReplacementFile('panoramic', file),
-              })}
-              {zonaFoto({
-                etiqueta: 'Foto de la serie que entra',
-                activa: dragOverReplace === 'serial',
-                inputRef: replaceSerialInputRef,
-                archivo: replacementSerialPhotoFile,
-                preview: replacementSerialPhotoPreview,
-                onDragOver: () => setDragOverReplace('serial'),
-                onDragLeave: () =>
-                  setDragOverReplace((current) => (current === 'serial' ? null : current)),
-                onFile: (file) => setReplacementFile('serial', file),
-              })}
+              <div className={styles.fieldsGrid}>
+                {zonaFoto({
+                  etiqueta: 'Foto del equipo que entra',
+                  activa: dragOverReplace === 'panoramic',
+                  inputRef: replacePanoramicInputRef,
+                  archivo: replacementPanoramicPhotoFile,
+                  preview: replacementPanoramicPhotoPreview,
+                  onDragOver: () => setDragOverReplace('panoramic'),
+                  onDragLeave: () =>
+                    setDragOverReplace((current) => (current === 'panoramic' ? null : current)),
+                  onFile: (file) => setReplacementFile('panoramic', file),
+                })}
+                {zonaFoto({
+                  etiqueta: 'Foto de la serie que entra',
+                  activa: dragOverReplace === 'serial',
+                  inputRef: replaceSerialInputRef,
+                  archivo: replacementSerialPhotoFile,
+                  preview: replacementSerialPhotoPreview,
+                  onDragOver: () => setDragOverReplace('serial'),
+                  onDragLeave: () =>
+                    setDragOverReplace((current) => (current === 'serial' ? null : current)),
+                  onFile: (file) => setReplacementFile('serial', file),
+                })}
+              </div>
+
+              <details className={styles.urlDetails}>
+                <summary className={styles.urlSummary}>Las fotos ya están en la web</summary>
+                <FieldGrid>
+                  <Field label="Dirección de la foto del equipo" optional>
+                    <Input value={replacementPanoramicPhotoUrl} onChange={(e) => setReplacementPanoramicPhotoUrl(e.target.value)} />
+                  </Field>
+                  <Field label="Dirección de la foto de la serie" optional>
+                    <Input value={replacementSerialPhotoUrl} onChange={(e) => setReplacementSerialPhotoUrl(e.target.value)} />
+                  </Field>
+                </FieldGrid>
+              </details>
+
+              <div className={`${styles.formActions} ${styles.formActionsLinea}`}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setReplacementTarget(null)}
+                  disabled={replacing}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary" loading={replacing}>
+                  Guardar reemplazo
+                </Button>
+              </div>
             </div>
-
-            <details className={styles.urlDetails}>
-              <summary className={styles.urlSummary}>Las fotos ya están en la web</summary>
-              <FinanceFormGrid>
-                <FinanceField label="Dirección de la foto del equipo" optional>
-                  <input
-                    className="input"
-                    value={replacementPanoramicPhotoUrl}
-                    onChange={(e) => setReplacementPanoramicPhotoUrl(e.target.value)}
-                  />
-                </FinanceField>
-                <FinanceField label="Dirección de la foto de la serie" optional>
-                  <input
-                    className="input"
-                    value={replacementSerialPhotoUrl}
-                    onChange={(e) => setReplacementSerialPhotoUrl(e.target.value)}
-                  />
-                </FinanceField>
-              </FinanceFormGrid>
-            </details>
-
-            <div
-              className={styles.formActions}
-              style={{
-                justifyContent: 'flex-end',
-                paddingTop: 12,
-                borderTop: '1px solid var(--nx-panel-hairline, var(--border))',
-              }}
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setReplacementTarget(null)}
-                disabled={replacing}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" variant="primary" loading={replacing}>
-                Guardar reemplazo
-              </Button>
-            </div>
-          </form>
-        </Section>
+          </FormSection>
+        </form>
       )}
 
-      <Section
-        title="Herramientas dadas de alta"
-        actions={
-          <div className={styles.topBar}>
-            {items.length > 0 && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setPorEtiquetar(seleccionadas.length > 0 ? seleccionadas : items)}
-              >
-                {seleccionadas.length > 0
-                  ? `Imprimir ${seleccionadas.length} etiqueta${seleccionadas.length === 1 ? '' : 's'}`
-                  : 'Imprimir todas las etiquetas'}
-              </Button>
-            )}
-            <input
-              className={`input ${styles.searchInput} ${isMobile ? styles.searchInputMobile : ''}`}
+      <Card aria-label="Herramientas dadas de alta">
+        <CardHead
+          title="Herramientas dadas de alta"
+          subtitle="Con su foto, su código de etiqueta y quién la tiene."
+          actions={
+            <>
+              {puedeCompletarCodigos && (
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  iconStart={<AutoFixHighOutlined fontSize="small" />}
+                  onClick={() => setConfirmarCodigos(true)}
+                  disabled={confirmarCodigos || completando}
+                  title="Guarda el código de etiqueta de las herramientas que aún no lo tienen"
+                >
+                  Completar códigos
+                </Button>
+              )}
+              {filas.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  iconStart={<PrintOutlined fontSize="small" />}
+                  onClick={() => setPorEtiquetar(seleccionadas.length > 0 ? seleccionadas : filas)}
+                >
+                  {seleccionadas.length > 0
+                    ? `Imprimir ${seleccionadas.length} etiqueta${seleccionadas.length === 1 ? '' : 's'}`
+                    : 'Imprimir todas las etiquetas'}
+                </Button>
+              )}
+              {!mostrarAlta && (
+                <Button
+                  size="sm"
+                  variant={editandoAlgo ? 'secondary' : 'primary'}
+                  iconStart={<AddOutlined fontSize="small" />}
+                  onClick={() => setAltaAbierta(true)}
+                >
+                  Nueva herramienta
+                </Button>
+              )}
+            </>
+          }
+        />
+
+        {confirmarCodigos && (
+          <div className={styles.aviso}>
+            <Alert
+              tone="info"
+              title="¿Completar los códigos de etiqueta?"
+              action={
+                <span className={styles.avisoAcciones}>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmarCodigos(false)} disabled={completando}>
+                    Cancelar
+                  </Button>
+                  <Button size="sm" variant="tonal" loading={completando} onClick={() => void completarCodigos()}>
+                    Completar
+                  </Button>
+                </span>
+              }
+            >
+              Se guarda el código a las herramientas que se dieron de alta sin él. Las que ya tienen código no cambian.
+            </Alert>
+          </div>
+        )}
+
+        <ModuleToolbar
+          search={
+            <SearchInput
               placeholder="Buscar por herramienta, modelo, serie o código"
               aria-label="Buscar por herramienta, modelo, serie o código"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <label className={styles.checkboxLabel}>
-              <input type="checkbox" checked={includeRetired} onChange={(e) => setIncludeRetired(e.target.checked)} />
-              Ver retiradas
-            </label>
-          </div>
-        }
-      >
+          }
+          chips={
+            items.length > 0 ? (
+              <FilterChips ariaLabel="Estado de las herramientas">
+                <FilterChip active={estadoFiltro === 'todas'} count={counts.total} onClick={() => setEstadoFiltro('todas')}>
+                  Todas
+                </FilterChip>
+                <FilterChip active={estadoFiltro === 'AVAILABLE'} count={counts.available} dot="success" onClick={() => alternarFiltro('AVAILABLE')}>
+                  Disponibles
+                </FilterChip>
+                <FilterChip active={estadoFiltro === 'ASSIGNED'} count={counts.assigned} dot="info" onClick={() => alternarFiltro('ASSIGNED')}>
+                  Asignadas
+                </FilterChip>
+                <FilterChip active={estadoFiltro === 'IN_REPAIR'} count={counts.inRepair} dot="warning" onClick={() => alternarFiltro('IN_REPAIR')}>
+                  En reparación
+                </FilterChip>
+                {includeRetired && (
+                  <FilterChip active={estadoFiltro === 'RETIRED'} count={counts.retired} dot="neutral" onClick={() => alternarFiltro('RETIRED')}>
+                    Retiradas
+                  </FilterChip>
+                )}
+              </FilterChips>
+            ) : undefined
+          }
+          end={
+            <Checkbox
+              label="Ver retiradas"
+              checked={includeRetired}
+              onChange={(e) => {
+                setIncludeRetired(e.target.checked);
+                if (!e.target.checked && estadoFiltro === 'RETIRED') setEstadoFiltro('todas');
+              }}
+            />
+          }
+        />
+
         {error && (
-          <div style={{ marginBottom: 12 }}>
-            <InlineAlert
-              variant="danger"
-              message={error}
+          <div className={styles.aviso}>
+            <Alert
+              tone="danger"
+              role="alert"
               action={
                 <Button size="sm" variant="secondary" onClick={() => void fetchItems()}>
                   Reintentar
                 </Button>
               }
-            />
+            >
+              {error}
+            </Alert>
           </div>
         )}
+
         {loading && items.length === 0 ? (
-          <p role="status" className={styles.centerLoading}>Cargando…</p>
+          <div className={styles.carga}>
+            <SkeletonRows rows={5} label="Cargando herramientas" />
+          </div>
         ) : items.length === 0 ? (
           // «No hay nada» y «el filtro no encuentra nada» no son lo mismo:
           // el primero pide dar de alta, el segundo pide cambiar la búsqueda.
           buscando ? (
             <EmptyState
-              variant="compact"
+              size="compact"
+              tone="neutral"
               title={`Ninguna herramienta coincide con «${query.trim()}»`}
               description="Se busca por nombre, modelo, número de serie y código de la etiqueta. Prueba con una parte del texto."
               action={
@@ -746,90 +1020,53 @@ const ToolInventoryPanel: React.FC = () => {
             />
           ) : includeRetired ? (
             <EmptyState
-              variant="compact"
+              size="compact"
+              icon={<HandymanOutlined />}
               title="Todavía no hay ninguna herramienta"
               description="Da de alta la primera arriba: nombre, modelo, serie y las dos fotos."
             />
           ) : (
             <EmptyState
-              variant="compact"
+              size="compact"
+              icon={<HandymanOutlined />}
               title="Ninguna herramienta activa"
               description="Puede que todas estén retiradas. Marca «Ver retiradas» para comprobarlo, o da una de alta arriba."
             />
           )
+        ) : filas.length === 0 ? (
+          <EmptyState
+            size="compact"
+            tone="neutral"
+            title="Ninguna herramienta en ese estado"
+            action={
+              <Button size="sm" variant="secondary" onClick={() => setEstadoFiltro('todas')}>
+                Ver todas
+              </Button>
+            }
+          />
         ) : (
-          <div className={styles.gallery}>
-            {items.map((item) => {
-              const panoramicSrc = resolveAssetUrl(item.panoramicPhotoUrl);
-              const serialSrc = resolveAssetUrl(item.serialPhotoUrl);
-              return (
-              <article key={item.id} className={styles.galleryCard}>
-                <div className={styles.photoRow}>
-                  <a href={panoramicSrc || undefined} target="_blank" rel="noreferrer" className={styles.photoLink}>
-                    {panoramicSrc ? (
-                      <img src={panoramicSrc} alt={`${item.toolName}, equipo completo`} className={styles.galleryPhoto} />
-                    ) : (
-                      <div className={styles.photoPlaceholder}>Sin foto del equipo</div>
-                    )}
-                  </a>
-                  <a href={serialSrc || undefined} target="_blank" rel="noreferrer" className={styles.photoLink}>
-                    {serialSrc ? (
-                      <img src={serialSrc} alt={`${item.toolName}, número de serie`} className={styles.galleryPhoto} />
-                    ) : (
-                      <div className={styles.photoPlaceholder}>Sin foto de la serie</div>
-                    )}
-                  </a>
-                </div>
-                <div className={styles.galleryBody}>
-                  <div className={styles.galleryTitle}>{item.toolName}</div>
-                  <div className={styles.galleryMeta}>
-                    {item.model} · Serie {item.serialNumber}
-                    {item.codigoInterno ? ` · Código ${item.codigoInterno}` : ''}
-                  </div>
-                  <div className={styles.statusRow}>
-                    <StatusDot tone={STATUS_TONE[item.status]} label={STATUS_LABEL[item.status]} />
-                    {(item.replacements?.length ?? 0) > 0 && (
-                      <span className={styles.galleryMeta}>
-                        {item.replacements?.length} reemplazo
-                        {item.replacements?.length === 1 ? '' : 's'}
-                      </span>
-                    )}
-                  </div>
-                  <label className={styles.checkboxLabel}>
-                    <input
-                      type="checkbox"
-                      checked={seleccion.includes(item.id)}
-                      onChange={() => alternarSeleccion(item.id)}
-                    />
-                    Imprimir con otras
-                  </label>
-                  <div className={styles.galleryActions}>
-                    <Button size="sm" variant="secondary" fullWidth onClick={() => setPorEtiquetar([item])}>
-                      Imprimir etiqueta
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      fullWidth
-                      title="Descarga el archivo que entiende una impresora Zebra"
-                      onClick={() => void descargarZpl(item)}
-                    >
-                      Etiqueta Zebra
-                    </Button>
-                    <Button size="sm" variant="secondary" fullWidth onClick={() => startEdit(item)}>
-                      Editar
-                    </Button>
-                    <Button size="sm" variant="secondary" fullWidth onClick={() => startReplacement(item)}>
-                      Reemplazar
-                    </Button>
-                  </div>
-                </div>
-              </article>
-              );
-            })}
-          </div>
+          <DataTable
+            columns={columnas}
+            rows={filas}
+            rowKey={(item) => item.id}
+            flush
+            ariaLabel="Herramientas dadas de alta"
+            rowActions={accionesFila}
+            rowActionsLabel="Acciones"
+            selectable
+            selectedKeys={seleccion}
+            onSelectionChange={(keys) => setSeleccion(keys.map((k) => Number(k)))}
+            selectRowLabel={(item) => `Imprimir con otras: ${item.toolName}`}
+            selectionBar={({ count }) => (
+              <Button size="sm" variant="ghost" iconStart={<PrintOutlined fontSize="small" />} onClick={() => setPorEtiquetar(seleccionadas)}>
+                {`Imprimir ${count} etiqueta${count === 1 ? '' : 's'}`}
+              </Button>
+            )}
+          />
         )}
-      </Section>
+
+        {filas.length > 0 && <ListFooter total={filas.length} unit={filas.length === 1 ? 'herramienta' : 'herramientas'} />}
+      </Card>
 
       <EtiquetasHerramientaDialog herramientas={porEtiquetar} onClose={() => setPorEtiquetar(null)} />
     </div>

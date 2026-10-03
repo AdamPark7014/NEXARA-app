@@ -2,8 +2,36 @@
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import BackpackOutlined from '@mui/icons-material/BackpackOutlined';
+import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
+import AutorenewOutlined from '@mui/icons-material/AutorenewOutlined';
+import ReportProblemOutlined from '@mui/icons-material/ReportProblemOutlined';
+import QrCodeScannerOutlined from '@mui/icons-material/QrCodeScannerOutlined';
+import PrintOutlined from '@mui/icons-material/PrintOutlined';
 import { useUser } from './UserContext';
-import KpiCard from './ui/KpiCard';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  EmptyState,
+  Field,
+  FieldGrid,
+  FormSection,
+  Input,
+  PersonCell,
+  Segmented,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  StatusBadge,
+  Textarea,
+  type StatMeterSegment,
+  type Tone,
+} from './base';
+import { FotoAlmacen, claseMono } from './almacen/PiezasAlmacen';
 import styles from './ToolUserKitPanel.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
@@ -54,9 +82,15 @@ interface UserKitRow {
   }[];
 }
 
+/** Cómo se resolvió un incidente del kit: los mismos textos de las opciones. */
+const RESOLUCION: Record<string, { etiqueta: string; tono: Tone }> = {
+  PENDING: { etiqueta: 'Pendiente', tono: 'warning' },
+  USER_MISUSE: { etiqueta: 'Mal uso del usuario', tono: 'danger' },
+  EQUIPMENT_FAILURE: { etiqueta: 'Falla de equipo', tono: 'info' },
+};
+
 const ToolUserKitPanel: React.FC = () => {
   const { user } = useUser();
-  const [isMobile, setIsMobile] = useState(false);
   const [rows, setRows] = useState<UserKitRow[]>([]);
   const [users, setUsers] = useState<AssignableUser[]>([]);
   const [inventoryQuery, setInventoryQuery] = useState('');
@@ -76,14 +110,6 @@ const ToolUserKitPanel: React.FC = () => {
   const [etiquetas, setEtiquetas] = useState<{ de: string; herramientas: HerramientaEtiquetable[] } | null>(null);
   const [avisoLector, setAvisoLector] = useState<string | null>(null);
 
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 900px)');
-    const sync = () => setIsMobile(mediaQuery.matches);
-    sync();
-    mediaQuery.addEventListener('change', sync);
-    return () => mediaQuery.removeEventListener('change', sync);
-  }, []);
 
   const fetchRows = useCallback(async () => {
     if (!user?.token) return;
@@ -344,256 +370,306 @@ const ToolUserKitPanel: React.FC = () => {
     loans: rows.filter((r) => r.isActive && r.assignmentType === 'LOAN').length,
     pendingEvents,
   };
+  const kitsActivos = rows.filter((r) => r.isActive && r.assignmentType === 'KIT').length;
+  const cerradas = rows.filter((r) => !r.isActive).length;
 
   return (
     <div className={styles.root}>
-      {!loading && rows.length > 0 && (() => {
-        const kits = rows.filter(r => r.isActive && r.assignmentType === 'KIT').length;
-        const loans = rows.filter(r => r.isActive && r.assignmentType === 'LOAN').length;
-        const inactive = rows.filter(r => !r.isActive).length;
-        const total = rows.length;
-        return (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
-              <KpiCard label="Asignaciones activas" value={kitCounts.activeAssignments} icon="🧰" />
-              <KpiCard label="Usuarios con kit" value={kitCounts.usersWithKit} icon="👥" variant="accent" />
-              <KpiCard label="Préstamos activos" value={kitCounts.loans} icon="🔁" />
-              <KpiCard label="Incidentes pendientes" value={kitCounts.pendingEvents} icon="⚠️" variant={kitCounts.pendingEvents > 0 ? "danger" : "positive"} />
-            </div>
-            <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por tipo</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {([
-                  { label: "Kit base", count: kits, color: "var(--primary)" },
-                  { label: "Préstamos", count: loans, color: "var(--warning)" },
-                  { label: "Cerradas", count: inactive, color: "var(--text-tertiary)" },
-                ] as { label: string; count: number; color: string }[]).filter(r => r.count > 0).map(r => (
-                  <div key={r.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                    <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                    </div>
-                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-                  </div>
-                ))}
+      {!loading && rows.length > 0 && (
+        <StatRow ariaLabel="Resumen de kits" cols={4}>
+          <Stat
+            label="Asignaciones activas"
+            value={kitCounts.activeAssignments}
+            icon={<BackpackOutlined />}
+            meter={[
+              { value: kitsActivos, tone: 'brand', label: 'Kit base' },
+              { value: kitCounts.loans, tone: 'warning', label: 'Préstamos' },
+              { value: cerradas, tone: 'neutral', label: 'Cerradas' },
+            ].filter((m) => m.value > 0) as StatMeterSegment[]}
+            meterMax={rows.length}
+          />
+          <Stat label="Usuarios con kit" value={kitCounts.usersWithKit} icon={<GroupsOutlined />} iconTone="info" />
+          <Stat label="Préstamos activos" value={kitCounts.loans} icon={<AutorenewOutlined />} iconTone="warning" />
+          <Stat
+            label="Incidentes pendientes"
+            value={kitCounts.pendingEvents}
+            tone={kitCounts.pendingEvents > 0 ? 'danger' : 'success'}
+            icon={<ReportProblemOutlined />}
+            iconTone={kitCounts.pendingEvents > 0 ? 'danger' : 'success'}
+            semaforo={kitCounts.pendingEvents > 0 ? 'rojo' : 'verde'}
+          />
+        </StatRow>
+      )}
+
+      <form onSubmit={assign}>
+        <FormSection
+          title="Gestión de herramientas por usuario"
+          description="Escanea la etiqueta (o busca la herramienta), elige a la persona y si es su kit base o un préstamo."
+        >
+          <div className={styles.formGrid}>
+            <Field label="Herramienta" required>
+              <div className={styles.searchWrap}>
+                <Input
+                  // Campo del lector: escanear la etiqueta con el foco aquí elige la
+                  // herramienta, en vez de enviar el formulario con el Enter del lector.
+                  {...{ [ATRIBUTO_CAMPO_LECTOR]: '' }}
+                  iconStart={<QrCodeScannerOutlined fontSize="small" />}
+                  value={inventoryQuery}
+                  onChange={(e) => {
+                    setInventoryQuery(e.target.value);
+                    if (selectedInventory) setSelectedInventory(null);
+                  }}
+                  placeholder="Escanea la etiqueta o busca la herramienta"
+                  aria-label="Escanea la etiqueta o busca la herramienta"
+                  valid={Boolean(selectedInventory)}
+                />
+                {!selectedInventory && inventoryOptions.length > 0 && (
+                  <ul className={styles.suggestionBox} aria-label="Herramientas que coinciden">
+                    {inventoryOptions.map((option) => (
+                      <li key={option.id}>
+                        <Button
+                          variant="ghost"
+                          fullWidth
+                          className={styles.suggestionItem}
+                          iconStart={<FotoAlmacen src={option.panoramicPhotoUrl} tipo="herramienta" size={28} />}
+                          onClick={() => {
+                            setSelectedInventory(option);
+                            setInventoryQuery(`${option.toolName} · ${option.model} · ${option.serialNumber}`);
+                            setInventoryOptions([]);
+                          }}
+                        >
+                          {option.toolName} · {option.model} · {option.serialNumber}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            </div>
-          </>
-        );
-      })()}
+            </Field>
 
-      <form className={`card ${styles.formCard}`} onSubmit={assign}>
-        <h3 className={styles.title}>👥 Gestión de Herramientas por Usuario</h3>
-
-        <div className={`${styles.formGrid} ${isMobile ? styles.formGridMobile : ''}`}>
-          <div className={styles.searchWrap}>
-            <input
-              className="input"
-              // Campo del lector: escanear la etiqueta con el foco aquí elige la
-              // herramienta, en vez de enviar el formulario con el Enter del lector.
-              {...{ [ATRIBUTO_CAMPO_LECTOR]: '' }}
-              value={inventoryQuery}
-              onChange={(e) => {
-                setInventoryQuery(e.target.value);
-                if (selectedInventory) setSelectedInventory(null);
-              }}
-              placeholder="Escanea la etiqueta o busca la herramienta"
-              aria-label="Escanea la etiqueta o busca la herramienta"
-            />
-            {!selectedInventory && inventoryOptions.length > 0 && (
-              <div className={styles.suggestionBox}>
-                {inventoryOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedInventory(option);
-                      setInventoryQuery(`${option.toolName} · ${option.model} · ${option.serialNumber}`);
-                      setInventoryOptions([]);
-                    }}
-                    className={styles.suggestionItem}
-                  >
-                    {option.toolName} · {option.model} · {option.serialNumber}
-                  </button>
+            <Field label="Persona" required>
+              <Select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
+                <option value="">Selecciona ingeniero</option>
+                {users.map((target) => (
+                  <option key={target.id} value={target.id}>{target.nombre} · {target.email}</option>
                 ))}
-              </div>
-            )}
+              </Select>
+            </Field>
+
+            <Field label="Tipo">
+              <Segmented
+                ariaLabel="Tipo de asignación"
+                value={assignmentType}
+                onChange={setAssignmentType}
+                items={[
+                  { id: 'KIT', label: 'Kit Base' },
+                  { id: 'LOAN', label: 'Préstamo' },
+                ]}
+              />
+            </Field>
+
+            <div className={styles.asignar}>
+              <Button type="submit" variant="primary" disabled={!selectedInventory || !selectedUserId}>
+                Asignar
+              </Button>
+            </div>
           </div>
-
-          <select className="input" value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
-            <option value="">Selecciona ingeniero</option>
-            {users.map((target) => (
-              <option key={target.id} value={target.id}>{target.nombre} · {target.email}</option>
-            ))}
-          </select>
-
-          <select className="input" value={assignmentType} onChange={(e) => setAssignmentType(e.target.value as 'KIT' | 'LOAN')}>
-            <option value="KIT">Kit Base</option>
-            <option value="LOAN">Préstamo</option>
-          </select>
-
-          <button className="button-primary" type="submit">Asignar</button>
-        </div>
-        {avisoLector && (
-          <div className={styles.error} role="alert">
-            {avisoLector}
-          </div>
-        )}
+          {avisoLector && (
+            <Alert tone="warning" role="alert" onDismiss={() => setAvisoLector(null)} className={styles.avisoLector}>
+              {avisoLector}
+            </Alert>
+          )}
+        </FormSection>
       </form>
 
-      <div className={`card ${styles.listCard}`}>
-        <div className={styles.filterRow}>
-          <select className="input" value={filterUserId} onChange={(e) => setFilterUserId(e.target.value)}>
-            <option value="">Filtrar: todos los usuarios</option>
-            {users.map((target) => (
-              <option key={target.id} value={target.id}>{target.nombre}</option>
-            ))}
-          </select>
-        </div>
+      <Card aria-label="Kits por persona">
+        <CardHead
+          title="Kits por persona"
+          subtitle="Lo que tiene asignado cada quien, sus fotos y los incidentes por resolver."
+          actions={
+            <Select
+              controlSize="sm"
+              wrapperClassName={styles.filtroUsuario}
+              aria-label="Filtrar por usuario"
+              value={filterUserId}
+              onChange={(e) => setFilterUserId(e.target.value)}
+            >
+              <option value="">Filtrar: todos los usuarios</option>
+              {users.map((target) => (
+                <option key={target.id} value={target.id}>{target.nombre}</option>
+              ))}
+            </Select>
+          }
+        />
 
-        {error && <div className={styles.error}>{error}</div>}
-        {loading ? (
-          <div className={styles.loading}>Cargando asignaciones...</div>
-        ) : groupedByUser.length === 0 ? (
-          <div className={styles.empty}>
-            No hay asignaciones registradas
+        {error && (
+          <div className={styles.aviso}>
+            <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
+              {error}
+            </Alert>
           </div>
-        ) : (
-          groupedByUser.map((group) => (
-            <div key={group.user.id} className={styles.userGroup}>
-              <div className={styles.userName}>{group.user.nombre}</div>
-              <div className={styles.userEmail}>{group.user.email}</div>
-              {group.rows.some((row) => row.isActive) && (
-                <div style={{ marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className={`button-secondary ${styles.smallBtn}`}
-                    onClick={() =>
-                      setEtiquetas({
-                        de: group.user.nombre,
-                        herramientas: group.rows.filter((row) => row.isActive).map((row) => row.inventoryItem),
-                      })
-                    }
-                  >
-                    Imprimir etiquetas del kit
-                  </button>
-                </div>
-              )}
-
-              <div className={styles.rowsList}>
-                {group.rows.map((row) => {
-                  const panoramicSrc = row.inventoryItem.panoramicPhotoUrl
-                    ? resolveAssetUrl(row.inventoryItem.panoramicPhotoUrl)
-                    : '';
-                  const serialSrc = row.inventoryItem.serialPhotoUrl
-                    ? resolveAssetUrl(row.inventoryItem.serialPhotoUrl)
-                    : '';
-
-                  return (
-                  <div key={row.id} className={styles.rowCard}>
-                    <div className={styles.rowTitle}>
-                      {row.inventoryItem.toolName} · {row.inventoryItem.model} · {row.inventoryItem.serialNumber}
-                    </div>
-                    <div className={styles.rowMeta}>
-                      {row.assignmentType === 'KIT' ? 'Kit base' : 'Préstamo'} · Reemplazos: {row.replacementCount} · {row.isActive ? 'Activa' : 'Cerrada'}
-                    </div>
-
-                    {(panoramicSrc || serialSrc) && (
-                      <div className={styles.photoGrid}>
-                        {panoramicSrc && (
-                          <div className={styles.photoBlock}>
-                            <div className={styles.photoLabel}>Panorámica</div>
-                            <img src={panoramicSrc} alt="" className={styles.photoImage} />
-                          </div>
-                        )}
-                        {serialSrc && (
-                          <div className={styles.photoBlock}>
-                            <div className={styles.photoLabel}>Serie</div>
-                            <img src={serialSrc} alt="" className={styles.photoImage} />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {row.events && row.events.length > 0 && (
-                      <div className={styles.eventsList}>
-                        {row.events.slice(0, 3).map((event) => (
-                          <div key={event.id} className={styles.eventCard}>
-                            <div className={styles.eventMeta}>
-                              {new Date(event.reportedAt).toLocaleDateString('es-MX')} · {event.resolution}
-                            </div>
-                            <div className={styles.eventDesc}>{event.description}</div>
-                            {event.resolution === 'PENDING' && (
-                              <div className={styles.resolveWrap}>
-                                {resolvingEventId !== event.id ? (
-                                  <button
-                                    className={`button-secondary ${styles.smallBtn}`}
-                                    onClick={() => openResolveForm(event.id)}
-                                  >
-                                    Resolver incidente
-                                  </button>
-                                ) : (
-                                  <div className={styles.resolveForm}>
-                                    <select
-                                      className="input"
-                                      value={resolutionType}
-                                      onChange={(e) => setResolutionType(e.target.value as 'USER_MISUSE' | 'EQUIPMENT_FAILURE')}
-                                    >
-                                      <option value="EQUIPMENT_FAILURE">Falla de equipo (reemplazo / reparación)</option>
-                                      <option value="USER_MISUSE">Mal uso del usuario (genera multa)</option>
-                                    </select>
-
-                                    {resolutionType === 'USER_MISUSE' && (
-                                      <input
-                                        className="input"
-                                        type="number"
-                                        min="1"
-                                        step="0.01"
-                                        value={resolutionFineAmount}
-                                        onChange={(e) => setResolutionFineAmount(e.target.value)}
-                                        placeholder="Monto de multa"
-                                      />
-                                    )}
-
-                                    <textarea
-                                      className={`input ${styles.notes}`}
-                                      value={resolutionNotes}
-                                      onChange={(e) => setResolutionNotes(e.target.value)}
-                                      placeholder="Notas de resolución (opcional)"
-                                    />
-
-                                    <div className={styles.resolveActions}>
-                                      <button
-                                        className={`button-primary ${styles.smallBtnSecondary}`}
-                                        onClick={() => resolveEvent(event.id)}
-                                        disabled={resolvingSubmit}
-                                      >
-                                        {resolvingSubmit ? 'Resolviendo...' : 'Guardar resolución'}
-                                      </button>
-                                      <button
-                                        className={`button-secondary ${styles.smallBtnSecondary}`}
-                                        onClick={cancelResolveForm}
-                                        disabled={resolvingSubmit}
-                                      >
-                                        Cancelar
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))
         )}
-      </div>
+        {loading ? (
+          <div className={styles.cuerpo}>
+            <SkeletonRows rows={4} label="Cargando asignaciones" />
+          </div>
+        ) : groupedByUser.length === 0 ? (
+          <EmptyState size="compact" icon={<BackpackOutlined />} title="No hay asignaciones registradas" />
+        ) : (
+          <div className={styles.cuerpo}>
+            {groupedByUser.map((group) => {
+              const activas = group.rows.filter((row) => row.isActive);
+              return (
+                <section key={group.user.id} className={styles.userGroup} aria-label={`Kit de ${group.user.nombre}`}>
+                  <header className={styles.userHead}>
+                    <PersonCell name={group.user.nombre} subtitle={group.user.email} size={36} />
+                    <span className={styles.userHeadEnd}>
+                      <Badge tone="neutral" size="sm">
+                        {activas.length} activa{activas.length === 1 ? '' : 's'}
+                      </Badge>
+                      {activas.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          iconStart={<PrintOutlined fontSize="small" />}
+                          onClick={() =>
+                            setEtiquetas({
+                              de: group.user.nombre,
+                              herramientas: activas.map((row) => row.inventoryItem),
+                            })
+                          }
+                        >
+                          Imprimir etiquetas del kit
+                        </Button>
+                      )}
+                    </span>
+                  </header>
+
+                  <ul className={styles.rowsList}>
+                    {group.rows.map((row) => {
+                      const panoramicSrc = row.inventoryItem.panoramicPhotoUrl
+                        ? resolveAssetUrl(row.inventoryItem.panoramicPhotoUrl)
+                        : '';
+                      const serialSrc = row.inventoryItem.serialPhotoUrl
+                        ? resolveAssetUrl(row.inventoryItem.serialPhotoUrl)
+                        : '';
+
+                      return (
+                        <li key={row.id} className={styles.rowCard} data-cerrada={row.isActive ? undefined : 'true'}>
+                          <div className={styles.rowTop}>
+                            <FotoAlmacen
+                              src={row.inventoryItem.panoramicPhotoUrl}
+                              tipo="herramienta"
+                              size={48}
+                              href={panoramicSrc || null}
+                              alt={`${row.inventoryItem.toolName}, panorámica`}
+                            />
+                            <div className={styles.rowTexto}>
+                              <div className={styles.rowTitle}>
+                                {row.inventoryItem.toolName} · {row.inventoryItem.model} · {row.inventoryItem.serialNumber}
+                              </div>
+                              <div className={styles.rowMeta}>
+                                <Badge tone={row.assignmentType === 'KIT' ? 'brand' : 'warning'} size="sm">
+                                  {row.assignmentType === 'KIT' ? 'Kit base' : 'Préstamo'}
+                                </Badge>
+                                <StatusBadge label={row.isActive ? 'Activa' : 'Cerrada'} tone={row.isActive ? 'success' : 'neutral'} size="sm" dot />
+                                <span>Reemplazos: {row.replacementCount}</span>
+                                {row.inventoryItem.codigoInterno ? <code className={claseMono}>{row.inventoryItem.codigoInterno}</code> : null}
+                              </div>
+                            </div>
+                            {serialSrc ? (
+                              <FotoAlmacen
+                                src={row.inventoryItem.serialPhotoUrl}
+                                tipo="herramienta"
+                                size={48}
+                                href={serialSrc}
+                                alt={`${row.inventoryItem.toolName}, serie`}
+                                className={styles.fotoSerie}
+                              />
+                            ) : null}
+                          </div>
+
+                          {row.events && row.events.length > 0 && (
+                            <ul className={styles.eventsList}>
+                              {row.events.slice(0, 3).map((event) => {
+                                const res = RESOLUCION[event.resolution] ?? { etiqueta: event.resolution, tono: 'neutral' as Tone };
+                                return (
+                                  <li key={event.id} className={styles.eventCard} data-pendiente={event.resolution === 'PENDING' ? 'true' : undefined}>
+                                    <div className={styles.eventMeta}>
+                                      <span>{new Date(event.reportedAt).toLocaleDateString('es-MX')}</span>
+                                      <StatusBadge label={res.etiqueta} tone={res.tono} size="sm" />
+                                    </div>
+                                    <div className={styles.eventDesc}>{event.description}</div>
+                                    {event.resolution === 'PENDING' && (
+                                      <div className={styles.resolveWrap}>
+                                        {resolvingEventId !== event.id ? (
+                                          <Button size="sm" variant="tonal" onClick={() => openResolveForm(event.id)}>
+                                            Resolver incidente
+                                          </Button>
+                                        ) : (
+                                          <div className={styles.resolveForm}>
+                                            <FieldGrid>
+                                              <Field label="Qué pasó" fullWidth={resolutionType !== 'USER_MISUSE'}>
+                                                <Select
+                                                  value={resolutionType}
+                                                  onChange={(e) => setResolutionType(e.target.value as 'USER_MISUSE' | 'EQUIPMENT_FAILURE')}
+                                                >
+                                                  <option value="EQUIPMENT_FAILURE">Falla de equipo (reemplazo / reparación)</option>
+                                                  <option value="USER_MISUSE">Mal uso del usuario (genera multa)</option>
+                                                </Select>
+                                              </Field>
+
+                                              {resolutionType === 'USER_MISUSE' && (
+                                                <Field label="Monto de multa" required>
+                                                  <Input
+                                                    type="number"
+                                                    min="1"
+                                                    step="0.01"
+                                                    inputMode="decimal"
+                                                    value={resolutionFineAmount}
+                                                    onChange={(e) => setResolutionFineAmount(e.target.value)}
+                                                    placeholder="Monto de multa"
+                                                  />
+                                                </Field>
+                                              )}
+
+                                              <Field label="Notas de resolución" optional fullWidth>
+                                                <Textarea
+                                                  rows={3}
+                                                  value={resolutionNotes}
+                                                  onChange={(e) => setResolutionNotes(e.target.value)}
+                                                  placeholder="Notas de resolución (opcional)"
+                                                />
+                                              </Field>
+                                            </FieldGrid>
+
+                                            <div className={styles.resolveActions}>
+                                              <Button size="sm" variant="ghost" onClick={cancelResolveForm} disabled={resolvingSubmit}>
+                                                Cancelar
+                                              </Button>
+                                              <Button size="sm" variant="primary" onClick={() => resolveEvent(event.id)} loading={resolvingSubmit}>
+                                                Guardar resolución
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </Card>
 
       <EtiquetasHerramientaDialog
         herramientas={etiquetas?.herramientas ?? null}

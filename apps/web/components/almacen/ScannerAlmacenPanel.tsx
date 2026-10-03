@@ -28,11 +28,22 @@ import {
   type TipoCodigo,
 } from "@/lib/codigo-barras";
 import { ATRIBUTO_CAMPO_LECTOR, useLectorDeCodigos } from "@/lib/lector-codigos";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import InlineAlert from "@/components/ui/InlineAlert";
-import EmptyState from "@/components/ui/EmptyState";
-import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
+import SearchOutlined from "@mui/icons-material/SearchOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  EmptyState,
+  Field,
+  FieldGrid,
+  Input,
+  Select,
+  Textarea,
+} from "@/components/base";
+import { CampoEscaneo, TarjetaHallazgo, claseMono } from "./PiezasAlmacen";
+import s from "./ScannerAlmacenPanel.module.css";
 
 type OpType = "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN";
 
@@ -68,19 +79,8 @@ const ERROR_ID = "escaner-almacen-error";
 /** Marca del campo que el lector puede tomar aunque tenga el foco. */
 const CAMPO_LECTOR = { [ATRIBUTO_CAMPO_LECTOR]: "" };
 
-/** Se usa de pie, con guantes o en tableta: 44 px de alto y 16 px (iOS no hace zoom). */
-const campo: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  minHeight: 44,
-  padding: "9px 12px",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "inherit",
-  font: "inherit",
-  fontSize: 16,
-};
+/** Se usa de pie, con guantes o en tableta: todos los controles van a 44 px (`lg`). */
+const TACTIL = "lg" as const;
 
 type Desconocido = { codigo: string; tipo: TipoCodigo };
 type ModoDesconocido = "elegir" | "alta" | "ligar";
@@ -367,320 +367,299 @@ export default function ScannerAlmacenPanel() {
   const existencias = hit?.existencias ?? [];
 
   return (
-    <Section
-      title="Escanear"
-      subtitle="Dispara el lector sobre el código, sin hacer clic en ningún campo. El producto aparece abajo y ahí decides qué pasó con él."
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (busyRef.current) return;
-          void buscarCodigo(code);
-        }}
-        style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
-      >
-        <input
+    <Card aria-label="Escanear">
+      <CardHead
+        title="Escanear"
+        subtitle="Dispara el lector sobre el código, sin hacer clic en ningún campo. El producto aparece abajo y ahí decides qué pasó con él."
+      />
+      <div className={s.cuerpo}>
+        <CampoEscaneo
           ref={inputRef}
           {...CAMPO_LECTOR}
           value={code}
           onChange={(e) => setCode(e.target.value)}
+          onBuscar={() => {
+            if (busyRef.current) return;
+            void buscarCodigo(code);
+          }}
           placeholder="Código de barras…"
           aria-label="Código de barras"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? ERROR_ID : undefined}
-          autoComplete="off"
           autoFocus
           disabled={loading || saving}
-          style={{ ...campo, flex: "1 1 220px", maxWidth: 360 }}
+          buscando={loading}
+          botonDeshabilitado={!code.trim() || saving}
+          // Con un producto en pantalla, el primario es registrar: buscar pasa a secundario.
+          botonVariante={hit || desconocido ? "secondary" : "primary"}
+          lectorActivo={!loading && !saving}
         />
-        <Button type="submit" variant="primary" size="lg" loading={loading} disabled={!code.trim() || saving}>
-          Buscar
-        </Button>
-      </form>
 
-      {error && (
-        <div id={ERROR_ID} style={{ marginTop: 10 }}>
-          <InlineAlert variant="danger" message={error} onDismiss={() => setError(null)} />
-        </div>
-      )}
-      {okMsg && (
-        <div style={{ marginTop: 10 }}>
-          <InlineAlert variant="success" message={okMsg} onDismiss={() => setOkMsg(null)} />
-        </div>
-      )}
-
-      {desconocido ? (
-        <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gap: 2 }}>
-            <strong style={{ fontSize: 15 }}>Este código no está dado de alta</strong>
-            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              {nombreDeTipoCodigo(desconocido.tipo)} ·{" "}
-              <span style={{ fontFamily: "ui-monospace, monospace" }}>{desconocido.codigo}</span>
-            </span>
+        {error && (
+          <div id={ERROR_ID}>
+            <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
+              {error}
+            </Alert>
           </div>
+        )}
+        {okMsg && (
+          <Alert tone="success" role="status" onDismiss={() => setOkMsg(null)}>
+            {okMsg}
+          </Alert>
+        )}
 
-          {motivoNoGuardable ? (
-            <InlineAlert variant="warning" message={motivoNoGuardable} />
-          ) : modo === "elegir" ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button variant="primary" size="lg" onClick={() => void abrirAlta()}>
-                Dar de alta este producto
-              </Button>
-              <Button variant="secondary" size="lg" onClick={() => setModo("ligar")}>
-                Es un producto que ya tengo
-              </Button>
-              <Button variant="ghost" size="lg" onClick={cerrarDesconocido}>
-                Cancelar
-              </Button>
-            </div>
-          ) : modo === "alta" ? (
-            // Sin <form>: si el lector dispara con el foco en un campo, su Enter no
-            // debe guardar el alta a medias. Se guarda solo con el botón.
-            <div style={{ display: "grid", gap: 12 }}>
-              {(consultando || notaUpc) && (
-                <p role="status" style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {consultando ? "Buscando el código en el catálogo internacional…" : notaUpc}
-                </p>
-              )}
-              <FinanceFormGrid>
-                <FinanceField label="Nombre del producto" fullWidth>
-                  <input
-                    className="input"
-                    value={alta.name}
-                    onChange={(e) => setAlta((a) => ({ ...a, name: e.target.value }))}
-                    autoFocus
-                  />
-                </FinanceField>
-                <FinanceField label="Marca" optional>
-                  <input
-                    className="input"
-                    value={alta.marca}
-                    onChange={(e) => setAlta((a) => ({ ...a, marca: e.target.value }))}
-                  />
-                </FinanceField>
-                <FinanceField label="Modelo" optional>
-                  <input
-                    className="input"
-                    value={alta.modelo}
-                    onChange={(e) => setAlta((a) => ({ ...a, modelo: e.target.value }))}
-                  />
-                </FinanceField>
-                <FinanceField label="Categoría" optional>
-                  <input
-                    className="input"
-                    value={alta.categoria}
-                    onChange={(e) => setAlta((a) => ({ ...a, categoria: e.target.value }))}
-                  />
-                </FinanceField>
-                <FinanceField label="Descripción" optional fullWidth>
-                  <textarea
-                    className="input"
-                    rows={2}
-                    value={alta.descripcion}
-                    onChange={(e) => setAlta((a) => ({ ...a, descripcion: e.target.value }))}
-                  />
-                </FinanceField>
-              </FinanceFormGrid>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  paddingTop: 12,
-                  borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
-                }}
-              >
-                <Button variant="ghost" size="lg" onClick={cerrarDesconocido} disabled={saving}>
+        {desconocido ? (
+          <TarjetaHallazgo
+            tono="warning"
+            ariaLabel="Código sin dar de alta"
+            foto={modo === "alta" ? alta.imagenUrl || null : null}
+            eyebrow="Código nuevo"
+            titulo="Este código no está dado de alta"
+            meta={
+              <>
+                {nombreDeTipoCodigo(desconocido.tipo)} · <code className={claseMono}>{desconocido.codigo}</code>
+              </>
+            }
+            acciones={
+              motivoNoGuardable ? (
+                <Button variant="ghost" size={TACTIL} onClick={cerrarDesconocido}>
+                  Cancelar
+                </Button>
+              ) : modo === "elegir" ? (
+                <>
+                  <Button variant="ghost" size={TACTIL} onClick={cerrarDesconocido}>
+                    Cancelar
+                  </Button>
+                  <Button variant="secondary" size={TACTIL} onClick={() => setModo("ligar")}>
+                    Es un producto que ya tengo
+                  </Button>
+                  <Button variant="primary" size={TACTIL} onClick={() => void abrirAlta()}>
+                    Dar de alta este producto
+                  </Button>
+                </>
+              ) : modo === "alta" ? (
+                <>
+                  <Button variant="ghost" size={TACTIL} onClick={cerrarDesconocido} disabled={saving}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size={TACTIL}
+                    onClick={() => void guardarAlta()}
+                    loading={saving}
+                    disabled={!alta.name.trim()}
+                  >
+                    Dar de alta
+                  </Button>
+                </>
+              ) : (
+                <Button variant="ghost" size={TACTIL} onClick={() => setModo("elegir")} disabled={saving}>
+                  Volver
+                </Button>
+              )
+            }
+          >
+            {motivoNoGuardable ? (
+              <Alert tone="warning">{motivoNoGuardable}</Alert>
+            ) : modo === "alta" ? (
+              // Sin <form>: si el lector dispara con el foco en un campo, su Enter no
+              // debe guardar el alta a medias. Se guarda solo con el botón.
+              <div className={s.bloque}>
+                {(consultando || notaUpc) && (
+                  <p role="status" className={s.nota}>
+                    {consultando ? "Buscando el código en el catálogo internacional…" : notaUpc}
+                  </p>
+                )}
+                <FieldGrid>
+                  <Field label="Nombre del producto" required fullWidth>
+                    <Input
+                      controlSize={TACTIL}
+                      value={alta.name}
+                      onChange={(e) => setAlta((a) => ({ ...a, name: e.target.value }))}
+                      autoFocus
+                    />
+                  </Field>
+                  <Field label="Marca" optional>
+                    <Input controlSize={TACTIL} value={alta.marca} onChange={(e) => setAlta((a) => ({ ...a, marca: e.target.value }))} />
+                  </Field>
+                  <Field label="Modelo" optional>
+                    <Input controlSize={TACTIL} value={alta.modelo} onChange={(e) => setAlta((a) => ({ ...a, modelo: e.target.value }))} />
+                  </Field>
+                  <Field label="Categoría" optional>
+                    <Input controlSize={TACTIL} value={alta.categoria} onChange={(e) => setAlta((a) => ({ ...a, categoria: e.target.value }))} />
+                  </Field>
+                  <Field label="Descripción" optional fullWidth>
+                    <Textarea rows={2} value={alta.descripcion} onChange={(e) => setAlta((a) => ({ ...a, descripcion: e.target.value }))} />
+                  </Field>
+                </FieldGrid>
+              </div>
+            ) : modo === "ligar" ? (
+              <div className={s.bloque}>
+                <Input
+                  controlSize={TACTIL}
+                  iconStart={<SearchOutlined fontSize="small" />}
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Busca el producto por nombre o clave"
+                  aria-label="Busca el producto por nombre o clave"
+                  autoFocus
+                />
+                {buscandoProducto && (
+                  <p role="status" className={s.nota}>
+                    Buscando…
+                  </p>
+                )}
+                {!buscandoProducto && busqueda.trim().length >= 2 && candidatos.length === 0 && (
+                  <p className={s.nota}>Ningún producto coincide. Puedes darlo de alta.</p>
+                )}
+                {candidatos.length > 0 && (
+                  <ul className={s.candidatos}>
+                    {candidatos.map((p) => (
+                      <li key={p.id} className={s.candidato}>
+                        <span className={s.candidatoTexto}>
+                          <span className={s.candidatoNombre}>{p.name}</span>
+                          <span className={s.candidatoClave}>Clave {p.sku}</span>
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={saving}
+                          aria-label={`Ligar el código a ${p.name}`}
+                          onClick={() => void ligar(p)}
+                        >
+                          Ligar a este
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <p className={s.nota}>
+                Dalo de alta con sus datos (si es un UPC o EAN se buscan solos) o lígalo a un producto que ya existe.
+              </p>
+            )}
+          </TarjetaHallazgo>
+        ) : hit ? (
+          // El hallazgo no va en una caja verde: el producto ya es el protagonista
+          // y el color se reserva para lo que pide acción o salió mal.
+          <TarjetaHallazgo
+            ariaLabel="Producto escaneado"
+            foto={hit.product.imageUrl}
+            eyebrow="Producto encontrado"
+            titulo={hit.product.name}
+            meta={
+              <>
+                Clave {hit.product.sku} · código <code className={claseMono}>{hit.codigoBarras}</code>
+                {hit.match === "empaque"
+                  ? ` · ${hit.packaging.nombre} de ${hit.packaging.piezasPorUnidad} piezas`
+                  : ""}
+              </>
+            }
+            insignias={
+              existencias.length > 0 ? (
+                <>
+                  <span className={s.hay}>Hay</span>
+                  {existencias.map((e) => (
+                    <Badge key={e.warehouseId} tone="brand" size="sm">
+                      {e.cantidad} en {e.almacen}
+                    </Badge>
+                  ))}
+                </>
+              ) : (
+                <Badge tone="neutral" size="sm" dot>
+                  Sin existencia registrada
+                </Badge>
+              )
+            }
+            acciones={
+              <>
+                <Button variant="ghost" size={TACTIL} onClick={() => setHit(null)} disabled={saving}>
                   Cancelar
                 </Button>
                 <Button
                   variant="primary"
-                  size="lg"
-                  onClick={() => void guardarAlta()}
+                  size={TACTIL}
+                  onClick={() => void confirmarMovimiento()}
+                  disabled={confirmDisabled}
                   loading={saving}
-                  disabled={!alta.name.trim()}
                 >
-                  Dar de alta
+                  Registrar movimiento
                 </Button>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gap: 10 }}>
-              <input
-                className="input"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Busca el producto por nombre o clave"
-                aria-label="Busca el producto por nombre o clave"
-                autoFocus
-              />
-              {buscandoProducto && (
-                <p role="status" style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-                  Buscando…
-                </p>
-              )}
-              {!buscandoProducto && busqueda.trim().length >= 2 && candidatos.length === 0 && (
-                <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-                  Ningún producto coincide. Puedes darlo de alta.
-                </p>
-              )}
-              <div style={{ display: "grid", gap: 6 }}>
-                {candidatos.map((p) => (
-                  <div
-                    key={p.id}
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <span style={{ fontSize: 13, minWidth: 0 }}>
-                      {p.name}{" "}
-                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>· Clave {p.sku}</span>
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={saving}
-                      aria-label={`Ligar el código a ${p.name}`}
-                      onClick={() => void ligar(p)}
-                    >
-                      Ligar a este
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button variant="ghost" onClick={() => setModo("elegir")} disabled={saving}>
-                  Volver
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : hit ? (
-        // El hallazgo no va en una caja verde: el producto ya es el protagonista
-        // y el color se reserva para lo que pide acción o salió mal.
-        <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gap: 2 }}>
-            <strong style={{ fontSize: 15 }}>{hit.product.name}</strong>
-            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              Clave {hit.product.sku} · código {hit.codigoBarras}
-              {hit.match === "empaque"
-                ? ` · ${hit.packaging.nombre} de ${hit.packaging.piezasPorUnidad} piezas`
-                : ""}
-            </span>
-            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              {existencias.length > 0
-                ? `Hay ${existencias.map((e) => `${e.cantidad} en ${e.almacen}`).join(" · ")}`
-                : "Sin existencia registrada"}
-            </span>
-          </div>
-
-          <FinanceFormGrid>
-            <FinanceField label="Qué pasó">
-              <select
-                value={opType}
-                onChange={(e) => setOpType(e.target.value as OpType)}
-                style={campo}
-              >
-                {(Object.keys(OP_UI) as OpType[]).map((k) => (
-                  <option key={k} value={k}>
-                    {OP_UI[k]}
-                  </option>
-                ))}
-              </select>
-            </FinanceField>
-
-            {needsFrom && (
-              <FinanceField label="Sale de">
-                <select
-                  value={fromWarehouseId}
-                  onChange={(e) => setFromWarehouseId(e.target.value ? Number(e.target.value) : "")}
-                  style={campo}
-                >
-                  <option value="">Elige almacén…</option>
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </FinanceField>
-            )}
-
-            {needsTo && (
-              <FinanceField label="Entra a">
-                <select
-                  value={toWarehouseId}
-                  onChange={(e) => setToWarehouseId(e.target.value ? Number(e.target.value) : "")}
-                  style={campo}
-                >
-                  <option value="">Elige almacén…</option>
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </FinanceField>
-            )}
-
-            <FinanceField
-              label="Cantidad"
-              hint={hit.match === "empaque" ? hit.packaging.nombre : undefined}
-            >
-              {/* También es campo del lector: si disparan con el foco aquí, el código
-                  no se queda escrito como cantidad; se busca el producto siguiente. */}
-              <input
-                {...CAMPO_LECTOR}
-                type="number"
-                min={0.001}
-                step="any"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                style={{ ...campo, fontVariantNumeric: "tabular-nums" }}
-              />
-            </FinanceField>
-          </FinanceFormGrid>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              flexWrap: "wrap",
-              gap: 8,
-              paddingTop: 12,
-              borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
-            }}
+              </>
+            }
           >
-            <Button variant="ghost" size="lg" onClick={() => setHit(null)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={() => void confirmarMovimiento()}
-              disabled={confirmDisabled}
-              loading={saving}
-            >
-              Registrar movimiento
-            </Button>
-          </div>
-        </div>
-      ) : okMsg ? null : (
-        // Tras registrar un movimiento manda el aviso de «listo», no este hueco.
-        <div style={{ marginTop: 8 }}>
+            <FieldGrid>
+              <Field label="Qué pasó">
+                <Select controlSize={TACTIL} value={opType} onChange={(e) => setOpType(e.target.value as OpType)}>
+                  {(Object.keys(OP_UI) as OpType[]).map((k) => (
+                    <option key={k} value={k}>
+                      {OP_UI[k]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              {needsFrom && (
+                <Field label="Sale de">
+                  <Select
+                    controlSize={TACTIL}
+                    value={fromWarehouseId}
+                    onChange={(e) => setFromWarehouseId(e.target.value ? Number(e.target.value) : "")}
+                  >
+                    <option value="">Elige almacén…</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+
+              {needsTo && (
+                <Field label="Entra a">
+                  <Select
+                    controlSize={TACTIL}
+                    value={toWarehouseId}
+                    onChange={(e) => setToWarehouseId(e.target.value ? Number(e.target.value) : "")}
+                  >
+                    <option value="">Elige almacén…</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+
+              <Field label="Cantidad" hint={hit.match === "empaque" ? hit.packaging.nombre : undefined}>
+                {/* También es campo del lector: si disparan con el foco aquí, el código
+                    no se queda escrito como cantidad; se busca el producto siguiente. */}
+                <Input
+                  {...CAMPO_LECTOR}
+                  controlSize={TACTIL}
+                  className={s.cantidad}
+                  type="number"
+                  min={0.001}
+                  step="any"
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                />
+              </Field>
+            </FieldGrid>
+          </TarjetaHallazgo>
+        ) : okMsg ? null : (
+          // Tras registrar un movimiento manda el aviso de «listo», no este hueco.
           <EmptyState
-            variant="compact"
+            size="compact"
+            icon={<SearchOutlined />}
             title="Nada escaneado todavía"
             description="Dispara el lector sobre el código de barras, o tecléalo y pulsa Buscar."
           />
-        </div>
-      )}
-    </Section>
+        )}
+      </div>
+    </Card>
   );
 }

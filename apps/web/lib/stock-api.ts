@@ -13,6 +13,8 @@ export type StockLevelRow = {
     sku: string;
     category?: string | null;
     price?: number | null;
+    imageUrl?: string | null;
+    unitName?: string | null;
   } | null;
   warehouse?: { id: number; code?: string; name: string } | null;
   location?: { id: number; code?: string; name?: string } | null;
@@ -70,7 +72,8 @@ export function mapStockLevelToRow(level: StockLevelRow) {
     warehouseId: level.warehouse?.id,
     existencia: qty,
     minimo: min,
-    costo: Number(level.product?.price ?? 0),
+    // Costo promedio de la existencia; si aún no tiene, el precio de lista del producto.
+    costo: Number(level.unitCost ?? 0) || Number(level.product?.price ?? 0),
   };
 }
 
