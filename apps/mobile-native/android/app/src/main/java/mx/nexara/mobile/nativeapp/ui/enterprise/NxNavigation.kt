@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,6 +31,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
@@ -101,6 +104,11 @@ fun NavGraphBuilder.nxComposable(
     }
 }
 
+/**
+ * Barra inferior Material 3 del rediseño v2: pastilla teal suave en la activa,
+ * icono relleno al seleccionar y una insignia roja con el conteo cuando hay
+ * algo pendiente. Lee el tema (no [NxColors]) para que el modo oscuro funcione.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NxBottomTabBar(
@@ -109,7 +117,12 @@ fun NxBottomTabBar(
     onTabSelected: (String) -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
-    NavigationBar {
+    val scheme = MaterialTheme.colorScheme
+    NavigationBar(
+        containerColor = scheme.surface,
+        contentColor = scheme.onSurface,
+        tonalElevation = 0.dp,
+    ) {
         tabs.forEach { tab ->
             val selected = isSelected(tab.route)
             NavigationBarItem(
@@ -120,20 +133,39 @@ fun NxBottomTabBar(
                         onTabSelected(tab.route)
                     }
                 },
-                icon = { Icon(tab.icon, contentDescription = tab.label) },
+                icon = {
+                    val glyph = if (selected) tab.selectedIcon ?: tab.icon else tab.icon
+                    val badge = tab.badge
+                    if (badge != null && badge > 0) {
+                        BadgedBox(
+                            badge = {
+                                Badge(
+                                    containerColor = scheme.error,
+                                    contentColor = scheme.onError,
+                                ) { Text(if (badge > 99) "99+" else badge.toString()) }
+                            },
+                        ) {
+                            Icon(glyph, contentDescription = "${tab.label}, $badge pendientes")
+                        }
+                    } else {
+                        Icon(glyph, contentDescription = tab.label)
+                    }
+                },
                 label = {
                     Text(
                         tab.label,
                         fontSize = tab.labelFontSize,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        maxLines = 1,
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = NxColors.Brand,
-                    selectedTextColor = NxColors.Brand,
-                    indicatorColor = NxColors.BrandSoft,
-                    unselectedIconColor = NxColors.Muted,
-                    unselectedTextColor = NxColors.Muted,
+                    selectedIconColor = scheme.onSecondaryContainer,
+                    selectedTextColor = scheme.onSurface,
+                    indicatorColor = scheme.secondaryContainer,
+                    unselectedIconColor = scheme.onSurfaceVariant,
+                    unselectedTextColor = scheme.onSurfaceVariant,
                 ),
             )
         }
@@ -145,4 +177,8 @@ data class NxBottomTab(
     val icon: ImageVector,
     val label: String,
     val labelFontSize: TextUnit = TextUnit.Unspecified,
+    /** Icono relleno cuando la pestaña está activa (si no se da, se repite [icon]). */
+    val selectedIcon: ImageVector? = null,
+    /** Conteo pendiente; `null` o 0 = sin insignia. */
+    val badge: Int? = null,
 )

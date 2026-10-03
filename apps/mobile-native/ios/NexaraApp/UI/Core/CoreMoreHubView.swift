@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Hub «Más»: los módulos de Core que no caben como pestaña (Cotizaciones,
-/// Proyectos, Almacén, Vehículos…), filtrados por `CoreNavigation.extraModules`.
-/// Va dentro del `NavigationStack` de la cubierta del shell.
+/// Hub «Más» (quinta pestaña del rediseño v2): tu perfil arriba, Clientes si el
+/// rol lo ve (dejó de ser pestaña) y los módulos de Core que no caben como
+/// pestaña (Cotizaciones, Proyectos, Almacén, Vehículos…), filtrados por
+/// `CoreNavigation.extraModules`. Va dentro del `NavigationStack` de la pestaña.
 ///
 /// A dónde va cada uno lo decide `CoreExtraDestination`. La lista avisa con un
 /// «En la web» en los que todavía sacan al navegador: si no, dos entradas
@@ -10,6 +11,8 @@ import SwiftUI
 /// después de tocarlas.
 struct CoreMoreHubView: View {
     let modules: [CoreExtraModule]
+    /// Clientes (`erp-clients`) vive aquí desde el rediseño v2.
+    var showClientes: Bool = false
     @ObservedObject private var session = SessionStore.shared
 
     private static let order: [CoreExtraModule.Group] = [.hoy, .recursos, .finanzas, .gobierno]
@@ -31,6 +34,30 @@ struct CoreMoreHubView: View {
                     } label: {
                         CoreMoreHubProfileRow(user: user)
                     }
+                    .accessibilityIdentifier("more-profile")
+                }
+            }
+            if showClientes {
+                Section {
+                    NavigationLink {
+                        ClientesHomeView()
+                    } label: {
+                        CoreMoreHubLinkRow(
+                            systemImage: "person.2",
+                            title: "Clientes",
+                            summary: "Padrón por sector: fichas, sucursales y altas."
+                        )
+                    }
+                    .accessibilityIdentifier("more-clientes")
+                } header: {
+                    Text("Clientes y obra")
+                }
+            }
+            if modules.isEmpty {
+                Section {
+                    Text("Tu rol no tiene módulos extra. Si necesitas uno, pídelo a tu jefe.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             ForEach(sections) { section in
@@ -48,17 +75,33 @@ struct CoreMoreHubView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .overlay {
-            if modules.isEmpty {
-                ContentUnavailableView(
-                    "Sin módulos adicionales",
-                    systemImage: "square.grid.2x2",
-                    description: Text("Tu rol no tiene módulos extra. Si necesitas uno, pídelo a tu jefe.")
-                )
+        .navigationTitle("Más")
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
+/// Renglón del hub para lo que no es `CoreExtraModule` (Clientes).
+private struct CoreMoreHubLinkRow: View {
+    let systemImage: String
+    let title: String
+    let summary: String
+
+    var body: some View {
+        HStack(spacing: NxSpacing.m) {
+            NxIconBadge(systemName: systemImage, size: 40)
+            VStack(alignment: .leading, spacing: NxSpacing.xxs) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
         }
-        .navigationTitle("Más")
-        .navigationBarTitleDisplayMode(.inline)
+        .padding(.vertical, NxSpacing.xs)
+        .frame(minHeight: NxMetrics.minTap)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Abre el módulo")
     }
 }
 

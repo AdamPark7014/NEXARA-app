@@ -11,8 +11,8 @@ import XCTest
 /// La app arranca en MODO DEMO (`-NEXARA_DEMO 1`): salta login y onboarding y sirve
 /// datos ficticios sin red. Identificadores que usa el test (los pone la app):
 ///
-///   tab-actividades  tab-asistencias  tab-chat  tab-clientes  tab-perfil
-///   bell-button (campana)   more-button (hub «Más»)
+///   tab-inicio  tab-actividades  tab-chat  tab-asistencias  tab-mas (rediseño v2)
+///   bell-button (campana)   more-clientes / more-profile (renglones del hub «Más»)
 ///
 /// Todo lo que no sea imprescindible es TOLERANTE: si un elemento no aparece se
 /// anota como omitido, se adjunta el arbol de accesibilidad (`dbg-*`) para
@@ -51,11 +51,11 @@ final class StoreScreenshotsUITests: XCTestCase {
         let id: String
         let etiqueta: String
 
+        static let inicio = Pestana(id: "tab-inicio", etiqueta: "Inicio")
         static let actividades = Pestana(id: "tab-actividades", etiqueta: "Actividades")
-        static let asistencias = Pestana(id: "tab-asistencias", etiqueta: "Asistencias")
+        static let asistencias = Pestana(id: "tab-asistencias", etiqueta: "Asistencia")
         static let chat = Pestana(id: "tab-chat", etiqueta: "Chat")
-        static let clientes = Pestana(id: "tab-clientes", etiqueta: "Clientes")
-        static let perfil = Pestana(id: "tab-perfil", etiqueta: "Mi perfil")
+        static let mas = Pestana(id: "tab-mas", etiqueta: "Más")
     }
 
     // MARK: - Ciclo de vida
@@ -90,40 +90,50 @@ final class StoreScreenshotsUITests: XCTestCase {
         despejarAlertas()
 
         // El shell (barra de pestanas) existe si el modo demo salto login y onboarding.
-        guard buscar(elementosDePestana(.actividades), timeout: 30) != nil else {
+        // Rediseño v2: la app arranca en Inicio; Clientes y Mi perfil viven en «Más».
+        guard buscar(elementosDePestana(.inicio), timeout: 30) != nil
+            || buscar(elementosDePestana(.actividades), timeout: 5) != nil else {
             adjuntarJerarquia("dbg-sin-shell")
             XCTFail("No aparece la barra de pestanas: el modo demo (-NEXARA_DEMO 1) no llego al shell")
             return
         }
         Thread.sleep(forTimeInterval: 1.5)
 
-        // 1. Actividades / pizarra del equipo.
-        capturar(1, "actividades")
-        adjuntarJerarquia("dbg-actividades")
+        // 1. Inicio: jornada, aviso, actividad de ahora y siguientes.
+        capturar(1, "inicio")
+        adjuntarJerarquia("dbg-inicio")
 
-        // 2. Detalle de una actividad (primera tarjeta) y volver.
-        let tituloRaiz = tituloActual()
-        if abrirPrimeraFila() {
-            capturar(2, "detalle-actividad")
-            volver(a: tituloRaiz)
+        // 2. Actividades / pizarra del equipo.
+        if irAPestana(.actividades) {
+            capturar(2, "actividades")
+            adjuntarJerarquia("dbg-actividades")
+
+            // 3. Detalle de una actividad (primera tarjeta) y volver.
+            let tituloRaiz = tituloActual()
+            if abrirPrimeraFila() {
+                capturar(3, "detalle-actividad")
+                volver(a: tituloRaiz)
+            } else {
+                omitir("detalle-actividad: no se encontro una tarjeta que abra el detalle")
+            }
         } else {
-            omitir("detalle-actividad: no se encontro una tarjeta que abra el detalle")
+            omitir("actividades / detalle-actividad: no se encontro la pestana")
         }
 
-        // 3. Asistencias.
+        // 4. Asistencia.
         if irAPestana(.asistencias) {
-            capturar(3, "asistencias")
+            capturar(4, "asistencias")
         } else {
             omitir("asistencias: no se encontro la pestana")
         }
 
-        // 4 y 5. Chat: la lista de canales y un canal abierto con mensajes.
+        // 5 y 6. Chat: la lista de canales y un canal abierto con mensajes.
         if irAPestana(.chat) {
-            capturar(4, "chat-canales")
+            capturar(5, "chat-canales")
             let tituloChat = tituloActual()
             if abrirPrimeraFila() {
                 Thread.sleep(forTimeInterval: 0.8)
-                capturar(5, "chat-canal")
+                capturar(6, "chat-canal")
                 volver(a: tituloChat)
             } else {
                 omitir("chat-canal: no se encontro un canal que abrir")
@@ -132,36 +142,38 @@ final class StoreScreenshotsUITests: XCTestCase {
             omitir("chat: no se encontro la pestana")
         }
 
-        // 6. Clientes.
-        if irAPestana(.clientes) {
-            capturar(6, "clientes")
+        // 7. Hub «Más» (quinta pestaña).
+        if irAPestana(.mas) {
+            capturar(7, "mas-modulos")
+            let tituloMas = tituloActual()
 
-            // 7. Hub «Más» (se abre a pantalla completa; «Cerrar» lo baja).
-            if tocarSiExiste(botonMas(), timeout: 5) {
-                capturar(7, "mas-modulos")
-                cerrarPantallaModal()
+            // 8. Clientes (renglón del hub) y volver.
+            if tocarSiExiste(renglonDelHub("more-clientes", etiqueta: "Clientes"), timeout: 5) {
+                capturar(8, "clientes")
+                volver(a: tituloMas)
             } else {
-                omitir("mas-modulos: no se encontro more-button")
-                adjuntarJerarquia("dbg-sin-more")
+                omitir("clientes: no se encontro more-clientes en «Más»")
             }
 
-            // 8. Notificaciones (campana).
+            // 9. Notificaciones (campana).
             if tocarSiExiste(botonCampana(), timeout: 5) {
-                capturar(8, "notificaciones")
+                capturar(9, "notificaciones")
                 cerrarPantallaModal()
             } else {
                 omitir("notificaciones: no se encontro bell-button")
                 adjuntarJerarquia("dbg-sin-campana")
             }
-        } else {
-            omitir("clientes / mas-modulos / notificaciones: no se encontro la pestana Clientes")
-        }
 
-        // 9. Mi perfil.
-        if irAPestana(.perfil) {
-            capturar(9, "mi-perfil")
+            // 10. Mi perfil (renglón de arriba del hub).
+            if tocarSiExiste(renglonDelHub("more-profile", etiqueta: "Mi perfil"), timeout: 5) {
+                capturar(10, "mi-perfil")
+                volver(a: tituloMas)
+            } else {
+                omitir("mi-perfil: no se encontro more-profile en «Más»")
+            }
         } else {
-            omitir("mi-perfil: no se encontro la pestana")
+            omitir("mas-modulos / clientes / notificaciones / mi-perfil: no se encontro la pestana Más")
+            adjuntarJerarquia("dbg-sin-mas")
         }
 
         let listaCapturadas = capturadas.joined(separator: ", ")
@@ -240,10 +252,12 @@ final class StoreScreenshotsUITests: XCTestCase {
         ]
     }
 
-    private func botonMas() -> [XCUIElement] {
+    /// Un renglón del hub «Más» por identificador y, como plan B, por su etiqueta.
+    private func renglonDelHub(_ id: String, etiqueta: String) -> [XCUIElement] {
         [
-            app.descendants(matching: .any).matching(identifier: "more-button").firstMatch,
-            app.navigationBars.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Más")).firstMatch
+            app.descendants(matching: .any).matching(identifier: id).firstMatch,
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", etiqueta)).firstMatch,
+            app.cells.matching(NSPredicate(format: "label BEGINSWITH %@", etiqueta)).firstMatch
         ]
     }
 

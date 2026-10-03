@@ -6,12 +6,14 @@ private enum CoreShellOverlay: Identifiable {
     case activity(id: Int, tab: String?)
     case person(userId: Int)
     case comidas
-    /// Hub «Más»: los módulos de Core que no son pestaña.
-    case more
     /// Un módulo del hub directo (deep link o push).
     case extra(CoreExtraModule)
     /// Un viático concreto: el aviso trae su id y hay que abrir ÉSE, no la lista.
     case viatico(id: Int)
+    /// Clientes dejó de ser pestaña (v2): `/erp/clientes/:id` y `?sector=` se abren encima.
+    case clientes(id: Int?, sector: String?)
+    /// Mi perfil dejó de ser pestaña (v2): su enlace se abre encima.
+    case perfil
 
     var id: String {
         switch self {
@@ -19,33 +21,77 @@ private enum CoreShellOverlay: Identifiable {
         case .activity(let id, let tab): return "activity-\(id)-\(tab ?? "")"
         case .person(let userId): return "person-\(userId)"
         case .comidas: return "comidas"
-        case .more: return "more"
         case .extra(let module): return "extra-\(module.rawValue)"
         case .viatico(let id): return "viatico-\(id)"
+        case .clientes(let id, let sector): return "clientes-\(id ?? 0)-\(sector ?? "")"
+        case .perfil: return "perfil"
         }
     }
 }
 
-/// Shell de NEXARA Core. Después del login el personal cae directo en
-/// Actividades (`/erp/pizarra`). Menú = módulos de Core de `GET me/navigation`
-/// filtrados por rol (ver `CoreNavigation`), más la campana de notificaciones.
+/// Las 5 pestañas del rediseño v2, en este orden: Inicio · Actividades · Chat ·
+/// Asistencia · Más. Inicio y Más las tiene todo el personal; las otras tres
+/// solo si el rol abre ese módulo (`CoreNavigation`). Clientes y Mi perfil
+/// viven en «Más» (sus enlaces no cambian).
+private enum CoreShellTab: String, Hashable, CaseIterable {
+    case inicio, actividades, chat, asistencias, mas
+
+    var title: String {
+        switch self {
+        case .inicio: return "Inicio"
+        case .actividades: return "Actividades"
+        case .chat: return "Chat"
+        case .asistencias: return "Asistencia"
+        case .mas: return "Más"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .inicio: return "house"
+        case .actividades: return "checklist"
+        case .chat: return "bubble.left.and.bubble.right"
+        case .asistencias: return "clock"
+        case .mas: return "square.grid.2x2"
+        }
+    }
+
+    /// Módulo de Core que la pestaña necesita; `nil` = la tiene todo el personal.
+    var module: CoreModule? {
+        switch self {
+        case .actividades: return .actividades
+        case .chat: return .chat
+        case .asistencias: return .asistencias
+        case .inicio, .mas: return nil
+        }
+    }
+}
+
+/// Shell de NEXARA Core (rediseño v2). Después del login el personal cae en
+/// Inicio (jornada, aviso, actividad de ahora y siguientes). Menú = módulos de
+/// Core de `GET me/navigation` filtrados por rol (ver `CoreNavigation`), en una
+/// tab bar nativa de 5 destinos con insignias; la campana va en cada pestaña.
 struct CoreShellView: View {
     @EnvironmentObject var session: SessionStore
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
     @ObservedObject private var badge = NotificationsBadgeStore.shared
-    @State private var selected: CoreModule = .actividades
+    @StateObject private var inicio = InicioStore()
+    @State private var selected: CoreShellTab = .inicio
     @State private var overlay: CoreShellOverlay?
     @State private var chatChannelId: Int64?
     @State private var chatMessageId: Int64?
     @State private var chatNonce = 0
-    @State private var clientesLinkId: Int?
-    @State private var clientesSectorSlug: String?
-    @State private var clientesNonce = 0
+    /// Mensajes de chat sin leer (suma de `unreadCount` de los canales), para la insignia.
+    @State private var chatUnread = 0
 
     private var modules: [CoreModule] { CoreNavigation.modules(for: session.currentUser) }
     /// Módulos del hub «Más» (ver `CoreNavigation.extraModules`).
     private var extraModules: [CoreExtraModule] { CoreNavigation.extraModules(for: session.currentUser) }
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
+
+    private var tabs: [CoreShellTab] {
+        CoreShellTab.allCases.filter { tab in tab.module.map { modules.contains($0) } ?? true }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,16 +105,18 @@ struct CoreShellView: View {
 
     private var shell: some View {
         TabView(selection: $selected) {
-            ForEach(modules) { module in
-                tabRoot(module)
+            ForEach(tabs, id: \.self) { tab in
+                tabRoot(tab)
                     .tabItem {
-                        Label(module.title, systemImage: module.systemImage)
-                            .accessibilityIdentifier("tab-\(module.rawValue)")
+                        Label(tab.title, systemImage: tab.systemImage)
+                            .accessibilityIdentifier("tab-\(tab.rawValue)")
                     }
-                    .accessibilityIdentifier("tab-\(module.rawValue)")
-                    .tag(module)
+                    .badge(badgeCount(tab))
+                    .accessibilityIdentifier("tab-\(tab.rawValue)")
+                    .tag(tab)
             }
         }
+        .tint(NxBrand.adaptive)
         .fullScreenCover(item: $overlay) { item in
             overlayScreen(item)
         }
@@ -82,66 +130,57 @@ struct CoreShellView: View {
         .onChange(of: deepLink.pending) { _, _ in applyDeepLink() }
     }
 
+    private func badgeCount(_ tab: CoreShellTab) -> Int {
+        switch tab {
+        case .actividades: return inicio.pendientes
+        case .chat: return chatUnread
+        default: return 0
+        }
+    }
+
     // MARK: Pestañas
 
     @ViewBuilder
-    private func tabRoot(_ module: CoreModule) -> some View {
-        switch module {
+    private func tabRoot(_ tab: CoreShellTab) -> some View {
+        switch tab {
+        case .inicio:
+            NavigationStack {
+                InicioView(
+                    store: inicio,
+                    tieneActividades: modules.contains(.actividades),
+                    tieneAsistencia: modules.contains(.asistencias),
+                    onOpenNotifications: { present(.notifications) },
+                    onOpenActivity: { id, detailTab in present(.activity(id: id, tab: detailTab)) },
+                    onOpenActividades: { if modules.contains(.actividades) { selected = .actividades } },
+                    onOpenAsistencia: { if modules.contains(.asistencias) { selected = .asistencias } },
+                    onOpenComidas: { present(.comidas) }
+                )
+            }
         case .chat:
             // `ChatView` trae su propio NavigationStack.
             ChatView(initialChannelId: chatChannelId, initialMessageId: chatMessageId)
                 .id(chatNonce)
         case .actividades:
             NavigationStack {
-                ActividadesHomeView().toolbar {
-                    bellItem
-                    moreItem
-                }
+                ActividadesHomeView().toolbar { bellItem }
             }
         case .asistencias:
             NavigationStack {
-                AttendanceView().toolbar {
-                    bellItem
-                    moreItem
-                }
+                AttendanceView().toolbar { bellItem }
             }
-        case .clientes:
+        case .mas:
             NavigationStack {
-                ClientesHomeView(
-                    initialClientId: clientesLinkId,
-                    initialSectorSlug: clientesSectorSlug
+                CoreMoreHubView(
+                    modules: extraModules,
+                    showClientes: modules.contains(.clientes)
                 )
-                .toolbar {
-                    bellItem
-                    moreItem
-                }
-                .id(clientesNonce)
-            }
-        case .perfil:
-            NavigationStack {
-                MyProfileView().toolbar {
-                    bellItem
-                    moreItem
-                }
-            }
-        }
-    }
-
-    /// «Más»: Cotizaciones, Almacén, Vehículos… Solo si el rol ve alguno.
-    private var moreItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            if !extraModules.isEmpty {
-                Button { present(.more) } label: {
-                    Label("Más", systemImage: "square.grid.2x2")
-                }
-                .accessibilityLabel("Más módulos")
-                .accessibilityIdentifier("more-button")
+                .toolbar { bellItem }
             }
         }
     }
 
     private var bellItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .topBarTrailing) {
             Button { present(.notifications) } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "bell")
@@ -182,10 +221,6 @@ struct CoreShellView: View {
             NavigationStack {
                 ComidasView().toolbar { closeItem }
             }
-        case .more:
-            NavigationStack {
-                CoreMoreHubView(modules: extraModules).toolbar { closeItem }
-            }
         case .extra(let module):
             NavigationStack {
                 // Mismo destino que en el hub: un enlace o un push a Vehículos,
@@ -196,6 +231,17 @@ struct CoreShellView: View {
             NavigationStack {
                 ViaticosView(abrirId: id).toolbar { closeItem }
             }
+        case .clientes(let id, let sector):
+            NavigationStack {
+                ClientesHomeView(initialClientId: id, initialSectorSlug: sector)
+                    .toolbar { closeItem }
+            }
+            .environmentObject(session)
+        case .perfil:
+            NavigationStack {
+                MyProfileView().toolbar { closeItem }
+            }
+            .environmentObject(session)
         }
     }
 
@@ -208,8 +254,8 @@ struct CoreShellView: View {
     // MARK: Navegación
 
     private func syncSelection() {
-        if !modules.contains(selected) {
-            selected = modules.first ?? .actividades
+        if !tabs.contains(selected) {
+            selected = .inicio
         }
     }
 
@@ -233,7 +279,7 @@ struct CoreShellView: View {
         case .notifications:
             present(.notifications)
         case .portal:
-            selected = .actividades
+            selected = .inicio
         case .core(let link):
             open(link)
         }
@@ -244,7 +290,7 @@ struct CoreShellView: View {
         // no lo ve, a casa (misma regla que abajo).
         if let extra = link.extra {
             guard extraModules.contains(extra) else {
-                selected = .actividades
+                selected = .inicio
                 return
             }
             // El aviso de un viático trae su id: abre ESE viático, no la lista.
@@ -258,12 +304,12 @@ struct CoreShellView: View {
         }
         // Módulo que su rol no ve: a casa, como `coreSurfaceRedirect`.
         guard modules.contains(link.module) else {
-            selected = .actividades
+            selected = .inicio
             return
         }
-        selected = link.module
         switch link.module {
         case .actividades:
+            selected = .actividades
             if let vista = link.vista, vista == "mias" || vista == "equipo" {
                 UserDefaults.standard.set(vista, forKey: coreActividadesVistaKey)
             }
@@ -273,20 +319,20 @@ struct CoreShellView: View {
                 present(.person(userId: userId))
             }
         case .asistencias:
+            selected = .asistencias
             if link.tab == "comidas" {
                 present(.comidas)
             }
         case .chat:
+            selected = .chat
             chatChannelId = link.chatChannelId
             chatMessageId = link.chatMessageId
             chatNonce += 1
         case .clientes:
             // `/erp/clientes/:id` y `?sector=` abren la ficha o la pestaña.
-            clientesLinkId = link.entityId.map { Int($0) }
-            clientesSectorSlug = link.vista
-            clientesNonce += 1
+            present(.clientes(id: link.entityId.map { Int($0) }, sector: link.vista))
         case .perfil:
-            break
+            present(.perfil)
         }
     }
 
@@ -305,10 +351,18 @@ struct CoreShellView: View {
         }
     }
 
-    /// Como la web: el contador de no leídas se refresca cada 45 s.
+    /// Como la web: el contador de no leídas se refresca cada 45 s. Con él se
+    /// releen las insignias de Actividades (lo pendiente) y de Chat (sin leer).
+    @MainActor
     private func pollUnread() async {
         while !Task.isCancelled {
             await badge.refresh()
+            if modules.contains(.actividades) {
+                await inicio.load(enabled: true)
+            }
+            if modules.contains(.chat), let canales = try? await ChatRepository.shared.listChannels() {
+                chatUnread = canales.reduce(0) { $0 + max(0, ConsoleHelpers.mapInt($1, "unreadCount")) }
+            }
             try? await Task.sleep(nanoseconds: 45_000_000_000)
         }
     }

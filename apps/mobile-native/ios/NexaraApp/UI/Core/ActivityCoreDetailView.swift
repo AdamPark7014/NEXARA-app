@@ -46,6 +46,14 @@ struct ActivityCoreDetailView: View {
     @State private var acciones: ActivitySuperiorActions?
     @State private var cancelar: ActivitySuperiorTarget?
     @State private var pasar: ActivitySuperiorTarget?
+    /// Flujo de evidencia propio (v2): alimenta la lista de pasos y el dock. `nil` = sin empezar.
+    @State private var flow: EvidenceFlowState?
+    /// Dock inferior (v2): «Iniciar», «Reanudar» y «Pausar» con su motivo.
+    @State private var iniciando = false
+    @State private var reanudando = false
+    @State private var dockError: String?
+    @State private var pidiendoPausa = false
+    @State private var motivoPausa = ""
 
     // MARK: Datos derivados
 
@@ -119,6 +127,62 @@ struct ActivityCoreDetailView: View {
         )
     }
 
+    // MARK: Rediseño v2: cabecera, sitio, pasos y dock
+
+    private var folio: String { text("anNumber") }
+
+    /// Mi reloj en esta actividad (solo con fila propia; el CEO no ejecuta).
+    private var sesionPropia: SesionActividad? {
+        guard !isCeo, let mine = myAssigneeRow else { return nil }
+        return SesionActividad(fila: mine)
+    }
+
+    private var fotosRequeridas: Int { max(1, photoRequired ?? 4) }
+
+    /// Regla del 18-09: quien la recibe no la acepta ni la rechaza, únicamente la inicia.
+    /// Aquí cae el push de «actividad nueva», así que el botón también vive en el detalle.
+    private var puedeIniciar: Bool {
+        guard !isCeo, let mine = myAssigneeRow else { return false }
+        return ActivityDockRules.puedeIniciar(
+            aceptacion: ActivityParse.str(mine["aceptacion"]),
+            inicioRealAt: ActivityParse.str(mine["inicioRealAt"]),
+            despachador: splits,
+            estatus: text("estatus")
+        )
+    }
+
+    private var dock: ActivityDockRules.Dock? {
+        guard !raw.isEmpty else { return nil }
+        return ActivityDockRules.principal(
+            puedeIniciar: puedeIniciar,
+            sesion: sesionPropia,
+            despachador: splits,
+            estatus: text("estatus"),
+            captura: canCapture,
+            flow: flow,
+            coreKind: coreKind,
+            fotosRequeridas: fotosRequeridas
+        )
+    }
+
+    private var lugarTitulo: String {
+        ActivityParse.nestedName(raw["client"], raw["clienteNombre"], raw["branchName"])
+    }
+
+    private var lugarDetalle: String {
+        let titulo = lugarTitulo
+        let partes = [text("branchName"), text("branchCity"), text("branchState")]
+            .filter { !$0.isEmpty && $0 != titulo }
+        return partes.isEmpty ? text("branchAddress") : partes.joined(separator: " · ")
+    }
+
+    private var lugarMapa: URL? {
+        ActivityParse.mapsUrl(
+            lat: ActivityParse.double(raw["branchLatitude"]),
+            lng: ActivityParse.double(raw["branchLongitude"])
+        )
+    }
+
     private func superiorTarget(_ acciones: ActivitySuperiorActions) -> ActivitySuperiorTarget {
         var enActividad = Set(assignees.filter { isActive($0) }.compactMap { userId(of: $0) })
         if let responsableId { enActividad.insert(responsableId) }
@@ -136,6 +200,21 @@ struct ActivityCoreDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Cabecera v2: tipo, estado y título grande arriba de las pestañas.
+            if !raw.isEmpty {
+                ActivityHeaderV2(
+                    titulo: titulo,
+                    folio: folio,
+                    coreKind: coreKind,
+                    ticketTypeCustom: text("ticketTypeCustom"),
+                    estatus: text("estatus"),
+                    prioridad: text("prioridad"),
+                    sesion: sesionPropia,
+                    isDespacho: isDespacho
+                )
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
             Picker("Sección", selection: $tab) {
                 ForEach(CoreDetailTab.allCases) { item in
                     Text(item.title).tag(item)
@@ -164,7 +243,10 @@ struct ActivityCoreDetailView: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .navigationTitle(titulo.isEmpty ? "Actividad" : titulo)
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        // Dock inferior fijo (v2): la acción principal al alcance del pulgar.
+        .safeAreaInset(edge: .bottom, spacing: 0) { dockView }
+        .navigationTitle(folio.isEmpty ? (titulo.isEmpty ? "Actividad" : titulo) : folio)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             guard !didApplyInitialTab else { return }
@@ -172,6 +254,20 @@ struct ActivityCoreDetailView: View {
             tab = CoreDetailTab.from(initialTab)
         }
         .task { await load() }
+        // Pasos y dock: el flujo propio se relee al cambiar de pestaña o al capturar algo.
+        .task(id: "\(tab.rawValue)-\(teamRefresh)-\(canCapture)") {
+            guard canCapture else { return }
+            if let next = try? await CoreRepository.shared.evidenceFlow(activityId: activityId) {
+                flow = next
+            }
+        }
+        .alert(SesionActividad.tituloPausaPropia, isPresented: $pidiendoPausa) {
+            TextField("Motivo (opcional)", text: $motivoPausa)
+            Button("Cancelar", role: .cancel) {}
+            Button("Pausar") { Task { await pausar() } }
+        } message: {
+            Text(SesionActividad.textoPausaPropia)
+        }
         .task(id: tab) {
             if tab == .historial && !eventsLoaded {
                 await loadTimeline()
@@ -232,25 +328,17 @@ struct ActivityCoreDetailView: View {
                 }
             }
 
+            // Tipo, estado, folio y despacho van en la cabecera v2 (arriba de las pestañas);
+            // la prioridad sigue aquí, con su bandera.
             Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(titulo.isEmpty ? "Actividad" : titulo).font(.headline)
-                    let folio = text("anNumber")
-                    if !folio.isEmpty {
-                        Text("Folio \(folio)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    CoreFlowLayout {
-                        let estatus = CoreStatusUI.estatus(text("estatus"))
-                        let priority = CoreStatusUI.priority(text("prioridad"))
-                        CoreChip(text: estatus.label, color: estatus.color)
-                        CoreChip(icon: "flag.fill", text: priority.label, color: priority.color)
-                        CoreChip(icon: CoreStatusUI.kindSymbol(coreKind), text: CoreStatusUI.kind(coreKind, ticketTypeCustom: text("ticketTypeCustom")))
-                        if isDespacho {
-                            CoreChip(icon: "paperplane", text: "Despacho", color: CorePalette.purple)
-                        }
+                CoreFlowLayout {
+                    let priority = CoreStatusUI.priority(text("prioridad"))
+                    CoreChip(icon: "flag.fill", text: priority.label, color: priority.color)
+                    if let por = ActivityParse.nestedName(raw["asignadoPor"]).nilIfEmpty {
+                        CoreChip(icon: "person", text: "De \(CoreFormat.shortName(por))")
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 2)
             }
 
             if let cancelNotice {
@@ -260,17 +348,47 @@ struct ActivityCoreDetailView: View {
                 }
             }
 
-            if let mine = myAssigneeRow, !isCeo {
-                SesionPropiaSection(
-                    activityId: activityId,
-                    sesion: SesionActividad(fila: mine),
-                    miId: myId,
-                    despachador: splits,
-                    estatus: text("estatus")
-                ) { message in
-                    notice = message
-                    teamRefresh += 1
-                    Task { await load() }
+            if !lugarTitulo.isEmpty {
+                Section {
+                    ActivityPlaceCardV2(titulo: lugarTitulo, detalle: lugarDetalle, mapsURL: lugarMapa)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
+            }
+
+            // «Iniciar actividad» vive en el dock; aquí solo se explica (regla del 18-09).
+            if puedeIniciar {
+                Section {
+                    NxIconText(
+                        systemName: "hand.raised",
+                        text: "Te asignaron esta actividad. Iníciala cuando empieces: queda registrada tu hora real de inicio. Si no puedes hacerla, habla con tu jefe para que la reasigne.",
+                        tint: NxTone.info.fg
+                    )
+                    .font(.footnote)
+                }
+            }
+
+            // Tu reloj: «Reanudar» y «Pausar» están en el dock; aquí queda el porqué de la pausa.
+            if let sesion = sesionPropia, let texto = sesion.textoPausa(miId: myId, propia: true) {
+                Section {
+                    NxIconText(systemName: "pause.circle.fill", text: texto, tint: CorePalette.orange)
+                        .font(.footnote)
+                } header: {
+                    Text("Tu reloj")
+                } footer: {
+                    Text(SesionActividad.ayudaReanudar)
+                }
+            }
+
+            if canCapture {
+                Section {
+                    ActivityStepsCardV2(
+                        pasos: ActivityDockRules.pasos(flow: flow, coreKind: coreKind, fotosRequeridas: fotosRequeridas)
+                    ) {
+                        tab = .evidencias
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
             }
 
@@ -455,6 +573,91 @@ struct ActivityCoreDetailView: View {
         }
         .listStyle(.insetGrouped)
         .refreshable { await loadTimeline() }
+    }
+
+    // MARK: Dock (v2)
+
+    /// En Evidencias la captura trae sus propios botones: ahí el dock solo sale
+    /// para «Iniciar» o «Reanudar», sin los que el reloj no corre.
+    @ViewBuilder
+    private var dockView: some View {
+        if let dock, tab != .evidencias || dock.kind == .iniciar || dock.kind == .reanudar {
+            ActivityDockBar(
+                label: dock.label,
+                systemImage: dock.systemImage,
+                loading: iniciando || reanudando,
+                hint: dock.hint,
+                error: dockError,
+                secondary: dock.pausable
+                    ? [ActivityDockSecondary(label: "Pausar", systemImage: "pause") { pedirPausa() }]
+                    : [],
+                onPrimary: { primaria(dock) }
+            )
+        }
+    }
+
+    private func primaria(_ dock: ActivityDockRules.Dock) {
+        switch dock.kind {
+        case .iniciar: Task { await iniciar() }
+        case .reanudar: Task { await reanudar() }
+        case .evidencias, .ver: tab = .evidencias
+        case .pausar: pedirPausa()
+        }
+    }
+
+    private func pedirPausa() {
+        dockError = nil
+        motivoPausa = ""
+        pidiendoPausa = true
+    }
+
+    /// Guarda la hora real de inicio; lo siguiente es la foto de entrada.
+    @MainActor
+    private func iniciar() async {
+        iniciando = true
+        dockError = nil
+        defer { iniciando = false }
+        do {
+            try await CoreRepository.shared.iniciarActividad(activityId: activityId)
+            notice = "Actividad iniciada. Sigue con la foto de entrada."
+            teamRefresh += 1
+            await load()
+            tab = .evidencias
+        } catch {
+            dockError = error.toUserMessage(fallback: "No se pudo iniciar la actividad")
+        }
+    }
+
+    @MainActor
+    private func reanudar() async {
+        reanudando = true
+        dockError = nil
+        defer { reanudando = false }
+        do {
+            try await CoreRepository.shared.reanudarActividad(activityId: activityId)
+            notice = "Tu reloj volvió a correr"
+            teamRefresh += 1
+            await load()
+        } catch {
+            dockError = error.toUserMessage(fallback: "No se pudo reanudar la actividad")
+        }
+    }
+
+    @MainActor
+    private func pausar() async {
+        if let invalido = SesionActividad.errorMotivoPropio(motivoPausa) {
+            dockError = invalido
+            return
+        }
+        dockError = nil
+        do {
+            try await CoreRepository.shared.pausarActividad(activityId: activityId, motivo: motivoPausa)
+            notice = "Actividad en pausa"
+            teamRefresh += 1
+            await load()
+        } catch {
+            dockError = error.toUserMessage(fallback: "No se pudo pausar la actividad")
+        }
     }
 
     // MARK: Carga

@@ -105,7 +105,7 @@ fun NxLightStatusBarIcons() {
 
 // ── Botones ─────────────────────────────────────────────────────────────────
 
-/** Acción principal de la pantalla: 48 dp de alto, ancho completo por omisión. */
+/** Acción principal de la pantalla: 52 dp de alto (v2), ancho completo por omisión. */
 @Composable
 fun NxPrimaryButton(
     text: String,
@@ -114,13 +114,13 @@ fun NxPrimaryButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     icon: ImageVector? = null,
-    containerColor: Color = NxColors.Brand,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.heightIn(min = NxSpacing.TouchTarget),
-        shape = RoundedCornerShape(NxUi.RadiusLg),
+        modifier = modifier.heightIn(min = NxDimens.PrimaryButtonHeight),
+        shape = RoundedCornerShape(NxDimens.ControlRadius),
         colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = Color.White),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
     ) {
@@ -137,13 +137,13 @@ fun NxSecondaryButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     icon: ImageVector? = null,
-    contentColor: Color = NxColors.Brand,
+    contentColor: Color = MaterialTheme.colorScheme.primary,
 ) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled && !loading,
-        modifier = modifier.heightIn(min = NxSpacing.TouchTarget),
-        shape = RoundedCornerShape(NxUi.RadiusLg),
+        modifier = modifier.heightIn(min = NxDimens.PrimaryButtonHeight),
+        shape = RoundedCornerShape(NxDimens.ControlRadius),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
     ) {

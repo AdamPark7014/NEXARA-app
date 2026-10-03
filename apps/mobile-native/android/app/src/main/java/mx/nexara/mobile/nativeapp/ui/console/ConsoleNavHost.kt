@@ -1,15 +1,20 @@
 package mx.nexara.mobile.nativeapp.ui.console
 
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +43,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import mx.nexara.mobile.nativeapp.access.CoreKeys
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
@@ -45,6 +51,7 @@ import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionRevision
+import mx.nexara.mobile.nativeapp.data.chat.ChatRepository
 import mx.nexara.mobile.nativeapp.data.notifications.NotificationsRepository
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.navigation.PendingModuleLink
@@ -62,6 +69,8 @@ import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionDetalleScree
 import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionesScreen
 import mx.nexara.mobile.nativeapp.ui.console.gastos.GastosScreen
 import mx.nexara.mobile.nativeapp.ui.console.herramientas.HerramientasScreen
+import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioScreen
+import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioViewModel
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
@@ -85,6 +94,11 @@ import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 import mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen
 
 internal object ConsoleRoutes {
+    /**
+     * Inicio (rediseño v2): jornada, aviso, actividad de ahora y siguientes.
+     * Es la primera pestaña y el destino inicial del grafo para todo el personal.
+     */
+    const val Inicio = "console/inicio"
     const val Activities = "console/activities"
     const val Attendance = "console/attendance"
     const val Chat = "console/chat"
@@ -249,21 +263,45 @@ internal object ConsoleRoutes {
     }
 }
 
-private fun CoreModule.icon(): ImageVector = when (this) {
-    CoreModule.ACTIVIDADES -> Icons.AutoMirrored.Filled.Assignment
-    CoreModule.ASISTENCIAS -> Icons.Default.Schedule
-    CoreModule.CHAT -> Icons.AutoMirrored.Filled.Chat
-    CoreModule.CLIENTES -> Icons.Default.Business
-    CoreModule.MI_PERFIL -> Icons.Default.Person
+/**
+ * Una pestaña de la barra inferior v2: icono de trazo en reposo y relleno al
+ * estar activa (como la maqueta `movil-inicio.png`).
+ */
+private data class ShellTab(
+    val route: String,
+    val label: String,
+    val icon: ImageVector,
+    val selectedIcon: ImageVector,
+)
+
+/**
+ * Las 5 pestañas del rediseño v2, en este orden: Inicio · Actividades · Chat ·
+ * Asistencia · Más. Inicio y Más las tiene todo el personal; las otras tres
+ * solo si el rol abre ese módulo ([CoreMenu]). Clientes y Mi perfil dejan de
+ * ser pestaña: viven en «Más» (sus rutas y deep links no cambian).
+ */
+private fun shellTabsFor(modules: List<CoreModule>): List<ShellTab> = buildList {
+    add(ShellTab(ConsoleRoutes.Inicio, "Inicio", Icons.Outlined.Home, Icons.Filled.Home))
+    if (CoreModule.ACTIVIDADES in modules) {
+        add(ShellTab(ConsoleRoutes.Activities, "Actividades", Icons.Outlined.CheckBox, Icons.Filled.CheckBox))
+    }
+    if (CoreModule.CHAT in modules) {
+        add(ShellTab(ConsoleRoutes.Chat, "Chat", Icons.AutoMirrored.Outlined.Chat, Icons.AutoMirrored.Filled.Chat))
+    }
+    if (CoreModule.ASISTENCIAS in modules) {
+        add(ShellTab(ConsoleRoutes.Attendance, "Asistencia", Icons.Outlined.Schedule, Icons.Filled.Schedule))
+    }
+    add(ShellTab(ConsoleRoutes.More, "Más", Icons.Outlined.GridView, Icons.Filled.GridView))
 }
 
 /** La web consulta el contador de la campana cada 45 s (AppShell.tsx). */
 private const val UNREAD_POLL_MS = 45_000L
 
 /**
- * NEXARA Core en el teléfono: una barra inferior con exactamente los módulos de
- * `CORE_OLA1_MODULE_IDS` que el rol puede abrir ([CoreMenu]) y la campana de
- * notificaciones arriba. No hay «Más», ni módulos genéricos, ni salida a paneles.
+ * NEXARA Core en el teléfono (rediseño v2): barra inferior con 5 destinos
+ * —Inicio, Actividades, Chat, Asistencia y Más— según lo que el rol puede abrir
+ * ([CoreMenu]), y la campana arriba. Inicio pinta su propia cabecera (saludo y
+ * campana), así que ahí no hay barra superior. Sin salida a paneles.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -273,7 +311,12 @@ fun ConsoleNavHost(
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
     val notificationsRepo = remember(context) { NotificationsRepository(context) }
+    val chatRepo = remember(context) { ChatRepository(context) }
     val user = remember { authRepo.loadSession() }
+    // Vive en el ámbito del shell (la entrada `Routes.Erp`, que se borra al cerrar
+    // sesión): Inicio lo pinta y la pestaña Actividades saca de aquí su insignia.
+    val inicioVm: InicioViewModel = viewModel()
+    val inicioState by inicioVm.state.collectAsState()
 
     /**
      * La misma sesión, pero releída cuando se guarda una versión nueva.
@@ -301,12 +344,18 @@ fun ConsoleNavHost(
     /** `?nueva=` de la web: la actividad recién auto-asignada se resalta en Mis actividades. */
     var nuevaActividadId by remember { mutableStateOf<Long?>(null) }
     var unreadCount by remember { mutableIntStateOf(0) }
+    /** Mensajes de chat sin leer (suma de `unreadCount` de `chat/channels`), para la insignia. */
+    var chatUnread by remember { mutableIntStateOf(0) }
 
     val modules = remember(user) { CoreMenu.modulesFor(user) }
     /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos). */
     val extras = remember(userAlDia) { CoreMenu.extraModulesFor(userAlDia) }
-    val tabs = remember(modules) { modules.map { ConsoleRoutes.forModule(it) to it } }
-    val startRoute = tabs.firstOrNull()?.first ?: ConsoleRoutes.MyProfile
+    val tabs = remember(modules) { shellTabsFor(modules) }
+    val tieneChat = CoreModule.CHAT in modules
+    val tieneAsistencia = CoreModule.ASISTENCIAS in modules
+    val tieneClientes = CoreModule.CLIENTES in modules
+    // Fijo a propósito: cambiar `startDestination` con el NavHost vivo deja la pila incoherente.
+    val startRoute = ConsoleRoutes.Inicio
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -328,6 +377,11 @@ fun ConsoleNavHost(
         while (true) {
             runCatching { notificationsRepo.unreadCount() }
                 .onSuccess { unreadCount = it.unreadCount }
+            // Insignia de Chat: la misma lista de canales que ya pide la pantalla de Chat.
+            if (tieneChat) {
+                runCatching { chatRepo.channels() }
+                    .onSuccess { canales -> chatUnread = canales.sumOf { it.unreadCount.coerceAtLeast(0) } }
+            }
             delay(UNREAD_POLL_MS)
         }
     }
@@ -391,8 +445,17 @@ fun ConsoleNavHost(
     val openSelfAssign: () -> Unit = {
         navController.navigate(ConsoleRoutes.selfAssign()) { launchSingleTop = true }
     }
+    /** Cambiar de pestaña: igual que tocarla en la barra inferior (conserva el estado de cada una). */
+    val selectTab: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(startRoute) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     val currentTitle = when (currentRoute) {
+        ConsoleRoutes.Inicio -> "Inicio"
         ConsoleRoutes.Activities -> "Actividades"
         ConsoleRoutes.Attendance -> "Asistencias"
         ConsoleRoutes.Chat -> "Chat"
@@ -423,13 +486,19 @@ fun ConsoleNavHost(
         else -> "NEXARA"
     }
 
-    val tabRoutes = remember(tabs) { tabs.map { it.first }.toSet() }
+    val tabRoutes = remember(tabs) { tabs.map { it.route }.toSet() }
     val showBack = currentRoute != null && currentRoute !in tabRoutes
+    /** Inicio trae su propia cabecera (saludo, fecha y campana): sin barra superior. */
+    val enInicio = (currentRoute ?: startRoute) == ConsoleRoutes.Inicio
+    /** El detalle de actividad lleva su dock con la acción grande: ahí la barra inferior estorba. */
+    val conBarraInferior = currentRoute != ConsoleRoutes.ActivityDetail
 
-    NxLightStatusBarIcons()
+    // La barra superior es teal con letras blancas: iconos claros en la barra de
+    // estado mientras se ve. En Inicio el fondo es claro y vuelven los oscuros.
+    if (!enInicio) NxLightStatusBarIcons()
     Scaffold(
         topBar = {
-            TopAppBar(
+            if (!enInicio) TopAppBar(
                 title = {
                     Text(
                         currentTitle,
@@ -452,15 +521,7 @@ fun ConsoleNavHost(
                     }
                 },
                 actions = {
-                    // «Más»: el resto de Core. No cabe una sexta pestaña abajo (Material deja 5),
-                    // así que vive aquí, junto a la campana.
-                    if (extras.isNotEmpty() && currentRoute != ConsoleRoutes.More) {
-                        IconButton(
-                            onClick = { navController.navigate(ConsoleRoutes.More) { launchSingleTop = true } },
-                        ) {
-                            Icon(Icons.Default.Apps, contentDescription = "Más módulos", tint = Color.White)
-                        }
-                    }
+                    // «Más» ya es la quinta pestaña de abajo (v2): aquí solo queda la campana.
                     // Sin «Salir» aquí: cerrar sesión vive al final de Mi perfil, con confirmación.
                     // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
                     if (currentRoute != ConsoleRoutes.Notifications) {
@@ -486,19 +547,25 @@ fun ConsoleNavHost(
             )
         },
         bottomBar = {
-            if (tabs.size > 1) {
+            if (conBarraInferior) {
                 NxBottomTabBar(
-                    tabs = tabs.map { (route, module) -> NxBottomTab(route, module.icon(), module.label) },
+                    tabs = tabs.map { tab ->
+                        NxBottomTab(
+                            route = tab.route,
+                            icon = tab.icon,
+                            label = tab.label,
+                            selectedIcon = tab.selectedIcon,
+                            badge = when (tab.route) {
+                                ConsoleRoutes.Activities -> inicioState.pendientes
+                                ConsoleRoutes.Chat -> chatUnread
+                                else -> null
+                            },
+                        )
+                    },
                     isSelected = { route ->
                         currentDestination?.hierarchy?.any { it.route == route } == true
                     },
-                    onTabSelected = { route ->
-                        navController.navigate(route) {
-                            popUpTo(startRoute) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    onTabSelected = selectTab,
                 )
             }
         },
@@ -506,8 +573,28 @@ fun ConsoleNavHost(
         NavHost(
             navController = navController,
             startDestination = startRoute,
-            modifier = Modifier.padding(inner),
+            // Lo que ya rellenan las barras no se vuelve a sumar dentro (el dock
+            // del detalle y la cabecera de Inicio piden sus propios márgenes).
+            modifier = Modifier.padding(inner).consumeWindowInsets(inner),
         ) {
+            nxComposable(ConsoleRoutes.Inicio) {
+                InicioScreen(
+                    vm = inicioVm,
+                    unreadCount = unreadCount,
+                    onOpenNotifications = {
+                        navController.navigate(ConsoleRoutes.Notifications) { launchSingleTop = true }
+                    },
+                    onOpenActivity = openActivity,
+                    onOpenActividades = { if (CoreModule.ACTIVIDADES in modules) selectTab(ConsoleRoutes.Activities) },
+                    onOpenAsistencia = { if (tieneAsistencia) selectTab(ConsoleRoutes.Attendance) },
+                    onOpenComidas = {
+                        if (tieneAsistencia) {
+                            attendanceTab = "comidas"
+                            selectTab(ConsoleRoutes.Attendance)
+                        }
+                    },
+                )
+            }
             nxComposable(ConsoleRoutes.Activities) {
                 // Core (/erp/pizarra): CEO → pizarra; con equipo → pestañas; resto → lo suyo.
                 ActividadesScreen(
@@ -555,7 +642,8 @@ fun ConsoleNavHost(
                     initialMessageId = chatMessageId,
                 )
             }
-            nxComposable(ConsoleRoutes.Clients) { entry ->
+            // Clientes ya no es pestaña (v2): se abre desde «Más» o por enlace, con flecha de volver.
+            nxComposable(ConsoleRoutes.Clients, style = NxNavAnimStyle.Push) { entry ->
                 val recargar by entry.savedStateHandle
                     .getStateFlow(ConsoleRoutes.CLIENTS_CHANGED_KEY, false)
                     .collectAsState()
@@ -614,7 +702,8 @@ fun ConsoleNavHost(
                     },
                 )
             }
-            nxComposable(ConsoleRoutes.MyProfile) {
+            // Mi perfil se abre desde la tarjeta de arriba de «Más».
+            nxComposable(ConsoleRoutes.MyProfile, style = NxNavAnimStyle.Push) {
                 MyProfileScreen(
                     onOpenOfflineQueue = {
                         navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
@@ -622,7 +711,8 @@ fun ConsoleNavHost(
                     onLogout = onLogout,
                 )
             }
-            nxComposable(ConsoleRoutes.More, style = NxNavAnimStyle.Push) {
+            // «Más» es la quinta pestaña (v2): perfil, Clientes si el rol lo ve y el resto de Core.
+            nxComposable(ConsoleRoutes.More) {
                 MoreHubScreen(
                     modules = extras,
                     onOpen = { module ->
@@ -632,6 +722,11 @@ fun ConsoleNavHost(
                     },
                     onOpenProfile = {
                         navController.navigate(ConsoleRoutes.MyProfile) { launchSingleTop = true }
+                    },
+                    onOpenClientes = if (tieneClientes) {
+                        { navController.navigate(ConsoleRoutes.Clients) { launchSingleTop = true } }
+                    } else {
+                        null
                     },
                 )
             }

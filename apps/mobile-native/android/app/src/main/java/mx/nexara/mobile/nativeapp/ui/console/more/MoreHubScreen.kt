@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Payments
@@ -65,7 +66,7 @@ import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.console.ConsoleRoutes
 import mx.nexara.mobile.nativeapp.ui.console.CoreExtraModule
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
@@ -102,6 +103,8 @@ fun MoreHubScreen(
     modules: List<CoreExtraModule>,
     onOpen: (CoreExtraModule) -> Unit,
     onOpenProfile: () -> Unit = {},
+    /** Clientes dejó de ser pestaña (v2: Inicio · Actividades · Chat · Asistencia · Más); vive aquí si el rol lo ve. */
+    onOpenClientes: (() -> Unit)? = null,
 ) {
     // Agrupar por «Hoy», «Recursos», «Finanzas», «Gobierno», en ese orden.
     val groupsInOrder = remember(modules) {
@@ -120,7 +123,7 @@ fun MoreHubScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(NxColors.Surface),
+        modifier = Modifier.fillMaxSize().background(NxTheme.colors.surface),
         contentPadding = NxSpacing.ListPadding,
         verticalArrangement = Arrangement.spacedBy(NxSpacing.S),
     ) {
@@ -129,9 +132,22 @@ fun MoreHubScreen(
                 ProfileHeaderCard(user = sessionUser, onClick = onOpenProfile)
             }
         }
+        if (onOpenClientes != null) {
+            item(key = "header-core", contentType = "header") {
+                GroupHeader(title = "Clientes y obra", topPadding = 0.dp)
+            }
+            item(key = "module-clientes", contentType = "module") {
+                HubCard(
+                    icon = Icons.Default.Handshake,
+                    label = "Clientes",
+                    summary = "Padrón por sector: fichas, sucursales y altas.",
+                    onClick = onOpenClientes,
+                )
+            }
+        }
         groupsInOrder.forEachIndexed { gi, (group, list) ->
             item(key = "header-${group.name}", contentType = "header") {
-                GroupHeader(title = group.title, topPadding = if (gi == 0) 0.dp else NxSpacing.M)
+                GroupHeader(title = group.title, topPadding = if (gi == 0 && onOpenClientes == null) 0.dp else NxSpacing.M)
             }
             items(list, key = { it.key }, contentType = { "module" }) { module ->
                 ExtraCard(module = module, onOpen = onOpen)
@@ -147,7 +163,7 @@ private fun ProfileHeaderCard(user: SessionUser, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(NxDimens.PanelRadius),
-        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+        colors = CardDefaults.cardColors(containerColor = NxTheme.colors.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Row(
@@ -160,7 +176,7 @@ private fun ProfileHeaderCard(user: SessionUser, onClick: () -> Unit) {
                 AsyncImage(
                     model = toAbsoluteAssetUrl(avatarUrl),
                     contentDescription = user.nombre,
-                    modifier = Modifier.size(52.dp).clip(CircleShape).border(2.dp, NxColors.Brand, CircleShape),
+                    modifier = Modifier.size(52.dp).clip(CircleShape).border(2.dp, NxTheme.colors.brand, CircleShape),
                     contentScale = ContentScale.Crop,
                 )
             } else {
@@ -170,7 +186,7 @@ private fun ProfileHeaderCard(user: SessionUser, onClick: () -> Unit) {
                     .joinToString("")
                     .ifBlank { "?" }
                 Box(
-                    modifier = Modifier.size(52.dp).clip(CircleShape).background(NxColors.Brand),
+                    modifier = Modifier.size(52.dp).clip(CircleShape).background(NxTheme.colors.brand),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(initials, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
@@ -180,7 +196,7 @@ private fun ProfileHeaderCard(user: SessionUser, onClick: () -> Unit) {
                 Text(
                     user.nombre.ifBlank { "Tu cuenta" },
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = NxColors.Slate,
+                    color = NxTheme.colors.fg,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -188,7 +204,7 @@ private fun ProfileHeaderCard(user: SessionUser, onClick: () -> Unit) {
                     Text(
                         user.department,
                         style = MaterialTheme.typography.bodySmall,
-                        color = NxColors.Muted,
+                        color = NxTheme.colors.muted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -197,7 +213,7 @@ private fun ProfileHeaderCard(user: SessionUser, onClick: () -> Unit) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = NxColors.Muted,
+                tint = NxTheme.colors.muted,
             )
         }
     }
@@ -208,7 +224,7 @@ private fun GroupHeader(title: String, topPadding: Dp = 0.dp) {
     Text(
         title.uppercase(),
         style = MaterialTheme.typography.labelMedium,
-        color = NxColors.Muted,
+        color = NxTheme.colors.muted,
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = topPadding, bottom = NxSpacing.Xxs, start = NxSpacing.Xs)
@@ -218,12 +234,29 @@ private fun GroupHeader(title: String, topPadding: Dp = 0.dp) {
 
 @Composable
 private fun ExtraCard(module: CoreExtraModule, onOpen: (CoreExtraModule) -> Unit) {
-    val enWeb = !ConsoleRoutes.tienePantallaNativa(module)
-    Card(
+    HubCard(
+        icon = module.icon(),
+        label = module.label,
+        summary = module.summary,
+        enWeb = !ConsoleRoutes.tienePantallaNativa(module),
         onClick = { onOpen(module) },
+    )
+}
+
+/** Renglón del hub: icono en baldosa suave, nombre, una línea y flecha. */
+@Composable
+private fun HubCard(
+    icon: ImageVector,
+    label: String,
+    summary: String,
+    onClick: () -> Unit,
+    enWeb: Boolean = false,
+) {
+    Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(NxDimens.PanelRadius),
-        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+        colors = CardDefaults.cardColors(containerColor = NxTheme.colors.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Row(
@@ -237,28 +270,28 @@ private fun ExtraCard(module: CoreExtraModule, onOpen: (CoreExtraModule) -> Unit
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(NxColors.BrandTint, RoundedCornerShape(10.dp)),
+                    .background(NxTheme.colors.brandSoft, RoundedCornerShape(NxDimens.ControlRadius)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    module.icon(),
+                    icon,
                     contentDescription = null,
-                    tint = NxColors.Brand,
+                    tint = NxTheme.colors.brandText,
                     modifier = Modifier.size(22.dp),
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    module.label,
+                    label,
                     style = MaterialTheme.typography.titleSmall,
-                    color = NxColors.Slate,
+                    color = NxTheme.colors.fg,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    module.summary,
+                    summary,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxColors.Muted,
+                    color = NxTheme.colors.muted,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -269,7 +302,7 @@ private fun ExtraCard(module: CoreExtraModule, onOpen: (CoreExtraModule) -> Unit
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = NxColors.Muted,
+                tint = NxTheme.colors.muted,
             )
         }
     }
@@ -282,7 +315,7 @@ fun ModulePlaceholderScreen(module: CoreExtraModule) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(NxColors.Surface)
+            .background(NxTheme.colors.surface)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -290,13 +323,13 @@ fun ModulePlaceholderScreen(module: CoreExtraModule) {
         Box(
             modifier = Modifier
                 .size(88.dp)
-                .background(NxColors.BrandTint, RoundedCornerShape(24.dp)),
+                .background(NxTheme.colors.brandTint, RoundedCornerShape(24.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 module.icon(),
                 contentDescription = null,
-                tint = NxColors.Brand,
+                tint = NxTheme.colors.brand,
                 modifier = Modifier.size(44.dp),
             )
         }
@@ -304,21 +337,21 @@ fun ModulePlaceholderScreen(module: CoreExtraModule) {
         Text(
             module.label,
             style = MaterialTheme.typography.headlineSmall,
-            color = NxColors.Slate,
+            color = NxTheme.colors.fg,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(6.dp))
         Text(
             module.summary,
             style = MaterialTheme.typography.bodyMedium,
-            color = NxColors.Muted,
+            color = NxTheme.colors.muted,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(18.dp))
         Text(
             "Este módulo llegará pronto a la app. Mientras tanto, ábrelo en la web.",
             style = MaterialTheme.typography.bodyMedium,
-            color = NxColors.Slate,
+            color = NxTheme.colors.fg,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(20.dp))

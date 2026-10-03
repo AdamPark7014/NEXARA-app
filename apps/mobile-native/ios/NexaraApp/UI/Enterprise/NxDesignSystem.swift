@@ -45,18 +45,21 @@ enum NxSpacing {
     static let xxl: CGFloat = 32
 }
 
-/// Radios de la web (`--ds-radius-sm/-/-lg`).
+/// Radios v2: 8 controles chicos · 12 controles · 16 tarjetas · 20 hojas y tarjetas hero.
 enum NxRadius {
     static let s: CGFloat = 8
     static let m: CGFloat = 12
     static let l: CGFloat = 16
+    static let xl: CGFloat = 20
 }
 
 /// Medidas mínimas de toque (HIG: 44 pt).
 enum NxMetrics {
     static let minTap: CGFloat = 44
-    /// Botón principal: se toca con guantes y sin mirar.
-    static let primaryButtonHeight: CGFloat = 50
+    /// Botón principal (v2): 52 pt, se toca con guantes y sin mirar.
+    static let primaryButtonHeight: CGFloat = 52
+    /// Acción principal del dock del detalle, al alcance del pulgar.
+    static let dockButtonHeight: CGFloat = 56
 }
 
 // MARK: - Formato es-MX (formatters en caché)
@@ -328,7 +331,7 @@ extension View {
 
 // MARK: - Botones
 
-/// Botón principal: ancho completo, 50 pt de alto, azul de marca.
+/// Botón principal: ancho completo, 52 pt de alto, teal de marca.
 struct NxPrimaryButtonStyle: ButtonStyle {
     var tint: Color = NxBrand.primary
 
