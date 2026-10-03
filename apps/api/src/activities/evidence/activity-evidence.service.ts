@@ -14,6 +14,7 @@ import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
 import { ActivitySessionsService } from '../sessions/activity-sessions.service.js';
+import { abrirJornadaDeGuardia } from '../../attendance/entrada-guardia.js';
 import { ActivityEvidenceFieldsService } from './activity-evidence-fields.service.js';
 import { progresoDeCampos } from './evidence-fields.helpers.js';
 import { claveVentanaAdjuntar, ventanaAdjuntarEntradaSalida } from './adjuntar-entrada-salida.js';
@@ -618,8 +619,46 @@ export class ActivityEvidenceService {
       longitude,
       justificacionOrden,
     });
+    await this.entradaDeGuardia({
+      activityId,
+      userId,
+      companyId: updated.companyId,
+      at: updated.entryPhotoUploadedAt ?? new Date(),
+      latitude,
+      longitude,
+      photoUrl,
+    });
     this.avisarAvance({ activityId, actorId: userId, paso: 'inicio', at: updated.entryPhotoUploadedAt ?? undefined });
     return updated;
+  }
+
+  /**
+   * Con guardia de fin de semana, iniciar su primer servicio o tarea del día es también su
+   * entrada: misma hora, misma ubicación y misma foto. Sus jefes se enteran como de
+   * cualquier entrada. Nunca tumba la foto de entrada.
+   */
+  private async entradaDeGuardia(p: {
+    activityId: number;
+    userId: number;
+    companyId: number;
+    at: Date;
+    latitude: number;
+    longitude: number;
+    photoUrl: string;
+  }) {
+    const entrada = await abrirJornadaDeGuardia(this.prisma, p);
+    if (!entrada.creada) return;
+    try {
+      await this.notificationHierarchy.notifyAttendanceChange(
+        p.userId,
+        'ATTENDANCE_CHECKIN',
+        entrada.nombre || 'Usuario',
+        entrada.deviceInfo,
+        p.at,
+      );
+    } catch (error) {
+      this.logger.warn(`entradaDeGuardia ${p.activityId}/${p.userId}: ${String(error)}`);
+    }
   }
 
   /**

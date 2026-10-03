@@ -29,6 +29,7 @@ import { horaAviso } from '../notifications/notification-push-meta.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-sessions.service.js';
+import { MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA, diaDeGuardia } from '../guardias/guardias-reglas.js';
 import {
   AttendanceJustificationsService,
   type AttendanceJustificationDto,
@@ -710,6 +711,12 @@ export class AttendanceService {
     const motivo = String(body.motivo).trim();
     const dia = this.getDateOnly(at);
 
+    if (type === 'entrada' && (await diaDeGuardia(this.prisma, { userId: targetId, companyId: tenantId, at })) === 'SIN_GUARDIA') {
+      throw new BadRequestException(
+        'Ese día es fin de semana y esa persona no tiene guardia. Prográmala primero en Guardias.',
+      );
+    }
+
     const yaExiste = await this.findAttendanceOnDate(targetId, type, at, tenantId);
     if (yaExiste) {
       throw new BadRequestException(
@@ -1063,8 +1070,9 @@ export class AttendanceService {
     }
 
     // El intento desde el navegador no es un fraude: es alguien que abrió la web
-    // en vez de la app. No se despierta a sus jefes por eso.
-    if (motivo !== MOTIVO_RECHAZO.desdeNavegador) {
+    // en vez de la app. Tampoco quien quiso checar en fin de semana sin guardia.
+    // No se despierta a sus jefes por eso.
+    if (motivo !== MOTIVO_RECHAZO.desdeNavegador && motivo !== MOTIVO_RECHAZO.finDeSemanaSinGuardia) {
       await this.avisarChecadaMarcada({
         userId: ctx.userId,
         titulo:
@@ -1489,6 +1497,14 @@ export class AttendanceService {
     });
     const now = hora.at;
     const today = this.getDateOnly(now);
+
+    // Sábado y domingo solo abre jornada quien tiene guardia ese día. La salida no se
+    // bloquea: cerrar una jornada abierta siempre se permite.
+    const guardia = await diaDeGuardia(this.prisma, { userId, companyId: tenantId, at: now });
+    if (dto.type === 'entrada' && guardia === 'SIN_GUARDIA') {
+      await this.rechazar(contexto, MOTIVO_RECHAZO.finDeSemanaSinGuardia, MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA);
+    }
+
     // Una sola lectura de las coordenadas para todo el registro: lo que se
     // guarda, lo que decide si hay GPS y lo que alimenta el rastreo salen de
     // aquí. Antes cada uno filtraba a su manera y `entryLatitude` acababa con
@@ -1503,7 +1519,8 @@ export class AttendanceService {
     const ubicacion = evaluarUbicacion({
       coords,
       accuracyM: dto.accuracyM,
-      sitios: await this.sitiosPermitidos(userId, now, tenantId),
+      // Con guardia trabaja donde lo manden: sin sitios no hay «fuera de sitio».
+      sitios: guardia === 'CON_GUARDIA' ? [] : await this.sitiosPermitidos(userId, now, tenantId),
     });
 
     // Lo que solo se ve mirando las checadas anteriores de esta misma persona.

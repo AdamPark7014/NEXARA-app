@@ -16,6 +16,7 @@ export const MOTIVO_RECHAZO_ETIQUETA: Record<string, string> = {
   ORIGEN_WEB: "Desde el navegador",
   VIAJE_IMPOSIBLE: "Viaje imposible",
   UBICACION_VIEJA: "Ubicación guardada",
+  FIN_DE_SEMANA_SIN_GUARDIA: "Fin de semana sin guardia",
 };
 
 /** Desde dónde llegó el intento, dicho como lo diría una persona. */

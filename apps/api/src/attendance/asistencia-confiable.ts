@@ -304,6 +304,7 @@ export const MOTIVO_RECHAZO = {
   desdeNavegador: 'ORIGEN_WEB',
   viajeImposible: 'VIAJE_IMPOSIBLE',
   ubicacionVieja: 'UBICACION_VIEJA',
+  finDeSemanaSinGuardia: 'FIN_DE_SEMANA_SIN_GUARDIA',
 } as const;
 
 export type MotivoRechazo = (typeof MOTIVO_RECHAZO)[keyof typeof MOTIVO_RECHAZO];
@@ -314,6 +315,7 @@ export const ETIQUETA_MOTIVO_RECHAZO: Record<string, string> = {
   ORIGEN_WEB: 'Intento desde el navegador',
   VIAJE_IMPOSIBLE: 'Viaje imposible entre checadas',
   UBICACION_VIEJA: 'Ubicación guardada, no del momento',
+  FIN_DE_SEMANA_SIN_GUARDIA: 'Fin de semana sin guardia',
 };
 
 /**

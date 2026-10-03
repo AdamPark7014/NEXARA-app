@@ -120,6 +120,8 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'OvertimeApproval',
   // Sesiones de trabajo de una actividad (migración 20261002130000_activity_work_sessions).
   'ActivityWorkSession',
+  // Guardias de fin de semana (migración 20261003010000_guardias).
+  'Guardia',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */

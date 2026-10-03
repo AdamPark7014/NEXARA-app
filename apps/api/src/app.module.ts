@@ -30,6 +30,7 @@ import { AlertsModule } from './alerts/alerts.module.js';
 import { DevicesModule } from './devices/devices.module.js';
 import { ViaticosModule } from './viaticos/viaticos.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { GuardiasModule } from './guardias/guardias.module.js';
 import { ProjectsModule } from './projects/projects.module';
 import { ContactMessagesModule } from './contact-messages/contact-messages.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
@@ -132,6 +133,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
     AlertsModule,
     ViaticosModule,
     AttendanceModule,
+    GuardiasModule,
     ProjectsModule,
     ContactMessagesModule,
     NewsletterModule,
