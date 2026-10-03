@@ -8,11 +8,19 @@
  * rápida de una actividad. Si el cliente de operación no tenía ficha en el padrón
  * (altas viejas), se le crea una mínima: así no quedan proyectos de clientes que no
  * existen en Clientes.
+ *
+ * Sumarle «Proyecto» a una ficha que ya existe la vuelve visible para toda la empresa, así
+ * que pide lo mismo que `addClientSector` (abrir la ficha, administrar el padrón y llevar el
+ * sector; `client-access.ts`). Si quien crea el proyecto no puede, el proyecto se crea igual
+ * y el cliente conserva sus tipos: se lo suma después quien administra el padrón, desde la
+ * ficha. Así un comercial ajeno no se destapa por abrirle un proyecto.
  */
+import { porQueNoSumaTipo, type ActorDelPadron } from '../ventas/client-access.js';
 
 type ClienteDelPadron = {
   id: number;
   tipo?: string | null;
+  ownerId?: number | null;
   companyId: number;
   sectors?: Array<{ sector: string }> | null;
 };
@@ -39,12 +47,12 @@ type PrismaDeClientes = {
 export async function marcarClienteDeProyecto(
   prisma: unknown,
   serviceClientId: number,
-  actorId?: number | null,
+  actor?: ActorDelPadron,
 ): Promise<void> {
   const db = prisma as PrismaDeClientes;
   const delPadron = await db.salesClient.findMany({
     where: { serviceClientId },
-    select: { id: true, tipo: true, companyId: true, sectors: { select: { sector: true } } },
+    select: { id: true, tipo: true, ownerId: true, companyId: true, sectors: { select: { sector: true } } },
   });
 
   if (!delPadron.length) {
@@ -57,7 +65,7 @@ export async function marcarClienteDeProyecto(
         billingPhone: operacion.contactPhone ?? null,
         fiscalAddress: operacion.address ?? null,
         status: operacion.isActive === false ? 'Inactivo' : 'Activo',
-        ownerId: actorId ?? null,
+        ownerId: actor?.id ?? null,
         serviceClientId: operacion.id,
         companyId: operacion.companyId,
         tipo: 'PROYECTO',
@@ -69,6 +77,8 @@ export async function marcarClienteDeProyecto(
 
   for (const cliente of delPadron) {
     if ((cliente.sectors ?? []).some((s) => s.sector === 'PROYECTO')) continue;
+    // La misma puerta que la ficha: quien no puede sumarle el tipo no lo destapa desde Proyectos.
+    if (await porQueNoSumaTipo(prisma, cliente, actor, 'PROYECTO')) continue;
     await db.salesClientSector.create({
       data: { salesClientId: cliente.id, sector: 'PROYECTO', companyId: cliente.companyId },
     });
@@ -82,10 +92,10 @@ export async function marcarClienteDeProyecto(
 export async function marcarClienteDeProyectoSinFallar(
   prisma: unknown,
   serviceClientId: number,
-  actorId?: number | null,
+  actor?: ActorDelPadron,
 ): Promise<void> {
   try {
-    await marcarClienteDeProyecto(prisma, serviceClientId, actorId);
+    await marcarClienteDeProyecto(prisma, serviceClientId, actor);
   } catch {
     /* el proyecto ya está creado */
   }

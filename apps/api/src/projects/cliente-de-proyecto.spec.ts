@@ -5,6 +5,11 @@ import { OperationalProjectsService } from './operational-projects.service';
  * Abrirle un proyecto a un cliente lo deja como cliente de proyecto en el padrón,
  * venga de donde venga. Así Proyectos y la ficha del cliente leen de la misma lista.
  */
+/** Coordinador de operaciones (matriz: proyecto y comercial): administra el padrón. */
+const COORDINADOR = { id: 10, email: 'operaciones@nexara.com.mx', roleKey: 'coord_operaciones' };
+/** Técnico de campo: crea proyectos y actividades, no edita el padrón. */
+const TECNICO = { id: 12, email: 'israel.ramos@nexara.com.mx', roleKey: 'ing_campo' };
+
 describe('marcarClienteDeProyecto', () => {
   function prisma(delPadron: Array<Record<string, unknown>>, operacion: Record<string, unknown> | null = null) {
     return {
@@ -14,17 +19,28 @@ describe('marcarClienteDeProyecto', () => {
       },
       salesClientSector: { create: jest.fn().mockResolvedValue({}) },
       serviceClient: { findUnique: jest.fn().mockResolvedValue(operacion) },
+      user: { count: jest.fn().mockResolvedValue(0) },
     };
   }
 
-  it('al cliente comercial le suma «Proyecto» sin tocar lo demás', async () => {
-    const db = prisma([{ id: 4, tipo: 'COMERCIAL', companyId: 7, sectors: [{ sector: 'COMERCIAL' }] }]);
-    await marcarClienteDeProyecto(db, 8);
+  it('al cliente comercial le suma «Proyecto» sin tocar lo demás, si quien abre el proyecto administra el padrón', async () => {
+    const db = prisma([{ id: 4, tipo: 'COMERCIAL', ownerId: 99, companyId: 7, sectors: [{ sector: 'COMERCIAL' }] }]);
+    await marcarClienteDeProyecto(db, 8, COORDINADOR);
     expect(db.salesClient.findMany.mock.calls[0][0].where).toEqual({ serviceClientId: 8 });
     expect(db.salesClientSector.create).toHaveBeenCalledWith({
       data: { salesClientId: 4, sector: 'PROYECTO', companyId: 7 },
     });
     expect(db.salesClient.create).not.toHaveBeenCalled();
+  });
+
+  it('un técnico no le suma «Proyecto» al comercial de otro: el proyecto no destapa la ficha', async () => {
+    const db = prisma([{ id: 4, tipo: 'COMERCIAL', ownerId: 99, companyId: 7, sectors: [{ sector: 'COMERCIAL' }] }]);
+    await marcarClienteDeProyecto(db, 8, TECNICO);
+    expect(db.salesClientSector.create).not.toHaveBeenCalled();
+    expect(db.salesClient.create).not.toHaveBeenCalled();
+    // Sin actor (solo el id, llamadas viejas) tampoco.
+    await marcarClienteDeProyecto(db, 8, { id: 12 });
+    expect(db.salesClientSector.create).not.toHaveBeenCalled();
   });
 
   it('si ya era de proyecto no escribe nada', async () => {
@@ -44,7 +60,7 @@ describe('marcarClienteDeProyecto', () => {
       isActive: true,
       companyId: 7,
     });
-    await marcarClienteDeProyecto(db, 8, 12);
+    await marcarClienteDeProyecto(db, 8, TECNICO);
     expect(db.salesClient.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: 'ACME',
@@ -68,12 +84,16 @@ describe('marcarClienteDeProyecto', () => {
 });
 
 describe('alta rápida de proyecto para cualquier cliente del padrón', () => {
-  it('a un cliente comercial se le abre el proyecto y queda marcado como de proyecto', async () => {
+  it('a un cliente comercial se le abre el proyecto y queda marcado como de proyecto cuando lo abre quien administra el padrón', async () => {
     const creado = { id: 3, title: 'Obra norte', status: 'ACTIVE', clientId: 8, salesProjectId: 31, client: { id: 8, name: 'ACME' } };
     const db: any = {
       salesClient: {
-        findFirst: jest.fn().mockResolvedValue({ id: 4, name: 'ACME', tipo: 'COMERCIAL', companyId: 7, serviceClientId: 8 }),
-        findMany: jest.fn().mockResolvedValue([{ id: 4, tipo: 'COMERCIAL', companyId: 7, sectors: [{ sector: 'COMERCIAL' }] }]),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 4, name: 'ACME', tipo: 'COMERCIAL', ownerId: 99, companyId: 7, serviceClientId: 8 }),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 4, tipo: 'COMERCIAL', ownerId: 99, companyId: 7, sectors: [{ sector: 'COMERCIAL' }] }]),
         update: jest.fn().mockResolvedValue({}),
       },
       salesClientSector: { create: jest.fn().mockResolvedValue({}) },
@@ -81,11 +101,14 @@ describe('alta rápida de proyecto para cualquier cliente del padrón', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 8, name: 'ACME', companyId: 7 }),
         findUnique: jest.fn().mockResolvedValue({ id: 8, name: 'ACME', companyId: 7 }),
       },
-      user: { findUnique: jest.fn().mockResolvedValue({ id: 12, nombre: 'Israel' }) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 10, nombre: 'David' }),
+        count: jest.fn().mockResolvedValue(0),
+      },
       operationalProject: { create: jest.fn().mockResolvedValue(creado) },
     };
     const service = new OperationalProjectsService(db, {} as any);
-    const res = await service.quickCreate({ title: 'Obra norte', salesClientId: 4 }, { id: 12 }, 7);
+    const res = await service.quickCreate({ title: 'Obra norte', salesClientId: 4 }, COORDINADOR, 7);
     expect(res).toEqual(creado);
     expect(db.operationalProject.create.mock.calls[0][0].data.clientId).toBe(8);
     expect(db.salesClientSector.create).toHaveBeenCalledWith({

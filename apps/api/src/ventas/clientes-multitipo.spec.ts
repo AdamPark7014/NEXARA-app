@@ -17,6 +17,7 @@ const DAVID = { id: 10, email: 'operaciones@nexara.com.mx', roleKey: 'coord_oper
 const DANIELA = { id: 15, email: 'daniela.hernandez@nexara.com.mx', roleKey: 'administrativo' };
 const PAULINA = { id: 16, email: 'finanzas@nexara.com.mx', roleKey: 'administrativo' };
 const TECNICO = { id: 12, email: 'israel.ramos@nexara.com.mx', roleKey: 'ing_campo' };
+const LUIS = { id: 11, email: 'direccion.operaciones@nexara.com.mx', roleKey: 'dir_operaciones' };
 
 type Fila = Record<string, any>;
 
@@ -167,11 +168,12 @@ describe('clientes: un solo padrón, sin duplicar', () => {
     sectors: [{ sector: 'PROYECTO' }],
   };
 
-  it('el alta rápida de un servicio reutiliza al cliente que ya existe y le suma el tipo', async () => {
+  it('el alta rápida de un servicio reutiliza al cliente que ya existe y, si quien la hace administra el padrón, le suma el tipo', async () => {
+    // Luis lleva corporativo y dirige operaciones: sumar CORPORATIVO es lo mismo que haría desde la ficha.
     const { service, prisma } = armar({ enPadron: [EXISTENTE] });
     const res = await service.createClient(
       { name: '  plaza   NORTE ', tipo: 'CORPORATIVO', altaRapida: true, billingPhone: '2221234567', billingEmail: 'otro@x.mx' } as any,
-      TECNICO,
+      LUIS,
       7,
     );
     // Se busca sin distinguir mayúsculas ni espacios de más, y dentro de la empresa.
@@ -188,6 +190,19 @@ describe('clientes: un solo padrón, sin duplicar', () => {
     expect(data.billingEmail).toBeUndefined();
     expect(res.id).toBe(40);
     expect(sectoresDelCliente(res)).toEqual(['PROYECTO', 'CORPORATIVO']);
+  });
+
+  it('la misma alta rápida hecha por un operativo reutiliza al cliente tal cual: ni tipo ni datos', async () => {
+    // Lo ve (es de proyecto, de toda la empresa) pero no edita el padrón: sale de aquí con el id y nada más.
+    const { service, prisma } = armar({ enPadron: [EXISTENTE] });
+    const res = await service.createClient(
+      { name: 'Plaza Norte', tipo: 'CORPORATIVO', altaRapida: true, billingPhone: '2221234567' } as any,
+      TECNICO,
+      7,
+    );
+    expect(prisma.salesClient.create).not.toHaveBeenCalled();
+    expect(prisma.salesClient.update).not.toHaveBeenCalled();
+    expect(res).toBe(EXISTENTE);
   });
 
   it('el alta desde una cotización tampoco duplica: el cliente de proyecto queda además comercial', async () => {
