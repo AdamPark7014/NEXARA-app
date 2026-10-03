@@ -13,6 +13,7 @@ import {
   type StockMovementPdfRow,
 } from './stock-movement-pdf.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
+import { clasificarCodigo, variantesDeBusqueda } from './codigo-barras.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
 
@@ -218,45 +219,101 @@ export class WarehouseService {
     });
   }
 
-  /** Cuña USB / HID: resuelve empaque o producto por código de barras. */
+  /** Existencia por almacén de un producto, para enseñarla junto al hallazgo del lector. */
+  private async existenciasDeProducto(productId: number, tenantId: number) {
+    const niveles = await this.prisma.stockLevel.findMany({
+      where: { productId, warehouse: companyWhere(tenantId) },
+      select: {
+        quantity: true,
+        reservedQty: true,
+        warehouse: { select: { id: true, name: true } },
+      },
+    });
+    const porAlmacen = new Map<
+      number,
+      { warehouseId: number; almacen: string; cantidad: number; reservado: number }
+    >();
+    for (const nivel of niveles ?? []) {
+      if (!nivel.warehouse) continue;
+      const fila = porAlmacen.get(nivel.warehouse.id) ?? {
+        warehouseId: nivel.warehouse.id,
+        almacen: nivel.warehouse.name,
+        cantidad: 0,
+        reservado: 0,
+      };
+      fila.cantidad += Number(nivel.quantity ?? 0);
+      fila.reservado += Number(nivel.reservedQty ?? 0);
+      porAlmacen.set(nivel.warehouse.id, fila);
+    }
+    return [...porAlmacen.values()].sort((a, b) => a.almacen.localeCompare(b.almacen));
+  }
+
+  /**
+   * Lector de códigos (cuña USB en la web, cámara en las apps): resuelve empaque o
+   * producto. Busca por UPC, EAN, código propio y clave; un UPC-A y su EAN-13 con cero
+   * delante son el mismo artículo, llegue como llegue del lector.
+   */
   async findByBarcode(codigo: string, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
-    const code = String(codigo || '').trim();
+    const { codigo: code, tipo } = clasificarCodigo(codigo);
     if (!code) throw new BadRequestException('Escanea o escribe un código de barras');
+    const variantes = variantesDeBusqueda(code);
+
+    const selectProducto = {
+      id: true,
+      sku: true,
+      name: true,
+      ean: true,
+      upc: true,
+      codigoBarras: true,
+      unitName: true,
+      imageUrl: true,
+      companyId: true,
+    } as const;
 
     const empaque = await this.prisma.productPackaging.findFirst({
       where: {
-        codigoBarras: code,
+        codigoBarras: { in: variantes },
         product: { ...companyWhere(tenantId) },
       },
-      include: {
-        product: {
-          select: { id: true, sku: true, name: true, companyId: true },
-        },
-      },
+      include: { product: { select: selectProducto } },
     });
     if (empaque?.product) {
       return {
         match: 'empaque' as const,
         codigoBarras: code,
+        tipo,
         packaging: {
           id: empaque.id,
           nombre: empaque.nombre,
           piezasPorUnidad: Number(empaque.piezasPorUnidad),
         },
         product: empaque.product,
+        existencias: await this.existenciasDeProducto(empaque.product.id, tenantId),
       };
     }
 
     const product = await this.prisma.product.findFirst({
       where: {
         ...companyWhere(tenantId),
-        OR: [{ ean: code }, { upc: code }, { sku: code }],
+        OR: [
+          { ean: { in: variantes } },
+          { upc: { in: variantes } },
+          { codigoBarras: { in: variantes } },
+          { sku: { equals: code, mode: 'insensitive' } },
+        ],
       },
-      select: { id: true, sku: true, name: true, ean: true, upc: true },
+      select: selectProducto,
+      orderBy: { id: 'asc' },
     });
     if (!product) throw new NotFoundException(`No hay producto con código «${code}»`);
-    return { match: 'producto' as const, codigoBarras: code, product };
+    return {
+      match: 'producto' as const,
+      codigoBarras: code,
+      tipo,
+      product,
+      existencias: await this.existenciasDeProducto(product.id, tenantId),
+    };
   }
 
   async createPackaging(

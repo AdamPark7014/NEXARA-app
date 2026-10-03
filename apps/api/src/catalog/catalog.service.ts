@@ -98,6 +98,12 @@ export class CatalogService {
     satUnitKey?: string;
     unitName?: string;
     companyId?: number | null;
+    /** Alta desde el lector de almacén: el código con que se escaneó y lo que trajo el catálogo. */
+    upc?: string | null;
+    ean?: string | null;
+    codigoBarras?: string | null;
+    brandId?: number | null;
+    especificaciones?: Record<string, string>;
   }) {
     const companyId = await resolveRequiredCompanyId(this.prisma, dto.companyId);
     const sku = dto.sku?.trim()
@@ -106,6 +112,7 @@ export class CatalogService {
     const existing = await this.prisma.product.findFirst({ where: { sku, companyId } });
     if (existing) throw new ConflictException(`Ya existe un producto con SKU ${sku}`);
     const unit = dto.unit?.trim() || dto.unitName?.trim() || null;
+    const specifications = { ...(dto.especificaciones ?? {}), ...(unit ? { unit } : {}) };
     return this.prisma.product.create({
       data: {
         sku,
@@ -119,7 +126,11 @@ export class CatalogService {
         satProductKey: dto.satProductKey?.trim() || null,
         satUnitKey: dto.satUnitKey?.trim() || null,
         unitName: unit,
-        specifications: unit ? { unit } : undefined,
+        specifications: Object.keys(specifications).length ? specifications : undefined,
+        upc: dto.upc?.trim() || null,
+        ean: dto.ean?.trim() || null,
+        codigoBarras: dto.codigoBarras?.trim() || null,
+        brandId: dto.brandId ?? null,
         activo: true,
         companyId,
       },

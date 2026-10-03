@@ -99,6 +99,40 @@ export class ToolRequestsController {
     );
   }
 
+  /**
+   * La herramienta de una etiqueta escaneada y quién la tiene. Lo consultan el lector
+   * USB del mostrador y la cámara de las apps. Va antes de `inventory/:id/label` para
+   * que ninguna ruta con parámetro se la quede. La variante con `?code=` existe porque
+   * un código con «/» no cabe en un segmento de ruta.
+   */
+  @Get('inventory/por-codigo')
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_MANAGE, PERMISSIONS.TOOLS_REQUEST, PERMISSIONS.TOOLS_VIEW] })
+  async inventoryByCodeQuery(
+    @CurrentUser() user: any,
+    @Query('code') code: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.toolRequestsService.buscarHerramientaPorCodigo(
+      code,
+      { id: user.id, email: user.email, isSuperAdmin: user.isSuperAdmin, permissions: user.permissions },
+      companyId,
+    );
+  }
+
+  @Get('inventory/por-codigo/:code')
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_MANAGE, PERMISSIONS.TOOLS_REQUEST, PERMISSIONS.TOOLS_VIEW] })
+  async inventoryByCode(
+    @CurrentUser() user: any,
+    @Param('code') code: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.toolRequestsService.buscarHerramientaPorCodigo(
+      code,
+      { id: user.id, email: user.email, isSuperAdmin: user.isSuperAdmin, permissions: user.permissions },
+      companyId,
+    );
+  }
+
   /** Etiqueta PDF o ZPL para impresora térmica. */
   @Get('inventory/:id/label')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })

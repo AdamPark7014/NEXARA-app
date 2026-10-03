@@ -45,6 +45,9 @@ vi.mock("@/components/almacen/KitInspeccionesPanel", () => ({
 vi.mock("@/components/almacen/ScannerAlmacenPanel", () => ({
   default: () => <div data-testid="panel-scanner" />,
 }));
+vi.mock("@/components/almacen/HerramientasPorEtiquetaPanel", () => ({
+  default: () => <div data-testid="panel-etiquetas" />,
+}));
 vi.mock("@/components/ToolInventoryPanel", () => ({
   default: () => <div data-testid="tool-inventory" />,
 }));
