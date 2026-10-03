@@ -1,6 +1,26 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Turno 03-10 (mañana, claude-code — dependencias, en paralelo con el agente del rediseño v2):**
+  commits **locales, sin push ni deploy** (debajo hay commits del rediseño que su agente aún no sube):
+  - `5f51ac19` parches de runtime: protobufjs 7.6.6, websocket-driver 0.7.5, tar 7 (vía override de
+    `@mapbox/node-pre-gyp` 2), multer 2.4.0 en todo el árbol, axios 1.20, engine.io/socket.io-parser/ws,
+    path-to-regexp, form-data, grpc-js, busboy, basic-ftp 5.3.1, lodash 4.18 bajo swagger. Borrado
+    `apps/api/pnpm-lock.yaml` (ningún build lo usa).
+  - `b35be85e` maplibre-gl 6.11.2: ESM, sin variante CSP; worker módulo en `public/maplibre/`
+    (`maplibre-worker.spec.ts` vigila que sea copia exacta del paquete). Verificado en Chrome headless
+    contra `next start`: idéntico a producción, tema claro OK.
+  - `fd351cee` mapa de cobertura de Adam en versión clara/oscura (`CoverageMap`, webp 1200/1600/2000).
+    Solo se ve en Inicio: el middleware manda `/cobertura` → `/proyectos`, que no tiene mapa.
+  - `017cf330` nodemailer 10.0.13 (+ prueba de envío con las dos formas de importar); sale `@types/nodemailer`.
+  - **Next 14 → 15: solo plan** en `.ai/PLAN-NEXT15.md` (≈10–14 h, recomendado 15.5.x). Espera a Adam.
+  - trivy: 353 → 113 hallazgos; CRITICAL 8 → 3 (2 de `next`, sin exposición hoy; 1 es la llave de Stripe
+    en `deploy/.env.nexara`, archivo local ignorado por git). HIGH 181 → 46.
+  - **Trampa de npm 11:** no aplica `overrides` nuevos a dependencias de un workspace si ya hay lock. Truco:
+    agregar el paquete padre a `dependencies` de la raíz, `npm install`, quitarlo, `npm install`.
+    `npm ls` las marca «invalid»; el install (también el de Docker) respeta el lock.
+  - **Índice compartido:** `git rm` deja el borrado preparado y el siguiente `git commit` de otro agente se
+    lo lleva (pasó en `8fdb7059`). Con varios agentes, commitear con rutas explícitas (`git commit -- rutas`).
+- **Último turno (antes de este):** claude-code
 - **Fecha:** 2026-10-02 (noche)
 - **Revisé el turno de Cursor:** reglas respetadas (solo `main`, trailer, árbol limpio, RELEVO al día,
   `tsc` 0, producción en el commit declarado). Única desviación: eligió la dirección A del chat sin
