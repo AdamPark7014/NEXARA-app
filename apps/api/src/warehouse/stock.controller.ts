@@ -2,11 +2,9 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res, UseGuard
 import type { Response } from 'express';
 import { WarehouseService } from './warehouse.service.js';
 import { ReabastecimientoService } from './reabastecimiento.service.js';
-import {
-  CodigosBarrasService,
-  type AltaPorCodigoDto,
-  type MovimientoPorCodigoDto,
-} from './codigos-barras.service.js';
+import { CodigosBarrasService } from './codigos-barras.service.js';
+// Importados como valor (no `import type`): el ValidationPipe necesita la clase en los metadatos.
+import { AltaPorCodigoDto, MovimientoPorCodigoDto } from './dto/codigos-barras.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';

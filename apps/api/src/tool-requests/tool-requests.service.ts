@@ -25,9 +25,11 @@ import {
   hasToolsManageAccess,
 } from './tools-access.js';
 import {
+  LARGO_MAXIMO_CODIGO_ETIQUETA,
   buildCodigoInterno,
   codigoDeEtiqueta,
   normalizarCodigoEtiqueta,
+  pistaDeSerie,
 } from './tool-nomenclature.js';
 import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
 
@@ -883,16 +885,19 @@ export class ToolRequestsService {
       },
       orderBy: [{ toolName: 'asc' }, { model: 'asc' }, { serialNumber: 'asc' }],
     });
-    return this.completarCodigosDeEtiqueta(items);
+    return this.conCodigosDeEtiqueta(items);
   }
 
   /**
    * Toda herramienta lleva su código interno. Las que se dieron de alta antes de la
    * nomenclatura (o entraron como reemplazo) lo tienen vacío: se les calcula con la
-   * misma regla y se guarda, para que la etiqueta impresa y el lector hablen del mismo
-   * código. No inventa una numeración: es `buildCodigoInterno`, la de siempre.
+   * misma regla para que la lista, la etiqueta y el lector hablen del mismo código. No
+   * inventa una numeración: es `buildCodigoInterno`, la de siempre.
+   *
+   * Solo lo calcula en memoria: guardarlo es `completarCodigosPendientes`, un paso
+   * explícito del gestor. Antes se escribía de paso en cada GET, y un GET no escribe.
    */
-  private async completarCodigosDeEtiqueta<
+  private conCodigosDeEtiqueta<
     T extends {
       id: number;
       toolName: string;
@@ -900,25 +905,74 @@ export class ToolRequestsService {
       codigoInterno?: string | null;
       barcode?: string | null;
     },
-  >(items: T[]): Promise<T[]> {
-    const pendientes = (items ?? []).filter((i) => !i.codigoInterno || !i.barcode);
-    for (const item of pendientes) {
+  >(items: T[]): T[] {
+    for (const item of items ?? []) {
+      if (item.codigoInterno && item.barcode) continue;
       const codigoInterno =
         (item.codigoInterno || '').trim() ||
         buildCodigoInterno({ toolName: item.toolName, serialNumber: item.serialNumber });
-      const barcode = (item.barcode || '').trim() || codigoInterno;
-      try {
-        await (this.prisma as any).toolInventoryItem.update({
-          where: { id: item.id },
-          data: { codigoInterno, barcode },
-        });
-      } catch {
-        // Si no se pudo guardar, la lista sale igual: el código se vuelve a calcular.
-      }
       item.codigoInterno = codigoInterno;
-      item.barcode = barcode;
+      item.barcode = (item.barcode || '').trim() || codigoInterno;
     }
     return items;
+  }
+
+  /**
+   * El paso que sí escribe: guarda el código calculado a las herramientas de la
+   * empresa que no lo tienen, por lotes con cursor por id (nunca el inventario entero
+   * de golpe). Lo dispara el gestor desde `POST tool-requests/inventory/codigos/completar`.
+   */
+  async completarCodigosPendientes(
+    companyId?: number | null,
+    opciones: { lote?: number } = {},
+  ): Promise<{ revisadas: number; completadas: number; errores: number[] }> {
+    const tenantId = requireCompanyId(companyId);
+    const lote = Math.min(Math.max(Math.trunc(Number(opciones.lote)) || 200, 1), 500);
+    const modelo = (this.prisma as any).toolInventoryItem;
+    let desdeId = 0;
+    let revisadas = 0;
+    let completadas = 0;
+    const errores: number[] = [];
+
+    for (;;) {
+      const pendientes: Array<{
+        id: number;
+        toolName: string;
+        serialNumber: string;
+        codigoInterno: string | null;
+        barcode: string | null;
+      }> = await modelo.findMany({
+        where: {
+          ...companyWhere(tenantId),
+          id: { gt: desdeId },
+          OR: [{ codigoInterno: null }, { barcode: null }],
+        },
+        select: { id: true, toolName: true, serialNumber: true, codigoInterno: true, barcode: true },
+        orderBy: { id: 'asc' },
+        take: lote,
+      });
+      if (pendientes.length === 0) break;
+
+      for (const item of pendientes) {
+        revisadas += 1;
+        const codigoInterno =
+          (item.codigoInterno || '').trim() ||
+          buildCodigoInterno({ toolName: item.toolName, serialNumber: item.serialNumber });
+        const barcode = (item.barcode || '').trim() || codigoInterno;
+        try {
+          await modelo.update({ where: { id: item.id }, data: { codigoInterno, barcode } });
+          completadas += 1;
+        } catch {
+          // Una fila que no se deja guardar no detiene el lote: se reporta y se sigue.
+          errores.push(item.id);
+        }
+      }
+
+      desdeId = pendientes[pendientes.length - 1].id;
+      if (pendientes.length < lote) break;
+    }
+
+    return { revisadas, completadas, errores };
   }
 
   /**
@@ -936,6 +990,12 @@ export class ToolRequestsService {
     if (code.length < 3) {
       throw new BadRequestException('Escanea la etiqueta de la herramienta');
     }
+    if (code.length > LARGO_MAXIMO_CODIGO_ETIQUETA) {
+      // Ninguna etiqueta cabe en más de 64: la columna mide eso y el lector tampoco.
+      throw new BadRequestException(
+        `El código es demasiado largo (máximo ${LARGO_MAXIMO_CODIGO_ETIQUETA} caracteres)`,
+      );
+    }
 
     const modelo = (this.prisma as any).toolInventoryItem;
     let candidatas: any[] = await modelo.findMany({
@@ -951,14 +1011,22 @@ export class ToolRequestsService {
       take: 10,
     });
 
-    if (candidatas.length === 0) {
-      // Herramientas sin código guardado: su etiqueta lleva el calculado.
+    // Herramientas sin código guardado: su etiqueta lleva el calculado (`PREFIJO-SERIE`).
+    // Se compara en memoria, sin escribir (eso es `completarCodigosPendientes`), y la
+    // búsqueda se acota por la serie que va dentro del código: nada de leer el inventario
+    // entero por cada etiqueta desconocida.
+    const pista = candidatas.length === 0 ? pistaDeSerie(code) : undefined;
+    if (candidatas.length === 0 && pista !== undefined) {
       const sinCodigo: any[] = await modelo.findMany({
-        where: { ...companyWhere(tenantId), OR: [{ codigoInterno: null }, { barcode: null }] },
+        where: {
+          ...companyWhere(tenantId),
+          OR: [{ codigoInterno: null }, { barcode: null }],
+          ...(pista ? { serialNumber: { contains: pista, mode: 'insensitive' } } : {}),
+        },
         orderBy: { id: 'asc' },
-        take: 1000,
+        take: 50,
       });
-      candidatas = await this.completarCodigosDeEtiqueta(
+      candidatas = this.conCodigosDeEtiqueta(
         sinCodigo.filter((i) => codigoDeEtiqueta(i).toUpperCase() === code),
       );
     }
@@ -967,7 +1035,9 @@ export class ToolRequestsService {
     const vivas = candidatas.filter((i) => i.status !== 'RETIRED');
     const elegibles = vivas.length > 0 ? vivas : candidatas;
     if (elegibles.length === 0) {
-      throw new NotFoundException(`Ninguna herramienta tiene la etiqueta «${code}»`);
+      throw new NotFoundException(
+        `Ninguna herramienta tiene la etiqueta «${code}». Si es una herramienta anterior a la nomenclatura, pide a almacén «Completar códigos» en el inventario.`,
+      );
     }
     if (elegibles.length > 1) {
       throw new ConflictException(
@@ -1248,8 +1318,8 @@ export class ToolRequestsService {
   }
 
   /** Las herramientas de un kit salen con su código: la etiqueta se imprime desde aquí. */
-  private async conCodigosDeKit<T extends { inventoryItem?: any }>(asignaciones: T[]): Promise<T[]> {
-    await this.completarCodigosDeEtiqueta(
+  private conCodigosDeKit<T extends { inventoryItem?: any }>(asignaciones: T[]): T[] {
+    this.conCodigosDeEtiqueta(
       (asignaciones ?? []).map((a) => a.inventoryItem).filter((i) => i && typeof i.id === 'number'),
     );
     return asignaciones;
