@@ -18,12 +18,12 @@
   font-size: 13px;
   font-weight: 650;
   text-decoration: none;
-  box-shadow: var(--ui-shadow-pop);
   transform: translateY(-160%);
   transition: transform var(--ui-duration-fast) var(--ui-ease-out);
 
   &:focus,
   &:focus-visible {
+    box-shadow: var(--ui-shadow-pop);
     transform: translateY(0);
     outline: var(--ui-focus-outline);
     outline-offset: var(--ui-focus-offset);
@@ -39,11 +39,26 @@
 }
 
 .shell {
+  /* Barra lateral v2 (maqueta aprobada `.ai/ui-maquetas`): clara por defecto.
+     Variables propias del shell; los --ui-* globales no se redefinen aquí. */
+  --shell-sidebar-w: 264px;
+  --shell-rail-w: 68px;
+  --shell-topbar-h: 56px;
+  --sb-bg: #fbfcfd;
+  --sb-fg: #3d4a5c;
+  --sb-fg-2: #6b7889;
+  --sb-label: #8592a3;
+  --sb-hover: #f0f3f6;
+  --sb-active-bg: var(--ui-brand-soft, #e7f5f1);
+  --sb-active-fg: #0f5f4f;
+  --sb-border: #e6ebf0;
+  --sb-tip-bg: #0f1728;
+
   position: relative;
   display: grid;
   /* minmax(0, 1fr): la columna main puede encogerse; sin esto el min-content
      empuja el shell más allá del viewport y overflow-x: clip corta la derecha. */
-  grid-template-columns: var(--shell-sidebar-w, var(--ui-sidebar-w, 240px)) minmax(0, 1fr);
+  grid-template-columns: var(--shell-sidebar-w) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas:
     "sidebar topbar"
@@ -58,27 +73,42 @@
   font-family: var(--ui-font);
   isolation: isolate;
   overflow-x: clip;
+  /* La barra superior mide 56 px; quien calcula alturas con --ui-topbar-h (cabeceras pegadas,
+     organigrama) dentro del shell usa la misma medida. */
+  --ui-topbar-h: var(--shell-topbar-h);
   /* Cabeceras de tabla pegadas justo debajo de la barra superior. */
-  --ui-sticky-top: var(--ui-topbar-h);
+  --ui-sticky-top: var(--shell-topbar-h);
 }
 
-/* La columna del menú sigue blanca aunque la página sea más alta que la ventana
+:global(body.dark) .shell {
+  --sb-bg: #0c1220;
+  --sb-fg: #c3ccd8;
+  --sb-fg-2: #8692a5;
+  --sb-label: #6f7c90;
+  --sb-hover: #152033;
+  --sb-active-bg: rgba(34, 169, 140, 0.16);
+  --sb-active-fg: #6ee0c3;
+  --sb-border: #182233;
+  --sb-tip-bg: #1d2a3d;
+}
+
+/* La columna del menú conserva su tono aunque la página sea más alta que la ventana
    (el menú es sticky de 100vh; esto solo se nota al imprimir o capturar la página completa). */
 @media (min-width: 901px) {
   .shell:not([data-auth-state]):not([data-console="true"]) {
     background:
       linear-gradient(
         90deg,
-        var(--ui-surface) 0 var(--shell-sidebar-w, 240px),
-        var(--ui-border) var(--shell-sidebar-w, 240px) calc(var(--shell-sidebar-w, 240px) + 1px),
-        transparent calc(var(--shell-sidebar-w, 240px) + 1px)
+        var(--sb-bg) 0 var(--shell-sidebar-w),
+        var(--sb-border) var(--shell-sidebar-w) calc(var(--shell-sidebar-w) + 1px),
+        transparent calc(var(--shell-sidebar-w) + 1px)
       ),
       var(--ui-bg);
   }
 }
 
 .shell[data-collapsed="true"] {
-  --shell-sidebar-w: var(--ui-sidebar-w-collapsed, 60px);
+  --shell-sidebar-w: var(--shell-rail-w);
 }
 
 /* Integra consola: sin sidebar ni topbar ERP — HUD propio full viewport */
@@ -127,16 +157,15 @@
    ============================================================ */
 .sidebar {
   /* Ritmo y métrica del menú. Local al shell: no redefine tokens globales. */
-  --nav-gutter: 10px; /* sangría del menú; el riel del activo vive en su borde */
-  --nav-item-h: var(--ui-nav-item-h, 32px);
-  --nav-item-gap: 2px; /* módulo ↔ módulo */
-  --nav-label-gap: 4px; /* micro-etiqueta ↔ primer módulo */
-  --nav-group-gap: 22px; /* grupo ↔ grupo (≈10× el anterior: la agrupación se ve) */
+  --nav-gutter: 10px; /* sangría del menú; el indicador del activo vive en su borde */
+  --nav-item-h: 32px;
+  --nav-item-gap: 1px; /* módulo ↔ módulo */
+  --nav-label-gap: 5px; /* título del grupo ↔ primer módulo */
+  --nav-group-gap: 12px; /* grupo ↔ grupo */
   --nav-icon-box: 18px;
-  --nav-icon-gap: 10px;
-  /* Tintas propias del menú: la etiqueta baja de tono sin bajar de contraste. */
-  --nav-label-ink: color-mix(in srgb, var(--ui-fg-2) 85%, var(--ui-fg-3));
-  --nav-icon-ink: color-mix(in srgb, var(--ui-fg-2) 70%, var(--ui-fg-3));
+  --nav-icon-gap: 11px;
+  --nav-label-ink: var(--sb-label);
+  --nav-icon-ink: var(--sb-fg-2);
 
   grid-area: sidebar;
   position: sticky;
@@ -145,8 +174,9 @@
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--ui-surface);
-  border-right: 1px solid var(--ui-border);
+  background: var(--sb-bg);
+  color: var(--sb-fg);
+  border-right: 1px solid var(--sb-border);
   z-index: var(--ui-z-sidebar, 30);
   /* visible: el menú de perfil se despliega fuera del riel cuando está colapsado.
      El scroll lo gestiona `.menu`, no el aside. */
@@ -190,10 +220,13 @@
     font-size: 15px;
   }
 
-  .sidebar .searchInput {
+  .sidebar .groupTitle {
+    min-height: 32px;
+  }
+
+  .sidebar .searchBtn {
     height: var(--ui-touch-min);
-    /* 16 px: iOS no hace zoom al enfocar. */
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .sidebar .userTrigger {
@@ -210,55 +243,100 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  height: var(--ui-topbar-h);
-  /* 18 px = borde izquierdo exacto de los iconos del menú. */
-  padding: 0 12px 0 18px;
-  border-bottom: 1px solid var(--ui-border);
+  padding: 16px 12px 12px 18px;
   position: relative;
   flex: 0 0 auto;
 }
 
-.brandLogo {
-  height: 24px;
-  width: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
 .brandLogoMark {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .brandText {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  flex-direction: column;
   min-width: 0;
   flex: 1;
 }
 
 .brandName {
   font-family: var(--ui-font);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 650;
+  font-size: 15px;
   letter-spacing: -0.01em;
   color: var(--ui-fg);
-  line-height: 1;
+  line-height: 1.1;
 }
 
 .brandPanel {
   font-size: 12px;
   font-weight: 500;
-  color: var(--nav-label-ink);
-  line-height: 1;
+  color: var(--sb-fg-2);
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.brandText > .brandPanel {
+  margin-top: 2px;
+}
+
+/* El nombre del panel abre «Mis paneles» cuando hay más de uno. */
+.brandPanelBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: 1px 0 0 -4px;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sb-fg-2);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--sb-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-brand);
+    outline-offset: 1px;
+  }
+}
+
+/* Reducir a riel / expandir. */
+.collapseBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sb-fg-2);
+  cursor: pointer;
+  transition:
+    background var(--ui-duration-fast) ease,
+    color var(--ui-duration-fast) ease;
+
+  &:hover {
+    background: var(--sb-hover);
+    color: var(--ui-fg);
+  }
+
+  @media (max-width: 900px) {
+    display: none;
+  }
 }
 
 /* Cierre del cajón: solo existe donde el cajón existe. */
@@ -269,15 +347,16 @@
   border: 0;
   border-radius: var(--ui-radius);
   background: transparent;
-  color: var(--ui-fg-2);
+  color: var(--sb-fg-2);
   cursor: pointer;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  margin-left: auto;
   margin-right: -8px;
 
   &:hover {
-    background: var(--ui-hover);
+    background: var(--sb-hover);
     color: var(--ui-fg);
   }
 
@@ -291,62 +370,69 @@
   }
 }
 
-/* ── 2 · Filtro del menú ────────────────────────────────── */
+/* ── 2 · Buscar o ir a… (abre la paleta, Ctrl K) ─────────── */
 .search {
-  padding: 12px var(--nav-gutter) 2px;
+  padding: 4px 12px 8px;
   flex: 0 0 auto;
 }
 
-.searchWrap {
-  position: relative;
+.searchBtn {
   display: flex;
   align-items: center;
-}
-
-.searchIcon {
-  position: absolute;
-  /* 9 px + gutter = 19 px: misma vertical que el trazo de los iconos del menú. */
-  left: 9px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  color: var(--nav-icon-ink);
-  pointer-events: none;
-}
-
-.searchInput {
+  gap: 8px;
   width: 100%;
-  height: 32px;
-  /* 36 px = la etiqueta del filtro cae en la misma columna que la del módulo. */
-  padding: 0 10px 0 36px;
+  height: 36px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--sb-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  color: var(--sb-fg-2);
   font-family: inherit;
   font-size: 13px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  color: var(--ui-fg);
-  outline: none;
+  text-align: left;
+  cursor: pointer;
   transition:
-    background var(--ui-duration-fast) ease,
     border-color var(--ui-duration-fast) ease,
-    box-shadow var(--ui-duration-fast) ease;
-
-  &::placeholder {
-    color: var(--ui-fg-3);
-  }
-
-  &::-webkit-search-cancel-button {
-    cursor: pointer;
-  }
+    color var(--ui-duration-fast) ease;
 
   &:hover {
-    background: var(--ui-hover);
+    border-color: var(--ui-border-strong);
+    color: var(--ui-fg-2);
   }
 
-  &:focus {
-    background: var(--ui-surface);
+  &:focus-visible {
+    outline: none;
     border-color: color-mix(in srgb, var(--ui-brand) 45%, transparent);
     box-shadow: var(--ui-ring);
+  }
+}
+
+.searchLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-3);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+
+  @media (max-width: 900px) {
+    display: none;
   }
 }
 
@@ -356,7 +442,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 10px var(--nav-gutter) 14px;
+  padding: 4px var(--nav-gutter) 12px;
   display: flex;
   flex-direction: column;
   gap: var(--nav-group-gap);
@@ -390,30 +476,85 @@
   position: relative;
   display: flex;
   flex-direction: column;
+}
+
+.groupItems {
+  display: flex;
+  flex-direction: column;
   gap: var(--nav-item-gap);
+}
+
+.groupItems[hidden] {
+  display: none;
 }
 
 /* Navegación secundaria (Mi cuenta): se separa cayendo al fondo, sin línea. */
 .group[data-kind="secondary"] {
   margin-top: auto;
-  padding-top: 6px;
 }
 
-.group[data-kind="secondary"] .menuItem:not(.active) .menuItemIcon {
-  opacity: 0.72;
-}
-
-/* Micro-etiqueta: rotula el grupo, no compite con los módulos. */
+/* Título del grupo: rotula y pliega. El chevrón solo aparece al pasar o si está plegado. */
 .groupTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   margin: 0 0 var(--nav-label-gap);
-  padding: 0 8px;
+  padding: 0 10px;
+  min-height: 18px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.06em;
+  text-align: left;
   color: var(--nav-label-ink);
+  cursor: pointer;
   user-select: none;
+
+  &:hover {
+    color: var(--sb-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-brand);
+    outline-offset: 1px;
+  }
+}
+
+.group[data-folded="true"] .groupTitle {
+  margin-bottom: 0;
+}
+
+.groupTitleText {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.groupChevron {
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: rotate(90deg);
+  transition:
+    opacity var(--ui-duration-fast) ease,
+    transform var(--ui-duration-fast) ease;
+}
+
+.groupTitle:hover .groupChevron,
+.groupTitle:focus-visible .groupChevron {
+  opacity: 1;
+}
+
+.group[data-folded="true"] .groupChevron {
+  opacity: 1;
+  transform: none;
 }
 
 /* ── 4 · Módulo ─────────────────────────────────────────── */
@@ -422,14 +563,15 @@
   align-items: center;
   gap: var(--nav-icon-gap);
   min-height: var(--nav-item-h);
-  padding: 0 8px;
-  border-radius: 7px;
+  padding: 0 10px;
+  border-radius: 8px;
   font-size: 13.5px;
   font-weight: 500;
   line-height: 1.25;
   letter-spacing: -0.005em;
-  color: var(--ui-fg-2);
+  color: var(--sb-fg);
   text-decoration: none;
+  white-space: nowrap;
   position: relative;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -438,33 +580,29 @@
     color 120ms ease;
 
   &:hover {
-    background: var(--ui-hover);
+    background: var(--sb-hover);
     color: var(--ui-fg);
-  }
-
-  &:hover .menuItemIcon {
-    color: var(--ui-fg-2);
   }
 
   &:focus-visible {
     outline: 2px solid var(--ui-brand);
     outline-offset: 1px;
-    background: var(--ui-hover);
+    background: var(--sb-hover);
     color: var(--ui-fg);
   }
 }
 
-/* Activo = cuatro señales débiles que solo coinciden en un sitio:
-   tinte de marca, riel de 2 px en el borde del panel, icono teal y peso 600.
-   Ninguna basta sola; juntas se leen antes de leer el texto. */
+/* Activo: fondo teal suave, texto teal oscuro en 600, icono de marca e indicador de 3 px
+   pegado al borde del panel. */
 .menuItem.active {
-  background: color-mix(in srgb, var(--ui-brand) 9%, var(--ui-surface));
-  color: var(--ui-fg);
+  background: var(--sb-active-bg);
+  color: var(--sb-active-fg);
   font-weight: 600;
 }
 
 .menuItem.active:hover {
-  background: color-mix(in srgb, var(--ui-brand) 14%, var(--ui-surface));
+  background: color-mix(in srgb, var(--ui-brand) 16%, var(--sb-active-bg));
+  color: var(--sb-active-fg);
 }
 
 .menuItem.active .menuItemIcon {
@@ -477,9 +615,97 @@
   left: calc(-1 * var(--nav-gutter));
   top: 7px;
   bottom: 7px;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
   background: var(--ui-brand);
+}
+
+/* Contador a la derecha del renglón: neutro, o rojo cuando espera una decisión. */
+.navCount {
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  background: var(--ui-neutral-bg);
+  color: var(--ui-neutral-text);
+}
+
+.navCount[data-tone="hot"] {
+  background: var(--ui-danger);
+  color: #fff;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Globo del riel colapsado: fijo a la ventana, a la derecha del riel. */
+.railTip {
+  position: fixed;
+  left: calc(var(--shell-rail-w) + 6px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sb-tip-bg);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+  box-shadow:
+    0 2px 4px rgba(16, 24, 40, 0.06),
+    0 16px 40px rgba(16, 24, 40, 0.14);
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    background: inherit;
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  @media (max-width: 900px) {
+    display: none;
+  }
+}
+
+.railTipKbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .menuItemIcon {
@@ -491,6 +717,10 @@
   line-height: 1;
   color: var(--nav-icon-ink);
   transition: color 120ms ease;
+}
+
+.menuItem:not(.active):hover .menuItemIcon {
+  color: var(--sb-fg);
 }
 
 .menuItemLabel {
@@ -506,8 +736,8 @@
   position: relative;
   flex: 0 0 auto;
   /* Única línea del cuerpo del menú: separa lo que hace scroll de lo fijo. */
-  border-top: 1px solid var(--ui-border);
-  padding: 8px var(--nav-gutter);
+  border-top: 1px solid var(--sb-border);
+  padding: 10px;
 }
 
 .userTrigger {
@@ -515,10 +745,10 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 40px;
-  padding: 4px 6px 4px 8px;
+  min-height: 52px;
+  padding: 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 12px;
   background: transparent;
   color: inherit;
   font-family: inherit;
@@ -527,7 +757,7 @@
   transition: background 120ms ease;
 
   &:hover {
-    background: var(--ui-hover);
+    background: var(--sb-hover);
   }
 
   &:focus-visible {
@@ -537,8 +767,9 @@
 }
 
 .avatar {
-  width: 28px;
-  height: 28px;
+  position: relative;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--ui-brand-soft);
   display: flex;
@@ -546,9 +777,33 @@
   justify-content: center;
   color: var(--ui-brand-text);
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--ui-font);
   flex-shrink: 0;
+}
+
+.avatarImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Presencia propia: verde conectado, ámbar sin conexión. */
+.presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ui-success, #16a34a);
+  box-shadow: 0 0 0 2px var(--sb-bg);
+}
+
+.presence[data-state="away"] {
+  background: var(--ui-warning, #e08a0b);
 }
 
 .userInfo {
@@ -571,9 +826,9 @@
 .userRole {
   display: block;
   margin-top: 1px;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.25;
-  color: var(--nav-label-ink);
+  color: var(--sb-fg-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -585,7 +840,7 @@
   justify-content: center;
   width: 20px;
   flex: 0 0 auto;
-  color: var(--ui-fg-3);
+  color: var(--sb-fg-2);
 }
 
 /* Menú de cuenta: superficie + 1 px + elevación mínima. */
@@ -692,7 +947,7 @@
   .shell[data-collapsed="true"] .brandText,
   .shell[data-collapsed="true"] .userInfo,
   .shell[data-collapsed="true"] .menuItemLabel,
-  .shell[data-collapsed="true"] .groupTitle {
+  .shell[data-collapsed="true"] .searchLabel {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -703,32 +958,117 @@
     white-space: nowrap;
   }
 
+  /* Marca: solo el logotipo; al pasar o enfocar, el mismo hueco es el botón de expandir. */
+  .shell[data-collapsed="true"] .brand {
+    justify-content: center;
+    padding: 16px 0 12px;
+  }
+
+  .shell[data-collapsed="true"] .collapseBtn {
+    position: absolute;
+    left: 50%;
+    top: 16px;
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    transform: translateX(-50%);
+    opacity: 0;
+    background: var(--sb-hover);
+  }
+
+  .shell[data-collapsed="true"] .brand:hover .collapseBtn,
+  .shell[data-collapsed="true"] .collapseBtn:focus-visible {
+    opacity: 1;
+  }
+
   .shell[data-collapsed="true"] .search {
+    padding: 4px 14px 8px;
+  }
+
+  .shell[data-collapsed="true"] .searchBtn {
+    justify-content: center;
+    width: 40px;
+    padding: 0;
+  }
+
+  .shell[data-collapsed="true"] .searchBtn .kbd {
     display: none;
   }
 
-  /* Sin micro-etiquetas, los grupos se separan con una línea fina. */
+  /* Títulos de grupo → una raya corta centrada; el texto queda para el lector de pantalla. */
   .shell[data-collapsed="true"] .menu {
-    gap: 10px;
+    padding: 4px 12px 12px;
   }
 
-  .shell[data-collapsed="true"] .group + .group {
-    padding-top: 10px;
-    border-top: 1px solid var(--ui-border-subtle);
-  }
-
-  .shell[data-collapsed="true"] .brand {
+  .shell[data-collapsed="true"] .groupTitle {
     justify-content: center;
-    padding: 0;
+    padding: 0 0 6px;
+    min-height: 0;
+    font-size: 0;
+    pointer-events: none;
+  }
+
+  .shell[data-collapsed="true"] .groupTitle::after {
+    content: "";
+    width: 18px;
+    height: 1px;
+    background: var(--sb-border);
+  }
+
+  .shell[data-collapsed="true"] .groupTitleText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .shell[data-collapsed="true"] .groupChevron {
+    display: none;
+  }
+
+  .shell[data-collapsed="true"] .group:first-child .groupTitle {
+    display: none;
   }
 
   .shell[data-collapsed="true"] .menuItem {
     justify-content: center;
+    width: 44px;
     padding: 0;
+  }
+
+  .shell[data-collapsed="true"] .menuItem.active::before {
+    left: -12px;
+  }
+
+  /* Contador como globo en la esquina del icono. */
+  .shell[data-collapsed="true"] .navCount {
+    position: absolute;
+    top: 1px;
+    right: -3px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    margin: 0;
+    font-size: 10px;
+    box-shadow: 0 0 0 2px var(--sb-bg);
+  }
+
+  .shell[data-collapsed="true"] .navCount:not([data-tone="hot"]) {
+    background: var(--ui-fg-3);
+    color: #fff;
+  }
+
+  .shell[data-collapsed="true"] .userBlock {
+    padding: 10px 0;
+    display: grid;
+    place-items: center;
   }
 
   .shell[data-collapsed="true"] .userTrigger {
     justify-content: center;
+    width: auto;
+    min-height: 0;
     padding: 4px;
   }
 
@@ -748,21 +1088,24 @@
 /* ============================================================
    TOPBAR
    ============================================================ */
-/* Barra superior: 52 px, blanca, un solo borde abajo; nada compite con el contenido. */
+/* Barra superior: 56 px, del tono del fondo y translúcida; migas a la izquierda,
+   tema, campana y la acción principal a la derecha. */
 .topbar {
   grid-area: topbar;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: var(--ui-topbar-h);
-  padding: 0 24px 0 16px;
-  border-bottom: 1px solid var(--ui-border);
+  gap: 12px;
+  height: var(--shell-topbar-h);
+  padding: 0 32px;
+  border-bottom: 1px solid var(--ui-border-subtle);
   position: sticky;
   top: 0;
   z-index: 20;
   min-width: 0;
   max-width: 100%;
-  background-color: var(--ui-surface);
+  background-color: color-mix(in srgb, var(--ui-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 @media (max-width: 900px) {
@@ -771,8 +1114,21 @@
   }
 }
 
-.mobileMenuBtn,
-.collapseBtn {
+/* «Mis paneles» cuelga de la marca de la barra lateral. */
+.brand .switcherDropdown {
+  top: calc(100% - 4px);
+  left: 12px;
+  right: auto;
+}
+
+@media (min-width: 901px) {
+  .shell[data-collapsed="true"] .brand .switcherDropdown {
+    top: 12px;
+    left: calc(100% + 8px);
+  }
+}
+
+.mobileMenuBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -801,18 +1157,12 @@
   }
 }
 
-.collapseBtn {
-  @media (max-width: 900px) {
-    display: none;
-  }
-}
-
 .breadcrumbs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   font-size: 13px;
-  color: var(--ui-fg-2);
+  color: var(--ui-fg-3);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -838,10 +1188,17 @@
   }
 
   & .crumbSep {
+    display: inline-flex;
     color: var(--ui-fg-3);
-    opacity: 0.6;
-    font-size: 12px;
-    padding: 0 2px;
+    padding: 0 1px;
+  }
+
+  & > span.crumbHome {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 4px;
+    color: var(--ui-fg-3);
   }
 
   & .crumbCurrent {
@@ -882,9 +1239,68 @@
 .topbarActions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 1;
   min-width: 0;
+  margin-left: auto;
+}
+
+/* Acción principal (un solo primario por pantalla): teal, 36 px, peso 600. */
+.primaryAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  margin-left: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--ui-radius, 8px);
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  transition: background var(--ui-duration-fast) ease;
+  -webkit-tap-highlight-color: transparent;
+
+  &:hover {
+    background: var(--ui-brand-hover);
+    color: var(--ui-brand-fg, #fff);
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 600px) {
+    width: var(--ui-touch-min);
+    height: var(--ui-touch-min);
+    padding: 0;
+    margin-left: 0;
+    justify-content: center;
+  }
+}
+
+.primaryActionLabel {
+  @media (max-width: 600px) {
+    display: none;
+  }
+}
+
+/* Campana: un punto rojo dice «hay algo»; el número va en la etiqueta accesible. */
+.notifPip {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ui-danger);
+  box-shadow: 0 0 0 2px var(--ui-bg);
+  pointer-events: none;
 }
 
 /* Rol: texto gris con un punto; solo el punto lleva color según el nivel. */
@@ -923,8 +1339,8 @@
 }
 
 .iconBtn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--ui-radius);
   border: none;
   background: transparent;
@@ -945,62 +1361,28 @@
   }
 }
 
+/* Buscar en la barra superior: solo en pantallas angostas (en escritorio está en la barra lateral). */
 .paletteBtn {
-  height: 32px;
-  padding: 0 8px 0 10px;
+  display: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
   border-radius: var(--ui-radius);
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface-2);
+  background: transparent;
   cursor: pointer;
-  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--ui-fg-3);
-  font-size: 13px;
-  min-width: 0;
-  max-width: 240px;
-  flex: 1 1 180px;
-  transition: border-color 100ms ease, color 100ms ease;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--ui-fg-2);
 
   &:hover:not(:disabled) {
-    border-color: var(--ui-border-strong);
-    color: var(--ui-fg-2);
-    transform: none;
-    box-shadow: none;
+    background: var(--ui-hover);
+    color: var(--ui-fg);
   }
 
   @media (max-width: 900px) {
-    min-width: 0;
-    padding: 0;
-    width: 32px;
-    flex: 0 0 auto;
-    justify-content: center;
-    border: none;
-    background: transparent;
-  }
-}
-
-.paletteBtnLabel {
-  flex: 1;
-  text-align: left;
-
-  @media (max-width: 900px) {
-    display: none;
-  }
-}
-
-.paletteBtnKbd {
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  color: var(--ui-fg-3);
-
-  @media (max-width: 900px) {
-    display: none;
+    display: inline-flex;
   }
 }
 
@@ -1305,7 +1687,9 @@
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
   .sidebar,
-  .searchInput,
+  .searchBtn,
+  .collapseBtn,
+  .groupChevron,
   .menuItem,
   .menuItemIcon,
   .userTrigger,
