@@ -490,7 +490,7 @@ jobs:
               --time 9:41 \
               --dataNetwork wifi --wifiMode active --wifiBars 3 \
               --cellularMode active --cellularBars 4 \
-              --batteryState charged --batteryLevel 100 || echo "::warning::[$SLUG] status_bar override fallo"
+              --batteryState discharging --batteryLevel 100 || echo "::warning::[$SLUG] status_bar override fallo"
             xcrun simctl ui "$UDID" appearance light || echo "::warning::[$SLUG] no se pudo fijar la apariencia clara"
             # La camara y las notificaciones NO se pueden conceder con simctl: las cubre el
             # monitor de alertas del test. No es fatal si alguno falla.
