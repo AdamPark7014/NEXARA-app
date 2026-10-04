@@ -80,6 +80,9 @@ final class StoreScreenshotsUITests: XCTestCase {
         ]
         // Equivale a `-NEXARA_DEMO 1`; por si la app lee el entorno en vez de los argumentos.
         app.launchEnvironment["NEXARA_DEMO"] = "1"
+        // Hora de México: el runner de GitHub corre en UTC y, de noche, las actividades de
+        // demo «de más tarde hoy» caían pasada la medianoche (03:01, 05:11 en «Después, hoy»).
+        app.launchEnvironment["TZ"] = "America/Mexico_City"
         app.launch()
     }
 

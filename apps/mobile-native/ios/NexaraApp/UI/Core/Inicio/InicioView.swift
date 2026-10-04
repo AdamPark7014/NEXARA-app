@@ -641,7 +641,13 @@ private struct InicioSiguientesCard: View {
 
     private func fila(_ item: MyActivityItem) -> some View {
         let kindColor = NxBrand.category(item.coreKind)
-        let dia = item.periodo?.dia.map { "Día \($0)" } ?? CoreStatusUI.priority(item.prioridad).label
+        // Bajo la hora solo cabe algo corto («Día 2»). La prioridad («Esta semana», «Puede
+        // esperar») va en la línea de detalle: en la columna de 56 pt salía cortada («Esta se…»).
+        let dia = item.periodo?.dia.map { "Día \($0)" }
+        let detalle = [dia == nil ? CoreStatusUI.priority(item.prioridad).label : nil, InicioRules.detalleSiguiente(item)]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
         return Button {
             onOpen(item)
         } label: {
@@ -650,10 +656,12 @@ private struct InicioSiguientesCard: View {
                     Text(CoreFormat.time(item.fechaInicio) ?? "—")
                         .font(.subheadline.weight(.bold))
                         .monospacedDigit()
-                    Text(dia)
-                        .font(.caption2)
-                        .foregroundStyle(NxSurface.muted)
-                        .lineLimit(1)
+                    if let dia {
+                        Text(dia)
+                            .font(.caption2)
+                            .foregroundStyle(NxSurface.muted)
+                            .lineLimit(1)
+                    }
                 }
                 .frame(width: 56)
                 Image(systemName: CoreStatusUI.kindSymbol(item.coreKind))
@@ -666,10 +674,10 @@ private struct InicioSiguientesCard: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.primary)
                         .lineLimit(2)
-                    Text(InicioRules.detalleSiguiente(item))
+                    Text(detalle)
                         .font(.footnote)
                         .foregroundStyle(NxSurface.muted)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)

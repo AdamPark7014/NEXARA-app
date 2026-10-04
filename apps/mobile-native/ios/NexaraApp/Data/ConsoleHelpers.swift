@@ -22,13 +22,15 @@ enum ConsoleHelpers {
 
     static func mapStr(_ m: [String: Any], _ keys: String...) -> String {
         for k in keys {
-            if let v = m[k] {
-                let s: String
-                if let ss = v as? String { s = ss }
-                else if let n = v as? NSNumber { s = n.stringValue }
-                else { s = String(describing: v) }
-                if !s.isEmpty && s != "null" { return s }
-            }
+            // Un `null` de JSON llega como `NSNull`: es «sin valor», no un texto. Antes caía en
+            // `String(describing:)` y devolvía «<null>», así que cada mensaje de chat sin adjunto
+            // enseñaba una pastilla «<null>» (se vio en las capturas para App Store).
+            guard let v = m[k], !(v is NSNull) else { continue }
+            let s: String
+            if let ss = v as? String { s = ss }
+            else if let n = v as? NSNumber { s = n.stringValue }
+            else { s = String(describing: v) }
+            if !s.isEmpty && s != "null" && s != "<null>" { return s }
         }
         return ""
     }
