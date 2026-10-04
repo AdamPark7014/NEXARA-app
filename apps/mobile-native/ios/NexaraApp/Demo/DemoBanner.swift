@@ -30,7 +30,14 @@ struct DemoBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
-        .background(NxBrand.dark.ignoresSafeArea(edges: .top))
+        // Solo debajo de la barra de estado. Antes el color se extendía detrás de ella
+        // (`ignoresSafeArea(edges: .top)`): hora negra sobre una franja azul sólida, el
+        // aspecto de una barra de estado de Android. Apple rechazó por eso la 1.0 (6) con
+        // la regla 2.3.10 («remove non-iOS status bar images»).
+        .background(NxBrand.dark)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.top, 4)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("demo-banner")
     }
