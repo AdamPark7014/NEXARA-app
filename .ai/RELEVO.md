@@ -1,5 +1,14 @@
 # RELEVO
 
+- **04-10 (claude-code): App Store rechazó otra vez NEXARA iOS 1.0 (6)**, solo por 2.3.10 («remove
+  non-iOS status bar images»), revisada en iPad Air 11" (M3). Las 8 capturas de 6,9" SÍ son del
+  simulador de iOS, pero en 6 de ellas `DemoBanner` pintaba su azul detrás de la barra de estado
+  (`ignoresSafeArea(edges: .top)`): hora negra sobre franja sólida = aspecto Android. Arreglo: la franja
+  va debajo de la barra de estado, como pastilla. Siguiente: correr «iOS capturas de App Store
+  (simulador)» y «iOS TestFlight» (build nuevo con el rediseño v2), cambiar las 8 capturas en ASC,
+  elegir el build y reenviar (el reenvío lo confirma Adam). ASC solo tiene «Español (México)» y el
+  juego de iPad vacío (la app es solo iPhone).
+
 - **03-10 ~10:00 (claude-code):** `50e9b8cc` («Recordarme») **desplegado y verificado** (API/web sanas).
   **Chat purgado en producción a pedido de Adam** («como si nunca hubiéramos mandado ningún mensaje»):
   borrados 63 mensajes (y sus 312 lecturas), 157 notificaciones del chat (`category='chat'` o
