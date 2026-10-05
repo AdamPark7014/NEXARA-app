@@ -16,7 +16,7 @@ import {
 
 const mx = (fecha: string, hora: string) => new Date(`${fecha}T${hora}:00-06:00`);
 
-const OFICINA = { etiqueta: 'Oficina · entra 09:00', jornadaOrdinariaMin: 480, dias: [1, 2, 3, 4, 5], personalizado: false };
+const OFICINA = { etiqueta: 'Oficina · entra 10:00', jornadaOrdinariaMin: 480, dias: [1, 2, 3, 4, 5], personalizado: false };
 const SIN_HORARIO = { etiqueta: 'Sin horario fijo (24/7)', jornadaOrdinariaMin: null, dias: [], personalizado: false };
 
 const tot = (over: Partial<EntradaPreNomina['totales']> = {}): EntradaPreNomina['totales'] => ({

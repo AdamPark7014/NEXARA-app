@@ -89,21 +89,23 @@ describe('tramos', () => {
 });
 
 describe('horario y retardo', () => {
-  it('oficina 09:00 con 15 min de gracia; los minutos tarde cuentan desde las 09:00', () => {
-    expect(retardoDeEntrada(M('14', '09:10'), oficina)).toEqual({ retardo: false, minutosTarde: 0 });
-    expect(retardoDeEntrada(M('14', '09:15'), oficina)).toEqual({ retardo: false, minutosTarde: 0 });
-    expect(retardoDeEntrada(M('14', '09:16'), oficina)).toEqual({ retardo: true, minutosTarde: 16 });
-    expect(retardoDeEntrada(M('14', '10:30'), oficina)).toEqual({ retardo: true, minutosTarde: 90 });
+  it('oficina 10:00 con 15 min de gracia; los minutos tarde cuentan desde las 10:00', () => {
+    expect(oficina).toMatchObject({ entrada: '10:00', salida: '18:00' });
+    expect(retardoDeEntrada(M('14', '10:10'), oficina)).toEqual({ retardo: false, minutosTarde: 0 });
+    expect(retardoDeEntrada(M('14', '10:15'), oficina)).toEqual({ retardo: false, minutosTarde: 0 });
+    expect(retardoDeEntrada(M('14', '10:16'), oficina)).toEqual({ retardo: true, minutosTarde: 16 });
+    expect(retardoDeEntrada(M('14', '11:30'), oficina)).toEqual({ retardo: true, minutosTarde: 90 });
   });
 
-  it('contratista entra a las 08:00 y dirección (24/7) no tiene retardos', () => {
-    expect(retardoDeEntrada(M('14', '08:20'), contratista)).toEqual({ retardo: true, minutosTarde: 20 });
+  it('contratista también entra a las 10:00 y dirección (24/7) no tiene retardos', () => {
+    expect(contratista).toMatchObject({ entrada: '10:00', salida: '18:00' });
+    expect(retardoDeEntrada(M('14', '10:20'), contratista)).toEqual({ retardo: true, minutosTarde: 20 });
     expect(retardoDeEntrada(M('14', '12:00'), direccion)).toEqual({ retardo: false, minutosTarde: 0 });
-    expect(direccion.jornadaOrdinariaMin).toBeNull();
+    expect(direccion).toMatchObject({ entrada: null, salida: null, jornadaOrdinariaMin: null });
   });
 
   it('dice lo mismo que la regla de avisos y RH (isLateVsSchedule)', () => {
-    for (const hhmm of ['08:59', '09:00', '09:14', '09:15', '09:16', '11:00', '17:45']) {
+    for (const hhmm of ['09:59', '10:00', '10:14', '10:15', '10:16', '12:00', '18:45']) {
       for (const [clave, horario] of [
         ['office_hours', oficina],
         ['contractor', contratista],
@@ -408,19 +410,19 @@ describe('calculaKpisPersona', () => {
       hasta: '2026-09-19',
       ahora: M('20', '10:00'),
       checadas: [
-        entrada('14', '09:20'),
+        entrada('14', '10:20'),
         salida('14', '18:00'),
-        entrada('15', '09:05'),
+        entrada('15', '10:05'),
         salida('15', '18:00'),
-        entrada('16', '10:00'),
+        entrada('16', '11:00'),
         salida('16', '18:00'),
-        entrada('17', '09:00'),
+        entrada('17', '10:00'),
         salida('17', '18:00'),
-        entrada('18', '09:00'),
+        entrada('18', '10:00'),
         salida('18', '18:00'),
-        // Sábado a las 11: no es retardo, es tiempo extra.
-        entrada('19', '11:00'),
-        salida('19', '15:00'),
+        // Sábado a las 12: no es retardo, es tiempo extra.
+        entrada('19', '12:00'),
+        salida('19', '16:00'),
       ],
     });
     expect(totales).toMatchObject({ retardos: 2, minutosTarde: 80, diasConJornada: 6 });

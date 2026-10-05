@@ -12,37 +12,42 @@ import {
  * El horario propio de cada persona.
  *
  * La promesa es que mientras nadie escriba nada, nada cambia: la tabla nace vacía y el
- * cálculo sigue siendo el de siempre (oficina 09:00, campo 08:00, 15 min de gracia, L–V,
- * 8 h netas). Escribir un campo cambia ese campo y nada más.
+ * cálculo sigue siendo el de la plantilla (oficina y campo entran 10:00 y salen 18:00,
+ * 15 min de gracia, L–V, 8 h netas). Escribir un campo cambia ese campo y nada más.
  */
 
 const mx = (fecha: string, hora: string) => new Date(`${fecha}T${hora}:00-06:00`);
 
 describe('sin horario propio manda la plantilla', () => {
-  it('oficina sigue entrando a las nueve, L–V, con quince minutos de gracia', () => {
+  it('oficina entra a las diez y sale a las seis, L–V, con quince minutos de gracia', () => {
     const h = horarioDePersona('office_hours', null);
     expect(h).toEqual(horarioDePlantilla('office_hours'));
-    expect(h.entrada).toBe('09:00');
+    expect(h.entrada).toBe('10:00');
+    expect(h.salida).toBe('18:00');
     expect(h.graciaMin).toBe(15);
     expect(h.jornadaOrdinariaMin).toBe(JORNADA_ORDINARIA_MIN);
     expect(h.diasLaborables).toEqual(DIAS_LABORABLES);
     expect(h.personalizado).toBe(false);
   });
 
-  it('campo entra a las ocho', () => {
-    expect(horarioDePersona('contractor', null).entrada).toBe('08:00');
+  it('campo (contratista) también entra a las diez y sale a las seis', () => {
+    const h = horarioDePersona('contractor', null);
+    expect(h.entrada).toBe('10:00');
+    expect(h.salida).toBe('18:00');
   });
 
   it('dirección (24/7) no tiene hora a la que llegar tarde', () => {
     const h = horarioDePersona('always_on', null);
     expect(h.entrada).toBeNull();
+    expect(h.salida).toBeNull();
     expect(h.jornadaOrdinariaMin).toBeNull();
     expect(h.diasLaborables).toEqual([]);
   });
 
   it('una fila vacía tampoco cambia nada de fondo', () => {
     const h = horarioDePersona('office_hours', {});
-    expect(h.entrada).toBe('09:00');
+    expect(h.entrada).toBe('10:00');
+    expect(h.salida).toBe('18:00');
     expect(h.graciaMin).toBe(15);
     expect(h.diasLaborables).toEqual(DIAS_LABORABLES);
   });
@@ -52,6 +57,8 @@ describe('cada campo se decide por separado', () => {
   it('cambiar solo la hora de entrada no decide su jornada ni sus días', () => {
     const h = horarioDePersona('office_hours', { horaEntrada: '07:30' });
     expect(h.entrada).toBe('07:30');
+    // Tampoco su salida: sigue la de la plantilla.
+    expect(h.salida).toBe('18:00');
     expect(h.graciaMin).toBe(15);
     expect(h.jornadaOrdinariaMin).toBe(JORNADA_ORDINARIA_MIN);
     expect(h.diasLaborables).toEqual(DIAS_LABORABLES);
@@ -84,7 +91,7 @@ describe('cada campo se decide por separado', () => {
     expect(horaValida('25:00')).toBeNull();
     expect(horaValida('9:00')).toBeNull();
     expect(horaValida('09:00')).toBe('09:00');
-    expect(horarioDePersona('office_hours', { horaEntrada: 'a las nueve' }).entrada).toBe('09:00');
+    expect(horarioDePersona('office_hours', { horaEntrada: 'a las diez' }).entrada).toBe('10:00');
   });
 
   it('valores imposibles se ignoran en vez de producir números absurdos', () => {
@@ -102,12 +109,12 @@ describe('el horario propio se nota en las horas del periodo', () => {
   ];
 
   it('un sábado es día normal para quien trabaja en sábado, y todo extra para quien no', () => {
-    // Sábado 19-09-2026, ocho horas corridas sin comida registrada.
+    // Sábado 19-09-2026 de 10:00 a 18:00: ocho horas corridas sin comida registrada.
     const base = {
       desde: '2026-09-19',
       hasta: '2026-09-19',
       ahora: mx('2026-09-21', '10:00'),
-      checadas: jornada('2026-09-19', '08:00', '16:00') as any,
+      checadas: jornada('2026-09-19', '10:00', '18:00') as any,
       comidas: [],
       actividades: [],
     };

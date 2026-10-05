@@ -75,8 +75,8 @@ export type KpisPersonaResponse = KpiPersonaFila & {
 };
 
 const ETIQUETA_HORARIO: Record<string, string> = {
-  office_hours: 'Oficina · entra 09:00',
-  contractor: 'Contratista · entra 08:00',
+  office_hours: 'Oficina · 10:00 a 18:00',
+  contractor: 'Contratista · 10:00 a 18:00',
   always_on: 'Sin horario fijo (24/7)',
   visitor: 'Visitante',
   disabled: 'Inactivo',

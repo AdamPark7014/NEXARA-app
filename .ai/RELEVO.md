@@ -12,10 +12,13 @@
   **Capturas de paridad sin Mac:** `ios-screenshots.yml` ahora también corre en cada push a `main` que toque
   `apps/mobile-native/ios/**`: `ParityScreenshotsUITests` recorre todas las pantallas en modo demo y el bot deja
   los PNG en `docs/ios-paridad/iphone-69/` (commit `[skip ci]`; hacer `git pull --rebase` antes de empujar).
-  **Horario:** Adam: la jornada normal es 10:00–18:00 (hay quien entra antes o sale después). El demo de iOS
-  decía 8:00–17:30 y ya dice 10:00–18:00. OJO: el API (`expectedStartHm`, `attendance-hybrid.match.ts`) espera
-  oficina 09:00 y contratista 08:00 para retardos/KPIs en las TRES apps; cambiarlo es regla de negocio en
-  producción — pendiente de confirmar con Adam.
+  **Horario (Adam, 05-10):** jornada normal 10:00–18:00 para todos (hay quien entra antes o sale después),
+  comida 15:00–16:00 (ya estaba así en `lunch-breaks.service.ts`), 15 min de gracia, jornada ordinaria 8 h netas
+  (lo que dice la web). El API pasó oficina (09:00) y contratista (08:00) a `JORNADA_ENTRADA_HM = '10:00'` y
+  añadió `expectedEndHm` → `'18:00'` (`attendance-hybrid.match.ts`); `horarioDePlantilla` ya trae salida; textos
+  «Oficina · 10:00 a 18:00» en KPIs/nómina y en la ayuda de horarios de la web. Specs del API (468) y de la web
+  al día. El demo de iOS pasó de 8:00–17:30 a 10:00–18:00. **Regla de Adam: las dudas de negocio se
+  resuelven leyendo la web o Android, no preguntándole.**
 
 - **05-10 (claude-code) — tres fallas del build 1.0.0 (8) con la cuenta de Christian, arregladas en código
   (NO hay build nuevo todavía):**

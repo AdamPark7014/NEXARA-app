@@ -177,7 +177,7 @@ export class NotificationHierarchyService {
       const entrada = type === 'ATTENDANCE_CHECKIN';
       const hora = horaAviso(at);
 
-      // Retardo contra su plantilla (oficina 09:00, contratista 08:00, con 15 min de gracia).
+      // Retardo contra su plantilla (entrada 10:00, con 15 min de gracia).
       let horarioEsperado: string | null = null;
       if (entrada) {
         const plantilla = buildAccessScheduleAssignment({

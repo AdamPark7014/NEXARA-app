@@ -336,7 +336,7 @@ export class HrService {
           estadoRRHH: true,
           fechaIngreso: true,
           fechaCreacion: true,
-          // Para la puntualidad: cada quien tiene su horario (oficina 09:00, contratista 08:00).
+          // Para la puntualidad: cada quien tiene su horario (plantilla 10:00–18:00 o el propio).
           employeeNumber: true,
           roleKey: true,
           tipoContrato: true,
@@ -398,7 +398,7 @@ export class HrService {
     // hora local del proceso, que en el contenedor es UTC: una entrada a las
     // 08:30 de México se leía como las 14:30 y contaba retardo. Con eso, la
     // plantilla entera salía impuntual. Ahora se usa la misma regla que los
-    // avisos: oficina 09:00, contratista 08:00, 15 min de gracia.
+    // avisos: entrada 10:00 (oficina y contratista), 15 min de gracia.
     const horarioPorUsuario = new Map<number, ReturnType<typeof buildAccessScheduleAssignment>>();
     for (const u of staff) {
       horarioPorUsuario.set(

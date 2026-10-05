@@ -17,12 +17,12 @@ function build(over: Record<string, any> = {}) {
     },
     attendance: {
       findMany: jest.fn().mockResolvedValue([
-        // Ana (contratista, 08:00): llega 08:30 → retardo de 30 min; revisaron su uniforme.
-        { id: 1, userId: 20, type: 'entrada', timestamp: M('15', '08:30'), cierreAutomatico: false, uniformeOk: true },
-        { id: 2, userId: 20, type: 'salida', timestamp: M('15', '17:30'), cierreAutomatico: false, uniformeOk: null },
-        // Beto (oficina, 09:00): a tiempo.
-        { id: 3, userId: 21, type: 'entrada', timestamp: M('15', '09:00'), cierreAutomatico: false, uniformeOk: null },
-        { id: 4, userId: 21, type: 'salida', timestamp: M('15', '18:00'), cierreAutomatico: false, uniformeOk: null },
+        // Ana (contratista, 10:00): llega 10:30 → retardo de 30 min; revisaron su uniforme.
+        { id: 1, userId: 20, type: 'entrada', timestamp: M('15', '10:30'), cierreAutomatico: false, uniformeOk: true },
+        { id: 2, userId: 20, type: 'salida', timestamp: M('15', '19:30'), cierreAutomatico: false, uniformeOk: null },
+        // Beto (oficina, 10:00): a tiempo.
+        { id: 3, userId: 21, type: 'entrada', timestamp: M('15', '10:00'), cierreAutomatico: false, uniformeOk: null },
+        { id: 4, userId: 21, type: 'salida', timestamp: M('15', '19:00'), cierreAutomatico: false, uniformeOk: null },
       ]),
     },
     lunchBreak: {
@@ -35,11 +35,11 @@ function build(over: Record<string, any> = {}) {
         .fn()
         // Por ventana: la actividad 100 de Ana tiene inicio/fin real (sección B).
         .mockResolvedValueOnce([
-          { activityId: 100, userId: 20, inicioRealAt: M('15', '09:00'), finRealAt: M('15', '12:00') },
+          { activityId: 100, userId: 20, inicioRealAt: M('15', '11:00'), finRealAt: M('15', '14:00') },
         ])
         // Filas complementarias de las actividades encontradas.
         .mockResolvedValueOnce([
-          { activityId: 100, userId: 20, inicioRealAt: M('15', '09:00'), finRealAt: M('15', '12:00') },
+          { activityId: 100, userId: 20, inicioRealAt: M('15', '11:00'), finRealAt: M('15', '14:00') },
           { activityId: 101, userId: 20, inicioRealAt: null, finRealAt: null },
         ]),
     },
@@ -52,9 +52,9 @@ function build(over: Record<string, any> = {}) {
             activityId: 101,
             userId: 20,
             status: 'COMPLETED',
-            entryPhotoUploadedAt: M('15', '11:00'),
-            exitPhotoUploadedAt: M('15', '13:00'),
-            completedAt: M('15', '13:05'),
+            entryPhotoUploadedAt: M('15', '13:00'),
+            exitPhotoUploadedAt: M('15', '15:00'),
+            completedAt: M('15', '15:05'),
           },
         ])
         .mockResolvedValueOnce([]),
@@ -88,20 +88,20 @@ describe('KpisEquipoService', () => {
     expect(res.scope).toBe('subtree');
     const [a, b] = res.personas;
     expect(a.persona.nombre).toBe('Ana');
-    expect(a.horario).toMatchObject({ clave: 'contractor', entrada: '08:00' });
+    expect(a.horario).toMatchObject({ clave: 'contractor', entrada: '10:00', salida: '18:00' });
     expect(a.totales).toMatchObject({
       retardos: 1,
       minutosTarde: 30,
-      // 08:30–17:30 menos la comida = 8 h
+      // 10:30–19:30 menos la comida = 8 h
       minutosLaborados: 480,
-      // 09:00–12:00 ∪ 11:00–13:00 = 4 h, sin contar doble
+      // 11:00–14:00 ∪ 13:00–15:00 = 4 h, sin contar doble
       minutosProductivos: 240,
       minutosInactivos: 240,
       productividadPct: 50,
       uniforme: { revisadas: 1, ok: 1, noOk: 0, sinRevisar: 0, pct: 100 },
     });
     expect(a.motivos).toContain('1 retardo (30 min tarde)');
-    expect(b.horario.clave).toBe('office_hours');
+    expect(b.horario).toMatchObject({ clave: 'office_hours', entrada: '10:00', salida: '18:00' });
     expect(b.totales).toMatchObject({ retardos: 0, minutosLaborados: 540, minutosProductivos: 0 });
     expect(res.equipo.totales).toMatchObject({ minutosLaborados: 1020, minutosProductivos: 240, retardos: 1 });
     expect(res.supuestos.length).toBeGreaterThan(0);

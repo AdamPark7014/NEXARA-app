@@ -104,7 +104,7 @@ describe('la fila de pre-nómina', () => {
     nombre: 'Ana Pérez',
     puesto: 'Técnica',
     numeroEmpleado: 'NX-014',
-    horario: 'Oficina · entra 09:00',
+    horario: 'Oficina · entra 10:00',
     totales: {
       diasConJornada: 5,
       diasSinChecada: 0,

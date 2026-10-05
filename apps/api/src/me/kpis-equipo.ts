@@ -25,13 +25,13 @@
  *   pausa o la checada de salida); una actividad de antes, sin sesiones, es su
  *   intervalo foto de entrada → foto de salida. Ningún tramo pasa de 12 horas.
  * - Inactividad = laboradas − productivas; nunca negativa.
- * - Retardo = misma regla que los avisos y RH: oficina 09:00, contratista 08:00,
+ * - Retardo = misma regla que los avisos y RH: oficina y contratista entran 10:00 (salen 18:00),
  *   15 min de gracia; los minutos tarde se cuentan desde la hora de entrada.
  * - Tiempo extra = lo laborado por encima de 8 h en un día laborable (L–V) o todo
  *   lo laborado en un día de descanso. Sin horario (24/7, visitante) no hay extra.
  */
 import { horaCierreAutomatico } from '../attendance/asistencia-confiable.js';
-import { expectedStartHm, RETARDO_GRACE_MINUTES } from '../attendance/attendance-hybrid.match.js';
+import { expectedEndHm, expectedStartHm, RETARDO_GRACE_MINUTES } from '../attendance/attendance-hybrid.match.js';
 import {
   WORKDAY_TIMEZONE,
   parseWorkDate,
@@ -146,7 +146,7 @@ export function horarioDePlantilla(clave?: string | null): HorarioKpi {
   return {
     clave: clave ?? null,
     entrada,
-    salida: null,
+    salida: expectedEndHm(clave),
     graciaMin: RETARDO_GRACE_MINUTES,
     jornadaOrdinariaMin: entrada ? JORNADA_ORDINARIA_MIN : null,
     diasLaborables: entrada ? DIAS_LABORABLES : [],
@@ -921,7 +921,7 @@ export function supuestosKpi(): string[] {
     `El reloj de una actividad corre por sesiones: empieza con «Iniciar», la foto de entrada o «Reanudar», y se detiene con la foto de salida, una pausa (propia o de su jefe) o la checada de salida. Ninguna sesión cuenta más de ${TOPE_SESION_MIN / 60} horas ni pasa del final de su día: una actividad de varios días se reanuda cada día.`,
     `Las actividades de antes de esta regla (sin sesiones) cuentan su intervalo de foto de entrada a foto de salida, con tope de ${TOPE_SESION_MIN / 60} horas.`,
     'Inactividad: horas laboradas menos horas productivas.',
-    `Retardo: entrada después de su hora (oficina 09:00, contratista 08:00) más ${RETARDO_GRACE_MINUTES} min de gracia, de lunes a viernes. Los minutos tarde se cuentan desde su hora de entrada. Dirección (24/7) no tiene retardos. A quien se le haya escrito un horario propio, se le mide con ese.`,
+    `Retardo: entrada después de su hora (10:00; la salida normal es a las 18:00) más ${RETARDO_GRACE_MINUTES} min de gracia, de lunes a viernes. Los minutos tarde se cuentan desde su hora de entrada. Dirección (24/7) no tiene retardos. A quien se le haya escrito un horario propio, se le mide con ese.`,
     `Tiempo extra: lo laborado arriba de ${JORNADA_ORDINARIA_MIN / 60} h en día laborable, o todo lo laborado en sábado o domingo. Sin horario no se calcula.`,
     'El tiempo extra calculado no se paga solo: un jefe lo aprueba día por día, y a la pre-nómina solo llega lo aprobado.',
     'Uniforme: el jefe marca ✓ o ✗ en la entrada de cada persona (Asistencias). El % es sobre las entradas revisadas.',
