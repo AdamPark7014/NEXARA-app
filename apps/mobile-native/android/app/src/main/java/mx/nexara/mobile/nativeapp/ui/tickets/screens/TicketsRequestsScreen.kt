@@ -75,6 +75,12 @@ data class TicketsRequestsUiState(
     val error: String? = null,
     val message: String? = null,
     val requests: List<ClientTicketRequestDto> = emptyList(),
+    /**
+     * `null` mientras no se sabe. Cerrar y autorizar/rechazar sólo existen en
+     * `client-portal`: a una sucursal el API le responde 403 y la web de
+     * sucursal no los ofrece, así que sólo se pintan con `false`.
+     */
+    val isBranchUser: Boolean? = null,
 )
 
 class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
@@ -86,19 +92,35 @@ class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
         refresh(initial = true)
         refreshOnModels(
             models = setOf("ClientTicketRequest", "Activity"),
-            refresh = { refresh(initial = false) },
+            refresh = { refresh(initial = false, keepMessage = true) },
         )
     }
 
-    fun refresh(initial: Boolean = false) {
+    /**
+     * `keepMessage`: la recarga que sigue a una acción (o a un aviso en tiempo
+     * real) conserva «Solicitud cerrada» / «Solicitud autorizada»; antes la
+     * propia recarga lo borraba al instante. El gesto de recargar sí lo quita.
+     */
+    fun refresh(initial: Boolean = false, keepMessage: Boolean = false) {
         _state.update {
-            if (initial) it.copy(isLoading = true, error = null, message = null)
-            else it.copy(isRefreshing = true, error = null, message = null)
+            when {
+                initial -> it.copy(isLoading = true, error = null, message = null)
+                keepMessage -> it.copy(isRefreshing = true, error = null)
+                else -> it.copy(isRefreshing = true, error = null, message = null)
+            }
         }
         viewModelScope.launch {
             try {
-                val list = withContext(Dispatchers.IO) { repo.requests() }
-                _state.update { it.copy(isLoading = false, isRefreshing = false, requests = list, error = null) }
+                val (list, branchUser) = withContext(Dispatchers.IO) { repo.requests() to repo.isBranchUser() }
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        requests = list,
+                        error = null,
+                        isBranchUser = branchUser,
+                    )
+                }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
@@ -121,7 +143,7 @@ class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 withContext(Dispatchers.IO) { repo.closeRequest(id) }
                 _state.update { it.copy(saving = false, message = "Solicitud cerrada") }
-                refresh(initial = false)
+                refresh(initial = false, keepMessage = true)
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
@@ -140,7 +162,7 @@ class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.decideRequest(id, decision) }
                 val label = if (decision == "APPROVED") "Solicitud autorizada" else "Solicitud rechazada"
                 _state.update { it.copy(saving = false, message = label) }
-                refresh(initial = false)
+                refresh(initial = false, keepMessage = true)
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
@@ -321,6 +343,7 @@ fun TicketsRequestsScreen(
                         RequestCard(
                             request = r,
                             saving = state.saving,
+                            canManage = state.isBranchUser == false,
                             onClose = { pending = PendingRequestAction(r.id, "close") },
                             onApprove = { vm.decideRequest(r.id, "APPROVED") },
                             onReject = { pending = PendingRequestAction(r.id, "reject") },
@@ -377,6 +400,8 @@ fun TicketsRequestsScreen(
 private fun RequestCard(
     request: ClientTicketRequestDto,
     saving: Boolean,
+    /** Cuenta cliente: puede autorizar, rechazar y cerrar. La sucursal sólo consulta. */
+    canManage: Boolean,
     onClose: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
@@ -417,7 +442,7 @@ private fun RequestCard(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 4.dp),
         )
-        if (status != "CLOSED") {
+        if (canManage && status != "CLOSED") {
             Column(
                 modifier = Modifier.padding(top = NxSpacing.M),
                 verticalArrangement = Arrangement.spacedBy(NxSpacing.S),

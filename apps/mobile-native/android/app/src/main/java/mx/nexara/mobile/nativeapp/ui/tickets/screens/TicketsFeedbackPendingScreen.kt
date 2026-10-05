@@ -88,14 +88,22 @@ class TicketsFeedbackPendingViewModel(app: Application) : AndroidViewModel(app) 
         refresh(initial = true)
         refreshOnModels(
             models = setOf("Activity", "ClientSurvey", "ClientFeedback"),
-            refresh = { refresh(initial = false) },
+            refresh = { refresh(initial = false, keepMessage = true) },
         )
     }
 
-    fun refresh(initial: Boolean = false) {
+    /**
+     * `keepMessage`: la recarga que sigue a enviar (y el aviso en tiempo real
+     * que dispara el propio envío) conserva «Evaluación enviada. ¡Gracias!»;
+     * antes esa recarga lo borraba al instante. El gesto de recargar sí lo quita.
+     */
+    fun refresh(initial: Boolean = false, keepMessage: Boolean = false) {
         _state.update {
-            if (initial) it.copy(isLoading = true, error = null, message = null)
-            else it.copy(isRefreshing = true, error = null, message = null)
+            when {
+                initial -> it.copy(isLoading = true, error = null, message = null)
+                keepMessage -> it.copy(isRefreshing = true, error = null)
+                else -> it.copy(isRefreshing = true, error = null, message = null)
+            }
         }
         viewModelScope.launch {
             try {
@@ -143,7 +151,7 @@ class TicketsFeedbackPendingViewModel(app: Application) : AndroidViewModel(app) 
                     )
                 }
                 _state.update { it.copy(saving = false, message = "Evaluación enviada. ¡Gracias!") }
-                refresh(initial = false)
+                refresh(initial = false, keepMessage = true)
             } catch (e: Exception) {
                 _state.update {
                     it.copy(

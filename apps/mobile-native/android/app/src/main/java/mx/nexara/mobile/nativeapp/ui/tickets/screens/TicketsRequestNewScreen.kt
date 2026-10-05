@@ -686,9 +686,10 @@ fun TicketsRequestNewScreen(
 
                             ) {
 
+                                // Se ve «Media»; al API sigue viajando `MEDIUM`.
                                 OutlinedTextField(
 
-                                    value = state.urgency,
+                                    value = portalOptionLabel(PORTAL_URGENCIES, state.urgency),
 
                                     onValueChange = {},
 
@@ -704,11 +705,11 @@ fun TicketsRequestNewScreen(
 
                                 ExposedDropdownMenu(expanded = urgencyExpanded, onDismissRequest = { urgencyExpanded = false }) {
 
-                                    listOf("LOW", "MEDIUM", "HIGH").forEach { u ->
+                                    PORTAL_URGENCIES.forEach { (u, label) ->
 
                                         DropdownMenuItem(
 
-                                            text = { Text(u) },
+                                            text = { Text(label) },
 
                                             onClick = { vm.setUrgency(u); urgencyExpanded = false },
 
@@ -734,9 +735,10 @@ fun TicketsRequestNewScreen(
 
                             ) {
 
+                                // «Ticket por problema» / «Mantenimiento e inventario», como la web.
                                 OutlinedTextField(
 
-                                    value = state.requestType,
+                                    value = portalOptionLabel(PORTAL_REQUEST_TYPES, state.requestType),
 
                                     onValueChange = {},
 
@@ -752,11 +754,11 @@ fun TicketsRequestNewScreen(
 
                                 ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
 
-                                    listOf("ISSUE", "PREVENTIVE_INVENTORY").forEach { t ->
+                                    PORTAL_REQUEST_TYPES.forEach { (t, label) ->
 
                                         DropdownMenuItem(
 
-                                            text = { Text(t) },
+                                            text = { Text(label) },
 
                                             onClick = { vm.setRequestType(t); typeExpanded = false },
 

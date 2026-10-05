@@ -145,17 +145,7 @@ class TicketsTicketsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
-internal fun resolveTicketDateRange(range: String): Pair<String?, String?> {
-    if (range == "all") return null to null
-    val now = Instant.now()
-    val end = now.toString()
-    val start = when (range) {
-        "today" -> now.atZone(java.time.ZoneOffset.UTC).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
-        "30d" -> now.minus(30, ChronoUnit.DAYS)
-        else -> now.minus(7, ChronoUnit.DAYS)
-    }.toString()
-    return start to end
-}
+// `resolveTicketDateRange` vive en PortalRules.kt («Hoy» en hora de México).
 
 private val DATE_RANGES = listOf("today" to "Hoy", "7d" to "7 días", "30d" to "30 días", "all" to "Todos")
 
