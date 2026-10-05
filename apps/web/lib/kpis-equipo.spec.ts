@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { rangoDePreset } from "./team-board-api";
 import {
   fechaCorta,
   formatHoras,
@@ -106,10 +107,30 @@ describe("rangoDesdeUrl", () => {
   it("reconoce Hoy / Semana / Mes y si no, personalizado", () => {
     expect(rangoDesdeUrl("?desde=2026-09-18&hasta=2026-09-18", hoy).preset).toBe("hoy");
     expect(rangoDesdeUrl("?desde=2026-09-01&hasta=2026-09-18", hoy).preset).toBe("mes");
-    expect(rangoDesdeUrl("?desde=2026-08-01&hasta=2026-08-31", hoy)).toEqual({
+    expect(rangoDesdeUrl("?desde=2026-08-03&hasta=2026-08-20", hoy)).toEqual({
       preset: "personalizado",
-      rango: { desde: "2026-08-01", hasta: "2026-08-31" },
+      rango: { desde: "2026-08-03", hasta: "2026-08-20" },
     });
+  });
+
+  it("reconoce los periodos cerrados: semana pasada (lun–dom) y mes pasado completo", () => {
+    expect(rangoDesdeUrl("?desde=2026-09-07&hasta=2026-09-13", hoy)).toEqual({
+      preset: "semana_pasada",
+      rango: { desde: "2026-09-07", hasta: "2026-09-13" },
+    });
+    expect(rangoDesdeUrl("?desde=2026-08-01&hasta=2026-08-31", hoy).preset).toBe("mes_pasado");
+  });
+});
+
+describe("rangoDePreset", () => {
+  it("un lunes, la semana pasada es la de lunes a domingo anterior", () => {
+    expect(rangoDePreset("semana_pasada", "2026-10-05")).toEqual({ desde: "2026-09-28", hasta: "2026-10-04" });
+    expect(rangoDePreset("semana", "2026-10-05")).toEqual({ desde: "2026-10-05", hasta: "2026-10-05" });
+  });
+
+  it("el mes pasado cruza de año y respeta febrero", () => {
+    expect(rangoDePreset("mes_pasado", "2026-01-15")).toEqual({ desde: "2025-12-01", hasta: "2025-12-31" });
+    expect(rangoDePreset("mes_pasado", "2028-03-02")).toEqual({ desde: "2028-02-01", hasta: "2028-02-29" });
   });
 });
 

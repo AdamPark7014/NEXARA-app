@@ -149,7 +149,7 @@ export function rangoDesdeUrl(
   const desde = valido(q.get("desde"));
   const hasta = valido(q.get("hasta"));
   if (!desde || !hasta) return { preset: "semana", rango: rangoDePreset("semana", hoy) };
-  for (const p of ["hoy", "semana", "mes"] as const) {
+  for (const p of ["hoy", "semana", "semana_pasada", "mes", "mes_pasado"] as const) {
     const r = rangoDePreset(p, hoy);
     if (r.desde === desde && r.hasta === hasta) return { preset: p, rango: r };
   }

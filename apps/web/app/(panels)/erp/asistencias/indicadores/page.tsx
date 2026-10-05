@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { Alert, Button, Card, CardHead, EmptyState, InfoPopover, PageHead, Segmented, SkeletonRows, Stat, StatRow } from "@/components/base";
 import { useUser } from "@/components/UserContext";
-import { RangoSelector } from "@/components/pizarra/PizarraKpi";
+import { PRESETS_NOMINA, RangoSelector } from "@/components/pizarra/PizarraKpi";
 import RankingPersonas, { LeyendaJornada } from "@/components/kpis/RankingPersonas";
 import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
@@ -19,6 +20,14 @@ const ORDENES: ReadonlyArray<{ id: OrdenRanking; label: string }> = [
 ];
 
 const TONO_STAT = { ok: "brand", atencion: "warning", critico: "danger", sin_datos: "default" } as const;
+
+/** «28 sep – 4 oct», o un solo día: lo que va a traer el Excel. */
+function etiquetaPeriodo(r: BoardRange): string {
+  if (!r.desde || !r.hasta) return "periodo";
+  const corta = (dia: string) =>
+    new Date(`${dia}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short" }).replace(".", "");
+  return r.desde === r.hasta ? corta(r.desde) : `${corta(r.desde)} – ${corta(r.hasta)}`;
+}
 
 export default function KpisEquipoPage() {
   const { user } = useUser();
@@ -112,6 +121,7 @@ export default function KpisEquipoPage() {
         actions={
           <>
             <RangoSelector
+              presets={PRESETS_NOMINA}
               preset={preset}
               rango={rango}
               onChange={(p, r) => {
@@ -120,8 +130,15 @@ export default function KpisEquipoPage() {
               }}
             />
             {data ? (
-              <Button variant="secondary" disabled={bajando} onClick={() => void bajarPreNomina()}>
-                {bajando ? "Generando…" : "Pre-nómina (Excel)"}
+              <Button
+                variant="secondary"
+                iconStart={<FileDownloadOutlinedIcon fontSize="small" />}
+                loading={bajando}
+                disabled={bajando}
+                onClick={() => void bajarPreNomina()}
+                title="Resumen por persona, horas de cada día y detalle diario de las fechas elegidas"
+              >
+                {bajando ? "Generando…" : `Excel · ${etiquetaPeriodo(rango)}`}
               </Button>
             ) : null}
             {data ? (
