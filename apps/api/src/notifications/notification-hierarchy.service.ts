@@ -1494,13 +1494,15 @@ export class NotificationHierarchyService {
         relatedEntityId: params.activityId,
         entityType: 'Activity',
         priority: 'high' as const,
-        // El cron corre cada hora: dedupe en 2 horas para no repetir.
-        dedupeSeconds: 2 * 60 * 60,
+        // El cron corre cada hora: con 2 h de dedupe cada actividad vencida avisaba ~12 veces al
+        // día a cada jefe. Una vez al día basta; la tarjeta del teléfono se reemplaza, no se apila.
+        dedupeSeconds: 20 * 60 * 60,
       };
       // Responsable
       await this.notificationsService.createNotification({
         ...comun,
         userId: params.userId,
+        collapseKey: `nx_vencida_${params.activityId}_u${params.userId}`,
         title: `${actividad} está vencida`,
         message: unir(activity.client?.name),
         relatedUrl: appUrls.erpActividad(params.activityId),
@@ -1510,6 +1512,7 @@ export class NotificationHierarchyService {
         await this.notificationsService.createNotification({
           ...comun,
           userId: uid,
+          collapseKey: `nx_vencida_${params.activityId}_u${uid}`,
           triggerUserId: params.userId,
           title: `${actividad} está vencida`,
           message: unir(`${quien} — responsable`, activity.client?.name),
