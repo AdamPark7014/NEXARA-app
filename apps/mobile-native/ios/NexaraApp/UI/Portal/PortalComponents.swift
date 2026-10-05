@@ -115,6 +115,8 @@ struct PortalOutlinedField: View {
     var error: String? = nil
     /// Líneas visibles mínimas; con 1 el campo es de una línea.
     var minLines: Int = 1
+    /// Crece con el texto aunque empiece en una línea (Android sin `singleLine`).
+    var multiline: Bool = false
     var keyboard: UIKeyboardType = .default
     var capitalization: TextInputAutocapitalization = .sentences
     var secure: Bool = false
@@ -123,6 +125,37 @@ struct PortalOutlinedField: View {
     var labelBackground: Color = NxColors.card
 
     @FocusState private var focused: Bool
+
+    /// Explícito: con un `@FocusState` privado el inicializador sintetizado no
+    /// sería visible desde las pantallas, que viven en otros archivos.
+    init(
+        label: String,
+        text: Binding<String>,
+        enabled: Bool = true,
+        error: String? = nil,
+        minLines: Int = 1,
+        multiline: Bool = false,
+        keyboard: UIKeyboardType = .default,
+        capitalization: TextInputAutocapitalization = .sentences,
+        secure: Bool = false,
+        radius: CGFloat = 6,
+        labelBackground: Color = NxColors.card
+    ) {
+        self.label = label
+        self._text = text
+        self.enabled = enabled
+        self.error = error
+        self.minLines = minLines
+        self.multiline = multiline
+        self.keyboard = keyboard
+        self.capitalization = capitalization
+        self.secure = secure
+        self.radius = radius
+        self.labelBackground = labelBackground
+    }
+
+    /// Una sola línea fija: el texto y la etiqueta van centrados en los 56.
+    private var singleLine: Bool { secure || (minLines <= 1 && !multiline) }
 
     private var floating: Bool { focused || !text.isEmpty }
     private var hasError: Bool { !(error ?? "").isEmpty }
@@ -145,7 +178,7 @@ struct PortalOutlinedField: View {
                 input
                     .padding(.horizontal, 16)
                     .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity, minHeight: 56, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, minHeight: 56, alignment: singleLine ? .leading : .topLeading)
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(borderColor, lineWidth: focused && enabled ? 2 : 1)
                     .allowsHitTesting(false)
@@ -161,6 +194,9 @@ struct PortalOutlinedField: View {
                     .padding(.horizontal, 16)
             }
         }
+        // Material deja 8 arriba del contorno para la etiqueta que sube al borde
+        // (`OutlinedTextFieldTopPadding`): sin ellos la etiqueta pisa lo de arriba.
+        .padding(.top, 8)
         .animation(.easeOut(duration: 0.15), value: floating)
     }
 
@@ -169,11 +205,11 @@ struct PortalOutlinedField: View {
         Group {
             if secure {
                 SecureField("", text: $text)
-            } else if minLines <= 1 {
+            } else if singleLine {
                 TextField("", text: $text)
             } else {
                 TextField("", text: $text, axis: .vertical)
-                    .lineLimit(minLines...)
+                    .lineLimit(max(minLines, 1)...)
             }
         }
         .font(NxType.bodyLarge)
@@ -202,9 +238,9 @@ struct PortalOutlinedField: View {
                 .font(NxType.bodyLarge)
                 .foregroundStyle(labelColor)
                 .lineLimit(1)
-                .padding(.leading, 16)
-                .padding(.trailing, 16)
-                .padding(.top, 16)
+                .padding(.horizontal, 16)
+                .padding(.top, singleLine ? 0 : 16)
+                .frame(height: singleLine ? 56 : nil, alignment: .leading)
         }
     }
 }
@@ -260,7 +296,209 @@ struct PortalDropdownField: View {
             .contentShape(Rectangle())
         }
         .tint(NxColors.fg)
+        // Los 8 de Material arriba del contorno, como en `PortalOutlinedField`.
+        .padding(.top, 8)
         .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+// MARK: - Piezas de pantalla del portal
+
+/// Cómo se pide una recarga (Android distingue `isLoading` de `isRefreshing`).
+enum PortalLoad {
+    /// Primera carga: esqueleto en lugar del contenido.
+    case initial
+    /// La pidió el dedo: el indicador lo pone `.refreshable`.
+    case pull
+    /// Recarga programática (filtro, tiempo real, tras una acción): el
+    /// indicador redondo de Android arriba de la lista.
+    case visible
+    /// Al volver a la pantalla: sin indicador.
+    case silent
+}
+
+/// Opción de un filtro o de un control segmentado: clave del API y texto.
+struct PortalOption: Identifiable, Hashable {
+    let key: String
+    let label: String
+    var id: String { key }
+}
+
+/// Aire vertical fijo (`Spacer(Modifier.height(x.dp))` de Android).
+struct PortalGap: View {
+    let height: CGFloat
+
+    init(_ height: CGFloat) {
+        self.height = height
+    }
+
+    var body: some View {
+        Color.clear
+            .frame(height: height)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Tipo de cuenta del portal. Las mismas reglas que Android
+/// (`AuthRepository.loadSession()?.isBranchUser`) y que el API: lo que solo
+/// existe en `client-portal` (cerrar o autorizar solicitudes, aprobar
+/// inventarios, calificar servicios) a una sucursal le respondería 403.
+enum PortalSession {
+    static var isBranchUser: Bool { SessionStore.shared.currentUser?.isBranchUser == true }
+}
+
+/// Título de los formularios del portal (Android: `titleLarge` Bold y debajo
+/// `bodySmall` gris).
+struct PortalScreenTitle: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(NxColors.fg)
+                .accessibilityAddTraits(.isHeader)
+            Text(subtitle)
+                .font(NxType.bodySmall)
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Título de tarjeta en color de marca (Android `titleMedium` SemiBold
+/// `primary`) con 8 de aire debajo.
+struct PortalPanelTitle: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(NxType.titleMedium)
+            .foregroundStyle(NxColors.brand)
+            .padding(.bottom, NxSpacing.s)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Aviso en tarjeta de Android: `NxPanelShell(12)` con el texto en `primary` y
+/// un `OutlinedButton` para cerrarlo.
+struct PortalNoticePanel: View {
+    let message: String
+    var closeLabel: String = "Cerrar"
+    let onClose: () -> Void
+
+    var body: some View {
+        NxPanelShell(padding: 12) {
+            Text(message)
+                .font(NxType.bodyLarge)
+                .foregroundStyle(NxColors.brand)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(closeLabel, action: onClose)
+                .buttonStyle(PortalButtons.outlined)
+        }
+    }
+}
+
+/// Aviso verde con «Cerrar» (Android `NxAlertBanner(NxAlert(tone = Success,
+/// actionLabel = "Cerrar"))`).
+struct PortalSuccessBanner: View {
+    let message: String
+    let onClose: () -> Void
+
+    var body: some View {
+        NxAlertBanner(
+            alert: NxAlert(id: "message", title: message, tone: .success),
+            actionLabel: "Cerrar",
+            onAction: onClose
+        )
+    }
+}
+
+/// `Button` / `OutlinedButton` de Material 3 (píldora de 40), a lo ancho por
+/// omisión, como los `Modifier.fillMaxWidth()` / `weight(1f)` del portal Android.
+struct PortalPillButton: View {
+    let title: String
+    var filled: Bool = true
+    var enabled: Bool = true
+    var fullWidth: Bool = true
+    /// Alto mínimo total (Android 40; 48 en «Enviar solicitud»).
+    var minHeight: CGFloat = 40
+    var tint: Color = NxColors.brand
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: max(minHeight - 16, 0))
+        }
+        .buttonStyle(
+            filled
+                ? NxPillButtonStyle(fill: tint, foreground: .white)
+                : NxPillButtonStyle(fill: .clear, foreground: tint, border: NxColors.borderStrong)
+        )
+        .disabled(!enabled)
+    }
+}
+
+/// Etiqueta con la forma del `OutlinedButton` para lo que no es un `Button`
+/// (el selector de fotos de iOS).
+struct PortalOutlinedPillLabel: View {
+    let text: String
+    var enabled: Bool = true
+
+    var body: some View {
+        Text(text)
+            .font(NxType.labelLarge)
+            .lineLimit(1)
+            .foregroundStyle(enabled ? NxColors.brand : NxColors.fg.opacity(0.38))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .overlay(
+                Capsule().strokeBorder(enabled ? NxColors.borderStrong : NxColors.fg.opacity(0.12), lineWidth: 1)
+            )
+            .contentShape(Capsule())
+    }
+}
+
+/// Indicador de recarga de Android (`PullToRefreshBox` con `isRefreshing`)
+/// cuando la recarga no la pidió el dedo: cambiar el rango de fechas, el
+/// proyecto o volver de un detalle. Círculo blanco de 40 con sombra arriba.
+struct PortalRefreshIndicator: View {
+    let visible: Bool
+
+    var body: some View {
+        if visible {
+            ProgressView()
+                .tint(NxColors.brand)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(NxColors.card).nxElevation(3))
+                .padding(.top, NxSpacing.s)
+                .transition(.opacity)
+                .accessibilityLabel("Actualizando")
+        }
+    }
+}
+
+/// Bloques de carga arriba de la pantalla (Android `NxSkeletonList` fuera de la
+/// lista): no se desplazan y dejan el resto del fondo libre.
+struct PortalSkeletonScreen: View {
+    var itemCount: Int = 5
+    var itemHeight: CGFloat = 72
+    var horizontal: CGFloat = NxSpacing.screenH
+    var vertical: CGFloat = NxSpacing.m
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NxSkeletonList(itemCount: itemCount, itemHeight: itemHeight)
+                .padding(.horizontal, horizontal)
+                .padding(.vertical, vertical)
+            Spacer(minLength: 0)
+        }
     }
 }
 
