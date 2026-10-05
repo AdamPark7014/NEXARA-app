@@ -1,5 +1,11 @@
 # RELEVO
 
+- **05-10 ~11:25 (cursor) — Excel día por día más específico. DESPLEGADO (`8343ac06`).** Adam: «que diga lunes
+  tantas horas y productivas tantas». `pre-nomina-dias.ts`: día completo («Lunes 05/10»); «Horas por día» con
+  dos columnas por fecha (Trabajadas / Productivas, ancho 16 para que el encabezado quepa en 2 líneas) más
+  totales y productividad; «Detalle diario» con columna «En palabras» («Lunes 05/10: 8 h 10 min trabajadas,
+  5 h 20 min productivas (65 %)»). Jest employee-payments 57 verde.
+
 - **05-10 ~11:15 (cursor) — «Atrasada» recién asignada e iniciada. DESPLEGADO (`fbb9bf89`).** AN-0074 (tarea,
   En Proceso): el formulario manda `fechaInicio = fechaMaxima = fechaEntregaEsperada` (10:20) y
   `semaforo-actividad.ts` tomaba esa hora como tope → roja al minuto y aviso de atraso a las 10:25. Ahora `topeDe`:
