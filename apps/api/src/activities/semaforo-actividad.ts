@@ -16,7 +16,7 @@
  * Un periodo que todavía no empieza está programado: verde, aunque la prioridad
  * sea alta. Pasada la hora de inicio de su primer día, sí es roja si no arrancó.
  */
-import { workDateKey } from '../common/time/workday.js';
+import { workDateKey, workDayEnd } from '../common/time/workday.js';
 import { esMultiDia, finDelPeriodo, periodoDeActividad, periodoFuturo, type Periodo } from './actividad-periodo.js';
 
 export type Semaforo = 'rojo' | 'amarillo' | 'verde';
@@ -185,8 +185,17 @@ export function horasRecordatorioDe(valor: unknown): number {
   return Math.min(24 * 7, n);
 }
 
+/**
+ * El formulario manda `fechaInicio = fechaMaxima = fechaEntregaEsperada`: la hora que se
+ * captura es la de inicio, no un límite. Un tope que no queda después del inicio se lee como
+ * el fin de ese día (igual que un periodo de un día); el exceso de tiempo lo marca el plan.
+ */
 function topeDe(
-  params: { fechaMaxima?: Date | string | null; fechaEntregaEsperada?: Date | string | null },
+  params: {
+    fechaInicio?: Date | string | null;
+    fechaMaxima?: Date | string | null;
+    fechaEntregaEsperada?: Date | string | null;
+  },
   periodo: Periodo | null,
 ): Date | null {
   if (periodo) return finDelPeriodo(periodo.fin);
@@ -194,7 +203,10 @@ function topeDe(
     (d): d is Date => d != null,
   );
   if (!fechas.length) return null;
-  return new Date(Math.min(...fechas.map((d) => d.getTime())));
+  const tope = new Date(Math.min(...fechas.map((d) => d.getTime())));
+  const inicio = aFecha(params.fechaInicio);
+  if (inicio && tope.getTime() <= inicio.getTime()) return workDayEnd(inicio);
+  return tope;
 }
 
 function estatusArrancado(estatus?: string | null): boolean {

@@ -35,6 +35,39 @@ describe('semáforo por el reloj', () => {
     expect(porEntrega.minutosAtraso).toBe(15);
   });
 
+  it('la hora citada del formulario no es un tope: iniciada a tiempo sigue en tiempo ese día', () => {
+    // Así llega del formulario: inicio = fecha máxima = entrega (AN-0074, 05-10 10:20).
+    const citada = new Date('2026-10-05T16:20:00.000Z');
+    const iniciada = evaluarSemaforo({
+      fechaInicio: citada,
+      fechaMaxima: citada,
+      fechaEntregaEsperada: citada,
+      inicioRealAt: new Date('2026-10-05T16:21:00.000Z'),
+      estatus: 'En Proceso',
+      ahora: new Date('2026-10-05T16:29:00.000Z'),
+    });
+    expect(iniciada.semaforo).toBe('verde');
+
+    const sinIniciar = evaluarSemaforo({
+      fechaInicio: citada,
+      fechaMaxima: citada,
+      fechaEntregaEsperada: citada,
+      estatus: 'Pendiente',
+      ahora: new Date('2026-10-05T16:29:00.000Z'),
+    });
+    expect(sinIniciar).toMatchObject({ semaforo: 'rojo', motivo: 'inicio', minutosAtraso: 9 });
+
+    const otroDia = evaluarSemaforo({
+      fechaInicio: citada,
+      fechaMaxima: citada,
+      fechaEntregaEsperada: citada,
+      inicioRealAt: new Date('2026-10-05T16:21:00.000Z'),
+      estatus: 'En Proceso',
+      ahora: new Date('2026-10-06T15:00:00.000Z'),
+    });
+    expect(otroDia).toMatchObject({ semaforo: 'rojo', motivo: 'tope' });
+  });
+
   it('la prioridad alta o media, sin hora vencida, no la pone roja ni naranja', () => {
     expect(evaluarSemaforo({ estatus: 'Pendiente', ahora: AHORA }).semaforo).toBe('verde');
     expect(
