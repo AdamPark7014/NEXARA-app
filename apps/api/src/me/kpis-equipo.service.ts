@@ -53,6 +53,8 @@ export type KpiPersonaFila = {
   totales: TotalesKpi;
   semaforo: SemaforoKpi;
   motivos: string[];
+  /** Solo si se pidieron (`conDias`): el día por día, sin los tramos de la línea de tiempo. */
+  dias?: DiaKpi[];
 };
 
 export type KpisEquipoResponse = {
@@ -124,15 +126,16 @@ export class KpisEquipoService {
     companyId: number | null,
     rango: { desde: string; hasta: string },
     soloUserId?: number | null,
+    opciones: { conDias?: boolean } = {},
   ): Promise<KpisEquipoResponse> {
     const { companyWide, scoped, now } = await this.teamBoard.resolveScope(viewer, companyId);
     const gente = soloUserId ? scoped.filter((u) => u.id === soloUserId) : scoped;
     if (soloUserId && !gente.length) throw new NotFoundException('Usuario fuera de tu alcance');
 
     const datos = await this.cargar(gente.map((u) => u.id), companyId, rango, null);
-    const personas = gente.map((u) => {
+    const personas = gente.map((u): KpiPersonaFila => {
       const d = datos.get(u.id) ?? vacio();
-      const { totales } = calculaKpisPersona({
+      const { dias, totales } = calculaKpisPersona({
         desde: rango.desde,
         hasta: rango.hasta,
         ahora: now,
@@ -144,7 +147,7 @@ export class KpisEquipoService {
         aprobacionesExtra: d.aprobacionesExtra,
         fechaIngreso: d.fechaIngreso,
       });
-      return fila(u, d.horario, totales);
+      return opciones.conDias ? { ...fila(u, d.horario, totales), dias } : fila(u, d.horario, totales);
     });
 
     const totalesEquipo = sumaEquipo(personas.map((p) => p.totales));

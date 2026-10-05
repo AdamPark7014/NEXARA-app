@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import { Alert, Avatar, Badge, Button, Card, CardHead, EmptyState, InfoPopover, PageHead, SkeletonRows, tabla } from "@/components/base";
 import { useUser } from "@/components/UserContext";
-import { RangoSelector } from "@/components/pizarra/PizarraKpi";
+import { PRESETS_NOMINA, RangoSelector } from "@/components/pizarra/PizarraKpi";
 import DiasEnLinea from "@/components/kpis/DiasEnLinea";
 import { LeyendaJornada } from "@/components/kpis/RankingPersonas";
 import HorasExtraPorAprobar from "@/components/kpis/HorasExtraPorAprobar";
@@ -76,6 +76,7 @@ export default function KpisPersonaPage() {
         actions={
           <>
             <RangoSelector
+              presets={PRESETS_NOMINA}
               preset={preset}
               rango={rango}
               onChange={(p, r) => {

@@ -299,12 +299,14 @@ export function formatMinutes(mins: number | null | undefined): string {
   return `${h} h ${m.toString().padStart(2, "0")} min`;
 }
 
-export type RangoPreset = "hoy" | "semana" | "mes" | "personalizado";
+export type RangoPreset = "hoy" | "semana" | "semana_pasada" | "mes" | "mes_pasado" | "personalizado";
 
 export const RANGO_LABELS: Record<RangoPreset, string> = {
   hoy: "Hoy",
   semana: "Semana",
+  semana_pasada: "Semana pasada",
   mes: "Mes",
+  mes_pasado: "Mes pasado",
   personalizado: "Personalizado",
 };
 
@@ -320,14 +322,20 @@ function suma(dia: string, dias: number): string {
   return t.toISOString().slice(0, 10);
 }
 
-/** Semana = del lunes a hoy; mes = del día 1 a hoy. */
+/**
+ * Semana = del lunes a hoy; mes = del día 1 a hoy. Los «pasados» son periodos cerrados:
+ * de lunes a domingo de la semana anterior y del 1 al último día del mes anterior.
+ */
 export function rangoDePreset(preset: RangoPreset, hoy: string = fechaMx()): BoardRange {
-  if (preset === "semana") {
-    const [y, m, d] = hoy.split("-").map(Number);
-    const dow = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).getUTCDay(); // 0 = domingo
-    return { desde: suma(hoy, -((dow + 6) % 7)), hasta: hoy };
-  }
+  const [y, m, d] = hoy.split("-").map(Number);
+  const lunes = suma(hoy, -((new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).getUTCDay() + 6) % 7));
+  if (preset === "semana") return { desde: lunes, hasta: hoy };
+  if (preset === "semana_pasada") return { desde: suma(lunes, -7), hasta: suma(lunes, -1) };
   if (preset === "mes") return { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy };
+  if (preset === "mes_pasado") {
+    const finAnterior = suma(`${hoy.slice(0, 7)}-01`, -1);
+    return { desde: `${finAnterior.slice(0, 7)}-01`, hasta: finAnterior };
+  }
   return { desde: hoy, hasta: hoy };
 }
 

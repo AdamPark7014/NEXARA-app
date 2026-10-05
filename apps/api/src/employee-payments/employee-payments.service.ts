@@ -170,12 +170,12 @@ export class EmployeePaymentsService {
     viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
     rango: { desde: string; hasta: string },
     companyId?: number | null,
-    opciones: { verMontos?: boolean } = {},
+    opciones: { verMontos?: boolean; conDias?: boolean } = {},
   ) {
     // Si la empresa dejó «Pagos a personal» para pocos roles, quien no lo ve tampoco ve aquí lo
     // capturado: ni se consulta. Las horas y los avisos no cambian.
     const verMontos = opciones.verMontos !== false;
-    const datos = await this.kpis.getEquipo(viewer, companyId ?? null, rango, null);
+    const datos = await this.kpis.getEquipo(viewer, companyId ?? null, rango, null, { conDias: opciones.conDias });
     const userIds = datos.personas.map((p) => p.persona.id);
 
     const [personas, pagos] = await Promise.all([
@@ -227,6 +227,16 @@ export class EmployeePaymentsService {
       resumen: resumenPreNomina(filas),
       /** `true` cuando esta empresa reserva los montos de pagos y a quien consulta no le tocan. */
       montosOcultos: !verMontos,
+      /** Solo con `conDias`: el día por día de cada persona, para las hojas diarias del Excel. */
+      personasDias: opciones.conDias
+        ? datos.personas.map((p) => ({
+            userId: p.persona.id,
+            nombre: p.persona.nombre,
+            puesto: p.persona.puesto,
+            numeroEmpleado: numeroPor.get(p.persona.id) ?? null,
+            dias: p.dias ?? [],
+          }))
+        : undefined,
     };
   }
 

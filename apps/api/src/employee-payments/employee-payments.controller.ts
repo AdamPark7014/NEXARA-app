@@ -28,6 +28,7 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_PRE_NOMINA } from '../common/excel/reportes.js';
+import { hojaDetalleDiario, hojaHorasPorDia } from './pre-nomina-dias.js';
 
 @Controller('employee-payments')
 export class EmployeePaymentsController {
@@ -103,8 +104,9 @@ export class EmployeePaymentsController {
   ) {
     const rango = this.rango(desde, hasta);
     const verMontos = await this.policy.puedeUsar('employee-payments', user, companyId);
-    const datos = await this.service.preNomina(this.viewer(user), rango, companyId, { verMontos });
+    const datos = await this.service.preNomina(this.viewer(user), rango, companyId, { verMontos, conDias: true });
     const r = datos.resumen;
+    const personasDias = datos.personasDias ?? [];
     const buffer = await this.excel.exportarReporte({
       titulo: 'Pre-nómina',
       subtitulo: `Del ${rango.desde} al ${rango.hasta}`,
@@ -122,8 +124,10 @@ export class EmployeePaymentsController {
         `${r.personas} persona(s) · ${r.conAvisos} con algo que revisar antes de pagar.`,
         'Las horas son netas de comida y salen de los mismos registros que los indicadores.',
         'El tiempo extra solo se paga si un jefe lo aprobó: «Extra sin aprobar» no está incluido en ningún total pagable.',
+        '«Horas por día» y «Detalle diario» desglosan cada jornada del periodo con las mismas horas.',
         ...datos.supuestos,
       ],
+      hojasExtra: [hojaHorasPorDia(personasDias, rango), hojaDetalleDiario(personasDias, rango)],
     });
     res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.header('Content-Disposition', `attachment; filename="pre-nomina-${rango.desde}-${rango.hasta}.xlsx"`);

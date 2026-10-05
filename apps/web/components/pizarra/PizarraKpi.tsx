@@ -122,22 +122,27 @@ export function KpiStrip({ kpis, compacta = false }: { kpis?: BoardKpis; compact
 
 const PRESETS: RangoPreset[] = ["hoy", "semana", "mes", "personalizado"];
 
+/** Con periodos cerrados, para nómina: semana y mes anteriores completos. */
+export const PRESETS_NOMINA: RangoPreset[] = ["hoy", "semana", "semana_pasada", "mes", "mes_pasado", "personalizado"];
+
 /** Hoy / Semana / Mes / personalizado (control segmentado). Lo elegido viaja como `desde`/`hasta`. */
 export function RangoSelector({
   preset,
   rango,
   onChange,
+  presets = PRESETS,
 }: {
   preset: RangoPreset;
   rango: BoardRange;
   onChange: (preset: RangoPreset, rango: BoardRange) => void;
+  presets?: RangoPreset[];
 }) {
   const hoy = fechaMx();
   return (
     <div className={k.rango}>
       <Segmented
         ariaLabel="Rango de fechas"
-        items={PRESETS.map((p) => ({ id: p, label: RANGO_LABELS[p] }))}
+        items={presets.map((p) => ({ id: p, label: RANGO_LABELS[p] }))}
         value={preset}
         onChange={(p) =>
           onChange(
