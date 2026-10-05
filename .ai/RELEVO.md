@@ -4,8 +4,9 @@
   activado; build 1.0.0 (8) firmado con `aps-environment = production`; Firebase FCM v1 habilitado. Se
   registró la llave APNs «NEXARA APNs» (Key ID `3U672539N2`, Sandbox & Production, Team Scoped). **Adam ya
   subió el `.p8` en Firebase → Cloud Messaging → NEXARA iOS, en desarrollo y producción (verificado
-  21:56).** Push de iOS completo, sin build nuevo ni reenvío. Falta solo probarlo en un iPhone real:
-  ninguno tiene la app todavía (TestFlight 0 instalaciones). Android ya funciona
+  21:56).** Push de iOS completo, sin build nuevo ni reenvío. **Probado en iPhone real a las 22:15:**
+  Adam instaló el build 8 por TestFlight (grupo interno «Equipo NEXARA», tester `ad.pozo.ont@icloud.com`),
+  entró con la cuenta de Christian y recibió el push de prueba (`UserPushEndpoint` id 372). Android ya funciona
   (FCM puro, nada que configurar en Google Play). En TestFlight los builds 1, 3, 5, 6 y 7 aparecieron
   caducados el 04-10; el 8 (en revisión) sigue vigente.
 
