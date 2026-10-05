@@ -1,13 +1,17 @@
 # RELEVO
 
-- **04-10 (claude-code): App Store rechazó otra vez NEXARA iOS 1.0 (6)**, solo por 2.3.10 («remove
-  non-iOS status bar images»), revisada en iPad Air 11" (M3). Las 8 capturas de 6,9" SÍ son del
-  simulador de iOS, pero en 6 de ellas `DemoBanner` pintaba su azul detrás de la barra de estado
-  (`ignoresSafeArea(edges: .top)`): hora negra sobre franja sólida = aspecto Android. Arreglo: la franja
-  va debajo de la barra de estado, como pastilla. Siguiente: correr «iOS capturas de App Store
-  (simulador)» y «iOS TestFlight» (build nuevo con el rediseño v2), cambiar las 8 capturas en ASC,
-  elegir el build y reenviar (el reenvío lo confirma Adam). ASC solo tiene «Español (México)» y el
-  juego de iPad vacío (la app es solo iPhone).
+- **04-10 (claude-code): NEXARA iOS 1.0 REENVIADA a revisión — build 1.0.0 (8), «Pendiente de revisión»
+  desde las 18:32.** Apple había rechazado la 1.0 (6) solo por 2.3.10 («remove non-iOS status bar
+  images», revisada en iPad Air 11"): las capturas SÍ eran del simulador de iOS, pero `DemoBanner` pintaba
+  su azul detrás de la barra de estado (`53202c98`, ahora va como pastilla debajo). Además:
+  `256e6ff1` `ConsoleHelpers.mapStr` devolvía «<null>» para los `null` de JSON (pastillas «<null>» en el
+  chat, también con el servidor real); Inicio ya no corta la prioridad; capturas con hora de México y
+  batería normal. Capturas regeneradas en GitHub (`ios-screenshots.yml`, iPhone 17 Pro Max, commit
+  `3724a510`) y subidas a ASC 6,9" en orden (Inicio, Actividades, Asistencia, chat ×2, Más, Clientes,
+  Notificaciones, Mi perfil); 6,5" usa 6,9". Descripción y notas al revisor sin «organigrama» (ya no está
+  en las apps), con la navegación nueva y rutas «Más > Mi perfil > …». Builds 7 y 8 subidos por
+  `ios-testflight.yml` (el 8 es el enviado). **Si Apple vuelve a escribir: leer el mensaje en
+  Revisión de apps.**
 
 - **03-10 ~10:00 (claude-code):** `50e9b8cc` («Recordarme») **desplegado y verificado** (API/web sanas).
   **Chat purgado en producción a pedido de Adam** («como si nunca hubiéramos mandado ningún mensaje»):
