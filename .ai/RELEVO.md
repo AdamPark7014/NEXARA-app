@@ -1,5 +1,26 @@
 # RELEVO
 
+- **05-10 ~09:50 (claude-code) — SE CORTÓ POR LÍMITE DE USO A MITAD DE LA FASE B. LEER ANTES DE TOCAR NADA.**
+  Hecho y empujado: fallas de Christian (`4224cac7`), Android sin Ejecutivo/Documentos (`0cd5a4b6`), capturas de
+  paridad en CI (`ed7f3921`), jornada 10:00–18:00 en API/web **desplegada y verificada** en Hetzner
+  (`02cc7abf`; `expectedStartHm`=10:00, `expectedEndHm`=18:00 en vivo), fase A iOS (`ed9f7a61`, CI verde,
+  capturas en `docs/ios-paridad/iphone-69/`).
+  **Sin commitear en disco (~79 archivos iOS):** trabajo A MEDIAS de los 10 agentes de la fase B (B1 Inicio/
+  Actividades, B2 detalle, B3 Asistencias/Comidas, B4 Chat, B5 Perfil/Clientes/Avisos/Login, B6 Viáticos/
+  Vehículos/Almacén/Proyectos/KPIs, B7 Cotizaciones/Pagos nuevos, B8 Gastos/Aprobaciones nuevos, B9 Herramientas,
+  B10 Portal). Se detuvieron en mitad de una edición: **seguramente NO compila**. No es de Cursor ni de otro
+  turno: es de este. Antes de seguir: `python scripts/ios-static-check.py`, revisar `git diff` por área y
+  terminar cada una contra Android con las reglas de `.ai/FASE-B-REGLAS-IOS.md` (alcance por agente: ver el
+  encargo de cada área en ese archivo + el inventario Android/iOS de esta sesión). No commitear hasta que CI
+  (`ci.yml`, trabajo «iOS · compilar») pase; `docs/ios-paridad/` se regenera en cada push.
+  **Pendientes vistos en las capturas tras la fase A:** (1) iOS 26 pinta los botones de la barra teal como
+  burbujas de cristal → añadir `UIDesignRequiresCompatibility = YES` en `Resources/Info.plist` para el aspecto
+  plano de Android; (2) demo: «Sin entrada registrada» con «8:22 h trabajadas» y cronómetro 8:22:00 sin checada
+  (sospecha: `historicPunches` en `Demo/DemoFixtures+Attendance.swift` no excluye hoy) y «PRODUCTIVIDAD DEL DÍA
+  27:29:28» (no existe en Android: quitar); (3) Notificaciones/Clientes con la barra apretada. Build 8 sigue en
+  revisión de Apple sin nada de esto; decidir con Adam si se manda un 9. El emulador `nexara_phone` tiene el
+  debug actual instalado esperando que Adam inicie sesión (para capturas de referencia Android).
+
 - **05-10 (claude-code) — PARIDAD TOTAL iOS ← Android (pedido de Adam: «la app iOS no se parece en nada»).**
   Android es la referencia en funciones y en UI/UX. Hecho: Android ya no tiene **Ejecutivo** ni **Documentos**
   (eran los dos únicos módulos de «Más» que solo abrían la web; se borraron la ficha «ábrelo en la web», la
