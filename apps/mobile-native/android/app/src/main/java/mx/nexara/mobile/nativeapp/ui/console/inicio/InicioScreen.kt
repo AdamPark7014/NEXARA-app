@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Login
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Pause
@@ -193,7 +194,13 @@ fun InicioScreen(
                 }
             }
 
-            if (state.tieneActividades) {
+            if (state.esDireccion) {
+                item(key = "equipo") {
+                    SectionTitle("Tu equipo hoy")
+                    Spacer(Modifier.height(8.dp))
+                    EquipoCard(onVerEquipo = if (state.tieneActividades) onOpenActividades else null)
+                }
+            } else if (state.tieneActividades) {
                 when {
                     state.isLoading -> item(key = "cargando") {
                         NxSkeletonList(itemCount = 2, itemHeight = 132.dp)
@@ -866,6 +873,48 @@ private fun VerTodasRow(onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 8.dp),
     )
+}
+
+/** Inicio de dirección general: no tiene cola propia; su día es el del equipo. */
+@Composable
+private fun EquipoCard(onVerEquipo: (() -> Unit)?) {
+    val c = NxTheme.colors
+    val shape = RoundedCornerShape(NxDimens.SheetRadius)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(c.card)
+            .border(1.dp, c.border, shape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier.size(44.dp).background(c.brandSoft, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Groups, contentDescription = null, tint = c.brandText, modifier = Modifier.size(24.dp))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Pizarra del equipo", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = c.fg)
+                Text(
+                    "Quién está en campo, qué lleva cada persona y qué va atrasado.",
+                    fontSize = 13.sp,
+                    color = c.muted,
+                )
+            }
+        }
+        if (onVerEquipo != null) {
+            Button(
+                onClick = onVerEquipo,
+                modifier = Modifier.fillMaxWidth().height(NxDimens.PrimaryButtonHeight),
+                shape = RoundedCornerShape(NxDimens.ControlRadius),
+            ) {
+                Text("Ver la pizarra del equipo", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
 }
 
 @Composable

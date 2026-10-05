@@ -28,6 +28,10 @@ struct InicioView: View {
 
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
     private var muestraJornada: Bool { tieneAsistencia && attendance.canRegisterSelf }
+    /// Dirección general (Christian y su equivalente): el API no le da «Mis actividades»
+    /// (403 «no aplica a dirección general»), así que Inicio le lleva a la pizarra del equipo.
+    /// En modo demo `CoreOrg.isCeo` es verdadero para la persona ficticia: ahí sí hay cola propia.
+    private var esDireccion: Bool { !DemoMode.isActive && CoreOrg.isCeo(session.currentUser?.email) }
 
     var body: some View {
         ScrollView {
@@ -115,7 +119,10 @@ struct InicioView: View {
 
     @ViewBuilder
     private var actividades: some View {
-        if tieneActividades {
+        if esDireccion {
+            InicioSectionTitle(title: "Tu equipo hoy")
+            InicioEquipoCard(onVerEquipo: tieneActividades ? Optional(onOpenActividades) : nil)
+        } else if tieneActividades {
             if store.loading && store.data == nil {
                 InicioSectionTitle(title: "Ahora")
                 NxSkeletonRows(count: 2)
@@ -161,7 +168,7 @@ struct InicioView: View {
 
     @MainActor
     private func reload() async {
-        await store.load(enabled: tieneActividades)
+        await store.load(enabled: tieneActividades && !esDireccion)
         if muestraJornada || tieneAsistencia {
             await attendance.loadMine()
             await ShiftGpsTracker.shared.resumeIfNeeded()
@@ -688,6 +695,43 @@ private struct InicioSiguientesCard: View {
             .multilineTextAlignment(.leading)
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Inicio de dirección general: no tiene cola propia; su día es el del equipo.
+private struct InicioEquipoCard: View {
+    let onVerEquipo: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: NxSpacing.s) {
+            HStack(spacing: NxSpacing.m) {
+                NxIconBadge(systemName: "person.3.fill", tint: NxBrand.primary, size: 44, circle: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Pizarra del equipo").font(.headline)
+                    Text("Quién está en campo, qué lleva cada persona y qué va atrasado.")
+                        .font(.footnote)
+                        .foregroundStyle(NxSurface.muted)
+                }
+            }
+            if let onVerEquipo {
+                Button(action: onVerEquipo) {
+                    Label("Ver la pizarra del equipo", systemImage: "arrow.right")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: NxMetrics.primaryButtonHeight)
+                        .foregroundStyle(.white)
+                        .background(NxBrand.primary, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NxSurface.card, in: RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous)
+                .strokeBorder(NxSurface.border, lineWidth: 1)
+        )
     }
 }
 
