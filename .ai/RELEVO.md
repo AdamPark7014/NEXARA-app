@@ -1,5 +1,13 @@
 # RELEVO
 
+- **05-10 ~11:35 (cursor) — Excel con texto encimado. DESPLEGADO (`abda19d4`).** Adam mandó capturas: «En
+  palabras» y las notas de «Información» se encimaban sobre las filas de abajo. Causa general en
+  `common/excel/reporte-excel.ts` (todos los reportes): filas con alto fijo 17 aunque el texto se ajuste, y Excel
+  no recalcula el alto de una fila con alto fijo. Ahora `lineasDeTexto`/`altoParaLineas` calculan el alto del
+  encabezado, de las filas con columnas que envuelven y de cada renglón de «Información». «En palabras» ya no
+  repite el día (está en su columna) y va en una línea (ancho 56). Sin LibreOffice local: no se vio el Excel como
+  imagen; pruebas de alto en `pre-nomina-dias.spec.ts`.
+
 - **05-10 ~11:25 (cursor) — Excel día por día más específico. DESPLEGADO (`8343ac06`).** Adam: «que diga lunes
   tantas horas y productivas tantas». `pre-nomina-dias.ts`: día completo («Lunes 05/10»); «Horas por día» con
   dos columnas por fecha (Trabajadas / Productivas, ancho 16 para que el encabezado quepa en 2 líneas) más
