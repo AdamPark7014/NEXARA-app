@@ -1,5 +1,24 @@
 # RELEVO
 
+- **05-10 ~14:35 (cursor) — Paridad iOS ← Android terminada (fase B) y avisos de Android.** Pedido de Adam:
+  «la iOS tiene muchos errores y le falta paridad en UI y colores; las notificaciones de Android son pobres
+  (feas, a destiempo, sin información, no suenan)».
+  - **iOS (`9a8e5b41`, CI «iOS · compilar» VERDE a la primera, capturas en `docs/ios-paridad/iphone-69/`):** se
+    terminó el trabajo a medias de la fase B de Claude con 7 agentes por área (Inicio/Actividades, detalle,
+    Asistencias/Chat, Perfil/Clientes/Avisos/Login, Viáticos/Vehículos/Almacén/Proyectos/KPIs/Portal,
+    Herramientas, y Cotizaciones/Pagos/Gastos/Aprobaciones nuevas en el hub «Más»). `UIDesignRequiresCompatibility`
+    en Info.plist (barras planas). Demo sin «8:22 h» sin checada. **Falta:** pantallas viejas del portal en
+    `PortalScreens.swift` (Perfil, Sucursales, Solicitudes, Tickets, Calificación, Inventarios) siguen con Form/List;
+    `AlmacenEscaneo` sin portar; en Inicio las etiquetas bajo la hora salen cortadas («Esta sem…»). Build 9 de iOS
+    no se ha mandado (TestFlight lo dispara Adam). Geocerca: se dejó 500 m (API y Android), no 100 m.
+  - **API (`f2839e3f`, DESPLEGADO):** «X está vencida» (SLA_BREACH) salía cada 2 h, 24/7, a gerencia y Claudia
+    (679 y 677 en 14 días). Ahora lunes–sábado 9–19 h, dedupe 20 h, collapseKey estable.
+  - **Android (`6f949759`, AAB 1.0.6 (16) listo en `app/build/outputs/bundle/release/app-release.aab`, SIN subir
+    a Play):** botones «Responder»/«Marcar como leído» (chat) y «Marcar como leída» (eventos) vía
+    `push/NotificationActionReceiver.kt`; aviso en Inicio (`NotificationHealthBanner`) si avisos apagados, canal
+    silenciado o batería restringida, con botón a Ajustes; acento y splash teal (#1F9E84, antes azul).
+  - CI: errores de xcodebuild salen como anotaciones; `.ai/ci-anotaciones.ps1 <sha>` los lee sin `gh`.
+
 - **05-10 ~11:35 (cursor) — Excel con texto encimado. DESPLEGADO (`abda19d4`).** Adam mandó capturas: «En
   palabras» y las notas de «Información» se encimaban sobre las filas de abajo. Causa general en
   `common/excel/reporte-excel.ts` (todos los reportes): filas con alto fijo 17 aunque el texto se ajuste, y Excel
@@ -35,7 +54,7 @@
   eran carga: cotizaciones/chat/vehículos pasan solos). **NO toqué el iOS a medias de Claude (nota de abajo)**: no
   corrí `salvar`/`cerrar` para no commitearlo; commits solo con mis archivos.
 
-- **05-10 ~09:50 (claude-code) — SE CORTÓ POR LÍMITE DE USO A MITAD DE LA FASE B. LEER ANTES DE TOCAR NADA.**
+- **05-10 ~09:50 (claude-code) — [RESUELTO por cursor 14:35: fase B terminada y commiteada, CI verde] SE CORTÓ POR LÍMITE DE USO A MITAD DE LA FASE B.**
   Hecho y empujado: fallas de Christian (`4224cac7`), Android sin Ejecutivo/Documentos (`0cd5a4b6`), capturas de
   paridad en CI (`ed7f3921`), jornada 10:00–18:00 en API/web **desplegada y verificada** en Hetzner
   (`02cc7abf`; `expectedStartHm`=10:00, `expectedEndHm`=18:00 en vivo), fase A iOS (`ed9f7a61`, CI verde,
