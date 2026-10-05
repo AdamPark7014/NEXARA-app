@@ -264,24 +264,32 @@ struct CoreShellView: View {
                     // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
                     .nxBrandNavBar(title: "Notificaciones", showsBell: false)
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
         case .activity(let id, let tab):
             NavigationStack {
                 ActivityCoreDetailView(activityId: id, initialTab: tab)
                     .nxBrandNavBar()
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
         case .person(let userId):
             NavigationStack {
                 TeamMemberDetailView(userId: userId, nombre: "", isSelf: userId == myId)
                     .nxBrandNavBar()
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
         case .comidas:
             NavigationStack {
                 ComidasView()
                     .nxBrandNavBar(title: "Comidas")
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
         case .extra(let module):
             NavigationStack {
@@ -290,18 +298,24 @@ struct CoreShellView: View {
                 CoreExtraDestination(module: module)
                     .nxBrandNavBar(title: module.title)
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
         case .viatico(let id):
             NavigationStack {
                 ViaticosView(abrirId: id)
                     .nxBrandNavBar(title: CoreExtraModule.viaticos.title)
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
         case .clientes(let id, let sector):
             NavigationStack {
                 ClientesHomeView(initialClientId: id, initialSectorSlug: sector)
                     .nxBrandNavBar(title: CoreModule.clientes.title)
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
             .environmentObject(session)
         case .perfil:
@@ -309,6 +323,8 @@ struct CoreShellView: View {
                 MyProfileView()
                     .nxBrandNavBar(title: CoreModule.perfil.title)
                     .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
             }
             .environmentObject(session)
         }
