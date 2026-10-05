@@ -34,9 +34,9 @@ enum class CoreModule(
 }
 
 /**
- * El resto de Core, en «Más»: módulos que la web ya tiene y la app todavía no. Cada uno abre
- * una pantalla «Disponible pronto en la app» con el botón a su página web; los frentes de
- * trabajo los irán sustituyendo por pantallas propias.
+ * El resto de Core, en «Más». Todos tienen pantalla dentro de la app: los módulos que solo
+ * mandaban a la web (Ejecutivo y Documentos) se quitaron el 05-10-2026 a pedido de Adam.
+ * [webPath] queda para emparejar enlaces y reglas de `me/navigation`, no para abrir el navegador.
  *
  * [key] es la misma clave que manda `GET me/navigation` en `moduleKeys`
  * (`apps/api/src/me/navigation-module-map.ts`, `CORE_EXTRA_MODULES`).
@@ -62,13 +62,6 @@ enum class CoreExtraModule(
      */
     val paraTodoElPersonal: Boolean = false,
 ) {
-    EXECUTIVE(
-        CoreKeys.EXECUTIVE,
-        "Hoy",
-        "/erp/executive",
-        "KPIs del negocio visibles para dirección.",
-        Group.HOY,
-    ),
     COTIZACIONES(CoreKeys.COTIZACIONES, "Cotizaciones", "/erp/cotizaciones", "Propuestas técnicas: folio, envío y seguimiento.", Group.HOY),
     PROYECTOS(CoreKeys.PROYECTOS, "Proyectos", "/erp/proyectos", "Cronograma, alcance, equipo y documentos.", Group.HOY),
     KPIS_EQUIPO(CoreKeys.KPIS_EQUIPO, "KPIs del equipo", "/erp/asistencias/indicadores", "Retardos, uniforme y horas del equipo.", Group.HOY),
@@ -84,7 +77,6 @@ enum class CoreExtraModule(
         "Pagos y anticipos al personal, con su comprobante.",
         Group.FINANZAS,
     ),
-    DOCUMENTOS(CoreKeys.DOCUMENTOS, "Documentos", "/erp/documents", "Manuales, planos y papeles de la operación.", Group.GOBIERNO),
     VIATICOS(
         CoreKeys.VIATICOS,
         "Viáticos",

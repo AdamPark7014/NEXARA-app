@@ -9,9 +9,6 @@ object CoreKeys {
     /** Actividades (`/erp/pizarra`) — la casa de Core. */
     const val ACTIVITIES = "activities"
 
-    /** Vista ejecutiva (KPIs) — `/erp/executive`. */
-    const val EXECUTIVE = "executive"
-
     /** Actividades en la vista «Mis actividades» (`/erp/mis-actividades`). */
     const val MY_ACTIVITIES = "my-activities"
 
@@ -54,9 +51,6 @@ object CoreKeys {
 
     /** Pagos a empleados (`/erp/finance/employee-payments`). */
     const val PAGOS_EMPLEADOS = "erp-pagos-empleados"
-
-    /** Documentos (`/erp/documents`). */
-    const val DOCUMENTOS = "erp-documentos"
 
     /**
      * Viáticos (`/erp/finance/viatics`).
