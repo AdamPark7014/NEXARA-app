@@ -74,7 +74,6 @@ import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioViewModel
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
-import mx.nexara.mobile.nativeapp.ui.console.more.ModulePlaceholderScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ProyectosScreen
 import mx.nexara.mobile.nativeapp.ui.console.pagos.PagosEmpleadosScreen
@@ -120,11 +119,6 @@ internal object ConsoleRoutes {
 
     /** «Más»: el resto de Core que el rol puede abrir ([CoreExtraModule]). */
     const val More = "console/more"
-
-    /** Módulo de «Más» sin pantalla propia todavía: se abre en la web. */
-    const val ModulePlaceholder = "console/more/{key}"
-
-    fun modulePlaceholder(key: String): String = "console/more/$key"
 
     /** Vehículos: ya tiene pantalla nativa (solicitar, salida y regreso con fotos). */
     const val Vehiculos = "console/vehiculos"
@@ -219,7 +213,6 @@ internal object ConsoleRoutes {
         CoreExtraModule.PAGOS_EMPLEADOS -> PagosEmpleados
         CoreExtraModule.GASTOS -> Gastos
         CoreExtraModule.APROBACIONES -> Aprobaciones
-        else -> modulePlaceholder(module.key)
     }
 
     /** ¿Este módulo de «Más» ya se abre dentro de la app? */
@@ -463,7 +456,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.ClientDetail -> "Cliente"
         ConsoleRoutes.NewClient -> "Nuevo cliente"
         ConsoleRoutes.MyProfile -> "Mi perfil"
-        ConsoleRoutes.More, ConsoleRoutes.ModulePlaceholder -> "Más"
+        ConsoleRoutes.More -> "Más"
         ConsoleRoutes.Vehiculos -> "Vehículos"
         ConsoleRoutes.KpisEquipo -> "KPIs del equipo"
         ConsoleRoutes.Proyectos -> "Proyectos"
@@ -854,12 +847,6 @@ fun ConsoleNavHost(
                         navController.popBackStack()
                     },
                 )
-            }
-            nxComposable(ConsoleRoutes.ModulePlaceholder, style = NxNavAnimStyle.Push) { entry ->
-                val module = CoreExtraModule.fromKey(entry.arguments?.getString("key"))
-                    ?.takeIf { it in extras }
-                    ?: return@nxComposable
-                ModulePlaceholderScreen(module)
             }
             nxComposable(ConsoleRoutes.Notifications, style = NxNavAnimStyle.Push) {
                 NotificationsScreen(

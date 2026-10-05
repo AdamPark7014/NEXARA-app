@@ -1,5 +1,15 @@
 # RELEVO
 
+- **05-10 (claude-code) — PARIDAD TOTAL iOS ← Android (pedido de Adam: «la app iOS no se parece en nada»).**
+  Android es la referencia en funciones y en UI/UX. Hecho: Android ya no tiene **Ejecutivo** ni **Documentos**
+  (eran los dos únicos módulos de «Más» que solo abrían la web; se borraron la ficha «ábrelo en la web», la
+  etiqueta «En la web» y la ruta `console/more/{key}`). En curso (iOS, por fases): A) sistema de diseño con los
+  tokens exactos de Android, barra inferior propia igual a la de Android, barra superior teal y hub «Más»;
+  B) cada pantalla a paridad + pantallas nativas que iOS no tiene (Cotizaciones, Aprobaciones, Gastos, Pagos a
+  empleados, Herramientas completo). Mientras no existan, esos módulos no salen en iOS; ninguno abre la web.
+  Referencia visual: emulador `nexara_phone` con el debug actual (`-PSCREENSHOT_API=true`) + modo `store_demo`
+  (`files/store_demo/serve`); hace falta que Adam inicie sesión (no tecleamos contraseñas).
+
 - **05-10 (claude-code) — tres fallas del build 1.0.0 (8) con la cuenta de Christian, arregladas en código
   (NO hay build nuevo todavía):**
   1. **Faltaban Chat y Asistencia en iOS.** Para dirección (CEO, dir_admin) `me/navigation` manda comodines

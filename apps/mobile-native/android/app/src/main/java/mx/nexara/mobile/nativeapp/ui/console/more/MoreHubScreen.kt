@@ -1,18 +1,13 @@
 package mx.nexara.mobile.nativeapp.ui.console.more
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,11 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Handshake
@@ -55,7 +48,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,18 +56,13 @@ import mx.nexara.mobile.nativeapp.data.SessionRevision
 import mx.nexara.mobile.nativeapp.data.SessionStore
 import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
-import mx.nexara.mobile.nativeapp.ui.console.ConsoleRoutes
 import mx.nexara.mobile.nativeapp.ui.console.CoreExtraModule
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
 /** Icono de cada módulo de «Más». */
 fun CoreExtraModule.icon(): ImageVector = when (this) {
-    CoreExtraModule.EXECUTIVE -> Icons.Default.Insights
     CoreExtraModule.COTIZACIONES -> Icons.Default.RequestQuote
     CoreExtraModule.PROYECTOS -> Icons.Default.Folder
     CoreExtraModule.KPIS_EQUIPO -> Icons.Default.Insights
@@ -86,17 +73,13 @@ fun CoreExtraModule.icon(): ImageVector = when (this) {
     CoreExtraModule.GASTOS -> Icons.AutoMirrored.Filled.ReceiptLong
     CoreExtraModule.APROBACIONES -> Icons.AutoMirrored.Filled.FactCheck
     CoreExtraModule.PAGOS_EMPLEADOS -> Icons.Default.AccountBalanceWallet
-    CoreExtraModule.DOCUMENTOS -> Icons.Default.Description
 }
 
 /**
  * «Más»: el resto de NEXARA Core que el rol puede abrir.
  *
- * Los que ya tienen pantalla nativa se abren dentro de la app; los que no,
- * siguen cayendo en [ModulePlaceholderScreen]. La lista lo dice antes de que se
- * toque, con una etiqueta «En la web» en los que todavía sacan al navegador: de
- * lo contrario, dos entradas iguales hacen dos cosas muy distintas y no hay
- * forma de saberlo hasta después.
+ * Todos se abren dentro de la app: los que solo mandaban a la web se quitaron
+ * (05-10-2026), así que aquí no hay ficha de «ábrelo en la web».
  */
 @Composable
 fun MoreHubScreen(
@@ -238,7 +221,6 @@ private fun ExtraCard(module: CoreExtraModule, onOpen: (CoreExtraModule) -> Unit
         icon = module.icon(),
         label = module.label,
         summary = module.summary,
-        enWeb = !ConsoleRoutes.tienePantallaNativa(module),
         onClick = { onOpen(module) },
     )
 }
@@ -250,7 +232,6 @@ private fun HubCard(
     label: String,
     summary: String,
     onClick: () -> Unit,
-    enWeb: Boolean = false,
 ) {
     Card(
         onClick = onClick,
@@ -296,81 +277,11 @@ private fun HubCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (enWeb) {
-                NxStatusChip("En la web", NxTone.Neutral)
-            }
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = NxTheme.colors.muted,
             )
         }
-    }
-}
-
-/** Módulo que todavía no tiene pantalla en la app: se abre en la web de Core. */
-@Composable
-fun ModulePlaceholderScreen(module: CoreExtraModule) {
-    val context = LocalContext.current
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(NxTheme.colors.surface)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .background(NxTheme.colors.brandTint, RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                module.icon(),
-                contentDescription = null,
-                tint = NxTheme.colors.brand,
-                modifier = Modifier.size(44.dp),
-            )
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(
-            module.label,
-            style = MaterialTheme.typography.headlineSmall,
-            color = NxTheme.colors.fg,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            module.summary,
-            style = MaterialTheme.typography.bodyMedium,
-            color = NxTheme.colors.muted,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(18.dp))
-        Text(
-            "Este módulo llegará pronto a la app. Mientras tanto, ábrelo en la web.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = NxTheme.colors.fg,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(20.dp))
-        NxPrimaryButton(
-            text = "Abrir en la web",
-            onClick = { abrirEnLaWeb(context, module) },
-            icon = Icons.AutoMirrored.Filled.OpenInNew,
-            modifier = Modifier,
-        )
-    }
-}
-
-private fun abrirEnLaWeb(context: android.content.Context, module: CoreExtraModule) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(module.webUrl)).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    // Sin navegador instalado no se cae la app: se avisa en vez de quedar el botón mudo.
-    runCatching { context.startActivity(intent) }.recoverCatching { e ->
-        if (e !is ActivityNotFoundException) throw e
-        android.widget.Toast.makeText(context, "No hay un navegador instalado para abrirlo", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
