@@ -141,4 +141,37 @@ describe('tarjetas de Mi equipo', () => {
       { folio: 'AN-0004', titulo: 'Preventivo sin fila' },
     ]);
   });
+
+  describe('«libre» dura 15 minutos después de terminar', () => {
+    async function carolinaQueTermino(hace: number) {
+      const cerrada = actividad({
+        id: 5,
+        anNumber: 'AN-0005',
+        titulo: 'Ya terminó',
+        responsableId: 13,
+        estatus: 'Finalizada',
+        fechaMaxima: new Date('2026-09-28T20:00:00.000Z'),
+        fechaFinalizacion: new Date(AHORA.getTime() - hace * 60_000),
+      });
+      const service = build([fila(cerrada, { userId: 13, rol: 'TECNICO' })]);
+      const board = await service.getBoard(
+        { id: 7, email: LUIS.email, roleKey: 'coord_operaciones' },
+        1,
+      );
+      return board.users.find((u) => u.id === 13)!;
+    }
+
+    it('terminó hace 10 min: libre, con lo que terminó', async () => {
+      const carolina = await carolinaQueTermino(10);
+      expect(carolina.status).toBe('libre');
+      expect(carolina.lastFinished).toEqual(expect.objectContaining({ anNumber: 'AN-0005' }));
+    });
+
+    it('terminó hace 30 min: sin nada asignado', async () => {
+      const carolina = await carolinaQueTermino(30);
+      expect(carolina.status).toBe('sin_actividad');
+      expect(carolina.lastFinished).toBeNull();
+      expect(carolina.idleSinceAt).toBeNull();
+    });
+  });
 });
