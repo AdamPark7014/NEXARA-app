@@ -1,5 +1,13 @@
 # RELEVO
 
+- **04-10 21:50 (claude-code) — push de iOS:** todo listo salvo subir la llave a Firebase. App ID con Push
+  activado; build 1.0.0 (8) firmado con `aps-environment = production`; Firebase FCM v1 habilitado. Se
+  registró la llave APNs «NEXARA APNs» (Key ID `3U672539N2`, Sandbox & Production, Team Scoped). **Falta
+  que Adam descargue el `.p8` (una sola vez) y lo suba en Firebase → Cloud Messaging → NEXARA iOS
+  (producción y desarrollo, Team ID AHNW9K8745).** No requiere build nuevo ni reenvío. Android ya funciona
+  (FCM puro, nada que configurar en Google Play). En TestFlight los builds 1, 3, 5, 6 y 7 aparecieron
+  caducados el 04-10; el 8 (en revisión) sigue vigente.
+
 - **04-10 (claude-code): NEXARA iOS 1.0 REENVIADA a revisión — build 1.0.0 (8), «Pendiente de revisión»
   desde las 18:32.** Apple había rechazado la 1.0 (6) solo por 2.3.10 («remove non-iOS status bar
   images», revisada en iPad Air 11"): las capturas SÍ eran del simulador de iOS, pero `DemoBanner` pintaba
