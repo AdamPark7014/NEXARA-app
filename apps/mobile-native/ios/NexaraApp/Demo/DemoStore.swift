@@ -198,6 +198,14 @@ final class DemoStore: @unchecked Sendable {
         let inicioDelDia = calendario.startOfDay(for: fecha)
         let minuto = calendario.component(.hour, from: fecha) * 60 + calendario.component(.minute, from: fecha)
         if minuto >= 18 * 60 {
+            // Si el demo se abrió con jornada por delante, lo de «más tarde hoy» se aprieta
+            // antes de las 18:00 (17:30–17:55, en el mismo orden); si ya es tarde, va a la
+            // mañana siguiente.
+            let minutoDeEntrada = calendario.component(.hour, from: epoch) * 60 + calendario.component(.minute, from: epoch)
+            if calendario.isDate(fecha, inSameDayAs: epoch), minutoDeEntrada < 17 * 60 + 15 {
+                let extra = min((minuto - 18 * 60) / 8, 25)
+                return inicioDelDia.addingTimeInterval(TimeInterval(17 * 60 + 30 + extra) * 60)
+            }
             let extra = (minuto - 18 * 60) / 3
             return inicioDelDia.addingTimeInterval(TimeInterval(24 * 60 + 10 * 60 + extra) * 60)
         }
