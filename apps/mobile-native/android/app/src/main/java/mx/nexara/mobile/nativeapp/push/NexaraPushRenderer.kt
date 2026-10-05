@@ -19,6 +19,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
+import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -187,6 +188,7 @@ internal object NexaraPushRenderer {
             .setNumber(conversation.messages.size)
             .setContentIntent(contentIntent(app, notificationId, linkData))
             .setPublicVersion(publicVersion(app, NexaraNotifications.CHANNEL_CHAT, "Nuevo mensaje", p.sentAtMillis))
+        chatActions(app, threadId, notificationId).forEach { builder.addAction(it) }
 
         publishConversationShortcut(
             app = app,
@@ -313,6 +315,21 @@ internal object NexaraPushRenderer {
             NotificationAvatars.filledGlyphCircle(app, glyphRes, badgeColor)
         }
         builder.setLargeIcon(largeIcon)
+        p.notificationId.toLongOrNull()?.let { serverId ->
+            builder.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_stat_nexara,
+                    "Marcar como leída",
+                    actionIntent(app, NotificationActionReceiver.ACTION_EVENT_READ, notificationId, mutable = false) {
+                        putExtra(NotificationActionReceiver.EXTRA_SHOWN_ID, notificationId)
+                        putExtra(NotificationActionReceiver.EXTRA_SERVER_ID, serverId.toString())
+                    },
+                )
+                    .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)
+                    .setShowsUserInterface(false)
+                    .build(),
+            )
+        }
 
         notify(app, notificationId, builder.build())
         refreshEventSummary(app, channelId, group, notificationId, summaryLine(title, body))
@@ -414,6 +431,59 @@ internal object NexaraPushRenderer {
     }
 
     private fun summaryId(group: String): Int = "summary:$group".hashCode()
+
+    /** «Responder» (con campo de texto) y «Marcar como leído», como WhatsApp. Solo con canal numérico. */
+    private fun chatActions(app: Context, threadId: String, notificationId: Int): List<NotificationCompat.Action> {
+        if (threadId.toLongOrNull() == null) return emptyList()
+        val input = RemoteInput.Builder(NotificationActionReceiver.KEY_REPLY)
+            .setLabel("Escribe tu respuesta")
+            .build()
+        val reply = NotificationCompat.Action.Builder(
+            R.drawable.ic_stat_nexara,
+            "Responder",
+            actionIntent(app, NotificationActionReceiver.ACTION_REPLY, notificationId, mutable = true) {
+                putExtra(NotificationActionReceiver.EXTRA_THREAD, threadId)
+            },
+        )
+            .addRemoteInput(input)
+            .setAllowGeneratedReplies(true)
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+            .setShowsUserInterface(false)
+            .build()
+        val read = NotificationCompat.Action.Builder(
+            R.drawable.ic_stat_nexara,
+            "Marcar como leído",
+            actionIntent(app, NotificationActionReceiver.ACTION_CHAT_READ, notificationId, mutable = false) {
+                putExtra(NotificationActionReceiver.EXTRA_THREAD, threadId)
+            },
+        )
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)
+            .setShowsUserInterface(false)
+            .build()
+        return listOf(reply, read)
+    }
+
+    /** El campo de respuesta exige un PendingIntent mutable; el resto, inmutable. */
+    private fun actionIntent(
+        app: Context,
+        action: String,
+        notificationId: Int,
+        mutable: Boolean,
+        extras: Intent.() -> Unit,
+    ): PendingIntent {
+        val intent = Intent(app, NotificationActionReceiver::class.java).setAction(action).apply(extras)
+        val mutability = when {
+            !mutable -> PendingIntent.FLAG_IMMUTABLE
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> PendingIntent.FLAG_MUTABLE
+            else -> 0
+        }
+        return PendingIntent.getBroadcast(
+            app,
+            31 * notificationId + action.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or mutability,
+        )
+    }
 
     /** Abre MainActivity con los extras `nexara_*` que lee NotificationDeepLinkResolver. */
     private fun contentIntent(app: Context, requestCode: Int, data: Map<String, String>): PendingIntent {

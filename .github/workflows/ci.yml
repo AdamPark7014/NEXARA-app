@@ -194,6 +194,7 @@ jobs:
       - name: Compilar para simulador (sin firmar)
         working-directory: apps/mobile-native/ios
         run: |
+          set -o pipefail
           xcodebuild build \
             -project NexaraApp.xcodeproj \
             -scheme NexaraApp \
@@ -203,4 +204,23 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
+            DEVELOPMENT_TEAM="" 2>&1 | tee xcodebuild.log
+
+      # El repo es público: las anotaciones se leen sin sesión de GitHub
+      # (`/check-runs/{id}/annotations`), así los errores de Swift se pueden ver
+      # desde una máquina sin `gh`. GitHub guarda hasta 10 por paso: van en lotes.
+      - name: Errores de Swift como anotaciones
+        if: failure()
+        working-directory: apps/mobile-native/ios
+        run: |
+          grep -E "(fatal )?error: " xcodebuild.log | sed -E 's#^.*/(NexaraApp[^/]*/)#\1#' | sort -u > errores.txt || true
+          echo "Errores de compilacion: $(wc -l < errores.txt | tr -d ' ')"
+          split -l 25 errores.txt lote_ || true
+          n=0
+          for f in lote_*; do
+            [ -f "$f" ] || continue
+            n=$((n+1))
+            [ "$n" -gt 10 ] && break
+            body=$(sed -e 's/%/%25/g' -e 's/\r//g' "$f" | awk 'BEGIN{ORS="%0A"} {print}')
+            echo "::error title=Swift ${n}::${body}"
+          done
