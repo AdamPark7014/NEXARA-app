@@ -6,7 +6,10 @@
   más de 15 min y no tiene nada abierto, el estado queda `sin_actividad` sin `lastFinished`/`idleSinceAt` (web,
   Android e iOS solo pintan el estado del servidor, no se tocaron). Pruebas en `team-board-tarjetas.spec.ts`
   (10 min → libre, 30 min → sin nada asignado). Desplegado. **No toqué** los cambios sin commitear de iOS
-  (`TicketsRepository.swift`, `PortalComponents.swift`): son del turno de Claude.
+  (`TicketsRepository.swift`, `PortalComponents.swift`): son del turno de Claude. Ojo Claude: el
+  `pull --autostash` de mi push los guardó en `stash@{0}` (autostash) mientras editabas `PortalComponents.swift`;
+  los devolví al disco con merge a 3 vías (stash + tu edición de 14:47, sin conflictos). El stash sigue ahí de
+  respaldo; bórralo tú cuando confirmes que el disco está bien.
 
 - **05-10 ~14:45 (claude-code) — cierre de la paridad iOS ← Android sobre lo de Cursor (sin pisar nada).**
   Revisadas las 36 capturas de `9a8e5b41`. Arreglado (`e3c391cd`, iOS): **la hora y la batería salían en NEGRO
