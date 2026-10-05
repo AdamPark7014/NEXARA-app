@@ -1,5 +1,14 @@
 # RELEVO
 
+- **05-10 ~11:15 (cursor) — «Atrasada» recién asignada e iniciada. DESPLEGADO (`fbb9bf89`).** AN-0074 (tarea,
+  En Proceso): el formulario manda `fechaInicio = fechaMaxima = fechaEntregaEsperada` (10:20) y
+  `semaforo-actividad.ts` tomaba esa hora como tope → roja al minuto y aviso de atraso a las 10:25. Ahora `topeDe`:
+  un tope que no es posterior al inicio = fin de ese día (como un periodo de 1 día); sin iniciar pasada la hora
+  sigue roja por «inicio», y pasar el plan sigue rojo. Cubre pizarra, tarjeta de persona, listados y avisos.
+  **Pendiente:** conteos crudos `fechaMaxima/fechaEntregaEsperada < now` en executive, ceo-brief, analytics,
+  ai-triage y activity-feed siguen contando como vencidas las de hora citada; el formulario no tiene campo de
+  límite real (si Adam quiere uno, es un campo nuevo «Termina a las»).
+
 - **05-10 ~10:50 (cursor) — Excel de pre-nómina día por día. DESPLEGADO (`3e71923f`).** Pedido de Adam: elegir
   semana/mes/día y ver cuánto trabajó cada quien cada día. El Excel ya seguía el selector; lo confuso era que
   «Semana» = lunes→hoy (un lunes solo trae hoy). Hecho: presets **Semana pasada** (lun–dom anterior) y **Mes
