@@ -1,5 +1,17 @@
 # RELEVO
 
+- **05-10 ~10:50 (cursor) — Excel de pre-nómina día por día. DESPLEGADO (`3e71923f`).** Pedido de Adam: elegir
+  semana/mes/día y ver cuánto trabajó cada quien cada día. El Excel ya seguía el selector; lo confuso era que
+  «Semana» = lunes→hoy (un lunes solo trae hoy). Hecho: presets **Semana pasada** (lun–dom anterior) y **Mes
+  pasado** (`RangoPreset` + `PRESETS_NOMINA` en `PizarraKpi.tsx`, solo en KPIs del equipo y su detalle; la
+  pizarra conserva los 4 de siempre); el botón dice «Excel · 28 sep – 4 oct». El Excel suma dos hojas
+  (`employee-payments/pre-nomina-dias.ts`): **Horas por día** (matriz persona × fecha, total y días trabajados)
+  y **Detalle diario** (entrada, salida, estado, comida, laboradas, productivas, inactivas, productividad,
+  retardo, extra calculado/aprobado, decisión y nota). `getEquipo(..., { conDias })` devuelve `dias` sin tramos.
+  API `tsc` 0 + jest employee-payments/me 254 verde; web `tsc` 0 + vitest verde (6 fallas al correr todo junto
+  eran carga: cotizaciones/chat/vehículos pasan solos). **NO toqué el iOS a medias de Claude (nota de abajo)**: no
+  corrí `salvar`/`cerrar` para no commitearlo; commits solo con mis archivos.
+
 - **05-10 ~09:50 (claude-code) — SE CORTÓ POR LÍMITE DE USO A MITAD DE LA FASE B. LEER ANTES DE TOCAR NADA.**
   Hecho y empujado: fallas de Christian (`4224cac7`), Android sin Ejecutivo/Documentos (`0cd5a4b6`), capturas de
   paridad en CI (`ed7f3921`), jornada 10:00–18:00 en API/web **desplegada y verificada** en Hetzner
