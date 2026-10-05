@@ -344,6 +344,44 @@ function logoNexara(): Buffer | null {
   return logoCache;
 }
 
+// ─────────────────────────────────────────────────────────── alto de filas ajustadas
+
+/** Alto de una línea de texto a 10 pt, en puntos. */
+const ALTO_LINEA = 13.5;
+
+/**
+ * Líneas que ocupa `texto` ajustado por palabras en una columna de `ancho` caracteres.
+ * Excel no recalcula el alto de una fila con alto fijo: si no se calcula aquí, el texto
+ * ajustado se encima sobre las filas de abajo.
+ */
+export function lineasDeTexto(texto: string, ancho: number): number {
+  const util = Math.max(1, Math.floor(ancho) - 1);
+  let lineas = 0;
+  for (const parrafo of String(texto ?? '').split('\n')) {
+    let n = 1;
+    let actual = 0;
+    for (const palabra of parrafo.split(/\s+/).filter(Boolean)) {
+      if (actual === 0) actual = palabra.length;
+      else if (actual + 1 + palabra.length <= util) actual += 1 + palabra.length;
+      else {
+        n += 1;
+        actual = palabra.length;
+      }
+      while (actual > util) {
+        n += 1;
+        actual -= util;
+      }
+    }
+    lineas += n;
+  }
+  return Math.max(1, lineas);
+}
+
+/** Alto de fila para `lineas` de texto, nunca menos que `minimo`. */
+export function altoParaLineas(lineas: number, minimo: number): number {
+  return Math.max(minimo, Math.ceil(lineas * ALTO_LINEA + 5));
+}
+
 // ─────────────────────────────────────────────────────────────── escritura de hoja
 
 /** Excel prohíbe `: \ / ? * [ ]` en los nombres de pestaña y los corta a 31 caracteres. */
@@ -470,12 +508,16 @@ function escribirHoja(
   // ── Datos ────────────────────────────────────────────────────────────────────
   const primeraFilaDatos = filaEncabezado + 1;
   const anchoNatural = columnas.map((c) => c.titulo.length + 3);
+  const textos: string[][] = [];
 
   hoja.filas.forEach((datos, idx) => {
     const fila = ws.getRow(primeraFilaDatos + idx);
     fila.height = 17;
+    const textosFila: string[] = [];
+    textos.push(textosFila);
     columnas.forEach((columna, i) => {
       const { valor, formato, alinear, texto } = prepararCelda(columna, datos);
+      textosFila.push(texto);
       const celda = fila.getCell(i + 1);
       celda.value = valor;
       if (formato) celda.numFmt = formato;
@@ -526,11 +568,15 @@ function escribirHoja(
   }
 
   // ── Anchos, congelado, autofiltro ────────────────────────────────────────────
+  const anchos: number[] = [];
+  const envuelve: boolean[] = [];
   columnas.forEach((columna, i) => {
     const natural = columna.ancho ?? Math.min(ANCHO_MAX, anchoNatural[i]);
     const col = ws.getColumn(i + 1);
     col.width = Math.max(ANCHO_MIN, natural);
+    anchos.push(col.width);
     const envolver = columna.ajustar ?? (columna.ancho === undefined && anchoNatural[i] > ANCHO_MAX);
+    envuelve.push(envolver);
     if (envolver && hayDatos) {
       for (let r = primeraFilaDatos; r <= ultimaFilaDatos; r += 1) {
         const celda = ws.getRow(r).getCell(i + 1);
@@ -538,6 +584,22 @@ function escribirHoja(
       }
     }
   });
+
+  // El encabezado (negrita, algo más ancha) y las filas con texto ajustado crecen lo necesario.
+  const lineasEncabezado = Math.max(
+    1,
+    ...columnas.map((c, i) => lineasDeTexto(c.titulo, anchos[i] * 0.9)),
+  );
+  encabezado.height = altoParaLineas(lineasEncabezado, 26);
+  if (hayDatos && envuelve.some(Boolean)) {
+    textos.forEach((textosFila, idx) => {
+      const lineas = Math.max(
+        1,
+        ...textosFila.map((t, i) => (envuelve[i] && t ? lineasDeTexto(t, anchos[i]) : 1)),
+      );
+      if (lineas > 1) ws.getRow(primeraFilaDatos + idx).height = altoParaLineas(lineas, 17);
+    });
+  }
 
   ws.views = [{ state: 'frozen', ySplit: filaEncabezado, showGridLines: false }];
   if (hayDatos) {
@@ -611,7 +673,7 @@ function escribirInformacion(
 
   entradas.forEach(([etiqueta, valor], i) => {
     const fila = ws.getRow(i + 3);
-    fila.height = 17;
+    fila.height = altoParaLineas(lineasDeTexto(valor, 64), 17);
     const a = fila.getCell(1);
     a.value = etiqueta;
     a.font = { name: FUENTE, size: 10, bold: true, color: { argb: EXCEL_COLORES.navy } };

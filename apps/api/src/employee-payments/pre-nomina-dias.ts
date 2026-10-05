@@ -42,13 +42,12 @@ export function horasEnPalabras(minutos: number): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
-/** «Lunes 05/10: 8 h 10 min trabajadas, 5 h 20 min productivas (65 %)», o por qué no trabajó. */
+/** «8 h 10 min trabajadas · 5 h 20 min productivas (65 %)», o por qué no trabajó. El día va en su columna. */
 export function resumenDelDia(d: DiaKpi): string {
-  const dia = etiquetaFecha(d.fecha);
-  if (!d.conJornada) return `${dia}: ${estadoDelDia(d).toLowerCase()}`;
+  if (!d.conJornada) return estadoDelDia(d);
   const pct = d.productividadPct != null ? ` (${Math.round(d.productividadPct)} %)` : '';
-  const abierta = d.abierta ? ', sigue en jornada' : '';
-  return `${dia}: ${horasEnPalabras(d.minutosLaborados)} trabajadas, ${horasEnPalabras(d.minutosProductivos)} productivas${pct}${abierta}`;
+  const abierta = d.abierta ? ' · en jornada' : '';
+  return `${horasEnPalabras(d.minutosLaborados)} trabajadas · ${horasEnPalabras(d.minutosProductivos)} productivas${pct}${abierta}`;
 }
 
 /** ISO → «09:58» en la zona de la jornada. */
@@ -189,7 +188,7 @@ const COLUMNAS_DETALLE_DIARIO: ColumnaReporte<FilaDetalleDiario>[] = [
   { clave: 'numeroEmpleado', titulo: 'No. de empleado', ancho: 14 },
   { clave: 'nombre', titulo: 'Persona', ancho: 28 },
   { clave: 'fecha', titulo: 'Día', ancho: 19 },
-  { clave: 'resumen', titulo: 'En palabras', ancho: 46, ajustar: true },
+  { clave: 'resumen', titulo: 'En palabras', ancho: 56 },
   { clave: 'entrada', titulo: 'Entrada', ancho: 9 },
   { clave: 'salida', titulo: 'Salida', ancho: 9 },
   { clave: 'estado', titulo: 'Estado', ancho: 18 },
