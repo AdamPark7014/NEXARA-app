@@ -177,6 +177,10 @@ final class AuthRepository {
             if let panels = map["panels"] as? [String], !panels.isEmpty { next.navPanels = panels }
             let moduleKeys = (map["moduleKeys"] as? [String] ?? []) + (map["webModuleIds"] as? [String] ?? [])
             if !moduleKeys.isEmpty { next.navModules = Array(Set(moduleKeys)).sorted() }
+            let paths = (map["paths"] as? [String] ?? [])
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty && !$0.hasPrefix("/api") }
+            if !paths.isEmpty { next.navPaths = paths }
         }
 
         return next

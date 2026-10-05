@@ -32,10 +32,22 @@ enum CoreModule: String, CaseIterable, Identifiable, Hashable {
     var navigationKeys: Set<String> {
         switch self {
         case .actividades: return ["pizarra", "mis-actividades"]
-        case .asistencias: return ["asistencias"]
+        case .asistencias: return ["asistencias", "attendance"]
         case .chat: return ["chat"]
         case .clientes: return ["erp-clients"]
         case .perfil: return ["my-profile"]
+        }
+    }
+
+    /// Páginas web del módulo: se comparan con las rutas permitidas (`navPaths`), igual que
+    /// `CoreModule.webPaths` de Android.
+    var webPaths: [String] {
+        switch self {
+        case .actividades: return ["/erp/pizarra", "/erp/mis-actividades"]
+        case .asistencias: return ["/erp/asistencias"]
+        case .chat: return ["/erp/chat"]
+        case .clientes: return ["/erp/clientes"]
+        case .perfil: return ["/erp/my-profile"]
         }
     }
 }
@@ -229,6 +241,24 @@ enum CoreNavigation {
     /// usan los módulos de Core que la web da a todo el personal.
     static func modules(for user: SessionUser?) -> [CoreModule] {
         guard let user, !isExternal(user) else { return [] }
+        // Con rutas de `me/navigation` manda la ruta, como en Android: a dirección (CEO,
+        // dir_admin) le llegan comodines (`/erp/**`) y sus `moduleKeys` no traen `chat` ni
+        // `asistencias`, así que filtrar por claves le escondía Chat y Asistencia.
+        if user.isSuperAdmin {
+            return CoreModule.allCases.filter { $0 != .clientes || !ClientSector.sectors(for: user.email).isEmpty }
+        }
+        if let paths = user.navPaths, !paths.isEmpty {
+            return CoreModule.allCases.filter { module in
+                switch module {
+                case .actividades, .perfil:
+                    return true
+                case .clientes:
+                    return !ClientSector.sectors(for: user.email).isEmpty && routeAllows(paths, module)
+                case .asistencias, .chat:
+                    return routeAllows(paths, module)
+                }
+            }
+        }
         let nav = Set((user.navModules ?? []).map { $0.lowercased() })
         let navHasCore = CoreModule.allCases.contains { !$0.navigationKeys.isDisjoint(with: nav) }
         func allowedByNavigation(_ module: CoreModule) -> Bool {
@@ -247,5 +277,28 @@ enum CoreNavigation {
                 return allowedByNavigation(module)
             }
         }
+    }
+
+    /// ¿Alguna ruta permitida abre una página del módulo?
+    static func routeAllows(_ paths: [String], _ module: CoreModule) -> Bool {
+        module.webPaths.contains { path in paths.contains { ruleMatches($0, path) } }
+    }
+
+    /// `checkUrlAccess` de url-matrix (espejo de `CoreMenu.ruleMatches` en Android):
+    /// `/**` = prefijo, `/*` = un solo nivel, sin comodín = igualdad exacta.
+    static func ruleMatches(_ rule: String, _ path: String) -> Bool {
+        var clean = rule.trimmingCharacters(in: .whitespaces)
+        while clean.count > 1 && clean.hasSuffix("/") { clean.removeLast() }
+        if clean.isEmpty || clean == "/**" { return true }
+        if clean.hasSuffix("/**") {
+            let base = String(clean.dropLast(3))
+            return path == base || path.hasPrefix(base + "/")
+        }
+        if clean.hasSuffix("/*") {
+            let base = String(clean.dropLast(2))
+            guard path.hasPrefix(base + "/") else { return false }
+            return !path.dropFirst(base.count + 1).contains("/")
+        }
+        return path == clean
     }
 }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.access.CoreKeys
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
@@ -24,6 +25,11 @@ data class InicioUiState(
     val error: String? = null,
     /** El rol abre Actividades: sin esto no se pide `me/activities` ni se pinta «Ahora». */
     val tieneActividades: Boolean = false,
+    /**
+     * Dirección general (Christian y su equivalente): el API le niega «Mis actividades» (403
+     * «no aplica a dirección general»); Inicio le muestra la pizarra del equipo en su lugar.
+     */
+    val esDireccion: Boolean = false,
     val open: List<MyActivityItemDto> = emptyList(),
     val hechasHoy: Int = 0,
     /** Actividad sobre la que corre «Iniciar» o «Reanudar». */
@@ -44,7 +50,12 @@ class InicioViewModel(app: Application) : AndroidViewModel(app) {
     private val authRepo = AuthRepository(app.applicationContext)
     private val repo = CoreActivitiesRepository(app.applicationContext)
     private val _state = MutableStateFlow(
-        InicioUiState(tieneActividades = CoreMenu.canOpen(authRepo.loadSession(), CoreKeys.ACTIVITIES)),
+        authRepo.loadSession().let { session ->
+            InicioUiState(
+                tieneActividades = CoreMenu.canOpen(session, CoreKeys.ACTIVITIES),
+                esDireccion = PlatformAccounts.isCeoEquivalentEmail(session?.email),
+            )
+        },
     )
     val state: StateFlow<InicioUiState> = _state
 
@@ -57,7 +68,7 @@ class InicioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun load(initial: Boolean = true) {
-        if (!_state.value.tieneActividades) {
+        if (!_state.value.tieneActividades || _state.value.esDireccion) {
             _state.update { it.copy(isLoading = false, isRefreshing = false) }
             return
         }

@@ -338,10 +338,14 @@ struct CoreShellView: View {
 
     // MARK: Datos
 
-    /// `GET me/navigation` define el menú; se pide si la sesión aún no lo trae.
+    /// `GET me/navigation` define el menú; se pide si la sesión aún no lo trae. También si le
+    /// faltan las rutas (`navPaths`): las sesiones abiertas antes de guardarlas solo tenían claves
+    /// y, sin rutas, dirección se quedaba sin Chat ni Asistencia hasta volver a entrar.
     @MainActor
     private func refreshNavigationIfNeeded() async {
-        guard let user = session.currentUser, user.navModules == nil else { return }
+        guard let user = session.currentUser,
+              user.navModules == nil || (user.navPaths == nil && !DemoMode.isActive)
+        else { return }
         var enriched = await AuthRepository.shared.enrichSession(user)
         if enriched != user, let now = SessionStore.shared.currentUser, now.id == user.id {
             // El token pudo renovarse mientras tanto: se guarda el vigente.

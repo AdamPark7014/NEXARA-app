@@ -25,6 +25,10 @@ struct SessionUser: Codable, Equatable {
     var navPanels: [String]? = nil
     /// `moduleKeys` ∪ `webModuleIds` de `GET /me/navigation`: filtran el menú de Core.
     var navModules: [String]? = nil
+    /// Rutas permitidas (`paths` de `GET /me/navigation`, sin las de `/api`). Mandan sobre
+    /// `navModules` para las pestañas, como en Android (`CoreMenu.routeAllows`): a dirección le
+    /// llegan comodines (`/erp/**`) que no producen las claves `chat` ni `asistencias`.
+    var navPaths: [String]? = nil
     /// Tenant activo — se manda como `X-Company-Id` (paridad Android).
     var companyId: Int64? = nil
     /// ISO-8601 de caducidad del JWT; `maybeExtendSession` lo usa.

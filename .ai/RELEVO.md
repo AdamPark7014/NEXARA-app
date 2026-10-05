@@ -1,5 +1,26 @@
 # RELEVO
 
+- **05-10 (claude-code) — tres fallas del build 1.0.0 (8) con la cuenta de Christian, arregladas en código
+  (NO hay build nuevo todavía):**
+  1. **Faltaban Chat y Asistencia en iOS.** Para dirección (CEO, dir_admin) `me/navigation` manda comodines
+     (`/erp/**`) y la clave `attendance`, no `chat` ni `asistencias`; iOS filtraba las pestañas por claves.
+     Ahora guarda las rutas (`SessionUser.navPaths`, sin las de `/api`) y decide por ruta como Android
+     (`CoreNavigation.routeAllows`/`ruleMatches`, espejo de `CoreMenu.ruleMatches`); super admin ve todo
+     (Clientes sigue dependiendo del sector). Las sesiones abiertas piden `me/navigation` otra vez si les
+     faltan las rutas (no en modo demo, para que la revisión de Apple se comporte igual que antes).
+     Afecta también a `play.review@nexara.com.mx` (rol CEO), así que el revisor tampoco veía esas pestañas.
+  2. **Inicio daba error y quedaba vacío:** el API niega «Mis actividades» a dirección general (403,
+     `isCeoEquivalentEmail` = gerencia@ y claudia.bernal@). Inicio ya no la pide para esas cuentas y muestra
+     «Tu equipo hoy» con un botón a la pizarra. Igual en iOS (fuera del modo demo, donde la persona ficticia
+     sí tiene cola) y en Android (que tenía el mismo 403). Que no salga la tarjeta de checar entrada es
+     correcto: CEO = asistencia en modo `manage`, no se registra a sí mismo, en las dos plataformas.
+  3. **El tema seguía el modo oscuro del iPhone:** Android es siempre claro; `Info.plist` fija
+     `UIUserInterfaceStyle = Light`.
+  Verificado en local: `scripts/ios-static-check.py` limpio, Android `compileDebugKotlin` + `testDebugUnitTest`
+  en verde. La compilación real de iOS la hace el trabajo `ios` de `ci.yml` al empujar. **Pendiente de Adam:**
+  decidir si se retira el 8 de revisión y se manda un build 9 (`ios-testflight.yml` desde su Chrome) o se
+  espera el veredicto del 8 y el 9 va como actualización.
+
 - **04-10 21:50 (claude-code) — push de iOS:** todo listo salvo subir la llave a Firebase. App ID con Push
   activado; build 1.0.0 (8) firmado con `aps-environment = production`; Firebase FCM v1 habilitado. Se
   registró la llave APNs «NEXARA APNs» (Key ID `3U672539N2`, Sandbox & Production, Team Scoped). **Adam ya
