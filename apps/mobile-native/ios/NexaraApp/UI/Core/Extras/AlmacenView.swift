@@ -10,8 +10,8 @@ import SwiftUI
 /// completo queda en la otra pastilla. El costo no sale: en el bolsillo no se
 /// decide un precio, y sí se enseña delante de un cliente.
 ///
-/// Sigue siendo una `List` porque el escáner está hecho de secciones con
-/// campos; el resto se pinta con las tarjetas de «Más».
+/// Es una `List` de filas transparentes: cada fila es una tarjeta de «Más»,
+/// el escáner incluido (una `MoreTarjeta` con sus campos).
 struct AlmacenView: View {
     enum Vista: String, CaseIterable, Identifiable {
         case bajoMinimo
@@ -77,9 +77,10 @@ struct AlmacenView: View {
 
     var body: some View {
         List {
-            EscanerDeAlmacen(onMovimiento: { Task { await cargar() } })
-
             Group {
+                // El escáner es una tarjeta más, arriba de todo (Android `item(key = "escaner")`).
+                EscanerDeAlmacen(onMovimiento: { Task { await cargar() } })
+
                 FilaDePastillasDeConsulta(pastillas: Vista.allCases.map { opcion in
                     PastillaDeConsulta(
                         etiqueta: opcion.etiqueta,
@@ -107,12 +108,14 @@ struct AlmacenView: View {
 
                 MoreNotaDeAlcance(texto: Self.limite)
             }
-            // El margen lateral lo pone la lista agrupada, igual que al escáner.
+            // El margen lateral lo pone la lista agrupada.
             .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         }
         .listStyle(.insetGrouped)
+        // El teclado de la cantidad (decimal) no trae «Listo»: se baja al deslizar.
+        .scrollDismissesKeyboard(.interactively)
         .nxListBackground()
         .refreshable { await cargar() }
         .task { if !estado.hayDatos { await cargar() } }

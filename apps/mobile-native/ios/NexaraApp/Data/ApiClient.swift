@@ -157,6 +157,9 @@ final class ApiClient {
                                   resolvingAgainstBaseURL: false)
         if !query.isEmpty {
             comps?.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+            // `URLComponents` deja el «+» tal cual y el API (Express/qs) lo lee como espacio:
+            // el código «AB+12» se buscaba como «AB 12». Android (OkHttp) lo manda como %2B.
+            comps?.percentEncodedQuery = comps?.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         }
         guard let url = comps?.url else { throw ApiError.invalidURL }
         var req = URLRequest(url: url)
