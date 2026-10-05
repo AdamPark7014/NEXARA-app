@@ -56,10 +56,14 @@ import {
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
 /**
  * activo/atrasado: tiene algo abierto (atrasado = pasó la fecha máxima).
- * libre: hoy terminó su actividad y no tiene otra abierta. sin_actividad: hoy no tuvo nada.
+ * libre: terminó su actividad hace 15 min o menos y no tiene otra abierta.
+ * sin_actividad: no tiene nada abierto (nada hoy, o terminó hace más de 15 min).
  * inactivo: ya no se asigna (clientes viejos).
  */
 export type BoardUserStatus = 'activo' | 'inactivo' | 'atrasado' | 'libre' | 'sin_actividad';
+
+/** Cuánto dura «libre» después de terminar; luego pasa a «sin nada asignado». */
+export const LIBRE_TRAS_TERMINAR_MS = 15 * 60_000;
 
 /** Rango de la pizarra, ya resuelto a instantes de la jornada mexicana. */
 export type BoardRange = { desde: Date; hasta: Date };
@@ -1414,13 +1418,14 @@ export class TeamBoardService {
         activityStartedAt = enCurso?.calculo?.inicio ?? null;
         activityElapsedMinutes = enCurso?.calculo?.calc.minutosReales ?? null;
       } else {
-        // Hoy terminó algo y no tiene nada abierto: «sin actividad desde hace…» y con cuánto atraso.
+        // Terminó algo hace ≤ LIBRE_TRAS_TERMINAR_MS y no tiene nada abierto: «libre» y con cuánto
+        // atraso. Pasado ese margen ya no está libre: queda «sin nada asignado» (Adam, 05-10).
         const ultima = enElRango
           .filter(
             (p) => p.terminada && !p.cancelada && p.terminoAt != null && p.terminoAt.getTime() >= dayStart.getTime(),
           )
           .sort((x, y) => (y.terminoAt?.getTime() ?? 0) - (x.terminoAt?.getTime() ?? 0))[0];
-        if (ultima?.terminoAt) {
+        if (ultima?.terminoAt && now.getTime() - ultima.terminoAt.getTime() <= LIBRE_TRAS_TERMINAR_MS) {
           status = 'libre';
           idleSinceAt = ultima.terminoAt;
           const limite = limiteDeActividad(ultima.a);
