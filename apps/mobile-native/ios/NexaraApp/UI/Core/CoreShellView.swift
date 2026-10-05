@@ -154,7 +154,10 @@ struct CoreShellView: View {
         .onAppear {
             syncSelection()
             applyDeepLink()
+            actualizarBarraDeEstado()
         }
+        .onChange(of: selected) { _, _ in actualizarBarraDeEstado() }
+        .onChange(of: overlay?.id) { _, _ in actualizarBarraDeEstado() }
         .onChange(of: modules) { _, _ in syncSelection() }
         .onChange(of: deepLink.pending) { _, _ in applyDeepLink() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
@@ -192,6 +195,12 @@ struct CoreShellView: View {
             )
         }
         .background(NxColors.surface.ignoresSafeArea(edges: .bottom))
+    }
+
+    /// Inicio pinta su propia cabecera clara (hora en negro); todo lo demás del shell
+    /// lleva la barra teal hasta arriba (hora en blanco). Ver `NxStatusBar`.
+    private func actualizarBarraDeEstado() {
+        NxStatusBar.textoBlanco(!(selected == .inicio && overlay == nil))
     }
 
     private func badgeCount(_ tab: CoreShellTab) -> Int {
@@ -254,6 +263,7 @@ struct CoreShellView: View {
                 NotificationsCenterView(onBack: { overlay = nil })
                     // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
                     .nxBrandNavBar(title: "Notificaciones", showsBell: false)
+                    .toolbar { closeItem }
             }
         case .activity(let id, let tab):
             NavigationStack {

@@ -238,7 +238,7 @@ extension DemoStore {
             "indicaciones": a.indicaciones,
             "teamEmails": [DemoData.person(a.ownerId).email],
             "reparte": false,
-            "fechaInicio": iso(a.startMin),
+            "fechaInicio": isoPlan(a.startMin),
         ])
         if let state { json["evidenceStatus"] = state.status }
         json.merge(sesionJSON(a)) { _, sesion in sesion }
@@ -295,7 +295,7 @@ extension DemoStore {
                 "anNumber": current.folio,
                 "titulo": current.titulo,
                 "estatus": "En Proceso",
-                "fechaMaxima": iso(current.maxMin),
+                "fechaMaxima": isoPlan(current.maxMin),
                 "bucket": current.kind == "servicio" ? "services" : "projects",
             ])
             let startedDate = startedAt[current.id] ?? at(current.startMin)
@@ -343,7 +343,7 @@ extension DemoStore {
                 "estatus": effectiveStatus(a),
                 "coreKind": a.kind,
                 "assignmentCharge": "ejecucion",
-                "fechaAsignacion": iso(a.startMin - 600),
+                "fechaAsignacion": isoEnJornada(a.startMin - 600),
                 "fechaFinalizacion": isoOrNull(a.finMin),
                 "evidence": dj(["status": "COMPLETED", "progressPct": 100.0, "evidencePhotos": [String]()]),
             ]))
@@ -378,9 +378,9 @@ extension DemoStore {
             "prioridad": a.prioridad,
             "coreKind": a.kind,
             "assignmentCharge": "ejecucion",
-            "fechaInicio": iso(a.startMin),
-            "fechaMaxima": iso(a.maxMin),
-            "fechaAsignacion": iso(a.startMin - 600),
+            "fechaInicio": isoPlan(a.startMin),
+            "fechaMaxima": isoPlan(a.maxMin),
+            "fechaAsignacion": isoEnJornada(a.startMin - 600),
             "tiempoEstimadoMin": a.estimadoMin,
             "tiempoMaximoMin": a.estimadoMin + 60,
             "rol": "EJECUTOR",
@@ -480,9 +480,9 @@ extension DemoStore {
             "prioridad": a.prioridad,
             "coreKind": a.kind,
             "assignmentCharge": isDispatch ? "despacho" : "ejecucion",
-            "fechaInicio": iso(a.startMin),
-            "fechaMaxima": iso(a.maxMin),
-            "fechaAsignacion": iso(a.startMin - 600),
+            "fechaInicio": isoPlan(a.startMin),
+            "fechaMaxima": isoPlan(a.maxMin),
+            "fechaAsignacion": isoEnJornada(a.startMin - 600),
             "tiempoEstimadoMin": a.estimadoMin,
             "tiempoMaximoMin": a.estimadoMin + 60,
             "indicaciones": a.indicaciones,
@@ -555,9 +555,9 @@ extension DemoStore {
         }
         let executor = DemoData.person(executorId(a))
         var events: [DemoJSON] = [
-            dj(["id": "\(id)-1", "at": iso(a.startMin - 600), "kind": "creada", "title": "Actividad creada",
+            dj(["id": "\(id)-1", "at": isoEnJornada(a.startMin - 600), "kind": "creada", "title": "Actividad creada",
                 "subtitle": "Por \(DemoData.person(a.creatorId).corto)", "icon": "🆕"]),
-            dj(["id": "\(id)-2", "at": iso(a.startMin - 590), "kind": "asignada", "title": "Asignada a \(executor.corto)",
+            dj(["id": "\(id)-2", "at": isoEnJornada(a.startMin - 590), "kind": "asignada", "title": "Asignada a \(executor.corto)",
                 "subtitle": a.indicaciones, "icon": "👤"]),
         ]
         if DemoStore.dispatchedIds.contains(a.id) {
@@ -637,7 +637,7 @@ extension DemoStore {
             "puesto": executor.puesto,
             "rol": "EJECUTOR",
             "reparte": false,
-            "asignadoAt": iso(a.startMin - 590),
+            "asignadoAt": isoEnJornada(a.startMin - 590),
             "asignadoPor": DemoData.person(a.creatorId).nombre,
             "indicaciones": a.indicaciones,
             "progressPct": progressPct(a, state: state),

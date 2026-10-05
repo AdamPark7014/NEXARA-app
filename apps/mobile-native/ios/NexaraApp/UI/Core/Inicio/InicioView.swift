@@ -758,7 +758,8 @@ private struct InicioSiguientesCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
-                .frame(width: 48)
+                // 58 como Android: con 48 «Esta semana» salía «Esta sem…».
+                .frame(width: 58)
                 Image(systemName: CoreStatusUI.kindSymbol(item.coreKind))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(kindColor)
