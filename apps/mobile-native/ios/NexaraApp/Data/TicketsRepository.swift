@@ -53,6 +53,17 @@ final class TicketsRepository {
         return ConsoleHelpers.decodeMap(data)
     }
 
+    /// MIME de una imagen por su extensión: antes todo salía como `image/jpeg`,
+    /// también los PNG que el selector deja como PNG.
+    private static func imageMime(_ fileName: String, fallback: String = "image/jpeg") -> String {
+        let lower = fileName.lowercased()
+        if lower.hasSuffix(".png") { return "image/png" }
+        if lower.hasSuffix(".webp") { return "image/webp" }
+        if lower.hasSuffix(".heic") { return "image/heic" }
+        if lower.hasSuffix(".jpg") || lower.hasSuffix(".jpeg") { return "image/jpeg" }
+        return fallback
+    }
+
     /// Texto recortado; vacío = `nil` (Android `trim().takeIf { !it.isNullOrBlank() }`).
     private static func clean(_ value: String?) -> String? {
         let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -158,7 +169,9 @@ final class TicketsRepository {
                 "urgency": urgency,
                 "requestType": requestType,
             ]
-            let files = evidenceFiles.map { (field: "files", data: $0.data, fileName: $0.fileName, mimeType: "image/jpeg") }
+            let files = evidenceFiles.map {
+                (field: "files", data: $0.data, fileName: $0.fileName, mimeType: Self.imageMime($0.fileName))
+            }
             let data = try await api.uploadMultipartFiles("branch-portal/requests", fields: fields, files: files)
             return ConsoleHelpers.decodeMap(data)
         }
@@ -370,9 +383,13 @@ final class TicketsRepository {
         completed: Bool, confirmDifference: Bool,
         items: [PortalInventoryItem]? = nil
     ) async throws -> [String: Any] {
+        // `items == nil` (lo que manda la pantalla) = el API conserva los equipos
+        // que ya tiene, con sus fotos. Si se mandan, el API descarta los que no
+        // traen `equipmentName` (`sanitizeItems`) y borra el resto: Android manda
+        // solo `itemName` y su «Sincronizar inventario» deja el conteo vacío.
         struct SyncItem: Encodable {
             let id: Int64?
-            let groupName, itemName, brand: String?
+            let groupName, equipmentName, itemName, brand: String?
             let modelBefore, modelAfter, serialNumber: String?
             let itemStatus, compareState, notes: String?
         }
@@ -388,6 +405,7 @@ final class TicketsRepository {
                 SyncItem(
                     id: it.id > 0 ? it.id : nil,
                     groupName: it.groupName.isEmpty ? nil : it.groupName,
+                    equipmentName: it.itemName.isEmpty ? nil : it.itemName,
                     itemName: it.itemName.isEmpty ? nil : it.itemName,
                     brand: it.brand.isEmpty ? nil : it.brand,
                     modelBefore: it.modelBefore.isEmpty ? nil : it.modelBefore,
@@ -430,7 +448,9 @@ final class TicketsRepository {
         files: [(fileName: String, data: Data)],
         mimeType: String = "image/jpeg"
     ) async throws -> [String] {
-        let parts = files.map { (field: "files", data: $0.data, fileName: $0.fileName, mimeType: mimeType) }
+        let parts = files.map {
+            (field: "files", data: $0.data, fileName: $0.fileName, mimeType: Self.imageMime($0.fileName, fallback: mimeType))
+        }
         let data: Data
         if isBranchUser {
             data = try await api.uploadMultipartFiles("branch-portal/inventories/upload", fields: [:], files: parts)

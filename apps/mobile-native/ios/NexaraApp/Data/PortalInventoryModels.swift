@@ -22,7 +22,10 @@ struct PortalInventoryItem: Hashable, Identifiable {
     init(raw: [String: Any]) {
         id = StockParse.int64(raw["id"]) ?? 0
         groupName = StockParse.str(raw["groupName"], raw["grupo"])
-        itemName = StockParse.str(raw["itemName"], raw["nombre"], raw["name"])
+        // El API guarda el nombre del equipo en `equipmentName` (`InventoryItem`
+        // de Prisma). Leyendo solo `itemName` —como Android— cada equipo salía
+        // como «GENERAL» (su grupo) o «Equipo» en vez de su nombre.
+        itemName = StockParse.str(raw["equipmentName"], raw["itemName"], raw["nombre"], raw["name"])
         brand = StockParse.str(raw["brand"], raw["marca"])
         modelBefore = StockParse.str(raw["modelBefore"])
         modelAfter = StockParse.str(raw["modelAfter"])
