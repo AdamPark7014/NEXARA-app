@@ -385,7 +385,14 @@ final class ApiClient {
         // Última defensa: un cuerpo de acceso (contraseña) jamás se persiste.
         guard !Self.isNeverQueued(path: relativePath(of: req)) else { return }
         let rawBody = req.httpBody.flatMap { String(data: $0, encoding: .utf8) }
-        let bodyStr = OfflineMediaStore.shared.externalizeDataUrls(rawBody)
+        let bodyStr: String?
+        if let binario = req.httpBody, rawBody == nil {
+            // Multipart con fotos (bytes que no son UTF-8): se guarda tal cual en
+            // disco, como Android; antes se encolaba sin cuerpo y la foto se perdía.
+            bodyStr = OfflineMediaStore.shared.guardarBinario(binario)
+        } else {
+            bodyStr = OfflineMediaStore.shared.externalizeDataUrls(rawBody)
+        }
         let ct = req.value(forHTTPHeaderField: "Content-Type") ?? "application/json"
         OfflineMutationQueue.shared.enqueue(QueuedMutation(
             id: UUID().uuidString,

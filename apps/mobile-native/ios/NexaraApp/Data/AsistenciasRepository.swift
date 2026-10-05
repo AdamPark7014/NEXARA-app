@@ -5,7 +5,32 @@ import Foundation
 // equipo del día (`attendance/hierarchy/range`), checadas propias
 // (`attendance/history`) y GPS de jornada (`gps/*`).
 
-/// Una checada: entrada o salida, con foto y coordenadas si las hubo.
+/// Corrección de una checada (solo dirección y RH): antes → después, con motivo
+/// (`AttendanceCorreccionDto` de Android).
+struct AttendanceCorreccion: Hashable {
+    let antes: String
+    let despues: String
+    let motivo: String
+    /// Quién la corrigió (`por.nombre`).
+    let porNombre: String
+    let at: String
+
+    init(raw: [String: Any]) {
+        antes = StockParse.str(raw["antes"])
+        despues = StockParse.str(raw["despues"])
+        motivo = StockParse.str(raw["motivo"])
+        porNombre = StockParse.str((raw["por"] as? [String: Any])?["nombre"])
+        at = StockParse.str(raw["at"])
+    }
+
+    static func list(_ value: Any?) -> [AttendanceCorreccion] {
+        (value as? [[String: Any]] ?? []).map { AttendanceCorreccion(raw: $0) }
+    }
+}
+
+/// Una checada: entrada o salida, con foto, coordenadas y lo que el servidor dijo de
+/// ella (contrato A: validación, sin conexión, fuera de sitio, cierre automático,
+/// correcciones). Antes iOS tiraba esos campos y no podía enseñar ningún aviso.
 struct AttendancePunch: Hashable, Identifiable {
     let type: String
     let timestamp: String
@@ -15,6 +40,18 @@ struct AttendancePunch: Hashable, Identifiable {
     let entryLongitude: Double?
     let exitLatitude: Double?
     let exitLongitude: Double?
+    /// OK | PENDIENTE | REVISAR.
+    let validacion: String
+    let motivoValidacion: String
+    let fueraDeSitio: Bool
+    let distanciaSitioM: Int?
+    let sitioNombre: String
+    /// Se capturó sin conexión y se mandó después.
+    let offline: Bool
+    /// La salida la puso la tarea de las 23:30, no la persona.
+    let cierreAutomatico: Bool
+    let accuracyM: Double?
+    let correcciones: [AttendanceCorreccion]
 
     var id: String { "\(type)-\(timestamp)" }
     var isEntry: Bool { type.lowercased().hasPrefix("entrada") }
@@ -28,15 +65,37 @@ struct AttendancePunch: Hashable, Identifiable {
         return (lat, lng)
     }
 
+    /// `Decimal` de Prisma llega como número o como texto; un valor no finito no es coordenada.
+    private static func coord(_ value: Any?) -> Double? {
+        guard let v = StockParse.dbl(value), v.isFinite else { return nil }
+        return v
+    }
+
+    private static func flag(_ value: Any?) -> Bool {
+        if let b = value as? Bool { return b }
+        if let n = value as? NSNumber { return n.boolValue }
+        if let s = value as? String { return s.lowercased() == "true" }
+        return false
+    }
+
     init(raw: [String: Any]) {
         type = StockParse.str(raw["type"], raw["tipo"]).lowercased()
         timestamp = StockParse.str(raw["timestamp"], raw["createdAt"])
         photoUrl = StockParse.str(raw["photoUrl"])
         deviceInfo = StockParse.str(raw["deviceInfo"])
-        entryLatitude = StockParse.dbl(raw["entryLatitude"])
-        entryLongitude = StockParse.dbl(raw["entryLongitude"])
-        exitLatitude = StockParse.dbl(raw["exitLatitude"])
-        exitLongitude = StockParse.dbl(raw["exitLongitude"])
+        entryLatitude = Self.coord(raw["entryLatitude"])
+        entryLongitude = Self.coord(raw["entryLongitude"])
+        exitLatitude = Self.coord(raw["exitLatitude"])
+        exitLongitude = Self.coord(raw["exitLongitude"])
+        validacion = StockParse.str(raw["validacion"])
+        motivoValidacion = StockParse.str(raw["motivoValidacion"])
+        fueraDeSitio = Self.flag(raw["fueraDeSitio"])
+        distanciaSitioM = StockParse.int(raw["distanciaSitioM"])
+        sitioNombre = StockParse.str(raw["sitioNombre"])
+        offline = Self.flag(raw["offline"])
+        cierreAutomatico = Self.flag(raw["cierreAutomatico"])
+        accuracyM = StockParse.dbl(raw["accuracyM"])
+        correcciones = AttendanceCorreccion.list(raw["correcciones"])
     }
 }
 

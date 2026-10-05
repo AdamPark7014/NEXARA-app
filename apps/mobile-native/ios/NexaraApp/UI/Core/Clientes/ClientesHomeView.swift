@@ -1,8 +1,32 @@
 import SwiftUI
 
-/// Clientes de Core (`/erp/clientes`): un padrón, tres usos. Pestañas por
-/// sector según `clientSectorsForEmail`, búsqueda por nombre, RFC o encargado
-/// y alta con «Nuevo cliente» (solo con `puedeAgregar`).
+/// Textos e iconos del padrón como en Android (`ClientSector.shortLabel` y su
+/// glifo): «Proyecto», «Corporativos», «Comerciales»; carpeta, edificio y maletín.
+extension ClientSector {
+    var padronEtiqueta: String {
+        switch self {
+        case .proyecto: return "Proyecto"
+        case .corporativo: return "Corporativos"
+        case .comercial: return "Comerciales"
+        }
+    }
+
+    var padronSimbolo: String {
+        switch self {
+        case .proyecto: return "folder"
+        case .corporativo: return "building.2"
+        case .comercial: return "briefcase"
+        }
+    }
+}
+
+/// Clientes de Core (`/erp/clientes`) — igual que `ClientsListScreen` de Android:
+/// buscador arriba, chips de sector con icono (si ves más de uno), la ayuda del
+/// sector con su conteo, filas-tarjeta con el encargado (o «Inactivo» / «Ver»)
+/// y el botón flotante «Nuevo cliente» solo con `puedeAgregar`.
+///
+/// La barra teal con «Clientes» la pone quien abre la pantalla; la ficha
+/// («Cliente») y el alta («Nuevo cliente») llevan la suya desde aquí.
 struct ClientesHomeView: View {
     /// Deep link `/erp/clientes/:id`.
     var initialClientId: Int? = nil
@@ -23,12 +47,13 @@ struct ClientesHomeView: View {
 
     private var allowed: [ClientSector] { ClientSector.sectors(for: session.currentUser?.email) }
 
-    /// Como la web: dirección general y superadmin ven al encargado en la fila.
+    /// Solo dirección general y super admin ven de quién es cada cliente.
     private var showOwner: Bool {
         CoreOrg.isCeo(session.currentUser?.email)
             || session.currentUser?.isSuperAdmin == true
     }
 
+    /// Búsqueda por nombre, razón social, RFC o encargado (la de la web).
     private var visible: [CoreSalesClient] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return items }
@@ -43,37 +68,37 @@ struct ClientesHomeView: View {
     var body: some View {
         Group {
             if allowed.isEmpty {
-                ContentUnavailableView(
-                    "Sin acceso",
-                    systemImage: "lock",
-                    description: Text("No tienes acceso al módulo de clientes.")
-                )
-            } else {
-                list
-            }
-        }
-        .navigationTitle("Clientes")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                if permisos.puedeAgregar {
-                    Button("Nuevo cliente") { showNuevo = true }
-                        .disabled(sector == nil)
+                ScrollView {
+                    NxEmptyState(
+                        title: "Sin acceso al padrón",
+                        subtitle: "Tu correo no tiene sectores de clientes asignados."
+                    )
+                    .padding(.horizontal, NxSpacing.l)
                 }
+            } else {
+                lista
+                    .nxFab("Nuevo cliente", systemImage: "plus", visible: permisos.puedeAgregar) {
+                        showNuevo = true
+                    }
             }
         }
+        .nxScreenBackground()
         .navigationDestination(item: $openClientId) { id in
             ClienteDetailView(clientId: id) {
-                Task { await load() }
+                Task { await load(refresh: true) }
             }
+            .nxBrandNavBar(title: "Cliente")
         }
         .navigationDestination(isPresented: $showNuevo) {
             ClienteNuevoView(presetSector: sector) { createdId in
+                // Como la web y Android: del alta se sale a la ficha recién creada.
                 showNuevo = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                     openClientId = createdId
                 }
-                Task { await load() }
+                Task { await load(refresh: true) }
             }
+            .nxBrandNavBar(title: "Nuevo cliente")
         }
         .task {
             if !didApplyInitial {
@@ -91,145 +116,147 @@ struct ClientesHomeView: View {
         }
         .task { await loadPermisos() }
         .onChange(of: sector) { _, _ in
-            items = []
             Task { await load() }
         }
     }
 
     private func loadPermisos() async {
-        permisos = (try? await ClientesRepository.shared.permissions()) ?? .ninguno
+        // Un fallo aquí no tumba la lista: se queda lo que ya había.
+        if let fresh = try? await ClientesRepository.shared.permissions() {
+            permisos = fresh
+        }
     }
 
-    private var list: some View {
-        List {
-            if allowed.count > 1 {
-                Section {
-                    Picker("Sector", selection: $sector) {
-                        ForEach(allowed) { s in
-                            // Segmentado: UISegmentedControl no pinta icono + texto a la vez.
-                            Text(s.shortTitle).tag(Optional(s))
+    // MARK: Lista
+
+    private var lista: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: NxSpacing.m) {
+                NxSearchField(text: $query, placeholder: "Buscar nombre, RFC o razón social")
+
+                if allowed.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: NxSpacing.s) {
+                            ForEach(allowed) { s in
+                                NxFiltroChipM3(
+                                    label: s.padronEtiqueta,
+                                    systemImage: s.padronSimbolo,
+                                    selected: sector == s
+                                ) {
+                                    if sector != s { sector = s }
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
                 }
-            } else if let sector {
-                Section {
-                    Label(sector.title, systemImage: sector.symbol)
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.subheadline.weight(.semibold))
-                }
-            }
 
-            if let sector {
-                Section {
-                    HStack(alignment: .top) {
-                        Text(sector.help).font(.caption).foregroundColor(.secondary)
-                        Spacer()
+                if let sector {
+                    HStack(alignment: .center, spacing: 0) {
+                        Text(sector.help)
+                            .font(NxType.bodySmall)
+                            .foregroundStyle(NxColors.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.trailing, NxSpacing.s)
                         Text(loading ? "…" : "\(visible.count)")
-                            .font(.caption.monospacedDigit())
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(NxColors.fg)
                     }
                 }
-            }
 
-            if let error, !items.isEmpty {
-                Section {
-                    NxStaleBanner(message: error) { Task { await load() } }
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                }
-            }
-
-            if loading && items.isEmpty {
-                Section { NxSkeletonRows(count: 5) }
-            } else if let error, items.isEmpty {
-                Section {
-                    NxErrorState(message: error) { Task { await load() } }
-                }
-            } else if visible.isEmpty {
-                Section {
-                    NxEmptyState(
-                        title: query.isEmpty ? "Nadie en este sector todavía" : "Sin coincidencias",
-                        subtitle: query.isEmpty
-                            ? "Cuando se registre un cliente aparecerá aquí."
-                            : "Prueba con otro nombre, RFC o encargado.",
-                        systemImage: query.isEmpty ? "person.2" : "magnifyingglass",
-                        actionLabel: query.isEmpty && permisos.puedeAgregar ? "Crear el primero" : nil,
-                        onAction: { showNuevo = true }
-                    )
-                }
-            } else {
-                Section {
-                    ForEach(visible) { c in
-                        Button { openClientId = c.id } label: { row(c) }
-                            .buttonStyle(.plain)
+                if let error {
+                    if items.isEmpty {
+                        NxErrorBlock(message: error) { Task { await load() } }
+                    } else {
+                        NxRefreshErrorBanner(message: error, onRetry: { Task { await load(refresh: true) } })
                     }
                 }
+
+                contenido
             }
+            .padding(.horizontal, NxSpacing.l)
+            .padding(.top, NxSpacing.l)
+            // Espacio para que el botón «Nuevo cliente» no tape la última fila.
+            .padding(.bottom, 96)
         }
-        .searchable(text: $query, prompt: "Buscar nombre, RFC…")
+        .scrollDismissesKeyboard(.interactively)
         .refreshable {
             await loadPermisos()
-            await load()
+            await load(refresh: true)
         }
     }
 
-    private func row(_ c: CoreSalesClient) -> some View {
+    @ViewBuilder
+    private var contenido: some View {
+        if loading {
+            NxSkeletonList()
+        } else if error != nil && items.isEmpty {
+            EmptyView()
+        } else if !items.isEmpty && visible.isEmpty {
+            NxEmptyState(
+                title: "Sin coincidencias",
+                subtitle: "Ningún cliente de este sector coincide con «\(query.trimmingCharacters(in: .whitespacesAndNewlines))».",
+                actionLabel: "Limpiar búsqueda",
+                onAction: { query = "" }
+            )
+        } else if visible.isEmpty {
+            if permisos.puedeAgregar {
+                NxEmptyState(
+                    title: "Nadie en este sector todavía",
+                    subtitle: "Da de alta el primer cliente del sector.",
+                    actionLabel: "Crear el primero",
+                    onAction: { showNuevo = true }
+                )
+            } else {
+                NxEmptyState(
+                    title: "Nadie en este sector todavía",
+                    subtitle: "Aún no hay clientes dados de alta en este sector."
+                )
+            }
+        } else {
+            ForEach(visible) { c in fila(c) }
+        }
+    }
+
+    private func fila(_ c: CoreSalesClient) -> some View {
         let fiscal = [c.taxId, c.legalName]
             .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
         let ownerName = (c.owner?.nombre ?? "")
-            .split(separator: " ")
+            .split(whereSeparator: { $0.isWhitespace })
             .prefix(2)
             .joined(separator: " ")
-        return HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(c.name).font(.subheadline.weight(.semibold))
-                    if c.isInactive {
-                        CoreChip(text: "Inactivo")
-                    }
-                }
-                Text(fiscal.isEmpty ? "Sin datos fiscales" : fiscal)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                if !c.clientSectors.isEmpty {
-                    Text(c.clientSectors.map(\.shortTitle).joined(separator: " · "))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            Spacer(minLength: 8)
-            if showOwner {
-                Text(ownerName.isEmpty ? "Sin encargado" : ownerName)
-                    .font(.caption2.weight(.semibold))
-                    .lineLimit(1)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color(.tertiarySystemFill), in: Capsule())
-            }
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-                .padding(.top, 2)
-                .accessibilityHidden(true)
-        }
-        .frame(minHeight: NxMetrics.minTap)
-        .contentShape(Rectangle())
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        let encargado = ownerName.isEmpty ? "Sin encargado" : ownerName
+        let sectores = c.clientSectors.map(\.padronEtiqueta).joined(separator: " · ")
+        // El chip dice «Inactivo»: el encargado baja a esta línea.
+        let meta = [sectores, (c.isInactive && showOwner) ? encargado : ""]
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+        let chip: String = c.isInactive ? "Inactivo" : (showOwner ? encargado : "Ver")
+        let nombre = c.name.trimmingCharacters(in: .whitespaces)
+        return NxListRow(
+            title: nombre.isEmpty ? "Sin nombre" : nombre,
+            subtitle: fiscal.isEmpty ? "Sin datos fiscales" : fiscal,
+            meta: meta.isEmpty ? nil : meta,
+            chipText: chip,
+            chipTone: c.isInactive ? .warning : .neutral,
+            onClick: { openClientId = c.id }
+        )
         .accessibilityHint("Abre la ficha del cliente")
     }
 
-    private func load() async {
+    // MARK: Datos
+
+    /// `refresh`: deslizar o volver de la ficha. La lista se queda a la vista
+    /// mientras llega la nueva y, si falla, no se borra.
+    private func load(refresh: Bool = false) async {
         guard let requested = sector else {
             loading = false
+            items = []
             return
         }
-        loading = true
+        if !refresh { loading = true }
         error = nil
         do {
             let rows = try await ClientesRepository.shared.list(sector: requested)
@@ -237,6 +264,7 @@ struct ClientesHomeView: View {
             items = rows
         } catch {
             guard sector == requested else { return }
+            if !refresh { items = [] }
             self.error = error.toUserMessage(fallback: "No se pudieron cargar los clientes")
         }
         loading = false

@@ -26,6 +26,47 @@ struct LunchRecord: Decodable, Identifiable, Hashable {
     let minutos: Int?
 
     var isOut: Bool { (checkoutTime ?? "").isEmpty }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, userId, status, checkinTime, checkoutTime, checkinPhotoUrl, checkoutPhotoUrl
+        case isCheckinLate, isCheckoutLate, checkinJustificacion, checkoutJustificacion
+        case revisionEstado, revisionNotas, revisadoPor, revisadoAt, minutos
+    }
+
+    /// Tolerante como el Gson de Android: un campo con otro tipo (minutos con
+    /// decimales, un id en texto) ya no tira el registro entero —antes la tarjeta de
+    /// la comida desaparecía en silencio porque `registro` se leía con `try?`.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let n = try? c.decode(Int.self, forKey: .id) {
+            id = n
+        } else if let s = try? c.decode(String.self, forKey: .id), let n = Int(s) {
+            id = n
+        } else {
+            id = 0
+        }
+        userId = try? c.decode(Int.self, forKey: .userId)
+        status = try? c.decode(String.self, forKey: .status)
+        checkinTime = try? c.decode(String.self, forKey: .checkinTime)
+        checkoutTime = try? c.decode(String.self, forKey: .checkoutTime)
+        checkinPhotoUrl = try? c.decode(String.self, forKey: .checkinPhotoUrl)
+        checkoutPhotoUrl = try? c.decode(String.self, forKey: .checkoutPhotoUrl)
+        isCheckinLate = try? c.decode(Bool.self, forKey: .isCheckinLate)
+        isCheckoutLate = try? c.decode(Bool.self, forKey: .isCheckoutLate)
+        checkinJustificacion = try? c.decode(String.self, forKey: .checkinJustificacion)
+        checkoutJustificacion = try? c.decode(String.self, forKey: .checkoutJustificacion)
+        revisionEstado = try? c.decode(String.self, forKey: .revisionEstado)
+        revisionNotas = try? c.decode(String.self, forKey: .revisionNotas)
+        revisadoPor = try? c.decode(String.self, forKey: .revisadoPor)
+        revisadoAt = try? c.decode(String.self, forKey: .revisadoAt)
+        if let n = try? c.decode(Int.self, forKey: .minutos) {
+            minutos = n
+        } else if let d = try? c.decode(Double.self, forKey: .minutos), d.isFinite {
+            minutos = Int(d.rounded())
+        } else {
+            minutos = nil
+        }
+    }
 }
 
 struct LunchWindow: Decodable, Hashable {
@@ -74,6 +115,21 @@ struct LunchTeamRow: Decodable, Identifiable, Hashable {
 
     var id: Int { userId }
     var canReview: Bool { puedoRevisar == true }
+
+    private enum CodingKeys: String, CodingKey {
+        case userId, nombre, puesto, avatarUrl, registro, puedoRevisar
+    }
+
+    /// Un nombre en `null` o un registro con forma rara no tiran la lista entera.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        userId = try c.decode(Int.self, forKey: .userId)
+        nombre = (try? c.decode(String.self, forKey: .nombre)) ?? "—"
+        puesto = try? c.decode(String.self, forKey: .puesto)
+        avatarUrl = try? c.decode(String.self, forKey: .avatarUrl)
+        registro = try? c.decode(LunchRecord.self, forKey: .registro)
+        puedoRevisar = try? c.decode(Bool.self, forKey: .puedoRevisar)
+    }
 }
 
 struct LunchTeamSummary: Decodable, Hashable {

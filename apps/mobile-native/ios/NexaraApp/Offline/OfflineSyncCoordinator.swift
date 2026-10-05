@@ -45,7 +45,9 @@ final class OfflineSyncCoordinator {
             req.httpMethod = item.method
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             req.setValue(item.contentType, forHTTPHeaderField: "Content-Type")
-            if let body = OfflineMediaStore.shared.expandMediaRefs(item.body) {
+            if let binario = OfflineMediaStore.shared.cuerpoBinario(item.body) {
+                req.httpBody = binario
+            } else if let body = OfflineMediaStore.shared.expandMediaRefs(item.body) {
                 req.httpBody = body.data(using: .utf8)
             }
             do {

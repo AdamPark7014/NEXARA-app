@@ -1,6 +1,16 @@
+import Combine
 import SwiftUI
 
-/// Centro de notificaciones — paridad web `notifications-center` y Android `NotificationsScreen`.
+/// Bandeja de notificaciones — igual que `NotificationsScreen` de Android (y el
+/// centro web `/erp/notifications-center`).
+///
+/// - Una sola fila de chips que se desliza: «Nuevos (N)» · Todas / Actividades /
+///   Asistencia / Chat / Otras con su conteo (las vacías no salen) · «Actividad
+///   reciente».
+/// - Abrir la bandeja la da por vista: un solo «leer todo» al cargar (y al
+///   deslizar para actualizar). Lo que llegó sin leer se queda marcado «Nuevo»
+///   (fondo de marca tenue y punto) mientras sigas aquí.
+/// - Tocar un aviso lo abre por el mismo camino que un push; el menú ⋮ lo elimina.
 struct NotificationsCenterView: View {
     let onBack: () -> Void
 
@@ -8,306 +18,424 @@ struct NotificationsCenterView: View {
     @State private var isLoading = true
     @State private var saving = false
     @State private var error: String?
-    @State private var message: String?
-    @State private var showFeed = false
+    @State private var aviso: String?
+    @State private var unreadCount = 0
+    /// Avisos que llegaron sin leer en esta visita (Android `newIds`).
+    @State private var newIds: Set<Int64> = []
+    @State private var soloNuevos = false
+    @State private var categoria: NotifCategoria = .todas
+    @State private var verFeed = false
     @State private var feedItems: [[String: Any]] = []
-    @State private var categoryFilter: NotifCategoryFilter = .all
+    @State private var feedLoading = false
+    @State private var feedError: String?
+    @State private var ultimoEvento = Date.distantPast
 
-    private var unread: Int {
-        rows.filter { ($0["isRead"] as? Bool) != true }.count
+    // MARK: Reglas (Android `visibleNotificationRows` / `NotificationSeen`)
+
+    private func id(_ n: [String: Any]) -> Int64 { ConsoleHelpers.mapInt64(n, "id") ?? -1 }
+    private func leida(_ n: [String: Any]) -> Bool { (n["isRead"] as? Bool) == true }
+    private func esNueva(_ n: [String: Any]) -> Bool { newIds.contains(id(n)) || !leida(n) }
+
+    /// Sin los avisos de módulos que ya no están en Core.
+    private var nucleo: [[String: Any]] {
+        rows.filter { !NotifCategoria.esHeredada(ConsoleHelpers.mapStr($0, "category")) }
     }
 
-    /// Filtro por categoría, con los mismos cubos que `bucketCategory` de la web.
-    private var filteredRows: [[String: Any]] {
-        guard categoryFilter != .all else { return rows }
-        return rows.filter { NotifCategoryFilter.bucket(ConsoleHelpers.mapStr($0, "category")) == categoryFilter }
+    private var visibles: [[String: Any]] {
+        nucleo
+            .filter { !soloNuevos || esNueva($0) }
+            .filter { categoria == .todas || NotifCategoria.de(ConsoleHelpers.mapStr($0, "category")) == categoria }
     }
+
+    private var nuevos: Int { nucleo.filter { esNueva($0) }.count }
+
+    private func conteo(_ cat: NotifCategoria) -> Int {
+        cat == .todas ? nucleo.count : nucleo.filter { NotifCategoria.de(ConsoleHelpers.mapStr($0, "category")) == cat }.count
+    }
+
+    // MARK: Vista
 
     var body: some View {
-        List {
-            Section {
-                Picker("Vista", selection: $showFeed) {
-                    Text("Bandeja").tag(false)
-                    Text("Actividad").tag(true)
+        VStack(spacing: 0) {
+            filtros
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: NxSpacing.listGap) {
+                    if verFeed {
+                        feed
+                    } else {
+                        bandeja
+                    }
                 }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets())
+                .padding(.horizontal, NxSpacing.l)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
             }
-            if !showFeed {
-                Section {
-                    Picker("Categoría", selection: $categoryFilter) {
-                        ForEach(NotifCategoryFilter.allCases) { f in
-                            Text(f.title).tag(f)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowInsets(EdgeInsets())
-                }
-            }
-            if let message {
-                Section {
-                    NxIconText(systemName: "checkmark.circle.fill", text: message, tint: NxTone.success.fg)
-                        .font(.footnote)
-                }
-            }
-            if let error {
-                Section {
-                    NxStaleBanner(message: error) {
-                        Task { if showFeed { await loadFeed() } else { await load() } }
-                    }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                }
-            }
-            if isLoading && rows.isEmpty && !showFeed {
-                Section {
-                    NxLoadingState(text: "Cargando notificaciones…")
-                }
-            } else if showFeed {
-                if feedItems.isEmpty && error == nil {
-                    Section {
-                        ContentUnavailableView(
-                            "Sin actividad reciente",
-                            systemImage: "clock.arrow.circlepath",
-                            description: Text("Aquí verás lo último que pasó en tus actividades.")
-                        )
-                    }
-                } else {
-                    Section("Actividad reciente") {
-                        ForEach(feedItems.indices, id: \.self) { idx in
-                            let item = feedItems[idx]
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(ConsoleHelpers.mapStr(item, "title").isEmpty ? "Evento" : ConsoleHelpers.mapStr(item, "title"))
-                                    .font(.subheadline.bold())
-                                let sub = ConsoleHelpers.mapStr(item, "subtitle")
-                                if !sub.isEmpty { Text(sub).font(.caption).foregroundColor(.secondary) }
-                            }
-                        }
-                    }
-                }
-            } else if rows.isEmpty && error == nil {
-                Section {
-                    ContentUnavailableView(
-                        "Estás al día",
-                        systemImage: "bell.badge",
-                        description: Text("No tienes notificaciones.")
-                    )
-                }
-            } else {
-                Section(unread == 0 ? "Todo leído" : (unread == 1 ? "1 sin leer" : "\(unread) sin leer")) {
-                    if filteredRows.isEmpty {
-                        Text("Sin notificaciones en esta categoría").foregroundStyle(.secondary)
-                    }
-                    ForEach(filteredRows, id: \.notifKey) { n in
-                        notificationRow(n)
-                            .contentShape(Rectangle())
-                            .onTapGesture { open(n) }
-                            .accessibilityAddTraits(.isButton)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    Task { await deleteItem(n) }
-                                } label: { Label("Eliminar", systemImage: "trash") }
-                            }
-                            .swipeActions(edge: .leading) {
-                                if (n["isRead"] as? Bool) != true {
-                                    Button {
-                                        Task { await markRead(n) }
-                                    } label: { Label("Leída", systemImage: "checkmark") }
-                                    .tint(NxBrand.primary)
-                                }
-                            }
-                    }
-                }
+            .refreshable {
+                // Deslizar para actualizar es mirar la lista: lo nuevo también queda visto.
+                if verFeed { await loadFeed() } else { await refresh(inicial: false, marcarVisto: true) }
             }
         }
-        .navigationTitle("Notificaciones")
-        .navigationBarTitleDisplayMode(.inline)
+        .nxScreenBackground()
+        .nxAvisoCorto($aviso)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cerrar", action: onBack)
-            }
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button { Task { await load() } } label: {
-                    Image(systemName: "arrow.clockwise")
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.backward")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.white)
                 }
-                .accessibilityLabel("Actualizar")
-                if unread > 0 {
-                    Button("Leer todo") { Task { await markAll() } }
-                        .disabled(saving)
-                }
+                .tint(Color.white)
+                .accessibilityLabel("Cerrar")
             }
         }
-        .refreshable {
-            if showFeed { await loadFeed() } else { await load() }
-            await NotificationsBadgeStore.shared.refresh()
-        }
-        .task {
-            await load()
-            await NotificationsBadgeStore.shared.refresh()
-        }
-        .onChange(of: showFeed) { _, newValue in
-            if newValue { Task { await loadFeed() } }
-        }
-        .onReceive(RealtimeBus.shared.events) { event in
-            let model = event.model?.lowercased() ?? ""
+        .task { await refresh(inicial: true, marcarVisto: true) }
+        .onReceive(RealtimeBus.shared.events.receive(on: DispatchQueue.main)) { event in
+            let model = (event.model ?? "").trimmingCharacters(in: .whitespaces).lowercased()
             guard model.isEmpty || model == "notification" else { return }
-            Task { await load() }
+            // Ráfagas de eventos: como Android, una recarga cada 750 ms como mucho.
+            let ahora = Date()
+            guard ahora.timeIntervalSince(ultimoEvento) >= 0.75 else { return }
+            ultimoEvento = ahora
+            Task { await refresh(inicial: false, marcarVisto: false) }
         }
     }
+
+    // MARK: Fila de filtros
+
+    private var filtros: some View {
+        // Categorías vacías no ocupan lugar; la elegida se queda aunque ya no tenga avisos.
+        let categorias = NotifCategoria.allCases.filter { $0 == .todas || conteo($0) > 0 || $0 == categoria }
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .center, spacing: NxSpacing.s) {
+                // «Nuevos» solo existe si esta visita trajo algo nuevo (o si ya está elegido).
+                if nuevos > 0 || soloNuevos {
+                    NxFiltroChipM3(label: "Nuevos (\(nuevos))", selected: !verFeed && soloNuevos) {
+                        verFeed = false
+                        soloNuevos.toggle()
+                    }
+                    NxDivisorVertical()
+                }
+                ForEach(categorias) { cat in
+                    NxFiltroChipM3(label: "\(cat.titulo) (\(conteo(cat)))", selected: !verFeed && categoria == cat) {
+                        verFeed = false
+                        categoria = cat
+                    }
+                }
+                NxDivisorVertical()
+                NxFiltroChipM3(label: "Actividad reciente", selected: verFeed) {
+                    verFeed.toggle()
+                    if verFeed && feedItems.isEmpty { Task { await loadFeed() } }
+                }
+            }
+            .padding(.horizontal, NxSpacing.l)
+        }
+        .padding(.vertical, 6)
+    }
+
+    // MARK: Bandeja
 
     @ViewBuilder
-    private func notificationRow(_ n: [String: Any]) -> some View {
-        let isRead = (n["isRead"] as? Bool) == true
-        let category = ConsoleHelpers.mapStr(n, "category")
-        let symbol = NotificationIcon.symbol(for: n)
-        HStack(alignment: .top, spacing: 12) {
-            NxIconBadge(systemName: symbol, tint: NotificationIcon.tint(forSymbol: symbol), size: 38, circle: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(ConsoleHelpers.mapStr(n, "title").isEmpty ? "Notificación" : ConsoleHelpers.mapStr(n, "title"))
-                    .font(.subheadline)
-                    .fontWeight(isRead ? .regular : .bold)
-                let msg = ConsoleHelpers.mapStr(n, "message")
-                if !msg.isEmpty {
-                    Text(msg).font(.caption).foregroundColor(.secondary)
-                }
-                HStack(spacing: 6) {
-                    Text(timeAgo(ConsoleHelpers.mapStr(n, "createdAt")))
-                    if !category.isEmpty {
-                        Text("·").foregroundColor(.secondary)
-                        Text(NotifCategoryFilter.label(category)).font(.caption2)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Color(.tertiarySystemFill))
-                            .clipShape(Capsule())
+    private var bandeja: some View {
+        if isLoading && rows.isEmpty {
+            NxSkeletonList()
+        } else {
+            if let error {
+                NxErrorBlock(message: error) { Task { await refresh(inicial: true, marcarVisto: true) } }
+            }
+            let lista = visibles
+            if lista.isEmpty {
+                if error == nil {
+                    if soloNuevos || categoria != .todas {
+                        NxEmptyState(
+                            title: "Nada con este filtro",
+                            subtitle: "No hay avisos que coincidan.",
+                            actionLabel: "Ver todos",
+                            onAction: {
+                                soloNuevos = false
+                                categoria = .todas
+                            }
+                        )
+                    } else {
+                        NxEmptyState(
+                            title: "Todo al día",
+                            subtitle: "Cuando algo necesite tu atención aparecerá aquí."
+                        )
                     }
-                    if ConsoleHelpers.mapStr(n, "priority").lowercased() == "high" {
-                        NxStatusChip(text: "Urgente", tone: .danger)
-                    }
                 }
-                .font(.caption2)
-                .foregroundColor(.secondary)
+            } else {
+                ForEach(lista.indices, id: \.self) { i in
+                    tarjeta(lista[i])
+                }
             }
         }
-        .padding(.vertical, 4)
-        .listRowBackground(isRead ? Color.clear : Color.accentColor.opacity(0.06))
     }
 
-    /// Toque: abre la pantalla nativa (misma resolución que el push:
-    /// relatedUrl → entityType + relatedEntityId → category).
-    @MainActor
-    private func open(_ n: [String: Any]) {
-        if (n["isRead"] as? Bool) != true {
-            Task { await markRead(n) }
+    private func tarjeta(_ n: [String: Any]) -> some View {
+        let nueva = esNueva(n)
+        let destino = NotificationDeepLinkResolver.resolve(notification: n)
+        let titulo = ConsoleHelpers.mapStr(n, "title")
+        let mensaje = ConsoleHelpers.mapStr(n, "message")
+        let meta = [
+            NotifCategoria.etiqueta(ConsoleHelpers.mapStr(n, "category")),
+            Self.haceCuanto(ConsoleHelpers.mapStr(n, "createdAt")),
+        ]
+        .filter { !$0.isEmpty }
+        .joined(separator: " · ")
+
+        let contenido = HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(nueva ? NxColors.brand : Color.clear)
+                .frame(width: 8, height: 8)
+                .padding(.top, 7)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                if nueva {
+                    Text("Nuevo")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(NxColors.brand)
+                }
+                Text(titulo.isEmpty ? "Notificación" : titulo)
+                    .font(.system(size: 14, weight: nueva ? .semibold : .regular))
+                    .foregroundStyle(NxColors.fg)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !mensaje.isEmpty {
+                    Text(mensaje)
+                        .nxTextStyle(.bodyMedium)
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(3)
+                }
+                if !meta.isEmpty {
+                    Text(meta)
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        guard let destination = NotificationDeepLinkResolver.resolve(notification: n) else { return }
-        onBack()
-        DeepLinkCoordinator.shared.ingest(destination: destination)
+        .padding(.leading, 14)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+
+        return HStack(alignment: .top, spacing: 0) {
+            if let destino {
+                Button { abrir(n, destino) } label: { contenido }
+                    .buttonStyle(NxPressableStyle())
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Abre el aviso")
+            } else {
+                contenido
+                    .accessibilityElement(children: .combine)
+            }
+            Menu {
+                Button(role: .destructive) {
+                    Task { await eliminar(n) }
+                } label: {
+                    Text("Eliminar")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .rotationEffect(.degrees(90))
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(NxColors.muted)
+                    .frame(width: 44, height: 48)
+                    .contentShape(Rectangle())
+            }
+            .disabled(saving)
+            .accessibilityLabel("Opciones de la notificación")
+            .padding(.trailing, 4)
+            .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            nueva ? NxColors.brandTint : NxColors.card,
+            in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+        )
     }
 
-    private func load() async {
-        isLoading = true
+    // MARK: Actividad reciente
+
+    @ViewBuilder
+    private var feed: some View {
+        if feedLoading && feedItems.isEmpty {
+            NxSkeletonList()
+        } else if let feedError, feedItems.isEmpty {
+            NxErrorBlock(message: feedError) { Task { await loadFeed() } }
+        } else if feedItems.isEmpty {
+            NxEmptyState(
+                title: "Sin actividad reciente",
+                subtitle: "Aquí verás lo último que pasó en tu equipo."
+            )
+        } else {
+            ForEach(feedItems.indices, id: \.self) { i in
+                let item = feedItems[i]
+                let titulo = ConsoleHelpers.mapStr(item, "title")
+                let sub = ConsoleHelpers.mapStr(item, "subtitle")
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(titulo.isEmpty ? "Evento" : titulo)
+                        .font(NxType.titleSmall)
+                        .foregroundStyle(NxColors.fg)
+                    if !sub.isEmpty {
+                        Text(sub)
+                            .font(NxType.bodySmall)
+                            .foregroundStyle(NxColors.muted)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    // MARK: Datos
+
+    /// `marcarVisto`: la persona está mirando la lista (al abrir y al deslizar);
+    /// lo que llegue sin leer se da por visto. Los refrescos en vivo no marcan nada.
+    private func refresh(inicial: Bool, marcarVisto: Bool) async {
+        if inicial { isLoading = true }
         error = nil
-        defer { isLoading = false }
         do {
-            rows = try await NotificationsRepository.shared.list(limit: 50)
+            let count = try await NotificationsRepository.shared.unreadCount()
+            let list = try await NotificationsRepository.shared.list(limit: 50)
+            rows = list
+            unreadCount = count
+            newIds.formUnion(list.filter { !leida($0) }.map { id($0) })
+            isLoading = false
+            if marcarVisto && (count > 0 || list.contains { !leida($0) }) {
+                await marcarTodoVisto()
+            }
         } catch {
-            self.error = error.toUserMessage()
+            isLoading = false
+            self.error = error.toUserMessage(fallback: "No se pudieron cargar notificaciones")
+        }
+    }
+
+    /// Abrir la bandeja = verla: el mismo «leer todo» del API, una vez por carga y
+    /// sin avisos en pantalla. Si falla (sin red) no pasa nada visible: los avisos
+    /// siguen sin leer y se vuelve a intentar la próxima vez.
+    private func marcarTodoVisto() async {
+        do {
+            try await NotificationsRepository.shared.markAllRead()
+            rows = rows.map { fila in
+                var copia = fila
+                copia["isRead"] = true
+                return copia
+            }
+            unreadCount = 0
+            await NotificationsBadgeStore.shared.refresh()
+        } catch {
+            // Silencioso, como Android.
         }
     }
 
     private func loadFeed() async {
-        isLoading = true
-        error = nil
-        defer { isLoading = false }
+        feedLoading = true
+        feedError = nil
         do {
             feedItems = try await NotificationsRepository.shared.activityFeed(limit: 40)
         } catch {
-            self.error = error.toUserMessage()
+            feedError = error.toUserMessage(fallback: "No se pudo cargar el feed")
+        }
+        feedLoading = false
+    }
+
+    /// Abre el aviso por el mismo camino que un push. Si seguía sin leer, primero
+    /// se marca; si eso falla, se queda aquí con el error (como Android).
+    private func abrir(_ n: [String: Any], _ destino: DeepLinkDestination) {
+        Task { @MainActor in
+            if !leida(n), id(n) > 0 {
+                saving = true
+                do {
+                    try await NotificationsRepository.shared.markRead(id: id(n))
+                    saving = false
+                    await NotificationsBadgeStore.shared.refresh()
+                } catch {
+                    saving = false
+                    self.error = error.toUserMessage(fallback: "No se pudo marcar")
+                    return
+                }
+            }
+            // Primero se cierra la bandeja y, cuando ya bajó, el destino entra por el
+            // camino de un push. En el mismo instante la cubierta nueva no se presenta.
+            onBack()
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            DeepLinkCoordinator.shared.ingest(destination: destino)
         }
     }
 
-    private func markRead(_ n: [String: Any]) async {
-        guard let id = ConsoleHelpers.mapInt64(n, "id") else { return }
+    private func eliminar(_ n: [String: Any]) async {
+        let nid = id(n)
+        guard nid > 0 else { return }
         saving = true
-        defer { saving = false }
+        error = nil
         do {
-            try await NotificationsRepository.shared.markRead(id: id)
-            await load()
+            try await NotificationsRepository.shared.delete(id: nid)
+            saving = false
+            aviso = "Eliminada"
+            await refresh(inicial: false, marcarVisto: false)
             await NotificationsBadgeStore.shared.refresh()
         } catch {
-            self.error = error.toUserMessage()
+            saving = false
+            self.error = error.toUserMessage(fallback: "No se pudo eliminar")
         }
     }
 
-    private func markAll() async {
-        saving = true
-        defer { saving = false }
-        do {
-            try await NotificationsRepository.shared.markAllRead()
-            message = "Marcadas como leídas"
-            await load()
-            await NotificationsBadgeStore.shared.refresh()
-        } catch {
-            self.error = error.toUserMessage()
-        }
-    }
-
-    private func deleteItem(_ n: [String: Any]) async {
-        guard let id = ConsoleHelpers.mapInt64(n, "id") else { return }
-        saving = true
-        defer { saving = false }
-        do {
-            try await NotificationsRepository.shared.delete(id: id)
-            await load()
-            await NotificationsBadgeStore.shared.refresh()
-        } catch {
-            self.error = error.toUserMessage()
-        }
-    }
-
-    private func timeAgo(_ iso: String) -> String {
-        guard !iso.isEmpty else { return "" }
-        guard let date = NxFormat.parseISO(iso) else { return iso.prefix(16).description }
-        let m = Int(Date().timeIntervalSince(date) / 60)
-        if m < 1 { return "Hace un momento" }
-        if m < 60 { return "Hace \(m) min" }
-        let h = m / 60
-        if h < 24 { return "Hace \(h) h" }
-        let d = h / 24
-        if d < 7 { return d == 1 ? "Ayer" : "Hace \(d) días" }
-        return NxFormat.day(date)
+    /// «Justo ahora», «Hace 12 min», «Hace 3h», «Hace 2d» (Android `relativeTime`).
+    static func haceCuanto(_ iso: String, ahora: Date = Date()) -> String {
+        guard let date = NxFormat.parseISO(iso) else { return "" }
+        let diff = ahora.timeIntervalSince(date)
+        let mins = Int((abs(diff) / 60).rounded())
+        if mins < 2 { return "Justo ahora" }
+        let fmt: (String) -> String = { diff < 0 ? "En \($0)" : "Hace \($0)" }
+        if mins < 60 { return fmt("\(mins) min") }
+        let hrs = Int((Double(mins) / 60).rounded())
+        if hrs < 24 { return fmt("\(hrs)h") }
+        return fmt("\(Int((Double(hrs) / 24).rounded()))d")
     }
 }
 
-/// Filtros del centro de notificaciones — `CategoryFilter`, `bucketCategory`
-/// y `CATEGORY_LABEL` de `apps/web/app/(panels)/erp/notifications-center`.
-private enum NotifCategoryFilter: String, CaseIterable, Identifiable {
-    case all, ops, attendance, chat, other
+/// Cubos de categoría del centro web (`bucketCategory` en
+/// `apps/web/app/(panels)/erp/notifications-center`) = `NotificationCategory` de Android.
+private enum NotifCategoria: String, CaseIterable, Identifiable {
+    case todas, actividades, asistencia, chat, otras
 
     var id: String { rawValue }
 
-    var title: String {
+    var titulo: String {
         switch self {
-        case .all: return "Todas"
-        case .ops: return "Actividades"
-        case .attendance: return "Asistencia"
+        case .todas: return "Todas"
+        case .actividades: return "Actividades"
+        case .asistencia: return "Asistencia"
         case .chat: return "Chat"
-        case .other: return "Otras"
+        case .otras: return "Otras"
         }
     }
 
-    static func bucket(_ category: String) -> NotifCategoryFilter {
-        let c = category.lowercased()
+    static func de(_ category: String) -> NotifCategoria {
+        let c = category.trimmingCharacters(in: .whitespaces).lowercased()
         if c.contains("sla") || c.hasPrefix("activit") || c.hasPrefix("evidence")
             || c == "approval" || c == "confirmations" || c == "erp" {
-            return .ops
+            return .actividades
         }
-        if c == "attendance" || c.hasPrefix("lunch") { return .attendance }
+        if c == "attendance" || c.hasPrefix("lunch") { return .asistencia }
         if c == "chat" { return .chat }
-        return .other
+        return .otras
     }
 
-    static func label(_ category: String) -> String {
-        switch category.lowercased() {
+    /// Categorías de módulos retirados de Core: sus avisos viejos no se listan.
+    static func esHeredada(_ category: String) -> Bool {
+        let c = category.trimmingCharacters(in: .whitespaces).lowercased()
+        return [
+            "quotes", "sales", "crm", "tool", "tools", "viatics", "vehicles", "fines", "tickets",
+            "orders", "stock-alert", "margin-alert", "workflow", "asc", "ops-acs", "finance",
+        ].contains(c)
+    }
+
+    /// Etiqueta legible de la categoría cruda (`CATEGORY_LABEL` de la web, solo Core).
+    static func etiqueta(_ category: String) -> String {
+        let raw = category.trimmingCharacters(in: .whitespaces)
+        switch raw.lowercased() {
         case "attendance": return "Asistencia"
         case "lunch_break", "lunch_breaks": return "Comida"
         case "activity", "activities": return "Actividad"
@@ -317,11 +445,9 @@ private enum NotifCategoryFilter: String, CaseIterable, Identifiable {
         case "chat": return "Chat"
         case "profile": return "Perfil"
         case "confirmations": return "Confirmación"
-        default: return category
+        case "security": return "Seguridad"
+        case "celebraciones": return "Celebraciones"
+        default: return raw
         }
     }
-}
-
-extension [String: Any] {
-    fileprivate var notifKey: String { "n-\(self["id"] ?? UUID().uuidString)" }
 }

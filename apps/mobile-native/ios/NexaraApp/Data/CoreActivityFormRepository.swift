@@ -104,16 +104,24 @@ extension CoreRepository {
     }
 
     /// `POST activities/:id/team` — suma a alguien al equipo con su rol e indicaciones.
-    func addTeamMember(activityId: Int, userId: Int, rol: String, indicaciones: String?) async throws {
+    /// `horasPlan` (contrato B): el «tiempo estimado» del alta, en horas; sin valor no se manda.
+    func addTeamMember(
+        activityId: Int,
+        userId: Int,
+        rol: String,
+        indicaciones: String?,
+        horasPlan: Double? = nil
+    ) async throws {
         struct Body: Encodable {
             let userId: Int
             let rol: String
             let indicaciones: String?
+            let horasPlan: Double?
         }
         let notes = (indicaciones ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let data = try await ApiClient.shared.postJSON(
             "activities/\(activityId)/team",
-            body: Body(userId: userId, rol: rol, indicaciones: notes.isEmpty ? nil : notes)
+            body: Body(userId: userId, rol: rol, indicaciones: notes.isEmpty ? nil : notes, horasPlan: horasPlan)
         )
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }

@@ -123,17 +123,18 @@ struct CoreOperationalProject: Decodable, Identifiable {
     var isInactive: Bool { (status ?? "").uppercased() == "ON_HOLD" }
 }
 
-/// Cuerpo de `POST ventas/clientes` como lo arma `/erp/clientes/nuevo`.
+/// Cuerpo de `POST ventas/clientes` como lo arma Android (`CreateClientBody`):
+/// lo que va vacío no se manda (`nil` se omite al codificar).
 struct CoreSalesClientCreateBody: Encodable {
     var name: String
-    var legalName: String
-    var taxId: String
-    var fiscalAddress: String
-    var fiscalZipCode: String
-    var fiscalRegime: String
-    var billingEmail: String
-    var billingPhone: String
-    var notes: String
+    var legalName: String?
+    var taxId: String?
+    var fiscalAddress: String?
+    var fiscalZipCode: String?
+    var fiscalRegime: String?
+    var billingEmail: String?
+    var billingPhone: String?
+    var notes: String?
     var sectors: [String]
     var status: String = "Activo"
 }
@@ -223,11 +224,13 @@ final class ClientesRepository {
         return try JSONDecoder().decode(CoreFiscalLookup.self, from: data)
     }
 
-    /// Proyectos del cliente de servicio: la web pide todos y filtra por `client.id`.
+    /// Proyectos del cliente de servicio: `GET operational-projects?clientId=` como
+    /// Android (el API filtra; antes se bajaban TODOS los proyectos de la empresa).
+    /// Se vuelve a filtrar por `client.id` por si un servidor viejo ignora el parámetro.
     func projects(serviceClientId: Int) async throws -> [CoreOperationalProject] {
-        let data = try await api.get("operational-projects")
+        let data = try await api.get("operational-projects", query: ["clientId": String(serviceClientId)])
         let all: [CoreOperationalProject] = decodeEach(data)
-        return all.filter { $0.client?.id == serviceClientId }
+        return all.filter { $0.client?.id == nil || $0.client?.id == serviceClientId }
     }
 
     /// `POST operational-projects/:id/desactivar` (queda `ON_HOLD`) o `.../reactivar` (`ACTIVE`).

@@ -29,7 +29,6 @@ struct PortalProfileView: View {
                 Button(saving ? "Guardando…" : "Guardar") { Task { await save() } }.disabled(saving)
             }
         }
-        .navigationTitle("Mi perfil")
         .task { await load() }
     }
 
@@ -57,7 +56,7 @@ struct PortalProfileView: View {
 // MARK: - Branches
 
 struct PortalBranchesView: View {
-    let onNew: () -> Void
+    let onCreate: () -> Void
     let onEdit: (Int64) -> Void
     @State private var branches: [PortalBranch] = []
     @State private var isLoading = true
@@ -99,10 +98,9 @@ struct PortalBranchesView: View {
                 }
             }
         }
-        .navigationTitle("Sucursales")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { onNew() } label: { Image(systemName: "plus") }
+                Button { onCreate() } label: { Image(systemName: "plus") }
                     .accessibilityLabel("Nueva sucursal")
             }
         }
@@ -124,7 +122,7 @@ struct PortalBranchesView: View {
 
 struct PortalBranchEditView: View {
     let branchId: Int64?
-    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
     @State private var branchNumber = ""
@@ -205,7 +203,6 @@ struct PortalBranchEditView: View {
                     .disabled(saving || name.isEmpty || branchNumber.isEmpty || portalEmail.isEmpty || (branchId == nil && portalPassword.isEmpty))
             }
         }
-        .navigationTitle(branchId == nil ? "Nueva sucursal" : "Editar sucursal")
         .task { await load() }
         .onChange(of: logoItem) { _, item in
             Task {
@@ -264,7 +261,7 @@ struct PortalBranchEditView: View {
                     logoData: logoData, logoFileName: "logo.jpg"
                 )
                 message = "Sucursal creada"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { onDone() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
             }
         } catch { self.error = error.toUserMessage(fallback: "No se pudo guardar la sucursal") }
     }
@@ -277,7 +274,7 @@ private extension String {
 // MARK: - Requests
 
 struct PortalRequestsView: View {
-    let onNew: () -> Void
+    let onCreate: () -> Void
     @State private var items: [ClientTicketRequest] = []
     @State private var isLoading = true
     @State private var selected: ClientTicketRequest?
@@ -286,11 +283,10 @@ struct PortalRequestsView: View {
         Group {
             if let s = selected { reqDetail(s) } else { listBody }
         }
-        .navigationTitle(selected == nil ? "Solicitudes" : "")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if selected == nil {
-                    Button { onNew() } label: { Image(systemName: "plus") }
+                    Button { onCreate() } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Nueva solicitud")
                 }
             }
@@ -310,7 +306,7 @@ struct PortalRequestsView: View {
                 } description: {
                     Text("Pide un servicio y aquí verás en qué va.")
                 } actions: {
-                    Button("Nueva solicitud") { onNew() }
+                    Button("Nueva solicitud") { onCreate() }
                         .buttonStyle(.borderedProminent)
                         .tint(NxBrand.primary)
                 }
@@ -403,7 +399,7 @@ struct PortalRequestsView: View {
 }
 
 struct PortalRequestNewView: View {
-    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: SessionStore
     @State private var description = ""
     @State private var urgency = "MEDIUM"
@@ -466,7 +462,6 @@ struct PortalRequestNewView: View {
             Button(saving ? "Enviando…" : "Crear solicitud") { Task { await submit() } }
                 .disabled(saving || description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .navigationTitle("Nueva solicitud")
         .task { await loadBranches() }
         .onChange(of: evidenceItems) { _, items in
             Task { await loadEvidence(items) }
@@ -505,7 +500,7 @@ struct PortalRequestNewView: View {
                 branchId: isBranchUser ? nil : selectedBranchId,
                 evidenceFiles: isBranchUser ? evidenceFiles : []
             )
-            onDone()
+            dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo crear la solicitud")
         }
@@ -515,7 +510,7 @@ struct PortalRequestNewView: View {
 // MARK: - Tickets
 
 struct PortalTicketsView: View {
-    let onOpen: (Int64) -> Void
+    let onOpenTicket: (Int64) -> Void
     @State private var tickets: [PortalTicket] = []
     @State private var query = ""
     @State private var filter = "todos" // todos | abiertos | alta | aging
@@ -629,7 +624,7 @@ struct PortalTicketsView: View {
                 }
                 List(filtered) { t in
                     Button {
-                        onOpen(t.id)
+                        onOpenTicket(t.id)
                     } label: {
                         let ageH = t.ageHours
                         let open = t.isOpen
@@ -671,7 +666,6 @@ struct PortalTicketsView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Tickets")
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -768,7 +762,6 @@ struct PortalTicketDetailView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Ticket")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
@@ -869,7 +862,6 @@ struct PortalFeedbackView: View {
                 }
             }
         }
-        .navigationTitle("Calificar servicios")
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -960,7 +952,7 @@ private struct FeedbackDraftBinding {
 // MARK: - Inventories
 
 struct PortalInventoriesView: View {
-    let onOpen: (Int64) -> Void
+    let onOpenInventory: (Int64) -> Void
     @State private var items: [PortalInventorySnapshot] = []
     @State private var search = ""
     @State private var isLoading = true
@@ -988,7 +980,7 @@ struct PortalInventoriesView: View {
             } else {
                 List(items) { inv in
                     Button {
-                        onOpen(inv.id)
+                        onOpenInventory(inv.id)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(inv.displayTitle).font(.headline)
@@ -1003,7 +995,6 @@ struct PortalInventoriesView: View {
                 }
             }
         }
-        .navigationTitle("Inventarios")
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -1109,7 +1100,6 @@ struct PortalInventoryDetailView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Inventario")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task { await load() }
@@ -1180,25 +1170,4 @@ struct PortalInventoryDetailView: View {
 private struct PDFSheetItem: Identifiable {
     let id = UUID()
     let data: Data
-}
-
-/// Wrapper con navegación interna para deep links del catálogo.
-struct PortalBranchesModuleView: View {
-    @State private var path: [PortalRoute] = []
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            PortalBranchesView(
-                onNew: { path.append(.branchNew) },
-                onEdit: { path.append(.branchEdit($0)) }
-            )
-            .navigationDestination(for: PortalRoute.self) { route in
-                switch route {
-                case .branchNew: PortalBranchEditView(branchId: nil, onDone: { path.removeLast() })
-                case .branchEdit(let id): PortalBranchEditView(branchId: id, onDone: { path.removeLast() })
-                default: EmptyView()
-                }
-            }
-        }
-    }
 }

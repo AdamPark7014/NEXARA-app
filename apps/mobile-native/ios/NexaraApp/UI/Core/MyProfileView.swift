@@ -1,11 +1,18 @@
 import SwiftUI
 
-/// Mi perfil (`/erp/my-profile`): KPIs y completitud, cuenta e identidad ACS,
-/// asistencia híbrida de hoy, datos personales editables (`PATCH
-/// users/profile/me`), más bloqueo de la app, cola offline y cierre de sesión.
+/// Mi perfil — igual que `MyProfileScreen` de Android (que a su vez sigue a
+/// `/erp/my-profile`): cabecera con avatar, nombre, correo y rol; «Perfil
+/// completo» con la identidad del control de acceso y la asistencia de hoy;
+/// datos personales editables (`PATCH users/profile/me`); departamento y
+/// correo; bloqueo de la app; cola offline; «Lo que puedes hacer»; cerrar
+/// sesión con confirmación y, al pie, la versión y el aviso de privacidad.
+///
+/// La barra teal con «Mi perfil» la pone quien abre la pantalla (hub «Más» o
+/// la cubierta del shell).
 struct MyProfileView: View {
     @EnvironmentObject var session: SessionStore
     @Environment(\.openURL) private var openURL
+
     @State private var appLockEnabled = AppLock.isEnabled
     @State private var confirmLogout = false
     @State private var confirmDeleteAccount = false
@@ -17,112 +24,189 @@ struct MyProfileView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var saving = false
-    @State private var saveError: String?
-    @State private var saved: String?
+    @State private var saveMessage: String?
+    @State private var saveSuccess = false
+
+    /// Gris de los subtítulos del perfil en Android (`Sub` = #64748B).
+    private static let sub = NxColors.rgb(0x64748B)
+    /// Verde del «Perfil guardado» y del 80 % (#059669).
+    private static let verde = NxColors.rgb(0x059669)
+
+    private let lockAvailable = AppLock.isAvailable
 
     var body: some View {
-        List {
-            if loading && profile == nil {
-                Section { NxLoadingState(text: "Cargando tu perfil…") }
-            } else if let error, profile == nil {
-                Section {
-                    NxErrorState(message: error) { Task { await load() } }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let user = session.currentUser {
+                    banner(user)
+                    if !loading && error == nil && !Self.cuentaDireccion(user) {
+                        resumen
+                    }
+                    datosCard(user)
+                    cuentaCard(user)
+                    bloqueoCard
+                    colaCard
+                    if !user.permissions.isEmpty {
+                        MyProfilePermisosSection(
+                            permisos: user.permissions,
+                            accesoTotal: user.isSuperAdmin || Self.esDireccion(user.email)
+                        )
+                    }
+                    cerrarSesion
+                    eliminarCuenta
+                    NxAppMetaFooter(mostrarSoporte: false)
+                    Spacer().frame(height: 24)
+                } else {
+                    Text("No hay sesión activa.")
+                        .font(NxType.bodyLarge)
+                        .foregroundStyle(Self.sub)
                 }
             }
-
-            if let profile {
-                summarySection(profile)
-                completenessSection
-                accountSection(profile)
-                attendanceSection
-                personalSection
-                emergencySection
-                saveSection
-            }
-
-            permisosSection
-
-            deviceSections
-
-            // Versión y aviso de privacidad al final, como en Android.
-            Section {
-                NxAppMetaFooter()
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-            }
+            .padding(20)
         }
-        .navigationTitle("Mi perfil")
-        .refreshable { await load() }
+        .nxScreenBackground()
         .task { await load() }
-        .confirmationDialog("¿Cerrar sesión?", isPresented: $confirmLogout, titleVisibility: .visible) {
-            Button("Cerrar sesión", role: .destructive) { AuthRepository.shared.logout() }
+        .alert("¿Cerrar sesión?", isPresented: $confirmLogout) {
             Button("Cancelar", role: .cancel) {}
+            Button("Cerrar sesión", role: .destructive) { AuthRepository.shared.logout() }
+        } message: {
+            Text("Tendrás que volver a entrar con tu correo y contraseña.")
+        }
+        .alert("¿Eliminar tu cuenta?", isPresented: $confirmDeleteAccount) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Continuar en la web", role: .destructive) { openURL(NxAppMeta.eliminarCuentaURL) }
+        } message: {
+            Text("La solicitud de eliminación de tu cuenta y tus datos se gestiona desde la web de NEXARA. Se abrirá en tu navegador para que la completes ahí.")
         }
     }
 
-    // MARK: Resumen
+    // MARK: Reglas
 
-    private func summarySection(_ p: MyProfileSnapshot) -> some View {
+    /// Christian y su equivalente (Claudia), por correo como Android
+    /// (`PlatformAccounts.isCeoEquivalentEmail`). No usa `CoreOrg.isCeo`, que en
+    /// el modo demostración siempre dice que sí y escondería los datos personales.
+    private static func esDireccion(_ email: String?) -> Bool {
+        CoreOrg.ceoEquivalentEmails.contains(CoreOrg.normalized(email))
+    }
+
+    /// Dirección y cuentas de sistema no llevan expediente de RH ni checador:
+    /// «Contacto» en vez de «Datos personales» y sin «Perfil completo».
+    private static func cuentaDireccion(_ user: SessionUser) -> Bool {
+        esDireccion(user.email) || CoreOrg.isNonEmployee(user.email)
+    }
+
+    // MARK: Cabecera
+
+    private func banner(_ user: SessionUser) -> some View {
+        let superAdmin = user.isSuperAdmin
+        let rol: String = {
+            if superAdmin { return "Super Administrador" }
+            if user.isClient { return "Portal Cliente" }
+            if user.isBranchUser { return "Portal Sucursal" }
+            let r = (user.role ?? "").trimmingCharacters(in: .whitespaces)
+            return r.isEmpty ? "Usuario" : r
+        }()
+        let nombre = user.nombre.trimmingCharacters(in: .whitespaces)
+        return VStack(spacing: 10) {
+            avatar(user, superAdmin: superAdmin)
+            Text(nombre.isEmpty ? "Usuario" : nombre)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(superAdmin ? Color.white : NxColors.fg)
+                .multilineTextAlignment(.center)
+            Text(user.email)
+                .font(NxType.bodyMedium)
+                .foregroundStyle(superAdmin ? NxColors.fg4 : Self.sub)
+                .multilineTextAlignment(.center)
+            Text(rol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(superAdmin ? Color.white : NxColors.brand)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(
+                    superAdmin ? NxColors.brand : NxColors.brandSoft,
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .nxCardSurface(radius: NxRadius.xl, elevation: 2, fill: superAdmin ? NxColors.fg : NxColors.surface)
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func avatar(_ user: SessionUser, superAdmin: Bool) -> some View {
+        if superAdmin {
+            Image("LogoNexara")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+                .frame(width: 80, height: 80)
+                .background(NxColors.brand, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .accessibilityLabel("NEXARA")
+        } else if let url = user.avatarUrl, !url.trimmingCharacters(in: .whitespaces).isEmpty {
+            AuthenticatedImage(url: url, contentMode: .fill, background: NxColors.brandSoft)
+                .frame(width: 80, height: 80)
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(NxColors.brand, lineWidth: 3))
+                .accessibilityHidden(true)
+        } else {
+            Text(NxAvatar.iniciales(user.nombre))
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(Color.white)
+                .frame(width: 80, height: 80)
+                .background(NxColors.brand, in: Circle())
+                .accessibilityHidden(true)
+        }
+    }
+
+    // MARK: Perfil completo, identidad y asistencia de hoy
+
+    private var resumen: some View {
         let pct = form.completeness
-        let tone: Color = pct >= 80 ? .green : (pct >= 50 ? .orange : .red)
-        return Section {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                kpi("Departamento", p.departmentName.isEmpty ? "—" : p.departmentName, "building.2", .primary)
-                kpi("Rol", p.roleName.isEmpty ? "—" : p.roleName, "theatermasks", .accentColor)
-                kpi("Perfil completo", "\(pct)%", "list.clipboard", tone)
-                kpi("Email", p.email, "envelope", .primary)
-            }
-            .padding(.vertical, 4)
-        }
-    }
-
-    private func kpi(_ label: String, _ value: String, _ icon: String, _ tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(label, systemImage: icon)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(tint)
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private var completenessSection: some View {
-        Section("Completitud del perfil") {
-            ForEach(form.sections) { sec in
-                let pct = Double(sec.filled) / Double(max(sec.total, 1))
-                HStack(spacing: 10) {
-                    Text(sec.label).font(.caption).frame(width: 118, alignment: .leading)
-                    ProgressView(value: pct)
-                        .tint(pct >= 1 ? .green : (pct >= 0.5 ? .orange : .red))
-                    Text("\(sec.filled)/\(sec.total)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.secondary)
+        let color: Color = pct >= 80 ? Self.verde : (pct >= 50 ? NxColors.naranja : NxColors.rojo)
+        return tarjeta(spacing: 12) {
+            titulo("Perfil completo")
+            HStack(alignment: .center, spacing: 12) {
+                Text("\(pct)%")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(color)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(color.opacity(0.22))
+                        Capsule()
+                            .fill(color)
+                            .frame(width: geo.size.width * CGFloat(min(max(pct, 0), 100)) / 100)
+                    }
                 }
+                .frame(height: 4)
+                .accessibilityHidden(true)
+            }
+            nota("Cuenta teléfono, CURP, RFC, NSS, fecha de nacimiento, ciudad y estado.")
+            divisor
+            fila("Departamento", profile?.departmentName.nonEmptyOr("—") ?? "—")
+            fila("Rol", profile?.roleName.nonEmptyOr("—") ?? "—")
+            fila("Nº de empleado", numeroDeEmpleado)
+            fila("Control de acceso", estadoIntegra)
+            divisor
+            titulo("Acceso y asistencia (hoy)")
+            fila("Checador de la app", lineaChecador)
+            fila("Pases en puertas", lineaPuertas)
+            nota("El checador de la app es el que cuenta para tu nómina.")
+            if identity?.status != "linked" {
+                // El texto de la API es para administradores (Integra, employeeNo); aquí va el del empleado.
+                nota("Pide a RH que vincule tu número de empleado con el control de acceso.")
             }
         }
     }
 
-    // MARK: Cuenta e identidad ACS
-
-    private func accountSection(_ p: MyProfileSnapshot) -> some View {
-        let employee = [identity?.employeeNumber, identity?.companyEmployeeNumber, p.employeeNumber]
-            .compactMap { $0 }
+    /// Misma cadena de respaldo que la web y Android.
+    private var numeroDeEmpleado: String {
+        [identity?.employeeNumber, identity?.companyEmployeeNumber, profile?.employeeNumber]
+            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
             .first { !$0.isEmpty } ?? "—"
-        return Section("Datos de cuenta") {
-            row("Nombre", p.nombre)
-            row("Email", p.email)
-            row("Nº de empleado", employee)
-            row("Control de acceso", integraStatus)
-        }
     }
 
-    private var integraStatus: String {
+    private var estadoIntegra: String {
         switch identity?.status {
         case "linked":
             let name = identity?.personName ?? ""
@@ -133,183 +217,214 @@ struct MyProfileView: View {
         }
     }
 
-    private var attendanceSection: some View {
-        let linked = identity?.status == "linked"
-        return Section {
-            row("Checador de la app", erpLine)
-            row("Pases en puertas", acsLine(linked: linked))
-            if !linked {
-                // El texto de la API es para administradores (Integra, employeeNo); aquí va el del empleado.
-                Text("Pide a RH que vincule tu número de empleado con el control de acceso.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        } header: {
-            Text("Acceso y asistencia (hoy)")
-        } footer: {
-            Text("El checador de la app es el que cuenta para tu nómina.")
-        }
-    }
-
-    private var erpLine: String {
+    private var lineaChecador: String {
         guard let hybrid, !hybrid.erpCheckIn.isEmpty else { return "Sin entrada" }
-        var line = "Entrada \(clock(hybrid.erpCheckIn))"
-        if !hybrid.erpCheckOut.isEmpty { line += " · Salida \(clock(hybrid.erpCheckOut))" }
+        var line = "Entrada \(NxHoraMexico.hhmm(hybrid.erpCheckIn) ?? "—")"
+        if let salida = NxHoraMexico.hhmm(hybrid.erpCheckOut) { line += " · Salida \(salida)" }
         return line
     }
 
-    private func acsLine(linked: Bool) -> String {
-        guard let hybrid, !hybrid.acsFirstAt.isEmpty else {
-            return linked ? "Sin pases hoy" : "Sin vincular"
+    private var lineaPuertas: String {
+        if let hybrid, !hybrid.acsFirstAt.isEmpty {
+            let door = hybrid.acsFirstDoor.isEmpty ? "puerta" : hybrid.acsFirstDoor
+            return "\(hybrid.acsPasses) pases · \(door) · desde \(NxHoraMexico.hhmm(hybrid.acsFirstAt) ?? "—")"
         }
-        let door = hybrid.acsFirstDoor.isEmpty ? "puerta" : hybrid.acsFirstDoor
-        return "\(hybrid.acsPasses) pases · \(door) · desde \(clock(hybrid.acsFirstAt))"
+        return identity?.status == "linked" ? "Sin pases hoy" : "Sin vincular"
     }
 
-    // MARK: Datos editables
+    // MARK: Datos personales
 
-    private var personalSection: some View {
-        Section {
-            TextField("Teléfono", text: $form.telefono).keyboardType(.phonePad)
-            birthDateRow
-            TextField("Dirección", text: $form.direccion)
-            TextField("Colonia", text: $form.colonia)
-            TextField("Ciudad", text: $form.ciudad)
-            TextField("Estado", text: $form.estado)
-            TextField("Código postal", text: $form.codigoPostal).keyboardType(.numberPad)
-            TextField("País", text: $form.pais)
-            TextField("CURP", text: $form.curp)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .onChange(of: form.curp) { _, v in if v.uppercased() != v { form.curp = v.uppercased() } }
-            TextField("RFC", text: $form.rfc)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .onChange(of: form.rfc) { _, v in if v.uppercased() != v { form.rfc = v.uppercased() } }
-            TextField("Número de INE", text: $form.ineNumero)
-                .autocorrectionDisabled()
-            TextField("NSS (IMSS)", text: $form.nss).keyboardType(.numberPad)
-        } header: {
-            Text("Datos personales")
-        } footer: {
-            Text("Solo tú y RH/Dirección pueden ver esta información.")
-        }
-    }
-
-    @ViewBuilder
-    private var birthDateRow: some View {
-        if form.fechaNacimiento.isEmpty {
-            Button("Agregar fecha de nacimiento") {
-                let base = Calendar.current.date(byAdding: .year, value: -30, to: Date()) ?? Date()
-                form.fechaNacimiento = Self.dayFormatter.string(from: base)
-            }
-        } else {
-            HStack {
-                DatePicker(
-                    "Fecha de nacimiento",
-                    selection: birthDateBinding,
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-                .environment(\.locale, Locale(identifier: "es_MX"))
-                Button {
-                    form.fechaNacimiento = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+    private func datosCard(_ user: SessionUser) -> some View {
+        let direccion = Self.cuentaDireccion(user)
+        return tarjeta(spacing: 10) {
+            titulo(direccion ? "Contacto" : "Datos personales")
+            if loading {
+                ProgressView()
+                    .tint(NxColors.brand)
+                    .frame(maxWidth: .infinity)
+            } else {
+                if let error {
+                    Text(error)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.danger)
+                    Button("Reintentar") { Task { await load() } }
+                        .font(NxType.labelLarge)
+                        .foregroundStyle(NxColors.brand)
+                        .buttonStyle(.plain)
+                        .nxTapTarget()
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Quitar fecha de nacimiento")
-            }
-        }
-    }
-
-    private var birthDateBinding: Binding<Date> {
-        Binding(
-            get: { Self.dayFormatter.date(from: form.fechaNacimiento) ?? Date() },
-            set: { form.fechaNacimiento = Self.dayFormatter.string(from: $0) }
-        )
-    }
-
-    private var emergencySection: some View {
-        Section("Contacto de emergencia") {
-            TextField("Nombre", text: $form.contactoEmergenciaNombre)
-            TextField("Teléfono", text: $form.contactoEmergenciaTelefono).keyboardType(.phonePad)
-        }
-    }
-
-    private var saveSection: some View {
-        Section {
-            Button(saving ? "Guardando…" : "Guardar cambios") { Task { await save() } }
-                .disabled(saving)
-            if let saved {
-                NxIconText(systemName: "checkmark.circle.fill", text: saved).font(.footnote).foregroundColor(.green)
-            }
-            if let saveError {
-                Text(saveError).font(.footnote).foregroundColor(.red)
-            }
-        }
-    }
-
-    // MARK: Lo que puedes hacer
-
-    /// Permisos del rol traducidos (paridad con Android). No depende de la carga del
-    /// perfil: viene de la sesión, así que sale aunque el API esté caído.
-    @ViewBuilder
-    private var permisosSection: some View {
-        if let user = session.currentUser, !PermissionLabels.agrupar(user.permissions).isEmpty {
-            MyProfilePermisosSection(
-                permisos: user.permissions,
-                accesoTotal: user.isSuperAdmin || CoreOrg.isCeo(user.email)
-            )
-        }
-    }
-
-    // MARK: Dispositivo
-
-    @ViewBuilder
-    private var deviceSections: some View {
-        Section("Seguridad") {
-            Toggle(isOn: $appLockEnabled) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Bloqueo de app")
-                    Text(AppLock.isAvailable ? "Biometría o código al volver" : "No disponible en este dispositivo")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                NxOutlinedCampo(label: "Teléfono", text: $form.telefono, keyboard: .phonePad, contentType: .telephoneNumber)
+                if !direccion {
+                    NxFechaCampo(label: "Fecha de nacimiento", value: $form.fechaNacimiento, hasta: Date())
+                    NxOutlinedCampo(label: "Dirección", text: $form.direccion, contentType: .streetAddressLine1, multiline: true)
+                    NxOutlinedCampo(label: "Colonia", text: $form.colonia)
+                    NxOutlinedCampo(label: "Ciudad", text: $form.ciudad, contentType: .addressCity)
+                    NxOutlinedCampo(label: "Estado", text: $form.estado, contentType: .addressState)
+                    NxOutlinedCampo(label: "C.P.", text: $form.codigoPostal, keyboard: .numberPad, contentType: .postalCode)
+                    NxOutlinedCampo(label: "País", text: $form.pais, contentType: .countryName)
+                    NxOutlinedCampo(label: "CURP", text: $form.curp, capitalization: .characters, autocorrect: false)
+                    NxOutlinedCampo(label: "RFC", text: $form.rfc, capitalization: .characters, autocorrect: false)
+                    NxOutlinedCampo(label: "Número de INE", text: $form.ineNumero, autocorrect: false)
+                    NxOutlinedCampo(label: "NSS", text: $form.nss, keyboard: .numberPad, autocorrect: false)
+                }
+                NxOutlinedCampo(label: "Contacto emergencia", text: $form.contactoEmergenciaNombre, contentType: .name)
+                NxOutlinedCampo(label: "Tel. emergencia", text: $form.contactoEmergenciaTelefono, keyboard: .phonePad, contentType: .telephoneNumber)
+                if let estatus = profile?.estatus, !estatus.trimmingCharacters(in: .whitespaces).isEmpty {
+                    fila("Estatus perfil", estatus)
+                }
+                if let saveMessage, !saveMessage.isEmpty {
+                    Text(saveMessage)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(saveSuccess ? Self.verde : NxColors.danger)
+                }
+                NxBotonPildora(title: "Guardar perfil", loading: saving, enabled: !loading) {
+                    Task { await save() }
                 }
             }
-            .disabled(!AppLock.isAvailable)
-            .onChange(of: appLockEnabled) { _, newValue in
-                AppLock.isEnabled = newValue
+        }
+    }
+
+    // MARK: Departamento y correo
+
+    @ViewBuilder
+    private func cuentaCard(_ user: SessionUser) -> some View {
+        let depto = (user.department ?? "").trimmingCharacters(in: .whitespaces)
+        let correo = user.email.trimmingCharacters(in: .whitespaces)
+        if !depto.isEmpty || !correo.isEmpty {
+            tarjeta(spacing: 12) {
+                if !depto.isEmpty { fila("Departamento", depto) }
+                if !correo.isEmpty { fila("Correo", correo) }
             }
         }
-        Section("Dispositivo") {
-            NavigationLink {
-                OfflineQueueView()
-            } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Cola offline")
+    }
+
+    // MARK: Bloqueo de app
+
+    private var bloqueoCard: some View {
+        tarjeta(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    titulo("Bloqueo de app")
+                    Text(lockAvailable ? "Biometría o PIN al volver a la app" : "No disponible en este dispositivo")
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(Self.sub)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Toggle("Bloqueo de app", isOn: $appLockEnabled)
+                    .labelsHidden()
+                    .tint(NxColors.brand)
+                    .disabled(!lockAvailable)
+                    .onChange(of: appLockEnabled) { _, newValue in
+                        AppLock.isEnabled = newValue
+                    }
+            }
+        }
+    }
+
+    // MARK: Cola offline
+
+    private var colaCard: some View {
+        NavigationLink {
+            OfflineQueueView()
+                .nxBrandNavBar(title: "Cola offline")
+        } label: {
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 0) {
+                    titulo("Cola offline")
                     Text("Ver y sincronizar cambios pendientes")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(Self.sub)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("›")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Self.sub)
+                    .accessibilityHidden(true)
             }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(NxColors.rgb(0xEFF6FF), in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
         }
-        Section {
-            Button(role: .destructive) { confirmLogout = true } label: {
-                Label("Cerrar sesión", systemImage: "rectangle.portrait.and.arrow.right")
-            }
-            // Eliminación de cuenta (guideline 5.1.1(v)): se pide desde la app y
-            // se gestiona en la web (las cuentas las crea tu organización).
-            Button(role: .destructive) { confirmDeleteAccount = true } label: {
-                Label("Eliminar mi cuenta", systemImage: "person.crop.circle.badge.minus")
-            }
-            .confirmationDialog("¿Eliminar tu cuenta?", isPresented: $confirmDeleteAccount, titleVisibility: .visible) {
-                Button("Continuar en la web", role: .destructive) { openURL(NxAppMeta.eliminarCuentaURL) }
-                Button("Cancelar", role: .cancel) {}
-            } message: {
-                Text("La solicitud de eliminación de tu cuenta y tus datos se gestiona desde la web de NEXARA. Se abrirá en tu navegador para que la completes ahí.")
-            }
+        .buttonStyle(NxPressableStyle())
+    }
+
+    // MARK: Cerrar sesión y eliminar cuenta
+
+    private var cerrarSesion: some View {
+        Button { confirmLogout = true } label: {
+            Text("Cerrar sesión")
+                .font(NxType.labelLarge)
+                .foregroundStyle(NxColors.danger)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .overlay(
+                    RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                        .strokeBorder(NxColors.danger.opacity(0.5), lineWidth: 1)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
         }
+        .buttonStyle(NxPressableStyle())
+    }
+
+    /// Exigencia de Apple (guideline 5.1.1(v)): la baja se pide desde la app y se
+    /// gestiona en la web, porque las cuentas las crea la organización.
+    private var eliminarCuenta: some View {
+        Button { confirmDeleteAccount = true } label: {
+            Text("Eliminar mi cuenta")
+                .font(NxType.labelMedium)
+                .foregroundStyle(NxColors.danger)
+                .frame(maxWidth: .infinity)
+                .nxTapTarget()
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Piezas
+
+    /// Tarjeta blanca del perfil de Android: radio 16, elevación 1, relleno 16.
+    private func tarjeta<Content: View>(spacing: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: spacing) { content() }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .nxCardSurface(radius: NxRadius.l, elevation: 1)
+    }
+
+    /// Título de tarjeta: 16 SemiBold (#0F172A).
+    private func titulo(_ texto: String) -> some View {
+        Text(texto)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(NxColors.fg)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    /// `HorizontalDivider` de Material (1, #E2E8F0).
+    private var divisor: some View {
+        Rectangle()
+            .fill(NxColors.border)
+            .frame(height: 1)
+            .accessibilityHidden(true)
+    }
+
+    private func nota(_ texto: String) -> some View {
+        Text(texto)
+            .font(NxType.bodySmall)
+            .foregroundStyle(Self.sub)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// `ProfileInfoRow`: etiqueta 12,5 gris a la izquierda, valor 14 SemiBold a la derecha.
+    private func fila(_ etiqueta: String, _ valor: String) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(etiqueta)
+                .font(NxType.bodySmall)
+                .foregroundStyle(Self.sub)
+            Spacer(minLength: 8)
+            Text(valor)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(NxColors.fg)
+                .multilineTextAlignment(.trailing)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Datos
@@ -317,6 +432,7 @@ struct MyProfileView: View {
     private func load() async {
         loading = true
         error = nil
+        saveMessage = nil
         async let identityTask = MyProfileRepository.shared.identity()
         async let hybridTask = MyProfileRepository.shared.hybridToday()
         do {
@@ -324,8 +440,9 @@ struct MyProfileView: View {
             profile = snapshot
             form = snapshot.fields
         } catch {
-            self.error = error.toUserMessage(fallback: "Error al cargar tu perfil")
+            self.error = error.toUserMessage(fallback: "No se pudo cargar el perfil")
         }
+        // Integra y el contraste híbrido son opcionales: si no contestan, el perfil sale igual.
         identity = await identityTask
         hybrid = await hybridTask
         loading = false
@@ -333,50 +450,42 @@ struct MyProfileView: View {
 
     private func save() async {
         saving = true
-        saved = nil
-        saveError = nil
+        saveMessage = nil
+        error = nil
         defer { saving = false }
+        // Como Android: lo que se manda va recortado (vacío = null en el API).
+        var limpio = form
+        limpio.telefono = limpio.telefono.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.fechaNacimiento = limpio.fechaNacimiento.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.direccion = limpio.direccion.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.colonia = limpio.colonia.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.ciudad = limpio.ciudad.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.estado = limpio.estado.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.codigoPostal = limpio.codigoPostal.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.pais = limpio.pais.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.curp = limpio.curp.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.rfc = limpio.rfc.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.ineNumero = limpio.ineNumero.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.nss = limpio.nss.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.contactoEmergenciaNombre = limpio.contactoEmergenciaNombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        limpio.contactoEmergenciaTelefono = limpio.contactoEmergenciaTelefono.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            let sent = try await MyProfileRepository.shared.save(form)
-            saved = sent
-                ? "Guardado — pendiente de revisión por RH"
+            let sent = try await MyProfileRepository.shared.save(limpio)
+            saveSuccess = true
+            saveMessage = sent
+                ? "Perfil guardado"
                 : "Guardado sin conexión; se enviará al recuperar la red."
-            if sent { await load() }
         } catch {
-            saveError = error.toUserMessage(fallback: "No se pudo guardar el perfil")
+            saveSuccess = false
+            saveMessage = error.toUserMessage(fallback: "No se pudo guardar")
         }
     }
+}
 
-    // MARK: Formato
-
-    @ViewBuilder private func row(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label).foregroundColor(.secondary)
-            Spacer()
-            Text(value).multilineTextAlignment(.trailing)
-        }
+private extension String {
+    /// El texto, o `fallback` si está vacío.
+    func nonEmptyOr(_ fallback: String) -> String {
+        let t = trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? fallback : t
     }
-
-    private static let dayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = .current
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
-
-    /// Hora local `es-MX` de un ISO-8601 del API.
-    private func clock(_ iso: String) -> String {
-        guard let date = NxFormat.parseISO(iso) else { return String(iso.prefix(16)) }
-        return Self.clockFormatter.string(from: date)
-    }
-
-    private static let clockFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "es_MX")
-        f.timeStyle = .short
-        f.dateStyle = .none
-        return f
-    }()
 }

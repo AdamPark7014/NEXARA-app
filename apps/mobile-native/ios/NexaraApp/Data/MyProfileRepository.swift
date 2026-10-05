@@ -24,39 +24,6 @@ struct MyProfileFields: Encodable, Equatable {
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count
         return Int((Double(filled) / 7.0 * 100).rounded())
     }
-
-    /// Barras de «Completitud del perfil».
-    var sections: [MyProfileSectionScore] {
-        func count(_ values: [String]) -> Int {
-            values.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count
-        }
-        return [
-            MyProfileSectionScore(
-                label: "Datos personales",
-                filled: count([telefono, fechaNacimiento, ciudad, estado]),
-                total: 4
-            ),
-            MyProfileSectionScore(
-                label: "Documentos",
-                filled: count([curp, rfc, nss]),
-                total: 3
-            ),
-            MyProfileSectionScore(
-                label: "Emergencia",
-                filled: count([contactoEmergenciaNombre, contactoEmergenciaTelefono]),
-                total: 2
-            ),
-        ]
-    }
-}
-
-/// Una barra de completitud del perfil.
-struct MyProfileSectionScore: Identifiable {
-    let label: String
-    let filled: Int
-    let total: Int
-
-    var id: String { label }
 }
 
 /// `GET users/profile/me`.
@@ -66,6 +33,8 @@ struct MyProfileSnapshot {
     var employeeNumber: String
     var roleName: String
     var departmentName: String
+    /// `perfil.estatus` («Estatus perfil» en Android); vacío si no viene.
+    var estatus: String
     var fields: MyProfileFields
 }
 
@@ -120,6 +89,7 @@ final class MyProfileRepository {
             employeeNumber: ConsoleHelpers.mapStr(map, "employeeNumber"),
             roleName: ConsoleHelpers.mapStr(map["role"] as? [String: Any] ?? [:], "nombre"),
             departmentName: ConsoleHelpers.mapStr(map["department"] as? [String: Any] ?? [:], "nombre"),
+            estatus: ConsoleHelpers.mapStr(perfil, "estatus"),
             fields: fields
         )
     }
@@ -147,14 +117,11 @@ final class MyProfileRepository {
         )
     }
 
-    /// `GET attendance/hybrid?date=YYYY-MM-DD` con la fecha local de hoy.
+    /// `GET attendance/hybrid?date=YYYY-MM-DD` con el día de hoy EN MÉXICO, como
+    /// Android (`todayInMexico`). Antes usaba la zona del teléfono: de viaje o con
+    /// el reloj en otra zona, pasadas las 18:00 pedía el día equivocado.
     func hybridToday() async -> MyHybridToday? {
-        let fmt = DateFormatter()
-        fmt.calendar = Calendar(identifier: .gregorian)
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.timeZone = .current
-        fmt.dateFormat = "yyyy-MM-dd"
-        guard let data = try? await api.get("attendance/hybrid", query: ["date": fmt.string(from: Date())]) else {
+        guard let data = try? await api.get("attendance/hybrid", query: ["date": NxHoraMexico.hoy()]) else {
             return nil
         }
         let map = ConsoleHelpers.decodeMap(data)

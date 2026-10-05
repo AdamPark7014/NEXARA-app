@@ -254,7 +254,7 @@ extension DemoStore {
         // Estado: con algo abierto, «activo» (o «atrasado» si ya pasó su hora máxima);
         // sin nada abierto, «libre» si terminó algo hoy; si no, «sin actividad».
         let current = open.first { effectiveStatus($0) == "En Proceso" }
-        let late = open.first { $0.maxMin < elapsed && effectiveStatus($0) == "En Proceso" }
+        let late = open.first { topeMin($0) < elapsed && effectiveStatus($0) == "En Proceso" }
         var status = "sin_actividad"
         if late != nil {
             status = "atrasado"
@@ -302,7 +302,7 @@ extension DemoStore {
             json["activityStartedAt"] = DemoClock.iso(startedDate)
             json["activityElapsedMinutes"] = DemoClock.minutes(from: startedDate, to: now)
             if let late {
-                json["currentLateMinutes"] = DemoClock.minutes(from: at(late.maxMin), to: now)
+                json["currentLateMinutes"] = DemoClock.minutes(from: at(topeMin(late)), to: now)
             }
         }
         if status == "libre", let finished = lastFinished(for: p.id), let fin = finished.finMin {
@@ -311,7 +311,7 @@ extension DemoStore {
                 "anNumber": finished.folio,
                 "titulo": finished.titulo,
                 "finishedAt": iso(fin),
-                "lateMinutes": max(0, fin - finished.maxMin),
+                "lateMinutes": max(0, fin - topeMin(finished)),
             ])
             json["idleSinceAt"] = iso(fin)
         }
@@ -407,6 +407,7 @@ extension DemoStore {
         }
         if let fin = a.finMin { json["fechaFinalizacion"] = iso(fin) }
         json.merge(sesionJSON(a)) { _, sesion in sesion }
+        json.merge(semaforoJSON(a, now: Date())) { _, nuevo in nuevo }
         return json
     }
 

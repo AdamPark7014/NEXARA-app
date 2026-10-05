@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Navegación Portal — paridad con Android `TicketsNavHost`.
-enum PortalRoute: Hashable, Identifiable {
+/// Rutas del portal de clientes y sucursales — las de Android `TicketsNavHost`
+/// (`TicketsRoutes`). Es la única parte de la app fuera de «solo ERP»: la ven
+/// las cuentas cliente y sucursal.
+enum PortalRoute: Hashable {
     case profile
     case branches
     case branchNew
@@ -16,232 +18,325 @@ enum PortalRoute: Hashable, Identifiable {
     case services
     case help
 
-    var id: String {
+    /// Título de la barra en el inicio del portal.
+    static let homeTitle = "Tickets / Portal"
+
+    /// Títulos de Android (`TicketsNavHost`); lo que Android no nombra (editar
+    /// sucursal y los detalles) cae en «Tickets / Portal», igual que allá.
+    var title: String {
         switch self {
-        case .profile: return "profile"
-        case .branches: return "branches"
-        case .branchNew: return "branchNew"
-        case .branchEdit(let id): return "branchEdit-\(id)"
-        case .requests: return "requests"
-        case .requestNew: return "requestNew"
-        case .tickets: return "tickets"
-        case .ticketDetail(let id): return "ticket-\(id)"
-        case .feedback: return "feedback"
-        case .inventories: return "inventories"
-        case .inventoryDetail(let id): return "inventory-\(id)"
-        case .services: return "services"
-        case .help: return "help"
-        }
-    }
-}
-
-struct PortalNavView: View {
-    let onExit: () -> Void
-    @State private var path: [PortalRoute] = []
-    @State private var deepLinkRoute: PortalRoute?
-    @ObservedObject private var deepLink = DeepLinkCoordinator.shared
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            PortalHomeView(onExit: onExit, onNavigate: { path.append($0) })
-                .navigationDestination(for: PortalRoute.self) { route in
-                    switch route {
-                    case .profile: PortalProfileView()
-                    case .branches: PortalBranchesView(
-                        onNew: { path.append(.branchNew) },
-                        onEdit: { path.append(.branchEdit($0)) }
-                    )
-                    case .branchNew: PortalBranchEditView(branchId: nil, onDone: { path.removeLast() })
-                    case .branchEdit(let id): PortalBranchEditView(branchId: id, onDone: { path.removeLast() })
-                    case .requests: PortalRequestsView(onNew: { path.append(.requestNew) })
-                    case .requestNew: PortalRequestNewView(onDone: { path.removeLast() })
-                    case .tickets: PortalTicketsView(onOpen: { path.append(.ticketDetail($0)) })
-                    case .ticketDetail(let id): PortalTicketDetailView(ticketId: id)
-                    case .feedback: PortalFeedbackView()
-                    case .inventories: PortalInventoriesView(onOpen: { path.append(.inventoryDetail($0)) })
-                    case .inventoryDetail(let id): PortalInventoryDetailView(inventoryId: id)
-                    case .services: PortalServicesView()
-                    case .help: PortalHelpView(onBack: { path.removeLast() })
-                    }
-                }
-        }
-        .sheet(item: $deepLinkRoute) { route in
-            NavigationStack {
-                portalDeepLinkScreen(route)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cerrar") { deepLinkRoute = nil }
-                        }
-                    }
-            }
-        }
-        .onAppear { consumePortalDeepLink() }
-        .onChange(of: deepLink.pending) { _, _ in consumePortalDeepLink() }
-    }
-
-    private func consumePortalDeepLink() {
-        guard let link = deepLink.consumePortal() else { return }
-        if link.key == "tickets", let id = link.entityId {
-            deepLinkRoute = .ticketDetail(id)
-        } else if let route = portalRoute(for: link.key) {
-            deepLinkRoute = route
+        case .profile: return "Mi perfil"
+        case .branches: return "Mis sucursales"
+        case .branchNew: return "Nueva sucursal"
+        case .requests: return "Solicitudes"
+        case .requestNew: return "Nueva solicitud"
+        case .tickets: return "Tickets"
+        case .feedback: return "Feedback pendiente"
+        case .inventories: return "Inventarios"
+        case .services: return "Mis servicios"
+        case .help: return "Centro de ayuda"
+        case .branchEdit, .ticketDetail, .inventoryDetail: return Self.homeTitle
         }
     }
 
-    @ViewBuilder
-    private func portalDeepLinkScreen(_ route: PortalRoute) -> some View {
-        switch route {
-        case .profile: PortalProfileView()
-        case .branches: PortalBranchesView(onNew: {}, onEdit: { _ in })
-        case .branchNew: PortalBranchEditView(branchId: nil, onDone: {})
-        case .branchEdit(let id): PortalBranchEditView(branchId: id, onDone: {})
-        case .requests: PortalRequestsView(onNew: {})
-        case .requestNew: PortalRequestNewView(onDone: {})
-        case .tickets: PortalTicketsView(onOpen: { _ in })
-        case .ticketDetail(let id): PortalTicketDetailView(ticketId: id)
-        case .feedback: PortalFeedbackView()
-        case .inventories: PortalInventoriesView(onOpen: { _ in })
-        case .inventoryDetail(let id): PortalInventoryDetailView(inventoryId: id)
-        case .services: PortalServicesView()
-        case .help: PortalHelpView(onBack: {})
-        }
-    }
-
-    private func portalRoute(for key: String) -> PortalRoute? {
+    /// Módulo de un enlace (Android `TicketsRoutes.routeForModuleKey`); `nil` = inicio.
+    static func forModuleKey(_ key: String) -> PortalRoute? {
         switch key {
         case "profile", "my-profile", "mi-perfil": return .profile
         case "branches", "sucursales": return .branches
         case "requests", "solicitudes": return .requests
-        case "tickets": return .tickets
+        case "tickets", "client-tickets": return .tickets
         case "inventories", "inventarios": return .inventories
         case "feedback-pending", "feedback": return .feedback
-        case "mis-servicios", "my-services", "services": return .services
+        case "mis-servicios", "services", "my-services": return .services
         case "help", "ayuda", "centro-de-ayuda": return .help
         default: return nil
         }
     }
 }
 
-// MARK: - Home
+/// Pila del portal (Android `TicketsNavHost`): inicio con tarjetas de módulos,
+/// barra teal con volver y cerrar sesión en todas las pantallas.
+struct PortalNavView: View {
+    let onExit: () -> Void
+    @State private var path: [PortalRoute] = []
+    @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
+    var body: some View {
+        NavigationStack(path: $path) {
+            PortalHomeView(onExit: onExit, onNavigate: push)
+                .portalChrome(PortalRoute.homeTitle)
+                .navigationDestination(for: PortalRoute.self) { route in
+                    destination(route)
+                        .portalChrome(route.title)
+                }
+        }
+        .environment(\.portalLogout, onExit)
+        .onAppear { consumePortalDeepLink() }
+        .onChange(of: deepLink.pending) { _, _ in consumePortalDeepLink() }
+    }
+
+    /// `navigate(…) { launchSingleTop = true }`: no apila dos veces la misma pantalla.
+    private func push(_ route: PortalRoute) {
+        guard path.last != route else { return }
+        path.append(route)
+    }
+
+    @ViewBuilder
+    private func destination(_ route: PortalRoute) -> some View {
+        switch route {
+        case .profile:
+            PortalProfileView()
+        case .branches:
+            PortalBranchesView(
+                onCreate: { push(.branchNew) },
+                onEdit: { push(.branchEdit($0)) }
+            )
+        case .branchNew:
+            PortalBranchEditView(branchId: nil)
+        case .branchEdit(let id):
+            PortalBranchEditView(branchId: id)
+        case .requests:
+            PortalRequestsView(onCreate: { push(.requestNew) })
+        case .requestNew:
+            PortalRequestNewView()
+        case .tickets:
+            PortalTicketsView(onOpenTicket: { push(.ticketDetail($0)) })
+        case .ticketDetail(let id):
+            PortalTicketDetailView(ticketId: id)
+        case .feedback:
+            PortalFeedbackView()
+        case .inventories:
+            PortalInventoriesView(onOpenInventory: { push(.inventoryDetail($0)) })
+        case .inventoryDetail(let id):
+            PortalInventoryDetailView(inventoryId: id)
+        case .services:
+            PortalServicesView()
+        case .help:
+            PortalHelpView()
+        }
+    }
+
+    /// Enlace pendiente (push o URL). Como Android: se abre DENTRO de la pila del
+    /// portal (antes iOS lo ponía en una hoja aparte, con «volver» que no hacía
+    /// nada); un enlace de Core deja a la cuenta de portal en su inicio.
+    private func consumePortalDeepLink() {
+        guard deepLink.pending != nil else { return }
+        guard let link = deepLink.consumePortal() else {
+            path.removeAll()
+            return
+        }
+        if link.key == "tickets" || link.key == "client-tickets", let id = link.entityId {
+            push(.ticketDetail(id))
+            return
+        }
+        if let route = PortalRoute.forModuleKey(link.key) {
+            push(route)
+        } else {
+            path.removeAll()
+        }
+    }
+}
+
+// MARK: - Inicio del portal
+
+/// Inicio del portal (Android `TicketsPortalScreen`): cabecera del cliente o de
+/// la sucursal, cuatro cifras, tarjetas de módulos y «Cerrar sesión».
 struct PortalHomeView: View {
     let onExit: () -> Void
     let onNavigate: (PortalRoute) -> Void
 
-    @EnvironmentObject var session: SessionStore
-    @State private var profile: [String: Any]?
-    @State private var isLoading = true
-    @State private var error: String?
-    @State private var portalReportData: Data?
+    private struct Stats {
+        var totalTickets = 0
+        var pendingTickets = 0
+        var closedTickets = 0
+        var openRequests = 0
+        var pendingFeedback = 0
+    }
 
-    private var isClient: Bool { session.currentUser?.isClient == true && !isBranch }
-    private var isBranch: Bool { session.currentUser?.isBranchUser == true }
+    @State private var isLoading = true
+    @State private var didStart = false
+    @State private var downloadingPortalReport = false
+    @State private var error: String?
+    @State private var message: String?
+    @State private var profile: PortalClientProfile?
+    @State private var stats = Stats()
+    @State private var pdfItem: PortalPDFItem?
+
+    private var isClient: Bool { profile?.isBranch == false }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if isLoading && profile == nil {
-                    NxLoadingState(text: "Cargando tu portal…").padding(.top, 24)
-                }
-                if let error {
-                    if profile == nil {
-                        NxErrorState(message: error) { Task { await load() } }
-                    } else {
-                        NxStaleBanner(message: error) { Task { await load() } }
+        Group {
+            if isLoading {
+                NxLoadingState(text: "Cargando portal…")
+                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        content
                     }
+                    .padding(16)
                 }
+                .refreshable { await Task { await refresh(initial: false) }.value }
+            }
+        }
+        .nxScreenBackground()
+        .onAppear {
+            guard !didStart else { return }
+            didStart = true
+            Task { await refresh(initial: true) }
+        }
+        .sheet(item: $pdfItem) { PortalPDFSheet(item: $0) }
+    }
 
-                if let p = profile {
-                    portalHeader(p)
-                    VStack(spacing: 10) {
-                        portalBtn("person.circle", "Mi perfil", .profile)
-                        if isClient {
-                            portalBtn("building.2", "Sucursales", .branches)
-                            portalBtn("star.bubble", "Calificar servicios", .feedback)
-                        }
-                        portalBtn("tray.full", "Solicitudes", .requests)
-                        portalBtn("ticket", "Tickets", .tickets)
-                        portalBtn("archivebox", "Inventarios", .inventories)
-                        portalBtn("briefcase", "Mis servicios", .services)
-                        portalBtn("questionmark.circle", "Centro de ayuda", .help)
-                        if isClient {
-                            Button {
-                                Task { portalReportData = try? await TicketsRepository.shared.portalReportPdf() }
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Image(systemName: "doc.richtext").font(.title3).foregroundColor(NxBrand.primary).frame(width: 28)
-                                    Text("Reporte del portal").font(.body)
-                                    Spacer()
-                                    Image(systemName: "chevron.right").foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+    @ViewBuilder
+    private var content: some View {
+        if let error {
+            NxErrorBlock(message: error, onRetry: { Task { await refresh(initial: true) } })
+        }
+        if let message {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(message)
+                    .font(NxType.bodyLarge)
+                    .foregroundStyle(NxColors.brand)
+                Button("Cerrar aviso") { self.message = nil }
+                    .buttonStyle(PortalButtons.outlined)
+            }
+        }
+        if let p = profile, !p.name.trimmingCharacters(in: .whitespaces).isEmpty {
+            header(p)
+            NxKpiGrid(items: [
+                NxKpi(label: "Tickets", value: "\(stats.totalTickets)", tone: .brand),
+                NxKpi(label: "En proceso", value: "\(stats.pendingTickets)",
+                      tone: stats.pendingTickets > 0 ? .warning : .success),
+                NxKpi(label: "Cerrados", value: "\(stats.closedTickets)", tone: .neutral),
+                NxKpi(label: "Solicitudes", value: "\(stats.openRequests)",
+                      tone: stats.openRequests > 0 ? .info : .neutral),
+            ])
+            NxSectionHeader(title: "Módulos", subtitle: "Acceso rápido al portal")
+            modules(p)
+            Button { onExit() } label: {
+                Text("Cerrar sesión").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PortalButtons.outlined)
+        } else {
+            Text("No se encontró perfil del portal.")
+                .font(NxType.bodyLarge)
+                .foregroundStyle(NxColors.danger)
+            Button("Cerrar sesión") { onExit() }
+                .buttonStyle(PortalButtons.outlined)
+        }
+    }
 
-                Button("Cerrar sesión", role: .destructive) { onExit() }
+    private func header(_ p: PortalClientProfile) -> some View {
+        NxPanelShell(padding: 16) {
+            if !p.logoUrl.isEmpty {
+                AuthenticatedImage(url: p.logoUrl, contentMode: .fit, background: .clear)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
+                    .frame(height: 96)
+                    .accessibilityLabel("Logo cliente")
+                Spacer().frame(height: 8)
             }
-            .padding()
-        }
-        .navigationTitle("Portal")
-        .task { await load() }
-        .refreshable { await load() }
-        .sheet(item: Binding(
-            get: { portalReportData.map { PortalPDFItem(data: $0) } },
-            set: { portalReportData = $0?.data }
-        )) { item in
-            NavigationStack { PDFViewerScreen(title: "Reporte portal", data: item.data) }
-        }
-    }
-
-    private func portalHeader(_ p: [String: Any]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            let name = ConsoleHelpers.mapStr(p, "name", "nombre")
-            Text(name).font(.title2).bold()
-            if isBranch {
-                let num = ConsoleHelpers.mapStr(p, "branchNumber")
-                if !num.isEmpty { Text("Sucursal \(num)").font(.caption).foregroundColor(.secondary) }
+            Text(p.name)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(NxColors.fg)
+            if p.isBranch && !p.branchNumber.isEmpty {
+                Text("Sucursal: \(p.branchNumber)")
+                    .font(NxType.bodyMedium)
+                    .foregroundStyle(NxColors.muted)
             }
-            let city = [ConsoleHelpers.mapStr(p, "city"), ConsoleHelpers.mapStr(p, "state")]
-                .filter { !$0.isEmpty }.joined(separator: ", ")
-            if !city.isEmpty { Text(city).font(.caption).foregroundColor(.secondary) }
+            Text("Seguimiento de servicio y soporte")
+                .font(NxType.bodySmall)
+                .foregroundStyle(NxColors.muted)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
-    private func portalBtn(_ icon: String, _ label: String, _ route: PortalRoute) -> some View {
-        Button { onNavigate(route) } label: {
-            HStack(spacing: 14) {
-                Image(systemName: icon).font(.title3).foregroundColor(NxBrand.primary).frame(width: 28)
-                Text(label).font(.body)
-                Spacer()
-                Image(systemName: "chevron.right").foregroundColor(.secondary)
+    @ViewBuilder
+    private func modules(_ p: PortalClientProfile) -> some View {
+        PortalNavCard(
+            title: "Estado de tickets",
+            subtitle: "\(stats.pendingTickets) en proceso · \(stats.closedTickets) cerrados",
+            onClick: { onNavigate(.tickets) }
+        )
+        PortalNavCard(
+            title: "Solicitudes",
+            subtitle: stats.openRequests > 0 ? "\(stats.openRequests) activas" : "Levantar o revisar solicitudes",
+            badge: stats.openRequests > 0 ? "\(stats.openRequests)" : nil,
+            onClick: { onNavigate(.requests) }
+        )
+        if isClient && stats.pendingFeedback > 0 {
+            PortalNavCard(
+                title: "Confirmación de servicio",
+                subtitle: "Evalúa servicios finalizados",
+                badge: "\(stats.pendingFeedback)",
+                tone: .warning,
+                onClick: { onNavigate(.feedback) }
+            )
+        }
+        if isClient {
+            PortalNavCard(
+                title: "Mis servicios",
+                subtitle: "Contratos, facturas y cotizaciones",
+                onClick: { onNavigate(.services) }
+            )
+        }
+        PortalNavCard(title: "Inventarios", subtitle: "Snapshots y mantenimiento", onClick: { onNavigate(.inventories) })
+        PortalNavCard(title: "Centro de ayuda", subtitle: "Preguntas frecuentes y guías", onClick: { onNavigate(.help) })
+        PortalNavCard(title: "Mi perfil", subtitle: "Datos corporativos", onClick: { onNavigate(.profile) })
+        if isClient {
+            PortalNavCard(title: "Sucursales", subtitle: "Gestión de sitios", onClick: { onNavigate(.branches) })
+            if stats.pendingFeedback == 0 {
+                PortalNavCard(title: "Feedback", subtitle: "Sin pendientes", onClick: { onNavigate(.feedback) })
             }
-            .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            PortalNavCard(
+                title: "Reporte del portal",
+                subtitle: downloadingPortalReport ? "Descargando…" : "PDF de actividad y tickets",
+                onClick: { if !downloadingPortalReport { Task { await downloadPortalReport() } } }
+            )
         }
-        .buttonStyle(.plain)
     }
 
-    private func load() async {
-        isLoading = true; error = nil
-        defer { isLoading = false }
-        do { profile = try await TicketsRepository.shared.profile() }
-        catch { self.error = error.toUserMessage() }
+    /// Perfil, tickets, solicitudes y (cliente) servicios por calificar, como el
+    /// `TicketsPortalViewModel` de Android: si una de las cuatro falla, aviso.
+    private func refresh(initial: Bool) async {
+        if initial { isLoading = true }
+        error = nil
+        do {
+            let repo = TicketsRepository.shared
+            let nuevoPerfil = try await repo.portalProfile()
+            let tickets = try await repo.portalTickets()
+            let requests = try await repo.portalRequests()
+            var feedback: [PendingFeedbackItem] = []
+            if nuevoPerfil?.isBranch == false {
+                feedback = try await repo.pendingFeedbackItems()
+            }
+            profile = nuevoPerfil
+            let closed = tickets.filter { !$0.isOpen }.count
+            stats = Stats(
+                totalTickets: tickets.count,
+                pendingTickets: tickets.count - closed,
+                closedTickets: closed,
+                openRequests: requests.filter { $0.status.uppercased() != "CLOSED" }.count,
+                pendingFeedback: feedback.count
+            )
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo cargar el portal")
+        }
+        isLoading = false
     }
-}
 
-private struct PortalPDFItem: Identifiable {
-    let id = UUID()
-    let data: Data
+    private func downloadPortalReport() async {
+        downloadingPortalReport = true
+        error = nil
+        message = nil
+        do {
+            let data = try await TicketsRepository.shared.portalReportPdf()
+            pdfItem = PortalPDFItem(title: "Reporte del portal", data: data)
+            message = "Reporte descargado"
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo descargar el reporte")
+        }
+        downloadingPortalReport = false
+    }
 }

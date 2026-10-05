@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Bienvenida de tres pantallas. Espejo de `OnboardingScreen` de Android, con los
-/// mismos tres textos palabra por palabra: quien cambia de teléfono no debe leer
-/// dos explicaciones distintas de la misma app.
+/// Bienvenida de tres pantallas — igual que `OnboardingScreen` de Android: los
+/// mismos tres textos palabra por palabra, los mismos colores (marca, azul y
+/// morado), el icono de 64 en una baldosa de 140 con degradado, los puntos que
+/// se alargan, «Siguiente» / «Comenzar» y «Omitir» arriba a la derecha.
 ///
 /// Se enseña una sola vez, después del primer inicio de sesión, y no vuelve a
 /// salir aunque se cierre sesión (ver `OnboardingStore`).
@@ -13,9 +14,16 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            fondo
+            LinearGradient(
+                colors: [NxColors.brandSoft, NxColors.surface, Color.white],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                Spacer().frame(height: 72)
+
                 TabView(selection: $pagina) {
                     ForEach(Self.laminas.indices, id: \.self) { indice in
                         OnboardingSlideView(lamina: Self.laminas[indice])
@@ -37,43 +45,43 @@ struct OnboardingView: View {
                     }
                 } label: {
                     Text(esUltima ? "Comenzar" : "Siguiente")
-                        .font(.headline)
+                        .font(NxType.labelLarge)
+                        .foregroundStyle(Color.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .frame(height: 52)
+                        .background(NxColors.brand, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(NxBrand.primary)
-                .padding(.horizontal, 28)
-                .padding(.bottom, 32)
-            }
+                .buttonStyle(NxPressableStyle())
 
-            Button("Omitir") { onFinish() }
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .padding(.top, 8)
-                .padding(.trailing, 12)
+                Spacer().frame(height: 32)
+            }
+            .padding(.horizontal, 28)
+
+            Button { onFinish() } label: {
+                Text("Omitir")
+                    .font(NxType.labelLarge)
+                    .foregroundStyle(NxColors.muted)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
+            .padding(.trailing, 4)
         }
     }
 
     private var esUltima: Bool { pagina == Self.laminas.count - 1 }
 
-    /// Tinte suave de marca que se apaga en modo oscuro (`softFill` ya es adaptable).
-    private var fondo: some View {
-        LinearGradient(
-            colors: [NxBrand.softFill, Color(.systemBackground)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
-    }
-
     private var puntos: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             ForEach(Self.laminas.indices, id: \.self) { indice in
                 let activo = indice == pagina
                 Capsule()
-                    .fill(activo ? Self.laminas[indice].acento : Color.secondary.opacity(0.3))
+                    .fill(activo ? Self.laminas[indice].acento : NxColors.muted.opacity(0.3))
                     .frame(width: activo ? 24 : 8, height: activo ? 8 : 6)
+                    .padding(.horizontal, 4)
                     .animation(.easeInOut(duration: 0.2), value: pagina)
             }
         }
@@ -83,29 +91,28 @@ struct OnboardingView: View {
 
     // MARK: Contenido
 
-    /// Los tres textos son los de Android, sin tocar una coma.
-    ///
-    /// Los colores no pueden serlo: Android trae su propio `NxColors.Info`, que aquí
-    /// no existe. Se usan los tokens que ya tiene iOS —marca, cian y morado de
-    /// `CorePalette`— en vez de inventar un `Color(red:…)` suelto.
+    /// Los tres textos y colores son los de Android, sin tocar una coma.
     private static let laminas: [OnboardingLamina] = [
         OnboardingLamina(
-            simbolo: "list.bullet.rectangle.fill",
+            simbolo: "wrench.and.screwdriver",
             titulo: "Tus actividades",
             texto: "Recibe tus servicios y proyectos, registra entrada y salida con ubicación, y sube evidencias con foto y PDF.",
-            acento: NxBrand.primary
+            acento: NxColors.brand,
+            acentoSuave: NxColors.brandSoft
         ),
         OnboardingLamina(
-            simbolo: "clock.fill",
+            simbolo: "calendar.badge.checkmark",
             titulo: "Asistencia y comida",
             texto: "Checa tu jornada con GPS y registra tu hora de comida; fuera de 3 a 4 pm, tu jefe revisa la justificación.",
-            acento: CorePalette.cyan
+            acento: NxColors.info,
+            acentoSuave: NxColors.infoSoft
         ),
         OnboardingLamina(
-            simbolo: "bubble.left.and.bubble.right.fill",
+            simbolo: "text.bubble",
             titulo: "Equipo conectado",
             texto: "Chat en tiempo real, avisos al instante y la revisión de tus evidencias por tus superiores.",
-            acento: CorePalette.purple
+            acento: NxColors.morado,
+            acentoSuave: NxColors.rgb(0xEDE9FE)
         ),
     ]
 }
@@ -115,6 +122,7 @@ struct OnboardingLamina {
     let titulo: String
     let texto: String
     let acento: Color
+    let acentoSuave: Color
 }
 
 private struct OnboardingSlideView: View {
@@ -125,30 +133,36 @@ private struct OnboardingSlideView: View {
             Spacer(minLength: 0)
 
             Image(systemName: lamina.simbolo)
-                .font(.system(size: 64, weight: .semibold))
+                .font(.system(size: 52, weight: .regular))
                 .foregroundStyle(lamina.acento)
+                .frame(width: 64, height: 64)
                 .frame(width: 140, height: 140)
                 .background(
-                    lamina.acento.opacity(0.14),
+                    LinearGradient(
+                        colors: [lamina.acentoSuave, Color.white],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
                     in: RoundedRectangle(cornerRadius: 32, style: .continuous)
                 )
                 .accessibilityHidden(true)
 
             Text(lamina.titulo)
-                .font(.title2.bold())
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(NxColors.fg)
                 .multilineTextAlignment(.center)
                 .padding(.top, 40)
 
             Text(lamina.texto)
-                .font(.body)
-                .foregroundStyle(.secondary)
+                .nxTextStyle(.bodyLarge)
+                .foregroundStyle(NxColors.muted)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
                 .padding(.horizontal, 8)
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

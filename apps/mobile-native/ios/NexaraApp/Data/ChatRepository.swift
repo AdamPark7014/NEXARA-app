@@ -2,18 +2,27 @@ import Foundation
 
 /// Página de mensajes — paridad Android `ChatMessagesResponse`.
 struct ChatMessagesPage {
-    let messages: [[String: Any]]
+    let messages: [ChatMessageRow]
     let hasMore: Bool
 }
 
-/// Chat workspace — paridad Android `ChatRepository` / `ChatApi` (endpoints verificados).
+/// Chat del equipo — paridad Android `ChatRepository` / `ChatApi`
+/// (mismos endpoints, mismos parámetros, mismos recortes).
 final class ChatRepository {
     static let shared = ChatRepository()
     private let api = ApiClient.shared
     private init() {}
 
+    // MARK: Canales
+
+    /// Lista cruda de `chat/channels`. La usa el shell para la insignia de Chat.
     func listChannels() async throws -> [[String: Any]] {
         ApiClient.decodeMapList(try await api.get("chat/channels"))
+    }
+
+    /// Canales con tipo (lo que pinta la lista).
+    func channels() async throws -> [ChatChannelRow] {
+        try await listChannels().map(ChatChannelRow.init).filter { $0.id > 0 }
     }
 
     func createChannel(
@@ -21,7 +30,7 @@ final class ChatRepository {
         kind: String? = nil,
         topic: String? = nil,
         description: String? = nil
-    ) async throws -> [String: Any] {
+    ) async throws -> ChatChannelRow {
         struct Body: Encodable {
             let name: String
             let kind: String?
@@ -37,21 +46,18 @@ final class ChatRepository {
                 description: description?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             )
         )
-        return ConsoleHelpers.decodeMap(data)
+        return ChatChannelRow(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    /// Detalle del canal — GET `chat/channels/:id`.
-    ///
-    /// La lista (`chat/channels`) no trae miembros ni el estado de silencio; sin
-    /// esto la pantalla no puede saber si el botón «Silenciar» debe salir
-    /// activado ni si el usuario está viendo el canal como supervisor.
+    /// Ficha del canal — GET `chat/channels/:id`: miembros, silencio y si la
+    /// vista es supervisada (la lista no trae miembros).
     func channelDetail(channelId: Int64) async throws -> ChatChannelDetail {
         let data = try await api.get("chat/channels/\(channelId)")
         return ChatChannelDetail(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    /// Silencia o reactiva el canal — PATCH `chat/channels/:id/mute`.
-    /// Devuelve el canal actualizado para no tener que recargar la lista entera.
+    /// Silencia o reactiva — PATCH `chat/channels/:id/mute`. El API devuelve la
+    /// ficha ya actualizada, así que no hace falta releer.
     @discardableResult
     func setChannelMuted(channelId: Int64, muted: Bool) async throws -> ChatChannelDetail {
         struct Body: Encodable { let muted: Bool }
@@ -59,62 +65,53 @@ final class ChatRepository {
         return ChatChannelDetail(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    /// Abandona el canal — DELETE `chat/channels/:id/leave`.
-    /// El backend rechaza salir de un DM y de un canal supervisado; la vista
-    /// oculta la acción en esos casos (`ChatChannelDetail.canLeave`).
+    /// Sale del canal — DELETE `chat/channels/:id/leave`. El API rechaza los DM y
+    /// los canales `general` / `anuncios`.
     func leaveChannel(channelId: Int64) async throws {
         try await api.delete("chat/channels/\(channelId)/leave")
     }
 
-    /// Busca mensajes — GET `chat/search`.
-    ///
-    /// El backend exige `q` de al menos dos caracteres y devuelve `{messages}`
-    /// vacío si no llega; se corta aquí para no gastar la llamada.
-    func searchMessages(query: String, channelId: Int64? = nil) async throws -> [ChatSearchHit] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard q.count >= 2 else { return [] }
-        var params: [String: String] = ["q": q]
-        if let channelId, channelId > 0 { params["channelId"] = String(channelId) }
-        let data = try await api.get("chat/search", query: params)
-        let map = ConsoleHelpers.decodeMap(data)
-        if let list = map["messages"] as? [[String: Any]] {
-            return list.map(ChatSearchHit.init)
-        }
-        return ApiClient.decodeMapList(data).map(ChatSearchHit.init)
-    }
-
-    func updateTopic(channelId: Int64, topic: String) async throws -> [String: Any] {
+    /// PATCH `chat/channels/:id/topic`. Devuelve la ficha del canal.
+    func updateTopic(channelId: Int64, topic: String) async throws -> ChatChannelDetail {
         struct Body: Encodable { let topic: String }
         let data = try await api.patchJSON(
             "chat/channels/\(channelId)/topic",
             body: Body(topic: topic.trimmingCharacters(in: .whitespacesAndNewlines))
         )
-        return ConsoleHelpers.decodeMap(data)
+        return ChatChannelDetail(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    func addMember(channelId: Int64, userId: Int64) async throws -> [String: Any] {
+    /// POST `chat/channels/:id/members`. Devuelve la ficha del canal.
+    func addMember(channelId: Int64, userId: Int64) async throws -> ChatChannelDetail {
         struct Body: Encodable { let userId: Int64 }
         let data = try await api.postJSON(
             "chat/channels/\(channelId)/members",
             body: Body(userId: userId)
         )
-        return ConsoleHelpers.decodeMap(data)
+        return ChatChannelDetail(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    func listColleagues(query: String? = nil) async throws -> [[String: Any]] {
+    func colleagues(query: String? = nil) async throws -> [ChatColleagueRow] {
         var q: [String: String] = [:]
-        if let query, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            q["q"] = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let clean = query?.trimmingCharacters(in: .whitespacesAndNewlines), !clean.isEmpty {
+            q["q"] = clean
         }
         return ApiClient.decodeMapList(try await api.get("chat/colleagues", query: q))
+            .map(ChatColleagueRow.init)
+            .filter { $0.id > 0 }
     }
 
-    func openDm(userId: Int64) async throws -> [String: Any] {
+    func openDm(userId: Int64) async throws -> ChatChannelRow {
         struct Body: Encodable { let userId: Int64 }
         let data = try await api.postJSON("chat/dm", body: Body(userId: userId))
-        return ConsoleHelpers.decodeMap(data)
+        return ChatChannelRow(raw: ConsoleHelpers.decodeMap(data))
     }
 
+    // MARK: Mensajes
+
+    /// GET `chat/channels/:id/messages`. Sin `parentId` trae solo los mensajes
+    /// del canal (no las respuestas de hilo). `aroundId` centra la ventana en
+    /// ese mensaje: así un enlace `?channel&msg` abre uno anterior a los últimos 50.
     func listMessages(
         channelId: Int64,
         limit: Int = 50,
@@ -125,41 +122,37 @@ final class ChatRepository {
         var q: [String: String] = ["limit": String(limit)]
         if let parentId, parentId > 0 { q["parentId"] = String(parentId) }
         if let beforeId, beforeId > 0 { q["beforeId"] = String(beforeId) }
-        // `aroundId` centra la ventana en ese mensaje: así un enlace
-        // `?channel&msg` abre mensajes más viejos que los últimos 50.
         if let aroundId, aroundId > 0, beforeId == nil { q["aroundId"] = String(aroundId) }
         let data = try await api.get("chat/channels/\(channelId)/messages", query: q)
         let map = ConsoleHelpers.decodeMap(data)
-        let messages: [[String: Any]]
+        let raw: [[String: Any]]
         if let list = map["messages"] as? [[String: Any]] {
-            messages = list
+            raw = list
         } else {
-            messages = ApiClient.decodeMapList(data)
+            raw = ApiClient.decodeMapList(data)
         }
-        let hasMore = (map["hasMore"] as? Bool)
-            ?? ((map["hasMore"] as? NSNumber)?.boolValue)
-            ?? false
-        return ChatMessagesPage(messages: messages, hasMore: hasMore)
+        let messages = raw.map(ChatMessageRow.init).filter { $0.id > 0 }
+        return ChatMessagesPage(messages: messages, hasMore: ChatJSON.bool(map["hasMore"]))
     }
 
-    func listPins(channelId: Int64) async throws -> [[String: Any]] {
+    func listPins(channelId: Int64) async throws -> [ChatMessageRow] {
         let data = try await api.get("chat/channels/\(channelId)/pins")
         let map = ConsoleHelpers.decodeMap(data)
-        if let messages = map["messages"] as? [[String: Any]] {
-            return messages
-        }
-        return ApiClient.decodeMapList(data)
+        let raw = (map["messages"] as? [[String: Any]]) ?? ApiClient.decodeMapList(data)
+        return raw.map(ChatMessageRow.init).filter { $0.id > 0 }
     }
 
-    func listMentions(query: String? = nil, kind: String? = nil) async throws -> [[String: Any]] {
+    /// GET `chat/mentions`. Sin `kind` devuelve personas, actividades y evidencias.
+    func mentions(query: String? = nil, kind: String? = nil) async throws -> [ChatMentionRow] {
         var q: [String: String] = [:]
-        if let query, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            q["q"] = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let clean = query?.trimmingCharacters(in: .whitespacesAndNewlines), !clean.isEmpty {
+            q["q"] = clean
         }
         if let kind, !kind.isEmpty { q["kind"] = kind }
-        return ApiClient.decodeMapList(try await api.get("chat/mentions", query: q))
+        return ApiClient.decodeMapList(try await api.get("chat/mentions", query: q)).map(ChatMentionRow.init)
     }
 
+    /// PATCH `chat/channels/:id/read`. Falla en silencio, como Android.
     func markRead(channelId: Int64) async {
         _ = try? await api.patchJSON("chat/channels/\(channelId)/read", body: EmptyBody())
     }
@@ -170,7 +163,7 @@ final class ChatRepository {
         parentId: Int64? = nil,
         attachmentUrl: String? = nil,
         attachmentName: String? = nil
-    ) async throws -> [String: Any] {
+    ) async throws -> ChatMessageRow {
         struct Body: Encodable {
             let body: String
             let parentId: Int64?
@@ -186,27 +179,30 @@ final class ChatRepository {
                 attachmentName: attachmentName
             )
         )
-        return ConsoleHelpers.decodeMap(data)
+        return ChatMessageRow(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    func toggleReaction(messageId: Int64, emoji: String) async throws -> [String: Any] {
+    /// POST `chat/messages/:id/reactions`: pone o quita la reacción y devuelve el
+    /// mensaje ya actualizado (id 0 si la respuesta no lo trae).
+    func toggleReaction(messageId: Int64, emoji: String) async throws -> ChatMessageRow {
         struct Body: Encodable { let emoji: String }
         let data = try await api.postJSON("chat/messages/\(messageId)/reactions", body: Body(emoji: emoji))
-        return ConsoleHelpers.decodeMap(data)
+        return ChatMessageRow(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    func editMessage(messageId: Int64, body: String) async throws -> [String: Any] {
+    func editMessage(messageId: Int64, body: String) async throws -> ChatMessageRow {
         struct Body: Encodable { let body: String }
         let data = try await api.patchJSON(
             "chat/messages/\(messageId)",
             body: Body(body: body.trimmingCharacters(in: .whitespacesAndNewlines))
         )
-        return ConsoleHelpers.decodeMap(data)
+        return ChatMessageRow(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    func pinMessage(messageId: Int64) async throws -> [String: Any] {
+    /// POST `chat/messages/:id/pin`: fija o desfija.
+    func pinMessage(messageId: Int64) async throws -> ChatMessageRow {
         let data = try await api.postJSON("chat/messages/\(messageId)/pin", body: EmptyBody())
-        return ConsoleHelpers.decodeMap(data)
+        return ChatMessageRow(raw: ConsoleHelpers.decodeMap(data))
     }
 
     func uploadAttachment(data: Data, fileName: String, mimeType: String) async throws -> (url: String, name: String) {
@@ -220,11 +216,24 @@ final class ChatRepository {
         )
         let map = ConsoleHelpers.decodeMap(response)
         let url = ConsoleHelpers.mapStr(map, "url", "attachmentUrl")
-        let name = ConsoleHelpers.mapStr(map, "name", "attachmentName", "fileName").isEmpty
-            ? fileName
-            : ConsoleHelpers.mapStr(map, "name", "attachmentName", "fileName")
+        let returned = ConsoleHelpers.mapStr(map, "name", "attachmentName", "fileName")
         guard !url.isEmpty else { throw ApiError.http(-1, "Respuesta de upload inválida") }
-        return (url, name)
+        return (url, returned.isEmpty ? fileName : returned)
+    }
+
+    // MARK: Búsqueda
+
+    /// GET `chat/search`. El servidor exige dos caracteres y devuelve como mucho
+    /// 30; con menos de dos se corta aquí para no gastar la petición.
+    func searchMessages(query: String, channelId: Int64? = nil) async throws -> [ChatSearchHit] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard q.count >= 2 else { return [] }
+        var params: [String: String] = ["q": q]
+        if let channelId, channelId > 0 { params["channelId"] = String(channelId) }
+        let data = try await api.get("chat/search", query: params)
+        let map = ConsoleHelpers.decodeMap(data)
+        let raw = (map["messages"] as? [[String: Any]]) ?? ApiClient.decodeMapList(data)
+        return raw.map(ChatSearchHit.init).filter { $0.id > 0 }
     }
 
     private struct EmptyBody: Encodable {}

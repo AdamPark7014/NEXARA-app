@@ -46,9 +46,19 @@ struct EvidenceCaptureFlowView: View {
     let activityId: Int
     var fallbackCoreKind: String? = nil
     var fallbackPhotoRequired: Int? = nil
+    /// Indicaciones generales del detalle, por si el flujo no las trae.
+    var fallbackIndicaciones: String? = nil
+    /// Prioridad del detalle, por si `me/activities` no trae esta actividad.
+    var fallbackPrioridad: String? = nil
     /// Dentro de otro ScrollView (no pone el suyo).
     var embedded: Bool = false
     var onChanged: (() -> Void)? = nil
+    /// Si viene, el botón principal de cada paso se publica al dock del detalle
+    /// y no se pinta dentro de la tarjeta (Android `dockHost`).
+    var dockHost: ((EvidenceDockAction?) -> Void)? = nil
+
+    /// Tope de fotos libres por actividad (Android `MAX_EVIDENCE_PHOTOS`).
+    private static let maxEvidencePhotos = 12
 
     @State private var flow: EvidenceFlowState?
     @State private var loaded = false
@@ -138,6 +148,118 @@ struct EvidenceCaptureFlowView: View {
         return keys.allSatisfy { !(form[$0] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
+    private func noVacio(_ texto: String?) -> String? {
+        guard let limpio = texto?.trimmingCharacters(in: .whitespacesAndNewlines), !limpio.isEmpty else { return nil }
+        return limpio
+    }
+
+    // MARK: Dock
+
+    /// Paso que manda el dock: el actual o, en corrección, el primero devuelto.
+    private var dockStep: String? {
+        guard loaded, flow != nil || loadError == nil else { return nil }
+        if isCorrection { return steps.first { canAct(on: $0) } }
+        return canAct(on: currentStep) ? currentStep : nil
+    }
+
+    /// El mismo botón de cada paso, al alcance del pulgar (Android `dockAction`).
+    private var dockAction: EvidenceDockAction? {
+        guard dockHost != nil, let step = dockStep else { return nil }
+        let comercial = CoreEvidence.isComercial(coreKind)
+        switch step {
+        case CoreEvidence.entryPhoto:
+            return EvidenceDockAction(
+                label: comercial ? "Tomar foto de inicio" : "Tomar foto de entrada",
+                enabled: !busy,
+                systemImage: "camera.fill",
+                hint: comercial ? "Se guarda con tu ubicación GPS." : "Tómala al llegar al sitio; se guarda con tu ubicación GPS.",
+                onPrimary: {
+                    message = nil
+                    errorText = nil
+                    camera = CameraRequest(step: CoreEvidence.entryPhoto)
+                }
+            )
+        case CoreEvidence.evidencePhotos where porCampos:
+            return EvidenceDockAction(
+                label: busy ? "Guardando…" : "Siguiente paso",
+                enabled: !busy,
+                systemImage: nil,
+                hint: camposBlockingExit ?? "Ya documentaste todos los campos.",
+                onPrimary: { Task { await sendEvidencePhotos() } }
+            )
+        case CoreEvidence.evidencePhotos:
+            let tomadas = confirmedPhotoURLs.count
+            let tomarFoto: () -> Void = {
+                message = nil
+                errorText = nil
+                camera = CameraRequest(step: CoreEvidence.evidencePhotos)
+            }
+            if tomadas < photoRequired {
+                let faltan = photoRequired - tomadas
+                return EvidenceDockAction(
+                    label: "Tomar foto · \(tomadas) de \(photoRequired)",
+                    enabled: !busy && tomadas < Self.maxEvidencePhotos,
+                    systemImage: "camera.fill",
+                    hint: "Faltan \(faltan) foto\(faltan == 1 ? "" : "s") para seguir.",
+                    onPrimary: tomarFoto,
+                    secondaryLabel: "Adjuntar",
+                    onSecondary: {
+                        errorText = nil
+                        campoAdjunto = nil
+                        showAttachMenu = true
+                    }
+                )
+            }
+            return EvidenceDockAction(
+                label: busy ? "Guardando…" : "Siguiente paso · \(tomadas) de \(photoRequired)",
+                enabled: !busy,
+                systemImage: nil,
+                hint: "Ya tienes las fotos. Puedes tomar más antes de seguir.",
+                onPrimary: { Task { await sendEvidencePhotos() } },
+                secondaryLabel: "Tomar otra",
+                secondarySystemImage: "camera.fill",
+                onSecondary: tomadas < Self.maxEvidencePhotos ? tomarFoto : nil
+            )
+        case CoreEvidence.serviceSheetPdf:
+            return EvidenceDockAction(
+                label: busy ? "Subiendo…" : "Seleccionar PDF",
+                enabled: !busy,
+                systemImage: busy ? nil : "doc.text",
+                hint: "Carga la hoja de servicio firmada. Solo PDF.",
+                onPrimary: {
+                    message = nil
+                    errorText = nil
+                    showPdfImporter = true
+                }
+            )
+        case CoreEvidence.serviceSheetData:
+            return EvidenceDockAction(
+                label: busy ? "Guardando…" : "Guardar formulario",
+                enabled: !busy,
+                systemImage: nil,
+                hint: "Completa los datos de esta actividad y guarda.",
+                onPrimary: { Task { await sendForm() } }
+            )
+        case CoreEvidence.exitPhoto:
+            let bloqueo = camposBlockingExit
+            return EvidenceDockAction(
+                label: checkingExitZone
+                    ? "Verificando ubicación…"
+                    : (comercial ? "Tomar foto de conclusión" : "Tomar foto de salida"),
+                enabled: !busy && !checkingExitZone && bloqueo == nil,
+                systemImage: "camera.fill",
+                hint: bloqueo ?? exitBlocked ?? "Con esta foto mandas la actividad a revisión.",
+                onPrimary: {
+                    message = nil
+                    errorText = nil
+                    Task { await openExitCamera() }
+                }
+            )
+        default:
+            return nil
+        }
+    }
+
     // MARK: Vista
 
     var body: some View {
@@ -154,6 +276,10 @@ struct EvidenceCaptureFlowView: View {
         // Se revisa cada vez que cambia el paso: solo aplica a la foto de entrada
         // de un alta, nunca a una corrección.
         .task(id: "\(currentStep)|\(isCorrection)") { await revisarOrdenDePrioridad() }
+        // El detalle solo repinta el dock cuando cambia lo que se ve (`look`).
+        .onAppear { dockHost?(dockAction) }
+        .onChange(of: dockAction?.look) { _, _ in dockHost?(dockAction) }
+        .onDisappear { dockHost?(nil) }
         .fullScreenCover(item: $camera) { request in
             cameraView(for: request)
         }
@@ -224,12 +350,11 @@ struct EvidenceCaptureFlowView: View {
                 if porCampos {
                     camposCard
                 }
-                if let indicaciones = flow?.assigneeIndicaciones ?? flow?.activity?.indicaciones, !indicaciones.isEmpty {
-                    NxIconText(systemName: "text.bubble", text: indicaciones)
-                        .font(.footnote)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                if let general = noVacio(flow?.activity?.indicaciones) ?? noVacio(fallbackIndicaciones) {
+                    ActivitySoftNote(text: general, title: "Indicaciones generales")
+                }
+                if let paraTi = noVacio(flow?.assigneeIndicaciones) {
+                    ActivitySoftNote(text: paraTi, title: "Indicaciones para ti")
                 }
                 // Se la pasaron: lo que dejó quien la tenía, solo para consulta.
                 ForEach(flow?.previousProgress ?? []) { item in
@@ -487,24 +612,29 @@ struct EvidenceCaptureFlowView: View {
                         : "Tómala al terminar. Si tu actividad lo pide, a \(ActivityGeofence.radioM) m o menos de donde iniciaste. Con esta foto envías tu evidencia."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Button {
-                    errorText = nil
-                    if isEntry {
-                        camera = CameraRequest(step: step)
-                    } else {
-                        Task { await openExitCamera() }
+                if dockHost == nil {
+                    Button {
+                        errorText = nil
+                        if isEntry {
+                            camera = CameraRequest(step: step)
+                        } else {
+                            Task { await openExitCamera() }
+                        }
+                    } label: {
+                        Label(
+                            isEntry
+                                ? (comercial ? "Tomar foto de inicio" : "Tomar foto de entrada")
+                                : (checkingExitZone ? "Verificando ubicación…" : (comercial ? "Tomar foto de conclusión" : "Tomar foto de salida")),
+                            systemImage: "camera.fill"
+                        )
+                        .frame(maxWidth: .infinity)
                     }
-                } label: {
-                    Label(
-                        isEntry
-                            ? (comercial ? "Tomar foto de inicio" : "Tomar foto de entrada")
-                            : (checkingExitZone ? "Verificando ubicación…" : (comercial ? "Tomar foto de conclusión" : "Tomar foto de salida")),
-                        systemImage: "camera.fill"
-                    )
-                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(busy || checkingExitZone || (!isEntry && camposBlockingExit != nil))
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(busy || checkingExitZone)
+                if !isEntry, let bloqueo = camposBlockingExit {
+                    ActivitySoftNote(text: bloqueo, color: CorePalette.orange)
+                }
                 if !isEntry, let exitBlocked {
                     NxIconText(systemName: "location.slash", text: exitBlocked, tint: CorePalette.red)
                         .font(.footnote.weight(.semibold))
@@ -522,18 +652,20 @@ struct EvidenceCaptureFlowView: View {
             }
         case CoreEvidence.serviceSheetPdf:
             VStack(alignment: .leading, spacing: 8) {
-                Text("Sube el PDF de la hoja de servicio firmada.")
+                Text("Carga el PDF de la hoja de servicio firmada. Solo PDF.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Button {
-                    errorText = nil
-                    showPdfImporter = true
-                } label: {
-                    Label(busy ? "Subiendo…" : "Elegir PDF", systemImage: "doc.badge.plus")
-                        .frame(maxWidth: .infinity)
+                if dockHost == nil {
+                    Button {
+                        errorText = nil
+                        showPdfImporter = true
+                    } label: {
+                        Label(busy ? "Subiendo…" : "Seleccionar PDF", systemImage: "doc.badge.plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(busy)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(busy)
             }
         case CoreEvidence.serviceSheetData:
             formAction
@@ -552,14 +684,16 @@ struct EvidenceCaptureFlowView: View {
                  : "Toma o adjunta las fotos de cada campo en «Fotos por campo». Faltan \(faltan).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            Button {
-                Task { await sendEvidencePhotos() }
-            } label: {
-                Label(busy ? "Enviando…" : "Continuar", systemImage: "arrow.right.circle.fill")
-                    .frame(maxWidth: .infinity)
+            if dockHost == nil {
+                Button {
+                    Task { await sendEvidencePhotos() }
+                } label: {
+                    Label(busy ? "Enviando…" : "Continuar", systemImage: "arrow.right.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(busy || faltan > 0)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(busy || faltan > 0)
         }
     }
 
@@ -636,7 +770,7 @@ struct EvidenceCaptureFlowView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .disabled(busy)
+                .disabled(busy || confirmedPhotoURLs.count >= Self.maxEvidencePhotos)
 
                 Button {
                     errorText = nil
@@ -647,17 +781,19 @@ struct EvidenceCaptureFlowView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .disabled(busy)
+                .disabled(busy || confirmedPhotoURLs.count >= Self.maxEvidencePhotos)
             }
             .font(.subheadline)
-            Button {
-                Task { await sendEvidencePhotos() }
-            } label: {
-                Label(busy ? "Enviando…" : "Enviar \(confirmedPhotoURLs.count) fotos", systemImage: "paperplane.fill")
-                    .frame(maxWidth: .infinity)
+            if dockHost == nil {
+                Button {
+                    Task { await sendEvidencePhotos() }
+                } label: {
+                    Label(busy ? "Enviando…" : "Enviar \(confirmedPhotoURLs.count) fotos", systemImage: "paperplane.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(busy || confirmedPhotoURLs.count < photoRequired)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(busy || confirmedPhotoURLs.count < photoRequired)
         }
     }
 
@@ -679,14 +815,16 @@ struct EvidenceCaptureFlowView: View {
                         .disabled(busy)
                 }
             }
-            Button {
-                Task { await sendForm() }
-            } label: {
-                Label(busy ? "Guardando…" : "Guardar formulario", systemImage: "checkmark")
-                    .frame(maxWidth: .infinity)
+            if dockHost == nil {
+                Button {
+                    Task { await sendForm() }
+                } label: {
+                    Label(busy ? "Guardando…" : "Guardar formulario", systemImage: "checkmark")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(busy || !formComplete)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(busy || !formComplete)
             if !formComplete {
                 Text("Cuenta qué se hizo para continuar.")
                     .font(.caption)
@@ -906,7 +1044,7 @@ struct EvidenceCaptureFlowView: View {
         let mia = abiertas.first { $0.id == activityId }
         guard let mayor = ActivityPriorityJump.mayorPendiente(
             actualId: activityId,
-            actualPrioridad: mia?.prioridad,
+            actualPrioridad: mia?.prioridad ?? noVacio(fallbackPrioridad),
             otras: pendientes
         ) else {
             avisoOrden = nil

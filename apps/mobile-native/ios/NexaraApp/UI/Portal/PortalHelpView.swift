@@ -1,13 +1,5 @@
 import SwiftUI
 
-/// «(ojo) 12 · (pulgar) 3» con SF Symbols dentro del texto.
-private func kbStatsText(views: Int, helpful: Int) -> Text {
-    let eye = Text(Image(systemName: "eye"))
-    let thumb = Text(Image(systemName: "hand.thumbsup"))
-    let first: Text = eye + Text(verbatim: " \(views) · ")
-    return first + thumb + Text(verbatim: " \(helpful)")
-}
-
 @MainActor
 final class PortalHelpVM: ObservableObject {
     @Published var isLoading = true
@@ -82,48 +74,43 @@ final class PortalHelpVM: ObservableObject {
                 selected = list.first { $0.id == selectedId }
             }
         } catch let err {
-            self.error = err.toUserMessage().isEmpty
-                ? "No se pudieron cargar los artículos"
-                : err.toUserMessage()
+            self.error = err.toUserMessage(fallback: "No se pudieron cargar los artículos")
             isLoading = false
             isRefreshing = false
         }
     }
 }
 
+/// Centro de ayuda del portal (Android `PortalHelpScreen`): título, buscador,
+/// tarjetas de artículos y el detalle con «¿Te fue útil este artículo?». El
+/// volver lo da la barra teal de la pila del portal.
 struct PortalHelpView: View {
-    let onBack: () -> Void
     @StateObject private var vm = PortalHelpVM()
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Button("← Portal", action: onBack)
-                    .buttonStyle(.bordered)
-
-                Text("🆘 Centro de ayuda")
-                    .font(.title2.bold())
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Centro de ayuda")
+                    .font(NxType.headlineSmall.bold())
+                    .foregroundStyle(NxColors.fg)
                 Text("Encuentra respuestas a las preguntas más frecuentes sobre nuestros servicios.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .nxTextStyle(.bodyMedium)
+                    .foregroundStyle(NxColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, NxSpacing.xs)
 
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Buscar artículos…", text: Binding(
-                        get: { vm.search },
-                        set: { vm.setSearch($0) }
-                    ))
-                    .autocorrectionDisabled()
-                }
-                .padding(10)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                NxSearchField(
+                    text: Binding(get: { vm.search }, set: { vm.setSearch($0) }),
+                    placeholder: "Buscar artículos…"
+                )
+                .padding(.top, NxSpacing.m)
 
                 contentBody
+                    .padding(.top, NxSpacing.m)
             }
-            .padding()
+            .padding(NxSpacing.l)
         }
-        .navigationTitle("Centro de ayuda")
+        .nxScreenBackground()
         .refreshable { vm.refresh(initial: false) }
     }
 
@@ -131,10 +118,8 @@ struct PortalHelpView: View {
     private var contentBody: some View {
         if vm.isLoading {
             NxLoadingState(text: "Cargando artículos…")
-                .padding(.top, 24)
-        } else if let err = vm.error {
-            NxErrorState(message: err) { vm.refresh(initial: true) }
-                .padding(.top, 24)
+        } else if let err = vm.error, !err.isEmpty {
+            NxErrorBlock(message: err, onRetry: { vm.refresh(initial: true) })
         } else if let article = vm.selected {
             PortalHelpArticleDetail(
                 article: article,
@@ -143,58 +128,73 @@ struct PortalHelpView: View {
                 onMarkHelpful: { vm.markHelpful(id: article.id) }
             )
         } else if vm.articles.isEmpty {
-            VStack(spacing: 8) {
-                Text("Sin artículos").font(.headline)
-                Text(vm.search.isEmpty
-                     ? "No hay artículos publicados por ahora."
-                     : "No se encontraron artículos para \"\(vm.search)\".")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 32)
+            NxEmptyState(
+                title: "Sin artículos",
+                subtitle: vm.search.trimmingCharacters(in: .whitespaces).isEmpty
+                    ? "No hay artículos publicados por ahora."
+                    : "No se encontraron artículos para \"\(vm.search)\"."
+            )
         } else {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: NxSpacing.listGap) {
                 ForEach(vm.articles) { article in
-                    Button { vm.selectArticle(article) } label: {
-                        PortalHelpArticleCard(article: article)
-                    }
-                    .buttonStyle(.plain)
+                    PortalHelpArticleCard(article: article) { vm.selectArticle(article) }
                 }
             }
+            .padding(.bottom, NxSpacing.l)
         }
     }
 }
 
-private struct PortalHelpArticleCard: View {
-    let article: KbPublicArticle
+/// «(ojo) 12   (pulgar) 3» en 11 Medium gris.
+private struct PortalHelpStats: View {
+    let views: Int
+    let helpful: Int
+    var published: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: NxSpacing.m) {
+            if !published.isEmpty {
+                Text(published)
+            }
+            NxIconText(systemName: "eye", text: "\(views)", tint: NxColors.muted)
+            NxIconText(systemName: "hand.thumbsup", text: "\(helpful)", tint: NxColors.muted)
+        }
+        .font(NxType.labelSmall)
+        .foregroundStyle(NxColors.muted)
+    }
+}
+
+private func portalHelpCategory(_ category: KbPublicCategory) -> String {
+    "\(category.icon) \(category.name)".trimmingCharacters(in: .whitespaces)
+}
+
+private struct PortalHelpArticleCard: View {
+    let article: KbPublicArticle
+    let onClick: () -> Void
+
+    var body: some View {
+        NxPanelShell(onClick: onClick) {
             if let category = article.category {
-                Text("\(category.icon) \(category.name)".trimmingCharacters(in: .whitespaces))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text(portalHelpCategory(category))
+                    .font(NxType.labelSmall)
+                    .foregroundStyle(NxColors.muted)
             }
             Text(article.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-            if !article.excerpt.isEmpty {
-                Text(article.excerpt)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                .font(NxType.titleMedium)
+                .foregroundStyle(NxColors.fg)
+                .multilineTextAlignment(.leading)
+                .padding(.top, NxSpacing.xs)
+            let excerpt = article.excerpt.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !excerpt.isEmpty {
+                Text(excerpt)
+                    .font(NxType.bodySmall)
+                    .foregroundStyle(NxColors.muted)
+                    .multilineTextAlignment(.leading)
+                    .padding(.top, NxSpacing.xs)
             }
-            kbStatsText(views: article.viewCount, helpful: article.helpfulCount)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.top, 4)
+            PortalHelpStats(views: article.viewCount, helpful: article.helpfulCount)
+                .padding(.top, NxSpacing.s)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -205,54 +205,51 @@ private struct PortalHelpArticleDetail: View {
     let onMarkHelpful: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button("← Volver al listado", action: onBack)
-                .buttonStyle(.bordered)
+        VStack(alignment: .leading, spacing: NxSpacing.m) {
+            NxSecondaryButton("← Volver al listado", action: onBack)
 
-            VStack(alignment: .leading, spacing: 8) {
+            NxPanelShell(padding: NxSpacing.l) {
                 if let category = article.category {
-                    Text("\(category.icon) \(category.name)".trimmingCharacters(in: .whitespaces))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(portalHelpCategory(category))
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
                 }
-                Text(article.title).font(.title3.bold())
-                metaLine.font(.caption2).foregroundStyle(.secondary)
+                Text(article.title)
+                    .font(NxType.titleLarge.bold())
+                    .foregroundStyle(NxColors.fg)
+                    .padding(.top, NxSpacing.xs)
+                PortalHelpStats(
+                    views: article.viewCount,
+                    helpful: article.helpfulCount,
+                    published: formatPublishedAt(article.publishedAt)
+                )
+                .padding(.top, NxSpacing.s)
+                .padding(.bottom, NxSpacing.m)
                 Text(article.content)
-                    .font(.body)
-                    .padding(.top, 4)
+                    .nxTextStyle(.bodyMedium)
+                    .foregroundStyle(NxColors.fg)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            VStack(alignment: .leading, spacing: 8) {
+            NxPanelShell(padding: NxSpacing.l) {
                 Text("¿Te fue útil este artículo?")
-                Button(action: onMarkHelpful) {
-                    if isMarkingHelpful {
-                        Text("…")
-                    } else {
-                        Label("Sí, gracias", systemImage: "hand.thumbsup")
-                    }
-                }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isMarkingHelpful)
+                    .nxTextStyle(.bodyMedium)
+                    .foregroundStyle(NxColors.fg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                NxPrimaryButton(
+                    isMarkingHelpful ? "…" : "Sí, gracias",
+                    systemImage: isMarkingHelpful ? nil : "hand.thumbsup",
+                    enabled: !isMarkingHelpful,
+                    fullWidth: false,
+                    action: onMarkHelpful
+                )
+                .padding(.top, NxSpacing.s)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .padding(.bottom, NxSpacing.l)
     }
 
-    /// «fecha · (ojo) vistas · (pulgar) útil», con SF Symbols en lugar de emojis.
-    private var metaLine: Text {
-        let published = formatPublishedAt(article.publishedAt)
-        let stats = kbStatsText(views: article.viewCount, helpful: article.helpfulCount)
-        if published.isEmpty { return stats }
-        return Text(verbatim: published + " · ") + stats
-    }
-
+    /// Android `formatPublishedAt`: «d MMM yyyy»; si no se puede leer, los 10 primeros.
     private func formatPublishedAt(_ raw: String) -> String {
         guard !raw.isEmpty else { return "" }
         guard let date = NxFormat.parseISO(raw) else { return String(raw.prefix(10)) }

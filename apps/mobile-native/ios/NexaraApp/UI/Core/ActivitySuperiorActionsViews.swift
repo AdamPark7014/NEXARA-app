@@ -6,29 +6,101 @@ struct ActivitySuperiorTarget: Identifiable {
     let id: Int
     let title: String
     let acciones: ActivitySuperiorActions
-    /// Quienes ya están en la actividad (responsable y equipo activo): no pueden recibirla.
+    /// Además de quienes trae `acciones.personas`, gente que no puede recibirla.
+    /// Android solo descarta a `personas`; se deja vacío para igualarlo.
     let excluded: Set<Int>
 }
 
-/// Largo máximo del motivo en los diálogos de superior (mismo `maxLength` que la web).
-private let superiorMotivoMaximo = 400
+/// Reglas de «Cancelar actividad» y «Pasar a otro compañero» (`ActivitySuperiorRules.kt`).
+enum ActivitySuperiorUIRules {
+    /// Largo máximo del motivo (mismo `maxLength` que la web; Android `take(400)`).
+    static let motivoMaximo = 400
 
-/// «12/10 caracteres mínimo», en rojo mientras no alcanza.
+    /// Mismo conteo que el servidor: sin espacios de sobra.
+    static func motivoLimpio(_ motivo: String) -> String {
+        motivo
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    static func motivoOk(_ motivo: String, minimo: Int) -> Bool {
+        motivoLimpio(motivo).count >= minimo
+    }
+
+    /// Quién la deja: quienes ejecutan; si ninguna viene marcada (API vieja o
+    /// despacho sin repartir), todas las que se pueden reemplazar.
+    static func quienesSalen(_ acciones: ActivitySuperiorActions) -> [ActivitySuperiorPerson] {
+        let ejecutan = acciones.personas.filter(\.ejecuta)
+        return ejecutan.isEmpty ? acciones.personas : ejecutan
+    }
+
+    /// Quién la continúa: gente del tablero que no está ya en la actividad, por nombre.
+    static func quienesEntran(_ equipo: [TeamBoardUser], acciones: ActivitySuperiorActions, excluded: Set<Int> = []) -> [TeamBoardUser] {
+        let enActividad = Set(acciones.personas.map(\.userId)).union(excluded)
+        var vistos = Set<Int>()
+        return equipo
+            .filter { !enActividad.contains($0.id) && vistos.insert($0.id).inserted }
+            .sorted { $0.nombre.lowercased() < $1.nombre.lowercased() }
+    }
+}
+
+/// «12/10 caracteres mínimo» (11,5; gris si alcanza, rojo si no).
 struct CoreMotivoCounter: View {
     let count: Int
     let minimo: Int
 
     var body: some View {
         Text("\(count)/\(minimo) caracteres mínimo")
-            .font(.caption)
-            .foregroundStyle(count >= minimo ? Color.secondary : CorePalette.red)
+            .font(.system(size: 11.5))
+            .foregroundStyle(count >= minimo ? NxColors.muted : NxColors.danger)
+    }
+}
+
+// MARK: - Botones del superior
+
+/// «Pasar a otro compañero» y «Cancelar actividad» (en rojo) como botones de
+/// contorno de Material, en una fila que se acomoda (Android `ActivitySuperiorActions`).
+/// Solo se pintan si el API dice que quien consulta puede (`acciones.hayAlgo`).
+struct ActivitySuperiorActionsBar: View {
+    let acciones: ActivitySuperiorActions
+    let onPasar: () -> Void
+    let onCancelar: () -> Void
+
+    var body: some View {
+        if acciones.hayAlgo {
+            CoreFlowLayout(spacing: 8) {
+                if acciones.puedePasar {
+                    Button(action: onPasar) {
+                        boton("Pasar a otro compañero", systemImage: "arrow.left.arrow.right")
+                    }
+                    .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.brand, border: NxColors.borderStrong))
+                }
+                if acciones.puedeCancelar {
+                    Button(action: onCancelar) {
+                        boton("Cancelar actividad", systemImage: "nosign")
+                    }
+                    .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.danger, border: NxColors.borderStrong))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func boton(_ texto: String, systemImage: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 18, height: 18)
+                .accessibilityHidden(true)
+            Text(texto).font(.system(size: 13, weight: .medium))
+        }
     }
 }
 
 // MARK: - Cancelar actividad
 
-/// «Cancelar actividad» con motivo (`POST activities/:id/cancelar`). Solo superiores de
-/// quien la ejecuta; queda «Cancelada» con el motivo en el historial.
+/// «Cancelar actividad» con motivo (`POST activities/:id/cancelar`). Diálogo como el
+/// de Android: queda «Cancelada» con el motivo en el historial.
 struct ActivityCancelSheet: View {
     let target: ActivitySuperiorTarget
     let onDone: (String) -> Void
@@ -38,73 +110,58 @@ struct ActivityCancelSheet: View {
     @State private var saving = false
     @State private var error: String?
 
-    private var limpio: String { motivo.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var minimo: Int { target.acciones.motivoMinimo }
-    private var motivoOk: Bool { limpio.count >= minimo }
+    private var limpio: String { ActivitySuperiorUIRules.motivoLimpio(motivo) }
+    private var motivoOk: Bool { ActivitySuperiorUIRules.motivoOk(motivo, minimo: minimo) }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text(target.title).font(.headline)
-                    Text("La actividad quedará como «Cancelada» con tu motivo en el historial. Se avisa a quienes la ejecutan, al responsable, a sus jefes y a Christian.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    TextField("Ej. El cliente pospuso el servicio hasta nuevo aviso.", text: $motivo, axis: .vertical)
-                        .lineLimit(3...6)
-                        .disabled(saving)
-                } header: {
-                    Text("Motivo")
-                } footer: {
-                    CoreMotivoCounter(count: limpio.count, minimo: minimo)
-                }
-
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(CorePalette.red)
-                    }
-                }
-
-                Section {
-                    Button(role: .destructive) {
-                        Task { await save() }
-                    } label: {
-                        Label(saving ? "Cancelando…" : "Cancelar actividad", systemImage: "xmark.circle")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .disabled(saving || !motivoOk)
-                }
+        ActivityDialogSheet(title: "Cancelar actividad", titleWeight: .bold) {
+            Text("La actividad quedará como «Cancelada» con tu motivo en el historial. Se avisa a quienes "
+                + "la ejecutan, al responsable, a sus jefes y a Christian.")
+                .font(.system(size: 13))
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            ActivityOutlinedField(
+                label: "Motivo *",
+                text: $motivo,
+                placeholder: "Ej. El cliente pospuso el servicio hasta nuevo aviso.",
+                minLines: 3,
+                enabled: !saving
+            )
+            CoreMotivoCounter(count: limpio.count, minimo: minimo)
+            if let error {
+                Text(error)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .navigationTitle("Cancelar actividad")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Volver") { dismiss() }
-                        .disabled(saving)
-                }
+        } actions: {
+            Button("Volver") { dismiss() }
+                .buttonStyle(ActivityDialogTextButtonStyle())
+                .disabled(saving)
+            Button(saving ? "Cancelando…" : "Cancelar actividad") {
+                Task { await save() }
             }
-            .interactiveDismissDisabled(saving)
-            .onChange(of: motivo) { _, value in
-                if value.count > superiorMotivoMaximo { motivo = String(value.prefix(superiorMotivoMaximo)) }
+            .buttonStyle(NxPillButtonStyle(fill: NxColors.danger, foreground: .white))
+            .disabled(saving || !motivoOk)
+        }
+        .interactiveDismissDisabled(saving)
+        .onChange(of: motivo) { _, value in
+            if value.count > ActivitySuperiorUIRules.motivoMaximo {
+                motivo = String(value.prefix(ActivitySuperiorUIRules.motivoMaximo))
             }
         }
     }
 
     @MainActor
     private func save() async {
-        guard motivoOk else {
-            error = "Escribe el motivo de la cancelación (mínimo \(minimo) caracteres)"
-            return
-        }
+        guard motivoOk else { return }
         saving = true
         error = nil
         defer { saving = false }
         do {
             try await CoreRepository.shared.cancelActivity(activityId: target.id, motivo: limpio)
-            onDone("La actividad quedó cancelada. Avisamos al equipo, a sus jefes y a Christian.")
+            onDone("La actividad quedó cancelada. Se avisó al equipo, a sus jefes y a Christian.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo cancelar la actividad")
@@ -123,144 +180,186 @@ struct ActivityReassignSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var deUsuarioId: Int?
-    @State private var aUsuarioId: Int?
+    @State private var para: TeamBoardUser?
+    @State private var equipo: [TeamBoardUser]?
+    @State private var equipoError: String?
     @State private var motivo = ""
-    @State private var roster: [TeamBoardUser] = []
-    @State private var loadingRoster = true
     @State private var saving = false
     @State private var error: String?
 
-    private var personas: [ActivitySuperiorPerson] { target.acciones.personas }
-    private var limpio: String { motivo.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var salen: [ActivitySuperiorPerson] { ActivitySuperiorUIRules.quienesSalen(target.acciones) }
+    private var entran: [TeamBoardUser] {
+        ActivitySuperiorUIRules.quienesEntran(equipo ?? [], acciones: target.acciones, excluded: target.excluded)
+    }
     private var minimo: Int { target.acciones.motivoMinimo }
-    private var motivoOk: Bool { limpio.count >= minimo }
-    private var ready: Bool { motivoOk && deUsuarioId != nil && aUsuarioId != nil }
-
-    private var candidatos: [TeamBoardUser] {
-        let enActividad = target.excluded.union(personas.map(\.userId))
-        return roster
-            .filter { !enActividad.contains($0.id) }
-            .sorted { $0.nombre.localizedCaseInsensitiveCompare($1.nombre) == .orderedAscending }
+    private var limpio: String { ActivitySuperiorUIRules.motivoLimpio(motivo) }
+    private var listo: Bool {
+        deUsuarioId != nil && para != nil && ActivitySuperiorUIRules.motivoOk(motivo, minimo: minimo)
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text(target.title).font(.headline)
-                    Text("Quien la recibe continúa donde se quedó: ve el avance anterior y toma sus propias fotos de entrada y salida. El avance de quien sale queda guardado.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+        ActivityDialogSheet(title: "Pasar a otro compañero", titleWeight: .bold) {
+            Text("Quien la recibe continúa donde se quedó: ve el avance anterior y toma sus propias fotos "
+                + "de entrada y salida. El avance de quien sale queda guardado.")
+                .font(.system(size: 13))
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
 
-                Section {
-                    Picker("Quién la deja", selection: $deUsuarioId) {
-                        Text("Elige a la persona").tag(Int?.none)
-                        ForEach(personas) { persona in
-                            Text(persona.etiqueta).tag(Int?.some(persona.userId))
-                        }
-                    }
-                    .disabled(saving)
-
-                    Picker("Quién la continúa", selection: $aUsuarioId) {
-                        Text(loadingRoster ? "Cargando compañeros…" : "Elige al compañero").tag(Int?.none)
-                        ForEach(candidatos) { user in
-                            Text(user.nombre).tag(Int?.some(user.id))
-                        }
-                    }
-                    .pickerStyle(.navigationLink)
-                    .disabled(saving || loadingRoster)
-
-                    if !loadingRoster && candidatos.isEmpty {
-                        Text("No encontramos compañeros disponibles para ti.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section {
-                    TextField("Ej. Se enfermó y no puede terminar hoy.", text: $motivo, axis: .vertical)
-                        .lineLimit(3...6)
-                        .disabled(saving)
-                } header: {
-                    Text("Motivo")
-                } footer: {
-                    CoreMotivoCounter(count: limpio.count, minimo: minimo)
-                }
-
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(CorePalette.red)
-                    }
-                }
-
-                Section {
-                    Button {
-                        Task { await save() }
-                    } label: {
-                        Label(saving ? "Pasando…" : "Pasar actividad", systemImage: "arrow.left.arrow.right")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .disabled(saving || !ready)
-                }
+            Text("Quién la deja *")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(NxColors.muted)
+            ForEach(salen) { persona in
+                filaQuienSale(persona)
             }
-            .navigationTitle("Pasar a otro compañero")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Volver") { dismiss() }
-                        .disabled(saving)
-                }
+
+            Text("Compañero que la continúa *")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(NxColors.muted)
+            companeroPicker
+            if let equipoError {
+                Text(equipoError)
+                    .font(.system(size: 12))
+                    .foregroundStyle(NxColors.danger)
             }
-            .interactiveDismissDisabled(saving)
-            .onChange(of: motivo) { _, value in
-                if value.count > superiorMotivoMaximo { motivo = String(value.prefix(superiorMotivoMaximo)) }
+            if equipo != nil && equipoError == nil && entran.isEmpty {
+                Text("No encontramos compañeros disponibles para ti.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(NxColors.muted)
             }
-            .task { await loadRoster() }
+
+            ActivityOutlinedField(
+                label: "Motivo *",
+                text: $motivo,
+                placeholder: "Ej. Se enfermó y no puede terminar hoy.",
+                minLines: 3,
+                enabled: !saving
+            )
+            CoreMotivoCounter(count: limpio.count, minimo: minimo)
+            if let error {
+                Text(error)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } actions: {
+            Button("Volver") { dismiss() }
+                .buttonStyle(ActivityDialogTextButtonStyle())
+                .disabled(saving)
+            Button(saving ? "Pasando…" : "Pasar actividad") {
+                Task { await save() }
+            }
+            .buttonStyle(NxPillButtonStyle(fill: NxColors.brand, foreground: .white))
+            .disabled(saving || !listo)
         }
+        .interactiveDismissDisabled(saving)
+        .onChange(of: motivo) { _, value in
+            if value.count > ActivitySuperiorUIRules.motivoMaximo {
+                motivo = String(value.prefix(ActivitySuperiorUIRules.motivoMaximo))
+            }
+        }
+        .task { await loadEquipo() }
+    }
+
+    /// Renglón con radio (Android `RadioButton` en una caja de radio 10).
+    private func filaQuienSale(_ persona: ActivitySuperiorPerson) -> some View {
+        let on = deUsuarioId == persona.userId
+        return Button {
+            deUsuarioId = persona.userId
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().strokeBorder(on ? NxColors.brand : NxColors.muted, lineWidth: 2)
+                    if on { Circle().fill(NxColors.brand).frame(width: 10, height: 10) }
+                }
+                .frame(width: 20, height: 20)
+                .padding(.leading, 12)
+                Text(persona.etiqueta)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.fg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 44)
+            .background(on ? NxColors.brandSoft.opacity(0.5) : NxColors.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(on ? NxColors.brand : NxColors.border, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(saving)
+        .accessibilityAddTraits(on ? AccessibilityTraits.isSelected : [])
+    }
+
+    /// Botón de contorno que abre la lista de compañeros (Android `CompaneroPicker`).
+    private var companeroPicker: some View {
+        let cargando = equipo == nil
+        let etiqueta: String
+        if cargando {
+            etiqueta = "Cargando compañeros…"
+        } else if let para {
+            etiqueta = para.nombre.isEmpty ? "Sin nombre" : para.nombre
+        } else {
+            etiqueta = "Elige al compañero"
+        }
+        return Menu {
+            ForEach(entran) { user in
+                Button {
+                    para = user
+                } label: {
+                    Text(user.nombre.isEmpty ? "Sin nombre" : user.nombre)
+                    if let puesto = user.puesto, !puesto.isEmpty {
+                        Text(puesto)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Text(etiqueta)
+                    .font(.system(size: 13))
+                    .foregroundStyle(para != nil ? NxColors.fg : NxColors.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(NxColors.muted)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .overlay(Capsule().strokeBorder(NxColors.borderStrong, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .disabled(saving || cargando || entran.isEmpty)
     }
 
     @MainActor
-    private func loadRoster() async {
-        if deUsuarioId == nil, personas.count == 1 {
-            deUsuarioId = personas[0].userId
+    private func loadEquipo() async {
+        if deUsuarioId == nil, salen.count == 1 {
+            deUsuarioId = salen[0].userId
         }
-        loadingRoster = true
-        defer { loadingRoster = false }
         do {
-            roster = try await CoreRepository.shared.teamBoard().users
+            equipo = try await CoreRepository.shared.teamBoard().users
         } catch {
-            roster = []
-            self.error = error.toUserMessage(fallback: "No se pudieron cargar los compañeros")
+            equipo = []
+            equipoError = error.toUserMessage(fallback: "No se pudo cargar tu equipo")
         }
     }
 
     @MainActor
     private func save() async {
-        guard let de = deUsuarioId else {
-            error = "Elige a la persona que la deja"
-            return
-        }
-        guard let a = aUsuarioId else {
-            error = "Elige al compañero que la va a continuar"
-            return
-        }
-        guard motivoOk else {
-            error = "Escribe por qué la pasas a otro compañero (mínimo \(minimo) caracteres)"
-            return
-        }
+        guard let de = deUsuarioId, let destino = para, listo else { return }
         saving = true
         error = nil
         defer { saving = false }
         do {
             try await CoreRepository.shared.reassignActivity(
                 activityId: target.id,
-                aUsuarioId: a,
+                aUsuarioId: destino.id,
                 deUsuarioId: de,
                 motivo: limpio
             )
-            let nuevo = roster.first(where: { $0.id == a })?.nombre ?? "tu compañero"
-            onDone("La actividad pasó a \(nuevo). Continuará donde se quedó con sus propias fotos de entrada y salida.")
+            let corto = ActivityDetailRules.shortName(destino.nombre)
+            let quien = corto.isEmpty ? "tu compañero" : corto
+            onDone("La actividad pasó a \(quien). Continuará donde se quedó con sus propias fotos de entrada y salida.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo pasar la actividad")
@@ -270,71 +369,103 @@ struct ActivityReassignSheet: View {
 
 // MARK: - Avance anterior
 
-/// «Avance anterior de <nombre>» dentro de la captura de evidencias: lo que dejó quien
-/// tenía la actividad. Solo lectura.
+/// «Avance anterior de <nombre>» dentro de la captura de evidencias (Android
+/// `AvanceAnteriorCard`): lo que dejó quien tenía la actividad. Solo lectura.
 struct ActivityPreviousProgressCard: View {
     let item: ActivityPreviousProgress
     let coreKind: String?
 
-    @State private var photo: CorePhotoItem?
+    @State private var visor: ActivityPreviousPhotos?
     @State private var pdf: CorePdfItem?
 
-    private var reasignada: String? {
-        let when = CoreFormat.when(item.reasignadaAt)
-        let by = (item.movidaPor ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = [by.isEmpty ? nil : "Reasignada por \(by)", when].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    private var motivo: String? {
-        let text = (item.motivo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? nil : text
+    /// «Solo lectura · 40% avanzado · Luis Pérez te la pasó · Motivo: se enfermó. Continúa…».
+    private var detalle: String {
+        var texto = "Solo lectura · \(Int(min(100, max(0, item.progressPct)).rounded()))% avanzado"
+        let por = (item.movidaPor ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !por.isEmpty { texto += " · \(por) te la pasó" }
+        var motivo = (item.motivo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        while motivo.hasSuffix(".") { motivo.removeLast() }
+        if !motivo.isEmpty { texto += " · Motivo: \(motivo)" }
+        return texto + ". Continúa desde aquí con tu propia foto de entrada y de salida."
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "arrow.left.arrow.right.circle.fill")
-                    .foregroundStyle(CorePalette.purple)
-                Text(item.titulo).font(.subheadline.weight(.bold))
-                Spacer(minLength: 4)
-                CoreChip(icon: "lock", text: "Solo lectura")
+        let evidence = item.evidence
+        let fotos = evidence.map { fotosDe($0) } ?? []
+        let campos = evidence.map { ActivityPreviousForm.entries($0.serviceSheetData, coreKind: coreKind) } ?? []
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(NxColors.azul)
+                    .accessibilityHidden(true)
+                Text(item.titulo)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            if let reasignada {
-                Text(reasignada).font(.caption).foregroundStyle(.secondary)
-            }
-            if let motivo {
-                NxIconText(systemName: "text.bubble", text: "Motivo: \(motivo)")
-                    .font(.caption)
-            }
-            CoreProgressBar(percent: item.progressPct)
+            Text(detalle)
+                .font(.system(size: 12.5))
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
 
-            if let evidence = item.evidence {
-                steps(evidence)
-                photos(evidence)
-                form(evidence)
-                if evidence.hasPdf, let url = evidence.serviceSheetPdfUrl {
-                    Button {
-                        pdf = CorePdfItem(title: "Hoja de servicio de \(CoreFormat.shortName(item.nombre))", url: url)
-                    } label: {
-                        Label("Ver hoja de servicio", systemImage: "doc.richtext")
-                    }
-                    .buttonStyle(.bordered)
-                    .font(.caption)
-                }
+            if fotos.isEmpty {
+                Text("No alcanzó a subir fotos.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(NxColors.muted)
             } else {
-                Text("No alcanzó a subir evidencia.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(fotos.enumerated()), id: \.offset) { index, foto in
+                            Button {
+                                visor = ActivityPreviousPhotos(items: fotos, index: index)
+                            } label: {
+                                AuthenticatedImage(url: foto.url)
+                                    .frame(width: 72, height: 72)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .strokeBorder(NxColors.rgb(0xE5E7EB), lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(foto.title)
+                        }
+                    }
+                }
             }
 
-            Text("Tú tomas tus propias fotos de entrada y salida.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            if let evidence, evidence.hasPdf, let url = evidence.serviceSheetPdfUrl {
+                Button {
+                    pdf = CorePdfItem(title: "Hoja de servicio", url: url)
+                } label: {
+                    Label("Ver hoja de servicio que subió", systemImage: "doc.text")
+                }
+                .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.brand, border: NxColors.borderStrong))
+            }
+
+            ForEach(Array(campos.enumerated()), id: \.offset) { _, campo in
+                HStack(alignment: .top, spacing: 10) {
+                    Text(campo.label)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(NxColors.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(campo.value)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(NxColors.fg)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
-        .coreCard(highlight: CorePalette.purple.opacity(0.35))
-        .fullScreenCover(item: $photo) { item in
-            CorePhotoViewer(item: item)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(
+            RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                .strokeBorder(NxColors.azul.opacity(0.30), lineWidth: 1)
+        )
+        .fullScreenCover(item: $visor) { visor in
+            CorePhotoViewer(items: visor.items, startIndex: visor.index)
         }
         .sheet(item: $pdf) { item in
             NavigationStack {
@@ -343,44 +474,10 @@ struct ActivityPreviousProgressCard: View {
         }
     }
 
-    private func steps(_ evidence: TeamEvidenceData) -> some View {
-        CoreFlowLayout {
-            ForEach(CoreEvidence.steps(for: coreKind), id: \.self) { step in
-                let done = evidence.stepTime(step) != nil
-                CoreChip(
-                    icon: done ? "checkmark.circle.fill" : "circle",
-                    text: CoreEvidence.label(step),
-                    color: done ? CorePalette.green : nil
-                )
-            }
-        }
-    }
-
-    /// Entrada, fotos en sitio y salida, en ese orden; tocar abre la foto en grande.
-    @ViewBuilder
-    private func photos(_ evidence: TeamEvidenceData) -> some View {
-        let list = photoItems(evidence)
-        if !list.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(list) { entry in
-                        Button {
-                            photo = entry
-                        } label: {
-                            AuthenticatedImage(url: entry.url)
-                                .frame(width: 64, height: 64)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(entry.title)
-                    }
-                }
-            }
-        }
-    }
-
-    private func photoItems(_ evidence: TeamEvidenceData) -> [CorePhotoItem] {
-        let quien = CoreFormat.shortName(item.nombre)
+    /// Entrada, en sitio y salida, con el nombre corto de quien las tomó
+    /// (Android `CoreActivityRules.fotosDe`).
+    private func fotosDe(_ evidence: TeamEvidenceData) -> [CorePhotoItem] {
+        let quien = ActivityDetailRules.shortName(item.nombre)
         var list: [CorePhotoItem] = []
         if evidence.hasEntry, let url = evidence.entryPhotoUrl {
             list.append(CorePhotoItem(
@@ -391,10 +488,10 @@ struct ActivityPreviousProgressCard: View {
                 time: evidence.entryPhotoUploadedAt
             ))
         }
-        for (index, url) in evidence.photos.enumerated() {
+        for (index, url) in evidence.photos.enumerated() where !url.trimmingCharacters(in: .whitespaces).isEmpty {
             let geo = evidence.geo(at: index)
             list.append(CorePhotoItem(
-                title: "\(quien) · Foto \(index + 1)",
+                title: "\(quien) · Evidencia \(index + 1)",
                 url: url,
                 latitude: geo?.latitude?.value,
                 longitude: geo?.longitude?.value,
@@ -412,20 +509,51 @@ struct ActivityPreviousProgressCard: View {
         }
         return list
     }
+}
 
-    @ViewBuilder
-    private func form(_ evidence: TeamEvidenceData) -> some View {
-        let values = evidence.serviceSheetData?.objectValue ?? [:]
-        let fields = CoreEvidence.formFields(for: coreKind).filter { values[$0.key]?.displayText != nil }
-        if !fields.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(fields) { field in
-                    if let value = values[field.key]?.displayText {
-                        (Text("\(field.label): ").bold() + Text(value))
-                            .font(.caption)
-                    }
-                }
-            }
+/// Fotos del avance anterior abiertas en el visor, desde la que se tocó.
+private struct ActivityPreviousPhotos: Identifiable {
+    let id = UUID()
+    let items: [CorePhotoItem]
+    let index: Int
+}
+
+/// Campos capturados con su etiqueta; los viejos (otras claves) también se muestran
+/// (Android `CoreActivityRules.formEntries`, hasta 12).
+enum ActivityPreviousForm {
+    struct Entry {
+        let label: String
+        let value: String
+    }
+
+    static func entries(_ data: JSONValue?, coreKind: String?) -> [Entry] {
+        guard let map = data?.objectValue else { return [] }
+        let fields = CoreEvidence.formFields(for: coreKind)
+        let known = Set(fields.map(\.key))
+        let main: [Entry] = fields.compactMap { field in
+            guard let value = map[field.key]?.displayText else { return nil }
+            return Entry(label: field.label, value: value)
         }
+        let extras: [Entry] = map.keys.sorted().compactMap { key in
+            guard !known.contains(key), let value = map[key] else { return nil }
+            switch value {
+            case .object, .array, .null: return nil
+            default: break
+            }
+            guard let text = value.displayText else { return nil }
+            if text.lowercased().hasPrefix("data:image") { return Entry(label: humanizeKey(key), value: "Firma capturada") }
+            return Entry(label: humanizeKey(key), value: text)
+        }
+        return Array((main + extras).prefix(12))
+    }
+
+    /// «gerenteEncargado» → «Gerente encargado».
+    static func humanizeKey(_ key: String) -> String {
+        let spaced = key
+            .replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "[_-]+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased()
+        return spaced.prefix(1).uppercased() + spaced.dropFirst()
     }
 }

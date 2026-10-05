@@ -10,20 +10,22 @@ private struct FilaReparto: Identifiable, Hashable {
     var id: Int { actividadId }
 }
 
-/// Repartir un viático entre varias actividades.
+/// «Repartir viático» (Android `RepartoViaticoScreen`): un viático entre varias
+/// actividades.
 ///
 /// Un mismo viaje cubre dos servicios de clientes distintos y la gasolina es
 /// una sola: sin esto, el costo entero cae sobre una actividad, un proyecto
 /// paga de más y el otro de menos, y el P&L miente sin que nada avise.
 ///
 /// **El cuadre manda**: la suma tiene que ser exactamente el total, al centavo.
-/// La pantalla no pelea con eso, ayuda a lograrlo — enseña en vivo cuánto falta
-/// o sobra y ofrece acomodar el resto de un toque. Todo se cuenta en centavos
-/// enteros (`RepartoViatico`), igual que el servidor.
+/// La pantalla enseña en vivo cuánto falta o sobra y ofrece acomodar el resto
+/// de un toque. Todo se cuenta en centavos enteros (`RepartoViatico`), igual
+/// que el servidor.
 ///
 /// El total es el **monto solicitado**, no el autorizado: es contra ése que
-/// `setReparto` valida del otro lado. Si el jefe recortó la cifra, el reparto
-/// sigue siendo del costo que se pidió.
+/// `setReparto` valida del otro lado.
+///
+/// Se apila sobre el detalle; la barra teal la pone quien la abre.
 struct RepartoViaticoView: View {
     let viaticoId: Int
     let onListo: (String) -> Void
@@ -34,10 +36,12 @@ struct RepartoViaticoView: View {
     @State private var filas: [FilaReparto] = []
     @State private var actividades: [MyActivityItem] = []
     @State private var cargando = true
+    @State private var cargandoActividades = true
     @State private var precargado = false
     @State private var agregando = false
     @State private var enviando = false
     @State private var error: String?
+    @State private var accionError: String?
 
     private var totalCentavos: Int { viatico?.solicitadoCentavos ?? 0 }
 
@@ -51,70 +55,101 @@ struct RepartoViaticoView: View {
 
     private var cuadre: CuadreReparto { RepartoViatico.revisar(partes, totalCentavos: totalCentavos) }
 
-    private var diferencia: Int { totalCentavos - sumaCentavos }
-
-    private var estado: String {
-        if case .cuadra = cuadre { return "Cuadra exacto" }
-        if diferencia > 0 { return "Faltan \(Dinero.pesos(diferencia))" }
-        return "Sobran \(Dinero.pesos(-diferencia))"
-    }
-
-    private var tonoEstado: NxTone {
-        if case .cuadra = cuadre { return .success }
-        return diferencia > 0 ? .warning : .danger
-    }
-
     private var candidatas: [MyActivityItem] {
         let puestas = Set(filas.map(\.actividadId))
         return actividades.filter { !puestas.contains($0.id) }
     }
 
     var body: some View {
-        List {
-            if let error {
-                Section {
-                    NxAlertBanner(alert: NxAlert(id: "reparto", title: error, tone: .danger))
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let error {
+                        NxAlertBanner(
+                            alert: NxAlert(id: "reparto-error", title: error, tone: .danger),
+                            actionLabel: "Reintentar",
+                            onAction: { Task { await cargar() } }
+                        )
+                    }
+
+                    if viatico == nil {
+                        if cargando { NxLoadingState(text: "Abriendo el viático…") }
+                    } else {
+                        MarcadorReparto(totalCentavos: totalCentavos, sumaCentavos: sumaCentavos, cuadre: cuadre)
+
+                        ForEach(filas) { fila in
+                            FilaDeReparto(
+                                etiqueta: fila.etiqueta,
+                                texto: texto(de: fila.actividadId),
+                                habilitado: !enviando,
+                                onQuitar: { quitar(fila.actividadId) }
+                            )
+                        }
+
+                        Button {
+                            agregando = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .frame(width: 18, height: 18)
+                                    .accessibilityHidden(true)
+                                Text("Agregar actividad")
+                            }
+                        }
+                        .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
+                        .disabled(enviando || filas.count >= RepartoViatico.maxPartes)
+
+                        if filas.count >= 2 {
+                            HStack(spacing: 10) {
+                                Button("Partes iguales") { partesIguales() }
+                                    .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
+                                    .disabled(enviando || totalCentavos <= 0)
+                                Button(sobra ? "Quitar lo que sobra" : "Repartir el resto") {
+                                    aplicar(RepartoViatico.cuadrarResto(partes, totalCentavos: totalCentavos))
+                                }
+                                .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
+                                .disabled(enviando || totalCentavos <= 0 || sumaCentavos == totalCentavos)
+                            }
+                        }
+
+                        if let viatico, !viatico.repartos.isEmpty {
+                            Button("Quitar el reparto") { guardar(partes: []) }
+                                .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.danger), alto: viaticoAlturaToque, llenaAncho: true))
+                                .disabled(enviando)
+                        }
+
+                        if let accionError {
+                            NxErrorBlock(message: accionError)
+                        }
+
+                        Color.clear.frame(height: 8)
+                    }
                 }
+                .padding(NxSpacing.l)
             }
+            .scrollDismissesKeyboard(.interactively)
 
-            if cargando && viatico == nil {
-                Section { NxLoadingState(text: "Cargando reparto…") }
-            }
-
-            if viatico != nil {
-                marcador
-                filasDeReparto
-                herramientas
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Repartir viático")
-        .navigationBarTitleDisplayMode(.inline)
-        // El botón vive abajo, fijo: con una mano y el teclado abierto no se
-        // puede exigir que alguien baje a buscarlo.
-        .safeAreaInset(edge: .bottom) {
+            // El botón vive abajo, fijo: con una mano y el teclado abierto no se
+            // puede exigir que alguien baje a buscarlo.
             if viatico != nil {
                 barraInferior
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    agregando = true
-                } label: {
-                    Label("Agregar actividad", systemImage: "plus")
-                }
-                .disabled(enviando || filas.count >= RepartoViatico.maxPartes)
-            }
-        }
+        .nxScreenBackground()
+        .task { await cargar() }
         .sheet(isPresented: $agregando) {
-            HojaElegirActividad(actividades: candidatas, cargando: cargando) { item in
+            HojaElegirActividadViatico(
+                titulo: "¿Qué actividad cubrió el viaje?",
+                actividades: candidatas,
+                textoVacio: cargandoActividades
+                    ? "Buscando tus actividades…"
+                    : "No te quedan actividades abiertas por agregar."
+            ) { item in
                 filas.append(
                     FilaReparto(
                         actividadId: item.id,
-                        etiqueta: etiqueta(item),
+                        etiqueta: ViaticoTextos.etiqueta(item),
                         // Entra vacía a propósito: «repartir el resto» sabe
                         // darle lo que falta.
                         texto: ""
@@ -123,136 +158,72 @@ struct RepartoViaticoView: View {
                 agregando = false
             }
         }
-        .task { await cargar() }
     }
 
-    // MARK: Secciones
-
-    /// El marcador: total, repartido y lo que falta o sobra, en vivo. Es lo
-    /// primero que se ve y lo único que hay que mirar mientras se teclea.
-    private var marcador: some View {
-        Section {
-            HStack(spacing: 14) {
-                ImporteLabel(titulo: "Total", centavos: totalCentavos)
-                ImporteLabel(titulo: "Repartido", centavos: sumaCentavos)
-            }
-            Text(estado)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(tonoEstado.fg)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(tonoEstado.bg, in: RoundedRectangle(cornerRadius: 10))
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(
-                    "\(estado). Repartido \(Dinero.pesos(sumaCentavos)) de \(Dinero.pesos(totalCentavos))."
-                )
-                .accessibilityAddTraits(.updatesFrequently)
-        } header: {
-            Text("Total a repartir")
-        } footer: {
-            Text("Es el monto solicitado; la suma tiene que dar esto, al centavo.")
-        }
-    }
-
-    private var filasDeReparto: some View {
-        Section {
-            ForEach($filas) { $fila in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(fila.etiqueta).font(.body.weight(.semibold)).lineLimit(2)
-                    CampoImporte(
-                        titulo: "Carga esta actividad",
-                        crudo: $fila.texto,
-                        ayuda: nil,
-                        error: nil,
-                        habilitado: !enviando
-                    )
-                }
-                .padding(.vertical, 4)
-            }
-            // Gesto nativo: deslizar para quitar una actividad del reparto.
-            .onDelete { indices in
-                filas.remove(atOffsets: indices)
-            }
-        } header: {
-            Text("Actividades")
-        } footer: {
-            if filas.isEmpty {
-                Text("Agrega las actividades que cubrió el viaje con el botón de arriba.")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var herramientas: some View {
-        if filas.count >= 2 {
-            Section {
-                Button("Partes iguales") {
-                    let trozos = RepartoViatico.repartirEnPartesIguales(
-                        totalCentavos: totalCentavos,
-                        cuantas: filas.count
-                    )
-                    aplicar(filas.enumerated().map { i, f in
-                        ParteReparto(actividadId: f.actividadId, centavos: trozos.indices.contains(i) ? trozos[i] : 0)
-                    })
-                }
-                .frame(minHeight: 44)
-                .disabled(enviando || totalCentavos <= 0)
-
-                Button(diferencia < 0 ? "Quitar lo que sobra" : "Repartir el resto") {
-                    aplicar(RepartoViatico.cuadrarResto(partes, totalCentavos: totalCentavos))
-                }
-                .frame(minHeight: 44)
-                .disabled(enviando || totalCentavos <= 0 || diferencia == 0)
-            }
-        }
-
-        if let viatico, !viatico.repartos.isEmpty {
-            Section {
-                Button("Quitar el reparto", role: .destructive) {
-                    guardar(partes: [])
-                }
-                .frame(minHeight: 44)
-                .disabled(enviando)
-            } footer: {
-                Text("El costo entero vuelve a caer en la actividad del viático.")
-            }
-        }
+    private var sobra: Bool {
+        if case .sobra = cuadre { return true }
+        return false
     }
 
     private var barraInferior: some View {
-        VStack(spacing: 10) {
-            if let aviso = RepartoViatico.mensaje(cuadre) {
-                Text(aviso)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(tonoEstado.fg)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Button {
-                guardar(partes: partes)
-            } label: {
-                if enviando {
-                    ProgressView().frame(maxWidth: .infinity, minHeight: 44)
-                } else {
-                    Text("Guardar reparto")
-                        .font(.body.weight(.bold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
+        VStack(spacing: 0) {
+            Rectangle().fill(NxColors.border).frame(height: 1)
+            VStack(alignment: .leading, spacing: 10) {
+                if let aviso = RepartoViatico.mensaje(cuadre) {
+                    Text(aviso)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(faltaNada ? NxColors.danger : NxColors.warning)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.updatesFrequently)
                 }
+                Button {
+                    guardar(partes: partes)
+                } label: {
+                    if enviando {
+                        SpinnerDeBoton()
+                    } else {
+                        Text("Guardar reparto").fontWeight(.bold)
+                    }
+                }
+                .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: 56, llenaAncho: true))
+                .disabled(enviando || !cuadre.puedeGuardarse || filas.isEmpty)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(NxBrand.primary)
-            .disabled(enviando || !cuadre.puedeGuardarse || filas.isEmpty)
+            .padding(NxSpacing.l)
+            .background(NxColors.card)
         }
-        .padding(16)
-        .background(.bar)
+    }
+
+    /// El aviso va en ámbar solo cuando faltan centavos; todo lo demás es rojo.
+    private var faltaNada: Bool {
+        if case .falta = cuadre { return false }
+        return true
     }
 
     // MARK: Datos
 
-    private func etiqueta(_ item: MyActivityItem) -> String {
-        [item.anNumber, item.titulo]
-            .compactMap { $0 }
-            .first { !$0.isEmpty } ?? "Actividad #\(item.id)"
+    private func quitar(_ actividadId: Int) {
+        filas.removeAll { $0.actividadId == actividadId }
+    }
+
+    /// El texto de una fila por su actividad, no por su posición: quitar una
+    /// fila no puede dejar a otro campo apuntando a un índice que ya no existe.
+    private func texto(de actividadId: Int) -> Binding<String> {
+        Binding(
+            get: { filas.first(where: { $0.actividadId == actividadId })?.texto ?? "" },
+            set: { nuevo in
+                if let i = filas.firstIndex(where: { $0.actividadId == actividadId }) {
+                    filas[i].texto = nuevo
+                }
+            }
+        )
+    }
+
+    private func partesIguales() {
+        let trozos = RepartoViatico.repartirEnPartesIguales(totalCentavos: totalCentavos, cuantas: filas.count)
+        aplicar(filas.enumerated().map { i, f in
+            ParteReparto(actividadId: f.actividadId, centavos: trozos.indices.contains(i) ? trozos[i] : 0)
+        })
     }
 
     private func aplicar(_ nuevos: [ParteReparto]) {
@@ -262,21 +233,25 @@ struct RepartoViaticoView: View {
     }
 
     private func cargar() async {
-        cargando = true
+        if viatico == nil { cargando = true }
         do {
             let v = try await ViaticosRepository.shared.detalle(id: viaticoId)
             viatico = v
             error = nil
             precargar(v)
         } catch {
-            self.error = error.toUserMessage()
-        }
-        // Las actividades se piden aparte: sin ellas todavía se puede ver y
-        // ajustar el reparto que ya existe.
-        if let abiertas = try? await CoreRepository.shared.myActivities().open {
-            actividades = abiertas
+            self.error = error.toUserMessage(fallback: "No se pudo abrir el viático")
         }
         cargando = false
+        // Las actividades se piden aparte: sin ellas todavía se puede ver y
+        // ajustar el reparto que ya existe.
+        if actividades.isEmpty {
+            cargandoActividades = true
+            if let abiertas = try? await CoreRepository.shared.myActivities().open {
+                actividades = abiertas
+            }
+            cargandoActividades = false
+        }
     }
 
     /// Se precarga una sola vez: un refresco no puede borrar lo que la persona
@@ -285,7 +260,7 @@ struct RepartoViaticoView: View {
         guard !precargado else { return }
         precargado = true
 
-        let existentes = v.repartos.map { parte in
+        let existentes = v.repartos.filter { $0.actividadId > 0 }.map { parte in
             FilaReparto(
                 actividadId: parte.actividadId,
                 etiqueta: parte.titulo,
@@ -299,12 +274,11 @@ struct RepartoViaticoView: View {
         // Sin reparto previo: se arranca con la actividad del viático y el total
         // encima, que es el punto de partida real de cualquier reparto.
         if let propia = v.actividadId ?? v.actividad?.id, propia > 0 {
+            let an = (v.actividad?.anNumber ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             filas = [
                 FilaReparto(
                     actividadId: propia,
-                    etiqueta: v.actividad.map { a in
-                        [a.anNumber, a.titulo].compactMap { $0 }.first { !$0.isEmpty } ?? "Actividad #\(propia)"
-                    } ?? "Actividad #\(propia)",
+                    etiqueta: an.isEmpty ? "Actividad #\(propia)" : an,
                     texto: Dinero.textoApi(v.solicitadoCentavos)
                 ),
             ]
@@ -312,8 +286,9 @@ struct RepartoViaticoView: View {
     }
 
     private func guardar(partes: [ParteReparto]) {
+        guard !enviando else { return }
         enviando = true
-        error = nil
+        accionError = nil
         Task {
             do {
                 let encolado = try await ViaticosRepository.shared.guardarReparto(
@@ -331,58 +306,104 @@ struct RepartoViaticoView: View {
                 // El 400 del servidor dice al centavo cuánto falta o sobra: se
                 // enseña tal cual y no se pierde nada de lo tecleado.
                 enviando = false
-                self.error = error.toUserMessage()
+                accionError = error.toUserMessage(fallback: "No se pudo guardar el reparto")
             }
         }
     }
 }
 
-/// «¿Qué actividad cubrió el viaje?» — hoja inferior nativa.
-private struct HojaElegirActividad: View {
-    let actividades: [MyActivityItem]
-    let cargando: Bool
-    let onElegir: (MyActivityItem) -> Void
+/// El marcador (Android `Marcador`): total, repartido y lo que falta o sobra,
+/// en vivo. Es lo primero que se ve y lo único que hay que mirar mientras se
+/// teclea: se pone verde en cuanto cuadra.
+private struct MarcadorReparto: View {
+    let totalCentavos: Int
+    let sumaCentavos: Int
+    let cuadre: CuadreReparto
 
-    @Environment(\.dismiss) private var dismiss
+    private var diferencia: Int { totalCentavos - sumaCentavos }
+
+    private var cuadra: Bool {
+        if case .cuadra = cuadre { return true }
+        return false
+    }
+
+    private var color: Color {
+        if cuadra { return NxColors.success }
+        return diferencia > 0 ? NxColors.warning : NxColors.danger
+    }
+
+    private var estado: String {
+        if cuadra { return "Cuadra exacto" }
+        if diferencia > 0 { return "Faltan \(Dinero.pesos(diferencia))" }
+        return "Sobran \(Dinero.pesos(-diferencia))"
+    }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if actividades.isEmpty {
-                    Text(cargando ? "Buscando tus actividades…" : "No te quedan actividades abiertas por agregar.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(actividades) { item in
-                        Button {
-                            onElegir(item)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.titulo?.isEmpty == false ? item.titulo! : "Actividad #\(item.id)")
-                                    .lineLimit(2)
-                                Text(
-                                    [item.anNumber, item.cliente]
-                                        .compactMap { $0 }
-                                        .filter { !$0.isEmpty }
-                                        .joined(separator: " · ")
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                    }
+        NxPanelShell {
+            VStack(alignment: .leading, spacing: 12) {
+                NxSectionHeader(
+                    title: "Total a repartir",
+                    subtitle: "Es el monto solicitado; la suma tiene que dar esto, al centavo."
+                )
+                HStack(alignment: .top, spacing: 14) {
+                    ImporteLabel(titulo: "Total", centavos: totalCentavos)
+                    ImporteLabel(titulo: "Repartido", centavos: sumaCentavos)
                 }
-            }
-            .navigationTitle("¿Qué actividad cubrió el viaje?")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cerrar") { dismiss() }
-                }
+                Text(estado)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(color)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .animation(.easeOut(duration: 0.2), value: estado)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        "\(estado). Repartido \(Dinero.pesos(sumaCentavos)) de \(Dinero.pesos(totalCentavos))."
+                    )
+                    .accessibilityAddTraits(.updatesFrequently)
             }
         }
-        .presentationDetents([.medium, .large])
+    }
+}
+
+/// Una actividad y lo que carga (Android `FilaDeReparto`). El importe usa el
+/// mismo campo que todo el módulo.
+private struct FilaDeReparto: View {
+    let etiqueta: String
+    @Binding var texto: String
+    let habilitado: Bool
+    let onQuitar: () -> Void
+
+    var body: some View {
+        NxPanelShell {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(etiqueta)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(NxColors.fg)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(action: onQuitar) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(NxColors.muted)
+                            .frame(width: viaticoAlturaToque, height: viaticoAlturaToque)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!habilitado)
+                    .accessibilityLabel("Quitar \(etiqueta) del reparto")
+                }
+                CampoImporte(
+                    titulo: "Carga esta actividad",
+                    crudo: $texto,
+                    ayuda: nil,
+                    error: nil,
+                    habilitado: habilitado,
+                    fondo: NxColors.card
+                )
+            }
+        }
     }
 }

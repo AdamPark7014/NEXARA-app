@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Lo que se confirma antes de tocar el estatus del cliente o de uno de sus proyectos.
+/// Lo que se confirma antes de tocar el estatus del cliente o de uno de sus
+/// proyectos. Textos de `ClientRules` de Android (= diálogo de `/erp/clientes/:id`).
 private enum ClienteAccion: Identifiable, Equatable {
     case desactivar, reactivar, eliminar
     case desactivarProyecto(id: Int, titulo: String)
@@ -37,7 +38,7 @@ private enum ClienteAccion: Identifiable, Equatable {
         }
     }
 
-    /// Como la web: desactivar y eliminar se confirman en rojo; reactivar no.
+    /// Desactivar y eliminar se confirman en rojo; reactivar no.
     var rol: ButtonRole? {
         switch self {
         case .reactivar, .reactivarProyecto: return nil
@@ -45,7 +46,6 @@ private enum ClienteAccion: Identifiable, Equatable {
         }
     }
 
-    /// Los del cliente, mismos textos que el diálogo de `/erp/clientes/:id`.
     func mensaje(_ nombre: String) -> String {
         switch self {
         case .desactivar:
@@ -59,15 +59,16 @@ private enum ClienteAccion: Identifiable, Equatable {
         case .reactivarProyecto(_, let titulo):
             return "«\(titulo)» volverá a estar activo."
         case .eliminarProyecto(_, let titulo):
-            return "¿Eliminar «\(titulo)»? Deja de aparecer en listas y buscadores; sus actividades conservan su historial. Si solo está detenido, mejor desactívalo."
+            return "¿Eliminar «\(titulo)»? Dejará de aparecer en las listas y esta acción no se puede deshacer. Si solo está detenido, mejor desactívalo."
         }
     }
 }
 
-/// Detalle de cliente (`/erp/clientes/:id`): datos fiscales, sectores (con
-/// «+ sector» de los que el usuario maneja) y, en PROYECTO, sus proyectos
-/// operativos con alta rápida. Desactivar, reactivar y eliminar solo aparecen
-/// con el permiso del API (hoy, solo Christian).
+/// Ficha de cliente — igual que `ClientDetailScreen` de Android: encabezado con
+/// el nombre, «Encargado: …» y el menú ⋮ (desactivar / reactivar y eliminar,
+/// solo con permiso del API: hoy, solo Christian); paneles «Fiscal»,
+/// «Sectores» (con «+ sector» de los que manejas) y, en PROYECTO, «Proyectos
+/// (N)» con su menú y el alta rápida (nombre y fecha de inicio).
 struct ClienteDetailView: View {
     let clientId: Int
     /// El padrón cambió (desactivado, reactivado o eliminado): la lista se recarga.
@@ -79,98 +80,58 @@ struct ClienteDetailView: View {
     @State private var projects: [CoreOperationalProject] = []
     @State private var permisos = CoreClientPermissions.ninguno
     @State private var accion: ClienteAccion?
+    @State private var loading = true
     @State private var error: String?
-    @State private var notice: String?
     @State private var busy = false
     @State private var projectTitle = ""
-    @State private var projectStart = Date()
+    @State private var projectStart = NxHoraMexico.hoy()
 
     private var mySectors: [ClientSector] { ClientSector.sectors(for: session.currentUser?.email) }
 
+    /// Sectores que puedo sumar: los míos que el cliente aún no tiene.
     private var addable: [ClientSector] {
         let current = Set(client?.clientSectors ?? [])
-        return ClientSector.allCases.filter { mySectors.contains($0) && !current.contains($0) }
+        return mySectors.filter { !current.contains($0) }
     }
 
+    /// Hay algo que mostrar en el menú ⋮.
+    private var showOwnerActions: Bool { permisos.puedeDesactivar || permisos.puedeEliminar }
+
     var body: some View {
-        List {
-            if let client {
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(client.name).font(.title3.bold())
-                        if client.isInactive {
-                            CoreChip(icon: "pause.circle", text: "Inactivo")
-                        }
-                        Text("Encargado: \(nonEmpty(client.owner?.nombre))")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 4)
+        ScrollView {
+            VStack(alignment: .leading, spacing: NxSpacing.m) {
+                if loading && client == nil {
+                    NxLoadingState(text: "Cargando cliente…")
                 }
-
-                Section("Fiscal") {
-                    field("Razón social", nonEmpty(client.legalName))
-                    field("RFC", nonEmpty(client.taxId))
-                    field("Dirección", nonEmpty(client.fiscalAddress))
-                    field("CP / régimen", joined([client.fiscalZipCode, client.fiscalRegime]))
-                    field("Contacto", joined([client.billingEmail, client.billingPhone]))
+                if let error {
+                    NxErrorBlock(message: error) { Task { await load() } }
                 }
-
-                Section("Sectores") {
-                    if client.clientSectors.isEmpty {
-                        Text("Sin sector").foregroundColor(.secondary)
-                    } else {
-                        CoreFlowLayout(spacing: 6) {
-                            ForEach(client.clientSectors) { s in
-                                Label(s.shortTitle, systemImage: s.symbol)
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color(.tertiarySystemFill), in: Capsule())
+                if let client {
+                    encabezado(client)
+                    if client.isInactive || busy {
+                        HStack(spacing: NxSpacing.s) {
+                            if client.isInactive {
+                                NxStatusChip(text: "Inactivo", tone: .warning, systemImage: "nosign")
+                            }
+                            if busy {
+                                Text("Guardando…")
+                                    .font(NxType.bodySmall)
+                                    .foregroundStyle(NxColors.muted)
                             }
                         }
                     }
-                    ForEach(addable) { s in
-                        Button { Task { await addSector(s) } } label: {
-                            Label("Agregar a \(s.shortTitle)", systemImage: "plus.circle")
-                        }
-                        .disabled(busy)
+                    fiscal(client)
+                    sectores(client)
+                    if client.clientSectors.contains(.proyecto) {
+                        proyectos(client)
                     }
                 }
-
-                if client.clientSectors.contains(.proyecto) {
-                    projectsSection(client)
-                }
-
-                if permisos.puedeDesactivar || permisos.puedeEliminar {
-                    estatusSection(client)
-                }
-            } else if let error {
-                Section {
-                    NxErrorState(message: error) { Task { await load() } }
-                }
-            } else {
-                Section { NxLoadingState(text: "Cargando cliente…") }
+                Spacer().frame(height: NxSpacing.l)
             }
-
-            if let notice {
-                Section {
-                    NxIconText(systemName: "checkmark.circle.fill", text: notice)
-                        .font(.footnote)
-                        .foregroundStyle(CorePalette.green)
-                }
-            }
-            if let error, client != nil {
-                Section {
-                    NxIconText(systemName: "exclamationmark.triangle.fill", text: error)
-                        .font(.footnote)
-                        .foregroundStyle(CorePalette.red)
-                }
-            }
+            .padding(NxSpacing.l)
         }
-        .navigationTitle(client?.name ?? "Cliente")
-        .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await load() }
+        .nxScreenBackground()
+        .scrollDismissesKeyboard(.interactively)
         .task { await load() }
         .alert(
             accion?.titulo ?? "",
@@ -180,196 +141,284 @@ struct ClienteDetailView: View {
             ),
             presenting: accion
         ) { pendiente in
+            Button("Cancelar", role: .cancel) {}
             Button(pendiente.boton, role: pendiente.rol) {
                 Task { await run(pendiente) }
             }
-            Button("Cancelar", role: .cancel) {}
         } message: { pendiente in
-            Text(pendiente.mensaje(client?.name ?? "Este cliente"))
+            Text(pendiente.mensaje(Self.nombre(client?.name)))
         }
     }
 
-    /// Desactivar / reactivar y eliminar, cada uno con su permiso.
-    @ViewBuilder
-    private func estatusSection(_ client: CoreSalesClient) -> some View {
-        Section {
+    // MARK: Encabezado
+
+    private func encabezado(_ client: CoreSalesClient) -> some View {
+        NxSectionHeader(
+            title: Self.nombre(client.name),
+            subtitle: "Encargado: \(Self.texto(client.owner?.nombre) ?? "—")"
+        ) {
+            if showOwnerActions {
+                menuDueno(
+                    toggleLabel: client.isInactive ? "Reactivar cliente" : "Desactivar cliente",
+                    deleteLabel: "Eliminar cliente",
+                    descripcion: "Opciones del cliente",
+                    inactivo: client.isInactive,
+                    enabled: !busy,
+                    onToggle: { accion = client.isInactive ? .reactivar : .desactivar },
+                    onDelete: { accion = .eliminar }
+                )
+            }
+        }
+    }
+
+    /// Menú ⋮ del dueño (cliente o proyecto), con el permiso de cada acción.
+    private func menuDueno(
+        toggleLabel: String,
+        deleteLabel: String,
+        descripcion: String,
+        inactivo: Bool,
+        enabled: Bool,
+        onToggle: @escaping () -> Void,
+        onDelete: @escaping () -> Void
+    ) -> some View {
+        Menu {
             if permisos.puedeDesactivar {
-                Button {
-                    accion = client.isInactive ? .reactivar : .desactivar
-                } label: {
-                    Label(
-                        client.isInactive ? "Reactivar cliente" : "Desactivar cliente",
-                        systemImage: client.isInactive ? "play.circle" : "pause.circle"
-                    )
+                Button(action: onToggle) {
+                    Label(toggleLabel, systemImage: inactivo ? "arrow.counterclockwise" : "nosign")
                 }
-                .disabled(busy)
             }
             if permisos.puedeEliminar {
-                Button(role: .destructive) {
-                    accion = .eliminar
-                } label: {
-                    Label("Eliminar cliente", systemImage: "trash")
-                        .foregroundColor(.red)
+                Button(role: .destructive, action: onDelete) {
+                    Label(deleteLabel, systemImage: "trash")
                 }
-                .disabled(busy)
             }
-        } footer: {
-            Text("Desactivar conserva sus datos y su historial. Eliminar no se puede deshacer.")
+        } label: {
+            Image(systemName: "ellipsis")
+                .rotationEffect(.degrees(90))
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(NxColors.muted)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(descripcion)
+    }
+
+    // MARK: Fiscal
+
+    private func fiscal(_ client: CoreSalesClient) -> some View {
+        NxPanelShell {
+            tituloPanel("Fiscal")
+            Spacer().frame(height: 6)
+            dato("Razón social", client.legalName)
+            dato("RFC", client.taxId)
+            dato("Dirección", client.fiscalAddress)
+            dato("CP / régimen", Self.unir([client.fiscalZipCode, client.fiscalRegime]))
+            dato("Contacto", Self.unir([client.billingEmail, client.billingPhone]))
         }
     }
 
-    @ViewBuilder
-    private func projectsSection(_ client: CoreSalesClient) -> some View {
-        Section("Proyectos (\(projects.count))") {
+    /// `ClientFactRow`: etiqueta 12,5 a la izquierda, valor 14 SemiBold a la derecha.
+    private func dato(_ etiqueta: String, _ valor: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(etiqueta)
+                .font(NxType.bodySmall)
+                .foregroundStyle(NxColors.fg)
+            Spacer(minLength: 0)
+            Text(Self.texto(valor) ?? "—")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(NxColors.fg)
+                .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
+        }
+        .padding(.vertical, 3)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Sectores
+
+    private func sectores(_ client: CoreSalesClient) -> some View {
+        NxPanelShell {
+            tituloPanel("Sectores")
+            Spacer().frame(height: NxSpacing.s)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: NxSpacing.s) {
+                    ForEach(client.clientSectors) { s in
+                        NxStatusChip(text: s.padronEtiqueta, tone: .brand, systemImage: s.padronSimbolo)
+                    }
+                }
+            }
+            if !addable.isEmpty {
+                Spacer().frame(height: NxSpacing.s)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: NxSpacing.s) {
+                        ForEach(addable) { s in
+                            NxBotonContorno(title: "+ \(s.padronEtiqueta)", enabled: !busy) {
+                                Task { await addSector(s) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Proyectos
+
+    private func proyectos(_ client: CoreSalesClient) -> some View {
+        NxPanelShell {
+            tituloPanel("Proyectos (\(projects.count))")
+            Spacer().frame(height: 6)
             if client.serviceClientId == nil {
-                Text("Este cliente todavía no está ligado a operación; pide que lo den de alta para crear proyectos.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                Text("Falta puente operativo.")
+                    .font(NxType.bodySmall)
+                    .foregroundStyle(NxColors.fg)
             } else {
                 if projects.isEmpty {
-                    Text("Aún no tiene proyectos.").foregroundStyle(.secondary)
+                    Text("Sin proyectos aún.")
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.fg)
                 } else {
                     ForEach(projects) { p in
-                        projectRow(p)
+                        filaProyecto(p)
+                        Spacer().frame(height: 6)
                     }
                 }
                 if mySectors.contains(.proyecto) {
-                    TextField("Nombre del proyecto", text: $projectTitle)
-                        .textInputAutocapitalization(.sentences)
-                        .submitLabel(.done)
-                    DatePicker("Inicio", selection: $projectStart, displayedComponents: .date)
-                        .environment(\.locale, Locale(identifier: "es_MX"))
-                    Button(busy ? "Creando…" : "Crear proyecto") {
+                    Spacer().frame(height: NxSpacing.s)
+                    NxOutlinedCampo(label: "Nombre del proyecto", text: $projectTitle)
+                    Spacer().frame(height: NxSpacing.s)
+                    NxFechaCampo(label: "Inicio", value: $projectStart)
+                    Spacer().frame(height: NxSpacing.s)
+                    NxBotonPildora(title: "Crear proyecto", enabled: !busy) {
                         Task { await createProject() }
                     }
-                    .disabled(busy)
                 }
             }
         }
     }
 
     /// Proyecto con su estatus y, con permiso, el menú para desactivarlo, reactivarlo o eliminarlo.
-    private func projectRow(_ p: CoreOperationalProject) -> some View {
-        HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(p.title).font(.subheadline.weight(.semibold))
-                if p.isInactive {
-                    CoreChip(icon: "pause.circle", text: "Inactivo")
-                } else {
-                    Text(p.statusLabel).font(.caption).foregroundColor(.secondary)
+    private func filaProyecto(_ p: CoreOperationalProject) -> some View {
+        let titulo = p.title.trimmingCharacters(in: .whitespaces)
+        let nombre = titulo.isEmpty ? "Proyecto \(p.id)" : titulo
+        return NxListRow(
+            title: nombre,
+            subtitle: p.isInactive ? nil : Self.estatusProyecto(p.status),
+            chipText: p.isInactive ? "Inactivo" : nil,
+            chipTone: .warning,
+            trailing: {
+                if showOwnerActions {
+                    menuDueno(
+                        toggleLabel: p.isInactive ? "Reactivar proyecto" : "Desactivar proyecto",
+                        deleteLabel: "Eliminar proyecto",
+                        descripcion: "Opciones del proyecto",
+                        inactivo: p.isInactive,
+                        enabled: !busy,
+                        onToggle: {
+                            accion = p.isInactive
+                                ? .reactivarProyecto(id: p.id, titulo: Self.nombreProyecto(p.title))
+                                : .desactivarProyecto(id: p.id, titulo: Self.nombreProyecto(p.title))
+                        },
+                        onDelete: { accion = .eliminarProyecto(id: p.id, titulo: Self.nombreProyecto(p.title)) }
+                    )
                 }
             }
-            Spacer(minLength: 8)
-            if permisos.puedeDesactivar || permisos.puedeEliminar {
-                Menu {
-                    if permisos.puedeDesactivar {
-                        if p.isInactive {
-                            Button {
-                                accion = .reactivarProyecto(id: p.id, titulo: p.title)
-                            } label: {
-                                Label("Reactivar proyecto", systemImage: "play.circle")
-                            }
-                        } else {
-                            Button {
-                                accion = .desactivarProyecto(id: p.id, titulo: p.title)
-                            } label: {
-                                Label("Desactivar proyecto", systemImage: "pause.circle")
-                            }
-                        }
-                    }
-                    if permisos.puedeEliminar {
-                        Button(role: .destructive) {
-                            accion = .eliminarProyecto(id: p.id, titulo: p.title)
-                        } label: {
-                            Label("Eliminar proyecto", systemImage: "trash")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .imageScale(.large)
-                        .nxTapTarget()
-                }
-                .accessibilityLabel("Opciones de \(p.title)")
-                .disabled(busy)
-            }
-        }
+        )
     }
 
-    private func field(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundColor(.secondary)
-            Text(value).font(.subheadline).textSelection(.enabled)
-        }
+    private func tituloPanel(_ texto: String) -> some View {
+        Text(texto)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(NxColors.fg)
+            .accessibilityAddTraits(.isHeader)
     }
 
-    private func nonEmpty(_ value: String?) -> String {
+    // MARK: Reglas de texto (`ClientRules` de Android)
+
+    private static func texto(_ value: String?) -> String? {
         let v = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return v.isEmpty ? "—" : v
+        return v.isEmpty ? nil : v
     }
 
-    private func joined(_ values: [String?]) -> String {
-        let parts = values.compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+    private static func nombre(_ value: String?) -> String { texto(value) ?? "Sin nombre" }
+
+    private static func nombreProyecto(_ value: String?) -> String { texto(value) ?? "Proyecto sin nombre" }
+
+    private static func unir(_ values: [String?]) -> String {
+        values.compactMap { texto($0) }.joined(separator: " · ")
     }
+
+    /// `projectStatusLabel`: ACTIVE → Activo, ON_HOLD → Inactivo, COMPLETED → Terminado.
+    private static func estatusProyecto(_ status: String?) -> String {
+        let s = (status ?? "").trimmingCharacters(in: .whitespaces)
+        switch s.uppercased() {
+        case "ACTIVE": return "Activo"
+        case "ON_HOLD": return "Inactivo"
+        case "COMPLETED": return "Terminado"
+        case "": return "Sin estatus"
+        default: return s
+        }
+    }
+
+    // MARK: Datos
 
     private func load() async {
+        loading = true
         error = nil
+        // Sin permisos no hay menú ⋮; un fallo aquí no tumba la ficha.
+        async let permisosTask = try? ClientesRepository.shared.permissions()
         do {
             let c = try await ClientesRepository.shared.detail(id: clientId)
             client = c
-            if c.serviceClientId != nil {
-                await reloadProjects()
+            // Los proyectos cuelgan del puente operativo; sin él no hay nada que pedir.
+            if let serviceId = c.serviceClientId {
+                projects = (try? await ClientesRepository.shared.projects(serviceClientId: serviceId)) ?? []
             } else {
                 projects = []
             }
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo cargar el cliente")
         }
-        // Sin permisos confirmados no se ofrece nada: el API vuelve a decidir en cada acción.
-        permisos = (try? await ClientesRepository.shared.permissions()) ?? .ninguno
+        if let fresh = await permisosTask { permisos = fresh }
+        loading = false
     }
 
     private func run(_ pendiente: ClienteAccion) async {
         busy = true
         error = nil
-        notice = nil
-        defer { busy = false }
         do {
             switch pendiente {
             case .desactivar, .reactivar:
                 let activar = pendiente == .reactivar
-                let updated: CoreSalesClient?
                 if activar {
-                    updated = try await ClientesRepository.shared.reactivate(id: clientId)
+                    _ = try await ClientesRepository.shared.reactivate(id: clientId)
                 } else {
-                    updated = try await ClientesRepository.shared.deactivate(id: clientId)
+                    _ = try await ClientesRepository.shared.deactivate(id: clientId)
                 }
-                if let updated {
-                    client = updated
-                } else {
-                    await load()
-                }
-                notice = activar
-                    ? "Cliente reactivado."
-                    : "Cliente desactivado. Sus datos y su historial se conservan."
+                busy = false
                 onChanged?()
+                await load()
             case .eliminar:
                 try await ClientesRepository.shared.delete(id: clientId)
+                busy = false
                 onChanged?()
                 dismiss()
             case .desactivarProyecto(let id, _), .reactivarProyecto(let id, _):
                 let activar: Bool
                 if case .reactivarProyecto = pendiente { activar = true } else { activar = false }
                 try await ClientesRepository.shared.setProjectActive(id: id, active: activar)
-                await reloadProjects()
-                notice = activar ? "Proyecto reactivado." : "Proyecto desactivado. Sus actividades y su historial se conservan."
+                busy = false
+                await load()
             case .eliminarProyecto(let id, _):
                 try await ClientesRepository.shared.deleteProject(id: id)
+                // Se quita de la lista sin esperar la recarga.
                 projects.removeAll { $0.id == id }
-                await reloadProjects()
-                notice = "Proyecto eliminado."
+                busy = false
+                await load()
             }
         } catch {
+            busy = false
             let fallback: String
             switch pendiente {
             case .eliminar: fallback = "No se pudo eliminar el cliente"
@@ -381,27 +430,18 @@ struct ClienteDetailView: View {
         }
     }
 
-    /// Solo la lista de proyectos; si falla se conserva la que ya estaba.
-    private func reloadProjects() async {
-        guard let serviceId = client?.serviceClientId else { return }
-        if let fresh = try? await ClientesRepository.shared.projects(serviceClientId: serviceId) {
-            projects = fresh
-        }
-    }
-
     private func addSector(_ sector: ClientSector) async {
         busy = true
         error = nil
-        notice = nil
         defer { busy = false }
         do {
             if let updated = try await ClientesRepository.shared.addSector(clientId: clientId, sector: sector) {
                 client = updated
-                if updated.clientSectors.contains(.proyecto) {
-                    await reloadProjects()
+                if updated.clientSectors.contains(.proyecto), let serviceId = updated.serviceClientId {
+                    projects = (try? await ClientesRepository.shared.projects(serviceClientId: serviceId)) ?? projects
                 }
             } else {
-                notice = "Sin conexión: el sector se agregará al recuperar la red."
+                error = "Sin conexión: el sector se agregará al recuperar la red."
             }
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo agregar el sector")
@@ -413,23 +453,23 @@ struct ClienteDetailView: View {
               let vendorId = session.currentUser.flatMap({ Int($0.id) }) else { return }
         let title = projectTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard title.count >= 3 else {
-            error = "Escribe un nombre de al menos 3 letras."
+            error = "Título muy corto"
             return
         }
         busy = true
         error = nil
-        notice = nil
-        defer { busy = false }
         do {
             try await ClientesRepository.shared.createProject(
                 title: title,
                 serviceClientId: serviceId,
                 vendorId: vendorId,
-                startDate: NxFormat.apiDay(projectStart)
+                startDate: projectStart.isEmpty ? NxHoraMexico.hoy() : projectStart
             )
             projectTitle = ""
+            busy = false
             await load()
         } catch {
+            busy = false
             self.error = error.toUserMessage(fallback: "No se pudo crear el proyecto")
         }
     }

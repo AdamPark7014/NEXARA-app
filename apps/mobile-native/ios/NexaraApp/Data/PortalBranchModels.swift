@@ -13,13 +13,17 @@ struct PortalClientProfile: Hashable {
     let state: String
     let country: String
     let branchNumber: String
+    /// Perfil de sucursal (`branch-portal/profile`) y no de cliente: Android
+    /// `PortalProfile.Kind.BRANCH`. Decide qué módulos ve y si el perfil se edita.
+    let isBranch: Bool
     let raw: [String: Any]
 
     static func == (lhs: PortalClientProfile, rhs: PortalClientProfile) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 
-    init(raw: [String: Any]) {
+    init(raw: [String: Any], isBranch: Bool = false) {
         self.raw = raw
+        self.isBranch = isBranch
         id = StockParse.int64(raw["id"]) ?? 0
         name = StockParse.str(raw["name"], raw["nombre"])
         logoUrl = StockParse.str(raw["logoUrl"])
@@ -49,6 +53,9 @@ struct PortalBranch: Hashable, Identifiable {
     let portalEmail: String
     let logoUrl: String
     let isActive: Bool
+    /// `isActive` tal como llegó: `nil` si el API no lo mandó (Android `Boolean?`:
+    /// sin dato no se pinta el chip «Activa»/«Inactiva»).
+    let isActiveValue: Bool?
     let raw: [String: Any]
 
     var rowKey: String { "br-\(id)" }
@@ -78,9 +85,11 @@ struct PortalBranch: Hashable, Identifiable {
         logoUrl = StockParse.str(raw["logoUrl"])
         if let b = raw["isActive"] as? Bool {
             isActive = b
+            isActiveValue = b
         } else {
             let s = StockParse.str(raw["isActive"], raw["activo"]).lowercased()
             isActive = s.isEmpty || s == "true" || s == "1" || s == "yes"
+            isActiveValue = s.isEmpty ? nil : isActive
         }
     }
 }
