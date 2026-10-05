@@ -83,7 +83,9 @@ struct ProductoPorCodigo: Decodable, Hashable {
     let product: ProductoCodigo?
     let existencias: [ExistenciaCodigo]?
 
-    var esCaja: Bool { match == "empaque" && packaging != nil }
+    /// Se leyó una caja (Android `r.match == "empaque"`): la cantidad cuenta cajas y la
+    /// existencia (en piezas) no se compara contra ella.
+    var esCaja: Bool { match == "empaque" }
 }
 
 struct ProductoUpc: Decodable, Hashable {
@@ -203,7 +205,7 @@ final class EscaneoRepository {
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 
-    /// `GET stock/barcode?code=` (`stock.view`).
+    /// `GET stock/barcode?code=` (`stock.view`). 404 = el código no existe (se ofrece el alta).
     func productoPorCodigo(_ codigo: String) async throws -> ProductoPorCodigo {
         let data = try await api.get("stock/barcode", query: ["code": codigo])
         return try decode(ProductoPorCodigo.self, from: data)

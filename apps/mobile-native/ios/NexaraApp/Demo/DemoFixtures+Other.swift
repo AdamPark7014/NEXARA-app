@@ -465,7 +465,9 @@ extension DemoStore {
     }
 
     func fxLowStock() -> [DemoJSON] {
-        DemoData.stock.filter { $0.reorder > 0 && $0.qty <= $0.reorder }.map { stockLevelJSON($0) }
+        // Con lo movido por el escáner, como `quantity` de `stockLevelJSON` (si no, una
+        // salida que deja el producto bajo mínimo no aparecía en «Bajo mínimo»).
+        DemoData.stock.filter { $0.reorder > 0 && cantidadDemo($0) <= $0.reorder }.map { stockLevelJSON($0) }
     }
 
     // MARK: Vehículos
