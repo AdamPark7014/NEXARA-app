@@ -61,6 +61,8 @@ SYSTEM_TYPES = {
     'AnyView', 'EdgeInsets', 'Animation', 'Alignment', 'UIApplication',
     'TimeInterval', 'UUID', 'Timer', 'DispatchQueue', 'Numeric', 'Text',
     'BinaryFloatingPoint', 'BinaryInteger', 'StringProtocol', 'RandomAccessCollection',
+    # SwiftUI: valores de entorno propios (`nxOpenNotifications`, `nxShellChrome`).
+    'EnvironmentValues',
 }
 
 

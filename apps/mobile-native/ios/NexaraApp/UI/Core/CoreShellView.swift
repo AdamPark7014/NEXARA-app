@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Lo que se abre encima del shell desde un enlace, un push o la campana.
 private enum CoreShellOverlay: Identifiable {
@@ -36,6 +37,7 @@ private enum CoreShellOverlay: Identifiable {
 private enum CoreShellTab: String, Hashable, CaseIterable {
     case inicio, actividades, chat, asistencias, mas
 
+    /// Texto de la barra inferior.
     var title: String {
         switch self {
         case .inicio: return "Inicio"
@@ -46,15 +48,30 @@ private enum CoreShellTab: String, Hashable, CaseIterable {
         }
     }
 
+    /// Título de la barra teal (Android `currentTitle` de `ConsoleNavHost`).
+    var barTitle: String {
+        switch self {
+        case .inicio: return "Inicio"
+        case .actividades: return "Actividades"
+        case .chat: return "Chat"
+        case .asistencias: return "Asistencias"
+        case .mas: return "Más"
+        }
+    }
+
+    /// Icono de contorno (inactiva): Android `Icons.Outlined.*`.
     var systemImage: String {
         switch self {
         case .inicio: return "house"
-        case .actividades: return "checklist"
-        case .chat: return "bubble.left.and.bubble.right"
+        case .actividades: return "checkmark.square"
+        case .chat: return "text.bubble"
         case .asistencias: return "clock"
         case .mas: return "square.grid.2x2"
         }
     }
+
+    /// Icono relleno (activa): Android `Icons.Filled.*`.
+    var selectedSystemImage: String { systemImage + ".fill" }
 
     /// Módulo de Core que la pestaña necesita; `nil` = la tiene todo el personal.
     var module: CoreModule? {
@@ -67,15 +84,20 @@ private enum CoreShellTab: String, Hashable, CaseIterable {
     }
 }
 
-/// Shell de NEXARA Core (rediseño v2). Después del login el personal cae en
-/// Inicio (jornada, aviso, actividad de ahora y siguientes). Menú = módulos de
-/// Core de `GET me/navigation` filtrados por rol (ver `CoreNavigation`), en una
-/// tab bar nativa de 5 destinos con insignias; la campana va en cada pestaña.
+/// Shell de NEXARA Core (rediseño v2), con el cromo de Android
+/// (`ConsoleNavHost`): barra superior teal con la campana en todas las pestañas
+/// menos Inicio (que pinta su cabecera) y barra inferior propia de 5 destinos con
+/// insignias. Después del login el personal cae en Inicio. Menú = módulos de
+/// Core de `GET me/navigation` filtrados por rol (ver `CoreNavigation`).
+///
+/// Por dentro sigue siendo un `TabView` (cada pestaña conserva su
+/// `NavigationStack` y su ciclo `onAppear`/`onDisappear`), pero con su barra
+/// nativa oculta: la que se ve es `NxBottomBar`.
 struct CoreShellView: View {
     @EnvironmentObject var session: SessionStore
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
-    @ObservedObject private var badge = NotificationsBadgeStore.shared
     @StateObject private var inicio = InicioStore()
+    @StateObject private var chrome = NxShellChrome()
     @State private var selected: CoreShellTab = .inicio
     @State private var overlay: CoreShellOverlay?
     @State private var chatChannelId: Int64?
@@ -83,6 +105,8 @@ struct CoreShellView: View {
     @State private var chatNonce = 0
     /// Mensajes de chat sin leer (suma de `unreadCount` de los canales), para la insignia.
     @State private var chatUnread = 0
+    /// Con el teclado arriba la barra inferior se esconde (no sube pegada al teclado).
+    @State private var tecladoVisible = false
 
     private var modules: [CoreModule] { CoreNavigation.modules(for: session.currentUser) }
     /// Módulos del hub «Más» (ver `CoreNavigation.extraModules`).
@@ -93,32 +117,37 @@ struct CoreShellView: View {
         CoreShellTab.allCases.filter { tab in tab.module.map { modules.contains($0) } ?? true }
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            // Modo demostración: aviso discreto arriba, con salida a un toque.
-            if DemoMode.isActive {
-                DemoBanner()
-            }
-            shell
-        }
+    /// Android `conBarraInferior`: fuera en el detalle de actividad (y con teclado).
+    private var muestraBarraInferior: Bool {
+        !chrome.barraInferiorOculta && !tecladoVisible
     }
 
-    private var shell: some View {
-        TabView(selection: $selected) {
-            ForEach(tabs, id: \.self) { tab in
-                tabRoot(tab)
-                    .tabItem {
-                        Label(tab.title, systemImage: tab.systemImage)
-                            .accessibilityIdentifier("tab-\(tab.rawValue)")
-                    }
-                    .badge(badgeCount(tab))
-                    .accessibilityIdentifier("tab-\(tab.rawValue)")
-                    .tag(tab)
+    /// La campana de la barra teal (en cualquier pantalla del shell) abre la bandeja.
+    private var abrirNotificaciones: () -> Void {
+        { present(.notifications) }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TabView(selection: $selected) {
+                ForEach(tabs, id: \.self) { tab in
+                    tabRoot(tab)
+                        // La barra nativa no se ve: la de Android es `NxBottomBar`.
+                        .toolbar(.hidden, for: .tabBar)
+                        .tag(tab)
+                }
+            }
+            if muestraBarraInferior {
+                barraInferior
             }
         }
-        .tint(NxBrand.adaptive)
+        .background(NxColors.surface.ignoresSafeArea())
+        .environment(\.nxOpenNotifications, abrirNotificaciones)
+        .environment(\.nxShellChrome, chrome)
         .fullScreenCover(item: $overlay) { item in
             overlayScreen(item)
+                .environment(\.nxOpenNotifications, abrirNotificaciones)
+                .environment(\.nxShellChrome, chrome)
         }
         .task { await refreshNavigationIfNeeded() }
         .task { await pollUnread() }
@@ -128,6 +157,41 @@ struct CoreShellView: View {
         }
         .onChange(of: modules) { _, _ in syncSelection() }
         .onChange(of: deepLink.pending) { _, _ in applyDeepLink() }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            tecladoVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            tecladoVisible = false
+        }
+    }
+
+    /// Barra inferior y, en modo demostración, su aviso justo encima. El aviso ya
+    /// no va arriba: ahí la barra teal tiene que llegar hasta la hora sin nada
+    /// en medio (si no, la hora blanca queda sobre fondo claro).
+    private var barraInferior: some View {
+        VStack(spacing: 0) {
+            if DemoMode.isActive {
+                DemoBanner()
+                    .padding(.bottom, NxSpacing.xs)
+            }
+            NxBottomBar(
+                items: tabs.map { tab in
+                    NxBottomBarItem(
+                        id: tab.rawValue,
+                        title: tab.title,
+                        systemImage: tab.systemImage,
+                        selectedSystemImage: tab.selectedSystemImage,
+                        badge: badgeCount(tab),
+                        badgeNoun: tab == .chat ? "sin leer" : "pendientes"
+                    )
+                },
+                selectedId: selected.rawValue,
+                onSelect: { id in
+                    if let tab = CoreShellTab(rawValue: id) { selected = tab }
+                }
+            )
+        }
+        .background(NxColors.surface.ignoresSafeArea(edges: .bottom))
     }
 
     private func badgeCount(_ tab: CoreShellTab) -> Int {
@@ -144,6 +208,7 @@ struct CoreShellView: View {
     private func tabRoot(_ tab: CoreShellTab) -> some View {
         switch tab {
         case .inicio:
+            // Inicio pinta su propia cabecera (saludo, fecha y campana): sin barra teal.
             NavigationStack {
                 InicioView(
                     store: inicio,
@@ -157,16 +222,18 @@ struct CoreShellView: View {
                 )
             }
         case .chat:
-            // `ChatView` trae su propio NavigationStack.
+            // `ChatView` trae su propio NavigationStack y pone su barra teal dentro.
             ChatView(initialChannelId: chatChannelId, initialMessageId: chatMessageId)
                 .id(chatNonce)
         case .actividades:
             NavigationStack {
-                ActividadesHomeView().toolbar { bellItem }
+                ActividadesHomeView()
+                    .nxBrandNavBar(title: CoreShellTab.actividades.barTitle)
             }
         case .asistencias:
             NavigationStack {
-                AttendanceView().toolbar { bellItem }
+                AttendanceView()
+                    .nxBrandNavBar(title: CoreShellTab.asistencias.barTitle)
             }
         case .mas:
             NavigationStack {
@@ -174,29 +241,8 @@ struct CoreShellView: View {
                     modules: extraModules,
                     showClientes: modules.contains(.clientes)
                 )
-                .toolbar { bellItem }
+                .nxBrandNavBar(title: CoreShellTab.mas.barTitle)
             }
-        }
-    }
-
-    private var bellItem: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button { present(.notifications) } label: {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "bell")
-                    if badge.unreadCount > 0 {
-                        Text(badge.unreadCount > 99 ? "99+" : "\(badge.unreadCount)")
-                            .font(.caption2.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.red, in: Capsule())
-                            .offset(x: 10, y: -8)
-                    }
-                }
-            }
-            .accessibilityLabel(badge.unreadCount > 0 ? "Notificaciones, \(badge.unreadCount) sin leer" : "Notificaciones")
-            .accessibilityIdentifier("bell-button")
         }
     }
 
@@ -206,48 +252,69 @@ struct CoreShellView: View {
         case .notifications:
             NavigationStack {
                 NotificationsCenterView(onBack: { overlay = nil })
+                    // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
+                    .nxBrandNavBar(title: "Notificaciones", showsBell: false)
             }
         case .activity(let id, let tab):
             NavigationStack {
                 ActivityCoreDetailView(activityId: id, initialTab: tab)
+                    .nxBrandNavBar()
                     .toolbar { closeItem }
             }
         case .person(let userId):
             NavigationStack {
                 TeamMemberDetailView(userId: userId, nombre: "", isSelf: userId == myId)
+                    .nxBrandNavBar()
                     .toolbar { closeItem }
             }
         case .comidas:
             NavigationStack {
-                ComidasView().toolbar { closeItem }
+                ComidasView()
+                    .nxBrandNavBar(title: "Comidas")
+                    .toolbar { closeItem }
             }
         case .extra(let module):
             NavigationStack {
                 // Mismo destino que en el hub: un enlace o un push a Vehículos,
-                // Almacén o Proyectos abre su pantalla, no la ficha de la web.
-                CoreExtraDestination(module: module).toolbar { closeItem }
+                // Almacén o Proyectos abre su pantalla.
+                CoreExtraDestination(module: module)
+                    .nxBrandNavBar(title: module.title)
+                    .toolbar { closeItem }
             }
         case .viatico(let id):
             NavigationStack {
-                ViaticosView(abrirId: id).toolbar { closeItem }
+                ViaticosView(abrirId: id)
+                    .nxBrandNavBar(title: CoreExtraModule.viaticos.title)
+                    .toolbar { closeItem }
             }
         case .clientes(let id, let sector):
             NavigationStack {
                 ClientesHomeView(initialClientId: id, initialSectorSlug: sector)
+                    .nxBrandNavBar(title: CoreModule.clientes.title)
                     .toolbar { closeItem }
             }
             .environmentObject(session)
         case .perfil:
             NavigationStack {
-                MyProfileView().toolbar { closeItem }
+                MyProfileView()
+                    .nxBrandNavBar(title: CoreModule.perfil.title)
+                    .toolbar { closeItem }
             }
             .environmentObject(session)
         }
     }
 
+    /// Cerrar una cubierta: flecha blanca de volver, como el `ArrowBack` de
+    /// Android. Se llama «Cerrar» para VoiceOver y para las pruebas de UI.
     private var closeItem: some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) {
-            Button("Cerrar") { overlay = nil }
+        ToolbarItem(placement: .topBarLeading) {
+            Button { overlay = nil } label: {
+                Image(systemName: "chevron.backward")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.white)
+            }
+            .tint(Color.white)
+            .accessibilityLabel("Cerrar")
         }
     }
 
@@ -286,10 +353,11 @@ struct CoreShellView: View {
     }
 
     private func open(_ link: CoreLink) {
-        // Módulo del hub «Más»: se abre encima de la pestaña actual; si su rol
-        // no lo ve, a casa (misma regla que abajo).
+        // Módulo del hub «Más»: se abre encima de la pestaña actual. Si su rol no
+        // lo ve, o si la app todavía no tiene su pantalla, a casa (misma regla
+        // que abajo): nunca se abre una ficha a medias.
         if let extra = link.extra {
-            guard extraModules.contains(extra) else {
+            guard extraModules.contains(extra), CoreExtraDestination.tienePantallaNativa(extra) else {
                 selected = .inicio
                 return
             }
@@ -360,7 +428,7 @@ struct CoreShellView: View {
     @MainActor
     private func pollUnread() async {
         while !Task.isCancelled {
-            await badge.refresh()
+            await NotificationsBadgeStore.shared.refresh()
             if modules.contains(.actividades) {
                 await inicio.load(enabled: true)
             }

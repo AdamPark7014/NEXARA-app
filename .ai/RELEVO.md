@@ -9,6 +9,14 @@
   empleados, Herramientas completo). Mientras no existan, esos módulos no salen en iOS; ninguno abre la web.
   Referencia visual: emulador `nexara_phone` con el debug actual (`-PSCREENSHOT_API=true`) + modo `store_demo`
   (`files/store_demo/serve`); hace falta que Adam inicie sesión (no tecleamos contraseñas).
+  **Fase A hecha (base iOS = Android):** `NxColors` con los valores exactos de Android (fijos, sin oscuro),
+  `NxType`, componentes nuevos en `UI/Enterprise/NxParityComponents.swift` (NxPanelShell, NxListRow,
+  NxMetricStrip, NxFilterBar/Pill, NxSegmented, NxSearchField, NxUnderlineTabs, NxFab, NxAvatar, More*…),
+  barra inferior propia `NxBottomBar` sobre el `TabView` con la barra nativa oculta y barra superior teal
+  `.nxBrandNavBar(title:showsBell:)` en `UI/Enterprise/NxNavigationChrome.swift`; hub «Más» como Android, sin
+  Ejecutivo ni Documentos ni nada «En la web». Cotizaciones/Aprobaciones/Gastos/Pagos no salen en el hub hasta
+  tener pantalla (fase B). Reglas para pantallas: cada una aplica `.nxBrandNavBar()` a lo que apila,
+  `.nxListBackground()` en `List`/`Form`, y no poner `.tint` de marca en la raíz (AccentColor oscuro = blanco).
   **Capturas de paridad sin Mac:** `ios-screenshots.yml` ahora también corre en cada push a `main` que toque
   `apps/mobile-native/ios/**`: `ParityScreenshotsUITests` recorre todas las pantallas en modo demo y el bot deja
   los PNG en `docs/ios-paridad/iphone-69/` (commit `[skip ci]`; hacer `git pull --rebase` antes de empujar).

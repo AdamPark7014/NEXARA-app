@@ -240,11 +240,13 @@ final class StoreScreenshotsUITests: XCTestCase {
     }
 
     /// Por identificador (lo que pone la app) y, como plan B, por la etiqueta visible.
+    /// La barra inferior es propia (`NxBottomBar`, igual que Android): sus pestañas
+    /// son botones con `tab-<clave>`, no elementos de `app.tabBars`.
     private func elementosDePestana(_ pestana: Pestana) -> [XCUIElement] {
         [
-            app.tabBars.buttons.matching(identifier: pestana.id).firstMatch,
-            app.tabBars.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", pestana.etiqueta)).firstMatch,
-            app.descendants(matching: .any).matching(identifier: pestana.id).firstMatch
+            app.buttons.matching(identifier: pestana.id).firstMatch,
+            app.descendants(matching: .any).matching(identifier: pestana.id).firstMatch,
+            app.tabBars.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", pestana.etiqueta)).firstMatch
         ]
     }
 

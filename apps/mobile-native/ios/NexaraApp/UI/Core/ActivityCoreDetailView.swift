@@ -248,6 +248,8 @@ struct ActivityCoreDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { dockView }
         .navigationTitle(folio.isEmpty ? (titulo.isEmpty ? "Actividad" : titulo) : folio)
         .navigationBarTitleDisplayMode(.inline)
+        // Android `conBarraInferior`: el detalle lleva su dock; la barra de pestañas estorba.
+        .nxOcultaBarraInferior()
         .onAppear {
             guard !didApplyInitialTab else { return }
             didApplyInitialTab = true

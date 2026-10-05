@@ -55,9 +55,11 @@ enum CoreModule: String, CaseIterable, Identifiable, Hashable {
 /// Módulos de Core que no son pestaña: viven en el hub «Más» del shell.
 /// `rawValue` = clave de `GET me/navigation` (`moduleKeys` / `webModuleIds`),
 /// las mismas que la web registra en `apps/web/lib/core-surface.ts`. Mismo
-/// orden, textos y rutas que el hub «Más» de Android.
+/// orden, textos y grupos que el hub «Más» de Android.
+///
+/// Ejecutivo (`executive`) y Documentos (`erp-documentos`) ya no están: solo
+/// mandaban a la web. Si `me/navigation` los nombra, se ignoran.
 enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
-    case executive = "executive"
     case cotizaciones = "erp-cotizaciones"
     case proyectos = "erp-proyectos"
     case kpisEquipo = "kpis-equipo"
@@ -67,7 +69,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     case gastos = "erp-gastos"
     case aprobaciones = "erp-aprobaciones"
     case pagosEmpleados = "erp-pagos-empleados"
-    case documentos = "erp-documentos"
     /// Viáticos. La clave NO sale de `CORE_EXTRA_MODULES` —ahí no está—, sino de
     /// la que `me/navigation` ya emite para cualquier ruta que contenga
     /// `viatic` (`navigation-module-map.ts`: `viatics`, `my-viatics`).
@@ -77,7 +78,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .executive: return "Ejecutivo"
         case .cotizaciones: return "Cotizaciones"
         case .proyectos: return "Proyectos"
         case .kpisEquipo: return "KPIs del equipo"
@@ -87,32 +87,30 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .gastos: return "Gastos"
         case .aprobaciones: return "Aprobaciones"
         case .pagosEmpleados: return "Pagos a empleados"
-        case .documentos: return "Documentos"
         case .viaticos: return "Viáticos"
         }
     }
 
+    /// SF Symbol equivalente al icono relleno de Android (`CoreExtraModule.icon()`
+    /// en `MoreHubScreen.kt`).
     var systemImage: String {
         switch self {
-        case .executive: return "chart.line.uptrend.xyaxis"
-        case .cotizaciones: return "doc.text"
-        case .proyectos: return "folder"
-        case .kpisEquipo: return "chart.bar"
-        case .almacen: return "shippingbox"
-        case .herramientas: return "wrench.and.screwdriver"
-        case .vehiculos: return "car"
-        case .gastos: return "creditcard"
-        case .aprobaciones: return "checkmark.seal"
-        case .pagosEmpleados: return "wallet.pass"
-        case .documentos: return "doc.richtext"
-        case .viaticos: return "banknote"
+        case .cotizaciones: return "doc.text.fill"                     // RequestQuote
+        case .proyectos: return "folder.fill"                          // Folder
+        case .kpisEquipo: return "chart.line.uptrend.xyaxis"           // Insights
+        case .almacen: return "archivebox.fill"                        // Inventory2
+        case .herramientas: return "wrench.and.screwdriver.fill"       // Build
+        case .vehiculos: return "car.fill"                             // DirectionsCar
+        case .gastos: return "doc.plaintext.fill"                      // ReceiptLong
+        case .aprobaciones: return "list.bullet.clipboard.fill"        // FactCheck
+        case .pagosEmpleados: return "wallet.pass.fill"                // AccountBalanceWallet
+        case .viaticos: return "banknote.fill"                         // Payments
         }
     }
 
-    /// Ruta del módulo en la web de Core.
+    /// Ruta del módulo en la web de Core (la misma que reconocen los enlaces).
     var webPath: String {
         switch self {
-        case .executive: return "/erp/executive"
         case .cotizaciones: return "/erp/cotizaciones"
         case .proyectos: return "/erp/proyectos"
         case .kpisEquipo: return "/erp/asistencias/indicadores"
@@ -122,15 +120,13 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .gastos: return "/erp/finance/expenses"
         case .aprobaciones: return "/erp/approvals"
         case .pagosEmpleados: return "/erp/finance/employee-payments"
-        case .documentos: return "/erp/documents"
         case .viaticos: return "/erp/finance/viatics"
         }
     }
 
-    /// Una línea para la lista del hub «Más».
+    /// Una línea para la lista del hub «Más» (mismos textos que `CoreMenu.kt`).
     var summary: String {
         switch self {
-        case .executive: return "KPIs del negocio, vista de dirección."
         case .cotizaciones: return "Propuestas técnicas: folio, envío y seguimiento."
         case .proyectos: return "Cronograma, alcance, equipo y documentos."
         case .kpisEquipo: return "Retardos, uniforme y horas del equipo."
@@ -140,7 +136,6 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .gastos: return "Gastos de la operación: captura, comprobación y estado."
         case .aprobaciones: return "Lo que espera tu visto bueno, en un solo sitio."
         case .pagosEmpleados: return "Pagos y anticipos al personal, con su comprobante."
-        case .documentos: return "Manuales, planos y papeles de la operación."
         case .viaticos: return "Pide un viático con la foto del ticket, repártelo y compruébalo."
         }
     }
@@ -169,31 +164,22 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case hoy = "Hoy"
         case recursos = "Recursos"
         case finanzas = "Finanzas"
+        /// Sin módulos desde que salió Documentos; se conserva por paridad con Android.
         case gobierno = "Gobierno"
     }
 
     var group: Group {
         switch self {
-        case .executive, .cotizaciones, .proyectos, .kpisEquipo, .aprobaciones: return .hoy
+        case .cotizaciones, .proyectos, .kpisEquipo, .aprobaciones: return .hoy
         case .almacen, .herramientas, .vehiculos: return .recursos
         case .gastos, .pagosEmpleados, .viaticos: return .finanzas
-        case .documentos: return .gobierno
         }
-    }
-
-    /// El módulo en la web (`CoreNavigation.coreWebBase` + `webPath`), mientras
-    /// la app no tenga pantalla nativa.
-    var webURL: URL {
-        URL(string: CoreNavigation.coreWebBase + webPath) ?? URL(string: CoreNavigation.coreWebBase)!
     }
 }
 
 /// Qué ve cada quien en la app: solo ERP (Core) para el personal y el portal
 /// externo para cuentas de cliente o sucursal.
 enum CoreNavigation {
-    /// Origen de la web de Core; los módulos del hub «Más» se abren aquí.
-    static let coreWebBase = "https://core.nexara.com.mx"
-
     /// Módulos del hub «Más». Salen de `GET me/navigation` (`navModules`), con
     /// las mismas claves que la web registra en `core-surface.ts`:
     /// - cliente / sucursal o sin sesión: ninguno;
@@ -205,7 +191,7 @@ enum CoreNavigation {
     static func extraModules(for user: SessionUser?) -> [CoreExtraModule] {
         guard let user, !isExternal(user) else { return [] }
         // Modo demostración: solo los módulos con pantalla propia y datos de muestra.
-        // Los otros siete son un «Abrir en la web» y harían parecer la app incompleta.
+        // Los demás todavía no tienen pantalla y harían parecer la app incompleta.
         if DemoMode.isActive {
             return CoreExtraModule.allCases.filter { CoreExtraDestination.tienePantallaNativa($0) }
         }

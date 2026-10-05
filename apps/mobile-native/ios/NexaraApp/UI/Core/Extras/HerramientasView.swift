@@ -2,23 +2,12 @@ import SwiftUI
 
 /// Herramientas (`/erp/almacen/herramientas`) en iPhone: el escáner de etiquetas para
 /// saber de quién es una herramienta y, si quien escanea lleva el inventario, registrar
-/// su salida o su entrada. Pedir prestada, aprobar y ver el kit siguen en la web.
+/// su salida o su entrada. Pedir prestada, aprobar y ver el kit llegan con la
+/// pantalla completa de Herramientas (paridad con Android).
 struct HerramientasView: View {
-    @Environment(\.openURL) private var openURL
-
     var body: some View {
         List {
             EscanerDeHerramientas()
-
-            Section {
-                Button {
-                    openURL(CoreExtraModule.herramientas.webURL)
-                } label: {
-                    Label("Abrir Herramientas en la web", systemImage: "safari")
-                }
-            } footer: {
-                Text("Pedir una herramienta prestada, aprobar préstamos y revisar tu kit se hacen desde la web, con tu misma cuenta.")
-            }
 
             Section {
                 CoreExtrasNotaDeAlcance(

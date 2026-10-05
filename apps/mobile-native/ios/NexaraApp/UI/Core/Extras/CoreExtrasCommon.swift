@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// Piezas que comparten las cuatro pantallas de consulta de «Más» en iOS.
+/// Piezas que comparten las pantallas de consulta de «Más» en iOS.
 ///
-/// **No son las de Android.** Allá el lenguaje es Material: tarjetas elevadas,
-/// pastillas de filtro, rejilla de mosaicos. Aquí es Human Interface: listas
-/// agrupadas (`insetGrouped`), `Picker` segmentado para elegir el corte,
-/// `.searchable` para buscar, `.refreshable` para tirar y recargar, y
-/// `ContentUnavailableView` para lo vacío y lo roto. Un usuario de iPhone
-/// reconoce esas formas sin que nadie se las explique; una tarjeta de Material
-/// flotando en una lista de iOS se ve como lo que sería: una app de Android
-/// traducida.
+/// Desde la paridad con Android (octubre de 2026) la referencia de diseño es la
+/// app Android: fondo #F8FAFC, tarjetas blancas y las piezas de
+/// `UI/Enterprise/NxParityComponents.swift` (`MoreTarjeta`, `MoreCabecera`,
+/// `MoreDatoCard`, `MoreNotaDeAlcance`, `NxMetricStrip`…). Lo de aquí se
+/// conserva para las pantallas que todavía son listas de iOS, con los colores
+/// de Android, hasta que cada una se rehaga.
 
 // MARK: - Estado de carga
 
@@ -81,14 +79,18 @@ enum CoreExtrasSemaforo: String {
         }
     }
 
-    var color: Color {
+    /// Tono del design system (Android `Semaforo.tono()`).
+    var tono: NxTone {
         switch self {
-        case .verde: return .green
-        case .amarillo: return .orange
-        case .rojo: return .red
-        case .sinDatos: return .secondary
+        case .verde: return .success
+        case .amarillo: return .warning
+        case .rojo: return .danger
+        case .sinDatos: return .neutral
         }
     }
+
+    /// Color del semáforo: el `fg` de su tono (#10B981 / #F59E0B / #EF4444 / #6B7889).
+    var color: Color { tono.fg }
 
     var systemImage: String {
         switch self {
@@ -130,19 +132,20 @@ struct CoreExtrasAvisoDesactualizado: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "wifi.exclamationmark")
-                .foregroundStyle(.orange)
+            Image(systemName: "icloud.slash")
+                .foregroundStyle(NxColors.warning)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sigues viendo lo último que se pudo cargar")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
                 Text(mensaje)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(NxType.labelSmall)
+                    .foregroundStyle(NxColors.muted)
             }
         }
         .padding(.vertical, 4)
-        .listRowBackground(Color.orange.opacity(0.12))
+        .listRowBackground(NxColors.warningSoft)
     }
 }
 
@@ -155,9 +158,7 @@ struct CoreExtrasNotaDeAlcance: View {
     let texto: String
 
     var body: some View {
-        Label(texto, systemImage: "info.circle")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+        MoreNotaDeAlcance(texto: texto)
     }
 }
 
@@ -199,12 +200,12 @@ struct CoreExtrasDatoFila: View {
         LabeledContent {
             Text(valor)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(semaforo == .sinDatos ? Color.primary : semaforo.color)
+                .foregroundStyle(semaforo == .sinDatos ? NxColors.fg : semaforo.color)
         } label: {
             VStack(alignment: .leading, spacing: 1) {
                 Text(etiqueta)
                 if let pie, !pie.isEmpty {
-                    Text(pie).font(.caption).foregroundStyle(.secondary)
+                    Text(pie).font(NxType.bodySmall).foregroundStyle(NxColors.muted)
                 }
             }
         }
@@ -224,47 +225,28 @@ struct CoreExtrasBarra: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ProgressView(value: min(max(valor ?? 0, 0), 1))
-                .tint(valor == nil ? Color.secondary.opacity(0.4) : color)
+                .tint(valor == nil ? NxColors.muted : color)
                 .accessibilityHidden(true)
             Text(etiqueta)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NxType.labelSmall)
+                .foregroundStyle(NxColors.muted)
         }
     }
 }
 
 /// Círculo con iniciales cuando no hay foto; foto protegida cuando sí la hay.
+/// Dibuja `NxAvatar` (estilo suave de Android `PersonAvatar`).
 struct CoreExtrasAvatar: View {
     let nombre: String
     let url: String?
     var lado: CGFloat = 40
 
     var body: some View {
-        if let url, !url.isEmpty {
-            AuthenticatedImage(url: url)
-                .frame(width: lado, height: lado)
-                .clipShape(Circle())
-        } else {
-            ZStack {
-                Circle().fill(NxBrand.softFill)
-                Text(CoreExtrasAvatar.iniciales(nombre))
-                    .font(.system(size: lado * 0.36, weight: .heavy))
-                    .foregroundStyle(NxBrand.adaptive)
-            }
-            .frame(width: lado, height: lado)
-            .accessibilityHidden(true)
-        }
+        NxAvatar(nombre: nombre, url: url, size: lado)
     }
 
     /// «CG» para el círculo. Dos letras como mucho.
     static func iniciales(_ nombre: String) -> String {
-        let partes = nombre
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(separator: " ")
-            .filter { !$0.isEmpty }
-        guard !partes.isEmpty else { return "?" }
-        let letras = partes.prefix(2).compactMap { $0.first }
-        let texto = String(letras).uppercased()
-        return texto.isEmpty ? "?" : texto
+        NxAvatar.iniciales(nombre)
     }
 }

@@ -140,8 +140,8 @@ struct ChatView: View {
                     }
                 }
             }
-            .navigationTitle(compactTitle)
-            .navigationBarTitleDisplayMode(.inline)
+            // Barra teal de Android con la campana (la pone `CoreShellView` por entorno).
+            .nxBrandNavBar(title: compactTitle)
             .toolbar {
                 if isCompact && selectedChannelId != nil {
                     ToolbarItem(placement: .topBarLeading) {
