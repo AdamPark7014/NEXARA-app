@@ -2,8 +2,8 @@ import { CronService } from './cron.service';
 
 const NOW = new Date('2026-09-22T20:00:00.000Z').getTime();
 
-function build() {
-  jest.spyOn(Date, 'now').mockReturnValue(NOW);
+function build(now = NOW) {
+  jest.spyOn(Date, 'now').mockReturnValue(now);
 
   const prisma = {
     activity: {
@@ -66,6 +66,23 @@ describe('SLA breach escalate', () => {
     });
     // Publica evento de dominio agrupado por compañía
     expect(domainEvents.publishEntityLifecycle).toHaveBeenCalled();
+  });
+
+  it('de madrugada no manda avisos, pero el tablero se sigue actualizando', async () => {
+    // 2026-09-23 03:00 en Ciudad de México.
+    const { service, notificationHierarchy, domainEvents } = build(Date.parse('2026-09-23T09:00:00.000Z'));
+    await service.handleSlaBreachEscalate();
+
+    expect(notificationHierarchy.notifyTicketSlaBreach).not.toHaveBeenCalled();
+    expect(domainEvents.publishEntityLifecycle).toHaveBeenCalled();
+  });
+
+  it('en domingo no manda avisos', async () => {
+    // 2026-09-27 12:00 en Ciudad de México (domingo).
+    const { service, notificationHierarchy } = build(Date.parse('2026-09-27T18:00:00.000Z'));
+    await service.handleSlaBreachEscalate();
+
+    expect(notificationHierarchy.notifyTicketSlaBreach).not.toHaveBeenCalled();
   });
 });
 

@@ -10,7 +10,7 @@ import { DomainEventBusService } from '../../domain-events/domain-event-bus.serv
 import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
 import { normalizarPrioridad } from '../../activities/actividad-tiempos.js';
 import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
-import { WORKDAY_TIMEZONE } from '../time/workday.js';
+import { WORKDAY_TIMEZONE, workClock } from '../time/workday.js';
 
 @Injectable()
 export class CronService {
@@ -451,13 +451,17 @@ export class CronService {
     });
     if (!breaches.length) return;
     this.logger.warn(`SLA breaches abiertos: ${breaches.length}`);
+    // El aviso al teléfono sale solo en horario de oficina (lunes a sábado, 9 a 19 h); de
+    // madrugada o en domingo solo despertaba a la gente. El tablero se sigue actualizando cada hora.
+    const reloj = workClock(new Date(now));
+    const avisar = reloj.weekday !== 0 && reloj.hour >= 9 && reloj.hour < 19;
     const byCompany = new Map<number, typeof breaches>();
     for (const t of breaches) {
       const list = byCompany.get(t.companyId) || [];
       list.push(t);
       byCompany.set(t.companyId, list);
-      // Notificar a responsable y jefes por cada actividad vencida (dedupe interno ~2 h).
-      if (t.responsableId && Number(t.responsableId) > 0) {
+      // Notificar a responsable y jefes por cada actividad vencida (una vez al día, ver dedupe).
+      if (avisar && t.responsableId && Number(t.responsableId) > 0) {
         void this.notificationHierarchy
           .notifyTicketSlaBreach({ activityId: t.id, userId: Number(t.responsableId) })
           .catch((err) => this.logger.warn(`SLA breach notify hierarchy: ${err instanceof Error ? err.message : String(err)}`));

@@ -77,6 +77,12 @@ export function workDateKey(instante: Date, tz = WORKDAY_TIMEZONE): string {
   return `${p.year}-${dosDigitos(p.month)}-${dosDigitos(p.day)}`;
 }
 
+/** Hora (0–23) y día de la semana (0 = domingo) de un instante en la zona. */
+export function workClock(instante: Date, tz = WORKDAY_TIMEZONE): { hour: number; weekday: number } {
+  const p = partesEn(instante, tz);
+  return { hour: p.hour, weekday: new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay() };
+}
+
 /**
  * Instante UTC en que empieza (00:00) el día laboral que contiene a `instante`.
  *
