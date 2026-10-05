@@ -14,6 +14,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 
 import androidx.compose.foundation.background
 
+import androidx.compose.foundation.selection.toggleable
+
+import androidx.compose.material3.Switch
+
+import androidx.compose.ui.semantics.Role
+
 import androidx.compose.foundation.layout.Arrangement
 
 import androidx.compose.foundation.layout.Column
@@ -138,6 +144,13 @@ data class InventoryDetailUiState(
 
     val confirmDifference: Boolean = false,
 
+    /**
+     * `null` mientras no se sabe. Aprobar y rechazar sólo existen en
+     * `client-portal`: a una sucursal el API le responde 403 y la web de
+     * sucursal no los enseña, así que sólo se pintan con `false`.
+     */
+    val isBranchUser: Boolean? = null,
+
 )
 
 
@@ -160,7 +173,10 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
             models = setOf("InventorySnapshot", "InventoryItem"),
 
-            refresh = { load(activeId, initial = false) },
+            // Un cambio en otro lado no pisa las notas que se están escribiendo
+            // ni el aviso de lo que se acaba de hacer (la sincronización misma
+            // dispara este evento y borraba «Inventario sincronizado»).
+            refresh = { activeId?.let { load(it, initial = false, keepDraft = true) } },
 
         )
 
@@ -168,7 +184,12 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
 
 
-    fun load(id: Long?, initial: Boolean = true) {
+    /**
+     * `keepDraft`: tras una acción (o un aviso en tiempo real) se conservan las
+     * notas, los interruptores y el aviso de éxito; sólo se actualiza el
+     * inventario. La carga inicial y el gesto de recargar los reinician.
+     */
+    fun load(id: Long?, initial: Boolean = true, keepDraft: Boolean = false) {
 
         activeId = id
 
@@ -182,9 +203,15 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
         _state.update {
 
-            if (initial) it.copy(isLoading = true, error = null, message = null)
+            when {
 
-            else it.copy(isRefreshing = true, error = null, message = null)
+                initial -> it.copy(isLoading = true, error = null, message = null)
+
+                keepDraft -> it.copy(isRefreshing = true, error = null)
+
+                else -> it.copy(isRefreshing = true, error = null, message = null)
+
+            }
 
         }
 
@@ -192,25 +219,49 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
             try {
 
-                val detail = withContext(Dispatchers.IO) { repo.inventoryDetail(id) }
+                val (detail, branchUser) = withContext(Dispatchers.IO) {
+
+                    repo.inventoryDetail(id) to repo.isBranchUser()
+
+                }
 
                 _state.update {
 
-                    it.copy(
+                    if (keepDraft) {
 
-                        isLoading = false,
+                        it.copy(
 
-                        isRefreshing = false,
+                            isLoading = false,
 
-                        snapshot = detail,
+                            isRefreshing = false,
 
-                        notes = detail.notes ?: "",
+                            snapshot = detail,
 
-                        markCompleted = (detail.status ?: "").uppercase() == "COMPLETED",
+                            isBranchUser = branchUser,
 
-                        confirmDifference = false,
+                        )
 
-                    )
+                    } else {
+
+                        it.copy(
+
+                            isLoading = false,
+
+                            isRefreshing = false,
+
+                            snapshot = detail,
+
+                            isBranchUser = branchUser,
+
+                            notes = detail.notes ?: "",
+
+                            markCompleted = (detail.status ?: "").uppercase() == "COMPLETED",
+
+                            confirmDifference = false,
+
+                        )
+
+                    }
 
                 }
 
@@ -306,7 +357,28 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                 val updated = withContext(Dispatchers.IO) { repo.decideInventory(id, decision) }
 
-                _state.update { it.copy(saving = false, snapshot = updated, message = "Inventario actualizado") }
+                // El API responde el inventario SIN sucursal ni equipos: ponerlo
+                // tal cual dejaba la pantalla en «Items (0)». Se toma sólo el
+                // estatus nuevo y se vuelve a pedir el detalle completo.
+                _state.update {
+
+                    it.copy(
+
+                        saving = false,
+
+                        snapshot = it.snapshot?.let { s ->
+
+                            s.copy(status = updated.status ?: s.status, approvedAt = updated.approvedAt)
+
+                        },
+
+                        message = if (decision == "APPROVED") "Inventario aprobado" else "Inventario rechazado",
+
+                    )
+
+                }
+
+                load(id, initial = false, keepDraft = true)
 
             } catch (e: Exception) {
 
@@ -388,6 +460,9 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
             try {
 
+                // Sin `items`: el API conserva los equipos que ya tiene, con sus
+                // fotos. Mandar `snap.items` (sin `equipmentName`) hacía que el
+                // API los descartara todos y dejara el inventario vacío.
                 val updated = withContext(Dispatchers.IO) {
 
                     repo.syncInventory(
@@ -404,11 +479,11 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                         confirmDifference = _state.value.confirmDifference,
 
-                        items = snap.items,
-
                     )
 
                 }
+
+                val complete = updated.items != null && updated.branch != null
 
                 _state.update {
 
@@ -416,13 +491,17 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                         saving = false,
 
-                        snapshot = updated,
+                        snapshot = if (complete) updated else it.snapshot,
+
+                        confirmDifference = false,
 
                         message = "Inventario sincronizado",
 
                     )
 
                 }
+
+                if (!complete) load(snap.id, initial = false, keepDraft = true)
 
             } catch (e: Exception) {
 
@@ -444,6 +523,33 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
     }
 
+}
+
+
+
+/** Renglón con interruptor: título, explicación y `Switch` (toda la fila es tocable). */
+@Composable
+private fun InventoryToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = { onToggle() })
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        // `onCheckedChange = null`: el toque lo maneja la fila (accesible como un solo control).
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
 }
 
 
@@ -699,29 +805,35 @@ fun TicketsInventoryDetailScreen(
 
                         Spacer(Modifier.height(8.dp))
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        // Interruptores con su nombre completo, no «Marcado:
+                        // COMPLETADO» / «ConfirmDiff: Sí». Se aplican al sincronizar.
+                        InventoryToggleRow(
 
-                            OutlinedButton(
+                            title = "Marcar como completado",
 
-                                onClick = vm::toggleCompleted,
+                            subtitle = "Al sincronizar, el inventario queda como terminado.",
 
-                                enabled = !state.saving,
+                            checked = state.markCompleted,
 
-                                modifier = Modifier.weight(1f),
+                            enabled = !state.saving,
 
-                            ) { Text(if (state.markCompleted) "Marcado: COMPLETADO" else "Marcar: COMPLETADO") }
+                            onToggle = vm::toggleCompleted,
 
-                            OutlinedButton(
+                        )
 
-                                onClick = vm::toggleConfirmDifference,
+                        InventoryToggleRow(
 
-                                enabled = !state.saving,
+                            title = "Confirmar diferencia de equipos",
 
-                                modifier = Modifier.weight(1f),
+                            subtitle = "Actívalo si el número de equipos cambió respecto al inventario anterior.",
 
-                            ) { Text(if (state.confirmDifference) "ConfirmDiff: Sí" else "ConfirmDiff: No") }
+                            checked = state.confirmDifference,
 
-                        }
+                            enabled = !state.saving,
+
+                            onToggle = vm::toggleConfirmDifference,
+
+                        )
 
                         Spacer(Modifier.height(8.dp))
 
@@ -735,29 +847,35 @@ fun TicketsInventoryDetailScreen(
 
                         ) { Text(if (state.saving) "Sincronizando…" else "Sincronizar inventario") }
 
-                        Spacer(Modifier.height(8.dp))
+                        // Aprobar y rechazar: sólo la cuenta cliente (a una
+                        // sucursal el API le responde 403).
+                        if (state.isBranchUser == false) {
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Spacer(Modifier.height(8.dp))
 
-                            OutlinedButton(
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
 
-                                onClick = { vm.decide(snap.id, "APPROVED") },
+                                OutlinedButton(
 
-                                enabled = !state.saving,
+                                    onClick = { vm.decide(snap.id, "APPROVED") },
 
-                                modifier = Modifier.weight(1f),
+                                    enabled = !state.saving,
 
-                            ) { Text("Aprobar") }
+                                    modifier = Modifier.weight(1f),
 
-                            OutlinedButton(
+                                ) { Text("Aprobar") }
 
-                                onClick = { vm.decide(snap.id, "REJECTED") },
+                                OutlinedButton(
 
-                                enabled = !state.saving,
+                                    onClick = { vm.decide(snap.id, "REJECTED") },
 
-                                modifier = Modifier.weight(1f),
+                                    enabled = !state.saving,
 
-                            ) { Text("Rechazar") }
+                                    modifier = Modifier.weight(1f),
+
+                                ) { Text("Rechazar") }
+
+                            }
 
                         }
 
@@ -819,17 +937,11 @@ fun TicketsInventoryDetailScreen(
 
                         NxPanelShell(contentPadding = PaddingValues(12.dp)) {
 
-                            Text(item.itemName ?: "Equipo", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                            // `equipmentName` (lo que manda el API), con respaldo a `itemName`.
+                            Text(item.displayName() ?: "Equipo", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
 
-                            val meta = buildList {
-
-                                item.serialNumber?.takeIf { it.isNotBlank() }?.let { add("SN: $it") }
-
-                                item.compareState?.takeIf { it.isNotBlank() }?.let { add(it) }
-
-                                item.itemStatus?.takeIf { it.isNotBlank() }?.let { add(it) }
-
-                            }.joinToString(" · ")
+                            // «SN: … · Sin cambios · Activo» en vez de «UNCHANGED · ACTIVE».
+                            val meta = inventoryItemMeta(item)
 
                             if (meta.isNotBlank()) {
 

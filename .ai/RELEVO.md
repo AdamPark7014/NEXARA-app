@@ -22,6 +22,15 @@
   Aprobaciones (+ prueba) y fecha de devolución de Herramientas un día antes en el escáner (fecha sin hora leída
   como UTC). En curso con agentes: pantallas viejas del portal iOS y `AlmacenEscaneo`. El AAB 1.0.6 (16) de Cursor
   NO trae estos arreglos de Android: se regenera.
+  **~15:20:** hora blanca VERIFICADA en las capturas (teal = 255,255,255; Inicio negro). Portal iOS a paridad
+  (`5a4f9250`), escáner de Almacén iOS (`8f5ed4d8`), cubiertas sin el «volver» del sistema. El build de iOS falló
+  por `ApiClient.swift:162` (acceso solapado a `comps`) → arreglado. Android: 10 errores del portal (el grave:
+  «Sincronizar inventario» borraba todos los equipos al mandarlos sin `equipmentName`; ahora no manda `items`),
+  `PortalRules.kt` + 20 pruebas. **OJO stash:** `stash@{0}` «autostash» lo dejó un `pull --autostash` de Cursor
+  (14:47) con una copia VIEJA del portal iOS: NO hacer `pop`. **Pendiente de decidir:** «Sincronizar» en un
+  inventario que viene de un servicio crea otro vacío (API `syncManualSnapshot` solo busca los manuales; igual en
+  web/iOS/Android). Adam autorizó publicar las dos apps (iOS build 9 a revisión reemplazando el 8; Android
+  1.0.6 (16) a producción) cuando CI esté verde.
 
 - **05-10 ~14:35 (cursor) — Paridad iOS ← Android terminada (fase B) y avisos de Android.** Pedido de Adam:
   «la iOS tiene muchos errores y le falta paridad en UI y colores; las notificaciones de Android son pobres

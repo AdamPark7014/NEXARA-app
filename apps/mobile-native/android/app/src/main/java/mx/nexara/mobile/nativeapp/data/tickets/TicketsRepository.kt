@@ -30,7 +30,12 @@ class TicketsRepository(context: Context) {
     ).create(BranchPortalApi::class.java)
     private val textMedia = "text/plain".toMediaType()
 
-    private fun isBranchUser(): Boolean = authRepo.loadSession()?.isBranchUser == true
+    /**
+     * Cuenta de sucursal (no cliente). Las pantallas la usan para no ofrecer lo
+     * que sólo existe en `client-portal` (cerrar/autorizar solicitudes,
+     * aprobar/rechazar inventarios): a una sucursal el API le responde 403.
+     */
+    fun isBranchUser(): Boolean = authRepo.loadSession()?.isBranchUser == true
 
     suspend fun profile(): PortalProfile? {
         return if (isBranchUser()) {
@@ -193,12 +198,20 @@ class TicketsRepository(context: Context) {
         )
     }
 
+    /** Sólo cuenta cliente: `branch-portal` no tiene cerrar ni autorizar. */
     suspend fun closeRequest(id: Long) = api.closeRequest(id = id)
 
+    /** Sólo cuenta cliente (`APPROVED` | `REJECTED`). */
     suspend fun decideRequest(id: Long, decision: String) =
         api.decideRequest(id = id, body = mx.nexara.mobile.nativeapp.data.api.RequestDecisionBody(decision = decision))
 
-    suspend fun projects() = api.getProjects()
+    /**
+     * Proyectos del cliente para el filtro de tickets. A una sucursal no se le
+     * piden: `branch-portal/tickets` no filtra por proyecto y `client-portal`
+     * le respondía 403 en cada recarga.
+     */
+    suspend fun projects(): List<mx.nexara.mobile.nativeapp.data.api.ClientPortalProjectDto> =
+        if (isBranchUser()) emptyList() else api.getProjects()
 
     suspend fun pendingFeedback(): List<PendingFeedbackTicketDto> = api.getPendingFeedback()
 
@@ -319,14 +332,24 @@ class TicketsRepository(context: Context) {
         return api.getInventoryReportPdf(id = id).bytes()
     }
 
+    /** La sucursal sube por `branch-portal` (como la web); `client-portal` le responde 403. */
     suspend fun uploadInventoryMedia(files: List<Pair<String, ByteArray>>): UploadUrlsResponse {
         val parts = files.map { (filename, bytes) ->
             val body = bytes.toRequestBody("image/*".toMediaType())
             MultipartBody.Part.createFormData("files", filename, body)
         }
-        return api.uploadInventoryMedia(files = parts)
+        return if (isBranchUser()) {
+            branchApi.uploadInventoryMedia(files = parts)
+        } else {
+            api.uploadInventoryMedia(files = parts)
+        }
     }
 
+    /**
+     * Sincroniza notas y estatus del inventario. Sin `items` (lo que manda la
+     * pantalla) el API conserva los equipos que ya tiene, con sus fotos; ver
+     * [buildSyncInventoryBody]. La sucursal sincroniza por `branch-portal`.
+     */
     suspend fun syncInventory(
         branchId: Long,
         snapshotId: Long?,
@@ -334,19 +357,25 @@ class TicketsRepository(context: Context) {
         notes: String?,
         completed: Boolean,
         confirmDifference: Boolean,
-        items: List<ClientPortalInventoryItemDto>?,
-    ) = api.syncInventory(
-        SyncInventoryInputDto(
+        items: List<ClientPortalInventoryItemDto>? = null,
+    ): ClientPortalInventorySnapshotDto {
+        val body = buildSyncInventoryBody(
             branchId = branchId,
             snapshotId = snapshotId,
-            title = title?.trim().takeIf { !it.isNullOrBlank() },
-            notes = notes?.trim().takeIf { !it.isNullOrBlank() },
+            title = title,
+            notes = notes,
             completed = completed,
             confirmDifference = confirmDifference,
             items = items,
         )
-    )
+        return if (isBranchUser()) branchApi.syncInventory(body) else api.syncInventory(body)
+    }
 
+    /**
+     * Sólo cuenta cliente (`APPROVED` | `REJECTED`). El API responde el
+     * inventario SIN sucursal ni equipos (`updateStatus` no hace `include`):
+     * quien llama debe volver a pedir el detalle.
+     */
     suspend fun decideInventory(id: Long, decision: String) =
         api.decideInventory(id = id, body = DecideInventoryBody(decision = decision))
 
@@ -390,5 +419,47 @@ class TicketsRepository(context: Context) {
         is org.json.JSONArray -> (0 until value.length()).map { jsonValue(value.get(it)) }
         else -> value
     }
+}
+
+/**
+ * Cuerpo de `…/inventories/sync`.
+ *
+ * `items == null` (lo que manda «Sincronizar inventario»): el campo no viaja
+ * y el API conserva los equipos que ya tiene el inventario, con sus fotos
+ * (`InventoriesService.syncManualSnapshot`: `Array.isArray(payload.items) ?
+ * payload.items : current.items`).
+ *
+ * Si se mandan equipos, el API **reemplaza** los del inventario: descarta los
+ * que no traen `equipmentName` (`sanitizeItems`) y borra todos los demás.
+ * Android los reenviaba tal como los recibió, sin `equipmentName` (ni lo leía),
+ * y un solo toque dejaba el inventario vacío. Por eso aquí cada equipo sale
+ * con `equipmentName` y, si alguno no tiene nombre, no se manda nada: mejor
+ * fallar que borrar equipos.
+ */
+internal fun buildSyncInventoryBody(
+    branchId: Long,
+    snapshotId: Long?,
+    title: String?,
+    notes: String?,
+    completed: Boolean,
+    confirmDifference: Boolean,
+    items: List<ClientPortalInventoryItemDto>? = null,
+): SyncInventoryInputDto {
+    val namedItems = items?.map { item ->
+        val name = item.displayName()
+            ?: throw IllegalArgumentException(
+                "Hay equipos sin nombre; no se sincronizó para no borrarlos del inventario",
+            )
+        item.copy(equipmentName = name)
+    }
+    return SyncInventoryInputDto(
+        branchId = branchId,
+        snapshotId = snapshotId,
+        title = title?.trim().takeIf { !it.isNullOrBlank() },
+        notes = notes?.trim().takeIf { !it.isNullOrBlank() },
+        completed = completed,
+        confirmDifference = confirmDifference,
+        items = namedItems,
+    )
 }
 

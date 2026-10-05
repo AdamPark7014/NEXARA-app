@@ -93,6 +93,19 @@ interface BranchPortalApi {
     @GET("branch-portal/inventories/{id}")
     suspend fun inventoryDetail(@Path("id") id: Long): ClientPortalInventorySnapshotDto
 
+    /**
+     * La sucursal sincroniza y sube fotos por su propio portal, como la web
+     * (`TicketsInventoryManager`): `client-portal` le responde 403
+     * (`ClientPortalGuard`). El API toma la sucursal de la sesión e ignora
+     * `branchId` del cuerpo.
+     */
+    @POST("branch-portal/inventories/sync")
+    suspend fun syncInventory(@Body body: SyncInventoryInputDto): ClientPortalInventorySnapshotDto
+
+    @Multipart
+    @POST("branch-portal/inventories/upload")
+    suspend fun uploadInventoryMedia(@Part files: List<MultipartBody.Part>): UploadUrlsResponse
+
     @Streaming
     @GET("branch-portal/inventories/{id}/report")
     suspend fun inventoryReportPdf(@Path("id") id: Long): Response<okhttp3.ResponseBody>

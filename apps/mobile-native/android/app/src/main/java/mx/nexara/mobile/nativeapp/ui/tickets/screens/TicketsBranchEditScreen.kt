@@ -36,6 +36,18 @@ import androidx.compose.foundation.rememberScrollState
 
 import androidx.compose.foundation.verticalScroll
 
+import androidx.compose.foundation.text.KeyboardOptions
+
+import androidx.compose.material3.TextButton
+
+import androidx.compose.ui.semantics.contentDescription
+
+import androidx.compose.ui.semantics.semantics
+
+import androidx.compose.ui.text.input.ImeAction
+
+import androidx.compose.ui.text.input.KeyboardType
+
 import androidx.compose.material3.Button
 
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -128,6 +140,19 @@ private fun absoluteAssetUrl(raw: String?): String? {
 
 
 
+/** «±» al final del campo de coordenada (cambia el signo). */
+@Composable
+private fun CoordinateSignButton(onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.semantics { contentDescription = "Cambiar signo" },
+    ) {
+        Text("±", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+
+
 private fun Context.readLogoBytes(uri: Uri): ByteArray? =
 
     runCatching { contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
@@ -196,6 +221,16 @@ data class TicketsBranchEditUiState(
 
     val logoUri: Uri? = null,
 
+    /**
+     * Id de la sucursal recién creada desde esta pantalla. La ruta de «Nueva
+     * sucursal» no trae id y la pantalla se queda abierta tras guardar: sin
+     * esto, un segundo «Guardar» creaba OTRA sucursal. Ya creada, se actualiza.
+     */
+    val createdId: Long? = null,
+
+    /** Latitud/longitud que no son número: se marca en el campo y no se guarda. */
+    val coordinatesError: String? = null,
+
 )
 
 
@@ -210,7 +245,10 @@ class TicketsBranchEditViewModel(app: Application) : AndroidViewModel(app) {
 
 
 
-    fun load(branchId: Long?, initial: Boolean = true) {
+    fun load(routeBranchId: Long?, initial: Boolean = true) {
+
+        // Tras crear, recargar trae la sucursal nueva (la ruta sigue sin id).
+        val branchId = routeBranchId ?: _state.value.createdId
 
         _state.update {
 
@@ -322,9 +360,14 @@ class TicketsBranchEditViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPlaceId(v: String) = _state.update { it.copy(placeId = v) }
 
-    fun setLatitud(v: String) = _state.update { it.copy(latitud = v) }
+    fun setLatitud(v: String) = _state.update { it.copy(latitud = sanitizeCoordinateInput(v), coordinatesError = null) }
 
-    fun setLongitud(v: String) = _state.update { it.copy(longitud = v) }
+    fun setLongitud(v: String) = _state.update { it.copy(longitud = sanitizeCoordinateInput(v), coordinatesError = null) }
+
+    /** «±»: en México la longitud es negativa y no todos los teclados numéricos traen «-». */
+    fun toggleLatitudSign() = setLatitud(toggleCoordinateSign(_state.value.latitud))
+
+    fun toggleLongitudSign() = setLongitud(toggleCoordinateSign(_state.value.longitud))
 
     fun toggleActive() = _state.update { it.copy(isActive = !it.isActive) }
 
@@ -334,9 +377,24 @@ class TicketsBranchEditViewModel(app: Application) : AndroidViewModel(app) {
 
 
 
-    fun save(branchId: Long?, context: Context) {
+    fun save(routeBranchId: Long?, context: Context) {
 
         val s = _state.value
+
+        if (s.saving) return
+
+        // La de la ruta o la que se acaba de crear aquí: desde ese momento se actualiza.
+        val branchId = routeBranchId ?: s.createdId
+
+        // Antes un valor que no era número se descartaba en silencio
+        // (`toDoubleOrNull()`) y la sucursal quedaba sin coordenadas.
+        branchCoordinatesError(s.latitud, s.longitud)?.let { problem ->
+
+            _state.update { it.copy(coordinatesError = problem, message = null) }
+
+            return
+
+        }
 
         _state.update { it.copy(saving = true, error = null, message = null) }
 
@@ -344,9 +402,9 @@ class TicketsBranchEditViewModel(app: Application) : AndroidViewModel(app) {
 
             try {
 
-                val lat = s.latitud.trim().toDoubleOrNull()
+                val lat = parseCoordinate(s.latitud)
 
-                val lng = s.longitud.trim().toDoubleOrNull()
+                val lng = parseCoordinate(s.longitud)
 
                 val logoUri = s.logoUri
 
@@ -452,6 +510,10 @@ class TicketsBranchEditViewModel(app: Application) : AndroidViewModel(app) {
 
                         branch = saved,
 
+                        createdId = if (branchId == null && saved.id > 0) saved.id else it.createdId,
+
+                        portalPassword = "",
+
                         logoUri = null,
 
                         message = if (branchId == null) "Sucursal creada" else "Sucursal actualizada",
@@ -524,6 +586,9 @@ fun TicketsBranchEditScreen(
 
     }
 
+    // Alta sólo mientras no se ha creado; después la pantalla edita la nueva.
+    val isNew = branchId == null && state.createdId == null
+
 
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -594,7 +659,7 @@ fun TicketsBranchEditScreen(
 
                 Text(
 
-                    if (branchId == null) "Nueva sucursal" else "Editar sucursal",
+                    if (isNew) "Nueva sucursal" else "Editar sucursal",
 
                     style = MaterialTheme.typography.titleLarge,
 
@@ -702,7 +767,7 @@ fun TicketsBranchEditScreen(
 
                         onValueChange = vm::setPortalPassword,
 
-                        label = { Text(if (branchId == null) "Password *" else "Password (opcional)") },
+                        label = { Text(if (isNew) "Password *" else "Password (opcional)") },
 
                         modifier = Modifier.fillMaxWidth(),
 
@@ -820,7 +885,10 @@ fun TicketsBranchEditScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    // Teclado numérico + «±»: el decimal no siempre trae «-» y en
+                    // México la longitud es negativa (p. ej. -98.2063). Uno bajo
+                    // otro para que el botón «±» no apriete el número.
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
 
                         OutlinedTextField(
 
@@ -830,7 +898,15 @@ fun TicketsBranchEditScreen(
 
                             label = { Text("Latitud") },
 
-                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("19.0414") },
+
+                            isError = state.coordinatesError != null,
+
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+
+                            trailingIcon = { CoordinateSignButton(onClick = vm::toggleLatitudSign) },
+
+                            modifier = Modifier.fillMaxWidth(),
 
                             singleLine = true,
 
@@ -844,11 +920,27 @@ fun TicketsBranchEditScreen(
 
                             label = { Text("Longitud") },
 
-                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("-98.2063") },
+
+                            isError = state.coordinatesError != null,
+
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+
+                            trailingIcon = { CoordinateSignButton(onClick = vm::toggleLongitudSign) },
+
+                            modifier = Modifier.fillMaxWidth(),
 
                             singleLine = true,
 
                         )
+
+                    }
+
+                    state.coordinatesError?.let { problem ->
+
+                        Spacer(Modifier.height(6.dp))
+
+                        Text(problem, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
 
                     }
 

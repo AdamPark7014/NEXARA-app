@@ -463,7 +463,9 @@ fun TicketsTicketDetailScreen(
 
                     val responsable = ticketPersonName(t.responsable)
 
-                    val evidencias = ticketMapList(t.evidencias) + ticketMapList(t.activityEvidence)
+                    // `evidencias` + el flujo del técnico (`activityEvidences`):
+                    // foto de llegada, fotos de trabajo, PDF y foto de salida.
+                    val evidencias = portalTicketEvidenceFiles(t)
 
                     val serviceSheet = ticketAsMap(t.serviceSheet)
 
@@ -535,7 +537,8 @@ fun TicketsTicketDetailScreen(
 
                                 Text("Operación / SLA", fontWeight = FontWeight.SemiBold)
 
-                                TicketDetailRow("Prioridad", t.displayPriority())
+                                // Con su etiqueta («Alta»), no cruda («HIGH»).
+                                TicketDetailRow("Prioridad", NxStatusLabels.priority(t.displayPriority()) ?: "—")
 
                                 TicketDetailRow("Tipo", (t.ticketType ?: t.urgency)?.takeIf { it.isNotBlank() }?.let(NxStatusLabels::label))
 
@@ -605,36 +608,29 @@ fun TicketsTicketDetailScreen(
 
                             item { Text("Evidencias (${evidencias.size})", fontWeight = FontWeight.SemiBold) }
 
-                            items(evidencias.take(20), key = { it.hashCode() }) { ev ->
+                            items(evidencias.take(20), key = { "${it.url}|${it.title}|${it.hashCode()}" }) { ev ->
 
                                 // La web enseña la foto; aquí sólo se leía el texto,
                                 // así que el cliente no podía VER la evidencia de su
                                 // propio servicio — que es para lo que sirve.
 
-                                val fileUrl = toAbsoluteAssetUrl(
+                                val fileUrl = toAbsoluteAssetUrl(ev.url.takeIf { it.isNotBlank() })
 
-                                    ticketMapStr(ev, "archivoUrl", "fileUrl", "url", "path").takeIf { it.isNotBlank() }
+                                val isPdf = ev.isPdf
 
-                                )
-
-                                val lower = fileUrl.lowercase()
-
-                                val isPdf = lower.endsWith(".pdf")
-
-                                val isImage = fileUrl.isNotBlank() && !isPdf
+                                val isImage = fileUrl.isNotBlank() && ev.isImage
 
                                 NxPanelShell(contentPadding = PaddingValues(12.dp)) {
 
                                     Text(
 
-                                        ticketMapStr(ev, "tipoEvidencia", "description", "descripcion", "name", "tipo")
-                                            .ifBlank { "Evidencia" },
+                                        ev.title.ifBlank { "Evidencia" },
 
                                         fontWeight = FontWeight.Medium,
 
                                     )
 
-                                    val comentarios = ticketMapStr(ev, "comentarios", "description", "descripcion")
+                                    val comentarios = ev.comments
 
                                     if (comentarios.isNotBlank()) {
 
@@ -642,7 +638,7 @@ fun TicketsTicketDetailScreen(
 
                                     }
 
-                                    val whenAt = ticketMapStr(ev, "subidoEn", "createdAt", "fecha", "uploadedAt")
+                                    val whenAt = ev.uploadedAt
 
                                     if (whenAt.isNotBlank()) {
 
@@ -670,7 +666,7 @@ fun TicketsTicketDetailScreen(
 
                                         )
 
-                                    } else if (isPdf) {
+                                    } else if (isPdf && fileUrl.isNotBlank()) {
 
                                         Spacer(Modifier.height(8.dp))
 
@@ -894,20 +890,6 @@ private fun TicketDetailRow(label: String, value: String?) {
 @Suppress("UNCHECKED_CAST")
 
 private fun ticketAsMap(value: Any?): Map<String, Any?>? = value as? Map<String, Any?>
-
-
-
-@Suppress("UNCHECKED_CAST")
-
-private fun ticketMapList(value: Any?): List<Map<String, Any?>> = when (value) {
-
-    is List<*> -> value.mapNotNull { it as? Map<String, Any?> }
-
-    is Map<*, *> -> listOf(value as Map<String, Any?>)
-
-    else -> emptyList()
-
-}
 
 
 

@@ -107,7 +107,16 @@ data class ClientPortalTicketDto(
     val responsable: Any? = null,
     val evidencias: Any? = null,
     val serviceSheet: Any? = null,
+    /** Respaldo de respuestas viejas; el API actual no lo manda (ver `activityEvidences`). */
     val activityEvidence: Any? = null,
+    /**
+     * Flujo de evidencia del técnico (foto de llegada, fotos de trabajo, PDF de
+     * la hoja y foto de salida). `client-portal/tickets/:id` y
+     * `branch-portal/tickets/:id` lo incluyen como `activityEvidences`, en
+     * plural y como arreglo (uno por asignado). Android lo buscaba en
+     * `activityEvidence` y el cliente nunca veía esas fotos.
+     */
+    val activityEvidences: Any? = null,
     val comentariosFeedback: String? = null,
 ) {
     fun displayPriority(): String = prioridad ?: urgency ?: "—"
@@ -203,6 +212,9 @@ data class ClientPortalInventorySnapshotRefRequestDto(
 data class ClientPortalInventoryItemDto(
     val id: Long? = null,
     val groupName: String? = null,
+    /** Nombre del equipo tal como lo guarda el API (`InventoryItem.equipmentName`). */
+    val equipmentName: String? = null,
+    /** Respaldo: el modelo de Prisma no tiene `itemName`; se conserva por respuestas viejas. */
     val itemName: String? = null,
     val brand: String? = null,
     val modelBefore: String? = null,
@@ -219,7 +231,16 @@ data class ClientPortalInventoryItemDto(
     val compareState: String? = null,
     val notes: String? = null,
     val sortOrder: Int? = null,
-)
+) {
+    /**
+     * Nombre visible del equipo: `equipmentName` y, si no vino, `itemName`.
+     * Leyendo sólo `itemName` cada equipo salía como «Equipo» o con el nombre de
+     * su grupo, porque el API nunca manda ese campo.
+     */
+    fun displayName(): String? =
+        equipmentName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: itemName?.trim()?.takeIf { it.isNotEmpty() }
+}
 
 data class ClientPortalInventorySnapshotDto(
     val id: Long,
@@ -242,6 +263,11 @@ data class ClientPortalInventorySnapshotDto(
     val items: List<ClientPortalInventoryItemDto>? = null,
 )
 
+/**
+ * Cuerpo de `…/inventories/sync`. `items == null` no viaja (Moshi omite los
+ * nulos) y entonces el API conserva los equipos del inventario. Armarlo con
+ * `buildSyncInventoryBody`, que protege ese caso.
+ */
 data class SyncInventoryInputDto(
     val branchId: Long,
     val snapshotId: Long? = null,
