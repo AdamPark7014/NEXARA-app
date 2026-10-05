@@ -27,14 +27,22 @@ on:
   push:
     tags:
       - "ios-screenshots-*"
+    # Paridad con Android: cada push a main que toque la app de iOS recorre TODAS las
+    # pantallas en modo demo (`ParityScreenshotsUITests`) y deja los PNG en
+    # docs/ios-paridad/ para compararlos con Android sin Mac. No toca las de tienda.
+    branches:
+      - main
+    paths:
+      - "apps/mobile-native/ios/**"
 
 permissions:
   contents: write
 
-# Dos ejecuciones a la vez se pisarian el commit de los PNG.
+# Dos ejecuciones a la vez se pisarian el commit de los PNG. Las de paridad se
+# cancelan entre si (solo importa la del ultimo push); las de tienda no.
 concurrency:
-  group: ios-screenshots
-  cancel-in-progress: false
+  group: ios-screenshots-${{ (github.event_name == 'push' && github.ref_type == 'branch') && 'paridad' || 'tienda' }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref_type == 'branch' }}
 
 defaults:
   run:
@@ -53,7 +61,11 @@ jobs:
       RESULTS_DIR: ${{ github.workspace }}/build/xcresult
       DERIVED: ${{ github.workspace }}/build/DerivedData
       # `inputs` solo existe en workflow_dispatch; en el push de un tag valen las dos clases.
-      CLASES: ${{ (github.event_name == 'workflow_dispatch' && inputs.dispositivos) || '6.9,6.5' }}
+      # Paridad (push a main): solo 6.9, que es con el que se compara.
+      MODO: ${{ (github.event_name == 'push' && github.ref_type == 'branch') && 'paridad' || 'tienda' }}
+      CLASES: ${{ (github.event_name == 'push' && github.ref_type == 'branch') && '6.9' || (github.event_name == 'workflow_dispatch' && inputs.dispositivos) || '6.9,6.5' }}
+      SUITE: ${{ (github.event_name == 'push' && github.ref_type == 'branch') && 'NexaraAppUITests/ParityScreenshotsUITests' || 'NexaraAppUITests/StoreScreenshotsUITests' }}
+      DEST: ${{ (github.event_name == 'push' && github.ref_type == 'branch') && 'docs/ios-paridad' || 'docs/store/ios-screenshots' }}
 
     steps:
       - name: Checkout
@@ -421,7 +433,7 @@ jobs:
                 -destination "id=$UDID" \
                 -derivedDataPath "$DERIVED" \
                 -resultBundlePath "$RESULT" \
-                -only-testing:NexaraAppUITests/StoreScreenshotsUITests \
+                -only-testing:"$SUITE" \
                 -parallel-testing-enabled NO \
                 -enableCodeCoverage NO \
                 "$@"
@@ -615,7 +627,7 @@ jobs:
               echo "::warning::[$SLUG] capturas identicas entre si (fallo alguna navegacion?): $REPES"
             fi
             if [ ${#FILES[@]} -lt 5 ]; then
-              echo "::warning::[$SLUG] solo ${#FILES[@]} capturas de las 9 previstas; revisa build/logs y debug/ (jerarquia de accesibilidad) en el artefacto"
+              echo "::warning::[$SLUG] solo ${#FILES[@]} capturas; revisa build/logs y debug/ (jerarquia de accesibilidad) en el artefacto"
             fi
 
             if [ "$MALAS" -eq 0 ]; then
@@ -672,7 +684,6 @@ jobs:
         if: ${{ always() && steps.verificar.outputs.hay_capturas == 'true' }}
         run: |
           set -euo pipefail
-          DEST=docs/store/ios-screenshots
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Un tag deja el checkout suelto (detached HEAD). Se queda suelto, pero sobre la
@@ -690,7 +701,11 @@ jobs:
             echo "Las capturas no cambiaron; nada que commitear."
             exit 0
           fi
-          git commit -m "chore(ios): capturas de tienda [skip ci]"
+          if [ "$MODO" = "paridad" ]; then
+            git commit -m "chore(ios): capturas de paridad con Android [skip ci]"
+          else
+            git commit -m "chore(ios): capturas de tienda [skip ci]"
+          fi
           for i in 1 2 3; do
             if git pull --rebase origin main && git push origin HEAD:main; then
               echo "Capturas publicadas en main."
@@ -710,4 +725,4 @@ jobs:
             echo "::error::Ningun dispositivo produjo capturas validas. Mira 'Capturar en el simulador' y el artefacto ios-capturas-logs."
             exit 1
           fi
-          echo "Capturas listas en docs/store/ios-screenshots/ y en los artefactos del run."
+          echo "Capturas listas en $DEST/ y en los artefactos del run."

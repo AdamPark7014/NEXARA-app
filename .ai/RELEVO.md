@@ -9,6 +9,13 @@
   empleados, Herramientas completo). Mientras no existan, esos módulos no salen en iOS; ninguno abre la web.
   Referencia visual: emulador `nexara_phone` con el debug actual (`-PSCREENSHOT_API=true`) + modo `store_demo`
   (`files/store_demo/serve`); hace falta que Adam inicie sesión (no tecleamos contraseñas).
+  **Capturas de paridad sin Mac:** `ios-screenshots.yml` ahora también corre en cada push a `main` que toque
+  `apps/mobile-native/ios/**`: `ParityScreenshotsUITests` recorre todas las pantallas en modo demo y el bot deja
+  los PNG en `docs/ios-paridad/iphone-69/` (commit `[skip ci]`; hacer `git pull --rebase` antes de empujar).
+  **Horario:** Adam: la jornada normal es 10:00–18:00 (hay quien entra antes o sale después). El demo de iOS
+  decía 8:00–17:30 y ya dice 10:00–18:00. OJO: el API (`expectedStartHm`, `attendance-hybrid.match.ts`) espera
+  oficina 09:00 y contratista 08:00 para retardos/KPIs en las TRES apps; cambiarlo es regla de negocio en
+  producción — pendiente de confirmar con Adam.
 
 - **05-10 (claude-code) — tres fallas del build 1.0.0 (8) con la cuenta de Christian, arregladas en código
   (NO hay build nuevo todavía):**

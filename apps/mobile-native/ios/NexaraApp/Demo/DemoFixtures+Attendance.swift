@@ -29,14 +29,15 @@ extension DemoStore {
     }
 
     /// Entrada y salida de un día que ya pasó (lunes a viernes, con alguna falta suelta).
+    /// Jornada normal de NEXARA: entrada 10:00 y salida 18:00 (hay quien llega antes o se va después).
     func historicPunches(day: String, personId: Int) -> (entry: Date, exit: Date)? {
         guard let start = DemoClock.startOfDay(day) else { return nil }
         let weekday = Calendar.current.component(.weekday, from: start)
         if weekday == 1 || weekday == 7 { return nil }
         let dayNumber = Int(start.timeIntervalSince1970 / 86400)
         if (dayNumber + personId) % 11 == 0 { return nil }
-        let entryMinutes = 7 * 60 + 50 + (personId * 3 + dayNumber) % 18
-        let exitMinutes = 17 * 60 + 20 + (personId * 5 + dayNumber) % 25
+        let entryMinutes = 9 * 60 + 45 + (personId * 3 + dayNumber) % 25
+        let exitMinutes = 18 * 60 + (personId * 5 + dayNumber) % 35
         return (
             start.addingTimeInterval(TimeInterval(entryMinutes) * 60),
             start.addingTimeInterval(TimeInterval(exitMinutes) * 60)

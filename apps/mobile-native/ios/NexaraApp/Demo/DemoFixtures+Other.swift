@@ -315,7 +315,7 @@ extension DemoStore {
             semaforos.append(semaforo)
             people.append(dj([
                 "persona": dj(["id": p.id, "nombre": p.nombre, "email": p.email, "puesto": p.puesto]),
-                "horario": dj(["etiqueta": "Lun–Vie · 8:00 a 17:30", "entrada": "08:00", "salida": "17:30"]),
+                "horario": dj(["etiqueta": "Lun–Vie · 10:00 a 18:00", "entrada": "10:00", "salida": "18:00"]),
                 "totales": kpiTotals(seed, workdays: workdays),
                 "semaforo": semaforo,
                 "motivos": motivos,
@@ -337,7 +337,7 @@ extension DemoStore {
             "desde": desde,
             "hasta": hasta,
             "supuestos": [
-                "Horario de oficina de lunes a viernes, de 8:00 a 17:30.",
+                "Horario de oficina de lunes a viernes, de 10:00 a 18:00.",
                 "La productividad se calcula con el tiempo en actividades contra la jornada.",
             ],
             "equipo": dj([
