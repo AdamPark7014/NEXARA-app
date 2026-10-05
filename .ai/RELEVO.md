@@ -8,7 +8,8 @@
   **Sin commitear en disco (~79 archivos iOS):** trabajo A MEDIAS de los 10 agentes de la fase B (B1 Inicio/
   Actividades, B2 detalle, B3 Asistencias/Comidas, B4 Chat, B5 Perfil/Clientes/Avisos/Login, B6 Viáticos/
   Vehículos/Almacén/Proyectos/KPIs, B7 Cotizaciones/Pagos nuevos, B8 Gastos/Aprobaciones nuevos, B9 Herramientas,
-  B10 Portal). Se detuvieron en mitad de una edición: **seguramente NO compila**. No es de Cursor ni de otro
+  B10 Portal). Excepción: `UI/Core/TeamEvidenceView.swift` (evidencias del equipo) SÍ quedó terminado por un
+  subagente de B2 (estático limpio, sin compilar). El resto se detuvo en mitad de una edición: **seguramente NO compila**. No es de Cursor ni de otro
   turno: es de este. Antes de seguir: `python scripts/ios-static-check.py`, revisar `git diff` por área y
   terminar cada una contra Android con las reglas de `.ai/FASE-B-REGLAS-IOS.md` (alcance por agente: ver el
   encargo de cada área en ese archivo + el inventario Android/iOS de esta sesión). No commitear hasta que CI
