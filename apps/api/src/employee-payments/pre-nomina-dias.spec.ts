@@ -8,6 +8,8 @@ import {
   hojaDetalleDiario,
   hojaHorasPorDia,
   horaLocal,
+  horasEnPalabras,
+  resumenDelDia,
   type PersonaConDias,
 } from './pre-nomina-dias.js';
 
@@ -56,8 +58,17 @@ const ana: PersonaConDias = {
 
 describe('pre-nómina día por día', () => {
   it('etiqueta la fecha con el día de la semana', () => {
-    expect(etiquetaFecha('2026-10-05')).toBe('lun 05/10');
-    expect(etiquetaFecha('2026-10-04', true)).toBe('dom 04/10/2026');
+    expect(etiquetaFecha('2026-10-05')).toBe('Lunes 05/10');
+    expect(etiquetaFecha('2026-10-04', true)).toBe('Domingo 04/10/2026');
+  });
+
+  it('cada día se dice en palabras: horas trabajadas y productivas', () => {
+    expect(resumenDelDia(dia('2026-10-05', { minutosLaborados: 490, minutosProductivos: 320, productividadPct: 65 }))).toBe(
+      'Lunes 05/10: 8 h 10 min trabajadas, 5 h 20 min productivas (65 %)',
+    );
+    expect(resumenDelDia(dia('2026-10-06', { conJornada: false, sinChecada: true }))).toBe('Martes 06/10: falta (sin checar)');
+    expect(horasEnPalabras(480)).toBe('8 h');
+    expect(horasEnPalabras(45)).toBe('45 min');
   });
 
   it('la hora sale en la zona de la jornada', () => {
@@ -75,29 +86,31 @@ describe('pre-nómina día por día', () => {
     expect(estadoDelDia(dia('2026-10-05', { abierta: true }))).toBe('En jornada');
   });
 
-  it('la matriz pone una columna por día y deja vacío donde no hubo jornada', () => {
+  it('la matriz pone trabajadas y productivas de cada día y deja vacío donde no hubo jornada', () => {
     const hoja = hojaHorasPorDia([ana], { desde: '2026-09-28', hasta: '2026-10-04' });
     const titulos = hoja.columnas.map((c) => c.titulo);
-    expect(titulos.slice(2, 9)).toEqual([
-      'lun 28/09',
-      'mar 29/09',
-      'mié 30/09',
-      'jue 01/10',
-      'vie 02/10',
-      'sáb 03/10',
-      'dom 04/10',
+    expect(titulos.slice(2, 6)).toEqual([
+      'Lunes 28/09 · Trabajadas',
+      'Lunes 28/09 · Productivas',
+      'Martes 29/09 · Trabajadas',
+      'Martes 29/09 · Productivas',
     ]);
+    expect(titulos).toContain('Domingo 04/10 · Productivas');
     const fila = hoja.filas[0];
-    expect(fila['d_2026-09-28']).toBe(360);
-    expect(fila['d_2026-09-29']).toBe(480);
-    expect(fila['d_2026-09-30']).toBeUndefined();
+    expect(fila['t_2026-09-28']).toBe(360);
+    expect(fila['p_2026-09-28']).toBe(240);
+    expect(fila['t_2026-09-29']).toBe(480);
+    expect(fila['t_2026-09-30']).toBeUndefined();
     expect(fila.minutosLaborados).toBe(840);
+    expect(fila.minutosProductivos).toBe(480);
+    expect(fila.productividadPct).toBe(57);
     expect(fila.diasTrabajados).toBe(2);
   });
 
   it('el detalle va en orden de fecha y omite los descansos sin trabajo', () => {
     const filas = filasDetalleDiario([ana]);
-    expect(filas.map((f) => f.fecha)).toEqual(['lun 28/09/2026', 'mar 29/09/2026', 'mié 30/09/2026']);
+    expect(filas.map((f) => f.fecha)).toEqual(['Lunes 28/09/2026', 'Martes 29/09/2026', 'Miércoles 30/09/2026']);
+    expect(filas[0].resumen).toBe('Lunes 28/09: 6 h trabajadas, 4 h productivas (67 %)');
     expect(filas[0]).toMatchObject({ entrada: '10:00', estado: 'Retardo', minutosTarde: 15, minutosLaborados: 360 });
     expect(filas[2]).toMatchObject({ estado: 'Falta (sin checar)', minutosLaborados: null, entrada: null });
   });

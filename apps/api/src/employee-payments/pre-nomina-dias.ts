@@ -17,7 +17,7 @@ export type PersonaConDias = {
   dias: DiaKpi[];
 };
 
-const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
 const ESTADO_EXTRA: Record<string, string> = {
   PENDIENTE: 'Sin aprobar',
@@ -25,12 +25,30 @@ const ESTADO_EXTRA: Record<string, string> = {
   RECHAZADO: 'Rechazado',
 };
 
-/** `2026-10-05` → «lun 05/10» (o «lun 05/10/2026» con año). */
+/** `2026-10-05` → «Lunes 05/10» (o «Lunes 05/10/2026» con año). */
 export function etiquetaFecha(fecha: string, conAnio = false): string {
   const [y, m, d] = fecha.split('-').map(Number);
   const dow = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).getUTCDay();
-  const base = `${DIAS_CORTOS[dow]} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+  const base = `${DIAS[dow]} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
   return conAnio ? `${base}/${y}` : base;
+}
+
+/** 490 → «8 h 10 min»; 45 → «45 min»; 480 → «8 h». */
+export function horasEnPalabras(minutos: number): string {
+  const total = Math.max(0, Math.round(minutos));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (!h) return `${m} min`;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+/** «Lunes 05/10: 8 h 10 min trabajadas, 5 h 20 min productivas (65 %)», o por qué no trabajó. */
+export function resumenDelDia(d: DiaKpi): string {
+  const dia = etiquetaFecha(d.fecha);
+  if (!d.conJornada) return `${dia}: ${estadoDelDia(d).toLowerCase()}`;
+  const pct = d.productividadPct != null ? ` (${Math.round(d.productividadPct)} %)` : '';
+  const abierta = d.abierta ? ', sigue en jornada' : '';
+  return `${dia}: ${horasEnPalabras(d.minutosLaborados)} trabajadas, ${horasEnPalabras(d.minutosProductivos)} productivas${pct}${abierta}`;
 }
 
 /** ISO → «09:58» en la zona de la jornada. */
@@ -71,39 +89,44 @@ export function hojaHorasPorDia(
   const columnas: ColumnaReporte<Record<string, unknown>>[] = [
     { clave: 'numeroEmpleado', titulo: 'No. de empleado', ancho: 14 },
     { clave: 'nombre', titulo: 'Persona', ancho: 28 },
-    ...fechas.map(
-      (f): ColumnaReporte<Record<string, unknown>> => ({
-        clave: `d_${f}`,
-        titulo: etiquetaFecha(f),
-        tipo: 'duracion',
-        total: 'suma',
-        ancho: 10,
-      }),
-    ),
-    { clave: 'minutosLaborados', titulo: 'Total laborado', tipo: 'duracion', total: 'suma', ancho: 13 },
+    ...fechas.flatMap((f): ColumnaReporte<Record<string, unknown>>[] => [
+      { clave: `t_${f}`, titulo: `${etiquetaFecha(f)} · Trabajadas`, tipo: 'duracion', total: 'suma', ancho: 16 },
+      { clave: `p_${f}`, titulo: `${etiquetaFecha(f)} · Productivas`, tipo: 'duracion', total: 'suma', ancho: 16 },
+    ]),
+    { clave: 'minutosLaborados', titulo: 'Total trabajadas', tipo: 'duracion', total: 'suma', ancho: 13 },
+    { clave: 'minutosProductivos', titulo: 'Total productivas', tipo: 'duracion', total: 'suma', ancho: 13 },
+    { clave: 'productividadPct', titulo: 'Productividad', tipo: 'porcentaje', ancho: 12 },
     { clave: 'diasTrabajados', titulo: 'Días trabajados', tipo: 'entero', total: 'suma', ancho: 12 },
   ];
 
   const filas = personas.map((p) => {
     const fila: Record<string, unknown> = { numeroEmpleado: p.numeroEmpleado, nombre: p.nombre };
-    let total = 0;
-    let trabajados = 0;
+    let trabajadas = 0;
+    let productivas = 0;
+    let dias = 0;
     for (const d of p.dias) {
       if (!d.conJornada) continue;
-      fila[`d_${d.fecha}`] = d.minutosLaborados;
-      total += d.minutosLaborados;
-      trabajados += 1;
+      fila[`t_${d.fecha}`] = d.minutosLaborados;
+      fila[`p_${d.fecha}`] = d.minutosProductivos;
+      trabajadas += d.minutosLaborados;
+      productivas += d.minutosProductivos;
+      dias += 1;
     }
-    fila.minutosLaborados = total;
-    fila.diasTrabajados = trabajados;
+    fila.minutosLaborados = trabajadas;
+    fila.minutosProductivos = productivas;
+    fila.productividadPct = trabajadas > 0 ? Math.round((productivas / trabajadas) * 100) : null;
+    fila.diasTrabajados = dias;
     return fila;
   });
 
   return {
     hoja: 'Horas por día',
-    titulo: 'Horas laboradas por día',
+    titulo: 'Horas trabajadas y productivas por día',
     subtitulo: `Del ${etiquetaFecha(rango.desde, true)} al ${etiquetaFecha(rango.hasta, true)}`,
-    notas: ['Horas netas de comida. Celda vacía: ese día no hubo jornada.'],
+    notas: [
+      'Trabajadas: de la entrada a la salida, sin la comida. Productivas: el tiempo dentro de actividades.',
+      'Celda vacía: ese día no hubo jornada.',
+    ],
     columnas,
     filas,
   };
@@ -114,6 +137,7 @@ export type FilaDetalleDiario = {
   nombre: string;
   puesto: string | null;
   fecha: string;
+  resumen: string;
   entrada: string | null;
   salida: string | null;
   estado: string;
@@ -141,6 +165,7 @@ export function filasDetalleDiario(personas: PersonaConDias[]): FilaDetalleDiari
         nombre: p.nombre,
         puesto: p.puesto,
         fecha: etiquetaFecha(d.fecha, true),
+        resumen: resumenDelDia(d),
         entrada: horaLocal(d.entrada),
         salida: d.abierta ? null : horaLocal(d.salida),
         estado: estadoDelDia(d),
@@ -163,14 +188,15 @@ export function filasDetalleDiario(personas: PersonaConDias[]): FilaDetalleDiari
 const COLUMNAS_DETALLE_DIARIO: ColumnaReporte<FilaDetalleDiario>[] = [
   { clave: 'numeroEmpleado', titulo: 'No. de empleado', ancho: 14 },
   { clave: 'nombre', titulo: 'Persona', ancho: 28 },
-  { clave: 'fecha', titulo: 'Día', ancho: 15 },
+  { clave: 'fecha', titulo: 'Día', ancho: 19 },
+  { clave: 'resumen', titulo: 'En palabras', ancho: 46, ajustar: true },
   { clave: 'entrada', titulo: 'Entrada', ancho: 9 },
   { clave: 'salida', titulo: 'Salida', ancho: 9 },
   { clave: 'estado', titulo: 'Estado', ancho: 18 },
   { clave: 'minutosComida', titulo: 'Comida', tipo: 'duracion', total: 'suma' },
-  { clave: 'minutosLaborados', titulo: 'Horas laboradas', tipo: 'duracion', total: 'suma' },
+  { clave: 'minutosLaborados', titulo: 'Horas trabajadas', tipo: 'duracion', total: 'suma' },
   { clave: 'minutosProductivos', titulo: 'Horas productivas', tipo: 'duracion', total: 'suma' },
-  { clave: 'minutosInactivos', titulo: 'Horas inactivas', tipo: 'duracion', total: 'suma' },
+  { clave: 'minutosInactivos', titulo: 'Horas sin actividad', tipo: 'duracion', total: 'suma' },
   { clave: 'productividadPct', titulo: 'Productividad', tipo: 'porcentaje', ancho: 13 },
   { clave: 'minutosTarde', titulo: 'Retardo', tipo: 'duracion', total: 'suma' },
   { clave: 'minutosExtra', titulo: 'Extra calculado', tipo: 'duracion', total: 'suma' },
