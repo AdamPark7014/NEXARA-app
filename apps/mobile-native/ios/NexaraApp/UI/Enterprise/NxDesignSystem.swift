@@ -43,6 +43,10 @@ enum NxSpacing {
     static let l: CGFloat = 16
     static let xl: CGFloat = 24
     static let xxl: CGFloat = 32
+    /// Margen lateral de todas las pantallas (Android `NxSpacing.ScreenH`).
+    static let screenH: CGFloat = 16
+    /// Separación entre tarjetas de una lista (Android `NxSpacing.ListGap`).
+    static let listGap: CGFloat = 10
 }
 
 /// Radios v2: 8 controles chicos · 12 controles · 16 tarjetas · 20 hojas y tarjetas hero.
@@ -297,6 +301,8 @@ enum NxStatusText {
 
 // MARK: - Tarjeta
 
+/// Tarjeta de Android (`Card` con `NxDimens.PanelElevation`): blanco, radio 16 y
+/// sombra de elevación 2, sin filo. `highlight` añade un borde de 1,5 de ese color.
 private struct NxCardModifier: ViewModifier {
     var padding: CGFloat
     var highlight: Color?
@@ -305,19 +311,18 @@ private struct NxCardModifier: ViewModifier {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
-                    .strokeBorder(highlight ?? Color.primary.opacity(0.08), lineWidth: highlight == nil ? 0.5 : 1.5)
-            )
+            .nxCardSurface()
+            .overlay {
+                if let highlight {
+                    RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
+                        .strokeBorder(highlight, lineWidth: 1.5)
+                }
+            }
     }
 }
 
 extension View {
-    /// Tarjeta estándar: fondo agrupado, radio 16 continuo y filo sutil.
+    /// Tarjeta estándar (Android `Card`): blanco, radio 16, elevación 2.
     func nxCard(padding: CGFloat = NxSpacing.l, highlight: Color? = nil) -> some View {
         modifier(NxCardModifier(padding: padding, highlight: highlight))
     }
@@ -331,49 +336,75 @@ extension View {
 
 // MARK: - Botones
 
-/// Botón principal: ancho completo, 52 pt de alto, teal de marca.
+/// Botón principal (Android `NxPrimaryButton`): 52 de alto, radio 12, teal de
+/// marca, letra 14 SemiBold blanca. Ancho completo salvo `fullWidth: false`.
+/// Deshabilitado: gris del texto al 12 % con letra al 38 %, como Material 3.
 struct NxPrimaryButtonStyle: ButtonStyle {
     var tint: Color = NxBrand.primary
+    var fullWidth: Bool = true
 
     func makeBody(configuration: Configuration) -> some View {
-        NxPrimaryButtonBody(configuration: configuration, tint: tint)
+        NxPrimaryButtonBody(configuration: configuration, tint: tint, fullWidth: fullWidth)
     }
 }
 
 private struct NxPrimaryButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let tint: Color
+    let fullWidth: Bool
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         configuration.label
-            .font(.headline)
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity, minHeight: NxMetrics.primaryButtonHeight)
-            .padding(.horizontal, NxSpacing.l)
+            .font(NxType.labelLarge)
+            .lineLimit(1)
+            .foregroundStyle(isEnabled ? Color.white : NxColors.fg.opacity(0.38))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: NxMetrics.primaryButtonHeight)
             .background(
-                (isEnabled ? tint : Color.secondary.opacity(0.35)),
+                isEnabled ? tint : NxColors.fg.opacity(0.12),
                 in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
             )
             .opacity(configuration.isPressed ? 0.85 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
             .contentShape(Rectangle())
     }
 }
 
-/// Botón secundario: mismo tamaño que el principal, fondo tenue.
+/// Botón secundario (Android `NxSecondaryButton` = `OutlinedButton`): misma
+/// altura y radio que el principal, contorno #CBD5E1 y letra de marca.
 struct NxSecondaryButtonStyle: ButtonStyle {
-    var tint: Color = NxBrand.adaptive
+    var tint: Color = NxBrand.primary
+    var fullWidth: Bool = true
 
     func makeBody(configuration: Configuration) -> some View {
+        NxSecondaryButtonBody(configuration: configuration, tint: tint, fullWidth: fullWidth)
+    }
+}
+
+private struct NxSecondaryButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let tint: Color
+    let fullWidth: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
         configuration.label
-            .font(.headline)
-            .foregroundStyle(tint)
-            .frame(maxWidth: .infinity, minHeight: NxMetrics.primaryButtonHeight)
-            .padding(.horizontal, NxSpacing.l)
-            .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .font(NxType.labelLarge)
+            .lineLimit(1)
+            .foregroundStyle(isEnabled ? tint : NxColors.fg.opacity(0.38))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: NxMetrics.primaryButtonHeight)
+            .background(
+                configuration.isPressed ? tint.opacity(0.08) : Color.clear,
+                in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                    .strokeBorder(isEnabled ? NxColors.borderStrong : NxColors.fg.opacity(0.12), lineWidth: 1)
+            )
             .contentShape(Rectangle())
     }
 }
@@ -399,100 +430,95 @@ struct NxIconButton: View {
 
 // MARK: - Estados de pantalla
 
-/// Primera carga en curso: indicador nativo y una frase, centrado.
+/// Primera carga en curso (Android `NxLoadingBlock`): indicador de marca y una
+/// frase 12,5 gris, centrados.
 struct NxLoadingState: View {
     var text: String = "Cargando…"
 
     var body: some View {
         VStack(spacing: NxSpacing.m) {
-            ProgressView().controlSize(.large)
+            ProgressView()
+                .controlSize(.large)
+                .tint(NxColors.brand)
             Text(text)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(NxType.bodySmall)
+                .foregroundStyle(NxColors.muted)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, NxSpacing.xxl)
+        .padding(NxSpacing.xl)
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Filas de relleno con `.redacted` mientras llega la primera carga de una lista.
+/// Bloques de carga con brillo mientras llega la primera carga de una lista.
+/// Mismo dibujo que `NxSkeletonList` de Android (bloques de 72, radio 16).
 struct NxSkeletonRows: View {
     var count: Int = 5
 
     var body: some View {
-        VStack(spacing: NxSpacing.m) {
-            ForEach(0..<count, id: \.self) { _ in
-                HStack(spacing: NxSpacing.m) {
-                    RoundedRectangle(cornerRadius: NxRadius.s, style: .continuous)
-                        .fill(Color.secondary.opacity(0.18))
-                        .frame(width: 40, height: 40)
-                    VStack(alignment: .leading, spacing: NxSpacing.xs) {
-                        Text("Nombre de ejemplo largo").font(.subheadline.weight(.semibold))
-                        Text("Detalle secundario de la fila").font(.caption)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .nxCard(padding: NxSpacing.m)
-            }
-        }
-        .redacted(reason: .placeholder)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Cargando")
+        NxSkeletonList(itemCount: count)
     }
 }
 
-/// Primera carga fallida: no hay nada que enseñar, ofrece «Reintentar».
+/// La carga falló y no hay nada que enseñar (Android `NxErrorState`): círculo
+/// rojo suave con la nube tachada, título 16 SemiBold, la causa en palabras de
+/// campo y «Reintentar». Si ya había datos, usar `NxRefreshErrorBanner`.
 struct NxErrorState: View {
-    var title: String = "No se pudo cargar"
-    let message: String
-    var systemImage: String = "wifi.exclamationmark"
-    let retry: () -> Void
+    var title: String
+    let message: String?
+    var systemImage: String
+    let retry: (() -> Void)?
+
+    init(
+        title: String = "No se pudo cargar",
+        message: String?,
+        systemImage: String = "icloud.slash",
+        retry: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.message = message
+        self.systemImage = systemImage
+        self.retry = retry
+    }
 
     var body: some View {
-        ContentUnavailableView {
-            Label(title, systemImage: systemImage)
-        } description: {
-            Text(message)
-        } actions: {
-            Button {
-                retry()
-            } label: {
-                Label("Reintentar", systemImage: "arrow.clockwise")
+        VStack(spacing: 10) {
+            ZStack {
+                Circle().fill(NxColors.dangerSoft)
+                Image(systemName: systemImage)
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(NxColors.danger)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(NxBrand.primary)
+            .frame(width: 56, height: 56)
+            .accessibilityHidden(true)
+            Text(title)
+                .font(NxType.titleMedium)
+                .foregroundStyle(NxColors.fg)
+                .multilineTextAlignment(.center)
+            Text(NxFriendlyError.text(message))
+                .font(NxType.bodyMedium)
+                .foregroundStyle(NxColors.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if let retry {
+                NxPrimaryButton("Reintentar", systemImage: "arrow.clockwise", fullWidth: false, action: retry)
+                    .padding(.top, 4)
+            }
         }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 40)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
     }
 }
 
 /// Refresco fallido con datos viejos en pantalla: cinta, no pantalla en blanco.
+/// Se dibuja como `NxRefreshErrorBanner` de Android.
 struct NxStaleBanner: View {
     let message: String
     var retry: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .top, spacing: NxSpacing.m) {
-            Image(systemName: "wifi.exclamationmark")
-                .foregroundStyle(NxTone.warning.fg)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: NxSpacing.xxs) {
-                Text("Mostrando lo último que se pudo cargar")
-                    .font(.subheadline.weight(.semibold))
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            if let retry {
-                Button("Reintentar", action: retry)
-                    .font(.caption.weight(.semibold))
-                    .nxTapTarget()
-            }
-        }
-        .padding(NxSpacing.m)
-        .background(NxTone.warning.bg, in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
-        .accessibilityElement(children: .combine)
+        NxRefreshErrorBanner(message: message, onRetry: retry)
     }
 }

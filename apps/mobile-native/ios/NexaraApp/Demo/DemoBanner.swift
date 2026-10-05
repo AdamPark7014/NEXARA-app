@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Franja fija de la parte alta de la shell mientras `DemoMode.isActive`: dice que los datos
-/// son de muestra y da una salida a un toque (`DemoMode.exit()`).
+/// Franja fija de la shell mientras `DemoMode.isActive`: dice que los datos son de muestra y
+/// da una salida a un toque (`DemoMode.exit()`). Desde la paridad con Android va justo encima
+/// de la barra inferior: arriba, la barra teal tiene que llegar hasta la hora sin nada en medio.
 struct DemoBanner: View {
     var body: some View {
         HStack(spacing: 8) {

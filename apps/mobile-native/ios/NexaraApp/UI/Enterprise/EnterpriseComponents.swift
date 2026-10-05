@@ -1,23 +1,35 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Enterprise design system (paridad Android Nx*)
+// MARK: - Enterprise design system (paridad Android `ui/enterprise/EnterpriseComponents.kt`)
 
+/// Tono semántico. Mismos colores que `NxTone.fg()` / `NxTone.bg()` de Android:
+/// el texto o el icono van en `fg` y el fondo suave en `bg` (no una opacidad
+/// calculada: los suaves de Android son colores propios).
 enum NxTone {
     case neutral, success, warning, danger, info, brand
 
     var fg: Color {
         switch self {
-        case .neutral: return NxTone.neutralFg
-        case .success: return NxTone.successFg
-        case .warning: return NxTone.warningFg
-        case .danger:  return NxTone.dangerFg
-        case .info:    return NxTone.infoFg
-        case .brand:   return NxBrand.adaptive
+        case .neutral: return NxColors.muted
+        case .success: return NxColors.success
+        case .warning: return NxColors.warning
+        case .danger:  return NxColors.danger
+        case .info:    return NxColors.info
+        case .brand:   return NxColors.brand
         }
     }
 
-    var bg: Color { fg.opacity(0.14) }
+    var bg: Color {
+        switch self {
+        case .neutral: return NxColors.sunken
+        case .success: return NxColors.successSoft
+        case .warning: return NxColors.warningSoft
+        case .danger:  return NxColors.dangerSoft
+        case .info:    return NxColors.infoSoft
+        case .brand:   return NxColors.brandSoft
+        }
+    }
 
     var systemImage: String {
         switch self {
@@ -29,20 +41,6 @@ enum NxTone {
         case .brand:   return "sparkles"
         }
     }
-
-    // Variante oscura más clara para que el texto sobre fondo negro pase contraste AA.
-    private static func dynamic(light: (CGFloat, CGFloat, CGFloat), dark: (CGFloat, CGFloat, CGFloat)) -> Color {
-        Color(uiColor: UIColor { traits in
-            let c = traits.userInterfaceStyle == .dark ? dark : light
-            return UIColor(red: c.0, green: c.1, blue: c.2, alpha: 1)
-        })
-    }
-
-    private static let neutralFg = dynamic(light: (0.39, 0.45, 0.55), dark: (0.58, 0.64, 0.72))
-    private static let successFg = dynamic(light: (0.02, 0.59, 0.41), dark: (0.20, 0.83, 0.60))
-    private static let warningFg = dynamic(light: (0.85, 0.47, 0.02), dark: (0.98, 0.75, 0.14))
-    private static let dangerFg = dynamic(light: (0.86, 0.15, 0.15), dark: (0.97, 0.44, 0.44))
-    private static let infoFg = dynamic(light: (0.15, 0.39, 0.92), dark: (0.38, 0.65, 0.98))
 }
 
 struct NxKpi: Identifiable {
@@ -62,44 +60,70 @@ struct NxAlert: Identifiable {
     var tone: NxTone = .warning
 }
 
-struct NxSectionHeader: View {
+/// Encabezado de sección (Android `NxSectionHeader`): título 16 Bold, subtítulo
+/// 12,5 gris y, si se da, algo a la derecha (un botón, una cuenta).
+struct NxSectionHeader<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
+    let trailing: Trailing
+
+    init(title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing()
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NxSpacing.xxs) {
-            Text(title)
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
-            if let subtitle, !subtitle.isEmpty {
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+        HStack(alignment: .center, spacing: NxSpacing.s) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.muted)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            trailing
         }
     }
 }
 
+extension NxSectionHeader where Trailing == EmptyView {
+    init(title: String, subtitle: String? = nil) {
+        self.init(title: title, subtitle: subtitle, trailing: { EmptyView() })
+    }
+}
+
+/// Tarjeta de cifra (Android `NxKpiCard`): etiqueta 12, cifra 22 Bold, pista y
+/// variación 11, minigráfica a la derecha.
 struct NxKpiCard: View {
     let kpi: NxKpi
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NxSpacing.xs + 2) {
-            HStack(spacing: NxSpacing.xs + 2) {
-                Circle().fill(kpi.tone.fg).frame(width: 6, height: 6)
-                Text(kpi.label)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            Text(kpi.label)
+                .font(NxType.labelMedium)
+                .foregroundStyle(NxColors.muted)
+                .lineLimit(2)
             Text(kpi.value)
-                .font(.title2.weight(.bold))
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(NxColors.fg)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: NxSpacing.xxs) {
-                    if let hint = kpi.hint { Text(hint).font(.caption2).foregroundStyle(.secondary) }
-                    if let delta = kpi.delta {
-                        Text(delta).font(.caption2.weight(.semibold)).foregroundStyle(kpi.tone.fg)
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let hint = kpi.hint, !hint.isEmpty {
+                        Text(hint).font(NxType.labelSmall).foregroundStyle(NxColors.muted)
+                    }
+                    if let delta = kpi.delta, !delta.isEmpty {
+                        Text(delta)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(kpi.tone.fg)
                     }
                 }
                 Spacer(minLength: 0)
@@ -110,7 +134,9 @@ struct NxKpiCard: View {
                 }
             }
         }
-        .nxCard(padding: NxSpacing.m + 2)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .nxCardSurface()
         .accessibilityElement(children: .combine)
     }
 }
@@ -147,62 +173,97 @@ struct NxSparkline: View {
             let minV = values.min() ?? 0
             let maxV = values.max() ?? 1
             let range = max(maxV - minV, 0.001)
-            Path { path in
-                for (i, v) in values.enumerated() {
-                    let x = geo.size.width * CGFloat(i) / CGFloat(max(values.count - 1, 1))
-                    let y = geo.size.height - ((v - minV) / range) * geo.size.height
-                    if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-                    else { path.addLine(to: CGPoint(x: x, y: y)) }
+            let stepX = geo.size.width / CGFloat(max(values.count - 1, 1))
+            let lastY = geo.size.height - (((values.last ?? 0) - minV) / range) * geo.size.height
+            ZStack(alignment: .topLeading) {
+                Path { path in
+                    for (i, v) in values.enumerated() {
+                        let x = stepX * CGFloat(i)
+                        let y = geo.size.height - ((v - minV) / range) * geo.size.height
+                        if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                        else { path.addLine(to: CGPoint(x: x, y: y)) }
+                    }
                 }
+                .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                // Punto final, como el `drawCircle` de Android.
+                Circle()
+                    .fill(color)
+                    .frame(width: 3, height: 3)
+                    .position(x: stepX * CGFloat(max(values.count - 1, 0)), y: lastY)
             }
-            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
     }
 }
 
+/// Aviso con tono (Android `NxAlertBanner`): fondo suave del tono, radio 16,
+/// cuadrito de color, título 14 SemiBold y acción opcional en negritas.
 struct NxAlertBanner: View {
     let alert: NxAlert
     var actionLabel: String? = nil
     var onAction: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .top, spacing: NxSpacing.m) {
-            Image(systemName: alert.tone.systemImage)
-                .foregroundStyle(alert.tone.fg)
+        HStack(alignment: .center, spacing: 10) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(alert.tone.fg)
+                .frame(width: 8, height: 8)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: NxSpacing.xxs) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(alert.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
                     .fixedSize(horizontal: false, vertical: true)
-                if let sub = alert.subtitle { Text(sub).font(.caption).foregroundStyle(.secondary) }
+                if let sub = alert.subtitle, !sub.isEmpty {
+                    Text(sub)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if let actionLabel, let onAction {
-                Button(actionLabel, action: onAction)
-                    .font(.caption.bold())
-                    .foregroundStyle(alert.tone.fg)
-                    .nxTapTarget()
+                Button(action: onAction) {
+                    Text(actionLabel)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(alert.tone.fg)
+                }
+                .buttonStyle(.plain)
+                .nxTapTarget()
             }
         }
-        .padding(NxSpacing.m + 2)
-        .background(alert.tone.bg, in: RoundedRectangle(cornerRadius: NxRadius.m + 2, style: .continuous))
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(alert.tone.bg, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
 
+/// Chip de estado (Android `NxStatusChip`): radio 8, fondo suave del tono, texto
+/// 11 SemiBold en el color del tono e icono opcional de 12.
 struct NxStatusChip: View {
     let text: String
     var tone: NxTone = .neutral
+    /// SF Symbol opcional delante del texto.
+    var systemImage: String? = nil
 
     var body: some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(tone.fg)
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(tone.bg, in: Capsule())
-            .accessibilityLabel("Estado: \(text)")
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(width: 12, height: 12)
+                    .accessibilityHidden(true)
+            }
+            Text(text)
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(tone.fg)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(tone.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Estado: \(text)")
     }
 }
 
@@ -213,6 +274,9 @@ extension NxStatusChip {
     }
 }
 
+/// Estado vacío (Android `NxEmptyState`): círculo de 56 en tinte de marca con el
+/// icono en teal, título 16 SemiBold, texto 14 gris centrado y, si hay acción,
+/// el botón principal del tamaño de su texto.
 struct NxEmptyState: View {
     let title: String
     let subtitle: String
@@ -221,30 +285,38 @@ struct NxEmptyState: View {
     var onAction: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: NxSpacing.s + 2) {
-            NxIconBadge(systemName: systemImage ?? "tray", tint: .secondary, size: 56, circle: true)
-                .padding(.bottom, NxSpacing.xs)
+        VStack(spacing: NxSpacing.s) {
+            ZStack {
+                Circle().fill(NxColors.brandTint)
+                Image(systemName: systemImage ?? "tray.fill")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(NxColors.brand)
+            }
+            .frame(width: 56, height: 56)
+            .accessibilityHidden(true)
+            .padding(.bottom, NxSpacing.xs)
             Text(title)
-                .font(.headline)
+                .font(NxType.titleMedium)
+                .foregroundStyle(NxColors.fg)
                 .multilineTextAlignment(.center)
             Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(NxType.bodyMedium)
+                .foregroundStyle(NxColors.muted)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             if let actionLabel, let onAction {
-                Button(actionLabel, action: onAction)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(NxBrand.primary)
-                    .padding(.top, NxSpacing.xs)
+                NxPrimaryButton(actionLabel, fullWidth: false, action: onAction)
+                    .padding(.top, 6)
             }
         }
-        .padding(NxSpacing.xxl)
+        .padding(.vertical, 36)
+        .padding(.horizontal, 24)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
     }
 }
 
+/// Aprobar / Rechazar. Se conserva por compatibilidad; dibuja `NxDecisionButtons`.
 struct NxDecisionActions: View {
     var approveLabel: String = "Aprobar"
     var rejectLabel: String = "Rechazar"
@@ -253,16 +325,13 @@ struct NxDecisionActions: View {
     var onReject: () -> Void
 
     var body: some View {
-        HStack(spacing: NxSpacing.s) {
-            Button(approveLabel, action: onApprove)
-                .buttonStyle(.borderedProminent)
-                .tint(NxTone.success.fg)
-                .disabled(acting)
-            Button(rejectLabel, role: .destructive, action: onReject)
-                .buttonStyle(.bordered)
-                .disabled(acting)
-        }
-        .controlSize(.large)
+        NxDecisionButtons(
+            approveLabel: approveLabel,
+            rejectLabel: rejectLabel,
+            acting: acting,
+            onApprove: onApprove,
+            onReject: onReject
+        )
     }
 }
 

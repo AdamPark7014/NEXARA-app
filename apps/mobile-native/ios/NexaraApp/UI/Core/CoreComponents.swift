@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// Colores de Core (mismos tonos que la web).
+/// Colores de dominio de Core: los MISMOS de Android (`CoreActivityRules`:
+/// VERDE, NARANJA, ROJO, AZUL, MORADO, GRIS, CIAN), tomados de `NxColors`.
 enum CorePalette {
-    static let green = Color(red: 0.086, green: 0.639, blue: 0.290)   // #16a34a
-    static let orange = Color(red: 0.851, green: 0.467, blue: 0.024)  // #d97706
-    static let red = Color(red: 0.863, green: 0.149, blue: 0.149)     // #dc2626
-    static let blue = Color(red: 0.145, green: 0.388, blue: 0.922)    // #2563eb
-    static let purple = Color(red: 0.486, green: 0.227, blue: 0.929)  // #7c3aed
-    static let slate = Color(red: 0.580, green: 0.639, blue: 0.722)   // #94a3b8
-    static let amber = Color(red: 0.961, green: 0.620, blue: 0.043)   // #f59e0b
-    static let cyan = Color(red: 0.031, green: 0.569, blue: 0.698)    // #0891b2
+    static let green = NxColors.verde      // #16A34A
+    static let orange = NxColors.naranja   // #D97706
+    static let red = NxColors.rojo         // #DC2626
+    static let blue = NxColors.azul        // #2563EB
+    static let purple = NxColors.morado    // #7C3AED
+    static let slate = NxColors.gris       // #94A3B8
+    static let amber = NxColors.warning    // #F59E0B (estrellas)
+    static let cyan = NxColors.cian        // #0284C7 («Terminó» en la pizarra)
 }
 
 /// Etiquetas de estatus en lenguaje de campo (espejo de MisActividadesView web).
@@ -111,6 +112,9 @@ enum CoreBoardText {
     }
 }
 
+/// Chip de estado (Android `ToneChip`): píldora con fondo al 10 % y filo al
+/// 35 % del color, texto 12 SemiBold e icono opcional de 14. Sin color: fondo
+/// #F8FAFC, filo #E2E8F0 y texto gris.
 struct CoreChip: View {
     /// SF Symbol opcional al frente del texto.
     var icon: String? = nil
@@ -121,18 +125,19 @@ struct CoreChip: View {
         HStack(spacing: 4) {
             if let icon {
                 Image(systemName: icon)
-                    .symbolRenderingMode(.hierarchical)
-                    .imageScale(.small)
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 14, height: 14)
                     .accessibilityHidden(true)
             }
             Text(text)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
         }
-        .font(.caption.weight(.semibold))
-        .lineLimit(1)
-        .padding(.horizontal, 9)
+        .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .foregroundStyle(color ?? Color.secondary)
-        .background((color ?? Color.secondary).opacity(0.12), in: Capsule())
+        .foregroundStyle(color ?? NxColors.muted)
+        .background(color.map { $0.opacity(0.10) } ?? NxColors.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(color.map { $0.opacity(0.35) } ?? NxColors.border, lineWidth: 1))
     }
 }
 
@@ -178,6 +183,8 @@ struct CoreFlowLayout: Layout {
     }
 }
 
+/// Cinco estrellas (Android `StarsText`): las de la calificación en ámbar, el
+/// resto en #CBD5E1.
 struct CoreStars: View {
     let value: Int
     var size: CGFloat = 13
@@ -186,9 +193,9 @@ struct CoreStars: View {
         let v = min(5, max(0, value))
         HStack(spacing: 1) {
             ForEach(1...5, id: \.self) { index in
-                Image(systemName: index <= v ? "star.fill" : "star")
+                Image(systemName: "star.fill")
                     .font(.system(size: size))
-                    .foregroundStyle(index <= v ? CorePalette.amber : Color.secondary.opacity(0.5))
+                    .foregroundStyle(index <= v ? CorePalette.amber : NxColors.borderStrong)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -196,6 +203,8 @@ struct CoreStars: View {
     }
 }
 
+/// Barra de avance con su porcentaje (Android `ProgressWithPct`): 8 de alto,
+/// pista #E2E8F0, verde al 100 % y de marca antes; «NN%» 12 Bold.
 struct CoreProgressBar: View {
     let percent: Double
     var showsLabel = true
@@ -205,41 +214,31 @@ struct CoreProgressBar: View {
         HStack(spacing: 8) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.secondary.opacity(0.18))
+                    Capsule().fill(NxColors.border)
                     Capsule()
-                        .fill(v >= 100 ? CorePalette.green : Color.accentColor)
+                        .fill(v >= 100 ? CorePalette.green : NxColors.brand)
                         .frame(width: geo.size.width * v / 100)
                 }
             }
             .frame(height: 8)
             if showsLabel {
-                Text("\(Int(v))%")
-                    .font(.caption.weight(.bold))
+                Text("\(Int(v.rounded()))%")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
                     .frame(minWidth: 36, alignment: .trailing)
             }
         }
     }
 }
 
+/// Avatar de persona. Dibuja `NxAvatar` (estilo suave de Android `PersonAvatar`).
 struct CoreAvatar: View {
     let name: String
     let url: String?
     var size: CGFloat = 44
 
     var body: some View {
-        Group {
-            if let url, !url.isEmpty {
-                AuthenticatedImage(url: url)
-            } else {
-                Text(CoreFormat.initials(name))
-                    .font(.system(size: size * 0.34, weight: .bold))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.accentColor.opacity(0.14))
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
+        NxAvatar(nombre: name, url: url, size: size)
     }
 }
 
@@ -251,25 +250,22 @@ struct CoreStatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(value)")
-                .font(.title2.weight(.heavy))
+                .font(.system(size: 22, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(color ?? Color.primary)
+                .foregroundStyle(color ?? NxColors.fg)
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NxType.labelMedium)
+                .foregroundStyle(NxColors.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(NxSpacing.m)
-        .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: NxRadius.m + 2, style: .continuous)
-        )
+        .nxCardSurface(radius: NxRadius.m + 2)
         .accessibilityElement(children: .combine)
     }
 }
 
 extension View {
-    /// Tarjeta estándar de Core.
+    /// Tarjeta estándar de Core (Android `NxPanelShell`: relleno 14, radio 16, elevación 2).
     func coreCard(highlight: Color? = nil) -> some View {
         nxCard(padding: NxSpacing.m + 2, highlight: highlight)
     }

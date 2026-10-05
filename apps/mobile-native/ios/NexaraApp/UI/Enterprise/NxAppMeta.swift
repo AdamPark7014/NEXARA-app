@@ -31,8 +31,8 @@ struct NxAppMetaFooter: View {
     var body: some View {
         VStack(spacing: 4) {
             Text("NEXARA · \(NxAppMeta.versionLabel)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(NxType.labelSmall)
+                .foregroundStyle(NxColors.muted)
             if mostrarPrivacidad || mostrarSoporte {
                 HStack(spacing: 12) {
                     if mostrarPrivacidad {
@@ -42,7 +42,7 @@ struct NxAppMetaFooter: View {
                         Link("Soporte", destination: NxAppMeta.soporteURL)
                     }
                 }
-                .font(.caption2)
+                .font(NxType.labelSmall)
                 .tint(NxBrand.primary)
             }
         }
