@@ -280,15 +280,18 @@ private struct DisponibleVehiculoRow: View {
             meta: estatus.isEmpty ? nil : estatus
         ) {
             HStack(spacing: 6) {
+                // `fixedSize`: en la fila el título se lleva el ancho y el botón salía «Solic…».
                 Button("Solicitar", action: onSolicitar)
                     .buttonStyle(BotonMaterialStyle(
                         tipo: .contorno(NxColors.brand), alto: 36, fuente: .system(size: 13, weight: .semibold)
                     ))
+                    .fixedSize()
                     .accessibilityLabel("Solicitar \(vehiculo.titulo)")
                 Button("Salida", action: onSalida)
                     .buttonStyle(BotonMaterialStyle(
                         tipo: .lleno(NxColors.brand), alto: 36, fuente: .system(size: 13, weight: .semibold)
                     ))
+                    .fixedSize()
                     .accessibilityLabel("Salida de \(vehiculo.titulo)")
             }
         }

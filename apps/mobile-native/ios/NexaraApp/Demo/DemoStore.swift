@@ -187,6 +187,35 @@ final class DemoStore: @unchecked Sendable {
         DemoClock.iso(at(minutes))
     }
 
+    /// `at(minutes)` acomodado a la jornada de NEXARA (10:00–18:00, hora del teléfono). Lo
+    /// que caería después de las 18:00 pasa a la mañana siguiente (desde las 10:00, en el
+    /// mismo orden) y lo que caería antes de las 9:00, a la tarde anterior. Solo para horas
+    /// de plan y de asignación, que se leen como hora del día: según a qué hora se abriera el
+    /// demo salían actividades «para hoy» a las 19:46 o creadas a las 04:31.
+    func atEnJornada(_ minutes: Int) -> Date {
+        let fecha = at(minutes)
+        let calendario = Calendar.current
+        let inicioDelDia = calendario.startOfDay(for: fecha)
+        let minuto = calendario.component(.hour, from: fecha) * 60 + calendario.component(.minute, from: fecha)
+        if minuto >= 18 * 60 {
+            let extra = (minuto - 18 * 60) / 3
+            return inicioDelDia.addingTimeInterval(TimeInterval(24 * 60 + 10 * 60 + extra) * 60)
+        }
+        if minuto < 9 * 60 {
+            return inicioDelDia.addingTimeInterval(TimeInterval(-7 * 60 + minuto / 9) * 60)
+        }
+        return fecha
+    }
+
+    func isoEnJornada(_ minutes: Int) -> String {
+        DemoClock.iso(atEnJornada(minutes))
+    }
+
+    /// Inicio de plan: lo ya empezado conserva su hora real; lo que viene, dentro de la jornada.
+    func isoPlan(_ minutes: Int) -> String {
+        minutes > 0 ? isoEnJornada(minutes) : iso(minutes)
+    }
+
     func isoOrNull(_ minutes: Int?) -> Any {
         if let minutes { return iso(minutes) }
         return NSNull()

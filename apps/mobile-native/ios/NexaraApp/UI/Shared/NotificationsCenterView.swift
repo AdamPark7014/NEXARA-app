@@ -77,17 +77,8 @@ struct NotificationsCenterView: View {
         }
         .nxScreenBackground()
         .nxAvisoCorto($aviso)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.backward")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.white)
-                }
-                .tint(Color.white)
-                .accessibilityLabel("Cerrar")
-            }
-        }
+        // La flecha de cerrar la pone el shell (`closeItem`), como en las demás cubiertas:
+        // con una propia aquí salían dos flechas en la barra.
         .task { await refresh(inicial: true, marcarVisto: true) }
         .onReceive(RealtimeBus.shared.events.receive(on: DispatchQueue.main)) { event in
             let model = (event.model ?? "").trimmingCharacters(in: .whitespaces).lowercased()

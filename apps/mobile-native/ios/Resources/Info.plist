@@ -29,6 +29,10 @@
     </dict>
     <key>UIUserInterfaceStyle</key>
     <string>Light</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleDarkContent</string>
     <key>UIDesignRequiresCompatibility</key>
     <true/>
     <key>UILaunchScreen</key>

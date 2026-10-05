@@ -260,20 +260,28 @@ extension DemoStore {
         DemoKpiSeed(id: 109, late: 0, lateMinutes: 0, missing: 0, productivity: 90, uniform: 100, extra: 0),
     ]
 
-    func kpiTotals(_ seed: DemoKpiSeed, workdays: Int) -> DemoJSON {
-        let scale = max(1, workdays) * 10 / 50  // la semilla es de una semana de 5 días (escala ×10)
-        let factor = max(1, scale)
-        let withWork = max(0, workdays - seed.missing * factor)
-        let worked = withWork * 530
+    func kpiTotals(_ seed: DemoKpiSeed, workdays: Int, personas: Int = 1) -> DemoJSON {
+        // La semilla es de una semana de 5 días: se escala a los días del rango y nunca hay
+        // más faltas ni retardos que días (con «Semana» un lunes solo hay uno; antes salían
+        // 3 retardos en 1 día). Jornada 10:00–18:30 con una hora de comida = 450 min.
+        let dias = max(1, workdays)
+        let personaDias = dias * max(1, personas)
+        func escala(_ valor: Int) -> Int { Int((Double(valor) * Double(dias) / 5).rounded()) }
+        let missing = min(escala(seed.missing), personaDias)
+        let withWork = max(0, personaDias - missing)
+        let late = min(escala(seed.late), withWork)
+        let lateMinutes = seed.late > 0 ? seed.lateMinutes * late / seed.late : 0
+        let extra = escala(seed.extra)
+        let worked = withWork * 450
         let productive = Int(Double(worked) * seed.productivity / 100)
         let reviewed = withWork
         let okCount = Int(Double(reviewed) * seed.uniform / 100)
         return dj([
             "diasConJornada": withWork,
-            "diasSinChecada": seed.missing * factor,
+            "diasSinChecada": missing,
             "faltasJustificadas": 0,
-            "retardos": seed.late * factor,
-            "minutosTarde": seed.lateMinutes * factor,
+            "retardos": late,
+            "minutosTarde": lateMinutes,
             "uniforme": dj([
                 "revisadas": reviewed,
                 "ok": okCount,
@@ -285,10 +293,10 @@ extension DemoStore {
             "minutosProductivos": productive,
             "minutosInactivos": worked - productive,
             "productividadPct": seed.productivity,
-            "minutosExtra": seed.extra * factor,
-            "minutosExtraAprobados": seed.extra * factor / 2,
-            "minutosExtraPendientes": seed.extra * factor / 2,
-            "diasExtraPendientes": seed.extra > 0 ? 1 : 0,
+            "minutosExtra": extra,
+            "minutosExtraAprobados": extra / 2,
+            "minutosExtraPendientes": extra - extra / 2,
+            "diasExtraPendientes": extra > 0 ? 1 : 0,
             "jornadasAbiertas": 0,
             "jornadasSinSalida": 0,
             "cierresAutomaticos": 0,
@@ -330,7 +338,7 @@ extension DemoStore {
             uniform: 96,
             extra: DemoStore.kpiSeeds.map { $0.extra }.reduce(0, +)
         )
-        let teamTotals = kpiTotals(totalSeed, workdays: workdays * DemoStore.kpiSeeds.count)
+        let teamTotals = kpiTotals(totalSeed, workdays: workdays, personas: DemoStore.kpiSeeds.count)
         let teamSemaforo = semaforos.contains("rojo") ? "amarillo" : "verde"
         return dj([
             "scope": "company",
