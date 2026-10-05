@@ -36,7 +36,7 @@ const totales = (over: Partial<TotalesKpi> = {}): TotalesKpi => ({
 
 const persona = (id: number, nombre: string, semaforo: SemaforoKpi, over: Partial<TotalesKpi> = {}): KpiPersonaFila => ({
   persona: { id, nombre, email: `${id}@x.mx`, avatarUrl: null, puesto: null },
-  horario: { clave: "office_hours", etiqueta: "Oficina", entrada: "09:00", graciaMin: 15, jornadaOrdinariaMin: 480 },
+  horario: { clave: "office_hours", etiqueta: "Oficina", entrada: "10:00", salida: "18:00", graciaMin: 15, jornadaOrdinariaMin: 480 },
   totales: totales(over),
   semaforo,
   motivos: [],

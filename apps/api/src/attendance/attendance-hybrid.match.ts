@@ -89,14 +89,27 @@ export const HYBRID_SKEW_MS = 30 * 60_000;
 export const RETARDO_GRACE_MINUTES = 15;
 
 /**
- * Hora de entrada esperada (HH:MM) según plantilla ACS ERP.
- * Oficina 09:00 · contratista 08:00 · 24/7 y visitante no marcan retardo.
+ * Jornada normal de NEXARA (Adam, 05-10-2026): entrada 10:00 y salida 18:00, para oficina y
+ * contratistas. Hay quien entra antes o sale después; el retardo se mide contra la entrada
+ * (más la gracia) y quien tenga horario propio en el editor conserva el suyo.
  */
-export function expectedStartHm(scheduleKey?: ScheduleLateKey): string | null {
+export const JORNADA_ENTRADA_HM = '10:00';
+export const JORNADA_SALIDA_HM = '18:00';
+
+/** ¿La plantilla ACS ERP mide horario? 24/7 y visitante no marcan retardo. */
+function plantillaConHorario(scheduleKey?: ScheduleLateKey): boolean {
   const key = String(scheduleKey || '').trim().toLowerCase();
-  if (key === 'office_hours') return '09:00';
-  if (key === 'contractor') return '08:00';
-  return null;
+  return key === 'office_hours' || key === 'contractor';
+}
+
+/** Hora de entrada esperada (HH:MM) según plantilla ACS ERP; null = sin horario. */
+export function expectedStartHm(scheduleKey?: ScheduleLateKey): string | null {
+  return plantillaConHorario(scheduleKey) ? JORNADA_ENTRADA_HM : null;
+}
+
+/** Hora de salida esperada (HH:MM) según plantilla ACS ERP; null = sin horario. Informativa. */
+export function expectedEndHm(scheduleKey?: ScheduleLateKey): string | null {
+  return plantillaConHorario(scheduleKey) ? JORNADA_SALIDA_HM : null;
 }
 
 /** ¿El instante cae después de expectedHm + gracia, en la zona de jornada? */

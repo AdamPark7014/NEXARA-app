@@ -125,8 +125,8 @@ export default function HorariosEquipo({
         actions={
           <InfoPopover label="¿Cómo funciona?" title="Horario de cada persona">
             <p className={estilo.popParrafo}>
-              Vacío significa <strong className={estilo.fuerte}>lo de siempre</strong>: oficina entra 09:00,
-              campo 08:00, 15 minutos de tolerancia, de lunes a viernes, jornada de 8 h netas de comida.
+              Vacío significa <strong className={estilo.fuerte}>lo de siempre</strong>: entrada 10:00 y salida
+              18:00, 15 minutos de tolerancia, de lunes a viernes, jornada de 8 h netas de comida.
             </p>
             <ul className={estilo.popLista}>
               <li>Cada casilla se decide por separado: cambiar la hora de entrada no cambia sus días ni su jornada.</li>

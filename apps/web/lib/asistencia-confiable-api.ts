@@ -104,7 +104,7 @@ export function fetchHorarios(token: string): Promise<HorarioPropio[]> {
 
 /**
  * Guarda el horario de una persona. Mandar todo vacío borra su fila y la persona
- * vuelve a la plantilla de siempre (oficina 09:00, campo 08:00, 15 min, L–V, 8 h).
+ * vuelve a la plantilla de siempre (10:00 a 18:00, 15 min, L–V, 8 h).
  */
 export function guardarHorario(
   token: string,

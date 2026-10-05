@@ -2,6 +2,7 @@ import {
   acsIdentityKeys,
   buildAcsCheckInSuggestion,
   erpIdentityKeys,
+  expectedEndHm,
   expectedStartHm,
   findAcsMatchKey,
   hybridTimeFlags,
@@ -87,23 +88,28 @@ describe('attendance-hybrid.match', () => {
     ).toBeNull();
   });
 
-  it('marca retardo vs horario de oficina (09:00 MX + 15 min gracia)', () => {
-    expect(expectedStartHm('office_hours')).toBe('09:00');
-    expect(expectedStartHm('contractor')).toBe('08:00');
+  it('marca retardo vs horario de oficina (10:00 MX + 15 min gracia)', () => {
+    // Oficina y contratista: entrada 10:00, salida 18:00. 24/7 no tiene horario.
+    expect(expectedStartHm('office_hours')).toBe('10:00');
+    expect(expectedStartHm('contractor')).toBe('10:00');
     expect(expectedStartHm('always_on')).toBeNull();
+    expect(expectedEndHm('office_hours')).toBe('18:00');
+    expect(expectedEndHm('contractor')).toBe('18:00');
+    expect(expectedEndHm('always_on')).toBeNull();
 
-    // 09:20 MX = 15:20 UTC en septiembre (UTC-6)
+    // 10:20 MX = 16:20 UTC en septiembre (UTC-6)
     expect(
-      isLateVsSchedule('2026-09-04T15:20:00.000Z', 'office_hours', { graceMinutes: 15 }),
+      isLateVsSchedule('2026-09-04T16:20:00.000Z', 'office_hours', { graceMinutes: 15 }),
     ).toBe(true);
-    // 09:10 MX = dentro de gracia
+    // 10:10 MX = dentro de gracia
     expect(
-      isLateVsSchedule('2026-09-04T15:10:00.000Z', 'office_hours', { graceMinutes: 15 }),
+      isLateVsSchedule('2026-09-04T16:10:00.000Z', 'office_hours', { graceMinutes: 15 }),
     ).toBe(false);
 
+    // 10:30 MX: la primera puerta del día, sin checador, ya cuenta como retardo.
     expect(
       hybridTimeFlags({
-        acsFirstAt: '2026-09-04T15:30:00.000Z',
+        acsFirstAt: '2026-09-04T16:30:00.000Z',
         acsPasses: 2,
         acsMinutes: 400,
         scheduleKey: 'office_hours',

@@ -731,7 +731,7 @@ export class MeController {
 
   /**
    * Escribe el horario propio de una persona. Todo vacío borra la fila y la persona
-   * vuelve a su plantilla (oficina 09:00, campo 08:00, 15 min de gracia, L–V, 8 h).
+   * vuelve a su plantilla (10:00 a 18:00, 15 min de gracia, L–V, 8 h).
    */
   @Post('kpis/horarios')
   guardarHorario(
