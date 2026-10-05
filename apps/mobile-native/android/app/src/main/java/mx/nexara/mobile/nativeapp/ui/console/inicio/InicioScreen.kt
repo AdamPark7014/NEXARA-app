@@ -86,6 +86,8 @@ import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
+import mx.nexara.mobile.nativeapp.ui.common.NotificationHealthBanner
+import mx.nexara.mobile.nativeapp.ui.common.rememberProblemaDeAvisos
 import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
 import mx.nexara.mobile.nativeapp.ui.console.CoreMenu
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
@@ -137,6 +139,7 @@ fun InicioScreen(
     val attendance = attendanceVm?.state?.collectAsState()?.value
     var pausandoId by remember { mutableStateOf<Long?>(null) }
     val hoy = remember { LocalDate.now() }
+    val problemaAvisos = rememberProblemaDeAvisos()
 
     // Al volver a la app se relee todo, sin esperar al siguiente tic.
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -175,6 +178,12 @@ fun InicioScreen(
                     unreadCount = unreadCount,
                     onOpenNotifications = onOpenNotifications,
                 )
+            }
+
+            problemaAvisos.actual?.let { p ->
+                item(key = "avisos-telefono") {
+                    NotificationHealthBanner(problema = p, onOcultar = problemaAvisos::ocultar)
+                }
             }
 
             if (attendanceVm != null && attendance != null && attendanceVm.viewMode.canRegisterSelf) {

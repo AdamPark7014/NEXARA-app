@@ -58,6 +58,11 @@
             android:stopWithTask="false"
             android:foregroundServiceType="location" />
 
+        <!-- Botones de las notificaciones: responder y marcar como leído sin abrir la app. -->
+        <receiver
+            android:name=".push.NotificationActionReceiver"
+            android:exported="false" />
+
         <!-- Firebase Cloud Messaging -->
         <service
             android:name=".push.NexaraFirebaseService"

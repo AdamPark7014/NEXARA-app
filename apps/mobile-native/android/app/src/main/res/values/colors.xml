@@ -1,10 +1,10 @@
 <resources>
-    <!-- Marca NEXARA en azul (mismos valores que NxColors en Compose). -->
-    <color name="nexara_primary">#FF2563EB</color>
-    <color name="nexara_primary_dark">#FF1E40AF</color>
-    <color name="nexara_primary_soft">#FFDBEAFE</color>
-    <color name="nexara_surface_tint">#FFEFF6FF</color>
-    <color name="nexara_accent">#FF3B82F6</color>
+    <!-- Marca NEXARA en teal (mismos valores que NxColors en Compose). -->
+    <color name="nexara_primary">#FF1F9E84</color>
+    <color name="nexara_primary_dark">#FF12715E</color>
+    <color name="nexara_primary_soft">#FFE7F5F1</color>
+    <color name="nexara_surface_tint">#FFF3FAF8</color>
+    <color name="nexara_accent">#FF1F9E84</color>
     <color name="ic_launcher_background">#FFFFFFFF</color>
     <color name="white">#FFFFFFFF</color>
     <color name="black">#FF000000</color>
