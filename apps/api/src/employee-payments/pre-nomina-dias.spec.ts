@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { crearReporte } from '../common/excel/reporte-excel.js';
+import { crearReporte, lineasDeTexto } from '../common/excel/reporte-excel.js';
 import type { DiaKpi } from '../me/kpis-equipo.js';
 import {
   estadoDelDia,
@@ -64,9 +64,9 @@ describe('pre-nómina día por día', () => {
 
   it('cada día se dice en palabras: horas trabajadas y productivas', () => {
     expect(resumenDelDia(dia('2026-10-05', { minutosLaborados: 490, minutosProductivos: 320, productividadPct: 65 }))).toBe(
-      'Lunes 05/10: 8 h 10 min trabajadas, 5 h 20 min productivas (65 %)',
+      '8 h 10 min trabajadas · 5 h 20 min productivas (65 %)',
     );
-    expect(resumenDelDia(dia('2026-10-06', { conJornada: false, sinChecada: true }))).toBe('Martes 06/10: falta (sin checar)');
+    expect(resumenDelDia(dia('2026-10-06', { conJornada: false, sinChecada: true }))).toBe('Falta (sin checar)');
     expect(horasEnPalabras(480)).toBe('8 h');
     expect(horasEnPalabras(45)).toBe('45 min');
   });
@@ -110,7 +110,7 @@ describe('pre-nómina día por día', () => {
   it('el detalle va en orden de fecha y omite los descansos sin trabajo', () => {
     const filas = filasDetalleDiario([ana]);
     expect(filas.map((f) => f.fecha)).toEqual(['Lunes 28/09/2026', 'Martes 29/09/2026', 'Miércoles 30/09/2026']);
-    expect(filas[0].resumen).toBe('Lunes 28/09: 6 h trabajadas, 4 h productivas (67 %)');
+    expect(filas[0].resumen).toBe('6 h trabajadas · 4 h productivas (67 %)');
     expect(filas[0]).toMatchObject({ entrada: '10:00', estado: 'Retardo', minutosTarde: 15, minutosLaborados: 360 });
     expect(filas[2]).toMatchObject({ estado: 'Falta (sin checar)', minutosLaborados: null, entrada: null });
   });
@@ -128,5 +128,39 @@ describe('pre-nómina día por día', () => {
     await libro.xlsx.load(buffer as any);
     const nombres = libro.worksheets.map((w) => w.name);
     expect(nombres).toEqual(expect.arrayContaining(['Pre-nómina', 'Horas por día', 'Detalle diario']));
+  });
+
+  it('el texto largo agranda su fila en vez de encimarse sobre la de abajo', async () => {
+    const notaLarga =
+      'Retardo: entrada después de su hora (10:00); la salida normal es a las 18:00. El día de descanso no cuenta para retardos y el tiempo extra solo se paga si un jefe lo aprueba.';
+    const buffer = await crearReporte({
+      hoja: 'Pre-nómina',
+      titulo: 'Pre-nómina',
+      columnas: [
+        { clave: 'nombre', titulo: 'Persona' },
+        { clave: 'nota', titulo: 'Revisar antes de pagar', ancho: 30, ajustar: true },
+      ],
+      filas: [
+        { nombre: 'Ana', nota: notaLarga },
+        { nombre: 'Luis', nota: 'Nada' },
+      ],
+      notas: [notaLarga],
+    });
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(buffer as any);
+    const datos = libro.getWorksheet('Pre-nómina')!;
+    const filaAna = [...Array(datos.rowCount).keys()].map((i) => datos.getRow(i + 1)).find((r) => r.getCell(1).value === 'Ana')!;
+    const filaLuis = datos.getRow(filaAna.number + 1);
+    expect(filaAna.height).toBeGreaterThan(40);
+    expect(filaLuis.height).toBe(17);
+    const info = libro.getWorksheet('Información')!;
+    const filaNota = [...Array(info.rowCount).keys()].map((i) => info.getRow(i + 1)).find((r) => r.getCell(2).value === notaLarga)!;
+    expect(filaNota.height).toBeGreaterThan(30);
+  });
+
+  it('cuenta las líneas por palabras', () => {
+    expect(lineasDeTexto('corto', 20)).toBe(1);
+    expect(lineasDeTexto('una frase que no cabe en diez', 10)).toBeGreaterThanOrEqual(3);
+    expect(lineasDeTexto('uno\ndos', 40)).toBe(2);
   });
 });
