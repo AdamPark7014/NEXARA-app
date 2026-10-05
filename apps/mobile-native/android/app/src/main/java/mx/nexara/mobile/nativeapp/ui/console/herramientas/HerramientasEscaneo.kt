@@ -29,7 +29,6 @@ import mx.nexara.mobile.nativeapp.data.console.EscaneoRepository
 import mx.nexara.mobile.nativeapp.ui.common.CodigoBarrasRules
 import mx.nexara.mobile.nativeapp.ui.common.EscanearOEscribirCodigo
 import mx.nexara.mobile.nativeapp.ui.common.FormatosDeEscaneo
-import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
 import mx.nexara.mobile.nativeapp.ui.console.more.EscaneoRules
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreTarjeta
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -144,7 +143,8 @@ private fun HerramientaEscaneada(r: HerramientaPorCodigoDto) {
     EscaneoRules.quienLaTiene(r)?.let {
         Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = NxColors.Slate)
     }
-    r.prestamo?.expectedReturnDate?.let { CoreActivityRules.formatWhen(it) }?.let {
+    // Es una fecha sin hora («2026-10-08»): leerla como instante UTC la pintaba un día antes en México.
+    r.prestamo?.expectedReturnDate?.let { HerramientasRules.fechaCorta(it) }?.takeIf { it.isNotEmpty() }?.let {
         Text("Devolución esperada: $it", style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
     }
     if (r.esMia == true) {

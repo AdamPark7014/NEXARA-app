@@ -1,5 +1,17 @@
 # RELEVO
 
+- **05-10 ~14:45 (claude-code) — cierre de la paridad iOS ← Android sobre lo de Cursor (sin pisar nada).**
+  Revisadas las 36 capturas de `9a8e5b41`. Arreglado (`e3c391cd`, iOS): **la hora y la batería salían en NEGRO
+  sobre la barra teal en todas las pantallas** (mismo efecto del rechazo 2.3.10) → estilo global
+  (`UIViewControllerBasedStatusBarAppearance = NO`) que decide `NxStatusBar.textoBlanco` desde el shell (Inicio sin
+  cubierta = negro, resto = blanco) y la raíz (login/bienvenida negro, portal blanco) — **verificar en las
+  capturas de CI que la hora salga blanca**; doble flecha en Notificaciones; «Solic…» en Vehículos; columna de
+  hora de «Después, hoy» a 58 (iOS y Android); demo: KPIs escalados al rango (3 retardos en 1 día) y horas de
+  plan/asignación dentro de 10–18 (`DemoStore.atEnJornada`). Android: «Cotizacion_monto» → «Cotización» en
+  Aprobaciones (+ prueba) y fecha de devolución de Herramientas un día antes en el escáner (fecha sin hora leída
+  como UTC). En curso con agentes: pantallas viejas del portal iOS y `AlmacenEscaneo`. El AAB 1.0.6 (16) de Cursor
+  NO trae estos arreglos de Android: se regenera.
+
 - **05-10 ~14:35 (cursor) — Paridad iOS ← Android terminada (fase B) y avisos de Android.** Pedido de Adam:
   «la iOS tiene muchos errores y le falta paridad en UI y colores; las notificaciones de Android son pobres
   (feas, a destiempo, sin información, no suenan)».
