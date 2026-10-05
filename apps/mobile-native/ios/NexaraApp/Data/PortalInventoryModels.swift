@@ -47,10 +47,21 @@ struct PortalInventorySnapshot: Hashable, Identifiable {
     let branchId: Int64?
     let branchName: String
     let items: [PortalInventoryItem]
+    /// `currentCount` tal como llegó (`nil` si no vino).
+    let currentCountValue: Int?
+    /// `true` si el API mandó el arreglo `items` (aunque venga vacío).
+    let itemsProvided: Bool
     let raw: [String: Any]
 
     var rowKey: String { "pis-\(id)" }
     var displayTitle: String { title.isEmpty ? "Inventario" : title }
+
+    /// Equipos del inventario: `currentCount` y, si no vino, cuántos `items` trae
+    /// (Android `inv.currentCount ?: inv.items?.size`). `nil` = sin dato.
+    var equipmentCount: Int? {
+        if let currentCountValue { return currentCountValue }
+        return itemsProvided ? items.count : nil
+    }
 
     func toFlatMap() -> [String: Any] {
         var out = raw
@@ -79,7 +90,8 @@ struct PortalInventorySnapshot: Hashable, Identifiable {
         notes = StockParse.str(raw["notes"], raw["notas"])
         status = StockParse.str(raw["status"], raw["estado"])
         previousCount = Int(StockParse.dbl(raw["previousCount"]) ?? 0)
-        currentCount = Int(StockParse.dbl(raw["currentCount"]) ?? 0)
+        currentCountValue = StockParse.dbl(raw["currentCount"]).map { Int($0) }
+        currentCount = currentCountValue ?? 0
         deltaCount = Int(StockParse.dbl(raw["deltaCount"]) ?? 0)
         createdAt = StockParse.str(raw["createdAt"], raw["fecha"])
         completedAt = StockParse.str(raw["completedAt"])
@@ -87,8 +99,10 @@ struct PortalInventorySnapshot: Hashable, Identifiable {
         branchName = StockParse.str(branch?["name"], raw["branchName"])
         if let arr = raw["items"] as? [[String: Any]] {
             items = arr.map { PortalInventoryItem(raw: $0) }
+            itemsProvided = true
         } else {
             items = []
+            itemsProvided = raw["items"] is [Any]
         }
     }
 }

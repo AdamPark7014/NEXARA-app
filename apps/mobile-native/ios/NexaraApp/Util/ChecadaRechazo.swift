@@ -33,6 +33,13 @@ enum ChecadaRechazo {
             || esFinDeSemanaSinGuardia(t)
     }
 
+    /// Igual que `esRechazoDelServidor` de Android: un 422 a secas ya es rechazo de la
+    /// checada (el servidor lo usa para todos sus motivos), aunque el texto sea uno que
+    /// la app todavía no conoce; un 400 cualquiera no lo es.
+    static func esRechazo(codigo: Int?, mensaje: String?) -> Bool {
+        codigo == 422 || esRechazo(mensaje)
+    }
+
     /// Para rechazos que la app todavía no conoce: no se culpa al GPS sin saberlo.
     static let ayudaGenerica =
         "Tu checada no se registró. Lee el motivo de arriba; si crees que es un error, "

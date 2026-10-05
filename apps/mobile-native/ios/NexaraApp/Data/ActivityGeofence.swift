@@ -55,6 +55,38 @@ enum ActivityGeofence {
         "La salida se registra donde iniciaste la actividad: estás a \(distancia) m y el máximo es \(radioM) m. "
             + "Regresa al punto de inicio para tomar la foto de salida."
     }
+
+    /// Distancia de un punto al inicio de la geocerca, o `nil` si no hay contra qué
+    /// medir (Android `ActivityGeofence.distanciaAlInicio`). Como el API, descarta el
+    /// (0,0) de un teléfono sin permiso.
+    static func distanciaAlInicio(_ state: ActivityGeofenceState?, latitude: Double?, longitude: Double?) -> Int? {
+        guard let origen = state?.origen else { return nil }
+        return distanciaAlOrigen(
+            origenLat: origen.latitude,
+            origenLng: origen.longitude,
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
+
+    /// Hora de la empresa: la jornada y las salidas de zona se leen en Puebla, no en
+    /// el huso del teléfono.
+    static let zona: TimeZone = TimeZone(identifier: "America/Mexico_City") ?? .current
+
+    private static let horaFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_MX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = ActivityGeofence.zona
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    /// «14:05» en America/Mexico_City; «—» si no hay hora (Android `horaDe`).
+    static func horaDe(_ iso: String?) -> String {
+        guard let fecha = CoreFormat.date(iso) else { return "—" }
+        return horaFormatter.string(from: fecha)
+    }
 }
 
 // MARK: - Decodificación tolerante
@@ -183,7 +215,9 @@ struct ActivityGeofenceAlert: Codable, Identifiable, Hashable {
 /// `GET activity-evidence/:activityId/geocerca`.
 struct ActivityGeofenceState: Codable, Hashable {
     let activityId: Int?
-    /// Solo Servicios. Si falta en el JSON, el cliente no pre-bloquea la salida.
+    /// Lo decide el tipo de actividad (servicio, proyecto, obra y tarea sí, salvo
+    /// recolección, entrega y compra de material; comercial no). Si falta en el JSON,
+    /// el cliente no pre-bloquea la salida.
     let exigeMismaUbicacion: Bool
     let radioM: Int
     let origen: ActivityGeofenceOrigin?
@@ -214,6 +248,11 @@ struct ActivityGeofenceState: Codable, Hashable {
     }
 
     var pendingAlerts: [ActivityGeofenceAlert] { alertas.filter { !$0.isJustified } }
+
+    /// Salida que sigue abierta y sin justificar: pinta de rojo la tarjeta (Android `abierta`).
+    var alertaAbiertaSinJustificar: ActivityGeofenceAlert? {
+        alertas.first { $0.abierta && !$0.isJustified }
+    }
 }
 
 /// Cuerpo de `POST .../geocerca/alertas/:alertId/justificacion`.

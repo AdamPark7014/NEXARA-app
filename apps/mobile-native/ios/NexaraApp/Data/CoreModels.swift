@@ -386,7 +386,12 @@ enum CoreOrg {
     /// A quién puede pasar cada encargado un despacho (espejo de `DISPATCH_POOLS`).
     static let dispatchPools: [String: [String]] = [
         "direccion.operaciones@nexara.com.mx": ["jose.ramirez@nexara.com.mx"],
-        "jose.ramirez@nexara.com.mx": ["soporte@nexara.com.mx", "alejandro.gonzalez@nexara.com.mx"],
+        // Roberto también es del soporte de Antonio (`EXTRAS_ASIGNACION_POR_CORREO` del API).
+        "jose.ramirez@nexara.com.mx": [
+            "soporte@nexara.com.mx",
+            "alejandro.gonzalez@nexara.com.mx",
+            "roberto.vivanco@nexara.com.mx",
+        ],
         "operaciones@nexara.com.mx": [
             "joan.sanchez@nexara.com.mx",
             "israel.ramos@nexara.com.mx",
@@ -572,6 +577,20 @@ struct MyActivityItem: Decodable, Identifiable, Hashable {
     let pausadaPor: MyActivityAssigner?
     let motivoPausa: String?
     let sesionAbiertaDesde: String?
+    // Contrato B: semáforo y tiempos. Opcionales: la API vieja no los manda.
+    /// rojo | amarillo | verde (lo calcula el servidor).
+    let semaforo: String?
+    /// Tiempo planeado en minutos (`horasPlan` × 60).
+    let minutosPlan: FlexDouble?
+    /// Tiempo real: inicio → fin, o inicio → ahora si sigue en curso.
+    let minutosReales: FlexDouble?
+    let excedida: Bool?
+    let motivoRechazo: String?
+    /// Quién se la asignó (nombre del contrato; `asignadaPor` es el campo viejo).
+    let asignadoPor: MyActivityAssigner?
+
+    /// El contrato dice `asignadoPor`; las respuestas de hoy traen `asignadaPor`.
+    var quienAsigno: MyActivityAssigner? { asignadoPor ?? asignadaPor }
 
     /// Estado del reloj de esta actividad para quien la tiene.
     var sesion: SesionActividad {
@@ -699,6 +718,8 @@ struct TeamBoardUser: Decodable, Identifiable, Hashable {
     let enCorreccion: Int?
     /// Solo en `me/board/:userId`: quien consulta puede pausarle el reloj (jefe o CEO).
     let puedePausar: Bool?
+    /// Contrato C: cómo le fue en el rango consultado (a tiempo, eficiencia…).
+    let kpis: TeamBoardKpis?
 }
 
 /// `lastFinished` del tablero. `lateMinutes` nulo = la actividad no tenía fecha máxima.
@@ -736,6 +757,13 @@ struct TeamBoardHistoryItem: Decodable, Identifiable, Hashable {
     let fechaAsignacion: String?
     let fechaFinalizacion: String?
     let evidence: TeamBoardHistoryEvidence?
+    /// Contrato C: la sacaron de la actividad (sigue en su historial, no en sus KPI).
+    let retirado: Bool?
+    /// rojo | amarillo | verde.
+    let semaforo: String?
+    let minutosPlan: FlexDouble?
+    let minutosReales: FlexDouble?
+    let excedida: Bool?
 }
 
 // MARK: - Evidencias del equipo (GET me/activities/:id/evidencias)
@@ -1037,6 +1065,9 @@ struct EvidenceFlowState: Decodable, Hashable {
     let entryLongitude: FlexDouble?
     let entryPhotoUploadedAt: String?
     let evidencePhotos: [String]?
+    /// Ubicación de cada foto en sitio (`[{latitude, longitude, capturedAt} | null]`).
+    /// Como `JSONValue` para que una entrada rara nunca tumbe el flujo entero.
+    let evidencePhotosGeo: JSONValue?
     let evidencePhotosUploadedAt: String?
     let serviceSheetPdfUrl: String?
     let serviceSheetUploadedAt: String?

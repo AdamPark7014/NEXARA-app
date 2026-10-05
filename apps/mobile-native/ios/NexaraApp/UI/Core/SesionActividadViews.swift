@@ -263,3 +263,184 @@ private struct PausarDeEquipoSheet: View {
         }
     }
 }
+
+// MARK: - Diálogos con la forma de Android
+
+/// Diálogo de Android (`AlertDialog`): título 22, contenido y botones a la derecha,
+/// en una hoja que se ajusta al contenido (fondo `surfaceContainerHigh`, radio 28).
+/// Lo usan «Pausar actividad», «Cancelar actividad» y «Pasar a otro compañero».
+struct ActivityDialogSheet<Content: View, Actions: View>: View {
+    let title: String
+    var titleWeight: Font.Weight
+    let content: Content
+    let actions: Actions
+
+    /// `surfaceContainerHigh` del tema de Android (#EEF2F7).
+    static var fondo: Color { NxColors.rgb(0xEEF2F7) }
+
+    init(
+        title: String,
+        titleWeight: Font.Weight = .semibold,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.title = title
+        self.titleWeight = titleWeight
+        self.content = content()
+        self.actions = actions()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(title)
+                    .font(.system(size: 22, weight: titleWeight))
+                    .foregroundStyle(NxColors.fg)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                VStack(alignment: .leading, spacing: 8) { content }
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    actions
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .background(Self.fondo.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(28)
+        .presentationBackground(Self.fondo)
+    }
+}
+
+/// `TextButton` de Material: letra 14 Medium de marca, sin fondo.
+struct ActivityDialogTextButtonStyle: ButtonStyle {
+    var color: Color = NxColors.brand
+
+    func makeBody(configuration: Configuration) -> some View {
+        ActivityDialogTextButtonBody(configuration: configuration, color: color)
+    }
+}
+
+private struct ActivityDialogTextButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let color: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        configuration.label
+            .font(.system(size: 14, weight: .medium))
+            .lineLimit(1)
+            .foregroundStyle(isEnabled ? color : NxColors.fg.opacity(0.38))
+            .padding(.horizontal, 12)
+            .frame(minHeight: 40)
+            .background(configuration.isPressed ? color.opacity(0.1) : Color.clear, in: Capsule())
+            .contentShape(Capsule())
+    }
+}
+
+/// Campo de contorno de Material (`OutlinedTextField`): etiqueta, borde #CBD5E1
+/// (rojo con error) y texto de apoyo debajo.
+struct ActivityOutlinedField: View {
+    let label: String
+    @Binding var text: String
+    var placeholder: String = ""
+    var minLines: Int = 1
+    var isError: Bool = false
+    var supporting: String? = nil
+    var enabled: Bool = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isError ? NxColors.danger : NxColors.muted)
+            TextField(placeholder.isEmpty ? label : placeholder, text: $text, axis: .vertical)
+                .font(.system(size: 16))
+                .foregroundStyle(NxColors.fg)
+                .lineLimit(max(1, minLines)...max(6, minLines))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.s, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: NxRadius.s, style: .continuous)
+                        .strokeBorder(isError ? NxColors.danger : NxColors.borderStrong, lineWidth: 1)
+                )
+                .disabled(!enabled)
+            if let supporting, !supporting.isEmpty {
+                Text(supporting)
+                    .font(.system(size: 12))
+                    .foregroundStyle(isError ? NxColors.danger : NxColors.muted)
+            }
+        }
+    }
+}
+
+// MARK: - Pausar mi actividad
+
+/// «Pausar actividad» (motivo opcional) con `me/activities/:id/pausar`. Espejo de
+/// `PausarPropiaDialog` de Android: lo usa el dock del detalle.
+struct PausarPropiaSheet: View {
+    let activityId: Int
+    let onDone: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var motivo = ""
+    @State private var guardando = false
+    @State private var error: String?
+
+    private var errorMotivo: String? { SesionActividad.errorMotivoPropio(motivo) }
+
+    var body: some View {
+        ActivityDialogSheet(title: SesionActividad.tituloPausaPropia) {
+            Text(SesionActividad.textoPausaPropia)
+                .font(.system(size: 13))
+                .foregroundStyle(NxColors.fg)
+                .fixedSize(horizontal: false, vertical: true)
+            ActivityOutlinedField(
+                label: "Motivo (opcional)",
+                text: $motivo,
+                minLines: 2,
+                isError: errorMotivo != nil,
+                supporting: errorMotivo,
+                enabled: !guardando
+            )
+            if let error {
+                Text(error)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(NxColors.rojo)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } actions: {
+            Button("Cancelar") { dismiss() }
+                .buttonStyle(ActivityDialogTextButtonStyle())
+                .disabled(guardando)
+            Button(guardando ? "Pausando…" : "Pausar") {
+                Task { await pausar() }
+            }
+            .buttonStyle(ActivityDialogTextButtonStyle())
+            .disabled(guardando || errorMotivo != nil)
+        }
+        .interactiveDismissDisabled(guardando)
+        .onChange(of: motivo) { _, value in
+            let tope = SesionActividad.motivoMaximo + 20
+            if value.count > tope { motivo = String(value.prefix(tope)) }
+        }
+    }
+
+    @MainActor
+    private func pausar() async {
+        guardando = true
+        error = nil
+        defer { guardando = false }
+        do {
+            try await CoreRepository.shared.pausarActividad(activityId: activityId, motivo: motivo)
+            onDone("Actividad en pausa")
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo pausar la actividad")
+        }
+    }
+}

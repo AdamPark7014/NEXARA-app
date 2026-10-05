@@ -1,52 +1,61 @@
 import SwiftUI
 
-/// Almacén (`/erp/almacen`) en iPhone: consulta de existencias y, arriba, el escáner de
-/// códigos de barras (`EscanerDeAlmacen`) para buscar un producto y registrar entradas o
-/// salidas con permiso de inventario.
+/// Almacén (`/erp/almacen`) en iPhone — Android `AlmacenScreen`: arriba el
+/// escáner de códigos de barras (`EscanerDeAlmacen`) para buscar un producto y
+/// registrar entradas o salidas con permiso de inventario; debajo, la consulta
+/// de existencias.
 ///
-/// La tabla de la web tiene nueve columnas: producto, SKU, almacén, ubicación,
-/// cantidad, reservado, disponible, punto de reorden y costo. En un teléfono eso
-/// no se lee, y además no es la pregunta que se hace en campo. La pregunta es
-/// «¿alcanza o hay que pedir?», así que la pantalla **abre en lo que está bajo
-/// mínimo** —que es la lista de compras— y el inventario completo queda en el
-/// otro segmento, con `.searchable`.
+/// La pregunta en campo es «¿alcanza o hay que pedir?», así que la pantalla
+/// **abre en lo que está bajo mínimo** —la lista de compras— y el inventario
+/// completo queda en la otra pastilla. El costo no sale: en el bolsillo no se
+/// decide un precio, y sí se enseña delante de un cliente.
 ///
-/// Cada fila lleva el producto, dónde está, la cantidad grande a la derecha y
-/// una barra que compara lo que hay contra el punto de reorden. El costo no
-/// sale: en el bolsillo no se decide un precio, y sí se enseña delante de un
-/// cliente.
+/// Sigue siendo una `List` porque el escáner está hecho de secciones con
+/// campos; el resto se pinta con las tarjetas de «Más».
 struct AlmacenView: View {
     enum Vista: String, CaseIterable, Identifiable {
-        case bajoMinimo = "Bajo mínimo"
-        case todo = "Todo"
+        case bajoMinimo
+        case todo
 
         var id: String { rawValue }
+
+        var etiqueta: String {
+            switch self {
+            case .bajoMinimo: return "Bajo mínimo"
+            case .todo: return "Todo el inventario"
+            }
+        }
     }
+
+    static let limite = "Con el escáner se consultan productos y se registran entradas y salidas (si tu usuario "
+        + "puede mover inventario). Traspasos, ajustes y costos se hacen desde la computadora."
 
     @State private var estado = CoreExtrasEstado<AlmacenConsulta>()
     @State private var vista: Vista = .bajoMinimo
-    @State private var busqueda = ""
+    @State private var consulta = ""
 
     private var visibles: [StockNivel] {
         guard let datos = estado.datos else { return [] }
         let base: [StockNivel]
         switch vista {
         case .bajoMinimo:
-            // Primero lo agotado, después lo más cerca del mínimo: así la
-            // primera pantalla ya es la lista de compras.
+            // Primero lo agotado, después lo más cerca del mínimo.
             base = datos.bajoMinimo.sorted { a, b in
                 if a.agotado != b.agotado { return a.agotado }
                 let pa = a.progreso ?? 1
                 let pb = b.progreso ?? 1
                 if pa != pb { return pa < pb }
-                return a.titulo.localizedCaseInsensitiveCompare(b.titulo) == .orderedAscending
+                return a.titulo.lowercased() < b.titulo.lowercased()
             }
         case .todo:
-            base = datos.niveles.sorted {
-                $0.titulo.localizedCaseInsensitiveCompare($1.titulo) == .orderedAscending
+            base = datos.niveles.sorted { a, b in
+                let ta = a.titulo.lowercased()
+                let tb = b.titulo.lowercased()
+                if ta != tb { return ta < tb }
+                return a.ubicacionTexto.lowercased() < b.ubicacionTexto.lowercased()
             }
         }
-        let q = busqueda.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let q = consulta.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return base }
         return base.filter { nivel in
             [nivel.product?.name, nivel.product?.sku, nivel.warehouse?.name, nivel.warehouse?.code]
@@ -70,112 +79,100 @@ struct AlmacenView: View {
         List {
             EscanerDeAlmacen(onMovimiento: { Task { await cargar() } })
 
-            Section {
-                Picker("Vista", selection: $vista) {
-                    ForEach(Vista.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            }
+            Group {
+                FilaDePastillasDeConsulta(pastillas: Vista.allCases.map { opcion in
+                    PastillaDeConsulta(
+                        etiqueta: opcion.etiqueta,
+                        conteo: opcion == .bajoMinimo ? estado.datos?.bajoMinimo.count : estado.datos?.niveles.count,
+                        seleccionada: opcion == vista,
+                        onClick: { vista = opcion }
+                    )
+                })
 
-            if let aviso = estado.avisoDesactualizado {
-                Section { CoreExtrasAvisoDesactualizado(mensaje: aviso) }
-            }
-
-            if estado.mostrandoEsqueleto {
-                Section { CoreExtrasCargando() }
-            }
-
-            if let datos = estado.datos {
-                if let resumen = resumenAlertas {
-                    Section {
-                        LabeledContent("Hay que pedir") {
-                            Text(resumen).foregroundStyle(.red).font(.body.weight(.semibold))
-                        }
-                    } footer: {
-                        Text("De \(datos.niveles.count) existencias en total.")
-                    }
+                if let aviso = estado.avisoDesactualizado {
+                    MoreAvisoDesactualizado(mensaje: aviso) { estado.avisoDesactualizado = nil }
                 }
 
-                Section {
-                    if visibles.isEmpty {
-                        vacio(total: datos.niveles.count)
-                    } else {
-                        ForEach(visibles) { nivel in
-                            fila(nivel)
-                        }
-                    }
-                } header: {
-                    Text(vista == .bajoMinimo ? "Bajo mínimo" : "Todo el inventario")
-                } footer: {
-                    if !visibles.isEmpty {
-                        Text(vista == .bajoMinimo
-                             ? "Primero lo que ya se acabó."
-                             : "En orden alfabético.")
-                    }
+                if estado.mostrandoEsqueleto {
+                    NxSkeletonList(itemCount: 6, itemHeight: 88)
                 }
-            }
 
-            Section {
-                CoreExtrasNotaDeAlcance(
-                    texto: "Con el escáner se consultan productos y se registran entradas y salidas (si tu usuario "
-                        + "puede mover inventario). Traspasos, ajustes y costos se hacen desde la computadora."
-                )
+                if let error = estado.error, !estado.hayDatos {
+                    NxErrorBlock(message: error, onRetry: { Task { await cargar() } })
+                }
+
+                if let datos = estado.datos {
+                    contenido(datos)
+                }
+
+                MoreNotaDeAlcance(texto: Self.limite)
             }
+            // El margen lateral lo pone la lista agrupada, igual que al escáner.
+            .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Almacén")
-        .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $busqueda, prompt: "Buscar por producto, SKU o almacén")
+        .nxListBackground()
         .refreshable { await cargar() }
-        .overlay {
-            if let error = estado.error, !estado.hayDatos {
-                CoreExtrasError(mensaje: error) { Task { await cargar() } }
-            }
-        }
         .task { if !estado.hayDatos { await cargar() } }
     }
 
     @ViewBuilder
-    private func vacio(total: Int) -> some View {
-        if !busqueda.isEmpty {
-            Text("Ningún producto coincide con «\(busqueda)».").foregroundStyle(.secondary)
-        } else if vista == .bajoMinimo && total > 0 {
-            Text("Ningún producto con punto de reorden está por acabarse.")
-                .foregroundStyle(.secondary)
+    private func contenido(_ datos: AlmacenConsulta) -> some View {
+        if let resumen = resumenAlertas {
+            MoreTarjeta {
+                Text("Hay que pedir")
+                    .font(NxType.labelMedium)
+                    .foregroundStyle(NxColors.muted)
+                Text(resumen)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(NxColors.danger)
+                Text("De \(datos.niveles.count) existencias en total")
+                    .font(NxType.labelSmall)
+                    .foregroundStyle(NxColors.muted)
+            }
+        }
+
+        if vista == .todo || datos.bajoMinimo.count > 6 {
+            NxSearchField(text: $consulta, placeholder: "Buscar por producto, SKU o almacén")
+        }
+
+        let filas = visibles
+        if filas.isEmpty {
+            vacio(total: datos.niveles.count)
         } else {
-            Text("Todavía no hay productos con existencia en los almacenes de esta empresa.")
-                .foregroundStyle(.secondary)
+            MoreCabecera(
+                titulo: vista.etiqueta,
+                subtitulo: vista == .bajoMinimo ? "Primero lo que ya se acabó" : "En orden alfabético",
+                trailing: "\(filas.count)"
+            )
+            ForEach(filas) { FilaDeExistencia(nivel: $0) }
         }
     }
 
     @ViewBuilder
-    private func fila(_ nivel: StockNivel) -> some View {
-        let semaforo: CoreExtrasSemaforo = nivel.agotado ? .rojo : (nivel.bajoMinimo ? .amarillo : .verde)
-        let estadoTexto = nivel.agotado ? "Agotado" : (nivel.bajoMinimo ? "Bajo mínimo" : "Con existencia")
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(nivel.titulo).font(.body.weight(.medium))
-                    Text(nivel.ubicacionTexto).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(CoreExtrasFormato.numero(nivel.cantidad))
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(semaforo.color)
-                    Text("en existencia").font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            CoreExtrasBarra(
-                valor: nivel.progreso,
-                etiqueta: nivel.detalleTexto,
-                color: semaforo.color
+    private func vacio(total: Int) -> some View {
+        if !consulta.trimmingCharacters(in: .whitespaces).isEmpty {
+            NxEmptyState(
+                title: "Sin coincidencias",
+                subtitle: "Ningún producto coincide con «\(consulta)».",
+                actionLabel: "Limpiar búsqueda",
+                onAction: { consulta = "" }
             )
-            CoreExtrasSemaforoBadge(semaforo: semaforo, texto: estadoTexto)
+        } else if vista == .bajoMinimo && total > 0 {
+            NxEmptyState(
+                title: "Nada bajo mínimo",
+                subtitle: "Ningún producto con punto de reorden está por acabarse.",
+                actionLabel: "Ver todo el inventario",
+                onAction: { vista = .todo }
+            )
+        } else {
+            NxEmptyState(
+                title: "Sin existencias",
+                subtitle: "Todavía no hay productos con existencia en los almacenes de esta empresa."
+            )
         }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
     }
 
     private func cargar() async {
@@ -185,5 +182,43 @@ struct AlmacenView: View {
         } catch {
             estado.fallo(error.toUserMessage(fallback: "No se pudo cargar el almacén"))
         }
+    }
+}
+
+/// Una existencia: la cantidad grande a la derecha, la barra contra el punto de
+/// reorden y el estado con palabras para quien no ve el color.
+private struct FilaDeExistencia: View {
+    let nivel: StockNivel
+
+    var body: some View {
+        let tono: NxTone = nivel.agotado ? .danger : (nivel.bajoMinimo ? .warning : .success)
+        let estadoTexto = nivel.agotado ? "Agotado" : (nivel.bajoMinimo ? "Bajo mínimo" : "Con existencia")
+        MoreTarjeta {
+            HStack(alignment: .top, spacing: NxSpacing.m) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(nivel.titulo)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(NxColors.fg)
+                        .lineLimit(2)
+                    Text(nivel.ubicacionTexto)
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(CoreExtrasFormato.numero(nivel.cantidad))
+                        .font(NxType.headlineSmall.bold())
+                        .foregroundStyle(tono.fg)
+                        .lineLimit(1)
+                    Text("en existencia")
+                        .font(NxType.labelSmall)
+                        .foregroundStyle(NxColors.muted)
+                }
+            }
+            MoreBarra(progreso: nivel.progreso, etiqueta: nivel.detalleTexto, tono: tono)
+            NxStatusChip(text: estadoTexto, tone: tono)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

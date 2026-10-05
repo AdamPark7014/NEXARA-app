@@ -234,14 +234,16 @@ final class CoreRepository {
     }
 
     /// Quien reparte un despacho lo pasa a su equipo. Devuelve cuántos quedaron asignados.
-    func dispatchActivity(activityId: Int, userIds: [Int], indicaciones: String?) async throws -> Int {
+    /// `horasPlan` (contrato B): tiempo estimado de cada persona; sin valor no se manda.
+    func dispatchActivity(activityId: Int, userIds: [Int], indicaciones: String?, horasPlan: Double? = nil) async throws -> Int {
         struct Body: Encodable {
             let userIds: [Int]
             let indicaciones: String?
+            let horasPlan: Double?
         }
         let data = try await api.postJSON(
             "me/activities/\(activityId)/despacho",
-            body: Body(userIds: userIds, indicaciones: indicaciones)
+            body: Body(userIds: userIds, indicaciones: indicaciones, horasPlan: horasPlan)
         )
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
         return ConsoleHelpers.mapInt(ConsoleHelpers.decodeMap(data), "asignados")
@@ -263,8 +265,9 @@ final class CoreRepository {
     // MARK: Pizarra
 
     /// Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados.
-    func teamBoard() async throws -> TeamBoardResponse {
-        let data = try await api.get("me/board")
+    /// `desde`/`hasta` (`AAAA-MM-DD`, contrato C): rango Hoy · Semana · Mes de la pizarra.
+    func teamBoard(desde: String? = nil, hasta: String? = nil) async throws -> TeamBoardResponse {
+        let data = try await api.get("me/board", query: CoreRepository.rangoQuery(desde, hasta))
         let decoded = try decode(TeamBoardResponse.self, from: data)
         return TeamBoardResponse(
             scope: decoded.scope,
@@ -272,13 +275,13 @@ final class CoreRepository {
         )
     }
 
-    func teamBoardUser(userId: Int) async throws -> TeamBoardUser {
-        let data = try await api.get("me/board/\(userId)")
+    func teamBoardUser(userId: Int, desde: String? = nil, hasta: String? = nil) async throws -> TeamBoardUser {
+        let data = try await api.get("me/board/\(userId)", query: CoreRepository.rangoQuery(desde, hasta))
         return try decode(TeamBoardUser.self, from: data)
     }
 
-    func teamBoardHistory(userId: Int) async throws -> [TeamBoardHistoryItem] {
-        let data = try await api.get("me/board/\(userId)/history")
+    func teamBoardHistory(userId: Int, desde: String? = nil, hasta: String? = nil) async throws -> [TeamBoardHistoryItem] {
+        let data = try await api.get("me/board/\(userId)/history", query: CoreRepository.rangoQuery(desde, hasta))
         return try decode([TeamBoardHistoryItem].self, from: data)
     }
 

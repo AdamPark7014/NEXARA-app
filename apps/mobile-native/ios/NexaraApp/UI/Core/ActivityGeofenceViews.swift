@@ -1,365 +1,402 @@
 import SwiftUI
-import PhotosUI
 import UIKit
+
+// Geocerca de la actividad: espejo de Android `ui/console/activities/ActivityGeofence.kt`
+// (`GeocercaActividadCard`, `AlertaZonaFila` y `JustificarZonaDialog`). Mismos textos,
+// tamaños y colores; las horas siempre en America/Mexico_City (`ActivityGeofence.horaDe`).
 
 /// Textos y colores de la geocerca, iguales en la captura del ejecutor y en las
 /// evidencias del equipo.
 enum ActivityGeofenceUI {
+    /// #B91C1C: texto de una salida de zona y de los errores (Android `Color(0xFFB91C1C)`).
+    static let rojoTexto = NxColors.rgb(0xB91C1C)
+    /// #FEF2F2: fondo de la tarjeta mientras hay una salida abierta sin justificar.
+    static let fondoFuera = NxColors.rgb(0xFEF2F2)
+
+    /// Chip de la salida: «Justificada» (azul) o «Sin justificar» (ámbar).
     static func alertStatus(_ alert: ActivityGeofenceAlert) -> (label: String, icon: String, color: Color) {
-        if alert.isJustified { return ("Justificada", "checkmark.seal", CorePalette.green) }
-        return ("Sin justificar", "exclamationmark.bubble", CorePalette.orange)
+        if alert.isJustified { return ("Justificada", "checkmark.seal", NxTone.info.fg) }
+        return ("Sin justificar", "exclamationmark.bubble", NxTone.warning.fg)
     }
 
-    /// Estado de la zona según la última lectura.
+    /// Tono del chip de la salida (Android `NxStatusChip(…, NxTone.Info / Warning)`).
+    static func alertTone(_ alert: ActivityGeofenceAlert) -> NxTone {
+        alert.isJustified ? .info : .warning
+    }
+
+    /// Chip de la zona según la última lectura (Android: «Dentro de 500 m»,
+    /// «Fuera de zona» o «Esperando ubicación»).
     static func zoneStatus(_ state: ActivityGeofenceState) -> (label: String, icon: String, color: Color) {
-        if !state.seguimientoActivo { return ("Seguimiento terminado", "flag.checkered", CorePalette.slate) }
-        if state.origen == nil { return ("Sin punto de inicio", "location.slash", CorePalette.slate) }
+        let chip = zoneChip(state)
+        return (chip.text, chip.systemImage ?? "location", chip.tone.fg)
+    }
+
+    static func zoneChip(_ state: ActivityGeofenceState) -> (text: String, tone: NxTone, systemImage: String?) {
         switch state.dentro {
-        case .some(true): return ("Dentro de la zona", "checkmark.circle", CorePalette.green)
-        case .some(false): return ("Fuera de la zona", "location.slash", CorePalette.red)
-        case .none: return ("Sin lecturas todavía", "location", CorePalette.slate)
+        case .some(true): return ("Dentro de \(state.radioM) m", .success, nil)
+        case .some(false): return ("Fuera de zona", .danger, "location.slash")
+        case .none: return ("Esperando ubicación", .neutral, nil)
         }
     }
 
+    /// «120 m»; «— m» sin distancia (Android `"${d ?: "—"} m"`).
     static func distance(_ meters: Int?) -> String {
-        guard let meters else { return "sin distancia" }
-        return "\(meters) m"
+        "\(meters.map { String($0) } ?? "—") m"
+    }
+}
+
+// MARK: - Piezas privadas
+
+/// Alto de línea de Android: un `Text(fontSize = …)` sin estilo propio hereda el de
+/// `bodyLarge` (24); en el diálogo, el de `bodyMedium` (20).
+private extension View {
+    func geoLinea(_ size: CGFloat, alto: CGFloat = 24) -> some View {
+        lineSpacing(max(0, alto - size * 1.2))
+    }
+}
+
+/// Icono + texto en una fila (Android `NxIconText`): icono de 1,25 × el tamaño de
+/// letra, 6 de separación, centrados. Sin color hereda el de su contenedor.
+private struct GeoIconText: View {
+    let systemName: String
+    let text: String
+    var size: CGFloat
+    var weight: Font.Weight = .regular
+    var color: Color? = nil
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            Image(systemName: systemName)
+                .font(.system(size: size, weight: .regular))
+                .frame(width: size * 1.25, height: size * 1.25)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.system(size: size, weight: weight))
+                .geoLinea(size)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(color.map { AnyShapeStyle($0) } ?? AnyShapeStyle(HierarchicalShapeStyle.primary))
+    }
+}
+
+/// `Button` / `OutlinedButton` de Material 3: píldora de 40 de alto con relleno
+/// 24 × 8. `fill == nil` = contorno #CBD5E1. La fuente la pone cada etiqueta.
+private struct GeoPillButtonStyle: ButtonStyle {
+    var fill: Color?
+    var foreground: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        GeoPillButtonBody(configuration: configuration, fill: fill, foreground: foreground)
+    }
+}
+
+private struct GeoPillButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    let fill: Color?
+    let foreground: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        configuration.label
+            .lineLimit(1)
+            .foregroundStyle(isEnabled ? foreground : NxColors.fg.opacity(0.38))
+            .padding(.horizontal, 24)
+            .padding(.vertical, 8)
+            .frame(minHeight: 40)
+            .background {
+                if let fill {
+                    Capsule().fill(isEnabled ? fill : NxColors.fg.opacity(0.12))
+                }
+            }
+            .overlay {
+                if fill == nil {
+                    Capsule().strokeBorder(isEnabled ? NxColors.borderStrong : NxColors.fg.opacity(0.12), lineWidth: 1)
+                }
+            }
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .contentShape(Capsule())
+    }
+}
+
+/// `TextButton` de Material 3: letra 14 SemiBold de marca, sin fondo.
+private struct GeoTextButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        GeoTextButtonBody(configuration: configuration)
+    }
+}
+
+private struct GeoTextButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        configuration.label
+            .font(NxType.labelLarge)
+            .lineLimit(1)
+            .foregroundStyle(isEnabled ? NxColors.brand : NxColors.fg.opacity(0.38))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(minHeight: 40)
+            .background(
+                configuration.isPressed ? NxColors.brand.opacity(0.08) : Color.clear,
+                in: Capsule()
+            )
+            .contentShape(Capsule())
     }
 }
 
 // MARK: - Fila de una salida de zona
 
-/// Una salida de zona: distancias, horas, estado, justificación y foto.
+/// Una salida de zona (Android `AlertaZonaFila`): «Salió de zona 14:05 · hasta 620 m»
+/// con su chip, si regresó, el motivo, la foto y «Justificar con motivo y foto».
 struct ActivityGeofenceAlertRow: View {
     let alert: ActivityGeofenceAlert
-    /// «Saliste…» para quien ejecuta; «Salió…» en las evidencias del equipo.
+    /// Se conserva por compatibilidad: Android dice «Salió de zona» en la captura y
+    /// en las evidencias del equipo.
     var firstPerson: Bool = true
-    var photoTitle: String = "Justificación de salida de zona"
+    var photoTitle: String = "Foto de la justificación"
+    /// Con él, tocar la foto la abre en grande.
     var onPhoto: ((CorePhotoItem) -> Void)? = nil
     /// Solo quien salió puede justificar.
     var onJustify: (() -> Void)? = nil
 
-    private var tone: Color { alert.abierta ? CorePalette.red : (alert.isJustified ? CorePalette.green : CorePalette.orange) }
+    private var hasta: Int { alert.maxDistanciaM }
 
     var body: some View {
-        let status = ActivityGeofenceUI.alertStatus(alert)
-        HStack(alignment: .top, spacing: 10) {
-            NxIconBadge(systemName: "location.slash", tint: tone, size: 32, circle: true)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("\(firstPerson ? "Saliste" : "Salió") a \(alert.distanciaM) m del inicio")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 4)
-                    CoreChip(icon: status.icon, text: status.label, color: status.color)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 6) {
+                GeoIconText(
+                    systemName: "location.slash",
+                    text: "Salió de zona \(ActivityGeofence.horaDe(alert.detectedAt)) · hasta \(hasta) m",
+                    size: 12.5,
+                    weight: .semibold,
+                    color: ActivityGeofenceUI.rojoTexto
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                NxStatusChip(
+                    text: alert.isJustified ? "Justificada" : "Sin justificar",
+                    tone: ActivityGeofenceUI.alertTone(alert)
+                )
+            }
+            Text(
+                alert.returnedAt != nil
+                    ? "Regresó a las \(ActivityGeofence.horaDe(alert.returnedAt))"
+                    : "Sigue fuera de la zona"
+            )
+            .font(.system(size: 11.5))
+            .foregroundStyle(NxColors.muted)
+            if alert.hasJustificationText {
+                Text("Motivo: \(alert.justificacion ?? "")")
+                    .font(.system(size: 12))
+                    .foregroundStyle(NxColors.fg)
+                    .geoLinea(12)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let url = alert.fotoUrl, !url.isEmpty {
+                foto(url)
+            }
+            if let onJustify, !alert.isJustified {
+                Button(action: onJustify) {
+                    Text("Justificar con motivo y foto")
+                        .font(.system(size: 13, weight: .semibold))
                 }
-                Text("Máximo \(alert.maxDistanciaM) m · zona de \(alert.radioM) m")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                times
-                if alert.hasJustificationText {
-                    justification
-                }
-                if let url = alert.fotoUrl, !url.isEmpty {
-                    Button {
-                        onPhoto?(CorePhotoItem(title: photoTitle, url: url, time: alert.justificadaAt))
-                    } label: {
-                        AuthenticatedImage(url: url)
-                            .frame(width: 72, height: 72)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onPhoto == nil)
-                    .accessibilityLabel("Ver foto de la justificación")
-                }
-                if let mapUrl = CoreMaps.url(latitude: alert.latitude, longitude: alert.longitude, label: "Salida de zona") {
-                    Link(destination: mapUrl) {
-                        Label("Dónde se detectó", systemImage: "mappin.and.ellipse")
-                    }
-                    .font(.caption.weight(.semibold))
-                }
-                if let onJustify, !alert.isJustified {
-                    Button(action: onJustify) {
-                        Label("Justificar", systemImage: "square.and.pencil")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(CorePalette.orange)
-                    .font(.subheadline)
-                }
+                .buttonStyle(GeoPillButtonStyle(fill: NxColors.brand, foreground: .white))
             }
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tone.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+        .background(NxColors.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private var times: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if let detected = CoreFormat.when(alert.detectedAt) {
-                NxIconText(systemName: "clock", text: "Detectada \(detected)")
+    @ViewBuilder
+    private func foto(_ url: String) -> some View {
+        let imagen = AuthenticatedImage(url: url, contentMode: .fill, background: NxColors.sunken)
+            .frame(width: 96, height: 96)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .accessibilityLabel("Foto de la justificación")
+        if let onPhoto {
+            Button {
+                onPhoto(CorePhotoItem(title: photoTitle, url: url, time: alert.justificadaAt))
+            } label: {
+                imagen
             }
-            if alert.abierta {
-                NxIconText(
-                    systemName: "exclamationmark.triangle",
-                    text: firstPerson ? "Sigues fuera de la zona" : "Sigue fuera de la zona",
-                    tint: CorePalette.red
-                )
-            } else if let back = CoreFormat.when(alert.returnedAt) {
-                NxIconText(systemName: "arrow.uturn.backward", text: "\(firstPerson ? "Regresaste" : "Regresó") \(back)")
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-
-    private var justification: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            NxIconText(systemName: "text.bubble", text: "«\(alert.justificacion ?? "")»")
-                .font(.footnote)
-            if let when = CoreFormat.when(alert.justificadaAt) {
-                Text("Justificada \(when)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+            .buttonStyle(.plain)
+        } else {
+            imagen
         }
     }
 }
 
 // MARK: - Tarjeta del ejecutor
 
-/// «Ubicación de la actividad»: punto de inicio, radio, última distancia,
-/// dentro/fuera, recorrido reciente y salidas de zona con «Justificar».
-/// Se actualiza sola cada minuto mientras el seguimiento está activo.
+/// «Ubicación de la actividad» (Android `GeocercaActividadCard`): punto de inicio, si
+/// está dentro del radio, la última lectura, el recorrido (solo dirección lo recibe)
+/// y las salidas de zona con su justificación. Va dentro del panel «Captura de
+/// evidencias»: dibuja su propio fondo (tinte de marca, o rojo suave con una salida
+/// abierta sin justificar). No pinta nada sin punto de inicio.
+///
+/// Se vuelve a pedir cada 2 minutos mientras el seguimiento sigue activo y la
+/// pantalla está abierta.
 struct ActivityGeofenceCard: View {
     let activityId: Int
     var refreshToken: Int = 0
+    /// Cada lectura buena (Android `onEstado`): la captura la guarda para medir la salida.
+    var onEstado: ((ActivityGeofenceState?) -> Void)? = nil
 
-    @ObservedObject private var tracker = ShiftGpsTracker.shared
     @State private var state: ActivityGeofenceState?
-    @State private var loading = false
     @State private var error: String?
-    @State private var notice: String?
-    @State private var showsAllPoints = false
+    @State private var recargar = 0
     @State private var justifying: ActivityGeofenceAlert?
     @State private var photo: CorePhotoItem?
 
-    private static let visiblePoints = 5
-    private static let refreshSeconds: UInt64 = 60
+    /// Android: `delay(120_000)` entre lecturas.
+    private static let refreshSeconds: UInt64 = 120
+    /// Android: `puntos.take(6)`.
+    private static let puntosVisibles = 6
 
-    private var highlight: Color? {
-        guard let state else { return nil }
-        if state.seguimientoActivo && state.dentro == false { return CorePalette.red }
-        if !state.pendingAlerts.isEmpty { return CorePalette.orange }
-        return nil
-    }
+    private var taskKey: String { "\(activityId)-\(refreshToken)-\(recargar)" }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            if let state {
-                content(state)
-            } else if loading {
-                ProgressView("Cargando ubicación…")
-                    .frame(maxWidth: .infinity)
-            }
-            if let error {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(CorePalette.red)
-                    if state == nil {
-                        Button("Reintentar") { Task { await load() } }
-                            .font(.caption.weight(.semibold))
-                    }
+        contenido
+            .task(id: taskKey) {
+                // Seguimiento paulatino: se refresca solo mientras la pantalla está abierta.
+                while !Task.isCancelled {
+                    await load()
+                    if Task.isCancelled || state?.seguimientoActivo != true { break }
+                    try? await Task.sleep(nanoseconds: ActivityGeofenceCard.refreshSeconds * 1_000_000_000)
                 }
             }
-        }
-        .coreCard(highlight: highlight)
-        .task(id: refreshToken) {
-            await load()
-            while !Task.isCancelled, state?.seguimientoActivo == true {
-                try? await Task.sleep(nanoseconds: ActivityGeofenceCard.refreshSeconds * 1_000_000_000)
-                if Task.isCancelled { break }
-                await load()
+            .fullScreenCover(item: $justifying) { alert in
+                ActivityGeofenceJustifySheet(
+                    activityId: activityId,
+                    alert: alert,
+                    onDone: { _, _ in recargar += 1 },
+                    onClose: { cerrarJustificacion() }
+                )
+                .presentationBackground(.clear)
             }
-        }
-        .sheet(item: $justifying) { alert in
-            ActivityGeofenceJustifySheet(activityId: activityId, alert: alert) { _, message in
-                notice = message
-                Task { await load() }
+            .fullScreenCover(item: $photo) { item in
+                CorePhotoViewer(item: item)
             }
-        }
-        .fullScreenCover(item: $photo) { item in
-            CorePhotoViewer(item: item)
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .center, spacing: 10) {
-            NxIconBadge(systemName: "location.circle", tint: NxBrand.primary, size: 36)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Ubicación de la actividad").font(.subheadline.weight(.bold))
-                Text("Zona de \(state?.radioM ?? ActivityGeofence.radioM) m alrededor de tu foto de entrada")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 4)
-            Button {
-                Task { await load() }
-            } label: {
-                if loading && state != nil {
-                    ProgressView()
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                }
-            }
-            .buttonStyle(.borderless)
-            .disabled(loading)
-            .accessibilityLabel("Actualizar ubicación")
-        }
     }
 
     @ViewBuilder
-    private func content(_ state: ActivityGeofenceState) -> some View {
-        let zone = ActivityGeofenceUI.zoneStatus(state)
-        let pending = state.pendingAlerts.count
-        CoreFlowLayout {
-            CoreChip(icon: zone.icon, text: zone.label, color: zone.color)
-            if pending > 0 {
-                CoreChip(
-                    icon: "exclamationmark.bubble",
-                    text: pending == 1 ? "1 salida por justificar" : "\(pending) salidas por justificar",
-                    color: CorePalette.orange
+    private var contenido: some View {
+        if let state {
+            // Sin punto de inicio no hay contra qué medir: Android no pinta nada.
+            if state.origen != nil {
+                tarjeta(state)
+            }
+        } else if let error {
+            Text(error)
+                .font(.system(size: 12))
+                .foregroundStyle(NxColors.muted)
+                .geoLinea(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            // Primera carga: Android no dibuja nada; esta vista sin alto solo sostiene la tarea.
+            Color.clear.frame(height: 0)
+        }
+    }
+
+    private func tarjeta(_ e: ActivityGeofenceState) -> some View {
+        let radio = e.radioM
+        let chip = ActivityGeofenceUI.zoneChip(e)
+        let iniciaste = "Iniciaste a las \(ActivityGeofence.horaDe(e.origen?.at))."
+        let parrafo = e.exigeMismaUbicacion
+            ? "\(iniciaste) Mantente a menos de \(radio) m de ese punto: la foto de salida solo se acepta ahí."
+            : "\(iniciaste) La foto de salida lleva tu ubicación; en este tipo de actividad no hace falta que coincida con el inicio."
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                GeoIconText(
+                    systemName: "scope",
+                    text: "Ubicación de la actividad",
+                    size: 14,
+                    weight: .bold,
+                    color: NxColors.fg
                 )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                NxStatusChip(text: chip.text, tone: chip.tone, systemImage: chip.systemImage)
             }
-        }
-
-        if let notice {
-            NxIconText(systemName: "checkmark.circle.fill", text: notice, tint: CorePalette.green)
-                .font(.footnote.weight(.semibold))
-        }
-
-        VStack(alignment: .leading, spacing: 4) {
-            if let origen = state.origen {
-                NxIconText(systemName: "clock", text: "Inicio: \(CoreFormat.when(origen.at) ?? "sin hora")")
-            }
-            NxIconText(systemName: "scope", text: "Radio: \(state.radioM) m")
-            if let ultimo = state.ultimo {
-                let hora = CoreFormat.time(ultimo.at).map { " · \($0)" } ?? ""
-                NxIconText(
+            Text(parrafo)
+                .font(.system(size: 12))
+                .foregroundStyle(NxColors.muted)
+                .geoLinea(12)
+                .fixedSize(horizontal: false, vertical: true)
+            if let ultimo = e.ultimo {
+                GeoIconText(
                     systemName: "location",
-                    text: "Última distancia: \(ActivityGeofenceUI.distance(ultimo.distanciaM))\(hora)",
-                    tint: state.dentro == false ? CorePalette.red : nil
+                    text: "Última ubicación \(ActivityGeofence.horaDe(ultimo.at)) · a \(ultimo.distanciaM.map { String($0) } ?? "—") m del inicio",
+                    size: 12.5,
+                    weight: .semibold,
+                    color: NxColors.fg
+                )
+            }
+            if !e.puntos.isEmpty {
+                Text(e.seguimientoActivo ? "Seguimiento cada ~10 min" : "Recorrido registrado")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(NxColors.muted)
+                ForEach(Array(e.puntos.prefix(ActivityGeofenceCard.puntosVisibles).enumerated()), id: \.offset) { _, punto in
+                    filaPunto(punto, radio: radio)
+                }
+            } else if e.seguimientoActivo {
+                Text("Aún no llega tu primer punto de seguimiento.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(NxColors.muted)
+                    .geoLinea(12)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(Array(e.alertas.enumerated()), id: \.offset) { _, alerta in
+                let justificar: (() -> Void)? = alerta.isJustified ? nil : { abrirJustificacion(alerta) }
+                ActivityGeofenceAlertRow(
+                    alert: alerta,
+                    onPhoto: { photo = $0 },
+                    onJustify: justificar
                 )
             }
         }
-        .font(.footnote)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            e.alertaAbiertaSinJustificar != nil ? ActivityGeofenceUI.fondoFuera : NxColors.brandTint,
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+    }
 
-        if let origen = state.origen,
-           let mapUrl = CoreMaps.url(latitude: origen.latitude, longitude: origen.longitude, label: "Inicio de la actividad") {
-            Link(destination: mapUrl) {
-                Label("Ver punto de inicio en mapa", systemImage: "mappin.and.ellipse")
-            }
-            .font(.caption.weight(.semibold))
-        }
-
-        if state.origen == nil {
-            Text("Tu foto de entrada no guardó ubicación: no hay punto contra el cual medir.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else if state.seguimientoActivo {
-            Text(
-                state.exigeMismaUbicacion
-                    ? "La foto de salida solo se acepta a \(state.radioM) m o menos de donde iniciaste. Si sales de la zona, justifica el motivo."
-                    : "La foto de salida lleva tu ubicación. En este tipo de actividad no tiene que coincidir con el inicio."
-            )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if !tracker.isTracking {
-                NxIconText(
-                    systemName: "location.slash",
-                    text: "Tu recorrido se mide con el GPS de tu jornada: marca tu entrada para que se registre.",
-                    tint: CorePalette.orange
-                )
-                .font(.caption)
-            }
-        }
-
-        if !state.alertas.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Salidas de zona").font(.caption.weight(.bold))
-                ForEach(state.alertas) { alert in
-                    ActivityGeofenceAlertRow(
-                        alert: alert,
-                        firstPerson: true,
-                        onPhoto: { photo = $0 },
-                        onJustify: { justifying = alert }
-                    )
-                }
-            }
-        }
-
-        if state.origen != nil {
-            trail(state)
+    private func filaPunto(_ punto: ActivityGeofencePoint, radio: Int) -> some View {
+        let fuera = (punto.distanciaM ?? 0) > radio
+        return HStack(alignment: .center, spacing: 8) {
+            Text(ActivityGeofence.horaDe(punto.at))
+                .font(.system(size: 12))
+                .foregroundStyle(NxColors.fg)
+            Spacer(minLength: 8)
+            Text(ActivityGeofenceUI.distance(punto.distanciaM))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(fuera ? ActivityGeofenceUI.rojoTexto : NxColors.verde)
         }
     }
 
-    private func trail(_ state: ActivityGeofenceState) -> some View {
-        let visible = showsAllPoints ? state.puntos : Array(state.puntos.prefix(ActivityGeofenceCard.visiblePoints))
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Seguimiento").font(.caption.weight(.bold))
-                Spacer()
-                if !state.puntos.isEmpty {
-                    Text(state.puntos.count == 1 ? "1 lectura" : "\(state.puntos.count) lecturas")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if state.puntos.isEmpty {
-                Text("Todavía no hay lecturas de GPS desde que iniciaste.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(Array(visible.enumerated()), id: \.offset) { _, point in
-                pointRow(point, radioM: state.radioM)
-            }
-            if state.puntos.count > ActivityGeofenceCard.visiblePoints {
-                Button(showsAllPoints ? "Ver menos" : "Ver todo el recorrido (\(state.puntos.count))") {
-                    showsAllPoints.toggle()
-                }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.borderless)
-            }
-        }
+    /// El diálogo se abre como el de Android: encima, sin la animación de hoja.
+    private func abrirJustificacion(_ alerta: ActivityGeofenceAlert) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { justifying = alerta }
     }
 
-    private func pointRow(_ point: ActivityGeofencePoint, radioM: Int) -> some View {
-        let inside = point.isInside(radioM: radioM)
-        let icon = inside == nil ? "circle" : (inside == true ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-        let color: Color = inside == nil ? Color.secondary : (inside == true ? CorePalette.green : CorePalette.red)
-        return HStack(spacing: 8) {
-            Image(systemName: icon)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(color)
-                .accessibilityHidden(true)
-            Text("\(CoreFormat.time(point.at) ?? "--:--") · \(ActivityGeofenceUI.distance(point.distanciaM))")
-            Spacer(minLength: 4)
-            if inside == false {
-                Text("Fuera")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(CorePalette.red)
-            }
-        }
-        .font(.caption)
+    private func cerrarJustificacion() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { justifying = nil }
     }
 
     @MainActor
     private func load() async {
-        loading = true
-        defer { loading = false }
         do {
-            state = try await ActivityGeofenceRepository.shared.estado(activityId: activityId)
+            let nuevo = try await ActivityGeofenceRepository.shared.estado(activityId: activityId)
+            state = nuevo
             error = nil
+            onEstado?(nuevo)
         } catch {
             if Task.isCancelled { return }
             if let core = error as? CoreError, case .queuedOffline = core { return }
@@ -368,162 +405,197 @@ struct ActivityGeofenceCard: View {
     }
 }
 
-// MARK: - Hoja de justificación
+// MARK: - Diálogo de justificación
 
-/// Motivo (mínimo 5 caracteres) y foto opcional de cámara o galería.
+/// «¿Por qué saliste de la zona?» (Android `JustificarZonaDialog`): motivo (mínimo 5
+/// caracteres) y una foto opcional tomada con la cámara. Se pinta como el
+/// `AlertDialog` de Material 3: velo oscuro, tarjeta #EEF2F7 de radio 20 y los botones
+/// «Cancelar» / «Enviar» abajo a la derecha. Tocar fuera lo cierra (si no está enviando).
+///
+/// Quien lo presenta lo pone en un `fullScreenCover` con `.presentationBackground(.clear)`.
 struct ActivityGeofenceJustifySheet: View {
     let activityId: Int
     let alert: ActivityGeofenceAlert
-    /// Alerta actualizada (`nil` si quedó en la cola sin conexión) y el aviso a mostrar.
+    /// Alerta actualizada (`nil` si quedó en la cola sin conexión) y el aviso que corresponde.
     let onDone: (ActivityGeofenceAlert?, String) -> Void
+    /// Cierra sin animación (lo da quien presenta). Sin él se usa `dismiss`.
+    var onClose: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var motivo = ""
     @State private var photo: CapturedGeoPhoto?
     @State private var showsCamera = false
-    @State private var pickerItem: PhotosPickerItem?
-    @State private var loadingPhoto = false
     @State private var saving = false
     @State private var error: String?
+    @State private var visible = false
+    @FocusState private var motivoFocused: Bool
 
     private static let minMotivo = 5
+    /// `surfaceContainerHigh` del tema claro de Android.
+    private static let fondo = NxColors.rgb(0xEEF2F7)
 
     private var trimmed: String { motivo.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    private var detail: String {
-        var parts: [String] = []
-        if let when = CoreFormat.when(alert.detectedAt) { parts.append("Detectada \(when)") }
-        if alert.maxDistanciaM > alert.distanciaM { parts.append("máximo \(alert.maxDistanciaM) m") }
-        parts.append(alert.abierta ? "sigues fuera" : "ya regresaste")
-        return parts.joined(separator: " · ")
-    }
-
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    HStack(alignment: .top, spacing: 10) {
-                        NxIconBadge(systemName: "location.slash", tint: CorePalette.orange, size: 34, circle: true)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Saliste a \(alert.distanciaM) m del punto de inicio")
-                                .font(.subheadline.weight(.semibold))
-                            Text(detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } footer: {
-                    Text("Tus jefes y los responsables de la actividad reciben tu motivo.")
-                }
-
-                Section {
-                    TextEditor(text: $motivo)
-                        .frame(minHeight: 120)
-                        .disabled(saving)
-                } header: {
-                    Text("Motivo")
-                } footer: {
-                    Text("Mínimo \(ActivityGeofenceJustifySheet.minMotivo) caracteres.")
-                }
-
-                Section {
-                    if let photo {
-                        Image(uiImage: photo.image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        Button(role: .destructive) {
-                            self.photo = nil
-                        } label: {
-                            Label("Quitar foto", systemImage: "trash")
-                        }
-                        .disabled(saving)
-                    }
-                    Button {
-                        error = nil
-                        showsCamera = true
-                    } label: {
-                        Label(photo == nil ? "Tomar foto" : "Tomar otra", systemImage: "camera.fill")
-                    }
-                    .disabled(saving || loadingPhoto)
-                    PhotosPicker(selection: $pickerItem, matching: .images) {
-                        Label("Elegir de la galería", systemImage: "photo.on.rectangle")
-                    }
-                    .disabled(saving || loadingPhoto)
-                    if loadingPhoto {
-                        ProgressView("Preparando foto…")
-                    }
-                } header: {
-                    Text("Foto")
-                } footer: {
-                    Text("Opcional, pero ayuda a entender por qué saliste.")
-                }
-
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(CorePalette.red)
-                    }
-                }
+        GeometryReader { geo in
+            ScrollView {
+                dialogo
+                    .opacity(visible ? 1 : 0)
+                    .scaleEffect(visible ? 1 : 0.96)
+                    .padding(24)
+                    .frame(maxWidth: .infinity, minHeight: geo.size.height)
+                    .background(
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { if !saving { cerrar() } }
+                    )
             }
-            .navigationTitle("Justificar salida")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
-                        .disabled(saving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Enviando…" : "Enviar") {
-                        Task { await submit() }
-                    }
-                    .disabled(saving || loadingPhoto || trimmed.count < ActivityGeofenceJustifySheet.minMotivo)
-                }
-            }
-            .interactiveDismissDisabled(saving)
-            .onChange(of: pickerItem) { item in
-                guard let item else { return }
-                Task { await loadPicked(item) }
-            }
-            .fullScreenCover(isPresented: $showsCamera) {
-                GeoPhotoCaptureView(
-                    title: "Foto de la justificación",
-                    confirmLabel: "Usar esta foto",
-                    requireLocation: false,
-                    onConfirm: { captured in
-                        photo = captured
-                        showsCamera = false
-                        return nil
-                    },
-                    onCancel: { showsCamera = false }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .background(Color.black.opacity(visible ? 0.32 : 0).ignoresSafeArea())
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.18)) { visible = true }
+        }
+        .fullScreenCover(isPresented: $showsCamera) {
+            GeoPhotoCaptureView(
+                title: "Foto para comprobar",
+                confirmLabel: "Usar esta foto",
+                requireLocation: false,
+                onConfirm: { captured in
+                    photo = captured
+                    showsCamera = false
+                    return nil
+                },
+                onCancel: { showsCamera = false }
+            )
+        }
+    }
+
+    private var dialogo: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("¿Por qué saliste de la zona?")
+                .font(NxType.headlineSmall)
+                .foregroundStyle(NxColors.fg)
+                .lineSpacing(1.6)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 16)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(
+                    "Te alejaste \(alert.maxDistanciaM) m del punto de inicio a las "
+                        + "\(ActivityGeofence.horaDe(alert.detectedAt)). Tu encargado y dirección verán tu explicación."
                 )
+                .font(.system(size: 13))
+                .foregroundStyle(NxColors.muted)
+                .geoLinea(13, alto: 20)
+                .fixedSize(horizontal: false, vertical: true)
+                campoMotivo
+                if let photo {
+                    Image(uiImage: photo.image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 120, height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .accessibilityLabel("Foto para comprobar")
+                }
+                Button {
+                    error = nil
+                    motivoFocused = false
+                    showsCamera = true
+                } label: {
+                    GeoIconText(
+                        systemName: "camera",
+                        text: photo == nil ? "Tomar foto para comprobarlo" : "Tomar otra foto",
+                        size: 13,
+                        weight: .semibold
+                    )
+                }
+                .buttonStyle(GeoPillButtonStyle(fill: nil, foreground: NxColors.brand))
+                .disabled(saving)
+                if let error {
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundStyle(ActivityGeofenceUI.rojoTexto)
+                        .geoLinea(12, alto: 20)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack(alignment: .center, spacing: 8) {
+                Spacer(minLength: 0)
+                Button("Cancelar") { cerrar() }
+                    .buttonStyle(GeoTextButtonStyle())
+                    .disabled(saving)
+                Button {
+                    Task { await submit() }
+                } label: {
+                    Text(saving ? "Enviando…" : "Enviar")
+                        .font(NxType.labelLarge)
+                }
+                .buttonStyle(GeoPillButtonStyle(fill: NxColors.brand, foreground: .white))
+                .disabled(saving || trimmed.count < ActivityGeofenceJustifySheet.minMotivo)
+            }
+            .padding(.top, 24)
+        }
+        .padding(24)
+        .frame(maxWidth: 560, alignment: .leading)
+        .background(ActivityGeofenceJustifySheet.fondo, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    /// `OutlinedTextField` de Material 3: contorno #CBD5E1 (2 de marca con foco),
+    /// radio 6, etiqueta «Motivo» que sube al borde y el ejemplo cuando está vacío.
+    private var campoMotivo: some View {
+        let activa = motivoFocused || !motivo.isEmpty
+        return ZStack(alignment: .topLeading) {
+            TextEditor(text: $motivo)
+                .font(NxType.bodyLarge)
+                .foregroundStyle(NxColors.fg)
+                .tint(NxColors.brand)
+                .scrollContentBackground(.hidden)
+                .focused($motivoFocused)
+                .disabled(saving)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .frame(minHeight: 96)
+                .accessibilityLabel("Motivo")
+            if motivo.isEmpty {
+                Text(motivoFocused ? "Ej. Fui por material a la ferretería de enfrente" : "Motivo")
+                    .font(NxType.bodyLarge)
+                    .foregroundStyle(NxColors.muted)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(motivoFocused ? NxColors.brand : NxColors.borderStrong, lineWidth: motivoFocused ? 2 : 1)
+        )
+        .overlay(alignment: .topLeading) {
+            if activa {
+                Text("Motivo")
+                    .font(.system(size: 12))
+                    .foregroundStyle(motivoFocused ? NxColors.brand : NxColors.muted)
+                    .padding(.horizontal, 4)
+                    .background(ActivityGeofenceJustifySheet.fondo)
+                    .offset(x: 12, y: -8)
+                    .accessibilityHidden(true)
             }
         }
     }
 
-    @MainActor
-    private func loadPicked(_ item: PhotosPickerItem) async {
-        loadingPhoto = true
-        error = nil
-        defer {
-            loadingPhoto = false
-            pickerItem = nil
+    private func cerrar() {
+        motivoFocused = false
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data),
-              let jpeg = CorePhotoProcessing.jpeg(from: image) else {
-            error = "No se pudo leer la foto. Intenta con otra."
-            return
-        }
-        photo = CapturedGeoPhoto(image: UIImage(data: jpeg) ?? image, jpeg: jpeg, coords: nil, capturedAt: Date())
     }
 
     @MainActor
     private func submit() async {
-        guard trimmed.count >= ActivityGeofenceJustifySheet.minMotivo else {
-            error = "Escribe el motivo (al menos \(ActivityGeofenceJustifySheet.minMotivo) caracteres)."
-            return
-        }
+        guard trimmed.count >= ActivityGeofenceJustifySheet.minMotivo else { return }
         saving = true
         error = nil
         defer { saving = false }
@@ -538,7 +610,7 @@ struct ActivityGeofenceJustifySheet: View {
                 ? (CoreError.queuedOffline.errorDescription ?? "Sin conexión: se enviará al regresar la señal.")
                 : "Justificación enviada."
             onDone(updated, message)
-            dismiss()
+            cerrar()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo enviar la justificación")
         }

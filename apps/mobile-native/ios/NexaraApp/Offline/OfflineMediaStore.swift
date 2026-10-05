@@ -52,7 +52,33 @@ final class OfflineMediaStore {
         return body
     }
 
+    /// Cuerpo binario (multipart con fotos) guardado tal cual en disco; la cola
+    /// solo lleva `nexara-media-bin://{id}` (Android `OfflineHttpInterceptor`).
+    /// Sin esto el cuerpo no cabía en un `String` UTF-8 y se encolaba vacío.
+    func guardarBinario(_ data: Data) -> String? {
+        queue.sync {
+            let id = UUID().uuidString
+            do {
+                try data.write(to: dir.appendingPathComponent(id), options: .atomic)
+                return "nexara-media-bin://\(id)"
+            } catch {
+                return nil
+            }
+        }
+    }
+
+    /// Los bytes de un cuerpo guardado con `guardarBinario`; `nil` si no es uno.
+    func cuerpoBinario(_ body: String?) -> Data? {
+        guard let body, body.hasPrefix("nexara-media-bin://") else { return nil }
+        let id = String(body.dropFirst("nexara-media-bin://".count))
+        return queue.sync { try? Data(contentsOf: dir.appendingPathComponent(id)) }
+    }
+
     func purgeRefs(in body: String?) {
+        if let body, body.hasPrefix("nexara-media-bin://") {
+            delete(String(body.dropFirst("nexara-media-bin://".count)))
+            return
+        }
         guard let body, body.contains("nexara-media://") else { return }
         let pattern = #"nexara-media://([0-9a-fA-F\-]{36})"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return }

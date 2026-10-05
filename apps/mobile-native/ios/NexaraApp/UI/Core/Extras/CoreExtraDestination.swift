@@ -28,10 +28,14 @@ struct CoreExtraDestination: View {
             ViaticosView()
         case .herramientas:
             HerramientasView()
-        case .cotizaciones, .gastos, .aprobaciones, .pagosEmpleados:
-            // Pantalla nativa en camino (otra ola). Mientras, ni enlace a la web
-            // ni ficha a medias: no aparecen en el hub y aquí solo se avisa.
-            CoreModulePendienteView(module: module)
+        case .cotizaciones:
+            CotizacionesView()
+        case .gastos:
+            GastosView()
+        case .aprobaciones:
+            AprobacionesView()
+        case .pagosEmpleados:
+            PagosEmpleadosView()
         }
     }
 
@@ -39,10 +43,9 @@ struct CoreExtraDestination: View {
     /// y el shell no abre por enlace los que no.
     static func tienePantallaNativa(_ module: CoreExtraModule) -> Bool {
         switch module {
-        case .vehiculos, .kpisEquipo, .proyectos, .almacen, .viaticos, .herramientas:
+        case .vehiculos, .kpisEquipo, .proyectos, .almacen, .viaticos, .herramientas,
+             .cotizaciones, .gastos, .aprobaciones, .pagosEmpleados:
             return true
-        case .cotizaciones, .gastos, .aprobaciones, .pagosEmpleados:
-            return false
         }
     }
 }

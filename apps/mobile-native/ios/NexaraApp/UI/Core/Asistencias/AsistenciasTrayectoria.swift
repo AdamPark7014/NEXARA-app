@@ -1,84 +1,119 @@
 import SwiftUI
 import MapKit
 
-/// «Trayectoria»: GPS en vivo del equipo (`gps/team`) y mi recorrido del día
-/// (`gps/trajectory?date=`). Solo para `gps.manage`, igual que la web.
+/// «Trayectoria» (Android `TrayectoriaTab`): «GPS del equipo» —quién comparte su
+/// ubicación ahora, con coordenadas y «Ver en mapa»— y «Mi trayecto · N puntos» con
+/// «Ver recorrido en Maps». Solo dirección (el API contesta 403 a los demás).
 struct AsistenciasTrayectoriaSection: View {
     @ObservedObject var vm: AttendanceVM
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if let error = vm.trajectoryError {
-                NxAlertBanner(
-                    alert: NxAlert(id: "att-gps", title: "No se pudo cargar la trayectoria", subtitle: error, tone: .danger),
-                    actionLabel: "Reintentar",
-                    onAction: { Task { await vm.loadTrajectory() } }
-                )
-            }
-
-            Text("GPS del equipo").font(.headline)
-            Text("Unidades con jornada abierta que están compartiendo ubicación.")
-                .font(.caption).foregroundStyle(.secondary)
-
-            if vm.trajectoryLoading && vm.teamGps.isEmpty {
-                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 16)
-            } else if vm.teamGps.isEmpty {
-                NxEmptyState(title: "Sin ubicaciones", subtitle: "Nadie comparte GPS en este momento.")
+        VStack(alignment: .leading, spacing: 12) {
+            if vm.trajectoryLoading && vm.teamGps.isEmpty && vm.trajectory.isEmpty {
+                NxSkeletonList(itemCount: 4, itemHeight: 56)
             } else {
-                ForEach(vm.teamGps) { item in
-                    GpsTeamCard(item: item)
+                if let error = vm.trajectoryError {
+                    NxErrorBlock(message: error) { Task { await vm.loadTrajectory() } }
+                }
+
+                NxDenseSectionHeader(title: "GPS del equipo", hint: "Unidades con jornada abierta.")
+                if vm.teamGps.isEmpty {
+                    NxEmptyState(title: "Sin ubicaciones", subtitle: "Nadie comparte GPS ahora.")
+                } else {
+                    equipo
+                }
+
+                NxDenseSectionHeader(
+                    title: "Mi trayecto · \(vm.trajectory.count) puntos",
+                    hint: "Entrada, GPS y salida del día que estás viendo."
+                )
+                .padding(.top, 6)
+                if vm.trajectory.isEmpty {
+                    NxEmptyState(title: "Sin puntos", subtitle: "No hay recorrido registrado para este día.")
+                } else {
+                    let puntos = vm.routePoints
+                    if puntos.count > 1 {
+                        // El recorrido dibujado, como la vista previa de la web.
+                        TrajectoryMap(points: puntos)
+                    }
+                    if let url = AttendanceClock.routeUrl(vm.trajectoryRoute) {
+                        Button {
+                            openURL(url)
+                        } label: {
+                            Text("Ver recorrido en Maps")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(NxColors.brand)
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 40)
+                                .overlay(Capsule().strokeBorder(NxColors.borderStrong, lineWidth: 1))
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
-
-            Divider().padding(.vertical, 4)
-
-            Text("Mi trayecto · \(vm.trajectory.count) punto\(vm.trajectory.count == 1 ? "" : "s")")
-                .font(.headline)
-            Text("Entrada, recorrido y salida del día seleccionado.")
-                .font(.caption).foregroundStyle(.secondary)
-
-            let puntos = vm.routePoints
-            if puntos.isEmpty {
-                NxEmptyState(
-                    title: "Sin trayecto",
-                    subtitle: "Ese día no se guardaron puntos: la checada no traía GPS o la ubicación estaba apagada."
-                )
-            } else {
-                TrajectoryMap(points: puntos)
-                if let url = AttendanceClock.routeUrl(puntos) {
-                    Link("Ver el recorrido trazado en Maps", destination: url)
-                        .font(.caption.weight(.semibold))
-                }
-                trajectoryList
-            }
+            Spacer(minLength: 24)
         }
     }
 
-    @ViewBuilder
-    private var trajectoryList: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(vm.trajectory.enumerated()), id: \.element.id) { index, point in
-                if let lat = point.latitude, let lng = point.longitude {
-                    HStack(spacing: 8) {
-                        Text(AttendanceClock.time(point.updatedAt))
-                            .font(.caption2.monospaced())
-                            .frame(width: 64, alignment: .leading)
-                        Text(String(format: "%.5f, %.5f", lat, lng))
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if index == 0 {
-                            Text("INICIO").font(.caption2.weight(.bold)).foregroundStyle(CorePalette.green)
-                        } else if index == vm.trajectory.count - 1 {
-                            Text("FIN").font(.caption2.weight(.bold)).foregroundStyle(CorePalette.blue)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
-                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
-                }
+    /// Una superficie con filas separadas por una línea: nombre, coordenadas y «Ver en mapa».
+    private var equipo: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(vm.teamGps.enumerated()), id: \.offset) { index, punto in
+                if index > 0 { NxRowDivider() }
+                GpsEquipoRow(punto: punto) { url in openURL(url) }
             }
         }
+        .background(NxColors.card)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(NxColors.border, lineWidth: 1)
+        )
+    }
+}
+
+private struct GpsEquipoRow: View {
+    let punto: GpsTeamLocation
+    let onAbrir: (URL) -> Void
+
+    private var url: URL? { AttendanceClock.mapUrl(lat: punto.latitude, lng: punto.longitude) }
+
+    var body: some View {
+        let fila = HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(punto.nombre.isEmpty ? "Usuario #\(punto.usuarioId)" : punto.nombre)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
+                    .lineLimit(1)
+                Text(coordenadas)
+                    .font(.system(size: 11.5, design: .monospaced))
+                    .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if url != nil {
+                Text("Ver en mapa")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(NxColors.brand)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .contentShape(Rectangle())
+
+        if let url {
+            Button { onAbrir(url) } label: { fila }
+                .buttonStyle(.plain)
+        } else {
+            fila
+        }
+    }
+
+    private var coordenadas: String {
+        guard let lat = punto.latitude, let lng = punto.longitude else { return "Sin coordenadas" }
+        return String(format: "%.5f, %.5f", lat, lng)
     }
 }
 
@@ -91,55 +126,23 @@ private struct TrajectoryMap: View {
         Map(initialPosition: .automatic) {
             if coords.count > 1 {
                 MapPolyline(coordinates: coords)
-                    .stroke(CorePalette.blue, lineWidth: 4)
+                    .stroke(NxColors.azul, lineWidth: 4)
             }
             if let first = coords.first {
-                Marker("Inicio", coordinate: first).tint(CorePalette.green)
+                Marker("Inicio", coordinate: first).tint(NxColors.verde)
             }
             if coords.count > 1, let last = coords.last {
-                Marker("Fin", coordinate: last).tint(CorePalette.red)
+                Marker("Fin", coordinate: last).tint(NxColors.rojo)
             }
         }
-        .frame(height: 240)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .frame(height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(NxColors.border, lineWidth: 1)
+        )
         // `initialPosition` solo encuadra al construirse: si cambia el día, el
         // mapa se rehace para que el encuadre siga al recorrido nuevo.
         .id(coords.count)
-    }
-}
-
-private struct GpsTeamCard: View {
-    let item: GpsTeamLocation
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(item.nombre.isEmpty ? "—" : item.nombre).font(.subheadline.weight(.bold))
-                Spacer()
-                CoreChip(
-                    text: item.isActive ? "En vivo" : "Detenido",
-                    color: item.isActive ? CorePalette.green : CorePalette.slate
-                )
-            }
-            if !item.detalle.isEmpty {
-                Text(item.detalle).font(.caption2).foregroundStyle(.secondary)
-            }
-            HStack(spacing: 10) {
-                if let lat = item.latitude, let lng = item.longitude {
-                    Text(String(format: "%.5f, %.5f", lat, lng))
-                        .font(.caption.monospaced())
-                } else {
-                    Text("Sin coordenadas").font(.caption).foregroundStyle(.secondary)
-                }
-                if let url = AttendanceClock.mapUrl(lat: item.latitude, lng: item.longitude) {
-                    Link("Ver en mapa", destination: url).font(.caption.weight(.semibold))
-                }
-            }
-            if !item.updatedAt.isEmpty {
-                Text("Actualizado \(AttendanceClock.time(item.updatedAt))")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-        }
-        .coreCard(highlight: item.isActive ? CorePalette.blue : nil)
     }
 }

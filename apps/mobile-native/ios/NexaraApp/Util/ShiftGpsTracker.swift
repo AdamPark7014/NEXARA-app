@@ -17,8 +17,6 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
     /// abrirse con la jornada todavía abierta.
     private static let activeKey = "nexara.shiftGps.active"
 
-    /// Ni un punto por segundo (gasta batería y llena la tabla) ni uno por hora
-    /// (el recorrido deja de ser un recorrido): 100 m o 45 s, lo que llegue.
     /// Trayecto de jornada: un punto cada ~30 min o al moverse 500 m (cuida datos y batería).
     private static let minSeconds: TimeInterval = 30 * 60
     private static let minMeters: CLLocationDistance = 500
@@ -54,6 +52,11 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
 
     var isAlways: Bool { DemoMode.isActive || authorization == .authorizedAlways }
     var isDenied: Bool { !DemoMode.isActive && (authorization == .denied || authorization == .restricted) }
+
+    /// ¿Se puede compartir el trayecto? (`JornadaGps.canTrack` de Android). Con la
+    /// ubicación bloqueada no se enciende el consentimiento: el encargado vería una
+    /// jornada «compartiendo» sin un solo punto. Sin decidir todavía, `start()` la pide.
+    var canTrack: Bool { !isDenied }
 
     /// Texto para explicar el permiso antes de pedirlo (lo pinta la pantalla).
     var authorizationLabel: String {

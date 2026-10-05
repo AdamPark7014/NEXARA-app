@@ -122,6 +122,10 @@ extension DemoStore {
         case "warehouse":
             return isGet ? reply(fxAlmacenes()) : empty()
         case "tool-requests":
+            // Mi kit, mis préstamos y prórrogas (`DemoFixtures+Herramientas`); lo demás, el escáner.
+            if let mio = routeMisHerramientas(method: method, parts: parts, json: json) {
+                return reply(mio.payload, status: mio.status)
+            }
             let respuesta = routeHerramientas(method: method, parts: parts, query: query, json: json)
             return reply(respuesta.payload, status: respuesta.status)
         case "users":
@@ -133,6 +137,9 @@ extension DemoStore {
             return empty()
         case "company":
             return reply(fxCompanyMine())
+        case "cotizaciones", "employee-payments", "expenses", "workflow":
+            // Cotizaciones, Pagos a empleados, Gastos y Aprobaciones (`DemoFixtures+Finanzas`).
+            return routeFinanzas(method: method, parts: parts, json: json, body: body) ?? empty()
         default:
             return empty()
         }
@@ -147,6 +154,7 @@ extension DemoStore {
         case "navigation":
             return reply(fxNavigation())
         case "board":
+            if parts.count >= 3, parts[2] == "asignadas-por-mi" { return reply(fxAsignadasPorMi(now: now)) }
             if let id = intAt(parts, 2) {
                 if parts.count >= 4, parts[3] == "history" { return reply(fxBoardHistory(personId: id)) }
                 // me/board/:userId/activities/:id/pausar
@@ -198,10 +206,7 @@ extension DemoStore {
             let respuesta = routeSesionPropia(action: action, activityId: id, json: json, now: now)
             return reply(respuesta.payload, status: respuesta.status)
         case "herramientas":
-            return reply(dj([
-                "activityId": id, "requisitos": [DemoJSON](), "total": 0, "listos": 0,
-                "pendientes": [String](), "completo": true,
-            ]))
+            return reply(checklistHerramientas(method: method, parts: parts, activityId: id, json: json, now: now))
         case "evidencias":
             if parts.count >= 6, parts[5] == "revision", let userId = Int(parts[4]) {
                 applyReview(activityId: id, userId: userId, json: json, now: now)

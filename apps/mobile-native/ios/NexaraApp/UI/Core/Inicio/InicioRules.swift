@@ -1,9 +1,9 @@
 import Foundation
 
-/// Reglas de la pantalla Inicio (rediseño v2, `.ai/ui-maquetas/movil-inicio-ios.png`):
-/// qué actividad es «la de ahora», qué botón lleva, cuáles van después y qué
-/// aviso importa hoy. Todo sale de lo que la app ya consulta (`GET me/activities`,
-/// `attendance/current`, `attendance/me`); no hay endpoint nuevo.
+/// Reglas de la pantalla Inicio (rediseño v2): qué actividad es «la de ahora»,
+/// qué botón lleva, cuáles van después y qué aviso importa hoy. Todo sale de lo
+/// que la app ya consulta (`GET me/activities`, `attendance/current`,
+/// `attendance/me`); no hay endpoint nuevo.
 ///
 /// Espejo de `InicioRules.kt` en Android. Sin SwiftUI: lógica pura.
 enum InicioRules {
@@ -20,12 +20,13 @@ enum InicioRules {
         /// Antes de abrir guarda la hora real de inicio (`me/activities/:id/iniciar`).
         var marcaInicio: Bool = false
 
+        /// Icono del botón (Android: PlayArrow · PhotoCamera · Send · Info).
         var systemImage: String {
             switch kind {
             case .iniciar, .reanudar: return "play.fill"
             case .continuar, .corregir: return "camera"
             case .repartir: return "paperplane"
-            case .ver, .abrir: return "doc.text.magnifyingglass"
+            case .ver, .abrir: return "info.circle"
             }
         }
     }
@@ -44,13 +45,12 @@ enum InicioRules {
         /// Actividad que abre al tocarlo; nil = solo informa.
         let activityId: Int?
         let tono: Tono
-        let systemImage: String
     }
 
     enum Jornada: Equatable { case enJornada, completada, sinEntrada }
 
     static let siguientesMax = 3
-    static let tabEvidencias = "evidencias"
+    static let tabEvidencias = ActividadesUx.tabEvidencias
 
     /// ¿Ya la empezó? Hora real de inicio, evidencia más allá de la entrada o «En Proceso».
     static func empezada(_ a: MyActivityItem) -> Bool {
@@ -69,33 +69,28 @@ enum InicioRules {
         return open.first
     }
 
-    /// Lo que sigue después de `actual`, en el orden de la cola.
+    /// Lo que sigue después de `actual`, en el orden de la cola, como mucho `max`.
     static func siguientes(_ open: [MyActivityItem], actual: MyActivityItem?, max: Int = siguientesMax) -> [MyActivityItem] {
         Array(open.filter { $0.id != actual?.id }.prefix(max))
     }
 
-    /// Botón grande de la tarjeta «Ahora» (mismo orden que `ActividadesUx.primaryAction` de Android).
+    /// Botón grande de la tarjeta «Ahora». En pausa → «Reanudar» (llama al API
+    /// directo); lo demás sale de `ActividadesUx.primaryAction` con etiquetas
+    /// cortas para un botón de 52.
     static func accion(_ a: MyActivityItem) -> Accion {
         if a.sesion.puedeReanudar(despachador: a.despachador == true, estatus: a.estatus) {
             return Accion(kind: .reanudar, label: "Reanudar", tab: tabEvidencias)
         }
-        if a.porRepartir == true { return Accion(kind: .repartir, label: "Repartir", tab: nil) }
-        if a.despachador == true { return Accion(kind: .abrir, label: "Abrir", tab: nil) }
-        let estatus = (a.estatus ?? "").lowercased()
-        let step = a.evidenceStatus
-        if estatus.contains("rechazada") {
-            return Accion(kind: .corregir, label: "Corregir evidencias", tab: tabEvidencias)
+        let p = ActividadesUx.primaryAction(a)
+        switch p.kind {
+        case .repartir: return Accion(kind: .repartir, label: "Repartir", tab: nil)
+        case .abrir: return Accion(kind: .abrir, label: "Abrir", tab: nil)
+        case .iniciar:
+            return Accion(kind: .iniciar, label: ActividadesSemaforo.accionIniciar, tab: p.tab, marcaInicio: p.marcaInicio)
+        case .continuar: return Accion(kind: .continuar, label: "Continuar evidencia", tab: p.tab)
+        case .corregir: return Accion(kind: .corregir, label: "Corregir evidencias", tab: p.tab)
+        case .ver: return Accion(kind: .ver, label: "Ver evidencias", tab: p.tab)
         }
-        if step == CoreEvidence.completed || estatus.contains("validar") {
-            return Accion(kind: .ver, label: "Ver evidencias", tab: tabEvidencias)
-        }
-        if (step == nil || step == CoreEvidence.entryPhoto) && a.puedeIniciar {
-            return Accion(kind: .iniciar, label: MyActivityItem.accionIniciar, tab: tabEvidencias, marcaInicio: true)
-        }
-        if (step != nil && step != CoreEvidence.entryPhoto) || estatus.contains("proceso") {
-            return Accion(kind: .continuar, label: "Continuar evidencia", tab: tabEvidencias)
-        }
-        return Accion(kind: .iniciar, label: MyActivityItem.accionIniciar, tab: tabEvidencias)
     }
 
     /// Chip de estado de la tarjeta «Ahora»: el reloj manda sobre el estatus.
@@ -104,15 +99,15 @@ enum InicioRules {
         if a.enCurso == true { return Estado(label: "En curso", tono: .info) }
         let s = (a.estatus ?? "").lowercased()
         let label = CoreStatusUI.estatus(a.estatus).label
+        if s.contains("proceso") || s.contains("validar") { return Estado(label: label, tono: .info) }
         if s.contains("rechazada") { return Estado(label: label, tono: .danger) }
         if s.contains("finalizada") || s.contains("completada") || s.contains("aprobada") {
             return Estado(label: label, tono: .success)
         }
-        if s.contains("proceso") || s.contains("validar") { return Estado(label: label, tono: .info) }
         return Estado(label: label, tono: .neutral)
     }
 
-    /// Avance de evidencia como (hechos, total) o nil si no ha empezado a capturar.
+    /// Avance de evidencia como (hechos, total), o nil si no ha empezado a capturar.
     static func avance(_ a: MyActivityItem) -> (hechos: Int, total: Int)? {
         let steps = CoreEvidence.steps(for: a.coreKind)
         guard let step = a.evidenceStatus else { return nil }
@@ -123,23 +118,19 @@ enum InicioRules {
 
     /// Cliente o proyecto: dónde es el trabajo.
     static func lugar(_ a: MyActivityItem) -> String? {
-        for value in [a.cliente, a.proyecto] {
-            let t = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if !t.isEmpty { return t }
-        }
-        return nil
+        ActividadesTexto.limpio(a.cliente) ?? ActividadesTexto.limpio(a.proyecto)
     }
 
-    /// El único aviso de Inicio, por urgencia: una actividad devuelta o una que
-    /// un jefe te pausó. Un aviso por pantalla, o deja de ser aviso.
+    /// El único aviso de Inicio, por orden de urgencia: una actividad devuelta,
+    /// una que un jefe te pausó, una atrasada (semáforo rojo). Nada más: un aviso
+    /// por pantalla o deja de ser aviso.
     static func aviso(_ open: [MyActivityItem], miId: Int?) -> Aviso? {
         if let a = open.first(where: { ($0.estatus ?? "").localizedCaseInsensitiveContains("rechazada") }) {
             return Aviso(
-                titulo: "Te regresaron «\(a.displayTitle)»",
+                titulo: "Te regresaron «\(titulo(a))»",
                 detalle: "Corrige las evidencias que te marcaron y vuelve a enviarla.",
                 activityId: a.id,
-                tono: .danger,
-                systemImage: "arrow.uturn.backward.circle"
+                tono: .danger
             )
         }
         if let a = open.first(where: { item in
@@ -147,14 +138,29 @@ enum InicioRules {
             return quien != miId
         }) {
             return Aviso(
-                titulo: "Te pausaron «\(a.displayTitle)»",
+                titulo: "Te pausaron «\(titulo(a))»",
                 detalle: a.sesion.textoPausa(miId: miId, propia: true) ?? "Reanúdala cuando vuelvas a ella.",
                 activityId: a.id,
-                tono: .warning,
-                systemImage: "pause.circle"
+                tono: .warning
+            )
+        }
+        if let a = open.first(where: { item in
+            (item.semaforo ?? "").trimmingCharacters(in: .whitespaces).lowercased() == ActividadesSemaforo.rojo
+                && !SesionActividad.cerrada(item.estatus)
+        }) {
+            return Aviso(
+                titulo: "«\(titulo(a))» va atrasada",
+                detalle: "Pasó su fecha límite. Empiézala ya o avisa a tu jefe.",
+                activityId: a.id,
+                tono: .danger
             )
         }
         return nil
+    }
+
+    /// Título, folio o «Actividad #id».
+    static func titulo(_ a: MyActivityItem) -> String {
+        ActividadesTexto.limpio(a.titulo) ?? ActividadesTexto.limpio(a.anNumber) ?? "Actividad #\(a.id)"
     }
 
     static func jornada(abierta: Bool, hayEntrada: Bool, haySalida: Bool) -> Jornada {
@@ -171,13 +177,14 @@ enum InicioRules {
 
     /// «Hola, Fernanda» · sin nombre, «Hola».
     static func saludo(_ nombre: String?) -> String {
-        let first = (nombre ?? "").split(separator: " ").first.map(String.init) ?? ""
+        let first = ActividadesTexto.primerNombre(nombre)
         return first.isEmpty ? "Hola" : "Hola, \(first)"
     }
 
     private static let fechaLargaFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "es_MX")
+        f.timeZone = ActividadesTexto.zona
         f.dateFormat = "EEEE d 'de' MMMM"
         return f
     }()
@@ -188,9 +195,26 @@ enum InicioRules {
         return texto.prefix(1).uppercased() + texto.dropFirst()
     }
 
-    /// Línea de detalle de «Después, hoy»: lugar · tiempo estimado (o el tipo).
+    /// Hora programada de una actividad («16:00»), o nil si no trae.
+    static func horaDe(_ iso: String?) -> String? {
+        let h = ActividadesTexto.hora(iso)
+        return h == "—" ? nil : h
+    }
+
+    /// Bajo la hora de «Después, hoy»: «Día 3» o la prioridad, corto.
+    static func subHora(_ a: MyActivityItem) -> String {
+        if let dia = a.periodo?.dia { return "Día \(dia)" }
+        return String(CoreStatusUI.priority(a.prioridad).label.prefix(12))
+    }
+
+    /// Línea de detalle de «Después, hoy»: lugar · plan (o el tipo).
     static func detalleSiguiente(_ a: MyActivityItem) -> String {
-        let partes = [lugar(a), CoreFormat.minutes(a.tiempoEstimadoMin)].compactMap { $0 }
+        let plan: Double? = {
+            if let p = a.minutosPlan?.value, p > 0 { return p }
+            if let e = a.tiempoEstimadoMin, e > 0 { return Double(e) }
+            return nil
+        }()
+        let partes = [lugar(a), plan.map { ActividadesTexto.minutos($0) }].compactMap { $0 }
         let texto = partes.joined(separator: " · ")
         return texto.isEmpty ? CoreStatusUI.kind(a.coreKind, ticketTypeCustom: a.ticketTypeCustom) : texto
     }

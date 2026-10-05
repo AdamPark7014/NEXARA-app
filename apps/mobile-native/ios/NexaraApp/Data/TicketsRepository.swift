@@ -25,15 +25,18 @@ final class TicketsRepository {
         // Se usa `if/else` y no un ternario porque Swift no admite `try` a la
         // derecha de un operador no-asignación.
         let data: Data
-        if isBranchUser {
+        let branch = isBranchUser
+        if branch {
             data = try await api.get("branch-portal/profile")
         } else {
             data = try await api.get("client-portal/profile")
         }
         let map = ConsoleHelpers.decodeMap(data)
-        return map.isEmpty ? nil : PortalClientProfile(raw: map)
+        return map.isEmpty ? nil : PortalClientProfile(raw: map, isBranch: branch)
     }
 
+    /// PUT `client-portal/profile`. Como Android: cada campo va recortado y uno
+    /// vacío no se manda (el servidor conserva el valor anterior).
     func updateProfile(
         contactName: String?, contactEmail: String?, contactPhone: String?,
         address: String?, city: String?, state: String?, country: String?
@@ -43,10 +46,17 @@ final class TicketsRepository {
             let address, city, state, country: String?
         }
         let data = try await api.putJSON("client-portal/profile", body: Body(
-            contactName: contactName, contactEmail: contactEmail, contactPhone: contactPhone,
-            address: address, city: city, state: state, country: country
+            contactName: Self.clean(contactName), contactEmail: Self.clean(contactEmail),
+            contactPhone: Self.clean(contactPhone), address: Self.clean(address),
+            city: Self.clean(city), state: Self.clean(state), country: Self.clean(country)
         ))
         return ConsoleHelpers.decodeMap(data)
+    }
+
+    /// Texto recortado; vacío = `nil` (Android `trim().takeIf { !it.isNullOrBlank() }`).
+    private static func clean(_ value: String?) -> String? {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     // MARK: Branches (client only)
@@ -63,7 +73,7 @@ final class TicketsRepository {
         name: String, branchNumber: String, portalEmail: String, portalPassword: String,
         address: String?, city: String?, state: String?, country: String?,
         placeId: String?, latitud: Double?, longitud: Double?, isActive: Bool,
-        logoData: Data?, logoFileName: String?
+        logoData: Data?, logoFileName: String?, logoMimeType: String = "image/jpeg"
     ) async throws -> [String: Any] {
         var fields: [String: String] = [
             "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -72,11 +82,11 @@ final class TicketsRepository {
             "portalPassword": portalPassword,
             "isActive": isActive ? "true" : "false",
         ]
-        if let address, !address.isEmpty { fields["address"] = address }
-        if let city, !city.isEmpty { fields["city"] = city }
-        if let state, !state.isEmpty { fields["state"] = state }
-        if let country, !country.isEmpty { fields["country"] = country }
-        if let placeId, !placeId.isEmpty { fields["placeId"] = placeId }
+        if let address = Self.clean(address) { fields["address"] = address }
+        if let city = Self.clean(city) { fields["city"] = city }
+        if let state = Self.clean(state) { fields["state"] = state }
+        if let country = Self.clean(country) { fields["country"] = country }
+        if let placeId = Self.clean(placeId) { fields["placeId"] = placeId }
         if let latitud { fields["latitud"] = String(latitud) }
         if let longitud { fields["longitud"] = String(longitud) }
         let data = try await api.uploadMultipart(
@@ -84,7 +94,8 @@ final class TicketsRepository {
             fields: fields,
             fileField: logoData != nil ? "logo" : nil,
             fileData: logoData,
-            fileName: logoFileName ?? "logo.jpg"
+            fileName: logoFileName ?? "logo.jpg",
+            mimeType: logoMimeType
         )
         return ConsoleHelpers.decodeMap(data)
     }
@@ -94,18 +105,18 @@ final class TicketsRepository {
         name: String?, branchNumber: String?, portalEmail: String?, portalPassword: String?,
         address: String?, city: String?, state: String?, country: String?,
         placeId: String?, latitud: Double?, longitud: Double?, isActive: Bool?,
-        logoData: Data?, logoFileName: String?
+        logoData: Data?, logoFileName: String?, logoMimeType: String = "image/jpeg"
     ) async throws -> [String: Any] {
         var fields: [String: String] = [:]
-        if let name, !name.isEmpty { fields["name"] = name }
-        if let branchNumber, !branchNumber.isEmpty { fields["branchNumber"] = branchNumber }
-        if let portalEmail, !portalEmail.isEmpty { fields["portalEmail"] = portalEmail.lowercased() }
+        if let name = Self.clean(name) { fields["name"] = name }
+        if let branchNumber = Self.clean(branchNumber) { fields["branchNumber"] = branchNumber }
+        if let portalEmail = Self.clean(portalEmail) { fields["portalEmail"] = portalEmail.lowercased() }
         if let portalPassword, !portalPassword.isEmpty { fields["portalPassword"] = portalPassword }
-        if let address, !address.isEmpty { fields["address"] = address }
-        if let city, !city.isEmpty { fields["city"] = city }
-        if let state, !state.isEmpty { fields["state"] = state }
-        if let country, !country.isEmpty { fields["country"] = country }
-        if let placeId, !placeId.isEmpty { fields["placeId"] = placeId }
+        if let address = Self.clean(address) { fields["address"] = address }
+        if let city = Self.clean(city) { fields["city"] = city }
+        if let state = Self.clean(state) { fields["state"] = state }
+        if let country = Self.clean(country) { fields["country"] = country }
+        if let placeId = Self.clean(placeId) { fields["placeId"] = placeId }
         if let latitud { fields["latitud"] = String(latitud) }
         if let longitud { fields["longitud"] = String(longitud) }
         if let isActive { fields["isActive"] = isActive ? "true" : "false" }
@@ -115,7 +126,8 @@ final class TicketsRepository {
             fields: fields,
             fileField: logoData != nil ? "logo" : nil,
             fileData: logoData,
-            fileName: logoFileName ?? "logo.jpg"
+            fileName: logoFileName ?? "logo.jpg",
+            mimeType: logoMimeType
         )
         return ConsoleHelpers.decodeMap(data)
     }
@@ -157,11 +169,15 @@ final class TicketsRepository {
             let branchId: Int64?
         }
         let data = try await api.postJSON("client-portal/requests", body: Body(
-            description: description, urgency: urgency, requestType: requestType, branchId: branchId
+            description: description.trimmingCharacters(in: .whitespacesAndNewlines),
+            urgency: urgency, requestType: requestType, branchId: branchId
         ))
         return ConsoleHelpers.decodeMap(data)
     }
 
+    /// Cerrar y autorizar/rechazar solo existen en `client-portal`: el API no las
+    /// tiene en `branch-portal` y a una sucursal le respondería 403
+    /// (`ClientPortalGuard`). La pantalla no las ofrece a sucursales.
     func closeRequest(id: Int64) async throws {
         _ = try await api.putJSON("client-portal/requests/\(id)/close", body: EmptyClose())
     }
@@ -180,16 +196,38 @@ final class TicketsRepository {
         try await portalTickets(branchId: branchId).map { $0.toFlatMap() }
     }
 
-    func portalTickets(branchId: Int64? = nil) async throws -> [PortalTicket] {
+    /// Tickets del portal (Android `TicketsRepository.tickets`). `start`/`end` en
+    /// ISO-8601 filtran por `fechaAsignacion`. La sucursal solo admite el rango
+    /// (`branch-portal/tickets` ignora sucursal y proyecto).
+    func portalTickets(
+        start: String? = nil,
+        end: String? = nil,
+        projectId: Int64? = nil,
+        branchId: Int64? = nil
+    ) async throws -> [PortalTicket] {
         var q: [String: String] = [:]
-        if let b = branchId { q["branchId"] = String(b) }
+        if let start, !start.isEmpty { q["start"] = start }
+        if let end, !end.isEmpty { q["end"] = end }
         let data: Data
         if isBranchUser {
             data = try await api.get("branch-portal/tickets", query: q)
         } else {
+            if let b = branchId { q["branchId"] = String(b) }
+            if let p = projectId { q["projectId"] = String(p) }
             data = try await api.get("client-portal/tickets", query: q)
         }
         return ApiClient.decodeMapList(data).map { PortalTicket(raw: $0) }
+    }
+
+    /// Proyectos activos del cliente para el filtro de tickets (Android `projects()`).
+    /// A una sucursal no se le piden: `branch-portal/tickets` no filtra por
+    /// proyecto y Android, que sí los pedía a `client-portal`, recibía 403 y
+    /// escondía el selector; aquí se llega a lo mismo sin la llamada fallida.
+    func portalProjects() async throws -> [PortalProject] {
+        if isBranchUser { return [] }
+        return ApiClient.decodeMapList(try await api.get("client-portal/projects"))
+            .map { PortalProject(raw: $0) }
+            .filter { $0.id > 0 }
     }
 
     func ticket(id: Int64) async throws -> [String: Any]? {
@@ -209,9 +247,9 @@ final class TicketsRepository {
 
     func ticketReportPdf(id: Int64) async throws -> Data {
         if isBranchUser {
-            return try await api.get("branch-portal/tickets/\(id)/report")
+            return try await api.getBinary("branch-portal/tickets/\(id)/report")
         }
-        return try await api.get("client-portal/tickets/\(id)/report")
+        return try await api.getBinary("client-portal/tickets/\(id)/report")
     }
 
     /// POST `…/tickets/{id}/comments` — body `{ body }`.
@@ -322,9 +360,9 @@ final class TicketsRepository {
 
     func inventoryReportPdf(id: Int64) async throws -> Data {
         if isBranchUser {
-            return try await api.get("branch-portal/inventories/\(id)/report")
+            return try await api.getBinary("branch-portal/inventories/\(id)/report")
         }
-        return try await api.get("client-portal/inventories/\(id)/report")
+        return try await api.getBinary("client-portal/inventories/\(id)/report")
     }
 
     func syncInventory(
@@ -361,23 +399,44 @@ final class TicketsRepository {
                 )
             }
         }
-        let data = try await api.postJSON("client-portal/inventories/sync", body: Body(
-            branchId: branchId, snapshotId: snapshotId, title: title, notes: notes,
+        let body = Body(
+            branchId: branchId, snapshotId: snapshotId,
+            title: Self.clean(title), notes: Self.clean(notes),
             completed: completed, confirmDifference: confirmDifference, items: syncItems
-        ))
+        )
+        // La sucursal sincroniza por su propio portal, como la web
+        // (`TicketsInventoryManager`): `client-portal` le responde 403. Android
+        // usaba siempre `client-portal` y a una sucursal le fallaba el botón.
+        let data: Data
+        if isBranchUser {
+            data = try await api.postJSON("branch-portal/inventories/sync", body: body)
+        } else {
+            data = try await api.postJSON("client-portal/inventories/sync", body: body)
+        }
         return ConsoleHelpers.decodeMap(data)
     }
 
+    /// PUT `client-portal/inventories/{id}/decision` con `APPROVED` | `REJECTED`
+    /// (el API rechaza cualquier otro valor con 400). Solo para cuentas cliente.
     func decideInventory(id: Int64, decision: String) async throws -> [String: Any] {
         struct Body: Encodable { let decision: String }
         let data = try await api.putJSON("client-portal/inventories/\(id)/decision", body: Body(decision: decision))
         return ConsoleHelpers.decodeMap(data)
     }
 
-    /// POST `client-portal/inventories/upload` — multipart field `files`.
-    func uploadInventoryMedia(files: [(fileName: String, data: Data)]) async throws -> [String] {
-        let parts = files.map { (field: "files", data: $0.data, fileName: $0.fileName, mimeType: "image/jpeg") }
-        let data = try await api.uploadMultipartFiles("client-portal/inventories/upload", fields: [:], files: parts)
+    /// POST `…/inventories/upload` — multipart field `files`. La sucursal sube
+    /// por `branch-portal` (como la web); `client-portal` le respondería 403.
+    func uploadInventoryMedia(
+        files: [(fileName: String, data: Data)],
+        mimeType: String = "image/jpeg"
+    ) async throws -> [String] {
+        let parts = files.map { (field: "files", data: $0.data, fileName: $0.fileName, mimeType: mimeType) }
+        let data: Data
+        if isBranchUser {
+            data = try await api.uploadMultipartFiles("branch-portal/inventories/upload", fields: [:], files: parts)
+        } else {
+            data = try await api.uploadMultipartFiles("client-portal/inventories/upload", fields: [:], files: parts)
+        }
         let map = ConsoleHelpers.decodeMap(data)
         if let urls = map["urls"] as? [String] { return urls }
         if let urls = map["urls"] as? [Any] {
@@ -391,9 +450,9 @@ final class TicketsRepository {
         if let start, !start.isEmpty { q["start"] = start }
         if let end, !end.isEmpty { q["end"] = end }
         if isBranchUser {
-            return try await api.get("branch-portal/report", query: q)
+            return try await api.getBinary("branch-portal/report", query: q)
         }
-        return try await api.get("client-portal/report", query: q)
+        return try await api.getBinary("client-portal/report", query: q)
     }
 
     // MARK: Mis servicios (portal cliente)

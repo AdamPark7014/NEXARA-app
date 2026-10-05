@@ -155,7 +155,7 @@ struct ComidasView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(NxColors.surface)
         .navigationTitle("Comidas")
         .task { await load() }
         .task { await tickEvery30s() }
@@ -441,23 +441,9 @@ struct ComidasView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(filterOptions(team)) { option in
-                        Button {
+                        NxFilterPill(label: option.label, count: option.count, selected: filter == option.key) {
                             filter = option.key
-                        } label: {
-                            Text(option.count.map { "\(option.label) \($0)" } ?? option.label)
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .foregroundStyle(filter == option.key ? Color.white : Color.primary)
-                                .background(
-                                    filter == option.key ? Color.accentColor : Color(.secondarySystemGroupedBackground),
-                                    in: Capsule()
-                                )
-                                .frame(minHeight: NxMetrics.minTap)
-                                .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(filter == option.key ? [.isSelected] : [])
                     }
                 }
             }

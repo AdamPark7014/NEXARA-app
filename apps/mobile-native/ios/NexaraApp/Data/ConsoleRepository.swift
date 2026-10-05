@@ -37,8 +37,9 @@ final class ConsoleRepository {
     /// ahora el iPhone no mandaba ninguno, así que una ubicación falsa desde iOS entraba
     /// a la nómina sin que nadie pudiera notarlo.
     ///
-    /// `timestamp` es la hora del teléfono y es informativa: la hora del registro la pone
-    /// el servidor.
+    /// `capturedAt` es la hora del teléfono y es informativa: la hora del registro la pone
+    /// el servidor (contrato A). Igual que Android ya no se manda `timestamp`, el campo
+    /// viejo de la app 1.0.2 que el API solo tolera por compatibilidad.
     func attendanceCheckInResult(
         type: String,
         lat: Double? = nil,
@@ -50,7 +51,7 @@ final class ConsoleRepository {
     ) async throws -> AttendanceCheckInResult {
         struct Body: Encodable {
             let type: String
-            let timestamp: String
+            let capturedAt: String
             let photoBase64: String?
             let latitude: Double?
             let longitude: Double?
@@ -60,7 +61,7 @@ final class ConsoleRepository {
         }
         let data = try await api.postJSON("attendance", body: Body(
             type: type,
-            timestamp: ConsoleHelpers.isoNow(),
+            capturedAt: ConsoleHelpers.isoNow(),
             photoBase64: photoBase64,
             latitude: lat,
             longitude: lng,

@@ -78,6 +78,9 @@ extension DemoStore {
             if let exit = myExit { json["checkOut"] = DemoClock.iso(exit) }
             return json
         }
+        // Hoy sin checar (o un día que no llega) no tiene jornada: antes caía en la
+        // del historial y salía «Sin entrada registrada» con 8 h trabajadas.
+        if date >= DemoClock.day(now) { return [:] }
         if let pair = historicPunches(day: date, personId: DemoMode.meId) {
             return dj([
                 "id": 2,
@@ -102,7 +105,8 @@ extension DemoStore {
             }
             return punches
         }
-        guard let pair = historicPunches(day: date, personId: DemoMode.meId) else { return [] }
+        guard date < DemoClock.day(now),
+              let pair = historicPunches(day: date, personId: DemoMode.meId) else { return [] }
         return [
             punchJSON(type: "entrada", time: pair.entry, photo: "", index: 1),
             punchJSON(type: "salida", time: pair.exit, photo: "", index: 2),
@@ -131,7 +135,7 @@ extension DemoStore {
                     minutes = DemoClock.minutes(from: entry, to: exit ?? now)
                     days = [dj(["date": today, "totalMinutes": minutes, "isOpen": exit == nil])]
                 }
-            } else if let pair = historicPunches(day: from, personId: p.id) {
+            } else if from < today, let pair = historicPunches(day: from, personId: p.id) {
                 punches.append(punchJSON(type: "entrada", time: pair.entry, photo: "", index: p.id))
                 punches.append(punchJSON(type: "salida", time: pair.exit, photo: "", index: p.id + 3))
                 minutes = DemoClock.minutes(from: pair.entry, to: pair.exit)

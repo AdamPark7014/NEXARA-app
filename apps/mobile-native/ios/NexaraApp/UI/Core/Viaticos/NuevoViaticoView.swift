@@ -1,14 +1,17 @@
 import SwiftUI
 
-/// Pedir un viático desde donde se gastó: cuánto, en qué, y la foto del ticket.
+/// «Pedir viático» (Android `NuevoViaticoScreen`): cuánto, en qué, el concepto,
+/// la actividad y la foto del ticket.
 ///
 /// La foto se toma con la **misma cámara en vivo de las evidencias**
-/// (`GeoPhotoCaptureView`); no hay galería y no se escribió otro flujo. El
-/// servidor exige evidencia, así que «Pedir» no se habilita sin ella.
+/// (`GeoPhotoCaptureView`); no hay galería. El servidor exige evidencia, así que
+/// sin ella no se manda nada.
 ///
 /// El reparto entre actividades no está aquí a propósito: viaja en el detalle,
 /// porque un multipart no lleva listas anidadas y porque a menudo se sabe qué
 /// visitas cubrió el viaje solo al volver.
+///
+/// Se apila sobre la lista; la barra teal «Pedir viático» la pone quien la abre.
 struct NuevoViaticoView: View {
     /// Recibe el mensaje que hay que enseñar (enviado, o en cola sin conexión).
     let onCreado: (String) -> Void
@@ -16,12 +19,13 @@ struct NuevoViaticoView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var importe = ""
-    @State private var categoria = Viatico.categorias.first?.clave ?? "OTROS"
+    @State private var categoria = Viatico.categorias.first?.clave ?? "COMBUSTIBLE"
     @State private var motivo = ""
     @State private var actividad: MyActivityItem?
     @State private var actividades: [MyActivityItem] = []
     @State private var ticket: CapturedGeoPhoto?
     @State private var camara = false
+    @State private var eligiendoActividad = false
     @State private var enviando = false
     @State private var error: String?
     @State private var intentado = false
@@ -30,9 +34,13 @@ struct NuevoViaticoView: View {
 
     private var errorImporte: String? {
         guard intentado else { return nil }
-        if importe.isEmpty { return "Captura cuánto gastaste" }
+        if importe.trimmingCharacters(in: .whitespaces).isEmpty { return "Captura cuánto gastaste" }
         if centavos <= 0 { return "El importe tiene que ser mayor que cero" }
         return nil
+    }
+
+    private var errorMotivo: String? {
+        intentado && motivo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Di en qué se gastó" : nil
     }
 
     private var completo: Bool {
@@ -40,142 +48,184 @@ struct NuevoViaticoView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    CampoImporte(
-                        titulo: "¿Cuánto?",
-                        crudo: $importe,
-                        ayuda: "Lo que pusiste de tu bolsa, con centavos.",
-                        error: errorImporte,
-                        habilitado: !enviando
-                    )
-                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                CampoImporte(
+                    titulo: "¿Cuánto?",
+                    crudo: $importe,
+                    ayuda: "Lo que pusiste de tu bolsa, con centavos.",
+                    error: errorImporte,
+                    habilitado: !enviando
+                )
 
-                Section("¿En qué?") {
-                    Picker("Categoría", selection: $categoria) {
+                VStack(alignment: .leading, spacing: 8) {
+                    NxSectionHeader(title: "¿En qué?")
+                    CoreFlowLayout(spacing: 8) {
                         ForEach(Viatico.categorias, id: \.clave) { item in
-                            Text(item.etiqueta).tag(item.clave)
+                            ChipDeFiltroMaterial(
+                                texto: item.etiqueta,
+                                seleccionado: categoria == item.clave,
+                                // `FilterChip` sin colores propios: secondaryContainer del tema.
+                                fondoActivo: NxColors.brandSoft2,
+                                textoActivo: NxColors.brandDeep,
+                                alto: viaticoAlturaToque,
+                                habilitado: !enviando
+                            ) {
+                                categoria = item.clave
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
-                    .disabled(enviando)
                 }
 
-                Section("Concepto") {
-                    TextField("En qué se gastó", text: $motivo, axis: .vertical)
-                        .lineLimit(2...4)
-                        .disabled(enviando)
-                    if intentado, motivo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("Di en qué se gastó")
-                            .font(.caption)
-                            .foregroundStyle(NxTone.danger.fg)
-                    }
-                }
+                CampoDelineado(
+                    etiqueta: "Concepto",
+                    texto: $motivo,
+                    error: errorMotivo,
+                    multilinea: true,
+                    minLineas: 2,
+                    habilitado: !enviando
+                )
 
-                Section {
-                    Picker("Actividad", selection: Binding(
-                        get: { actividad?.id ?? 0 },
-                        set: { nuevo in actividad = actividades.first { $0.id == nuevo } }
-                    )) {
-                        Text("Sin actividad").tag(0)
-                        ForEach(actividades) { item in
-                            Text(etiqueta(item)).tag(item.id)
-                        }
-                    }
-                    .disabled(enviando || actividades.isEmpty)
-                } header: {
-                    Text("¿A qué actividad se carga?")
-                } footer: {
-                    Text("Si el viaje cubrió varias, elige una ahora y repártelo después desde el detalle.")
-                }
+                selectorActividad
 
-                Section {
-                    if let ticket {
-                        Image(uiImage: ticket.image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 180)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .accessibilityLabel("Ticket fotografiado")
-                    }
-                    Button {
-                        camara = true
-                    } label: {
-                        Label(
-                            ticket == nil ? "Tomar foto del ticket" : "Tomar otra",
-                            systemImage: "camera"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .disabled(enviando)
-                } header: {
-                    Text("Foto del ticket")
-                } footer: {
-                    Text("Obligatoria: es el comprobante del gasto.")
-                }
+                fotoDelTicket
 
                 if let error {
-                    Section {
-                        NxAlertBanner(alert: NxAlert(id: "nuevo-viatico", title: error, tone: .danger))
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
-                    }
+                    NxErrorBlock(message: error)
                 }
 
-                Section {
+                VStack(spacing: 10) {
                     Button {
                         pedir()
                     } label: {
-                        if enviando {
-                            ProgressView().frame(maxWidth: .infinity, minHeight: 44)
-                        } else {
-                            Text("Pedir viático")
-                                .font(.body.weight(.bold))
-                                .frame(maxWidth: .infinity, minHeight: 44)
+                        HStack(spacing: 10) {
+                            if enviando {
+                                SpinnerDeBoton()
+                                Text("Enviando…")
+                            } else {
+                                Text("Pedir viático").fontWeight(.bold)
+                            }
                         }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NxBrand.primary)
+                    .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: 56, llenaAncho: true))
                     .disabled(enviando)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                } footer: {
+
+                    Button("Cancelar") { dismiss() }
+                        .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
+                        .disabled(enviando)
+
                     Text("Sin señal se guarda en la cola con su foto y sale solo al volver la red.")
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .navigationTitle("Pedir viático")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }.disabled(enviando)
-                }
-            }
-            .task { await cargarActividades() }
-            .fullScreenCover(isPresented: $camara) {
-                GeoPhotoCaptureView(
-                    title: "Foto del ticket",
-                    confirmLabel: "Usar esta foto",
-                    // Un ticket se fotografía donde caiga —gasolinera, caseta,
-                    // sótano—: la ubicación viaja si la hay, pero no bloquea el gasto.
-                    requireLocation: false,
-                    onConfirm: { foto in
-                        ticket = foto
-                        camara = false
-                        return nil
-                    },
-                    onCancel: { camara = false }
-                )
+            .padding(NxSpacing.l)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .nxScreenBackground()
+        .task { await cargarActividades() }
+        .fullScreenCover(isPresented: $camara) {
+            GeoPhotoCaptureView(
+                title: "Foto del ticket",
+                confirmLabel: "Usar esta foto",
+                // Un ticket se fotografía donde caiga —gasolinera, caseta,
+                // sótano—: la ubicación viaja si la hay, pero no bloquea el gasto.
+                requireLocation: false,
+                onConfirm: { foto in
+                    ticket = foto
+                    camara = false
+                    return nil
+                },
+                onCancel: { camara = false }
+            )
+        }
+        .sheet(isPresented: $eligiendoActividad) {
+            HojaElegirActividadViatico(
+                titulo: "¿A qué actividad se carga?",
+                pista: "Si el viaje cubrió varias, elige una ahora y repártelo después desde el detalle.",
+                actividades: actividades,
+                textoVacio: "No traes actividades abiertas."
+            ) { item in
+                actividad = item
+                eligiendoActividad = false
             }
         }
     }
 
-    private func etiqueta(_ item: MyActivityItem) -> String {
-        [item.anNumber, item.titulo]
-            .compactMap { $0 }
-            .first { !$0.isEmpty } ?? "Actividad #\(item.id)"
+    // MARK: Piezas
+
+    /// Qué actividad carga el gasto (Android `SelectorActividad`). Opcional:
+    /// hay viáticos que no son de ninguna.
+    private var selectorActividad: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Button {
+                eligiendoActividad = true
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Actividad")
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
+                    Text(actividad.map { ViaticoTextos.etiqueta($0) } ?? "Sin actividad (opcional)")
+                        .font(NxType.bodyLarge)
+                        .foregroundStyle(actividad == nil ? NxColors.muted : NxColors.fg)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxWidth: .infinity, minHeight: viaticoAlturaToque, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(NxPressableStyle())
+            .disabled(enviando)
+
+            if actividad != nil {
+                Button("Quitar") { actividad = nil }
+                    .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.brand)))
+                    .disabled(enviando)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .nxCardSurface()
     }
+
+    /// La evidencia (Android `FotoDelTicket`). Sin ella el servidor rechaza el
+    /// alta, así que se pide de frente.
+    private var fotoDelTicket: some View {
+        NxPanelShell {
+            VStack(alignment: .leading, spacing: 10) {
+                NxSectionHeader(title: "Foto del ticket", subtitle: "Obligatoria: es el comprobante del gasto.")
+                if let ticket {
+                    Color.clear
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .overlay {
+                            Image(uiImage: ticket.image)
+                                .resizable()
+                                .scaledToFill()
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+                        .accessibilityElement()
+                        .accessibilityLabel("Ticket fotografiado")
+                }
+                Button {
+                    camara = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 18, height: 18)
+                            .accessibilityHidden(true)
+                        Text(ticket == nil ? "Tomar foto del ticket" : "Tomar otra")
+                    }
+                }
+                .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
+                .disabled(enviando)
+            }
+        }
+    }
+
+    // MARK: Datos
 
     /// Aparte: sin actividades se puede pedir igual un viático suelto.
     private func cargarActividades() async {
@@ -184,9 +234,10 @@ struct NuevoViaticoView: View {
         }
     }
 
+    /// Mientras falle, la pantalla se queda con lo que la persona tecleó.
     private func pedir() {
         intentado = true
-        guard completo, let ticket else { return }
+        guard completo, let ticket, !enviando else { return }
         enviando = true
         error = nil
         Task {
@@ -206,9 +257,8 @@ struct NuevoViaticoView: View {
                 )
                 dismiss()
             } catch {
-                // La hoja se queda abierta con lo tecleado: nada que reescribir.
                 enviando = false
-                self.error = error.toUserMessage()
+                self.error = error.toUserMessage(fallback: "No se pudo pedir el viático")
             }
         }
     }

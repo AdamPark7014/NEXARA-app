@@ -1,239 +1,204 @@
 import SwiftUI
-import UIKit
 
-/// Mi jornada: entrada y salida con foto + GPS, cronómetro y las checadas de hoy.
-/// Espejo de `apps/web/components/AttendanceForm.tsx` (modo compacto).
+/// Mi jornada, en una tarjeta que cabe en un pulgar (Android `MiJornadaCard`): el
+/// estado con su punto y el cronómetro comparten renglón, el botón de checar es lo
+/// único grande, y debajo van las checadas del día con sus avisos.
 struct MiJornadaCard: View {
     @ObservedObject var vm: AttendanceVM
-    @ObservedObject private var tracker = ShiftGpsTracker.shared
+    /// `entrada` / `salida`: abre la cámara.
     let onMark: (String) -> Void
-    let onPhoto: (CorePhotoItem) -> Void
 
-    @Environment(\.openURL) private var openURL
+    private var abierta: Bool { vm.isOpen }
+    private var hayEntrada: Bool { vm.hasEntryToday }
+    private var haySalida: Bool { vm.hasExitToday }
+    private var esHoy: Bool { vm.isToday }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            if let notice = vm.checkInNotice {
-                Text(notice)
-                    .font(.footnote)
-                    .foregroundStyle(notice.hasPrefix("Error") ? CorePalette.red : CorePalette.green)
-            }
-            if let error = vm.mineError {
-                Text(error).font(.footnote).foregroundStyle(CorePalette.red)
-            }
-            buttons
-            hints
-            gpsCard
-            history
-            faltasJustificadas
-        }
-        .coreCard()
-        .alert(
-            "No se pudo checar",
-            isPresented: Binding(
-                get: { vm.checkInBloqueo != nil },
-                set: { if !$0 { vm.clearBloqueo() } }
-            ),
-            presenting: vm.checkInBloqueo
-        ) { _ in
-            Button("Entendido", role: .cancel) { vm.clearBloqueo() }
-        } message: { mensaje in
-            Text(mensaje + "\n\n" + ChecadaRechazo.ayuda(mensaje))
-        }
-    }
-
-    // MARK: Faltas justificadas
-
-    /// Días sin checada que Christian justificó (últimos 30 días). No suman horas.
-    @ViewBuilder
-    private var faltasJustificadas: some View {
-        if !vm.myJustifications.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Faltas justificadas").font(.caption.weight(.bold)).foregroundStyle(.secondary)
-                ForEach(vm.myJustifications.prefix(5)) { falta in
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            NxIconText(systemName: "checkmark.seal.fill", text: falta.fechaCorta, tint: CorePalette.purple)
-                                .font(.caption.weight(.semibold))
-                            Text(falta.texto)
-                                .font(.caption)
-                        }
-                        if !falta.justificadaPor.isEmpty {
-                            Text("Justificó \(falta.justificadaPor)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(CorePalette.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-        }
-    }
-
-    // MARK: Cabecera y cronómetro
-
-    private var statusColor: Color? {
-        if vm.isOpen { return CorePalette.green }
-        if vm.statusLabel == AttendanceEstado.justificada.label { return CorePalette.purple }
+    /// El API contesta 400 a la segunda entrada del día: aquí se apaga antes.
+    private var siguiente: String? {
+        if vm.canMarkEntry { return "entrada" }
+        if vm.canMarkExit { return "salida" }
         return nil
     }
 
-    private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Mi jornada").font(.headline)
-                Text("Entrada o salida · foto + GPS")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 4)
-            VStack(alignment: .trailing, spacing: 4) {
-                CoreChip(text: vm.statusLabel, color: statusColor)
-                timer
-            }
-        }
+    private var estadoTexto: String {
+        if abierta { return "Jornada en curso" }
+        if haySalida && hayEntrada { return "Jornada completada" }
+        if vm.miFalta != nil { return FaltasJustificadas.etiqueta }
+        return "Sin entrada registrada"
     }
 
-    /// Cronómetro desde la entrada: segundo a segundo, como la web.
-    @ViewBuilder
-    private var timer: some View {
-        if vm.isOpen || vm.totalSecondsToday > 0 {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let live = AttendanceClock.elapsed(from: vm.lastEntryAt, to: nil, now: context.date)
-                Text(AttendanceClock.hms(vm.totalSecondsToday + (vm.isOpen ? live : 0)))
-                    .font(.system(.title3, design: .monospaced).weight(.bold))
-                    .foregroundStyle(vm.isOpen ? CorePalette.green : Color.primary)
-            }
-        }
+    private var estadoColor: Color? {
+        if abierta { return NxColors.verde }
+        if haySalida && hayEntrada { return NxColors.azul }
+        if vm.miFalta != nil { return NxColors.morado }
+        return nil
     }
 
-    private var buttons: some View {
-        HStack(spacing: 12) {
-            Button { onMark("entrada") } label: {
-                Label("Entrada", systemImage: "arrow.right.circle.fill").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(CorePalette.green)
-            .disabled(vm.checkInLoading || !vm.canMarkEntry)
-
-            Button { onMark("salida") } label: {
-                Label("Salida", systemImage: "arrow.left.circle.fill").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(CorePalette.blue)
-            .disabled(vm.checkInLoading || !vm.canMarkExit)
-        }
+    private var subtitulo: String {
+        if abierta, let inicio = vm.inicioIso { return "Desde las \(AttendanceClock.time(inicio))" }
+        if !esHoy { return "Solo se puede checar en el día de hoy." }
+        return "Se toma una foto y tu ubicación."
     }
 
-    @ViewBuilder
-    private var hints: some View {
-        if vm.checkInLoading {
-            ProgressView().frame(maxWidth: .infinity)
-        } else if vm.canMarkEntry {
-            Text("Toca Entrada → foto → se guarda con tu GPS.")
-                .font(.caption).foregroundStyle(.secondary)
-        } else if vm.canMarkExit {
-            Text(vm.openedOnAnotherDay
-                 ? "Jornada abierta desde otro día: marca Salida para cerrarla."
-                 : "Toca Salida → foto → cierra la jornada y deja de compartir tu ubicación.")
-                .font(.caption)
-                .foregroundStyle(vm.openedOnAnotherDay ? CorePalette.orange : .secondary)
-        } else if vm.hasEntryToday {
-            Text("Jornada completada: entrada y salida registradas.")
-                .font(.caption).foregroundStyle(CorePalette.green)
-        }
-    }
-
-    // MARK: GPS de jornada
-
-    /// El permiso se explica **antes** de pedirlo: seguir a alguien en segundo
-    /// plano sin decirle para qué es lo que hace que lo niegue (y con razón).
-    @ViewBuilder
-    private var gpsCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            NxIconText(systemName: "location.circle", text: "GPS de jornada", tint: NxBrand.primary)
-                .font(.subheadline.weight(.semibold))
-            Text("Mientras tu jornada esté abierta, la app manda tu ubicación a tu encargado cada ~100 m, aunque la tengas cerrada. Al marcar Salida se detiene.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                CoreChip(
-                    text: tracker.isTracking ? "Enviando" : "Detenido",
-                    color: tracker.isTracking ? CorePalette.green : CorePalette.slate
-                )
-                CoreChip(
-                    text: tracker.authorizationLabel,
-                    color: tracker.isAlways ? CorePalette.green : CorePalette.orange
-                )
-                if let at = tracker.lastSentAt {
-                    Text("Último punto \(AttendanceClock.time(CoreFormat.isoString(at)))")
-                        .font(.caption2).foregroundStyle(.secondary)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    NxStatusDot(text: estadoTexto, color: estadoColor, fontSize: 15, fontWeight: .bold)
+                    Text(subtitulo)
+                        .font(.system(size: 12))
+                        .foregroundStyle(NxColors.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-            if tracker.isDenied {
-                Button("Abrir Ajustes de ubicación") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                }
-                .font(.caption.weight(.semibold))
-            } else if !tracker.isAlways {
-                Button("Permitir ubicación «Siempre»") {
-                    tracker.requestAlwaysAuthorization()
-                }
-                .font(.caption.weight(.semibold))
-            }
-            if let error = tracker.lastError, tracker.isTracking {
-                Text(error).font(.caption2).foregroundStyle(CorePalette.orange)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    // MARK: Checadas de hoy
-
-    @ViewBuilder
-    private var history: some View {
-        if !vm.myPunches.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Hoy").font(.caption.weight(.bold)).foregroundStyle(.secondary)
-                ForEach(vm.myPunches) { punch in
-                    HStack(spacing: 10) {
-                        NxIconText(
-                            systemName: punch.isEntry ? "arrow.right.circle" : "rectangle.portrait.and.arrow.right",
-                            text: punch.isEntry ? "Entrada" : "Salida",
-                            tint: NxBrand.primary
-                        )
-                        .font(.caption.weight(.semibold))
-                        Text(AttendanceClock.time(punch.timestamp))
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if !punch.photoUrl.isEmpty {
-                            Button {
-                                onPhoto(CorePhotoItem(
-                                    title: punch.isEntry ? "Tu foto de entrada" : "Tu foto de salida",
-                                    url: punch.photoUrl,
-                                    latitude: punch.coords?.lat,
-                                    longitude: punch.coords?.lng,
-                                    time: punch.timestamp
-                                ))
-                            } label: {
-                                AuthenticatedImage(url: punch.photoUrl)
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        if let url = AttendanceClock.mapUrl(lat: punch.coords?.lat, lng: punch.coords?.lng) {
-                            Link("Mapa", destination: url).font(.caption2.weight(.semibold))
-                        }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if abierta, let inicio = vm.inicioIso {
+                    // Cifras de ancho fijo: el reloj no baila mientras corre.
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(AttendanceClock.hms(AttendanceClock.elapsed(from: inicio, to: nil, now: context.date)))
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
+                            .foregroundStyle(AttendanceEstado.presente.color)
+                            .lineLimit(1)
                     }
                 }
             }
+
+            if let falta = vm.miFalta {
+                FaltaJustificadaNota(justificacion: falta)
+            }
+
+            boton
+
+            if let notice = vm.checkInNotice, !notice.isEmpty {
+                AsisIconText(
+                    text: notice,
+                    systemImage: vm.checkInNoticeIsError ? AsisIcono.error : AsisIcono.aprobado,
+                    fontSize: 12,
+                    color: vm.checkInNoticeIsError ? NxColors.danger : AttendanceEstado.presente.color,
+                    iconSize: 15
+                )
+            }
+
+            if !vm.myPunches.isEmpty {
+                NxRowDivider()
+                ForEach(vm.myPunches.sorted { $0.timestamp < $1.timestamp }) { punch in
+                    checada(punch)
+                }
+            }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NxColors.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(abierta ? AttendanceEstado.presente.color.opacity(0.45) : NxColors.border, lineWidth: 1)
+        )
+    }
+
+    /// El único botón primario de la pantalla: lo que la persona vino a hacer.
+    @ViewBuilder
+    private var boton: some View {
+        if siguiente != nil || vm.checkInLoading {
+            Button {
+                if let siguiente { onMark(siguiente) }
+            } label: {
+                HStack(spacing: 8) {
+                    if vm.checkInLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.white)
+                            .frame(width: 18, height: 18)
+                        Text("Registrando…")
+                            .font(.system(size: 14, weight: .bold))
+                    } else {
+                        Image(systemName: siguiente == "salida" ? AsisIcono.salida : AsisIcono.entrada)
+                            .font(.system(size: 16, weight: .regular))
+                            .frame(width: 20, height: 20)
+                            .accessibilityHidden(true)
+                        Text(siguiente == "salida" ? "Registrar salida" : "Registrar entrada")
+                            .font(.system(size: 15, weight: .bold))
+                    }
+                }
+                .foregroundStyle(Color.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(siguiente != nil && !vm.checkInLoading ? NxColors.brand : NxColors.brand.opacity(0.55))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(NxPressableStyle())
+            .disabled(siguiente == nil || vm.checkInLoading)
+        } else if esHoy && hayEntrada && !haySalida {
+            Text("Ya registraste tu entrada de hoy.")
+                .font(.system(size: 12))
+                .foregroundStyle(NxColors.muted)
+        }
+    }
+
+    /// Una checada del día: tipo con icono, hora, avisos y correcciones.
+    private func checada(_ punch: AttendancePunch) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                AsisIconText(
+                    text: punch.isEntry ? "Entrada" : "Salida",
+                    systemImage: punch.isEntry ? AsisIcono.entrada : AsisIcono.salida,
+                    fontSize: 12.5,
+                    color: NxColors.fg2,
+                    iconSize: 15
+                )
+                Spacer(minLength: 8)
+                Text(AttendanceClock.time(punch.timestamp))
+                    .font(.system(size: 12.5, design: .monospaced))
+                    .foregroundStyle(NxColors.fg)
+            }
+            let avisos = AttendanceBadges.de(punch)
+            if !avisos.isEmpty {
+                AvisosChecada(avisos: avisos)
+            }
+            ForEach(Array(punch.correcciones.enumerated()), id: \.offset) { _, correccion in
+                Text(AttendanceBadges.correccionTexto(correccion))
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(AttendanceBadges.morado)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// Rastreo activo: se dice en pantalla, no solo en el indicador del sistema
+/// (Android `GpsJornadaAviso`).
+struct GpsJornadaAviso: View {
+    let onDetener: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                AsisIconText(
+                    text: "Compartiendo ubicación de jornada",
+                    systemImage: AsisIcono.gps,
+                    fontSize: 13,
+                    weight: .semibold,
+                    color: NxColors.fg,
+                    iconSize: 16
+                )
+                Text("Se apaga sola al registrar tu salida.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(NxColors.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: onDetener) {
+                Text("Dejar de compartir")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(NxColors.brand)
+                    .padding(.horizontal, 8)
+                    .frame(minHeight: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NxColors.infoSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

@@ -1,8 +1,11 @@
 import SwiftUI
 
-/// El viático por dentro: cuánto se pidió, cuánto se autorizó, cuánto se
-/// comprobó y qué falta. Desde aquí se reparte entre actividades, se suben los
-/// tickets y —si me toca— se autoriza, se rechaza o se marca pagado.
+/// «Viático» (Android `ViaticoDetalleScreen`): cuánto se pidió, cuánto se
+/// autorizó, cuánto se comprobó y qué falta. Desde aquí se reparte entre
+/// actividades, se suben los tickets y —si me toca— se autoriza, se rechaza o
+/// se marca pagado.
+///
+/// Se apila sobre la lista; la barra teal «Viático» la pone quien la abre.
 struct ViaticoDetalleView: View {
     let viaticoId: Int
     /// La lista de arriba quedó desfasada: que relea.
@@ -11,19 +14,16 @@ struct ViaticoDetalleView: View {
     @State private var viatico: Viatico?
     @State private var cargando = true
     @State private var error: String?
-    @State private var aviso: String?
+    @State private var accionError: String?
+    @State private var mensaje: String?
     @State private var comprobando = false
     @State private var decidiendo = false
     @State private var confirmandoPago = false
+    @State private var repartiendo = false
     @State private var enviando = false
 
-    private var miId: Int? { SessionStore.shared.currentUser.flatMap { Int($0.id) } }
-
-    private var administra: Bool {
-        guard let user = SessionStore.shared.currentUser else { return false }
-        if user.isSuperAdmin { return true }
-        return user.permissions.contains { $0 == "viatics.manage" || $0 == "CONSOLE_ADMIN" }
-    }
+    private var miId: Int? { ViaticoSesion.miId }
+    private var administra: Bool { ViaticoSesion.administra }
 
     private var esMio: Bool {
         guard let viatico else { return false }
@@ -55,12 +55,12 @@ struct ViaticoDetalleView: View {
     }
 
     var body: some View {
-        List {
-            if let error {
-                Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let error {
                     NxAlertBanner(
                         alert: NxAlert(
-                            id: "viatico",
+                            id: "viatico-error",
                             title: error,
                             subtitle: viatico == nil ? nil : "Abajo sigue lo último que se pudo leer.",
                             tone: .danger
@@ -68,223 +68,252 @@ struct ViaticoDetalleView: View {
                         actionLabel: "Reintentar",
                         onAction: { Task { await cargar() } }
                     )
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
                 }
-            }
 
-            if let viatico {
-                encabezado(viatico)
-                importes(viatico)
-                reparto(viatico)
-                if let url = viatico.ticketEvidenciaUrl, !url.isEmpty {
-                    Section("Comprobante") {
-                        AuthenticatedImage(url: url, contentMode: .fit)
-                            .frame(height: 240)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .accessibilityLabel("Foto del ticket del viático")
+                if let viatico {
+                    encabezado(viatico)
+                    importes(viatico)
+                    reparto(viatico)
+                    if let url = viatico.ticketEvidenciaUrl, !url.trimmingCharacters(in: .whitespaces).isEmpty {
+                        comprobante(url)
                     }
+                    if let accionError {
+                        NxErrorBlock(message: accionError)
+                    }
+                    acciones
+                    Color.clear.frame(height: 16)
+                } else if cargando {
+                    NxLoadingState(text: "Abriendo el viático…")
                 }
-                acciones(viatico)
-            } else if cargando {
-                Section { NxLoadingState(text: "Cargando viático…") }
             }
+            .padding(NxSpacing.l)
         }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Viático")
-        .navigationBarTitleDisplayMode(.inline)
+        .nxScreenBackground()
         .refreshable { await cargar() }
         .task { await cargar() }
+        .avisoSnackbar($mensaje)
+        .navigationDestination(isPresented: $repartiendo) {
+            RepartoViaticoView(viaticoId: viaticoId) { texto in
+                avisar(texto)
+            }
+            .nxBrandNavBar(title: "Repartir viático")
+        }
         .sheet(isPresented: $comprobando) {
             if let viatico {
-                HojaComprobarViatico(viatico: viatico) { mensaje in
-                    aviso = mensaje
+                HojaComprobarViatico(viatico: viatico) { texto in
                     comprobando = false
-                    Task { await cargar() }
-                    onCambio()
+                    avisar(texto)
                 }
             }
         }
         .sheet(isPresented: $decidiendo) {
             if let viatico {
-                HojaDecisionViatico(viatico: viatico) { mensaje in
-                    aviso = mensaje
+                HojaDecisionViatico(viatico: viatico) { texto in
                     decidiendo = false
-                    Task { await cargar() }
-                    onCambio()
+                    avisar(texto)
                 }
             }
         }
-        .confirmationDialog(
-            "¿Marcar como pagado?",
-            isPresented: $confirmandoPago,
-            titleVisibility: .visible
-        ) {
-            Button("Sí, pagado") { marcarPagado() }
+        .alert("¿Marcar como pagado?", isPresented: $confirmandoPago) {
             Button("Cancelar", role: .cancel) {}
+            Button("Sí, pagado") { marcarPagado() }
         } message: {
             Text(
-                "Se levanta la póliza contable con lo autorizado. Después de esto el viático "
-                    + "ya no se puede repartir entre actividades: el asiento ya salió."
+                "Se levanta la póliza contable con lo autorizado. Después de esto el "
+                    + "viático ya no se puede repartir entre actividades: el asiento ya salió."
             )
-        }
-        .alert(
-            "Viáticos",
-            isPresented: Binding(get: { aviso != nil }, set: { if !$0 { aviso = nil } })
-        ) {
-            Button("Entendido") { aviso = nil }
-        } message: {
-            Text(aviso ?? "")
         }
     }
 
-    // MARK: Secciones
+    // MARK: Bloques
 
+    /// Título, de quién, cuándo y su estado (Android `Encabezado`).
     private func encabezado(_ viatico: Viatico) -> some View {
-        Section {
+        NxPanelShell {
             VStack(alignment: .leading, spacing: 8) {
-                Text(viatico.titulo).font(.title3.weight(.bold))
+                Text(viatico.titulo)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(
                     [
                         Viatico.etiquetaCategoria(viatico.categoria),
-                        viatico.usuario?.nombre ?? "",
-                        viatico.fechaCorta,
-                        viatico.actividad?.anNumber ?? "",
-                        viatico.contabilidadRef ?? "",
+                        (viatico.usuario?.nombre ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+                        FechaMexico.dia(iso: viatico.fechaSolicitud) ?? "",
+                        (viatico.actividad?.anNumber ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+                        (viatico.contabilidadRef ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
                     ]
                     .filter { !$0.isEmpty }
                     .joined(separator: " · ")
                 )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(NxType.labelMedium)
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
                 ChipsDeViatico(viatico: viatico)
             }
-            .padding(.vertical, 4)
         }
     }
 
+    /// Solicitado, autorizado, comprobado y el saldo (Android `BloqueImportes`).
     private func importes(_ viatico: Viatico) -> some View {
-        Section("Importes") {
-            HStack(spacing: 14) {
-                ImporteLabel(titulo: "Solicitado", centavos: viatico.solicitadoCentavos)
-                ImporteLabel(
-                    titulo: "Autorizado",
-                    centavos: viatico.aprobadoCentavos,
-                    tono: viatico.fueRecortado ? .warning : .success
+        let solicitado = viatico.solicitadoCentavos
+        let aprobado = viatico.aprobadoCentavos
+        let comprobado = viatico.comprobadoCentavos
+        let saldo = viatico.liquidacion?.saldoCentavos
+        let recortado = aprobado.map { $0 < solicitado } ?? false
+        let tonoSaldo: NxTone = {
+            guard let saldo, saldo != 0 else { return .success }
+            return saldo > 0 ? .info : .brand
+        }()
+
+        return NxPanelShell {
+            VStack(alignment: .leading, spacing: 14) {
+                NxSectionHeader(title: "Importes")
+                ParDeImportes(
+                    izquierda: "Solicitado",
+                    izquierdaCentavos: solicitado,
+                    derecha: "Autorizado",
+                    derechaCentavos: aprobado,
+                    derechaTono: recortado ? .warning : .success
                 )
-            }
-            if viatico.fueRecortado, let aprobado = viatico.aprobadoCentavos {
-                Text("Se autorizó \(Dinero.pesos(viatico.solicitadoCentavos - aprobado)) menos de lo que pediste.")
-                    .font(.caption)
-                    .foregroundStyle(NxTone.warning.fg)
-            }
-            HStack(spacing: 14) {
-                ImporteLabel(titulo: "Comprobado", centavos: viatico.comprobadoCentavos ?? 0)
-                ImporteLabel(
-                    titulo: "Saldo",
-                    centavos: viatico.liquidacion?.saldoCentavos,
-                    tono: viatico.liquidacion?.tono ?? .neutral
+                if recortado, let aprobado {
+                    Text("Se autorizó \(Dinero.pesos(solicitado - aprobado)) menos de lo que pediste.")
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Rectangle().fill(NxColors.border).frame(height: 1)
+                ParDeImportes(
+                    izquierda: "Comprobado",
+                    izquierdaCentavos: comprobado ?? 0,
+                    derecha: "Saldo",
+                    derechaCentavos: saldo,
+                    derechaTono: tonoSaldo
                 )
-            }
-            if let explicacion = viatico.liquidacion?.explicacion {
-                Text(explicacion).font(.subheadline)
-            }
-            if viatico.comprobadoCentavos == nil {
-                Text("Falta subir tickets por \(Dinero.pesos(viatico.vigenteCentavos)).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let explicacion = viatico.liquidacion?.explicacion {
+                    Text(explicacion)
+                        .font(NxType.bodyMedium)
+                        .foregroundStyle(NxColors.fg)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if comprobado == nil {
+                    Text("Falta subir tickets por \(Dinero.pesos(abs(aprobado ?? solicitado))).")
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.muted)
+                }
             }
         }
     }
 
+    /// Entre qué actividades se reparte el gasto, y el botón para cambiarlo
+    /// (Android `BloqueReparto`).
     private func reparto(_ viatico: Viatico) -> some View {
-        Section {
-            ForEach(viatico.repartos) { parte in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(parte.titulo).lineLimit(2)
-                        if let nota = parte.nota, !nota.isEmpty {
-                            Text(nota).font(.caption2).foregroundStyle(.secondary)
+        NxPanelShell {
+            VStack(alignment: .leading, spacing: 10) {
+                NxSectionHeader(
+                    title: "Reparto entre actividades",
+                    subtitle: viatico.repartos.isEmpty
+                        ? "Todo el costo cae en una sola actividad."
+                        : "El costo se divide en \(viatico.repartos.count) actividades."
+                )
+                ForEach(viatico.repartos) { parte in
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(parte.titulo)
+                                .font(NxType.bodyMedium)
+                                .foregroundStyle(NxColors.fg)
+                                .lineLimit(2)
+                            if let nota = parte.nota?.trimmingCharacters(in: .whitespacesAndNewlines), !nota.isEmpty {
+                                Text(nota)
+                                    .font(NxType.labelSmall)
+                                    .foregroundStyle(NxColors.muted)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(Dinero.pesos(parte.centavos))
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(NxColors.fg)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                if puedeRepartir {
+                    Button {
+                        repartiendo = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.triangle.branch")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 18, height: 18)
+                                .accessibilityHidden(true)
+                            Text(viatico.repartos.isEmpty ? "Repartir entre actividades" : "Cambiar el reparto")
                         }
                     }
-                    Spacer()
-                    Text(Dinero.pesos(parte.centavos)).font(.headline)
+                    .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
+                } else if viatico.estaPagado {
+                    ChipLargoViatico(texto: "Pagado: el asiento contable ya salió y el reparto queda fijo")
+                } else if viatico.estaRechazado {
+                    ChipLargoViatico(texto: "Rechazado: no hay costo que repartir")
                 }
-                .accessibilityElement(children: .combine)
             }
-            if puedeRepartir {
-                NavigationLink {
-                    RepartoViaticoView(viaticoId: viatico.id) { mensaje in
-                        aviso = mensaje
-                        Task { await cargar() }
-                        onCambio()
-                    }
-                } label: {
-                    Label(
-                        viatico.repartos.isEmpty ? "Repartir entre actividades" : "Cambiar el reparto",
-                        systemImage: "arrow.triangle.branch"
-                    )
-                    .frame(minHeight: 44)
-                }
-            } else if viatico.estaPagado {
-                Text("Pagado: el asiento contable ya salió y el reparto queda fijo.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else if viatico.estaRechazado {
-                Text("Rechazado: no hay costo que repartir.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Reparto entre actividades")
-        } footer: {
-            Text(
-                viatico.repartos.isEmpty
-                    ? "Todo el costo cae en una sola actividad."
-                    : "El costo se divide en \(viatico.repartos.count) actividades."
-            )
         }
     }
 
+    /// La foto del ticket (Android `BloqueTicket`).
+    private func comprobante(_ url: String) -> some View {
+        NxPanelShell {
+            VStack(alignment: .leading, spacing: 10) {
+                NxSectionHeader(title: "Comprobante")
+                AuthenticatedImage(url: url, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+                    .accessibilityLabel("Foto del ticket del viático")
+            }
+        }
+    }
+
+    /// Lo que toca hacer, cada cosa en su hoja (Android `Acciones`).
     @ViewBuilder
-    private func acciones(_ viatico: Viatico) -> some View {
+    private var acciones: some View {
         if puedeDecidir || puedeComprobar || puedePagar {
-            Section {
+            VStack(spacing: 10) {
                 if puedeDecidir {
                     Button {
                         decidiendo = true
                     } label: {
-                        Text("Autorizar o rechazar")
-                            .font(.body.weight(.bold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                        Text("Autorizar o rechazar").fontWeight(.bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NxBrand.primary)
+                    .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: 56, llenaAncho: true))
                     .disabled(enviando)
                 }
                 if puedeComprobar {
                     Button {
                         comprobando = true
                     } label: {
-                        Label("Comprobar con tickets", systemImage: "doc.text.magnifyingglass")
-                            .font(.body.weight(.bold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.plaintext")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 18, height: 18)
+                                .accessibilityHidden(true)
+                            Text("Comprobar con tickets").fontWeight(.bold)
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NxTone.success.fg)
+                    .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.success), alto: 56, llenaAncho: true))
                     .disabled(enviando)
                 }
                 if puedePagar {
                     Button {
                         confirmandoPago = true
                     } label: {
-                        Text("Marcar como pagado").frame(maxWidth: .infinity, minHeight: 44)
+                        HStack(spacing: 10) {
+                            if enviando { SpinnerDeBoton(color: NxColors.brand) }
+                            Text("Marcar como pagado")
+                        }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
                     .disabled(enviando)
                 }
             }
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
         }
     }
 
@@ -296,23 +325,32 @@ struct ViaticoDetalleView: View {
             viatico = try await ViaticosRepository.shared.detalle(id: viaticoId)
             error = nil
         } catch {
-            self.error = error.toUserMessage()
+            // Lo que ya se veía se queda: el aviso va arriba.
+            self.error = error.toUserMessage(fallback: "No se pudo abrir el viático")
         }
         cargando = false
     }
 
+    /// Una mutación salió: snackbar, se relee el detalle y la lista se entera.
+    private func avisar(_ texto: String) {
+        accionError = nil
+        mensaje = texto
+        Task { await cargar() }
+        onCambio()
+    }
+
     private func marcarPagado() {
+        guard !enviando else { return }
         enviando = true
+        accionError = nil
         Task {
             do {
                 try await ViaticosRepository.shared.marcarPagado(id: viaticoId)
                 enviando = false
-                aviso = "Marcado como pagado"
-                await cargar()
-                onCambio()
+                avisar("Marcado como pagado")
             } catch {
                 enviando = false
-                aviso = error.toUserMessage()
+                accionError = error.toUserMessage(fallback: "No se pudo marcar como pagado")
             }
         }
     }
@@ -320,12 +358,13 @@ struct ViaticoDetalleView: View {
 
 // MARK: - Comprobar
 
-/// Subir tickets contra el anticipo: cuánto se gastó de verdad y, si hay, su foto.
+/// «Comprobar el anticipo» (Android `HojaComprobar`): cuánto se gastó de verdad
+/// y, si hay, la foto del comprobante. Si falla, la hoja se queda abierta con
+/// lo escrito y el error del servidor debajo.
 struct HojaComprobarViatico: View {
     let viatico: Viatico
     let onListo: (String) -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var importe = ""
     @State private var nota = ""
     @State private var foto: CapturedGeoPhoto?
@@ -333,106 +372,109 @@ struct HojaComprobarViatico: View {
     @State private var enviando = false
     @State private var error: String?
 
+    private var entregado: Int { viatico.vigenteCentavos }
     private var centavos: Int? { Dinero.parsearCentavos(importe) }
 
     private var ayuda: String {
         guard let centavos else { return "Si no gastaste nada, captura 0." }
-        let diferencia = viatico.vigenteCentavos - centavos
+        let diferencia = entregado - centavos
         if diferencia == 0 { return "Cuadra exacto con lo entregado." }
         if diferencia > 0 { return "Sobran \(Dinero.pesos(diferencia)): hay que devolverlos." }
         return "Gastaste \(Dinero.pesos(-diferencia)) de más: la empresa te los debe."
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    CampoImporte(
-                        titulo: "Total de los tickets",
-                        crudo: $importe,
-                        ayuda: ayuda,
-                        error: nil,
-                        habilitado: !enviando
-                    )
-                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                } footer: {
-                    Text("Se te entregaron \(Dinero.pesos(viatico.vigenteCentavos)).")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Comprobar el anticipo")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Se te entregaron \(Dinero.pesos(entregado)). Captura cuánto suman tus tickets.")
+                    .font(NxType.bodyMedium)
+                    .foregroundStyle(NxColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                CampoImporte(
+                    titulo: "Total de los tickets",
+                    crudo: $importe,
+                    ayuda: ayuda,
+                    error: nil,
+                    habilitado: !enviando
+                )
+                CampoDelineado(
+                    etiqueta: "Nota (opcional)",
+                    texto: $nota,
+                    multilinea: true,
+                    minLineas: 2,
+                    habilitado: !enviando
+                )
+                if let foto {
+                    Color.clear
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 160)
+                        .overlay {
+                            Image(uiImage: foto.image)
+                                .resizable()
+                                .scaledToFill()
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+                        .accessibilityElement()
+                        .accessibilityLabel("Comprobante fotografiado")
                 }
-
-                Section("Nota (opcional)") {
-                    TextField("Qué conviene saber", text: $nota, axis: .vertical)
-                        .lineLimit(2...4)
-                        .disabled(enviando)
-                }
-
-                Section("Foto del comprobante (opcional)") {
-                    if let foto {
-                        Image(uiImage: foto.image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 160)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                Button {
+                    camara = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 18, height: 18)
+                            .accessibilityHidden(true)
+                        Text(foto == nil ? "Foto del comprobante (opcional)" : "Tomar otra")
                     }
-                    Button {
-                        camara = true
-                    } label: {
-                        Label(foto == nil ? "Tomar foto" : "Tomar otra", systemImage: "camera")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .disabled(enviando)
                 }
+                .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: viaticoAlturaToque, llenaAncho: true))
+                .disabled(enviando)
 
                 if let error {
-                    Section {
-                        NxAlertBanner(alert: NxAlert(id: "comprobar", title: error, tone: .danger))
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
-                    }
+                    NxErrorBlock(message: error)
                 }
 
-                Section {
-                    Button {
-                        enviar()
-                    } label: {
-                        if enviando {
-                            ProgressView().frame(maxWidth: .infinity, minHeight: 44)
-                        } else {
-                            Text("Enviar comprobación")
-                                .font(.body.weight(.bold))
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
+                Button {
+                    enviar()
+                } label: {
+                    if enviando {
+                        SpinnerDeBoton()
+                    } else {
+                        Text("Enviar comprobación").fontWeight(.bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NxTone.success.fg)
-                    .disabled(enviando || centavos == nil)
                 }
+                .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.success), alto: 56, llenaAncho: true))
+                .disabled(enviando || centavos == nil)
             }
-            .navigationTitle("Comprobar el anticipo")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }.disabled(enviando)
-                }
-            }
-            .fullScreenCover(isPresented: $camara) {
-                GeoPhotoCaptureView(
-                    title: "Foto del comprobante",
-                    confirmLabel: "Usar esta foto",
-                    requireLocation: false,
-                    onConfirm: { capturada in
-                        foto = capturada
-                        camara = false
-                        return nil
-                    },
-                    onCancel: { camara = false }
-                )
-            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 28)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .interactiveDismissDisabled(enviando)
+        .hojaMaterial(detents: [.large])
+        .fullScreenCover(isPresented: $camara) {
+            GeoPhotoCaptureView(
+                title: "Foto del comprobante",
+                confirmLabel: "Usar esta foto",
+                requireLocation: false,
+                onConfirm: { capturada in
+                    foto = capturada
+                    camara = false
+                    return nil
+                },
+                onCancel: { camara = false }
+            )
         }
     }
 
     private func enviar() {
-        guard let centavos else { return }
+        guard let centavos, !enviando else { return }
         enviando = true
         error = nil
         Task {
@@ -449,10 +491,9 @@ struct HojaComprobarViatico: View {
                         ? "Sin conexión: la comprobación quedó en la cola y sale al volver la señal."
                         : "Comprobación registrada"
                 )
-                dismiss()
             } catch {
                 enviando = false
-                self.error = error.toUserMessage()
+                self.error = error.toUserMessage(fallback: "No se pudo comprobar el viático")
             }
         }
     }
@@ -460,7 +501,7 @@ struct HojaComprobarViatico: View {
 
 // MARK: - Decisión del jefe
 
-/// Autorizar (con recorte opcional) o rechazar.
+/// Autorizar (con recorte opcional) o rechazar (Android `HojaDecision`).
 ///
 /// El recorte no puede pasarse de lo solicitado —el servidor lo rechaza— y la
 /// hoja lo dice antes de intentarlo.
@@ -468,114 +509,102 @@ struct HojaDecisionViatico: View {
     let viatico: Viatico
     let onResuelto: (String) -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var recorte = ""
     @State private var nota = ""
     @State private var enviando = false
     @State private var error: String?
 
+    private var solicitado: Int { viatico.solicitadoCentavos }
     private var centavosRecorte: Int? { Dinero.parsearCentavos(recorte) }
 
     private var errorRecorte: String? {
-        guard !recorte.isEmpty else { return nil }
+        guard !recorte.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         guard let centavosRecorte, centavosRecorte > 0 else {
             return "Captura un importe mayor que cero"
         }
-        if centavosRecorte > viatico.solicitadoCentavos {
-            return "No puedes autorizar más de \(Dinero.pesos(viatico.solicitadoCentavos)). "
+        if centavosRecorte > solicitado {
+            return "No puedes autorizar más de \(Dinero.pesos(solicitado)). "
                 + "Si hace falta más, que levante otro viático por la diferencia."
         }
         return nil
     }
 
     private var tituloBoton: String {
-        if !recorte.isEmpty, errorRecorte == nil, let centavosRecorte {
+        if !recorte.trimmingCharacters(in: .whitespaces).isEmpty, errorRecorte == nil, let centavosRecorte {
             return "Autorizar \(Dinero.pesos(centavosRecorte))"
         }
-        return "Autorizar \(Dinero.pesos(viatico.solicitadoCentavos))"
+        return "Autorizar \(Dinero.pesos(solicitado))"
+    }
+
+    private var titulo: String {
+        let nombre = (viatico.usuario?.nombre ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return nombre.isEmpty
+            ? "Pide \(Dinero.pesos(solicitado))"
+            : "\(nombre) pide \(Dinero.pesos(solicitado))"
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(
-                            (viatico.usuario?.nombre).flatMap { $0.isEmpty ? nil : $0 }
-                                .map { "\($0) pide \(Dinero.pesos(viatico.solicitadoCentavos))" }
-                                ?? "Pide \(Dinero.pesos(viatico.solicitadoCentavos))"
-                        )
-                        .font(.headline)
-                        if !viatico.motivo.isEmpty {
-                            Text(viatico.motivo).font(.subheadline).foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(titulo)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
+                    .accessibilityAddTraits(.isHeader)
+                let motivo = viatico.motivo.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !motivo.isEmpty {
+                    Text(motivo)
+                        .font(NxType.bodyMedium)
+                        .foregroundStyle(NxColors.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Section {
-                    CampoImporte(
-                        titulo: "Autorizar otra cantidad (opcional)",
-                        crudo: $recorte,
-                        ayuda: "Vacío autoriza los \(Dinero.pesos(viatico.solicitadoCentavos)) completos.",
-                        error: errorRecorte,
-                        habilitado: !enviando
-                    )
-                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                }
-
-                Section("Nota para quien lo pidió") {
-                    TextField("Opcional", text: $nota, axis: .vertical)
-                        .lineLimit(2...4)
-                        .disabled(enviando)
-                }
+                CampoImporte(
+                    titulo: "Autorizar otra cantidad (opcional)",
+                    crudo: $recorte,
+                    ayuda: "Vacío autoriza los \(Dinero.pesos(solicitado)) completos.",
+                    error: errorRecorte,
+                    habilitado: !enviando
+                )
+                CampoDelineado(
+                    etiqueta: "Nota para quien lo pidió",
+                    texto: $nota,
+                    multilinea: true,
+                    minLineas: 2,
+                    habilitado: !enviando
+                )
 
                 if let error {
-                    Section {
-                        NxAlertBanner(alert: NxAlert(id: "decision", title: error, tone: .danger))
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
-                    }
+                    NxErrorBlock(message: error)
                 }
 
-                Section {
-                    Button {
-                        resolver(aprobar: true)
-                    } label: {
-                        if enviando {
-                            ProgressView().frame(maxWidth: .infinity, minHeight: 44)
-                        } else {
-                            Text(tituloBoton)
-                                .font(.body.weight(.bold))
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
+                Button {
+                    resolver(aprobar: true)
+                } label: {
+                    if enviando {
+                        SpinnerDeBoton()
+                    } else {
+                        Text(tituloBoton).fontWeight(.bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(NxTone.success.fg)
-                    .disabled(enviando || errorRecorte != nil)
+                }
+                .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.success), alto: 56, llenaAncho: true))
+                .disabled(enviando || errorRecorte != nil)
 
-                    Button(role: .destructive) {
-                        resolver(aprobar: false)
-                    } label: {
-                        Text("Rechazar").frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(enviando)
-                } footer: {
-                    Text("Autorizar y rechazar necesitan señal: no se guardan en la cola.")
+                Button("Rechazar") {
+                    resolver(aprobar: false)
                 }
+                .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.danger), alto: viaticoAlturaToque, llenaAncho: true))
+                .disabled(enviando)
             }
-            .navigationTitle("Resolver viático")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }.disabled(enviando)
-                }
-            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 28)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .interactiveDismissDisabled(enviando)
+        .hojaMaterial(detents: [.large])
     }
 
     private func resolver(aprobar: Bool) {
+        guard !enviando else { return }
         enviando = true
         error = nil
         Task {
@@ -583,7 +612,7 @@ struct HojaDecisionViatico: View {
                 if aprobar {
                     try await ViaticosRepository.shared.aprobar(
                         id: viatico.id,
-                        centavosAprobados: recorte.isEmpty ? nil : centavosRecorte,
+                        centavosAprobados: recorte.trimmingCharacters(in: .whitespaces).isEmpty ? nil : centavosRecorte,
                         nota: nota
                     )
                 } else {
@@ -591,10 +620,9 @@ struct HojaDecisionViatico: View {
                 }
                 enviando = false
                 onResuelto(aprobar ? "Viático autorizado" : "Viático rechazado")
-                dismiss()
             } catch {
                 enviando = false
-                self.error = error.toUserMessage()
+                self.error = error.toUserMessage(fallback: aprobar ? "No se pudo autorizar" : "No se pudo rechazar")
             }
         }
     }

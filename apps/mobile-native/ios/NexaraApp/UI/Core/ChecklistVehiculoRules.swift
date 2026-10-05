@@ -107,13 +107,24 @@ enum NivelCombustible: String, CaseIterable, Identifiable, Hashable {
 
 // MARK: - Validación
 
-/// Un error del check list: el campo que lo provoca y lo que se le dice a quien
-/// está parado junto al coche (`ErrorChecklist` del API).
-struct ErrorChecklist: Identifiable, Hashable {
-    let campo: String
-    let mensaje: String
+/// Lo que falta del check list, ya en español (Android
+/// `ChecklistVehiculoRules.Validacion`).
+struct ValidacionChecklist: Equatable {
+    /// Etiquetas de las casillas sin foto (o con una foto que ya no es de ahora).
+    var faltantes: [String] = []
+    /// Km y combustible: lo que hay que corregir.
+    var errores: [String] = []
 
-    var id: String { "\(campo)|\(mensaje)" }
+    var ok: Bool { faltantes.isEmpty && errores.isEmpty }
+
+    /// Una sola línea con todo; `nil` si todo está bien.
+    var mensaje: String? {
+        guard !ok else { return nil }
+        var partes: [String] = []
+        if !faltantes.isEmpty { partes.append("Faltan fotos: \(faltantes.joined(separator: ", "))") }
+        partes.append(contentsOf: errores)
+        return partes.joined(separator: ". ")
+    }
 }
 
 enum ChecklistVehiculoRules {
@@ -126,76 +137,88 @@ enum ChecklistVehiculoRules {
     /// Paso 1 del flujo: habitáculo y cajuela.
     static let interior: [SlotChecklist] = [.interiorDelantera, .interiorTrasera]
 
+    /// Paso 1 completo (Android `SLOTS_FOTOS`): 4 exterior + 2 interior.
+    static let fotos: [SlotChecklist] = exterior + interior
+
     /// Paso 2: el tablero va solo, con el kilometraje y la gasolina.
     static let tablero: SlotChecklist = .tablero
 
-    /// Margen para aceptar una captura como «en vivo» (`VENTANA_CAPTURA_HORAS`).
+    /// Margen para aceptar una captura como «en vivo» (`VENTANA_CAPTURA_HORAS`
+    /// del API): una foto más vieja la rechaza el servidor, así que aquí cuenta
+    /// como faltante.
     static let ventanaCapturaHoras: Double = 12
 
-    /// Los slots que todavía no tienen foto.
-    static func faltantes(capturas: [SlotChecklist: Date]) -> [SlotChecklist] {
-        slots.filter { capturas[$0] == nil }
+    /// «Faltan fotos: Frente, Trasera» de unas casillas; `nil` si están todas.
+    static func faltaEn(_ casillas: [SlotChecklist], capturas: [SlotChecklist: Date]) -> String? {
+        let faltan = casillas.filter { capturas[$0] == nil }.map(\.label)
+        return faltan.isEmpty ? nil : "Faltan fotos: \(faltan.joined(separator: ", "))"
     }
 
-    /// Todos los errores juntos, en el mismo orden que `revisarChecklist`: que
-    /// nadie descubra el segundo error después de arreglar el primero.
-    /// Vacío == se puede enviar.
+    /// Mismas reglas y mismas palabras que Android (`validar`).
     ///
     /// - Parameters:
-    ///   - capturas: slot → instante en que la cámara tomó la foto
-    ///     (`CapturedGeoPhoto.capturedAt`). Sin entrada == sin foto.
-    ///   - odometroKm: lo tecleado en el paso de kilometraje; `nil` si está vacío.
-    ///   - combustible: nivel marcado en el selector; `nil` si no se ha tocado.
-    ///   - odometroInicio: en la devolución, el kilometraje con el que salió.
+    ///   - capturas: slot → instante en que la cámara tomó la foto. Sin entrada == sin foto.
+    ///   - odometroKm: lo tecleado; `nil` si está vacío o no es número.
+    ///   - combustible: nivel marcado; `nil` si no se ha tocado.
+    ///   - kmInicio: en la devolución, el km con el que salió (piso del km final).
     ///   - ahora: inyectable para no depender del reloj real.
     static func validar(
         capturas: [SlotChecklist: Date],
         odometroKm: Int?,
         combustible: NivelCombustible?,
-        odometroInicio: Int? = nil,
+        kmInicio: Int? = nil,
         ahora: Date = Date()
-    ) -> [ErrorChecklist] {
-        var errores: [ErrorChecklist] = []
-
-        for slot in slots {
-            guard let capturedAt = capturas[slot] else {
-                errores.append(ErrorChecklist(campo: slot.field, mensaje: "Falta la foto: \(slot.label)"))
-                continue
-            }
-            let edadHoras = ahora.timeIntervalSince(capturedAt) / 3600
-            if edadHoras > ventanaCapturaHoras {
-                errores.append(ErrorChecklist(
-                    campo: slot.field,
-                    mensaje: "\(slot.label): la foto no es de ahora, vuelve a tomarla"
-                ))
-            }
+    ) -> ValidacionChecklist {
+        let faltantes = slots.filter { slot in
+            guard let capturedAt = capturas[slot] else { return true }
+            return ahora.timeIntervalSince(capturedAt) / 3600 > ventanaCapturaHoras
         }
+        .map(\.label)
 
-        if let odometroKm {
-            if odometroKm < 0 {
-                errores.append(ErrorChecklist(campo: "odometroKm", mensaje: "Captura el kilometraje del tablero"))
-            } else if let odometroInicio, odometroKm < odometroInicio {
-                errores.append(ErrorChecklist(
-                    campo: "odometroKm",
-                    mensaje: "El kilometraje final no puede ser menor al inicial (\(odometroInicio) km)"
-                ))
+        var errores: [String] = []
+        if let km = odometroKm {
+            if km < 0 {
+                errores.append("El kilometraje no puede ser negativo")
+            } else if let kmInicio, km < kmInicio {
+                errores.append("El kilometraje final (\(km)) no puede ser menor al de salida (\(kmInicio))")
             }
         } else {
-            errores.append(ErrorChecklist(campo: "odometroKm", mensaje: "Captura el kilometraje del tablero"))
+            errores.append("Escribe el kilometraje")
         }
-
         if combustible == nil {
-            errores.append(ErrorChecklist(
-                campo: "combustible",
-                mensaje: "Marca el nivel de gasolina (E, ¼, ½, ¾, F)"
-            ))
+            errores.append("Elige el nivel de combustible")
         }
-
-        return errores
+        return ValidacionChecklist(faltantes: faltantes, errores: errores)
     }
 
-    /// Un solo renglón con todo lo que falta (`mensajeErrores` del API).
-    static func mensaje(_ errores: [ErrorChecklist]) -> String {
-        errores.map(\.mensaje).joined(separator: ". ")
+    /// La misma validación, renglón por renglón, para las pantallas que pintan
+    /// una lista (`ChecklistVehiculoView`).
+    static func validar(
+        capturas: [SlotChecklist: Date],
+        odometroKm: Int?,
+        combustible: NivelCombustible?,
+        odometroInicio: Int?,
+        ahora: Date = Date()
+    ) -> [ErrorChecklist] {
+        let v: ValidacionChecklist = validar(
+            capturas: capturas,
+            odometroKm: odometroKm,
+            combustible: combustible,
+            kmInicio: odometroInicio,
+            ahora: ahora
+        )
+        var lista: [ErrorChecklist] = []
+        if !v.faltantes.isEmpty {
+            lista.append(ErrorChecklist(campo: "fotos", mensaje: "Faltan fotos: \(v.faltantes.joined(separator: ", "))"))
+        }
+        lista.append(contentsOf: v.errores.map { ErrorChecklist(campo: "datos", mensaje: $0) })
+        return lista
     }
+}
+
+/// Un renglón de `ValidacionChecklist`, identificable para `ForEach`.
+struct ErrorChecklist: Identifiable, Hashable {
+    let campo: String
+    let mensaje: String
+    var id: String { "\(campo)|\(mensaje)" }
 }
