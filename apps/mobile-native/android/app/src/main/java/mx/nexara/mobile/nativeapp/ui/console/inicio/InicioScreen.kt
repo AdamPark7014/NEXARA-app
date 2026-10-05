@@ -837,7 +837,8 @@ private fun SiguientesCard(items: List<MyActivityItemDto>, onOpen: (MyActivityIt
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Column(Modifier.width(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                // 58: con 48 «Esta semana» y «Puede esperar» salían cortadas («Esta sem…»).
+                Column(Modifier.width(58.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         InicioRules.horaDe(a.fechaInicio) ?: "—",
                         fontSize = 15.sp,

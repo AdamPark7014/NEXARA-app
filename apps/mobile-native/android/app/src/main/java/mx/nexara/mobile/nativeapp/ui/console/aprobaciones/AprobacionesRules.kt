@@ -114,7 +114,10 @@ object AprobacionesRules {
     fun etiquetaTipo(tipo: String?): String {
         val crudo = tipo?.trim().orEmpty()
         if (crudo.isEmpty()) return "Solicitud"
-        ETIQUETA_ENTIDAD[crudo.uppercase(ESPANOL)]?.let { return it }
+        // El flujo de autorización por monto llega como `COTIZACION_MONTO` (`tipoBase` del API):
+        // sin quitar el sufijo salía «Cotizacion_monto» en la tarjeta.
+        val clave = crudo.uppercase(ESPANOL).removeSuffix("_MONTO")
+        ETIQUETA_ENTIDAD[clave]?.let { return it }
         return crudo.lowercase(ESPANOL).replaceFirstChar { it.uppercase() }
     }
 

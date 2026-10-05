@@ -212,6 +212,8 @@ class AprobacionesRulesTest {
         assertEquals("Viático", AprobacionesRules.etiquetaTipo("viatic"))
         assertEquals("Orden de compra", AprobacionesRules.etiquetaTipo("PURCHASE_ORDER"))
         assertEquals("Cotización", AprobacionesRules.etiquetaTipo("COTIZACION"))
+        // El flujo por monto llega como COTIZACION_MONTO: antes salía «Cotizacion_monto».
+        assertEquals("Cotización", AprobacionesRules.etiquetaTipo("COTIZACION_MONTO"))
         assertEquals("Solicitud", AprobacionesRules.etiquetaTipo(null))
         // Lo que no se conoce se capitaliza: feo, pero dice de qué se trata.
         assertEquals("Something_new", AprobacionesRules.etiquetaTipo("SOMETHING_NEW"))
