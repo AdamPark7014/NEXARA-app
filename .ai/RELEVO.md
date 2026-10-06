@@ -13,8 +13,14 @@
     `docs/store/ios-screenshots/`) en «iPhone con Dynamic Island (pantalla grande)» del Gestor de recursos
     multimedia (ASC nuevo: el «obligatorio» es la pantalla mediana pero se escala de la grande). «Pendiente de
     revisión» desde 18:07. Publicación manual tras aprobar (así estaba).
-  - **Control de nómina semanal** (pedido de Adam con sus dos Excel): especificación en `.ai/CONTROL-NOMINA-SPEC.md`;
-    dos agentes trabajando (API+Excel y web) — sin commitear todavía.
+  - **Control de nómina semanal** (pedido de Adam con sus dos Excel): especificación en `.ai/CONTROL-NOMINA-SPEC.md`.
+    **06-10:** hecho. API `employee-payments/control-semanal` (GET, `export.xlsx`, PATCH `dia`/`fila`, descuentos,
+    `cerrar`, `reabrir`) con la lógica pura en `control-nomina.ts`, servicio, Excel de 2 hojas idéntico a sus formatos
+    + «Cómo se calcula» (`control-nomina-excel.ts`), migración aditiva `20261005120000_control_nomina_semanal`
+    (4 tablas `nomina_*`), y el hueco de `preview-period`/`prenomina/batch` sin política de módulo cerrado. Web:
+    pestaña «Control semanal» en Pagos a empleados (`components/finance/ControlNominaSemanal.tsx`,
+    `lib/control-nomina*.ts`). Jest employee-payments 144 verde, vitest 39 verde, tsc API/web 0. Las sugerencias
+    de descuento por falta (id `sugerido-AAAA-MM-DD`) no se «descartan» (no existen en el servidor): solo se aceptan.
 
 - **05-10 ~15:10 (cursor) — Pizarra: «Libre» dura 15 min y luego «Sin nada asignado».** Pedido de Adam con
   captura de core.nexara.com.mx/erp/pizarra (Luis Joel «Libre · Terminó 12:00» a las 14:40). En

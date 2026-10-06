@@ -101,6 +101,17 @@ export const VISTA_PREVIA_COTIZACION_URL_RULE: UrlRule = {
 };
 
 /**
+ * Control de nómina semanal: ajustar el lugar de un día, la nota o el sueldo (PATCH), quitar un
+ * descuento (DELETE), cerrar y reabrir (POST). Solo abre el camino: el controlador vuelve a
+ * exigir CONTABILIDAD_MANAGE y la política del módulo «Pagos a personal» de la empresa.
+ */
+export const CONTROL_NOMINA_URL_RULE: UrlRule = {
+  path: '/api/employee-payments/control-semanal/**',
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  scope: 'write',
+};
+
+/**
  * Proyectos en Core (`/erp/proyectos`): mismo público que las cotizaciones de Core.
  *
  * Las páginas van aquí para que `/me/navigation` no recorte el módulo del menú. La escritura en
@@ -1090,6 +1101,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/pac/readiness', methods: ['GET'], scope: 'read' },
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
+    CONTROL_NOMINA_URL_RULE,
     { path: '/api/employee-payments/**', methods: ['GET', 'POST'], scope: 'write' },
     { path: '/api/overtime-approvals/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     ...CLIENT_ADMIN_WRITE_URL_RULES,

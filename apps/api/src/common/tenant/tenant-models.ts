@@ -122,6 +122,11 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'ActivityWorkSession',
   // Guardias de fin de semana (migración 20261003010000_guardias).
   'Guardia',
+  // Control de nómina semanal (migración 20261005120000_control_nomina_semanal).
+  'NominaSemana',
+  'NominaSemanaDia',
+  'NominaSemanaFila',
+  'NominaDescuento',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */
