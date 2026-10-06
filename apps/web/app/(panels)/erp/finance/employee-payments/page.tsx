@@ -2,6 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
@@ -42,6 +43,18 @@ import {
   draftGateConfirmCopy,
   needsDraftApprovalConfirm,
 } from "@/lib/prenomina-draft-gate";
+
+/** El control semanal es pesado (dos tablas anchas, menús, panel lateral): se carga al abrir su pestaña. */
+const ControlNominaSemanal = dynamic(() => import("@/components/finance/ControlNominaSemanal"), {
+  ssr: false,
+  loading: () => (
+    <div role="status" aria-live="polite" style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+      Cargando el control semanal…
+    </div>
+  ),
+});
+
+type PaymentsTab = "lista" | "analytics" | "sugerencia" | "control";
 
 type PaymentStatus = "Borrador" | "Pagado" | "Anulado";
 
@@ -335,7 +348,7 @@ function EmployeePaymentsContent() {
   const [error, setError] = useState<string | null>(null);
   /** Fallo de una acción de fila: sobrevive al diálogo que lo provocó. */
   const [actionError, setActionError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"lista" | "analytics" | "sugerencia">("lista");
+  const [tab, setTab] = useState<PaymentsTab>("lista");
   const [searchQ, setSearchQ] = useState("");
   const deferredQ = useDeferredValue(searchQ);
   const [filterUser, setFilterUser] = useState("");
@@ -934,11 +947,19 @@ function EmployeePaymentsContent() {
           { id: "lista", label: "Lista" },
           { id: "analytics", label: "Análisis" },
           { id: "sugerencia", label: "Sugerencia de nómina" },
+          { id: "control", label: "Control semanal" },
         ]}
         activeTab={tab}
-        onTabChange={(id) => setTab(id as "lista" | "analytics" | "sugerencia")}
+        onTabChange={(id) => setTab(id as PaymentsTab)}
       >
-        {tab === "sugerencia" ? (
+        {tab === "control" ? (
+          <ControlNominaSemanal
+            token={token}
+            canEdit={cfg.canEdit}
+            onVerPagos={() => setTab("lista")}
+            onPagosGenerados={() => void load()}
+          />
+        ) : tab === "sugerencia" ? (
           <SugerenciaNomina token={token} />
         ) : tab === "analytics" ? (
           <div style={{ display: "grid", gap: 16 }}>

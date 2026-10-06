@@ -189,12 +189,15 @@ export class EmployeePaymentsController {
     ],
   })
   @Get('preview-period')
-  previewPeriod(
+  async previewPeriod(
+    @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Query('from') from: string,
     @Query('to') to: string,
     @Query('userIds') userIds?: string,
   ) {
+    // Lleva sueldos y montos sugeridos: la misma política de módulo que el resto de Pagos.
+    await this.gate(user, companyId);
     if (!from || !to) throw new BadRequestException('from y to requeridos');
     const ids = userIds
       ? userIds
@@ -208,11 +211,13 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
   @Post('prenomina/batch')
-  createPrenominaBatch(
+  async createPrenominaBatch(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Body() body: { from?: string; to?: string; userIds?: number[] },
   ) {
+    // Crea pagos: si la empresa reservó «Pagos a personal», RH no los genera por esta puerta.
+    await this.gate(user, companyId);
     if (!body?.from || !body?.to) throw new BadRequestException('from y to requeridos');
     return this.service.createBorradorBatch(user, body.from, body.to, companyId, body.userIds);
   }

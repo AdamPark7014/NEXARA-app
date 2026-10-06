@@ -979,6 +979,16 @@ model User {
   guardias                Guardia[]             @relation("GuardiaUser")
   guardiasProgramadas     Guardia[]             @relation("GuardiaCreadaPor")
 
+  // === Control de nómina semanal ===
+  nominaSemanasCerradas   NominaSemana[]        @relation("NominaSemanaCerradaPor")
+  nominaSemanasReabiertas NominaSemana[]        @relation("NominaSemanaReabiertaPor")
+  nominaDias              NominaSemanaDia[]     @relation("NominaDiaUser")
+  nominaDiasAjustados     NominaSemanaDia[]     @relation("NominaDiaAjustadoPor")
+  nominaFilas             NominaSemanaFila[]    @relation("NominaFilaUser")
+  nominaFilasEditadas     NominaSemanaFila[]    @relation("NominaFilaActualizadoPor")
+  nominaDescuentos        NominaDescuento[]     @relation("NominaDescuentoUser")
+  nominaDescuentosCreados NominaDescuento[]     @relation("NominaDescuentoCreadoPor")
+
   // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
   checadasRechazadas    AttendanceRejection[] @relation("AttendanceRejectionUser")
   toolRequestsRecogidas ToolRequest[]         @relation("ToolRequestPickedUpBy")
@@ -6107,6 +6117,10 @@ model CompanyProfile {
   activityGeofenceAlerts  ActivityGeofenceAlert[]
   activityWorkSessions    ActivityWorkSession[]
   guardias                Guardia[]
+  nominaSemanas           NominaSemana[]
+  nominaSemanaDias        NominaSemanaDia[]
+  nominaSemanaFilas       NominaSemanaFila[]
+  nominaDescuentos        NominaDescuento[]
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   attendanceRejections        AttendanceRejection[]
@@ -6664,6 +6678,119 @@ model Guardia {
   @@unique([companyId, userId, fecha])
   @@index([companyId, fecha])
   @@map("guardias")
+}
+
+/// Control de nómina semanal (lunes → domingo): lo que antes se llenaba a mano en dos Excel
+/// («Control de entradas y salidas» y «Control de nómina»). Las horas, el lugar de cada día,
+/// los viáticos y las horas extra se calculan solos (`employee-payments/control-nomina.ts`);
+/// aquí solo se guarda lo que una persona decidió: ajustes de lugar, notas, descuentos y el
+/// cierre. Sin fila, la semana está en BORRADOR y se calcula al vuelo.
+model NominaSemana {
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  /// Lunes de la semana (día calendario en America/Mexico_City).
+  inicio          DateTime  @db.Date
+  /// Domingo de la semana.
+  fin             DateTime  @db.Date
+  /// BORRADOR | REVISADO | CERRADA. Cerrada no se edita: se reabre con motivo.
+  estado          String    @default("BORRADOR") @db.VarChar(20)
+  cerradaPorId    Int?
+  cerradaAt       DateTime?
+  reabiertaPorId  Int?
+  reabiertaAt     DateTime?
+  /// Por qué se reabrió (obligatorio al reabrir; queda el último).
+  reabiertaMotivo String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company      CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  cerradaPor   User?              @relation("NominaSemanaCerradaPor", fields: [cerradaPorId], references: [id], onDelete: SetNull)
+  reabiertaPor User?              @relation("NominaSemanaReabiertaPor", fields: [reabiertaPorId], references: [id], onDelete: SetNull)
+  dias         NominaSemanaDia[]
+  filas        NominaSemanaFila[]
+  descuentos   NominaDescuento[]
+
+  @@unique([companyId, inicio])
+  @@index([companyId])
+  @@map("nomina_semanas")
+}
+
+/// Lugar de un día corregido a mano («Oficina», «Foráneo», «Descanso»…). Sin fila, manda el
+/// lugar automático; borrar la fila es «volver a automático». Queda quién y cuándo.
+model NominaSemanaDia {
+  id            Int      @id @default(autoincrement())
+  semanaId      Int
+  companyId     Int
+  userId        Int
+  /// Día calendario (America/Mexico_City), dentro de la semana.
+  fecha         DateTime @db.Date
+  lugar         String   @db.VarChar(40)
+  nota          String?  @db.VarChar(300)
+  ajustadoPorId Int?
+  at            DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  semana      NominaSemana   @relation(fields: [semanaId], references: [id], onDelete: Cascade)
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user        User           @relation("NominaDiaUser", fields: [userId], references: [id])
+  ajustadoPor User?          @relation("NominaDiaAjustadoPor", fields: [ajustadoPorId], references: [id], onDelete: SetNull)
+
+  @@unique([semanaId, userId, fecha])
+  @@index([companyId])
+  @@map("nomina_semana_dias")
+}
+
+/// Lo propio de una persona en una semana: la nota de la fila (null = automática) y, al
+/// cerrar, la foto de lo que se pagó (`snapshot`) y el pago en Borrador que se generó.
+model NominaSemanaFila {
+  id               Int      @id @default(autoincrement())
+  semanaId         Int
+  companyId        Int
+  userId           Int
+  /// null = nota automática («* Toda la semana asignado a …»); '' = sin nota a propósito.
+  notaFila         String?  @db.VarChar(500)
+  /// La fila tal como se cerró (horas, lugares, montos). Una semana cerrada se lee de aquí.
+  snapshot         Json?
+  /// `EmployeePayment` en Borrador que generó el cierre.
+  pagoId           Int?
+  actualizadoPorId Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  semana         NominaSemana   @relation(fields: [semanaId], references: [id], onDelete: Cascade)
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user           User           @relation("NominaFilaUser", fields: [userId], references: [id])
+  actualizadoPor User?          @relation("NominaFilaActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@unique([semanaId, userId])
+  @@index([companyId])
+  @@map("nomina_semana_filas")
+}
+
+/// Descuento de una persona en una semana. Los manuales los escribe nómina; los sugeridos
+/// (falta injustificada) solo existen aquí cuando alguien los aceptó: nunca se aplican solos.
+model NominaDescuento {
+  id          Int       @id @default(autoincrement())
+  semanaId    Int
+  companyId   Int
+  userId      Int
+  concepto    String    @db.VarChar(200)
+  monto       Decimal   @db.Decimal(10, 2)
+  /// Vino de una sugerencia (falta injustificada) que alguien aceptó.
+  sugerido    Boolean   @default(false)
+  /// Día de la falta de un sugerido: evita aceptar dos veces la misma.
+  fecha       DateTime? @db.Date
+  creadoPorId Int?
+  createdAt   DateTime  @default(now())
+
+  semana    NominaSemana   @relation(fields: [semanaId], references: [id], onDelete: Cascade)
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user      User           @relation("NominaDescuentoUser", fields: [userId], references: [id])
+  creadoPor User?          @relation("NominaDescuentoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([semanaId, userId])
+  @@index([companyId])
+  @@map("nomina_descuentos")
 }
 
 /// Una cosa que hay que documentar en la actividad: «Cámara 1», «Rack», «Canalización».
