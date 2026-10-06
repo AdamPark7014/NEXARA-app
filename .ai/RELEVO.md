@@ -1,5 +1,21 @@
 # RELEVO
 
+- **05-10 ~18:10 (claude-code) — APPS PUBLICADAS (autorizado por Adam).**
+  - **Android 1.0.6 (16)** en revisión de Google para producción (lanzamiento completo) junto con **8 capturas
+    nuevas** de la ficha (diseño teal; `scripts/store-demo/enmarcar-capturas.py` ya usa el teal y titulares
+    nuevos; `generar-fixtures.py` con la checada demo a las 10:05). Capturas tomadas en el emulador `nexara_phone`
+    con la sesión de `play.review` (la inició Adam) + `files/store_demo/serve` + `checador` + un fixture extra
+    `me__activities.json` empujado por adb (no está en el generador: Inicio y Mis actividades salían vacíos).
+    OJO emulador: estaba en **UTC** (horas desfasadas 6 h) → `adb shell cmd alarm set-timezone America/Mexico_City`.
+    Al terminar se borró `files/store_demo`.
+  - **iOS 1.0 con build 1.0.0 (9)** (TestFlight por `ios-testflight.yml`, también en el grupo «Equipo NEXARA»):
+    se quitó el 8 de revisión, se puso el 9 y **10 capturas nuevas** (las de `ios-screenshots.yml` modo tienda,
+    `docs/store/ios-screenshots/`) en «iPhone con Dynamic Island (pantalla grande)» del Gestor de recursos
+    multimedia (ASC nuevo: el «obligatorio» es la pantalla mediana pero se escala de la grande). «Pendiente de
+    revisión» desde 18:07. Publicación manual tras aprobar (así estaba).
+  - **Control de nómina semanal** (pedido de Adam con sus dos Excel): especificación en `.ai/CONTROL-NOMINA-SPEC.md`;
+    dos agentes trabajando (API+Excel y web) — sin commitear todavía.
+
 - **05-10 ~15:10 (cursor) — Pizarra: «Libre» dura 15 min y luego «Sin nada asignado».** Pedido de Adam con
   captura de core.nexara.com.mx/erp/pizarra (Luis Joel «Libre · Terminó 12:00» a las 14:40). En
   `apps/api/src/me/team-board.service.ts` (`LIBRE_TRAS_TERMINAR_MS = 15 min`): si lo último que terminó fue hace

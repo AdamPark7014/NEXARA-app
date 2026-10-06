@@ -1,4 +1,4 @@
-"""Capturas de Google Play con marco: fondo azul NEXARA, titular y la pantalla en un teléfono.
+"""Capturas de Google Play con marco: fondo teal NEXARA, titular y la pantalla en un teléfono.
 
 Entrada: capturas crudas del emulador (1080x1920) tomadas con datos ficticios
 (ver `generar-fixtures.py`). Salida: PNG 1080x1920 (9:16) listos para la ficha.
@@ -15,10 +15,11 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ANCHO, ALTO = 1080, 1920
-AZUL_OSCURO = (30, 64, 175)
-AZUL = (37, 99, 235)
+# Teal de la marca (rediseño v2): #0F5F4F → #1F9E84, como la barra de las apps.
+AZUL_OSCURO = (15, 95, 79)
+AZUL = (31, 158, 132)
 TEXTO = (255, 255, 255)
-SUBTEXTO = (219, 234, 254)
+SUBTEXTO = (207, 236, 228)
 BISEL = (15, 23, 42)
 
 FUENTE_TITULO = "C:/Windows/Fonts/segoeuib.ttf"
@@ -26,14 +27,14 @@ FUENTE_SUBTITULO = "C:/Windows/Fonts/segoeui.ttf"
 
 # (archivo crudo, titular, bajada) en el orden en que salen en la tienda.
 CAPTURAS = [
-    ("s1.png", "Tu equipo en tiempo real", "Quién está activo, atrasado o ya terminó"),
-    ("s3.png", "Asistencia con foto y GPS", "Entradas y salidas del equipo al momento"),
-    ("s5.png", "Coordina el trabajo en campo", "Chat del equipo con reacciones y menciones"),
-    ("s2.png", "El día de cada persona", "Entrada, tiempo en sitio y actividad en curso"),
-    ("s7.png", "Avisos que importan", "Entradas, avances y revisiones al instante"),
-    ("s4.png", "Canales y mensajes directos", "Todo el equipo conectado en un solo lugar"),
-    ("s6.png", "Clientes por sector", "Proyecto, corporativos y comerciales"),
-    ("s8.png", "Alertas si alguien sale de zona", "A más de 100 m del inicio llega el aviso y su motivo"),
+    ("s1.png", "Tu día en una sola pantalla", "Checa tu entrada y sigue la actividad en curso"),
+    ("s3.png", "Tu equipo en tiempo real", "Quién está activo, atrasado o ya terminó"),
+    ("s2.png", "Sabes por dónde empezar", "Tu cola ordenada por prioridad y fecha"),
+    ("s4.png", "Asistencia con foto y GPS", "Entradas y salidas del equipo al momento"),
+    ("s6.png", "Coordina el trabajo en campo", "Chat del equipo con reacciones y menciones"),
+    ("s5.png", "Canales y mensajes directos", "Todo el equipo conectado en un solo lugar"),
+    ("s8.png", "Avisos que importan", "Entradas, avances y revisiones al instante"),
+    ("s7.png", "Toda la operación a la mano", "Cotizaciones, proyectos, almacén y más"),
 ]
 
 
