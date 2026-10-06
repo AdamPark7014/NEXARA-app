@@ -268,7 +268,7 @@ def generar(ahora: datetime) -> dict[str, object]:
         aviso(9103, "SLA_BREACH", "activities", "Javier va atrasado",
               "Cableado estructurado · Bodega Norte pasó su hora máxima hace 45 min.", h(0, 45), False, 904),
         aviso(9104, "ATTENDANCE_CHECKIN", "attendance", "Sofía entró a trabajar",
-              "Checó entrada con foto y ubicación a las 8:15 a. m.", h(2, 30), False, 905, url="/erp/asistencias"),
+              "Checó entrada con foto y ubicación a las 10:05 a. m.", h(2, 30), False, 905, url="/erp/asistencias"),
         aviso(9105, "ACTIVITY_STATUS_CHANGED", "activities", "Diego inició una actividad",
               "Mantenimiento preventivo CCTV · Hotel Casa Azul.", h(1, 35), True, 902),
         aviso(9106, "ATTENDANCE_CHECKIN", "attendance", "Mariana entró a trabajar",

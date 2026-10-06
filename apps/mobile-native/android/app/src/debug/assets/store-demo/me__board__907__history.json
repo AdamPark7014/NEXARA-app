@@ -7,8 +7,8 @@
   "coreKind": "servicio",
   "ticketTypeCustom": null,
   "assignmentCharge": "ejecucion",
-  "fechaAsignacion": "2026-09-16T04:17:24.000Z",
-  "fechaFinalizacion": "2026-09-17T05:02:24.000Z",
+  "fechaAsignacion": "2026-10-04T17:30:00.000Z",
+  "fechaFinalizacion": "2026-10-05T18:15:00.000Z",
   "evidence": {
    "status": "COMPLETED",
    "progressPct": 100,
@@ -27,8 +27,8 @@
   "coreKind": "servicio",
   "ticketTypeCustom": null,
   "assignmentCharge": "ejecucion",
-  "fechaAsignacion": "2026-09-14T04:17:24.000Z",
-  "fechaFinalizacion": "2026-09-15T04:17:24.000Z",
+  "fechaAsignacion": "2026-10-02T17:30:00.000Z",
+  "fechaFinalizacion": "2026-10-03T17:30:00.000Z",
   "evidence": {
    "status": "COMPLETED",
    "progressPct": 100,

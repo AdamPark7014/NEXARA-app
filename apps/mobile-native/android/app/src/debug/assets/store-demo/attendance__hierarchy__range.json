@@ -1,6 +1,6 @@
 {
- "rangeStart": "2026-09-17",
- "rangeEnd": "2026-09-18",
+ "rangeStart": "2026-10-05",
+ "rangeEnd": "2026-10-06",
  "totalUsers": 8,
  "totalMinutesAll": 1315,
  "avgMinutesPerUser": 0,
@@ -14,7 +14,7 @@
    "totalMinutes": 182,
    "days": [
     {
-     "date": "2026-09-17",
+     "date": "2026-10-05",
      "totalMinutes": 182,
      "isOpen": true
     }
@@ -22,7 +22,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T03:15:24.000Z",
+     "timestamp": "2026-10-05T16:28:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -39,7 +39,7 @@
    "totalMinutes": 168,
    "days": [
     {
-     "date": "2026-09-17",
+     "date": "2026-10-05",
      "totalMinutes": 168,
      "isOpen": true
     }
@@ -47,7 +47,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T03:29:24.000Z",
+     "timestamp": "2026-10-05T16:42:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -64,7 +64,7 @@
    "totalMinutes": 195,
    "days": [
     {
-     "date": "2026-09-17",
+     "date": "2026-10-05",
      "totalMinutes": 195,
      "isOpen": true
     }
@@ -72,7 +72,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T03:02:24.000Z",
+     "timestamp": "2026-10-05T16:15:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -89,7 +89,7 @@
    "totalMinutes": 245,
    "days": [
     {
-     "date": "2026-09-17",
+     "date": "2026-10-05",
      "totalMinutes": 245,
      "isOpen": true
     }
@@ -97,7 +97,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T02:12:24.000Z",
+     "timestamp": "2026-10-05T15:25:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -114,7 +114,7 @@
    "totalMinutes": 150,
    "days": [
     {
-     "date": "2026-09-17",
+     "date": "2026-10-05",
      "totalMinutes": 150,
      "isOpen": true
     }
@@ -122,7 +122,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T03:47:24.000Z",
+     "timestamp": "2026-10-05T17:00:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -149,7 +149,7 @@
    "totalMinutes": 200,
    "days": [
     {
-     "date": "2026-09-17",
+     "date": "2026-10-05",
      "totalMinutes": 200,
      "isOpen": false
     }
@@ -157,7 +157,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T02:37:24.000Z",
+     "timestamp": "2026-10-05T15:50:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -165,7 +165,7 @@
     },
     {
      "type": "salida",
-     "timestamp": "2026-09-17T05:57:24.000Z",
+     "timestamp": "2026-10-05T19:10:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "exitLatitude": 19.0431,
@@ -182,7 +182,7 @@
    "totalMinutes": 175,
    "days": [
     {
-     "date": "2026-09-17",
+     "date": "2026-10-05",
      "totalMinutes": 175,
      "isOpen": true
     }
@@ -190,7 +190,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T03:22:24.000Z",
+     "timestamp": "2026-10-05T16:35:00.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,

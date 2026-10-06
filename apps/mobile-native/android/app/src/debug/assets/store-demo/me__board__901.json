@@ -10,7 +10,7 @@
   "anNumber": null,
   "titulo": "Instalación de 8 cámaras IP · Corporativo Atlixco",
   "estatus": "En Proceso",
-  "fechaMaxima": "2026-09-17T09:17:24.000Z",
+  "fechaMaxima": "2026-10-05T22:30:00.000Z",
   "bucket": "projects"
  },
  "openActivities": [
@@ -29,12 +29,12 @@
     "mariana.lopez@demo.nexara.mx"
    ],
    "reparte": false,
-   "fechaInicio": "2026-09-17T04:07:24.000Z"
+   "fechaInicio": "2026-10-05T17:20:00.000Z"
   }
  ],
- "clockInAt": "2026-09-17T03:15:24.000Z",
+ "clockInAt": "2026-10-05T16:28:00.000Z",
  "workedMinutes": 182,
- "activityStartedAt": "2026-09-17T04:07:24.000Z",
+ "activityStartedAt": "2026-10-05T17:20:00.000Z",
  "activityElapsedMinutes": 130,
  "currentLateMinutes": null,
  "idleSinceAt": null,
