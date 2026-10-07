@@ -1,5 +1,17 @@
 # RELEVO
 
+- **07-10 ~15:15 (claude-code) — KPIs v3: días perdidos y carga MULTIPLICAN el cumplimiento.**
+  - Adam: «debe bajar mucho su rendimiento en un día si no lo trabajaron y no está justificado» y «prioriza mucho
+    carga de trabajo en relación con horas que estuvieron en la oficina; si es muy bajo deberían bajar mucho».
+  - `me/kpis-equipo.ts`: `DiasDeTrabajoKpi` (esperados = laborables terminados —o hoy pasada su salida/18:00— desde su
+    ingreso y sin justificar; trabajado = ≥ `MIN_TRABAJO_DIA_MIN` 30 min con actividad o una entrega ese día; perdido =
+    sin checar o checó sin trabajo). `DiaKpi` + `trabajado/sinTrabajo/noTrabajado`. Cumplimiento = promedio ponderado
+    (entregas 20, ritmo 20, tiempo 15, ocupación 15, asistencia 15, forma 10, uniforme 5) × días trabajados/esperados ×
+    min(1, carga% / `META_CARGA_PCT` 50). Sin trabajar ninguno → 0. `carga` y `dias` salen en `cumplimientoPartes` con
+    peso 0 («multiplica el total»); web/Android/iOS ya no pintan «pesa 0 %». Semáforo: 1 día perdido = rojo.
+  - Servicio: permisos/vacaciones APROBADOS (`leave_requests`) cuentan como justificados (`leerPermisos`).
+  - Web ranking: «carga N %» en la fila y avisos «N días sin trabajar» / «Carga N %» primero.
+
 - **07-10 ~13:00 (claude-code) — adjuntos en actividades comerciales + guardar/compartir PDFs en las apps.**
   - Adam: «que en actividades de tipo comercial se pueda adjuntar un archivo (evidencias en Excel, Word o PDF) y se vea
     embebido… en la iOS intento descargar o enviar por WhatsApp las cotizaciones y se queda trabado».

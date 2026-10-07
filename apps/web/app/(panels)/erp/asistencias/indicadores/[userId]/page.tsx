@@ -184,7 +184,8 @@ export default function KpisPersonaPage() {
                       <span className={s.barraProductiva} style={{ width: `${Math.max(0, Math.min(100, p.pct))}%` }} />
                     </span>
                     <span className={st.parteDetalle}>
-                      {p.detalle} · pesa {p.peso} %
+                      {p.detalle}
+                      {p.peso > 0 ? ` · pesa ${p.peso} %` : ""}
                     </span>
                   </li>
                 ))}

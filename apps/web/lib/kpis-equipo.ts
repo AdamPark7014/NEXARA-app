@@ -82,6 +82,15 @@ export type TotalesKpi = {
   carga?: ProporcionKpi;
   /** Tiempo con una actividad (cada una hasta su tiempo máximo) contra las horas trabajadas. */
   ocupacion?: ProporcionKpi;
+  /** Días que debía trabajar y cuántos trabajó (multiplica el cumplimiento). */
+  diasDeTrabajo?: {
+    esperados: number;
+    trabajados: number;
+    sinChecar: number;
+    sinTrabajo: number;
+    sinTrabajar: number;
+    pct: number | null;
+  };
   /**
    * Cumplimiento en tiempo y forma (0–100): promedio ponderado de sus partes
    * (`cumplimientoPartes`, cada una con su peso; lo que no tiene dato no pesa).

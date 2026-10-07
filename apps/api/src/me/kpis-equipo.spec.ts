@@ -720,22 +720,24 @@ describe('entregas: en tiempo y forma', () => {
       ocupacion: { minutos: 168, pct: 35 },
     };
     expect(Object.values(PESOS_CUMPLIMIENTO).reduce((a, b) => a + b, 0)).toBe(100);
-    // entregas ½·20 + forma 1·10 + tiempo ½·15 + ritmo (2 de 4)·20 + carga (50 % de 75)·10 +
-    // ocupación (35 % de 70)·10 + asistencia 1·10 = 59.2 de 95 → 62 %.
+    // entregas ½·20 + forma 1·10 + tiempo ½·15 + ritmo (2 de 4)·20 + ocupación (35 % de 70)·15 +
+    // asistencia 1·15 = 60 de 95 → 63 %; carga 50 % (la meta) no resta.
     const c = cumplimientoDe(base, 4);
-    expect(c.pct).toBe(62);
+    expect(c.pct).toBe(63);
     expect(c.partes.map((p) => [p.clave, p.pct, p.peso])).toEqual([
       ['entregas', 50, 20],
       ['forma', 100, 10],
       ['tiempo', 50, 15],
       ['ritmo', 50, 20],
-      ['carga', 67, 10],
-      ['ocupacion', 50, 10],
-      ['asistencia', 100, 10],
+      ['ocupacion', 50, 15],
+      ['asistencia', 100, 15],
+      ['carga', 100, 0],
     ]);
     expect(c.partes.find((p) => p.clave === 'ritmo')!.detalle).toBe('2 por día · el equipo va a 4');
     // Sin ritmo del equipo, el ritmo no se califica.
-    expect(cumplimientoDe(base, null).pct).toBe(66);
+    expect(cumplimientoDe(base, null).pct).toBe(67);
+    // Poca carga multiplica: 12.5 % de las horas con trabajo entregado = ¼ de la meta → ×0.25.
+    expect(cumplimientoDe({ ...base, carga: { minutos: 60, pct: 13 } }, 4).pct).toBe(16);
     // Sin entregas no hay cumplimiento, aunque haya llegado temprano.
     expect(cumplimientoDe({ ...base, entregas: resumenEntregas([]) }, 4).pct).toBeNull();
   });
@@ -766,9 +768,40 @@ describe('entregas: en tiempo y forma', () => {
     // …pero el ritmo, la carga y la ocupación los separan.
     const ref = referenciaDeRitmo([daniela, alejandro]);
     expect(ref).toBe(5);
-    expect(conReferencia(daniela, ref).cumplimientoPct).toBe(97);
-    expect(conReferencia(alejandro, ref).cumplimientoPct).toBe(62);
+    // Daniela: 5 h de trabajo entregado en 8 h (62 %, sobre la meta). Alejandro: 1 h en 8 h
+    // (12.5 % = ¼ de la meta) y su cumplimiento se multiplica por 0.25.
+    expect(conReferencia(daniela, ref).cumplimientoPct).toBe(98);
+    expect(conReferencia(alejandro, ref).cumplimientoPct).toBe(17);
     expect(alejandro.ritmo).toMatchObject({ entregadas: 1, dias: 1, porDia: 1 });
+  });
+
+  it('un día laborable perdido sin justificar multiplica todo; sin trabajar ninguno, 0', () => {
+    const dosDias = { desde: '2026-09-14', hasta: '2026-09-15' };
+    const conUnDia = calcula({
+      ...dosDias,
+      checadas: [entrada('14', '10:00'), salida('14', '18:00')],
+      actividades: [actividad(1, M('14', '10:00'), M('14', '17:00'))],
+      entregas: [{ activityId: 1, limite: finDelDia('14'), entregadaAt: M('14', '17:00'), minutosPlan: 300 }],
+    }).totales;
+    // El 15 no checó y no está justificado: 1 de 2 días.
+    expect(conUnDia.diasDeTrabajo).toMatchObject({ esperados: 2, trabajados: 1, sinChecar: 1, sinTrabajo: 0, pct: 50 });
+    // entregas 1·20 + ocupación (4 h de 8 = 50 % de 70)·15 + asistencia (1 de 2)·15 = 38.2 de 50 → 76 %, × ½ = 38 %.
+    expect(conUnDia.cumplimientoPct).toBe(38);
+    expect(conUnDia.cumplimientoPartes.find((p) => p.clave === 'dias')).toMatchObject({
+      pct: 50,
+      peso: 0,
+      detalle: '1 de 2 días (1 sin checar) · multiplica el total',
+    });
+    // Justificado, ese día no cuenta.
+    expect(calcula({ ...dosDias, checadas: [entrada('14', '10:00'), salida('14', '18:00')], actividades: [actividad(1, M('14', '10:00'), M('14', '17:00'))], justificadas: ['2026-09-15'] }).totales.diasDeTrabajo).toMatchObject({ esperados: 1, trabajados: 1 });
+    // Sin trabajar ninguno de los que debía: 0, aunque no tenga entregas que medir.
+    expect(calcula(dosDias).totales.cumplimientoPct).toBe(0);
+  });
+
+  it('checar y no hacer nada también es un día perdido', () => {
+    const t = calcula({ desde: '2026-09-15', hasta: '2026-09-15', checadas: [entrada('15', '10:00'), salida('15', '18:00')] }).totales;
+    expect(t.diasDeTrabajo).toMatchObject({ esperados: 1, trabajados: 0, sinChecar: 0, sinTrabajo: 1 });
+    expect(t.cumplimientoPct).toBe(0);
   });
 
   it('dejar el reloj prendido no vuelve ocupado a nadie: cada actividad cuenta hasta su máximo', () => {

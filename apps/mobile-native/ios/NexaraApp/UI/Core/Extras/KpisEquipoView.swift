@@ -431,7 +431,8 @@ enum KpisEquipoRules {
             var partes: [String] = []
             if let detalle = p.detalle.nilSiVacio { partes.append(detalle) }
             if let valor = p.pct, valor.isFinite { partes.append(pct(valor)) }
-            if let peso = p.peso, peso.isFinite { partes.append("pesa \(numeroCorto(peso)) %") }
+            // Peso 0 = multiplica el total (carga, días trabajados): su detalle ya lo dice.
+            if let peso = p.peso, peso.isFinite, peso > 0 { partes.append("pesa \(numeroCorto(peso)) %") }
             return Linea(etiqueta: etiqueta, valor: partes.isEmpty ? "—" : partes.joined(separator: " · "))
         }
     }
