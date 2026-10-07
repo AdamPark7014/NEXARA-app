@@ -157,7 +157,8 @@ struct ActividadesHomeView: View {
 // MARK: - Pizarra del equipo
 
 /// Android `TeamBoardContent`: rango y filtros en la MISMA fila, tira de cifras
-/// que también filtra, rejilla de personas y «Asignadas por mí».
+/// que también filtra, «Para atender hoy» (solo con «Hoy»), rejilla de personas y
+/// «Asignadas por mí».
 struct TeamBoardView: View {
     let users: [TeamBoardUser]
     let meId: Int?
@@ -233,6 +234,10 @@ struct TeamBoardView: View {
                     filtro = filtro == aro ? nil : aro
                 }
             )
+            // «Desde hace cuánto» es de hoy: con otros rangos el panel no aplica (web).
+            if rango == .hoy {
+                AtencionEquipoPanel(users: users, onOpenPerson: onOpenPerson)
+            }
             if visibles.isEmpty {
                 NxEmptyState(
                     title: "Nadie en «\(filtro?.etiqueta ?? "")»",
@@ -346,6 +351,189 @@ private struct AsignadaPorMiRow: View {
     }
 }
 
+// MARK: - Para atender hoy (web `AtencionEquipo`, Android `ParaAtenderHoy`)
+
+/// Debajo de la tira de cifras y solo con «Hoy»: a quién hay que ir a ver y por qué.
+/// Tres grupos que se apilan —atrasados con su actividad y el motivo, a quién dejaron
+/// sin nada asignado (desde cuándo y qué fue lo último que terminó) y quién no ha
+/// checado entrada—, cada uno en la misma superficie con filas que «Asignadas por mí»
+/// y con cinco renglones antes de «Ver N más». Un grupo vacío no se pinta; si nadie
+/// pide atención, la sección tampoco. Tocar un renglón abre a la persona.
+private struct AtencionEquipoPanel: View {
+    let users: [TeamBoardUser]
+    let onOpenPerson: (TeamBoardUser) -> Void
+
+    var body: some View {
+        let grupos = AtencionGrupoDatos.de(ActividadesEquipo.atencion(users))
+        if !grupos.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                NxDenseSectionHeader(title: "Para atender hoy")
+                ForEach(grupos) { grupo in
+                    AtencionGrupo(grupo: grupo, onOpenPerson: onOpenPerson)
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+}
+
+/// Un renglón del panel, ya dicho en palabras.
+private struct AtencionRenglon: Identifiable {
+    let persona: TeamBoardUser
+    let principal: String
+    /// nil = tinta normal.
+    var principalColor: Color? = nil
+    var secundaria: String? = nil
+    /// nil = el gris de siempre.
+    var secundariaColor: Color? = nil
+    /// Dato corto a la derecha del nombre («hace 2 días»).
+    var meta: String? = nil
+
+    var id: Int { persona.id }
+}
+
+/// Un grupo del panel: título, el color de su punto (nil = gris) y sus renglones.
+private struct AtencionGrupoDatos: Identifiable {
+    let clave: String
+    let titulo: String
+    let color: Color?
+    let renglones: [AtencionRenglon]
+
+    var id: String { clave }
+
+    /// Atrasados (lo suyo y el atraso en rojo), sin nada asignado (su jornada en ámbar
+    /// y lo último que terminó) y sin entrada hoy (lo último y hace cuánto). Los vacíos
+    /// no salen.
+    static func de(_ a: ActividadesEquipo.Atencion) -> [AtencionGrupoDatos] {
+        let atrasados = a.atrasados.map { x -> AtencionRenglon in
+            AtencionRenglon(
+                persona: x.persona,
+                principal: x.actividad.isEmpty ? "Actividad sin datos" : x.actividad,
+                secundaria: x.detalle,
+                secundariaColor: NxColors.rojo
+            )
+        }
+        let sinNada = a.sinNada.map { x -> AtencionRenglon in
+            if let jornada = x.jornada {
+                return AtencionRenglon(
+                    persona: x.persona,
+                    principal: jornada,
+                    principalColor: NxColors.naranja,
+                    secundaria: x.ultima
+                )
+            }
+            // API vieja: no se sabe desde cuándo; queda lo último que terminó.
+            return AtencionRenglon(persona: x.persona, principal: x.ultima)
+        }
+        let sinEntrada = a.sinEntrada.map { x -> AtencionRenglon in
+            AtencionRenglon(persona: x.persona, principal: x.ultima, meta: x.haceCuanto)
+        }
+        return [
+            AtencionGrupoDatos(clave: "atrasados", titulo: "Atrasados", color: NxColors.rojo, renglones: atrasados),
+            AtencionGrupoDatos(clave: "sin-nada", titulo: "Sin nada asignado", color: NxColors.naranja, renglones: sinNada),
+            AtencionGrupoDatos(clave: "sin-entrada", titulo: "Sin entrada hoy", color: nil, renglones: sinEntrada),
+        ].filter { !$0.renglones.isEmpty }
+    }
+}
+
+/// Un grupo: punto y palabra con cuántos son, sus renglones separados por una línea y
+/// «Ver N más» / «Ver menos».
+private struct AtencionGrupo: View {
+    let grupo: AtencionGrupoDatos
+    let onOpenPerson: (TeamBoardUser) -> Void
+
+    @State private var todos = false
+    private static let visibles = 5
+
+    private var forma: RoundedRectangle { RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous) }
+
+    var body: some View {
+        let vista = todos ? grupo.renglones : Array(grupo.renglones.prefix(Self.visibles))
+        let resto = grupo.renglones.count - Self.visibles
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 8) {
+                NxStatusDot(text: grupo.titulo, color: grupo.color, fontSize: 13, fontWeight: .bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("\(grupo.renglones.count)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(NxColors.muted)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            ForEach(vista) { renglon in
+                NxRowDivider()
+                Button { onOpenPerson(renglon.persona) } label: {
+                    AtencionFila(renglon: renglon)
+                }
+                .buttonStyle(.plain)
+            }
+            if resto > 0 {
+                NxRowDivider()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { todos.toggle() }
+                } label: {
+                    Text(todos ? "Ver menos" : "Ver \(resto) más")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(NxColors.brand)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(NxColors.card)
+        .clipShape(forma)
+        .overlay(forma.strokeBorder(NxColors.border, lineWidth: 1))
+    }
+}
+
+private struct AtencionFila: View {
+    let renglon: AtencionRenglon
+
+    var body: some View {
+        let p = renglon.persona
+        HStack(alignment: .top, spacing: 10) {
+            NxAvatar(nombre: p.nombre, url: p.avatarUrl, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(p.nombre.isEmpty ? "—" : p.nombre)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(NxColors.fg)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let meta = renglon.meta {
+                        Text(meta)
+                            .font(.system(size: 12))
+                            .foregroundStyle(NxColors.muted)
+                            .lineLimit(1)
+                    }
+                }
+                Text(renglon.principal)
+                    .font(.system(size: 12.5, weight: renglon.principalColor != nil ? .semibold : .regular))
+                    .foregroundStyle(renglon.principalColor ?? NxColors.fg)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if let secundaria = renglon.secundaria {
+                    Text(secundaria)
+                        .font(.system(size: 12, weight: renglon.secundariaColor != nil ? .semibold : .regular))
+                        .foregroundStyle(renglon.secundariaColor ?? NxColors.muted)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Abre el día de \(CoreFormat.shortName(p.nombre))")
+    }
+}
+
 /// Una persona en la pizarra: el aro de color dice el estado, y debajo se lee en
 /// dos renglones qué está haciendo y en qué situación está.
 private struct PersonBoardCard: View {
@@ -381,6 +569,13 @@ private struct PersonBoardCard: View {
                 .font(.system(size: 11))
                 .foregroundStyle(aro == .retraso ? aro.color : NxColors.muted)
                 .lineLimit(2)
+            // Sin nada abierto: folio y cuándo terminó lo último («Última: AN-0091 · ayer 18:11»).
+            if let ultima = ActividadesEquipo.ultimaEnTarjeta(user) {
+                Text(ultima)
+                    .font(.system(size: 11))
+                    .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
+            }
             // El avance de lo que trae entre manos: es dato, no adorno.
             if let pct = user.openActivities?.first?.progressPct {
                 ActBarraAvance(pct: pct)

@@ -9,12 +9,21 @@ extension DemoStore {
     static let dispatchedIds: Set<Int> = [5154]
 
     /// Minutos atrás (respecto a la entrada al demo) a los que entró cada compañero hoy.
+    /// Fernanda (103) no ha checado: hizo el soporte remoto sin entrada y sale en
+    /// «Sin entrada hoy» de la pizarra (07-10).
     static let clockInAgo: [Int: Int] = [
-        101: 190, 102: 175, 103: 195, 104: 240, 105: 150, 106: 170, 107: 200, 108: 160, 109: 185,
+        101: 190, 102: 175, 104: 240, 105: 150, 106: 170, 107: 200, 108: 160, 109: 185,
     ]
 
     /// Quién ya salió hoy y hace cuánto.
     static let clockOutAgo: [Int: Int] = [107: 20]
+
+    /// Como el API (`LIBRE_TRAS_TERMINAR_MS`): quien terminó hace 15 min o menos y no
+    /// tiene nada abierto está «libre»; pasado ese margen queda «sin nada asignado».
+    static let libreTrasTerminarMin = 15
+
+    /// Con cuánto atraso entregó cada quien lo último de días anteriores (lo demás, a tiempo).
+    static let atrasoUltimaPrevia: [Int: Int] = [106: 40]
 
     // MARK: Actividades: estado efectivo
 
@@ -245,14 +254,52 @@ extension DemoStore {
         return json
     }
 
+    /// Por qué va tarde (`currentLateReason` del API): no la ha iniciado y ya pasó su
+    /// hora, pasó su límite o pasó su tiempo planeado.
+    func motivoAtraso(_ a: DemoActivity, now: Date) -> String {
+        let ahora = elapsedMinutes(now: now)
+        if !arrancada(a) && a.startMin < ahora { return "inicio" }
+        if topeMin(a) < ahora { return "tope" }
+        return "plan"
+    }
+
+    /// `lastFinished` de quien no tiene nada abierto: lo último que terminó, de cualquier
+    /// día. Si hoy no terminó nada, lo más reciente de su historial (el mismo
+    /// `fechaFinalizacion` que enseña `fxBoardHistory`).
+    func ultimaTerminadaJSON(for personId: Int) -> (json: DemoJSON, at: Date)? {
+        if let finished = lastFinished(for: personId), let fin = finished.finMin {
+            return (dj([
+                "id": finished.id,
+                "anNumber": finished.folio,
+                "titulo": finished.titulo,
+                "finishedAt": iso(fin),
+                "lateMinutes": max(0, fin - topeMin(finished)),
+            ]), at(fin))
+        }
+        guard let work = DemoData.olderWork.first else { return nil }
+        let done = -(work.daysAgo * 1440) + 200
+        return (dj([
+            "id": work.id,
+            "anNumber": "AN-0\(work.id - 5000 + 90)",
+            "titulo": work.titulo,
+            "finishedAt": iso(done),
+            "lateMinutes": DemoStore.atrasoUltimaPrevia[personId] ?? 0,
+        ]), at(done))
+    }
+
     func boardUserJSON(_ p: DemoPerson, now: Date) -> DemoJSON {
         let open = openActivities(for: p.id)
         let elapsed = elapsedMinutes(now: now)
         let clockInDate = clockIn(for: p.id)
-        let clockOutDate = clockOut(for: p.id)
+        // Una salida de antes de la entrada (volvió a entrar) no cuenta: sigue en jornada.
+        let clockOutDate = clockOut(for: p.id).flatMap { salida -> Date? in
+            guard let entrada = clockInDate else { return nil }
+            return salida >= entrada ? salida : nil
+        }
 
         // Estado: con algo abierto, «activo» (o «atrasado» si ya pasó su hora máxima);
-        // sin nada abierto, «libre» si terminó algo hoy; si no, «sin actividad».
+        // sin nada abierto, «libre» si terminó algo hace 15 min o menos (como el API);
+        // si no, «sin actividad».
         let current = open.first { effectiveStatus($0) == "En Proceso" }
         let late = open.first { topeMin($0) < elapsed && effectiveStatus($0) == "En Proceso" }
         var status = "sin_actividad"
@@ -260,7 +307,7 @@ extension DemoStore {
             status = "atrasado"
         } else if !open.isEmpty {
             status = "activo"
-        } else if lastFinished(for: p.id) != nil {
+        } else if let fin = lastFinished(for: p.id)?.finMin, elapsed - fin <= DemoStore.libreTrasTerminarMin {
             status = "libre"
         }
 
@@ -283,6 +330,12 @@ extension DemoStore {
             "enCorreccion": fixing,
             // La cuenta demo es la dirección: puede pausarle el reloj a cualquiera menos a sí misma.
             "puedePausar": p.id != DemoMode.meId,
+            // Jornada de hoy (07-10): las claves van siempre, nulas si no checó o sigue dentro.
+            "entradaHoyAt": isoOrNull(clockInDate),
+            "salidaHoyAt": isoOrNull(clockOutDate),
+            "currentLateReason": NSNull(),
+            "idleSinceAt": NSNull(),
+            "lastFinished": NSNull(),
         ])
         if let clockInDate {
             json["clockInAt"] = DemoClock.iso(clockInDate)
@@ -303,6 +356,7 @@ extension DemoStore {
             json["activityElapsedMinutes"] = DemoClock.minutes(from: startedDate, to: now)
             if let late {
                 json["currentLateMinutes"] = DemoClock.minutes(from: at(topeMin(late)), to: now)
+                json["currentLateReason"] = motivoAtraso(late, now: now)
             }
         }
         if status == "libre", let finished = lastFinished(for: p.id), let fin = finished.finMin {
@@ -314,6 +368,17 @@ extension DemoStore {
                 "lateMinutes": max(0, fin - topeMin(finished)),
             ])
             json["idleSinceAt"] = iso(fin)
+        } else if status == "sin_actividad" {
+            // Sin nada asignado: lo último que terminó (de cualquier día) y, si hoy checó y
+            // no ha salido, desde cuándo está sin nada: la más tardía entre su entrada y lo
+            // último que terminó hoy (= su entrada si lo dejaron sin nada desde que llegó).
+            let ultima = ultimaTerminadaJSON(for: p.id)
+            if let ultima { json["lastFinished"] = ultima.json }
+            if let clockInDate, clockOutDate == nil {
+                let termino = ultima?.at
+                let idle = termino.map { $0 > clockInDate ? $0 : clockInDate } ?? clockInDate
+                json["idleSinceAt"] = DemoClock.iso(idle)
+            }
         }
         return json
     }

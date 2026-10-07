@@ -708,10 +708,24 @@ struct TeamBoardUser: Decodable, Identifiable, Hashable {
     let activityElapsedMinutes: Int?
     /// Atrasado: minutos pasados de la fecha máxima de lo que está haciendo.
     let currentLateMinutes: Int?
-    /// Libre: desde cuándo no tiene nada abierto.
+    /// Atrasado: por qué. `inicio` = no la ha iniciado y ya pasó su hora; `tope` = pasó
+    /// su límite; `plan` = pasó su tiempo planeado. nil = el API no lo dice.
+    let currentLateReason: String?
+    /// Desde cuándo HOY no tiene nada abierto. Libre: desde que terminó; sin
+    /// actividad (07-10): la más tardía entre su entrada de hoy y lo último que terminó
+    /// hoy. nil si no checó hoy o ya salió.
     let idleSinceAt: String?
-    /// Libre: última actividad que terminó hoy.
+    /// Última actividad que terminó: la de hoy en «libre»; desde el 07-10 también en
+    /// «sin_actividad», de cualquier día.
     let lastFinished: TeamBoardLastFinished?
+    /// Hoy (hora de México), sin importar el rango: primera entrada y última salida.
+    /// `salidaHoyAt` nil = sigue en jornada (o no checó).
+    let entradaHoyAt: String?
+    let salidaHoyAt: String?
+    /// El API ya manda la jornada de hoy: la clave `entradaHoyAt` viene, aunque sea nula.
+    /// Con la API vieja no viene y no hay cómo separar «sin entrada» de «sin nada
+    /// asignado» (web: `entradaHoyAt === undefined`).
+    let traeJornadaHoy: Bool
     /// Entregadas que nadie ha aprobado.
     let enEsperaAprobacion: Int?
     /// Con evidencia devuelta que está corrigiendo.
@@ -720,6 +734,46 @@ struct TeamBoardUser: Decodable, Identifiable, Hashable {
     let puedePausar: Bool?
     /// Contrato C: cómo le fue en el rango consultado (a tiempo, eficiencia…).
     let kpis: TeamBoardKpis?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, nombre, email, avatarUrl, puesto, status, currentActivity, openActivities
+        case clockInAt, workedMinutes, activityStartedAt, activityElapsedMinutes
+        case currentLateMinutes, currentLateReason, idleSinceAt, lastFinished
+        case entradaHoyAt, salidaHoyAt
+        case enEsperaAprobacion, enCorreccion, puedePausar, kpis
+    }
+
+    /// A mano para saber si `entradaHoyAt` viene (aunque sea nulo). Todo lo demás es
+    /// opcional como antes: un campo raro deja la tarjeta incompleta, no tumba la pizarra.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func opt<T: Decodable>(_ tipo: T.Type, _ key: CodingKeys) -> T? {
+            (try? c.decodeIfPresent(tipo, forKey: key)) ?? nil
+        }
+        id = try c.decode(Int.self, forKey: .id)
+        nombre = opt(String.self, .nombre) ?? ""
+        email = opt(String.self, .email)
+        avatarUrl = opt(String.self, .avatarUrl)
+        puesto = opt(String.self, .puesto)
+        status = opt(String.self, .status)
+        currentActivity = opt(TeamBoardActivity.self, .currentActivity)
+        openActivities = opt([TeamBoardOpenActivity].self, .openActivities)
+        clockInAt = opt(String.self, .clockInAt)
+        workedMinutes = opt(Int.self, .workedMinutes)
+        activityStartedAt = opt(String.self, .activityStartedAt)
+        activityElapsedMinutes = opt(Int.self, .activityElapsedMinutes)
+        currentLateMinutes = opt(Int.self, .currentLateMinutes)
+        currentLateReason = opt(String.self, .currentLateReason)
+        idleSinceAt = opt(String.self, .idleSinceAt)
+        lastFinished = opt(TeamBoardLastFinished.self, .lastFinished)
+        entradaHoyAt = opt(String.self, .entradaHoyAt)
+        salidaHoyAt = opt(String.self, .salidaHoyAt)
+        traeJornadaHoy = c.contains(.entradaHoyAt)
+        enEsperaAprobacion = opt(Int.self, .enEsperaAprobacion)
+        enCorreccion = opt(Int.self, .enCorreccion)
+        puedePausar = opt(Bool.self, .puedePausar)
+        kpis = opt(TeamBoardKpis.self, .kpis)
+    }
 }
 
 /// `lastFinished` del tablero. `lateMinutes` nulo = la actividad no tenía fecha máxima.

@@ -32,6 +32,70 @@ enum ActividadesTexto {
         return f
     }()
 
+    private static let fechaCortaFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_MX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = zona
+        f.dateFormat = "EEE d MMM"
+        return f
+    }()
+
+    private static var calendarioMx: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = zona
+        return c
+    }
+
+    /// Días de calendario (en México) entre dos instantes: hoy 0, ayer 1…
+    static func diasEntre(_ desde: Date, _ hasta: Date) -> Int {
+        let cal = calendarioMx
+        return cal.dateComponents([.day], from: cal.startOfDay(for: desde), to: cal.startOfDay(for: hasta)).day ?? 0
+    }
+
+    /// Web `cuandoMx`: «hoy 13:39», «ayer 18:11» o «lun 5 oct 18:11» (con el año solo
+    /// si no es el de hoy). Hora de México, 24 h. Vacío sin fecha.
+    static func cuandoMx(_ iso: String?, ahora: Date = Date()) -> String {
+        guard let fecha = CoreFormat.date(iso) else { return "" }
+        let dias = diasEntre(fecha, ahora)
+        let h = horaFormatter.string(from: fecha)
+        if dias == 0 { return "hoy \(h)" }
+        if dias == 1 { return "ayer \(h)" }
+        var dia = fechaCortaFormatter.string(from: fecha)
+            .replacingOccurrences(of: ".", with: "")
+            .lowercased()
+        let cal = calendarioMx
+        let anio = cal.component(.year, from: fecha)
+        if anio != cal.component(.year, from: ahora) { dia += " \(anio)" }
+        return "\(dia) \(h)"
+    }
+
+    /// «hace 2 h 15 min»; con menos de un minuto, «hace un momento».
+    static func hace(_ minutos: Int) -> String {
+        minutos < 1 ? "hace un momento" : "hace \(minutosPizarra(minutos))"
+    }
+
+    /// Minutos enteros de `iso` a `ahora` (nunca negativos); nil sin fecha válida.
+    static func minutosDesde(_ iso: String?, ahora: Date = Date()) -> Int? {
+        guard let fecha = CoreFormat.date(iso) else { return nil }
+        return max(0, Int(ahora.timeIntervalSince(fecha) / 60))
+    }
+
+    /// «hoy» · «hace 1 día» · «hace 3 días» (días de calendario en México); nil sin fecha.
+    static func haceDias(_ iso: String?, ahora: Date = Date()) -> String? {
+        guard let fecha = CoreFormat.date(iso) else { return nil }
+        let dias = diasEntre(fecha, ahora)
+        if dias <= 0 { return "hoy" }
+        return dias == 1 ? "hace 1 día" : "hace \(dias) días"
+    }
+
+    /// Texto recortado con «…» (web `recortar`).
+    static func recortar(_ texto: String?, _ maximo: Int = 40) -> String {
+        let t = (texto ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t.count > maximo else { return t }
+        return String(t.prefix(max(maximo - 1, 0))).trimmingCharacters(in: .whitespaces) + "…"
+    }
+
     /// «lun 14 sep · 09:30»; nil sin fecha.
     static func cuando(_ iso: String?) -> String? {
         guard let date = CoreFormat.date(iso) else { return nil }
@@ -571,14 +635,47 @@ enum ActividadesEquipo {
         return "Sin actividad asignada"
     }
 
-    /// «AN-1042 · Despacho · Atrasado 1 h 20 min».
+    /// «AN-1042 · Despacho · Atrasado 1 h 20 min». Sin nada abierto (07-10), su jornada
+    /// de hoy: «Entró 10:05 · sin nada hace 2 h 15 min», «Salió 18:02» o «Sin entrada
+    /// hoy»; con la API vieja (sin `entradaHoyAt`) se queda el rótulo del estado.
     static func contexto(_ user: TeamBoardUser, now: Date = Date()) -> String {
         let abierta = user.openActivities?.first
         var partes: [String] = []
         if let folio = ActividadesTexto.limpio(abierta?.anNumber) { partes.append(folio) }
         if let carga = cargaTexto(abierta?.assignmentCharge) { partes.append(carga) }
-        partes.append(ActividadesTexto.estadoTexto(user, now: now))
+        let s = estado(user)
+        if (s == "sin_actividad" || s == "inactivo") && user.traeJornadaHoy {
+            partes.append(jornadaSinNada(user, ahora: now))
+        } else {
+            partes.append(ActividadesTexto.estadoTexto(user, now: now))
+        }
         return partes.joined(separator: " · ")
+    }
+
+    /// Web `jornadaSinNada`: «Entró 10:05 · sin nada hace 2 h 15 min», «Salió 18:02» o
+    /// «Sin entrada hoy».
+    static func jornadaSinNada(_ user: TeamBoardUser, ahora: Date = Date()) -> String {
+        guard CoreFormat.date(user.entradaHoyAt) != nil else { return "Sin entrada hoy" }
+        if CoreFormat.date(user.salidaHoyAt) != nil { return "Salió \(ActividadesTexto.hora(user.salidaHoyAt))" }
+        let entro = "Entró \(ActividadesTexto.hora(user.entradaHoyAt))"
+        if let minutos = ActividadesTexto.minutosDesde(user.idleSinceAt, ahora: ahora), minutos >= 1 {
+            return "\(entro) · sin nada hace \(ActividadesTexto.minutosPizarra(minutos))"
+        }
+        return entro
+    }
+
+    /// Línea extra de la tarjeta sin nada abierto: «Última: AN-0091 · ayer 18:11». En
+    /// «libre» no: el contexto ya dice cuándo terminó.
+    static func ultimaEnTarjeta(_ user: TeamBoardUser, ahora: Date = Date()) -> String? {
+        guard (user.openActivities ?? []).isEmpty, user.currentActivity == nil, estado(user) != "libre" else {
+            return nil
+        }
+        return ultimaActividadCorta(user, ahora: ahora)
+    }
+
+    /// El estado del API, sin espacios y en minúsculas.
+    private static func estado(_ user: TeamBoardUser) -> String {
+        (user.status ?? "").trimmingCharacters(in: .whitespaces).lowercased()
     }
 
     /// `despacho` / `ejecucion` en palabras; lo demás no se nombra.
@@ -608,34 +705,310 @@ enum ActividadesEquipo {
         return out
     }
 
+    // MARK: Jornada de hoy y quién pide atención (web `equipo-estado.ts`, 07-10)
+
+    /// Por qué alguien no tiene nada abierto: está en jornada, no ha llegado o ya se fue.
+    enum MotivoSinActividad: Equatable {
+        /// Checó hoy, sigue en jornada y no tiene nada abierto.
+        case sinNada
+        /// Hoy no ha checado entrada.
+        case sinEntrada
+        /// Ya checó su salida.
+        case yaSalio
+    }
+
+    /// Separa a quien no tiene nada abierto («sin_actividad» / «inactivo») por su jornada
+    /// de hoy; nil para los demás estados. Con la API vieja no viene `entradaHoyAt` y no
+    /// hay cómo separarlos: todo cuenta como «sin nada», como antes.
+    static func motivoSinActividad(_ user: TeamBoardUser) -> MotivoSinActividad? {
+        let s = estado(user)
+        guard s == "sin_actividad" || s == "inactivo" else { return nil }
+        guard user.traeJornadaHoy else { return .sinNada }
+        guard ActividadesTexto.limpio(user.entradaHoyAt) != nil else { return .sinEntrada }
+        if ActividadesTexto.limpio(user.salidaHoyAt) != nil { return .yaSalio }
+        return .sinNada
+    }
+
+    /// El equipo en los tres aros y el desglose del ámbar.
+    struct Resumen: Equatable {
+        var trabajando = 0
+        var retraso = 0
+        var libres = 0
+        var total = 0
+        var atrasados = 0
+        /// Checó hoy, sigue en jornada y no tiene nada abierto.
+        var sinNada = 0
+        /// Hoy no ha checado entrada.
+        var sinEntrada = 0
+        /// Ya checó su salida y no tiene nada abierto.
+        var yaSalieron = 0
+    }
+
+    static func resumen(_ users: [TeamBoardUser]) -> Resumen {
+        var r = Resumen()
+        r.total = users.count
+        for user in users {
+            switch aro(user.status) {
+            case .trabajando: r.trabajando += 1
+            case .libre: r.libres += 1
+            case .retraso: r.retraso += 1
+            }
+            if estado(user) == "atrasado" { r.atrasados += 1 }
+            switch motivoSinActividad(user) {
+            case .sinNada?: r.sinNada += 1
+            case .sinEntrada?: r.sinEntrada += 1
+            case .yaSalio?: r.yaSalieron += 1
+            case nil: break
+            }
+        }
+        return r
+    }
+
+    private static func partesDelRetraso(_ r: Resumen) -> [String] {
+        var partes: [String] = []
+        if r.atrasados > 0 { partes.append("\(r.atrasados) \(r.atrasados == 1 ? "atrasado" : "atrasados")") }
+        if r.sinNada > 0 { partes.append("\(r.sinNada) sin nada asignado") }
+        if r.sinEntrada > 0 { partes.append("\(r.sinEntrada) sin entrada") }
+        if r.yaSalieron > 0 { partes.append("\(r.yaSalieron) \(r.yaSalieron == 1 ? "ya salió" : "ya salieron")") }
+        return partes
+    }
+
+    /// El ámbar en una línea: «2 atrasados · 4 sin nada asignado · 4 sin entrada · 1 ya
+    /// salió». Los ceros no se dicen; si no hay nadie, «nadie pendiente».
+    static func desgloseRetraso(_ r: Resumen) -> String {
+        let partes = partesDelRetraso(r)
+        if !partes.isEmpty { return partes.joined(separator: " · ") }
+        // Un estado que la app no conoce también es ámbar: hay que ir a ver.
+        return r.retraso == 0 ? "nadie pendiente" : "hay que ir a ver"
+    }
+
     /// Tira de cifras del equipo; con la pizarra vacía no se pinta nada.
     static func metricas(_ users: [TeamBoardUser]) -> [NxMetric] {
         if users.isEmpty { return [] }
-        let porAro = conteo(users)
-        let trabajando = porAro[.trabajando] ?? 0
-        let retraso = porAro[.retraso] ?? 0
-        let libres = porAro[.libre] ?? 0
+        let r = resumen(users)
         return [
             NxMetric(
                 clave: ActividadesAro.trabajando.clave,
                 etiqueta: "Trabajando",
-                valor: "\(trabajando)",
-                pista: "de \(users.count) en el equipo"
+                valor: "\(r.trabajando)",
+                pista: "de \(r.total) en el equipo"
             ),
             NxMetric(
                 clave: ActividadesAro.retraso.clave,
                 etiqueta: "Con retraso",
-                valor: "\(retraso)",
-                pista: retraso == 0 ? "nadie pendiente" : "hay que ir a ver",
-                color: retraso > 0 ? NxColors.naranja : nil
+                valor: "\(r.retraso)",
+                pista: desgloseRetraso(r),
+                color: r.retraso > 0 ? NxColors.naranja : nil,
+                // El desglose no se corta: «2 atrasados · 4 sin…» ya no dice cuántos faltan por llegar.
+                pistaLineas: 6
             ),
             NxMetric(
                 clave: ActividadesAro.libre.clave,
                 etiqueta: "Libres",
-                valor: "\(libres)",
+                valor: "\(r.libres)",
                 pista: "terminaron lo suyo"
             ),
         ]
+    }
+
+    /// El motivo del atraso, en palabras (`currentLateReason`).
+    static func motivoAtraso(_ reason: String?) -> String? {
+        switch (reason ?? "").trimmingCharacters(in: .whitespaces).lowercased() {
+        case "inicio": return "no la ha iniciado"
+        case "tope": return "pasó su hora límite"
+        case "plan": return "pasó su tiempo planeado"
+        default: return nil
+        }
+    }
+
+    /// Sin límite cuenta a tiempo (lo mismo que los KPI de entregas).
+    private static func comoEntrego(_ lateMinutes: Int?) -> String {
+        if let late = lateMinutes, late > 0 { return "con \(ActividadesTexto.minutosPizarra(late)) de atraso" }
+        return "a tiempo"
+    }
+
+    /// Lo último que terminó, por su folio (o el título recortado si no tiene).
+    private static func ultimaCabeza(_ f: TeamBoardLastFinished) -> String {
+        let que = ActividadesTexto.limpio(f.anNumber) ?? ActividadesTexto.recortar(f.titulo, 24)
+        return que.isEmpty ? "Última" : "Última: \(que)"
+    }
+
+    /// «Última: AN-0085 · ayer 17:15, a tiempo» · «…, con 40 min de atraso» · «Sin
+    /// actividades terminadas».
+    static func ultimaActividad(_ user: TeamBoardUser, ahora: Date = Date()) -> String {
+        guard let corta = ultimaActividadCorta(user, ahora: ahora) else { return "Sin actividades terminadas" }
+        return "\(corta), \(comoEntrego(user.lastFinished?.lateMinutes))"
+    }
+
+    /// «Última: AN-0080 · lun 5 oct 18:38»; nil sin nada terminado.
+    static func ultimaActividadCorta(_ user: TeamBoardUser, ahora: Date = Date()) -> String? {
+        guard let f = user.lastFinished else { return nil }
+        let cuando = ActividadesTexto.cuandoMx(f.finishedAt, ahora: ahora)
+        return cuando.isEmpty ? ultimaCabeza(f) : "\(ultimaCabeza(f)) · \(cuando)"
+    }
+
+    /// Un atrasado en «Para atender hoy».
+    struct Atrasado: Identifiable {
+        let persona: TeamBoardUser
+        /// «AN-0091 · Depurar base de clientes»; vacío si no hay ni folio ni título.
+        let actividad: String
+        let minutosAtraso: Int?
+        /// «no la ha iniciado», «pasó su hora límite»… nil si el API no dice por qué.
+        let motivo: String?
+        /// «Atrasada · 34 h 00 min · pasó su hora límite».
+        let detalle: String
+
+        var id: Int { persona.id }
+    }
+
+    /// Alguien en jornada sin nada asignado.
+    struct SinNada: Identifiable {
+        let persona: TeamBoardUser
+        /// Minutos sin nada abierto; nil si el API no dice desde cuándo (API vieja).
+        let minutosSinNada: Int?
+        /// Lo dejaron sin nada desde que llegó (`idleSinceAt` = `entradaHoyAt`).
+        let desdeQueEntro: Bool
+        /// «Entró 10:05»; nil sin entrada conocida.
+        let entrada: String?
+        /// «sin nada desde hace 25 min» · «sin nada desde que entró (hace 2 h 15 min)».
+        let sinNadaDesde: String?
+        /// Ver `ultimaActividad`.
+        let ultima: String
+
+        /// El renglón ámbar: «Entró 08:57 · sin nada desde que entró (hace 1 h 50 min)».
+        /// nil con la API vieja: entonces el renglón principal es `ultima`.
+        var jornada: String? {
+            let texto = [entrada, sinNadaDesde].compactMap { $0 }.joined(separator: " · ")
+            return texto.isEmpty ? nil : texto
+        }
+
+        var id: Int { persona.id }
+    }
+
+    /// Alguien que hoy no ha checado entrada.
+    struct SinEntrada: Identifiable {
+        let persona: TeamBoardUser
+        /// «Última: AN-0080 · lun 5 oct 18:38» · «Sin actividades terminadas».
+        let ultima: String
+        /// «hace 2 días» desde lo último que terminó; nil si nunca terminó nada.
+        let haceCuanto: String?
+
+        var id: Int { persona.id }
+    }
+
+    /// «Para atender hoy»: quién va tarde y con qué, a quién dejaron sin nada (desde
+    /// cuándo y qué fue lo último que hizo) y quién no ha checado. Quien ya salió y los
+    /// libres no piden nada.
+    struct Atencion {
+        /// Más atraso primero.
+        var atrasados: [Atrasado] = []
+        /// Más tiempo sin nada primero.
+        var sinNada: [SinNada] = []
+        /// Lo último que terminaron, de lo más viejo a lo más reciente; sin nada al final.
+        var sinEntrada: [SinEntrada] = []
+
+        var vacia: Bool { atrasados.isEmpty && sinNada.isEmpty && sinEntrada.isEmpty }
+    }
+
+    /// Web `atencionEquipo`.
+    static func atencion(_ users: [TeamBoardUser], ahora: Date = Date()) -> Atencion {
+        var a = Atencion()
+        for user in users {
+            if estado(user) == "atrasado" {
+                a.atrasados.append(atrasado(user))
+                continue
+            }
+            switch motivoSinActividad(user) {
+            case .sinNada?:
+                a.sinNada.append(sinNada(user, ahora: ahora))
+            case .sinEntrada?:
+                a.sinEntrada.append(SinEntrada(
+                    persona: user,
+                    ultima: ultimaActividadCorta(user, ahora: ahora) ?? "Sin actividades terminadas",
+                    haceCuanto: ActividadesTexto.haceDias(user.lastFinished?.finishedAt, ahora: ahora)
+                ))
+            default:
+                break
+            }
+        }
+        a.atrasados.sort { x, y in
+            mayorPrimero(x.minutosAtraso, y.minutosAtraso) ?? antesPorNombre(x.persona, y.persona)
+        }
+        a.sinNada.sort { x, y in
+            mayorPrimero(x.minutosSinNada, y.minutosSinNada) ?? antesPorNombre(x.persona, y.persona)
+        }
+        func terminoHace(_ s: SinEntrada) -> Double? {
+            CoreFormat.date(s.persona.lastFinished?.finishedAt).map { ahora.timeIntervalSince($0) }
+        }
+        a.sinEntrada.sort { x, y in
+            mayorPrimero(terminoHace(x), terminoHace(y)) ?? antesPorNombre(x.persona, y.persona)
+        }
+        return a
+    }
+
+    private static func atrasado(_ user: TeamBoardUser) -> Atrasado {
+        // La API manda la que está haciendo en `currentActivity` (y su atraso en
+        // `currentLateMinutes`); si no viene, la primera abierta.
+        let folio: String?
+        let titulo: String?
+        if let actual = user.currentActivity {
+            folio = ActividadesTexto.limpio(actual.anNumber)
+            titulo = ActividadesTexto.limpio(actual.titulo)
+        } else {
+            let abierta = user.openActivities?.first
+            folio = ActividadesTexto.limpio(abierta?.anNumber)
+            titulo = ActividadesTexto.limpio(abierta?.titulo)
+        }
+        let minutos = user.currentLateMinutes
+        let motivo = motivoAtraso(user.currentLateReason)
+        let base = (minutos ?? 0) > 0 ? "Atrasada · \(ActividadesTexto.minutosPizarra(minutos))" : "Atrasada"
+        return Atrasado(
+            persona: user,
+            actividad: [folio, titulo].compactMap { $0 }.joined(separator: " · "),
+            minutosAtraso: minutos,
+            motivo: motivo,
+            detalle: [base, motivo].compactMap { $0 }.joined(separator: " · ")
+        )
+    }
+
+    private static func sinNada(_ user: TeamBoardUser, ahora: Date) -> SinNada {
+        let entrada = CoreFormat.date(user.entradaHoyAt)
+        let idle = CoreFormat.date(user.idleSinceAt)
+        let minutos = ActividadesTexto.minutosDesde(user.idleSinceAt, ahora: ahora)
+        var desdeQueEntro = false
+        if let entrada, let idle { desdeQueEntro = abs(idle.timeIntervalSince(entrada)) < 1 }
+        var sinNadaDesde: String?
+        if let minutos {
+            sinNadaDesde = desdeQueEntro
+                ? "sin nada desde que entró (\(ActividadesTexto.hace(minutos)))"
+                : "sin nada desde \(ActividadesTexto.hace(minutos))"
+        }
+        return SinNada(
+            persona: user,
+            minutosSinNada: minutos,
+            desdeQueEntro: desdeQueEntro,
+            entrada: entrada == nil ? nil : "Entró \(ActividadesTexto.hora(user.entradaHoyAt))",
+            sinNadaDesde: sinNadaDesde,
+            ultima: ultimaActividad(user, ahora: ahora)
+        )
+    }
+
+    /// `true` si `a` va antes, `false` si va después, nil si empatan. Sin dato, al final.
+    private static func mayorPrimero<T: Comparable>(_ a: T?, _ b: T?) -> Bool? {
+        switch (a, b) {
+        case (nil, nil): return nil
+        case (nil, _): return false
+        case (_, nil): return true
+        case let (x?, y?): return x == y ? nil : x > y
+        }
+    }
+
+    /// Por nombre como lo ordena una persona: «Ángel» va con la A, no después de la Z.
+    private static func antesPorNombre(_ a: TeamBoardUser, _ b: TeamBoardUser) -> Bool {
+        let na = a.nombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nb = b.nombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        return na.compare(nb, options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "es_MX"))
+            == .orderedAscending
     }
 
     /// «Todos 8 · Trabajando 3 · Con retraso 2 · Libres 3».

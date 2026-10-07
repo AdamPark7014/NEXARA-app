@@ -113,6 +113,55 @@ data class KpiTotalesDto(
     val jornadasSinSalida: Int? = null,
     val cierresAutomaticos: Int? = null,
     val actividadesFueraDeJornada: Int? = null,
+    // ── «En tiempo y forma» (07-10). La API vieja no manda nada de esto: todo `null`.
+    /** Entregas de actividades del rango. La API nueva lo manda SIEMPRE, aunque sea en ceros. */
+    val entregas: KpiEntregasDto? = null,
+    /** Días laborables en que checó a tiempo, de los que debía checar. */
+    val asistenciaPuntual: KpiAsistenciaPuntualDto? = null,
+    /** Cumplimiento 0–100; `null` = en el rango no tuvo ninguna entrega que medir. */
+    val cumplimientoPct: Double? = null,
+    /**
+     * De qué está hecho el cumplimiento. Se pinta la lista que llegue, sin suponer
+     * cuántas partes son ni cuánto pesa cada una: el API puede sumar más.
+     */
+    val cumplimientoPartes: List<KpiParteCumplimientoDto>? = null,
+)
+
+/** Las entregas del rango: el «tiempo y forma». */
+data class KpiEntregasDto(
+    /** Entregadas en el rango + las que vencieron en el rango sin entregarse. */
+    val medidas: Int? = null,
+    /** Entregadas antes de su límite (sin límite cuenta a tiempo). */
+    val aTiempo: Int? = null,
+    val tarde: Int? = null,
+    /** Su límite ya pasó y no la ha entregado. */
+    val sinEntregar: Int? = null,
+    /** Con al menos una revisión del jefe. */
+    val revisadas: Int? = null,
+    val aprobadasALaPrimera: Int? = null,
+    val devueltas: Int? = null,
+    /** 0–100; `null` sin medidas. */
+    val pctATiempo: Double? = null,
+    /** 0–100; `null` sin revisadas. */
+    val pctALaPrimera: Double? = null,
+)
+
+data class KpiAsistenciaPuntualDto(
+    val esperados: Int? = null,
+    val puntuales: Int? = null,
+    val pct: Double? = null,
+)
+
+/** Una parte del cumplimiento: «Entregas a tiempo · 17 de 18 · 94 % · pesa 40 %». */
+data class KpiParteCumplimientoDto(
+    /** `entregas`, `forma`, `asistencia`, `uniforme`… y las que el API sume después. */
+    val clave: String? = null,
+    val etiqueta: String? = null,
+    /** 0–100. */
+    val pct: Double? = null,
+    val peso: Double? = null,
+    /** «17 de 18», «7 de 8 días». */
+    val detalle: String? = null,
 )
 
 // ── Proyectos ────────────────────────────────────────────────────────────────

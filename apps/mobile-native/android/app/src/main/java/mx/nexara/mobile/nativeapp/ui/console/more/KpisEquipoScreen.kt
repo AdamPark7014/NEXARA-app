@@ -43,11 +43,12 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 /**
  * KPIs del equipo (`/erp/asistencias/indicadores`) en el teléfono.
  *
- * La web pone una tabla: una fila por persona con doce columnas. Aquí manda el
- * semáforo. Arriba, cómo va el equipo entero en el periodo; abajo, una tarjeta
- * por persona ordenada de peor a mejor, con tres números a la vista y el resto
- * al desplegarla. Quien está en rojo aparece primero porque en una columna de
- * tarjetas nadie baja hasta la número catorce.
+ * La web pone un ranking: una fila por persona. Aquí, arriba, cómo va el equipo
+ * entero en el periodo; abajo, una tarjeta por persona con su semáforo, tres
+ * números a la vista (cumplimiento, entregas y puntualidad) y el resto al
+ * desplegarla. El orden es el de la web: quien más cumple en tiempo y forma
+ * arriba. Con una API que aún no manda el cumplimiento, todo queda como antes
+ * (de peor a mejor, con productividad y horas).
  *
  * Toda la aritmética vive en [KpisEquipoRules], que se prueba sin Android.
  */
@@ -121,7 +122,7 @@ fun KpisEquipoScreen(vm: KpisEquipoViewModel = viewModel()) {
                 item(key = "cabecera-personas") {
                     MoreCabecera(
                         titulo = "Persona por persona",
-                        subtitulo = "De peor a mejor, para no tener que buscarlo",
+                        subtitulo = KpisEquipoRules.subtituloLista(datos.personas.orEmpty()),
                         trailing = if (consulta.isBlank()) "$totalPersonas" else "${personas.size} de $totalPersonas",
                     )
                 }
@@ -199,8 +200,9 @@ private fun ResumenDelEquipo(datos: mx.nexara.mobile.nativeapp.data.api.KpisEqui
 
 /**
  * Una persona. Cerrada enseña nombre, puesto, semáforo y tres números; abierta,
- * el uniforme, el tiempo extra, las jornadas sin cerrar y por qué su semáforo
- * está en ese color.
+ * de qué sale su cumplimiento (parte por parte, con su peso), el tiempo en
+ * actividades y las horas, el uniforme, el tiempo extra, las jornadas sin cerrar
+ * y por qué su semáforo está en ese color.
  */
 @Composable
 private fun TarjetaDePersona(fila: KpiPersonaFilaDto) {
@@ -249,6 +251,10 @@ private fun TarjetaDePersona(fila: KpiPersonaFilaDto) {
 
         AnimatedVisibility(visible = abierta) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Con la API vieja viene vacía: esos números siguen en la tarjeta.
+                KpisEquipoRules.lineasDesplegadas(totales).forEach { linea ->
+                    DetalleLinea(linea.etiqueta, linea.valor)
+                }
                 DetalleLinea("Horario", fila.horario?.etiqueta ?: "Sin horario")
                 DetalleLinea("Uniforme", "${KpisEquipoRules.pct(totales?.uniforme?.pct)} · ${KpisEquipoRules.uniformePie(totales)}")
                 DetalleLinea("Tiempo extra", "${KpisEquipoRules.horas(totales?.minutosExtra)} · ${KpisEquipoRules.extraPie(totales)}")
