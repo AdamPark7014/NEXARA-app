@@ -467,6 +467,16 @@ class CotizacionesRulesTest {
         assertEquals("cotizacion-482.pdf", CotizacionesRules.nombreArchivoPdf(482L, "///"))
     }
 
+    @Test
+    fun aFolioWithADotStillEndsInPdf() {
+        // Folio con varios participantes: el punto no es una extensión (bug de compartir, 07-10).
+        assertEquals("NEX-1-JA.CE-R2.pdf", CotizacionesRules.nombreArchivoPdf(482L, "NEX-1-JA.CE-R2"))
+        assertEquals("NEX-1-JA.CE-R2-interno.pdf", CotizacionesRules.nombreArchivoPdf(482L, "NEX-1-JA.CE-R2", interno = true))
+        assertEquals("NEX-1-JA.CE-R2", CotizacionesRules.tituloPdf("NEX-1-JA.CE-R2"))
+        assertEquals("NEX-1-JA.CE-R2 · interno", CotizacionesRules.tituloPdf("NEX-1-JA.CE-R2", interno = true))
+        assertEquals("Cotización", CotizacionesRules.tituloPdf("  "))
+    }
+
     // ── El contrato con el servidor ──────────────────────────────────────────
 
     /** La misma configuración que `ApiClient`: Moshi reflexivo de Kotlin. */

@@ -204,6 +204,13 @@ enum DemoData {
                      avance: 60, evidencia: "EVIDENCE_PHOTOS",
                      indicaciones: "Contar existencias por pasillo y reportar diferencias.",
                      estimadoMin: 150, descripcion: "Conteo cíclico de materiales y herramienta."),
+        // Comercial: trae «Archivos de evidencia» (`DemoFixtures+Adjuntos`).
+        DemoActivity(id: 5155, folio: "AN-0155", titulo: "Presentación de propuesta · Hotel Casa Azul",
+                     kind: "comercial", clientServiceId: 4102, projectId: nil, ownerId: 101, creatorId: 1,
+                     prioridad: "alta", estatus: "Asignada", startMin: 90, maxMin: 210, finMin: nil,
+                     avance: 0, evidencia: "",
+                     indicaciones: "Presentar la póliza anual de climas y dejar firmada la minuta.",
+                     estimadoMin: 90, descripcion: "Propuesta de mantenimiento anual para el hotel."),
         // Las mías (id 1): las que se ven en «Mis actividades».
         DemoActivity(id: 5150, folio: "AN-0150", titulo: "Visita de supervisión · Corporativo Atlixco",
                      kind: "proyecto", clientServiceId: 4101, projectId: 7001, ownerId: 1, creatorId: 1,

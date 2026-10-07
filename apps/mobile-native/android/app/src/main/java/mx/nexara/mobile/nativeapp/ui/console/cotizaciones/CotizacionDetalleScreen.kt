@@ -42,6 +42,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDetalleDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionGrupoDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionPartidaDto
+import mx.nexara.mobile.nativeapp.ui.common.DocumentoDialog
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreAvisoDesactualizado
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreCabecera
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreNotaDeAlcance
@@ -119,6 +120,17 @@ fun CotizacionDetalleScreen(
 
             item(key = "alcance") { MoreNotaDeAlcance(CotizacionesRules.LIMITE) }
         }
+    }
+
+    // El PDF dentro de la app: se ve aunque el teléfono no tenga lector, y desde aquí se guarda
+    // (selector de carpeta de Android) o se manda por WhatsApp con su nombre y su tipo.
+    state.pdfAbierto?.let { pdf ->
+        DocumentoDialog(
+            archivo = pdf.archivo,
+            titulo = pdf.titulo,
+            mime = "application/pdf",
+            onClose = vm::cerrarPdf,
+        )
     }
 }
 
