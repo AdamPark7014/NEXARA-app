@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
-import { Badge, Button, DateInput, Input, LinkButton } from "@/components/base";
+import { Badge, Button, DateInput, Input, LinkButton, Switch } from "@/components/base";
 import {
   TITULO_TERMINO,
   type ClaveTermino,
@@ -71,7 +71,10 @@ export default function SeccionCotizacion({
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
   const [aplicando, setAplicando] = useState<string | null>(null);
 
-  const totales = useMemo(() => totalesDePartidas(doc.partidas, doc.marginPercent), [doc.partidas, doc.marginPercent]);
+  const totales = useMemo(
+    () => totalesDePartidas(doc.partidas, doc.marginPercent, doc.conIva !== false),
+    [doc.partidas, doc.marginPercent, doc.conIva],
+  );
   const vigenciaDias = diasEntre(doc.issueDate, doc.validUntil);
   const entregaTexto = doc.opciones.condiciones.tiempoEntrega.trim() || doc.deliveryTime.trim() || ENTREGA_POR_OMISION;
   const garantiaTexto = doc.opciones.condiciones.garantia.trim() || GARANTIA_POR_OMISION;
@@ -289,6 +292,20 @@ export default function SeccionCotizacion({
         valor={doc.marginPercent}
         editable={editable}
         onValor={(marginPercent) => cambiar((d) => ({ ...d, marginPercent }))}
+      />
+      <Switch
+        checked={doc.conIva !== false}
+        disabled={!editable}
+        onChange={(e) => {
+          const conIva = e.target.checked;
+          cambiar((d) => ({ ...d, conIva }));
+        }}
+        label="Requiere factura (lleva IVA)"
+        description={
+          doc.conIva !== false
+            ? "Se suma el IVA de cada partida. Apágalo si el cliente no pide factura."
+            : "Sin factura: la cotización sale sin IVA y así se imprime en el PDF."
+        }
       />
       {doc.marginPercent != null && doc.marginPercent !== 0 && doc.partidas.some((p) => p.marginPercent != null) ? (
         <p className={styles.pista}>

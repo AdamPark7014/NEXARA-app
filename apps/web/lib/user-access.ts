@@ -4,6 +4,7 @@
  * Sidebar, guards de ruta, home post-login y panel switcher consumen
  * las mismas reglas — evita el bug "veo el menú pero la ruta parpadea".
  */
+import { canManageAlmacen, esRutaDeAlmacen } from "@/lib/almacen-access";
 import {
   MODULES,
   PANEL_META,
@@ -101,6 +102,9 @@ export function resolveDisplayOrgRoleKey(user: UserAccessInput | null | undefine
 export function canUserAccessPath(user: UserAccessInput | null | undefined, pathname: string): boolean {
   if (!user) return false;
   if (user.isSuperAdmin) return true;
+
+  // Almacén concedido por persona (Iván), sin cambiarle el rol (`lib/almacen-access.ts`).
+  if (esRutaDeAlmacen(pathname) && canManageAlmacen(user.email)) return true;
 
   const v2 = resolveV2RoleKey(user);
   if (v2) return canOpenPage(v2, pathname);

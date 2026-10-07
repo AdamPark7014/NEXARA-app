@@ -96,6 +96,8 @@ export type FormatoNexara = {
   garantia: string;
   partidas: PartidaFormato[];
   subtotal: number;
+  /** false = el cliente no requiere factura: sin renglón de IVA y «precios sin IVA». */
+  conIva: boolean;
   ivaPorciento: number;
   iva: number;
   total: number;
@@ -122,6 +124,8 @@ type QuoteLike = {
   depositPercent?: number | null;
   /** 20 = el precio impreso ya incluye ese margen. Null o 0: el precio de la partida. */
   marginPercent?: unknown;
+  /** false = sin factura: sin IVA. */
+  conIva?: boolean | null;
   currency?: string | null;
   note?: string | null;
   opciones?: unknown;
@@ -226,6 +230,7 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
   const moneda = String(quote.currency ?? 'MXN').toUpperCase() === 'USD' ? 'USD' : 'MXN';
   // El PDF del cliente no enseña el margen: el precio de cada partida ya lo trae.
   const factor = factorMargen(quote.marginPercent);
+  const conIva = quote.conIva !== false;
   const crudas = (quote.items ?? []).map((item, i) => {
     const qty = Number(item['qty'] ?? 0) || 0;
     const precio = Number(item['unitPrice'] ?? 0) || 0;
@@ -233,7 +238,8 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     const descuento = Math.min(100, Math.max(0, Number(item['discount'] ?? 0) || 0));
     const bruto = (qty * precio + labor) * (1 - descuento / 100);
     const taxRaw = item['tax'] == null || item['tax'] === '' ? 16 : Number(item['tax']);
-    const tax = Number.isFinite(taxRaw) ? taxRaw : 16;
+    // Sin factura no hay IVA, aunque la partida conserve su tasa.
+    const tax = !conIva ? 0 : Number.isFinite(taxRaw) ? taxRaw : 16;
     const fila: PartidaFormato = {
       partida: String(item['partida'] ?? '').trim() || String(i + 1),
       titulo: String(item['name'] ?? '').trim(),
@@ -285,6 +291,7 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     garantia: opciones.condiciones.garantia.trim() || GARANTIA_DEFAULT,
     partidas,
     subtotal,
+    conIva,
     ivaPorciento,
     iva,
     total,
@@ -606,7 +613,7 @@ function totales(p: Lapiz, q: FormatoNexara) {
   const y = p.y;
   const filas: Array<[string, string, boolean]> = [
     ['SUBTOTAL', dinero(q.subtotal), false],
-    [`IVA ${q.ivaPorciento}%`, dinero(q.iva), false],
+    ...(q.conIva ? ([[`IVA ${q.ivaPorciento}%`, dinero(q.iva), false]] as Array<[string, string, boolean]>) : []),
     ['TOTAL', dinero(q.total), true],
   ];
   filas.forEach((fila, i) => {
@@ -710,7 +717,9 @@ export async function generarCotizacionNexaraPdf(
   if (q.garantia) condiciones.push(['Garantía:', q.garantia]);
   condiciones.push([
     'Moneda:',
-    `Precios en ${q.moneda === 'USD' ? 'dólares americanos (USD)' : 'pesos mexicanos (MXN)'}, más IVA ${q.ivaPorciento}% desglosado.`,
+    `Precios en ${q.moneda === 'USD' ? 'dólares americanos (USD)' : 'pesos mexicanos (MXN)'}, ${
+      q.conIva ? `más IVA ${q.ivaPorciento}% desglosado.` : 'sin IVA (no incluye factura).'
+    }`,
   ]);
   for (const [k, v] of condiciones) {
     const h = Math.max(altoDe(p, v, AW * 0.76, 8), 12);

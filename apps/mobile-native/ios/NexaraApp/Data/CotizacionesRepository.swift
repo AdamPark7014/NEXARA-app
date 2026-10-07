@@ -392,6 +392,8 @@ struct CotizacionDetalle: Decodable, Hashable {
     var currency: String?
     var subtotal: String?
     var taxTotal: String?
+    /// false = el cliente no requiere factura: la cotización va sin IVA.
+    var conIva: Bool?
     var total: String?
     var depositPercent: String?
     var rejectedReason: String?
@@ -412,7 +414,7 @@ struct CotizacionDetalle: Decodable, Hashable {
         case id, folio, folioBase, quoteNumber, conNomenclatura, necesitaRefolio, revision
         case cadenaParticipantes, estado, estadoEtiqueta, bloqueada, segmento, segmentoEtiqueta
         case clientName, clientCompany, clientEmail, clientPhone, clientAddress, projectName, scope
-        case issueDate, validUntil, sentAt, sentToEmail, currency, subtotal, taxTotal, total
+        case issueDate, validUntil, sentAt, sentToEmail, currency, subtotal, taxTotal, conIva, total
         case depositPercent, rejectedReason, rejectedByName, incluyeInstalacion, elaboro
         case asignadoA, asignadoPor, asignadoNota, asignadoEn, grupos, totalesPorGrupo
         case terminos, participantes, actividades
@@ -447,6 +449,7 @@ struct CotizacionDetalle: Decodable, Hashable {
         currency = CotizacionLectura.texto(c, .currency)
         subtotal = CotizacionLectura.texto(c, .subtotal)
         taxTotal = CotizacionLectura.texto(c, .taxTotal)
+        conIva = CotizacionLectura.booleano(c, .conIva)
         total = CotizacionLectura.texto(c, .total)
         depositPercent = CotizacionLectura.texto(c, .depositPercent)
         rejectedReason = CotizacionLectura.texto(c, .rejectedReason)

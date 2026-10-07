@@ -93,6 +93,7 @@ export function borradorSobreGuardada<Q extends Record<string, any>>(guardada: Q
     depositPercent: dto.depositPercent ?? guardada['depositPercent'],
     marginPercent:
       dto.marginPercent !== undefined ? porcentajeMargen(dto.marginPercent) : porcentajeMargen(guardada['marginPercent']),
+    conIva: dto.conIva !== undefined ? dto.conIva !== false : guardada['conIva'] !== false,
     note: texto(dto.note, guardada['note']),
     // Personalización: la del borrador completa (el editor manda todas las opciones juntas).
     opciones: dto.opciones ? normalizarOpciones(dto.opciones) : guardada['opciones'],
@@ -103,8 +104,9 @@ export function borradorSobreGuardada<Q extends Record<string, any>>(guardada: Q
     const general =
       dto.marginPercent !== undefined ? porcentajeMargen(dto.marginPercent) : porcentajeMargen(guardada['marginPercent']);
     const items = dto.items.length ? normalizeItems(dto.items as RawCotizacionItem[]) : [];
-    const totales = calculateTotals(items, general);
-    mezcla['items'] = items.map((item) => ({ ...item, lineTotal: redondeo(calculateLine(item).total) }));
+    const conIva = mezcla['conIva'] !== false;
+    const totales = calculateTotals(items, general, { conIva });
+    mezcla['items'] = items.map((item) => ({ ...item, lineTotal: redondeo(calculateLine(item, { conIva }).total) }));
     mezcla['subtotal'] = redondeo(totales.subtotal);
     mezcla['discountTotal'] = redondeo(totales.discountTotal);
     mezcla['taxTotal'] = redondeo(totales.taxTotal);

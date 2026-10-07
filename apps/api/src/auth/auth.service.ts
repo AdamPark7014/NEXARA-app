@@ -1,3 +1,4 @@
+import { canManageAlmacen } from '../warehouse/almacen-access.js';
 import { rememberExpiresIn, rememberMaxMs } from '../common/security/session-cookie.js';
 import { ModuleRef } from '@nestjs/core';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -103,15 +104,30 @@ export class AuthService {
   resolveUserPermissions(user: UserWithRole, isSuperAdmin = false): string[] {
     const roleKey = this.resolveEffectiveRoleKey(user);
     if (roleKey) {
-      return this.addV2RolePermissions(
-        this.buildBaseAuthenticatedPermissions(isSuperAdmin),
-        roleKey,
+      return this.applyAlmacenByEmail(
+        this.addV2RolePermissions(this.buildBaseAuthenticatedPermissions(isSuperAdmin), roleKey, user.email),
         user.email,
       );
     }
     const legacy = this.buildPermissions(user.role, isSuperAdmin);
     // TOOLS_MANAGE es por email (Christian / Iván), no por flag legacy de consola.
-    return this.applyToolsManageByEmail(legacy, user.email);
+    return this.applyAlmacenByEmail(this.applyToolsManageByEmail(legacy, user.email), user.email);
+  }
+
+  /** Control de almacén concedido por persona (`warehouse/almacen-access.ts`), sin cambiar su rol. */
+  private applyAlmacenByEmail(permissions: string[], email?: string | null): string[] {
+    if (!canManageAlmacen(email)) return permissions;
+    const set = new Set(permissions);
+    for (const p of [
+      PERMISSIONS.STOCK_VIEW,
+      PERMISSIONS.STOCK_MANAGE,
+      PERMISSIONS.WAREHOUSE_VIEW,
+      PERMISSIONS.WAREHOUSE_MANAGE,
+      PERMISSIONS.CATALOG_VIEW,
+    ]) {
+      set.add(p);
+    }
+    return Array.from(set);
   }
 
   /** Permisos mínimos de cualquier empleado autenticado (sin flags acceso*). */

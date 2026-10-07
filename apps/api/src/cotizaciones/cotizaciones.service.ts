@@ -179,16 +179,17 @@ export class CotizacionesService {
     return porcentajeMargen(valor);
   }
 
-  private calculateTotals(items: NormalizedCotizacionItem[], margen?: number | null) {
-    return calculateTotals(items, margen);
+  /** `conIva` false: el cliente no requiere factura, sin IVA ni retenciones. */
+  private calculateTotals(items: NormalizedCotizacionItem[], margen?: number | null, conIva = true) {
+    return calculateTotals(items, margen, { conIva });
   }
 
-  private buildItemData(items: ReturnType<CotizacionesService['normalizeItems']>) {
+  private buildItemData(items: ReturnType<CotizacionesService['normalizeItems']>, conIva = true) {
     // Mismo cálculo que los totales de la cotización: antes estaba duplicado
     // aquí y cualquier cambio en uno dejaba al otro descuadrado.
     return items.map((item) => ({
       ...item,
-      lineTotal: round2(calculateLine(item).total),
+      lineTotal: round2(calculateLine(item, { conIva }).total),
     }));
   }
 
@@ -265,8 +266,9 @@ export class CotizacionesService {
     // El editor de Core guarda el borrador en cuanto hay cliente, antes de la primera partida: una
     // cotización sin partidas es un borrador válido (lo que no puede es enviarse así).
     const margenGeneral = this.margenGeneralDe(dto.marginPercent);
+    const conIva = dto.conIva !== false;
     const items = dto.items?.length ? this.normalizeItems(dto.items) : [];
-    const totals = this.calculateTotals(items, margenGeneral);
+    const totals = this.calculateTotals(items, margenGeneral, conIva);
     const status = normalizeStatus(dto.status) || CotizacionStatus.DRAFT;
     const segmento = normalizarSegmento(dto.segmento);
 
@@ -379,6 +381,7 @@ export class CotizacionesService {
       currency: dto.currency?.trim() || 'MXN',
       depositPercent: dto.depositPercent ?? 0,
       marginPercent: margenGeneral,
+      conIva,
       note: dto.note?.trim() || null,
       subtotal: round2(totals.subtotal),
       discountTotal: round2(totals.discountTotal),
@@ -388,7 +391,7 @@ export class CotizacionesService {
       total: round2(totals.total),
       createdById: createdById || null,
       companyId: resolvedCompanyId,
-      items: { create: this.buildItemData(items) },
+      items: { create: this.buildItemData(items, conIva) },
     };
     // `opciones` es JSON nuevo (migración 20260918180000): sin él, el PDF de siempre.
     if (dto.opciones) {
@@ -857,6 +860,7 @@ export class CotizacionesService {
       currency: dto.currency?.trim(),
       depositPercent: dto.depositPercent,
       marginPercent: dto.marginPercent !== undefined ? this.margenGeneralDe(dto.marginPercent) : undefined,
+      conIva: dto.conIva !== undefined ? dto.conIva !== false : undefined,
       note: dto.note?.trim(),
       opciones: dto.opciones ? (normalizarOpciones(dto.opciones) as unknown as Prisma.InputJsonValue) : undefined,
     };
@@ -879,12 +883,13 @@ export class CotizacionesService {
       dto.marginPercent !== undefined
         ? this.margenGeneralDe(dto.marginPercent)
         : this.margenGeneralDe(existing.marginPercent == null ? null : Number(existing.marginPercent));
+    const conIvaAlGuardar = dto.conIva !== undefined ? dto.conIva !== false : (existing as { conIva?: boolean }).conIva !== false;
 
     if (dto.items) {
       // Quitar la última partida deja el borrador sin partidas, no es un error.
       const items = dto.items.length ? this.normalizeItems(dto.items) : [];
-      const totals = this.calculateTotals(items, margenAlGuardar);
-      const itemData = this.buildItemData(items);
+      const totals = this.calculateTotals(items, margenAlGuardar, conIvaAlGuardar);
+      const itemData = this.buildItemData(items, conIvaAlGuardar);
 
       updateData['subtotal'] = round2(totals.subtotal);
       updateData['discountTotal'] = round2(totals.discountTotal);
@@ -913,10 +918,10 @@ export class CotizacionesService {
         });
       });
       finalItems = items;
-    } else if (dto.marginPercent !== undefined && existing.items.length) {
-      // Solo cambió el porcentaje: las partidas se quedan y el total se recalcula.
+    } else if ((dto.marginPercent !== undefined || dto.conIva !== undefined) && existing.items.length) {
+      // Solo cambió el porcentaje o el IVA: las partidas se quedan y el total se recalcula.
       const items = this.normalizeItems(existing.items as unknown as RawCotizacionItem[]);
-      const totals = this.calculateTotals(items, margenAlGuardar);
+      const totals = this.calculateTotals(items, margenAlGuardar, conIvaAlGuardar);
       updateData['subtotal'] = round2(totals.subtotal);
       updateData['discountTotal'] = round2(totals.discountTotal);
       updateData['taxTotal'] = round2(totals.taxTotal);
@@ -2129,6 +2134,7 @@ export class CotizacionesService {
         totales = this.calculateTotals(
           this.normalizeItems(quote.items as RawCotizacionItem[]),
           porcentajeMargen(quote.marginPercent),
+          (quote as { conIva?: boolean }).conIva !== false,
         );
       } catch {
         totales = null;
@@ -2186,6 +2192,7 @@ export class CotizacionesService {
       currency: quote.currency,
       depositPercent: quote.depositPercent,
       marginPercent: porcentajeMargen(quote.marginPercent),
+      conIva: (quote as { conIva?: boolean }).conIva !== false,
       note: quote.note,
       subtotal: totales ? round2(totales.subtotal) : Number(quote.subtotal),
       discountTotal: totales ? round2(totales.discountTotal) : Number(quote.discountTotal),

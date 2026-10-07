@@ -354,6 +354,8 @@ export function importeDeLinea(p: Pick<PartidaCotizacion, "qty" | "unitPrice" | 
 
 export type Totales = {
   subtotal: number;
+  /** false = el cliente no requiere factura: `iva` es 0. */
+  conIva: boolean;
   iva: number;
   /** Subtotal + IVA, antes del margen. */
   baseConIva: number;
@@ -364,7 +366,8 @@ export type Totales = {
   porGrupo: Record<GrupoPartida, number>;
 };
 
-export function totalesDePartidas(partidas: PartidaCotizacion[], margen?: number | null): Totales {
+/** `conIva` false: el cliente no requiere factura, sin IVA (cada partida conserva su tasa). */
+export function totalesDePartidas(partidas: PartidaCotizacion[], margen?: number | null, conIva = true): Totales {
   const porGrupo: Record<GrupoPartida, number> = { EQUIPOS: 0, MATERIALES: 0, MANO_DE_OBRA: 0 };
   let subtotal = 0;
   let iva = 0;
@@ -372,7 +375,7 @@ export function totalesDePartidas(partidas: PartidaCotizacion[], margen?: number
     if (!String(p.name ?? "").trim()) continue;
     const linea = importeDeLinea(p);
     subtotal += linea;
-    iva += linea * (Number(p.tax ?? 16) / 100);
+    if (conIva) iva += linea * (Number(p.tax ?? 16) / 100);
     const grupo = (p.grupo as GrupoPartida) || "EQUIPOS";
     porGrupo[grupo] = (porGrupo[grupo] ?? 0) + linea;
   }
@@ -384,6 +387,7 @@ export function totalesDePartidas(partidas: PartidaCotizacion[], margen?: number
     margenPorcentaje == null || margenPorcentaje === 0 ? baseConIva : redondeo(baseConIva * (1 + margenPorcentaje / 100));
   return {
     subtotal: subtotalR,
+    conIva,
     iva: ivaR,
     baseConIva,
     margenPorcentaje,
@@ -459,6 +463,8 @@ export type DocumentoCotizacion = {
    * 20 → total final = (subtotal + IVA) × 1.20. No reescribe el precio de cada partida.
    */
   marginPercent: number | null;
+  /** Lleva IVA: el cliente requiere factura. Apagado, la cotización sale sin IVA. */
+  conIva: boolean;
   /** Tiempo de entrega legado (`Cotizacion.deliveryTime`). Si las condiciones no traen el suyo, el PDF lo usa. */
   deliveryTime: string;
   partidas: PartidaEditor[];
@@ -503,6 +509,7 @@ export function documentoVacio(segmento: Segmento = "COMERCIAL", hoy = new Date(
     validUntil: sumarDias(emision, 15),
     depositPercent: 50,
     marginPercent: MARGEN_INICIAL,
+    conIva: true,
     deliveryTime: "",
     partidas: [],
     terminos: {},
@@ -535,6 +542,7 @@ export function documentoDesdeDetalle(d: CotizacionDetalle): DocumentoCotizacion
     validUntil: fechaCorta(d.validUntil),
     depositPercent: Number(d.depositPercent ?? 50),
     marginPercent: porcentajeMargen(d.marginPercent),
+    conIva: d.conIva !== false,
     deliveryTime: d.deliveryTime?.trim() ?? "",
     partidas: partidasDesdeApi(d.items),
     terminos: terminosPropiosDeDetalle(d),
@@ -621,6 +629,7 @@ export function payloadDeDocumento(doc: DocumentoCotizacion): GuardarCotizacion 
     alcanceBloques: bloquesParaApi(doc.bloques),
     depositPercent: Math.min(100, Math.max(0, Math.round(Number(doc.depositPercent) || 0))),
     marginPercent: porcentajeMargen(doc.marginPercent),
+    conIva: doc.conIva !== false,
     note: escribirTerminos(doc.terminos),
     items: partidasParaApi(doc.partidas),
     currency: doc.moneda,

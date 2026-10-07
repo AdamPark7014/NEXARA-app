@@ -21,7 +21,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { checkUrlAccess } from './url-matrix';
+import { ALMACEN_POR_CORREO_URL_RULES, checkUrlAccess, checkUrlRules } from './url-matrix';
+import { canManageAlmacen } from '../../warehouse/almacen-access';
 import { LEGACY_TO_V2, type RoleKey, ROLES } from './roles.v2';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -50,7 +51,11 @@ export class UrlAccessGuard extends AuthGuard('jwt') {
     const method = (req.method as HttpMethod) ?? 'GET';
     const url = req.originalUrl || req.url || '';
 
-    const result = checkUrlAccess(role, url, method);
+    let result = checkUrlAccess(role, url, method);
+    // Almacén concedido por persona (Iván): sin cambiarle el rol.
+    if (!result.allowed && canManageAlmacen(user.email)) {
+      result = checkUrlRules(ALMACEN_POR_CORREO_URL_RULES, url, method);
+    }
     // Whitelist: sin match (o deny) → Forbidden. No fallthrough a legacy.
     if (!result.allowed) {
       this.logger.warn(`[DENY] role=${role} ${method} ${url}`);

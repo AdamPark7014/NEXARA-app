@@ -83,6 +83,8 @@ export type CotizacionPdfPayload = {
   depositPercent: number;
   /** Porcentaje sobre el total ya con IVA. 20 → el total guardado es × 1.20. */
   marginPercent?: number | null;
+  /** false = sin factura: no lleva IVA ni retenciones. */
+  conIva?: boolean;
   note?: string | null;
   subtotal: number;
   discountTotal: number;
@@ -559,7 +561,8 @@ const drawSummary = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): num
   if (payload.discountTotal > 0) {
     rows.push(['Descuentos', `− ${formatMoney(payload.discountTotal, payload.currency)}`, false]);
   }
-  rows.push(['IVA', formatMoney(payload.taxTotal, payload.currency), false]);
+  if (payload.conIva !== false) rows.push(['IVA', formatMoney(payload.taxTotal, payload.currency), false]);
+  else rows.push(['IVA', 'Sin IVA (sin factura)', false]);
   if ((payload.iepsTotal || 0) > 0) rows.push(['IEPS', formatMoney(payload.iepsTotal || 0, payload.currency), false]);
   if ((payload.retentionTotal || 0) > 0) {
     rows.push(['Retenciones', `− ${formatMoney(payload.retentionTotal || 0, payload.currency)}`, false]);
@@ -633,7 +636,7 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
   const rows: Array<[string, string]> = [
     ['Costo', formatMoney(costTotal, payload.currency)],
     ['Subtotal de partidas', formatMoney(sellNet, payload.currency)],
-    ['IVA', formatMoney(payload.taxTotal, payload.currency)],
+    ['IVA', payload.conIva === false ? 'Sin IVA (sin factura)' : formatMoney(payload.taxTotal, payload.currency)],
     [
       margenPct == null ? 'Margen' : `Margen ${margenPct}%`,
       formatMoney(margenMonto, payload.currency),
@@ -829,7 +832,9 @@ export const generateCotizacionPdf = (
       y += 10;
     } else {
       doc.fillColor(COLORS.muted).font(fuente(doc, 'texto')).fontSize(8).text(
-        'Precios de venta netos (sin IVA). El IVA se muestra por partida y en el resumen.',
+        payload.conIva === false
+          ? 'Cotización sin factura: los precios no llevan IVA.'
+          : 'Precios de venta netos (sin IVA). El IVA se muestra por partida y en el resumen.',
         ctx.margin,
         y - 2,
         { width: ctx.contentWidth },

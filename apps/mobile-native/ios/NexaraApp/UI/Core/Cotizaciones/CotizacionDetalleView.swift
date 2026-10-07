@@ -439,7 +439,10 @@ private struct ImportesDeCotizacion: View {
 
         MoreTarjeta {
             FilaImporte(etiqueta: "Subtotal", valor: CotizacionesRules.pesos(cotizacion.subtotal))
-            FilaImporte(etiqueta: "Impuestos", valor: CotizacionesRules.pesos(cotizacion.taxTotal))
+            FilaImporte(
+                etiqueta: "Impuestos",
+                valor: cotizacion.conIva == false ? "Sin IVA (sin factura)" : CotizacionesRules.pesos(cotizacion.taxTotal)
+            )
             Rectangle().fill(NxColors.surface).frame(height: 1)
             FilaImporte(etiqueta: "Total", valor: CotizacionesRules.pesos(cotizacion.total) + sufijo, destacado: true)
             if let porGrupo = textoPorGrupo {

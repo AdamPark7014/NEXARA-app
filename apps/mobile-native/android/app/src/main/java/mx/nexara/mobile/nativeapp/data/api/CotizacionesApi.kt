@@ -231,6 +231,8 @@ data class CotizacionDetalleDto(
     val currency: String? = null,
     val subtotal: String? = null,
     val taxTotal: String? = null,
+    /** false = el cliente no requiere factura: la cotización va sin IVA. */
+    val conIva: Boolean? = null,
     val total: String? = null,
     val depositPercent: String? = null,
     val rejectedReason: String? = null,
