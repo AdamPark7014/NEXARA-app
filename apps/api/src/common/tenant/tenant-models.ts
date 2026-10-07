@@ -127,6 +127,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'NominaSemanaDia',
   'NominaSemanaFila',
   'NominaDescuento',
+  'ActivityAttachment',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */
