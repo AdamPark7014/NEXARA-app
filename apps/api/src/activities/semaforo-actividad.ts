@@ -186,6 +186,24 @@ export function horasRecordatorioDe(valor: unknown): number {
 }
 
 /**
+ * Hasta cuándo hay que entregar una actividad: el mismo límite que pinta el semáforo.
+ *
+ * Los KPI y el SLA del flujo lo usan para decidir «a tiempo»: antes comparaban contra la
+ * fecha máxima cruda, y como el formulario la manda igual a la hora de inicio, casi todo lo
+ * que se entregaba el mismo día salía «tarde».
+ */
+export function limiteDeEntrega(params: {
+  fechaInicio?: Date | string | null;
+  fechaMaxima?: Date | string | null;
+  fechaEntregaEsperada?: Date | string | null;
+  periodoInicio?: Date | string | null;
+  periodoFin?: Date | string | null;
+  periodo?: Periodo | null;
+}): Date | null {
+  return topeDe(params, params.periodo ?? periodoDeActividad(params));
+}
+
+/**
  * El formulario manda `fechaInicio = fechaMaxima = fechaEntregaEsperada`: la hora que se
  * captura es la de inicio, no un límite. Un tope que no queda después del inicio se lee como
  * el fin de ese día (igual que un periodo de un día); el exceso de tiempo lo marca el plan.

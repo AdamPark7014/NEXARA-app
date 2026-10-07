@@ -5,7 +5,7 @@ import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
 import { Stat, StatRow } from "@/components/base";
-import { resumenEquipo, type EstadoAro } from "@/components/pizarra/equipo-estado";
+import { desgloseRetraso as desglose, resumenEquipo, type EstadoAro } from "@/components/pizarra/equipo-estado";
 import type { TeamBoardUser } from "@/lib/team-board-api";
 
 export type FiltroEquipo = EstadoAro | "todos";
@@ -23,7 +23,8 @@ export default function ResumenEquipo({ users }: { users: readonly TeamBoardUser
   const r = resumenEquipo(users);
   const espera = users.reduce((n, u) => n + (u.enEsperaAprobacion ?? 0), 0);
   const corrigiendo = users.filter((u) => (u.enCorreccion ?? 0) > 0).length;
-  const desgloseRetraso = `${r.atrasados} atrasados · ${r.sinActividad} sin nada abierto`;
+  // «2 atrasados · 9 sin nada asignado · 3 sin entrada»: sin ceros.
+  const desgloseRetraso = desglose(r);
 
   return (
     <StatRow cols={4} ariaLabel="Resumen del equipo">

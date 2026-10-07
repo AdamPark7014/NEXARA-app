@@ -11,6 +11,7 @@ import {
   iniciales,
   queHace,
   tintaPersona,
+  ultimaActividadCorta,
   type EstadoAro,
 } from "@/components/pizarra/equipo-estado";
 import s from "./EquipoPersonaCard.module.css";
@@ -115,6 +116,9 @@ export default function EquipoPersonaCard({
   const lineas = actividadesDeTarjeta(user);
   const actividad = queHace(user);
   const contexto = contextoActividad(user, ahora);
+  // Sin nada abierto: folio y cuándo terminó lo último. En «libre» el contexto ya dice
+  // «Terminó 13:39, a tiempo» y repetirlo sobra.
+  const ultima = lineas.length === 0 && user.status !== "libre" ? ultimaActividadCorta(user, ahora) : null;
   const espera = user.enEsperaAprobacion ?? 0;
   const tarjeta = (
     <Link
@@ -144,6 +148,7 @@ export default function EquipoPersonaCard({
             {actividad}
           </span>
           {contexto ? <span className={s.contexto}>{contexto}</span> : null}
+          {ultima ? <span className={s.contexto}>{ultima}</span> : null}
         </>
       )}
       {isSelf || user.enCorreccion || espera > 0 ? (

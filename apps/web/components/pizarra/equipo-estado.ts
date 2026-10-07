@@ -4,8 +4,9 @@
  *
  * El lenguaje visual que aprobó Adam tiene TRES aros de color, no cinco estados:
  * verde trabajando, ámbar con retraso o sin actividad, azul libre. Aquí vive esa
- * reducción, el resumen de arriba y los dos renglones de texto de la tarjeta,
- * para que la pantalla, el centro operativo y las pruebas digan lo mismo.
+ * reducción, el resumen de arriba, el panel de quién pide atención (atrasados,
+ * sin nada asignado, sin entrada) y los renglones de texto de la tarjeta, para
+ * que la pantalla, el centro operativo y las pruebas digan lo mismo.
  */
 import {
   CLAUDIA_TESTER_EMAIL,
@@ -14,7 +15,9 @@ import {
 } from "@/lib/platform-accounts";
 import {
   STATUS_LABELS,
+  fechaMx,
   formatMinutes,
+  type BoardLateReason,
   type BoardUserStatus,
   type TeamBoardUser,
   type WorkflowPipeline,
@@ -48,10 +51,33 @@ export type ResumenEquipo = {
   retraso: number;
   libres: number;
   total: number;
-  /** Desglose del ámbar, para el `title` de la celda. */
+  /** Desglose del ámbar, para el hint y el `title` de la celda. */
   atrasados: number;
+  /** Checó hoy, sigue en jornada y no tiene nada abierto. */
+  sinNada: number;
+  /** Hoy no ha checado entrada. */
+  sinEntrada: number;
+  /** Ya checó su salida y no tiene nada abierto. */
+  yaSalieron: number;
+  /** `sinNada + sinEntrada + yaSalieron`: se queda por compatibilidad. */
   sinActividad: number;
 };
+
+/** Por qué alguien no tiene nada abierto: está en jornada, no ha llegado o ya se fue. */
+export type MotivoSinActividad = "sinNada" | "sinEntrada" | "yaSalio";
+
+/**
+ * Separa a quien no tiene nada abierto (status «sin_actividad» / «inactivo») por su
+ * jornada de hoy; `null` para los demás estados. Con la API vieja no viene
+ * `entradaHoyAt` y no hay cómo separarlos: todo cuenta como «sin nada», como antes.
+ */
+export function motivoSinActividad(u: TeamBoardUser): MotivoSinActividad | null {
+  if (u.status !== "sin_actividad" && u.status !== "inactivo") return null;
+  if (u.entradaHoyAt === undefined) return "sinNada";
+  if (!u.entradaHoyAt) return "sinEntrada";
+  if (u.salidaHoyAt) return "yaSalio";
+  return "sinNada";
+}
 
 export function resumenEquipo(users: readonly TeamBoardUser[]): ResumenEquipo {
   const r: ResumenEquipo = {
@@ -60,6 +86,9 @@ export function resumenEquipo(users: readonly TeamBoardUser[]): ResumenEquipo {
     libres: 0,
     total: users.length,
     atrasados: 0,
+    sinNada: 0,
+    sinEntrada: 0,
+    yaSalieron: 0,
     sinActividad: 0,
   };
   for (const u of users) {
@@ -68,9 +97,283 @@ export function resumenEquipo(users: readonly TeamBoardUser[]): ResumenEquipo {
     else if (aro === "libre") r.libres += 1;
     else r.retraso += 1;
     if (u.status === "atrasado") r.atrasados += 1;
-    if (u.status === "sin_actividad" || u.status === "inactivo") r.sinActividad += 1;
+    const motivo = motivoSinActividad(u);
+    if (motivo) r.sinActividad += 1;
+    if (motivo === "sinNada") r.sinNada += 1;
+    else if (motivo === "sinEntrada") r.sinEntrada += 1;
+    else if (motivo === "yaSalio") r.yaSalieron += 1;
   }
   return r;
+}
+
+/**
+ * Desglose del ámbar en una línea: «2 atrasados · 9 sin nada asignado · 3 sin entrada».
+ * Los ceros no se dicen; si todo es cero, lo dice en positivo.
+ */
+export function desgloseRetraso(r: ResumenEquipo): string {
+  const partes: string[] = [];
+  if (r.atrasados > 0) partes.push(`${r.atrasados} ${r.atrasados === 1 ? "atrasado" : "atrasados"}`);
+  if (r.sinNada > 0) partes.push(`${r.sinNada} sin nada asignado`);
+  if (r.sinEntrada > 0) partes.push(`${r.sinEntrada} sin entrada`);
+  if (r.yaSalieron > 0) partes.push(`${r.yaSalieron} ${r.yaSalieron === 1 ? "ya salió" : "ya salieron"}`);
+  return partes.length > 0 ? partes.join(" · ") : "nadie atrasado ni sin nada asignado";
+}
+
+/* ─── Horas y fechas en hora de México ─────────────────────────────────── */
+
+const ZONA_MX = "America/Mexico_City";
+
+function fecha(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** «13:39»: hora de México, 24 h. */
+function hora(valor: string | Date): string {
+  const d = typeof valor === "string" ? fecha(valor) : valor;
+  if (!d) return "";
+  return d.toLocaleTimeString("es-MX", {
+    timeZone: ZONA_MX,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+/** Minutos enteros de `iso` a `ahora` (nunca negativos); `null` sin fecha válida. */
+function minutosDesde(iso: string | null | undefined, ahora: number): number | null {
+  const d = fecha(iso);
+  if (!d) return null;
+  return Math.max(0, Math.floor((ahora - d.getTime()) / 60_000));
+}
+
+/** Días de calendario (en México) entre dos instantes: hoy 0, ayer 1… */
+function diasEntre(desde: Date, hasta: Date): number {
+  return Math.round((Date.parse(fechaMx(hasta)) - Date.parse(fechaMx(desde))) / 86_400_000);
+}
+
+const FECHA_CORTA = new Intl.DateTimeFormat("es-MX", {
+  timeZone: ZONA_MX,
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/**
+ * Cuándo pasó algo, como se dice: «hoy 13:39», «ayer 18:11» o «lun 5 oct 18:11»
+ * (con el año solo si no es el de hoy). Hora de México, 24 h.
+ */
+export function cuandoMx(iso: string | null | undefined, ahora: number = Date.now()): string {
+  const d = fecha(iso);
+  if (!d) return "";
+  const dias = diasEntre(d, new Date(ahora));
+  const h = hora(d);
+  if (dias === 0) return `hoy ${h}`;
+  if (dias === 1) return `ayer ${h}`;
+  const partes = FECHA_CORTA.formatToParts(d);
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) =>
+    (partes.find((p) => p.type === tipo)?.value ?? "").replace(/\./g, "");
+  const anio = valor("year");
+  const otroAnio = anio !== fechaMx(new Date(ahora)).slice(0, 4);
+  return `${valor("weekday")} ${valor("day")} ${valor("month")}${otroAnio ? ` ${anio}` : ""} ${h}`;
+}
+
+/** «hace 2 h 15 min»; con menos de un minuto, «hace un momento». */
+function hace(minutos: number): string {
+  return minutos < 1 ? "hace un momento" : `hace ${formatMinutes(minutos)}`;
+}
+
+/** Días de calendario desde `iso`: «hoy», «hace 1 día», «hace 3 días». */
+function haceDias(iso: string | null | undefined, ahora: number): string | null {
+  const d = fecha(iso);
+  if (!d) return null;
+  const dias = diasEntre(d, new Date(ahora));
+  if (dias <= 0) return "hoy";
+  return dias === 1 ? "hace 1 día" : `hace ${dias} días`;
+}
+
+function recortar(texto: string, max = 40): string {
+  const t = (texto || "").trim();
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+
+/* ─── Última actividad terminada ───────────────────────────────────────── */
+
+/** Sin límite cuenta a tiempo (lo mismo que los KPI de entregas). */
+function comoEntrego(lateMinutes: number | null | undefined): string {
+  return lateMinutes && lateMinutes > 0 ? `con ${formatMinutes(lateMinutes)} de atraso` : "a tiempo";
+}
+
+/**
+ * «Última: AN-0091 · Depurar base… · terminó ayer 18:11, a tiempo» (o «con 40 min de
+ * atraso»). Sin nada terminado: «Sin actividades terminadas».
+ */
+export function ultimaActividad(u: TeamBoardUser, ahora: number = Date.now()): string {
+  const f = u.lastFinished;
+  if (!f) return "Sin actividades terminadas";
+  const que = [f.anNumber, recortar(f.titulo)].filter(Boolean).join(" · ");
+  const cuando = cuandoMx(f.finishedAt, ahora);
+  return `Última: ${que} · terminó ${cuando ? `${cuando}, ` : ""}${comoEntrego(f.lateMinutes)}`;
+}
+
+/** Versión corta para la tarjeta: «Última: AN-0091 · ayer 18:11». `null` sin nada terminado. */
+export function ultimaActividadCorta(u: TeamBoardUser, ahora: number = Date.now()): string | null {
+  const f = u.lastFinished;
+  if (!f) return null;
+  const que = f.anNumber || recortar(f.titulo, 24);
+  return [`Última: ${que}`, cuandoMx(f.finishedAt, ahora)].filter(Boolean).join(" · ");
+}
+
+/* ─── Panel «para atender»: atrasados, sin nada asignado y sin entrada ─── */
+
+/** El motivo del atraso, en palabras. */
+export const MOTIVO_ATRASO: Record<BoardLateReason, string> = {
+  inicio: "no la ha iniciado",
+  tope: "pasó su hora límite",
+  plan: "pasó su tiempo planeado",
+};
+
+export type AtrasadoEnAtencion = {
+  persona: TeamBoardUser;
+  folio: string | null;
+  titulo: string | null;
+  minutosAtraso: number | null;
+  /** «no la ha iniciado», «pasó su hora límite»… `null` si la API no dice por qué. */
+  motivo: string | null;
+  /** «Atrasada · 2 h 15 min · no la ha iniciado». */
+  detalle: string;
+};
+
+export type SinNadaEnAtencion = {
+  persona: TeamBoardUser;
+  /** Minutos sin nada abierto; `null` si la API no dice desde cuándo (API vieja). */
+  minutosSinNada: number | null;
+  /** Lo dejaron sin nada desde que llegó (`idleSinceAt === entradaHoyAt`). */
+  desdeQueEntro: boolean;
+  /** «Entró 10:05»; `null` sin entrada conocida. */
+  entrada: string | null;
+  /** «sin nada desde hace 2 h 15 min» o «sin nada desde que entró (hace 2 h 15 min)». */
+  sinNadaDesde: string | null;
+  /** Ver `ultimaActividad`. */
+  ultima: string;
+};
+
+export type SinEntradaEnAtencion = {
+  persona: TeamBoardUser;
+  /** Ver `ultimaActividad`. */
+  ultima: string;
+  /** Desde su última actividad terminada: «hace 3 días». `null` si nunca terminó nada. */
+  haceCuanto: string | null;
+};
+
+export type AtencionDelEquipo = {
+  /** Más atraso primero. */
+  atrasados: AtrasadoEnAtencion[];
+  /** Más tiempo sin nada primero. */
+  sinNada: SinNadaEnAtencion[];
+  /** Lo último que terminaron, de lo más viejo a lo más reciente; sin nada terminado al final. */
+  sinEntrada: SinEntradaEnAtencion[];
+};
+
+/** Mayor primero; sin dato, al final. */
+function mayorPrimero(a: number | null, b: number | null): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return b - a;
+}
+
+const porNombre = (a: { persona: TeamBoardUser }, b: { persona: TeamBoardUser }) =>
+  a.persona.nombre.localeCompare(b.persona.nombre, "es");
+
+/**
+ * La actividad por la que va tarde. La API manda la que está haciendo en
+ * `currentActivity` (y su atraso en `currentLateMinutes`); si solo vienen las
+ * abiertas, la más atrasada de ellas.
+ */
+function atrasadoEnAtencion(u: TeamBoardUser): AtrasadoEnAtencion {
+  const abiertas = u.openActivities ?? [];
+  let folio: string | null = null;
+  let titulo: string | null = null;
+  let minutos: number | null = u.currentLateMinutes ?? null;
+  if (u.currentActivity) {
+    folio = u.currentActivity.anNumber || null;
+    titulo = u.currentActivity.titulo || null;
+    const misma = abiertas.find((a) => a.id === u.currentActivity?.id);
+    if (minutos == null) minutos = misma?.minutosAtraso ?? null;
+  } else {
+    const tarde =
+      [...abiertas]
+        .filter((a) => a.atrasada)
+        .sort((a, b) => mayorPrimero(a.minutosAtraso ?? null, b.minutosAtraso ?? null))[0] ?? abiertas[0];
+    if (tarde) {
+      folio = tarde.anNumber || null;
+      titulo = tarde.titulo || null;
+      if (minutos == null) minutos = tarde.minutosAtraso ?? null;
+    }
+  }
+  const motivo = u.currentLateReason ? (MOTIVO_ATRASO[u.currentLateReason] ?? null) : null;
+  const detalle = [minutos != null && minutos > 0 ? `Atrasada · ${formatMinutes(minutos)}` : "Atrasada", motivo]
+    .filter(Boolean)
+    .join(" · ");
+  return { persona: u, folio, titulo, minutosAtraso: minutos, motivo, detalle };
+}
+
+function sinNadaEnAtencion(u: TeamBoardUser, ahora: number): SinNadaEnAtencion {
+  const entrada = fecha(u.entradaHoyAt);
+  const idle = fecha(u.idleSinceAt);
+  const minutosSinNada = minutosDesde(u.idleSinceAt, ahora);
+  const desdeQueEntro = Boolean(idle && entrada && idle.getTime() === entrada.getTime());
+  let sinNadaDesde: string | null = null;
+  if (minutosSinNada != null) {
+    sinNadaDesde = desdeQueEntro
+      ? `sin nada desde que entró (${hace(minutosSinNada)})`
+      : `sin nada desde ${hace(minutosSinNada)}`;
+  }
+  return {
+    persona: u,
+    minutosSinNada,
+    desdeQueEntro,
+    entrada: entrada ? `Entró ${hora(entrada)}` : null,
+    sinNadaDesde,
+    ultima: ultimaActividad(u, ahora),
+  };
+}
+
+/**
+ * Lo que el encargado tiene que ir a ver, en tres listas: quién va tarde y con
+ * qué, a quién dejaron sin nada (y desde cuándo, y qué fue lo último que hizo) y
+ * quién no ha checado. Quien ya salió y los libres no piden nada.
+ */
+export function atencionEquipo(users: readonly TeamBoardUser[], ahora: number = Date.now()): AtencionDelEquipo {
+  const atrasados: AtrasadoEnAtencion[] = [];
+  const sinNada: SinNadaEnAtencion[] = [];
+  const sinEntrada: SinEntradaEnAtencion[] = [];
+  for (const u of users) {
+    if (u.status === "atrasado") {
+      atrasados.push(atrasadoEnAtencion(u));
+      continue;
+    }
+    const motivo = motivoSinActividad(u);
+    if (motivo === "sinNada") sinNada.push(sinNadaEnAtencion(u, ahora));
+    else if (motivo === "sinEntrada") {
+      sinEntrada.push({
+        persona: u,
+        ultima: ultimaActividad(u, ahora),
+        haceCuanto: haceDias(u.lastFinished?.finishedAt, ahora),
+      });
+    }
+  }
+  atrasados.sort((a, b) => mayorPrimero(a.minutosAtraso, b.minutosAtraso) || porNombre(a, b));
+  sinNada.sort((a, b) => mayorPrimero(a.minutosSinNada, b.minutosSinNada) || porNombre(a, b));
+  const terminoHace = (s: SinEntradaEnAtencion) => {
+    const d = fecha(s.persona.lastFinished?.finishedAt);
+    return d ? ahora - d.getTime() : null;
+  };
+  sinEntrada.sort((a, b) => mayorPrimero(terminoHace(a), terminoHace(b)) || porNombre(a, b));
+  return { atrasados, sinNada, sinEntrada };
 }
 
 /**
@@ -160,19 +463,31 @@ export function actividadesDeTarjeta(u: TeamBoardUser): LineaActividadTarjeta[] 
   return [];
 }
 
-/** Renglón 1: qué está haciendo, completo (la tarjeta lo parte en dos líneas). */
+/**
+ * Renglón 1: qué está haciendo, completo (la tarjeta lo parte en dos líneas). Sin
+ * nada abierto, lo último que terminó, dicho como tal: «Última: …».
+ */
 export function queHace(u: TeamBoardUser): string {
   const abierta = u.openActivities?.[0];
   if (abierta) return abierta.titulo;
   if (u.currentActivity) return u.currentActivity.titulo;
-  if (u.lastFinished) return u.lastFinished.titulo;
+  if (u.lastFinished) return `Última: ${u.lastFinished.titulo}`;
   return "Sin actividad asignada";
 }
 
-function hora(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+/**
+ * Sin nada abierto, su jornada de hoy: «Entró 10:05 · sin nada hace 2 h 15 min»,
+ * «Salió 18:02» o «Sin entrada hoy».
+ */
+function jornadaSinNada(u: TeamBoardUser, ahora: number): string {
+  const entrada = fecha(u.entradaHoyAt);
+  if (!entrada) return "Sin entrada hoy";
+  const salida = fecha(u.salidaHoyAt);
+  if (salida) return `Salió ${hora(salida)}`;
+  const min = minutosDesde(u.idleSinceAt, ahora);
+  return min != null && min >= 1
+    ? `Entró ${hora(entrada)} · sin nada hace ${formatMinutes(min)}`
+    : `Entró ${hora(entrada)}`;
 }
 
 /**
@@ -206,6 +521,9 @@ export function contextoActividad(u: TeamBoardUser, ahora: number = Date.now()):
     partes.push(min < 1 ? "Sin nada abierto" : `Sin nada abierto desde hace ${formatMinutes(min)}`);
   } else if (u.status === "activo" && u.activityStartedAt) {
     partes.push(`Desde las ${hora(u.activityStartedAt)}`);
+  } else if ((u.status === "sin_actividad" || u.status === "inactivo") && u.entradaHoyAt !== undefined) {
+    // API vieja (sin `entradaHoyAt`): se queda el rótulo del estado, como antes.
+    partes.push(jornadaSinNada(u, ahora));
   } else {
     partes.push(STATUS_LABELS[u.status] ?? "");
   }

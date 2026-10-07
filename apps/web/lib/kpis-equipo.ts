@@ -1,6 +1,6 @@
 /**
- * KPI del equipo (dashboard del dueño): retardos, uniforme, horas laboradas contra
- * productivas, inactividad y tiempo extra.
+ * KPI del equipo (dashboard del dueño): cumplimiento en tiempo y forma (entregas),
+ * retardos, uniforme, horas laboradas contra productivas, inactividad y tiempo extra.
  *
  * Las cuentas las hace la API (`apps/api/src/me/kpis-equipo.ts`); aquí solo hay
  * tipos, llamadas y lo necesario para pintar: formato, orden y la línea de tiempo.
@@ -18,7 +18,58 @@ export type UniformeKpi = {
   pct: number | null;
 };
 
+/** Entregas de actividades: el «tiempo y forma». */
+export type EntregasKpi = {
+  /** Las que se miden en el rango: entregadas en el rango + las que vencieron en el rango sin entregarse. */
+  medidas: number;
+  /** Entregadas antes de su límite (las que no tienen límite cuentan a tiempo). */
+  aTiempo: number;
+  /** Entregadas después de su límite. */
+  tarde: number;
+  /** Su límite ya pasó (dentro del rango) y no la ha entregado. */
+  sinEntregar: number;
+  /** Con al menos una revisión del jefe. */
+  revisadas: number;
+  /** Su primera revisión fue «aprobada» (no se la devolvieron). */
+  aprobadasALaPrimera: number;
+  /** Revisadas que le devolvieron al menos una vez. */
+  devueltas: number;
+  /** aTiempo ÷ medidas. null sin medidas. */
+  pctATiempo: number | null;
+  /** aprobadasALaPrimera ÷ revisadas. null sin revisadas. */
+  pctALaPrimera: number | null;
+};
+
+/** Días laborables en que checó a tiempo ÷ días laborables que debía checar (los sin checar cuentan como no). */
+export type AsistenciaPuntualKpi = { esperados: number; puntuales: number; pct: number | null };
+
+/** Una de las partes del cumplimiento, con su peso en el promedio. */
+export type ParteCumplimiento = {
+  clave: "entregas" | "forma" | "asistencia" | "uniforme";
+  /** «Entregas a tiempo», «Aprobadas a la primera», «Asistencia puntual», «Uniforme». */
+  etiqueta: string;
+  /** 0–100. */
+  pct: number;
+  /** 40 / 25 / 25 / 10. */
+  peso: number;
+  /** «17 de 18», «7 de 8 días». */
+  detalle: string;
+};
+
 export type TotalesKpi = {
+  /*
+   * Lo de «tiempo y forma» es opcional en el tipo: una API que aún no lo manda
+   * (undefined) deja la pantalla como antes, con la productividad al frente.
+   */
+  entregas?: EntregasKpi;
+  asistenciaPuntual?: AsistenciaPuntualKpi;
+  /**
+   * Cumplimiento en tiempo y forma (0–100): promedio ponderado de entregas a tiempo 40,
+   * aprobadas a la primera 25, asistencia puntual 25 y uniforme 10 (lo que no tiene dato no pesa).
+   * null si no tuvo ninguna entrega que medir en el rango.
+   */
+  cumplimientoPct?: number | null;
+  cumplimientoPartes?: ParteCumplimiento[];
   diasConJornada: number;
   diasSinChecada: number;
   faltasJustificadas: number;
@@ -28,6 +79,7 @@ export type TotalesKpi = {
   minutosLaborados: number;
   minutosProductivos: number;
   minutosInactivos: number;
+  /** En pantalla es «Tiempo en actividades»: minutos con el reloj de una actividad corriendo ÷ minutos en jornada. */
   productividadPct: number | null;
   minutosExtra: number | null;
   /** Lo que un jefe ya aprobó: lo único que la pre-nómina puede pagar como extra. */
@@ -111,6 +163,24 @@ export type KpisEquipoResponse = {
   personas: KpiPersonaFila[];
 };
 
+/** Una actividad que se mide en el «tiempo y forma» de la persona. */
+export type EntregaKpi = {
+  activityId: number;
+  anNumber: string | null;
+  /** «Actividad de otra área» si quien mira no ve ese tipo. */
+  titulo: string | null;
+  /** ISO; el límite real (fin del periodo, o fecha máxima). */
+  limite: string | null;
+  /** ISO; cuándo la entregó la persona (no cuándo la aprobó el jefe). */
+  entregadaAt: string | null;
+  estado: "a_tiempo" | "tarde" | "sin_entregar";
+  /** Tarde: entrega − límite; sin entregar: ahora − límite. */
+  minutosTarde: number | null;
+  /** null = nadie la ha revisado. */
+  primeraRevision: "APROBADA" | "DEVUELTA" | null;
+  devoluciones: number;
+};
+
 export type KpisPersonaResponse = KpiPersonaFila & {
   desde: string;
   hasta: string;
@@ -118,6 +188,8 @@ export type KpisPersonaResponse = KpiPersonaFila & {
   supuestos: string[];
   dias: DiaKpi[];
   justificaciones: Array<{ fecha: string; motivo: string }>;
+  /** Lo más reciente arriba. Opcional: una API vieja no lo manda. */
+  entregas?: EntregaKpi[];
 };
 
 export const SEMAFORO_KPI_COLORS: Record<SemaforoKpi, string> = {

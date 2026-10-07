@@ -62,12 +62,12 @@ function fila(act: ReturnType<typeof actividad>, over: Record<string, unknown> =
   };
 }
 
-function build(filas: unknown[], huerfanas: unknown[] = []) {
+function build(filas: unknown[], huerfanas: unknown[] = [], asistencias: unknown[] = []) {
   const prisma = {
     user: { findMany: jest.fn().mockResolvedValue([LUIS, CAROLINA]) },
     activityAssignee: { findMany: jest.fn().mockResolvedValue(filas) },
     activity: { findMany: jest.fn().mockResolvedValue(huerfanas) },
-    attendance: { findMany: jest.fn().mockResolvedValue([]) },
+    attendance: { findMany: jest.fn().mockResolvedValue(asistencias) },
     lunchBreak: { findMany: jest.fn().mockResolvedValue([]) },
     locationTracking: { findMany: jest.fn().mockResolvedValue([]) },
     activityPeerRequest: { count: jest.fn().mockResolvedValue(0) },
@@ -143,7 +143,7 @@ describe('tarjetas de Mi equipo', () => {
   });
 
   describe('«libre» dura 15 minutos después de terminar', () => {
-    async function carolinaQueTermino(hace: number) {
+    async function carolinaQueTermino(hace: number, asistencias: unknown[] = []) {
       const cerrada = actividad({
         id: 5,
         anNumber: 'AN-0005',
@@ -153,7 +153,7 @@ describe('tarjetas de Mi equipo', () => {
         fechaMaxima: new Date('2026-09-28T20:00:00.000Z'),
         fechaFinalizacion: new Date(AHORA.getTime() - hace * 60_000),
       });
-      const service = build([fila(cerrada, { userId: 13, rol: 'TECNICO' })]);
+      const service = build([fila(cerrada, { userId: 13, rol: 'TECNICO' })], [], asistencias);
       const board = await service.getBoard(
         { id: 7, email: LUIS.email, roleKey: 'coord_operaciones' },
         1,
@@ -167,11 +167,59 @@ describe('tarjetas de Mi equipo', () => {
       expect(carolina.lastFinished).toEqual(expect.objectContaining({ anNumber: 'AN-0005' }));
     });
 
-    it('terminó hace 30 min: sin nada asignado', async () => {
+    it('terminó hace 30 min: sin nada asignado, y se sabe qué fue lo último', async () => {
       const carolina = await carolinaQueTermino(30);
       expect(carolina.status).toBe('sin_actividad');
-      expect(carolina.lastFinished).toBeNull();
+      expect(carolina.lastFinished).toEqual(expect.objectContaining({ anNumber: 'AN-0005', lateMinutes: 0 }));
+      // Hoy no checó: no hay «desde cuándo está sin nada» en la oficina.
+      expect(carolina.entradaHoyAt).toBeNull();
       expect(carolina.idleSinceAt).toBeNull();
     });
+
+    // AHORA = 12:00 en México. Carolina entró 10:00 (16:00 UTC).
+    const entrada = (iso: string) => ({ userId: 13, type: 'entrada', timestamp: new Date(iso), workDate: null });
+    const salida = (iso: string) => ({ userId: 13, type: 'salida', timestamp: new Date(iso), workDate: null });
+
+    it('entró y terminó después: sin nada desde que terminó', async () => {
+      const carolina = await carolinaQueTermino(30, [entrada('2026-09-28T16:00:00.000Z')]);
+      expect(carolina.status).toBe('sin_actividad');
+      expect(carolina.entradaHoyAt).toEqual(new Date('2026-09-28T16:00:00.000Z'));
+      expect(carolina.salidaHoyAt).toBeNull();
+      expect(carolina.idleSinceAt).toEqual(new Date(AHORA.getTime() - 30 * 60_000));
+    });
+
+    it('lo último lo terminó antes de entrar: sin nada desde que llegó', async () => {
+      const carolina = await carolinaQueTermino(180, [entrada('2026-09-28T16:00:00.000Z')]);
+      expect(carolina.idleSinceAt).toEqual(new Date('2026-09-28T16:00:00.000Z'));
+      expect(carolina.lastFinished).toEqual(expect.objectContaining({ anNumber: 'AN-0005' }));
+    });
+
+    it('ya salió: no está «sin nada», se fue', async () => {
+      const carolina = await carolinaQueTermino(180, [
+        entrada('2026-09-28T16:00:00.000Z'),
+        salida('2026-09-28T17:30:00.000Z'),
+      ]);
+      expect(carolina.salidaHoyAt).toEqual(new Date('2026-09-28T17:30:00.000Z'));
+      expect(carolina.idleSinceAt).toBeNull();
+    });
+  });
+
+  it('atrasado dice por qué: no la ha iniciado y ya pasó su hora', async () => {
+    const sinIniciar = actividad({
+      id: 6,
+      anNumber: 'AN-0006',
+      titulo: 'Revisar NVR',
+      responsableId: 13,
+      // Citada a las 09:00 de México de hoy; son las 12:00 y no la ha iniciado.
+      fechaInicio: new Date('2026-09-28T15:00:00.000Z'),
+      fechaMaxima: new Date('2026-09-28T15:00:00.000Z'),
+      fechaAsignacion: new Date('2026-09-28T14:00:00.000Z'),
+    });
+    const service = build([fila(sinIniciar, { userId: 13, rol: 'TECNICO' })]);
+    const board = await service.getBoard({ id: 7, email: LUIS.email, roleKey: 'coord_operaciones' }, 1);
+    const carolina = board.users.find((u) => u.id === 13)!;
+    expect(carolina.status).toBe('atrasado');
+    expect(carolina.currentLateReason).toBe('inicio');
+    expect(carolina.currentLateMinutes).toBe(180);
   });
 });

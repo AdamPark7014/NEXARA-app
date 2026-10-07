@@ -3,6 +3,7 @@
  * asignadas → iniciadas → en evidencia → cerradas + rechazos peer + SLA de periodo.
  * Puro: sin Prisma ni Nest.
  */
+import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
 
 export type WorkflowPipelineCounts = {
   assigned: number;
@@ -19,9 +20,17 @@ export type WorkflowActivityInput = {
   estatus: string;
   inicioRealAt?: Date | string | null;
   fechaFinalizacion?: Date | string | null;
+  fechaInicio?: Date | string | null;
   fechaMaxima?: Date | string | null;
+  fechaEntregaEsperada?: Date | string | null;
+  periodoInicio?: Date | string | null;
   periodoFin?: Date | string | null;
   evidenceStatus?: string | null;
+  /**
+   * Cuándo la entregó quien la hace (fin real o evidencia completa). Es lo que se compara con
+   * el límite: `fechaFinalizacion` es cuándo la aprobó el jefe, a veces un día después.
+   */
+  entregadaAt?: Date | string | null;
   cancelada?: boolean;
 };
 
@@ -34,14 +43,10 @@ function asDate(v: Date | string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** El mismo límite que el semáforo (fin del periodo en hora de México; fecha máxima = inicio → fin de ese día). */
 function deadlineOf(a: WorkflowActivityInput): Date | null {
-  const fin = asDate(a.periodoFin);
-  if (fin) {
-    const d = new Date(fin);
-    d.setHours(23, 59, 59, 999);
-    return d;
-  }
-  return asDate(a.fechaMaxima);
+  // Una fila con solo el fin del periodo (editada por otro camino) sigue midiéndose contra él.
+  return limiteDeEntrega({ ...a, periodoInicio: a.periodoInicio ?? a.periodoFin });
 }
 
 export function emptyWorkflowPipeline(): WorkflowPipelineCounts {
@@ -96,8 +101,10 @@ export function clasificarActividad(a: WorkflowActivityInput, now: Date = new Da
   let slaLate = false;
   const deadline = deadlineOf(a);
   if (deadline) {
-    const fin = asDate(a.fechaFinalizacion);
-    if (closed && fin) {
+    // Lo que cuenta es cuándo la entregó la persona; la aprobación del jefe puede tardar.
+    const entregada = asDate(a.entregadaAt);
+    const fin = entregada ?? (closed ? asDate(a.fechaFinalizacion) : null);
+    if (fin) {
       if (fin.getTime() <= deadline.getTime()) slaOnTime = true;
       else slaLate = true;
     } else if (!closed && now.getTime() > deadline.getTime()) {

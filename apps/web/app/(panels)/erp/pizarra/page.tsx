@@ -33,6 +33,7 @@ import FlujoKpiStrip from "@/components/pizarra/FlujoKpiStrip";
 import CentroOperativo from "@/components/pizarra/CentroOperativo";
 import EquipoPersonaCard, { rejillaEquipo } from "@/components/pizarra/EquipoPersonaCard";
 import ResumenEquipo, { type FiltroEquipo } from "@/components/pizarra/ResumenEquipo";
+import AtencionEquipo from "@/components/pizarra/AtencionEquipo";
 import { ARO_DE_ESTADO, ARO_LABEL, hayFlujo, resumenEquipo } from "@/components/pizarra/equipo-estado";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
@@ -44,6 +45,7 @@ import {
   type BoardRange,
   type RangoPreset,
   type TeamBoardResponse,
+  type TeamBoardUser,
 } from "@/lib/team-board-api";
 import c from "@/components/pizarra/comun.module.css";
 import p from "./pizarra.module.css";
@@ -203,6 +205,9 @@ export default function PizarraPage() {
 
   const actCfg = getActivitiesSectionConfig(user);
   const puedeAsignar = hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
+  /** «＋ Asignar» de la tarjeta y del panel «Para atender»: con permiso y nunca a uno mismo. */
+  const asignarA = (u: TeamBoardUser): string | undefined =>
+    puedeAsignar && u.id !== user?.id ? `/erp/pizarra/${u.id}/asignar` : undefined;
 
   const isCeo = isCeoEmail(user?.email);
   const otros = users.filter((u) => u.id !== user?.id).length;
@@ -453,7 +458,7 @@ export default function PizarraPage() {
                 key={u.id}
                 user={u}
                 isSelf={yo}
-                asignarHref={puedeAsignar && !yo ? `/erp/pizarra/${u.id}/asignar` : undefined}
+                asignarHref={asignarA(u)}
               />
             );
           })}
@@ -470,7 +475,17 @@ export default function PizarraPage() {
         tertiaryActions={actualizar}
         secondaryActions={centroOperativo}
         tabs={conPestanas ? pestanasNodo(pestanas) : null}
-        stats={verEquipo && data ? <ResumenEquipo users={users} /> : null}
+        stats={
+          verEquipo && data ? (
+            <>
+              <ResumenEquipo users={users} />
+              {/* «Desde hace cuánto» es de hoy: con otros rangos el panel no aplica. */}
+              {preset === "hoy" ? (
+                <AtencionEquipo users={users} ahora={updatedAt ?? undefined} asignarHref={asignarA} />
+              ) : null}
+            </>
+          ) : null
+        }
         before={avisoRefresco}
         toolbar={barraEquipo}
         card={verEquipo}

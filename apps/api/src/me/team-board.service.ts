@@ -28,6 +28,7 @@ import {
   sesionesDe,
 } from '../activities/sessions/activity-sessions.service.js';
 import { estadoDeTrabajo, type MotivoFinSesion } from '../activities/sessions/sesiones-trabajo.js';
+import { limiteDeEntrega, type MotivoSemaforo } from '../activities/semaforo-actividad.js';
 import {
   calculaActividad,
   enRango,
@@ -147,9 +148,21 @@ export type TeamBoardUser = {
   activityElapsedMinutes: number | null;
   /** Atrasado: minutos pasados de la fecha máxima de lo que está haciendo. */
   currentLateMinutes: number | null;
-  /** Libre: desde cuándo no tiene nada abierto. */
+  /** Atrasado: por qué (no la ha iniciado, pasó su límite o pasó su tiempo planeado). */
+  currentLateReason: MotivoSemaforo | null;
+  /** Hoy (hora de México), sin importar el rango: primera entrada y última salida. */
+  entradaHoyAt: Date | null;
+  salidaHoyAt: Date | null;
+  /**
+   * Desde cuándo hoy no tiene nada abierto. Libre: desde que terminó. Sin nada asignado: lo
+   * más tarde entre su entrada de hoy y lo último que terminó hoy (si es su entrada, lo dejaron
+   * sin nada desde que llegó). null si hoy no checó o ya salió.
+   */
   idleSinceAt: Date | null;
-  /** Libre: última actividad que terminó hoy y con cuánto atraso (null = sin fecha máxima). */
+  /**
+   * Última actividad que terminó y con cuánto atraso (0 = a tiempo; null = sin límite).
+   * Libre: la de hoy. Sin nada asignado: la última, de cualquier día.
+   */
   lastFinished: {
     id: number;
     anNumber: string;
@@ -451,6 +464,7 @@ export class TeamBoardService {
       select: {
         userId: true,
         inicioRealAt: true,
+        finRealAt: true,
         activity: {
           select: {
             id: true,
@@ -458,11 +472,14 @@ export class TeamBoardService {
             titulo: true,
             estatus: true,
             fechaFinalizacion: true,
+            fechaInicio: true,
             fechaMaxima: true,
+            fechaEntregaEsperada: true,
+            periodoInicio: true,
             periodoFin: true,
             fechaAsignacion: true,
             cancelledAt: true,
-            activityEvidences: { select: { userId: true, status: true } },
+            activityEvidences: { select: { userId: true, status: true, completedAt: true } },
           },
         },
       },
@@ -480,15 +497,19 @@ export class TeamBoardService {
           rangoFinal.hasta,
         ) || enRango([a.periodoFin], rangoFinal.desde, rangoFinal.hasta);
       if (!enRangoAct) continue;
-      const ev = a.activityEvidences.find((e) => e.userId === row.userId)?.status ?? null;
+      const miEv = a.activityEvidences.find((e) => e.userId === row.userId) ?? null;
       const clasif = clasificarActividad(
         {
           estatus: a.estatus,
           inicioRealAt: row.inicioRealAt,
           fechaFinalizacion: a.fechaFinalizacion,
+          fechaInicio: a.fechaInicio,
           fechaMaxima: a.fechaMaxima,
+          fechaEntregaEsperada: a.fechaEntregaEsperada,
+          periodoInicio: a.periodoInicio,
           periodoFin: a.periodoFin,
-          evidenceStatus: ev,
+          evidenceStatus: miEv?.status ?? null,
+          entregadaAt: row.finRealAt ?? (miEv?.status === 'COMPLETED' ? miEv.completedAt : null),
           cancelada: Boolean(a.cancelledAt),
         },
         now,
@@ -531,16 +552,20 @@ export class TeamBoardService {
       select: {
         userId: true,
         inicioRealAt: true,
+        finRealAt: true,
         activity: {
           select: {
             estatus: true,
             fechaFinalizacion: true,
+            fechaInicio: true,
             fechaMaxima: true,
+            fechaEntregaEsperada: true,
+            periodoInicio: true,
             periodoFin: true,
             fechaAsignacion: true,
             cancelledAt: true,
             activityEvidences: {
-              select: { userId: true, status: true },
+              select: { userId: true, status: true, completedAt: true },
             },
           },
         },
@@ -559,16 +584,20 @@ export class TeamBoardService {
         ) ||
         enRango([a.periodoFin], rango.desde, rango.hasta);
       if (!enRangoAct) continue;
-      const ev = a.activityEvidences.find((e) => e.userId === row.userId)?.status ?? null;
+      const miEv = a.activityEvidences.find((e) => e.userId === row.userId) ?? null;
       accumulateWorkflow(
         counts,
         {
           estatus: a.estatus,
           inicioRealAt: row.inicioRealAt,
           fechaFinalizacion: a.fechaFinalizacion,
+          fechaInicio: a.fechaInicio,
           fechaMaxima: a.fechaMaxima,
+          fechaEntregaEsperada: a.fechaEntregaEsperada,
+          periodoInicio: a.periodoInicio,
           periodoFin: a.periodoFin,
-          evidenceStatus: ev,
+          evidenceStatus: miEv?.status ?? null,
+          entregadaAt: row.finRealAt ?? (miEv?.status === 'COMPLETED' ? miEv.completedAt : null),
           cancelada: Boolean(a.cancelledAt),
         },
         now,
@@ -1179,6 +1208,37 @@ export class TeamBoardService {
       ...locationTrackings.map((lt) => lt.usuarioId),
     ]);
 
+    // Entrada y salida de HOY, se haya pedido el rango que se haya pedido: con ellas se sabe
+    // quién está en la oficina sin nada que hacer, desde cuándo, y quién ya se fue.
+    const hoyKey = workDateKey(now);
+    const hoyEnRango = workDateKey(dayStart) <= hoyKey && hoyKey <= workDateKey(dayEnd);
+    const jornadaDeHoy = new Map<number, Jornada>();
+    if (hoyEnRango) {
+      for (const [userId, porDia] of jornadasPorUsuario) {
+        const j = porDia.get(hoyKey);
+        if (j) jornadaDeHoy.set(userId, j);
+      }
+    } else {
+      const { start, end } = workDayBounds(now);
+      const deHoy = await this.prisma.attendance.findMany({
+        where: {
+          userId: { in: userIds },
+          timestamp: { gte: start, lte: end },
+          ...(companyId != null ? { companyId } : {}),
+        },
+        select: { userId: true, type: true, timestamp: true },
+        orderBy: { timestamp: 'asc' },
+      });
+      for (const a of deHoy) {
+        const actual = jornadaDeHoy.get(a.userId);
+        if (a.type === 'entrada') {
+          if (!actual) jornadaDeHoy.set(a.userId, { entrada: a.timestamp, salida: null });
+        } else if (a.type === 'salida' && actual) {
+          actual.salida = a.timestamp;
+        }
+      }
+    }
+
     /** Lo calculado de cada fila (persona + actividad), para no repetir cuentas. */
     type Calculo = {
       calc: ActividadCalculada;
@@ -1396,14 +1456,29 @@ export class TeamBoardService {
       let activityStartedAt: Date | null = null;
       let activityElapsedMinutes: number | null = null;
       let currentLateMinutes: number | null = null;
+      let currentLateReason: MotivoSemaforo | null = null;
       let idleSinceAt: Date | null = null;
       let lastFinished: TeamBoardUser['lastFinished'] = null;
+      const hoy = jornadaDeHoy.get(u.id) ?? null;
+      // Una salida vieja de antes de volver a entrar no cuenta: sigue en jornada.
+      const salioHoy = hoy?.salida != null && hoy.salida.getTime() >= hoy.entrada.getTime();
+      const terminadaDatos = (p: (typeof propias)[number], terminoAt: Date) => {
+        const limite = limiteDeEntrega(p.a);
+        return {
+          id: p.a.id,
+          anNumber: p.a.anNumber,
+          titulo: p.a.titulo,
+          finishedAt: terminoAt,
+          lateMinutes: limite ? minutos(terminoAt.getTime() - limite.getTime()) : null,
+        };
+      };
 
       if (act) {
         // Con periodo, «atrasado» es pasar el fin de su último día, no la hora citada del primero.
         const overdue = enCurso?.calculo?.calc.semaforo === 'rojo';
         status = overdue ? 'atrasado' : 'activo';
         currentLateMinutes = overdue ? (enCurso?.calculo?.calc.minutosAtraso ?? null) : null;
+        currentLateReason = overdue ? (enCurso?.calculo?.calc.motivoAtraso ?? null) : null;
         currentActivity = {
           id: act.id,
           anNumber: act.anNumber,
@@ -1428,14 +1503,18 @@ export class TeamBoardService {
         if (ultima?.terminoAt && now.getTime() - ultima.terminoAt.getTime() <= LIBRE_TRAS_TERMINAR_MS) {
           status = 'libre';
           idleSinceAt = ultima.terminoAt;
-          const limite = limiteDeActividad(ultima.a);
-          lastFinished = {
-            id: ultima.a.id,
-            anNumber: ultima.a.anNumber,
-            titulo: ultima.a.titulo,
-            finishedAt: ultima.terminoAt,
-            lateMinutes: limite ? minutos(ultima.terminoAt.getTime() - limite.getTime()) : null,
-          };
+          lastFinished = terminadaDatos(ultima, ultima.terminoAt);
+        } else {
+          // Sin nada asignado: su última actividad (de cualquier día, no solo del rango) y,
+          // si hoy checó y no ha salido, desde cuándo está sin nada.
+          const previa = propias
+            .filter((p) => p.terminada && !p.cancelada && p.terminoAt != null && p.terminoAt.getTime() <= now.getTime())
+            .sort((x, y) => (y.terminoAt?.getTime() ?? 0) - (x.terminoAt?.getTime() ?? 0))[0];
+          if (previa?.terminoAt) lastFinished = terminadaDatos(previa, previa.terminoAt);
+          if (hoy && !salioHoy) {
+            const termino = previa?.terminoAt ?? null;
+            idleSinceAt = termino && termino.getTime() > hoy.entrada.getTime() ? termino : hoy.entrada;
+          }
         }
       }
       void present; // la presencia ya no define el estado (se sigue calculando la entrada del día)
@@ -1468,6 +1547,9 @@ export class TeamBoardService {
         activityStartedAt,
         activityElapsedMinutes,
         currentLateMinutes,
+        currentLateReason,
+        entradaHoyAt: hoy?.entrada ?? null,
+        salidaHoyAt: salioHoy ? hoy!.salida : null,
         idleSinceAt,
         lastFinished,
         enEsperaAprobacion,
