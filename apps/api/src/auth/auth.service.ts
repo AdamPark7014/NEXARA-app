@@ -124,6 +124,8 @@ export class AuthService {
       PERMISSIONS.WAREHOUSE_VIEW,
       PERMISSIONS.WAREHOUSE_MANAGE,
       PERMISSIONS.CATALOG_VIEW,
+      // Dar de alta y corregir artículos (por código de barras o desde el formulario).
+      PERMISSIONS.CATALOG_MANAGE,
     ]) {
       set.add(p);
     }
