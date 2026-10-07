@@ -4,7 +4,7 @@
  *
  * Nada de esto recalcula: los números vienen de la API (`apps/api/src/me/kpis-equipo.ts`).
  */
-import type { DiaKpi, KpiPersonaFila, TotalesKpi } from "@/lib/kpis-equipo";
+import { fechaCorta, type DiaKpi, type EntregaKpi, type EntregasKpi, type KpiPersonaFila, type TotalesKpi } from "@/lib/kpis-equipo";
 
 const ZONA = "America/Mexico_City";
 
@@ -20,25 +20,143 @@ export function horasEnPalabras(min: number | null | undefined): string {
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-/** Mismos cortes que el semáforo de la API (`UMBRALES_KPI`): verde ≥ 70 %, amarillo ≥ 50 %. */
-export function tonoProductividad(pct: number | null | undefined): "ok" | "atencion" | "critico" | "sin_datos" {
+export type TonoKpi = "ok" | "atencion" | "critico" | "sin_datos";
+
+/**
+ * «Tiempo en actividades» (la vieja «productividad»). Ya no pinta el semáforo de la persona;
+ * los cortes se quedan para el orden por tiempo: ≥ 70 % bien, ≥ 50 % atención.
+ */
+export function tonoProductividad(pct: number | null | undefined): TonoKpi {
   if (pct == null || !Number.isFinite(pct)) return "sin_datos";
   if (pct >= 70) return "ok";
   if (pct >= 50) return "atencion";
   return "critico";
 }
 
+/** Cumplimiento en tiempo y forma, con los cortes del semáforo de entregas de la API: ≥ 90 % bien, ≥ 75 % atención. */
+export function tonoCumplimiento(pct: number | null | undefined): TonoKpi {
+  if (pct == null || !Number.isFinite(pct)) return "sin_datos";
+  if (pct >= 90) return "ok";
+  if (pct >= 75) return "atencion";
+  return "critico";
+}
+
+/** Para el `title` de la cifra: de qué está hecho el cumplimiento. */
+export const PESOS_CUMPLIMIENTO =
+  "Entregas a tiempo 40 %, aprobadas a la primera 25 %, asistencia puntual 25 %, uniforme 10 %";
+
 /**
- * La productividad de una persona (o del equipo) en una o varias frases:
- * «De 40 h en jornada, 29 h estuvo en actividades (73 %). Llegó tarde 2 veces (35 min en total).
- * Uniforme correcto 4 de 5 días.»
+ * Las entregas en una frase: «Entregó 18 actividades: 17 a tiempo y 1 tarde; 18 de 18 aprobadas
+ * a la primera.» Solo dice lo que aplica (sin tarde, sin vencidas o sin revisiones, se lo calla).
+ */
+export function entregasEnPalabras(e: EntregasKpi): string {
+  const entregadas = e.aTiempo + e.tarde;
+  const partes: string[] = [];
+  if (entregadas > 0) {
+    const todas = entregadas === 1 ? "" : "todas ";
+    const como = !e.tarde
+      ? `, ${todas}a tiempo`
+      : !e.aTiempo
+        ? `, ${todas}tarde`
+        : `: ${e.aTiempo} a tiempo y ${e.tarde} tarde`;
+    partes.push(`Entregó ${plural(entregadas, "actividad", "actividades")}${como}`);
+    if (e.sinEntregar) partes.push(`${plural(e.sinEntregar, "venció", "vencieron")} sin entregar`);
+  } else if (e.sinEntregar) {
+    partes.push(`${plural(e.sinEntregar, "actividad venció", "actividades vencieron")} sin entregar`);
+  } else {
+    return "No tuvo actividades que entregar en estas fechas.";
+  }
+  if (e.revisadas) {
+    partes.push(`${e.aprobadasALaPrimera} de ${e.revisadas} ${e.revisadas === 1 ? "aprobada" : "aprobadas"} a la primera`);
+  }
+  return `${partes.join("; ")}.`;
+}
+
+/** Pista de la cifra del equipo: «17 de 18 entregas a tiempo · 0 devueltas». */
+export function entregasDelEquipo(e: EntregasKpi | undefined): string {
+  if (!e || !e.medidas) return "Sin entregas en estas fechas";
+  return `${e.aTiempo} de ${plural(e.medidas, "entrega", "entregas")} a tiempo · ${plural(e.devueltas, "devuelta", "devueltas")}`;
+}
+
+/**
+ * El texto bajo la barra del ranking: «17/18 a tiempo · 18/18 a la primera · 3 h 10 min en
+ * actividades de 24 h». Con `tiempo` (orden «Tiempo en actividades») o con una API que aún
+ * no manda entregas, solo las horas.
+ */
+export function detalleDeFila(t: TotalesKpi, opciones: { tiempo?: boolean } = {}): string {
+  const partes: string[] = [];
+  const e = t.entregas;
+  if (!opciones.tiempo && e) {
+    if (e.medidas) {
+      partes.push(`${e.aTiempo}/${e.medidas} a tiempo`);
+      if (e.revisadas) partes.push(`${e.aprobadasALaPrimera}/${e.revisadas} a la primera`);
+    } else {
+      partes.push("Sin entregas");
+    }
+  }
+  partes.push(
+    t.minutosLaborados > 0
+      ? `${horasEnPalabras(t.minutosProductivos)} en actividades de ${horasEnPalabras(t.minutosLaborados)}`
+      : "Sin jornada",
+  );
+  return partes.join(" · ");
+}
+
+/** Atraso de una entrega: «45 min», «1 h 20 min»; de un día para arriba, «2 días 3 h». */
+export function atrasoEnPalabras(min: number | null | undefined): string {
+  if (min == null || !Number.isFinite(min)) return "—";
+  const total = Math.max(0, Math.round(min));
+  if (total < 1440) return horasEnPalabras(total);
+  const dias = Math.floor(total / 1440);
+  const horas = Math.floor((total % 1440) / 60);
+  return horas ? `${plural(dias, "día", "días")} ${horas} h` : plural(dias, "día", "días");
+}
+
+/** La píldora de estado de una entrega: «A tiempo», «Tarde · 1 h 20 min», «Sin entregar · 2 h». */
+export function estadoDeEntrega(e: Pick<EntregaKpi, "estado" | "minutosTarde">): {
+  texto: string;
+  tono: "success" | "warning" | "danger";
+} {
+  const atraso = e.minutosTarde != null && e.minutosTarde > 0 ? ` · ${atrasoEnPalabras(e.minutosTarde)}` : "";
+  if (e.estado === "tarde") return { texto: `Tarde${atraso}`, tono: "warning" };
+  if (e.estado === "sin_entregar") return { texto: `Sin entregar${atraso}`, tono: "danger" };
+  return { texto: "A tiempo", tono: "success" };
+}
+
+/** Qué pasó en la revisión del jefe: «Aprobada a la primera», «Devuelta ×2», «Sin revisar». */
+export function revisionDeEntrega(e: Pick<EntregaKpi, "estado" | "primeraRevision" | "devoluciones">): {
+  texto: string;
+  tono: "success" | "warning" | "neutral";
+} {
+  if (e.devoluciones > 1) return { texto: `Devuelta ×${e.devoluciones}`, tono: "warning" };
+  if (e.devoluciones === 1 || e.primeraRevision === "DEVUELTA") return { texto: "Devuelta", tono: "warning" };
+  if (e.primeraRevision === "APROBADA") return { texto: "Aprobada a la primera", tono: "success" };
+  // Lo que no entregó no tiene qué revisar.
+  return { texto: e.estado === "sin_entregar" ? "—" : "Sin revisar", tono: "neutral" };
+}
+
+/** Día y hora en hora de México, 24 h: «Lun 5 oct 18:00». */
+export function fechaHoraMx(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const p = Object.fromEntries(partesMx.formatToParts(d).map((x) => [x.type, x.value]));
+  return `${fechaCorta(`${p.year}-${p.month}-${p.day}`)} ${p.hour}:${p.minute}`;
+}
+
+/**
+ * Una persona (o el equipo) en frases. Empieza por las entregas, que es lo que más pesa:
+ * «Entregó 18 actividades: 17 a tiempo y 1 tarde; 18 de 18 aprobadas a la primera. De 40 h en
+ * jornada, 29 h estuvo con el reloj de una actividad corriendo (73 %). Llegó tarde 2 veces
+ * (35 min en total). Uniforme correcto 4 de 5 días.»
  */
 export function resumenEnPalabras(t: TotalesKpi, opciones: { conHorario?: boolean } = {}): string {
   const frases: string[] = [];
+  if (t.entregas) frases.push(entregasEnPalabras(t.entregas));
   if (t.minutosLaborados > 0) {
     const pct = t.productividadPct == null ? "" : ` (${Math.round(t.productividadPct)} %)`;
     frases.push(
-      `De ${horasEnPalabras(t.minutosLaborados)} en jornada, ${horasEnPalabras(t.minutosProductivos)} estuvo en actividades${pct}.`,
+      `De ${horasEnPalabras(t.minutosLaborados)} en jornada, ${horasEnPalabras(t.minutosProductivos)} estuvo con el reloj de una actividad corriendo${pct}.`,
     );
   } else {
     frases.push("No tiene horas en jornada en estas fechas.");
@@ -68,11 +186,34 @@ export function resumenEnPalabras(t: TotalesKpi, opciones: { conHorario?: boolea
   return frases.join(" ");
 }
 
-export type AvisoKpi = { clave: string; texto: string; tono: "warning" | "danger" | "neutral" };
+export type AvisoKpi = { clave: string; texto: string; tono: "warning" | "danger" | "neutral"; titulo?: string };
 
-/** Solo lo que pide atención, en corto, para la fila del ranking. Vacío = todo en orden. */
+/**
+ * Solo lo que pide atención, en corto, para la fila del ranking. Vacío = todo en orden.
+ * Primero las entregas (lo que más importa: el ranking solo enseña dos avisos), luego la asistencia.
+ */
 export function avisosDePersona(t: TotalesKpi): AvisoKpi[] {
   const out: AvisoKpi[] = [];
+  const e = t.entregas;
+  if (e?.tarde) {
+    out.push({ clave: "tarde", texto: `${e.tarde} tarde`, tono: "warning", titulo: "Actividades entregadas después de su límite" });
+  }
+  if (e?.sinEntregar) {
+    out.push({
+      clave: "sin-entregar",
+      texto: `${e.sinEntregar} sin entregar`,
+      tono: "danger",
+      titulo: "Actividades cuyo límite ya pasó y no ha entregado",
+    });
+  }
+  if (e?.devueltas) {
+    out.push({
+      clave: "devueltas",
+      texto: plural(e.devueltas, "devuelta", "devueltas"),
+      tono: "warning",
+      titulo: "Actividades que el jefe le devolvió al revisarlas",
+    });
+  }
   if (t.retardos) {
     out.push({ clave: "retardos", texto: `${plural(t.retardos, "retardo", "retardos")} · ${horasEnPalabras(t.minutosTarde)}`, tono: "warning" });
   }
@@ -95,9 +236,21 @@ export function avisosDePersona(t: TotalesKpi): AvisoKpi[] {
   return out;
 }
 
-export type OrdenRanking = "productividad" | "nombre" | "retardos";
+/** `productividad` se conserva como id; en pantalla es «Tiempo en actividades». */
+export type OrdenRanking = "cumplimiento" | "productividad" | "nombre" | "retardos";
 
-/** Ranking: mejor productividad arriba (sin dato al final), por nombre o por retardos. */
+/** Mayor primero; sin dato (null o una API que no lo manda) al final. */
+function mayorPrimero(x: number | null | undefined, y: number | null | undefined): number {
+  if (x == null && y == null) return 0;
+  if (x == null) return 1;
+  if (y == null) return -1;
+  return y - x;
+}
+
+/**
+ * Ranking: mejor cumplimiento arriba (a igualdad, más entregas a tiempo), más tiempo en
+ * actividades, más retardos o por nombre. Sin dato, siempre al final.
+ */
 export function ordenaRanking(personas: KpiPersonaFila[], orden: OrdenRanking): KpiPersonaFila[] {
   const nombre = (a: KpiPersonaFila, b: KpiPersonaFila) => a.persona.nombre.localeCompare(b.persona.nombre, "es");
   return [...personas].sort((a, b) => {
@@ -105,12 +258,14 @@ export function ordenaRanking(personas: KpiPersonaFila[], orden: OrdenRanking): 
     if (orden === "retardos") {
       return b.totales.retardos - a.totales.retardos || b.totales.minutosTarde - a.totales.minutosTarde || nombre(a, b);
     }
-    const x = a.totales.productividadPct;
-    const y = b.totales.productividadPct;
-    if (x == null && y == null) return nombre(a, b);
-    if (x == null) return 1;
-    if (y == null) return -1;
-    return y - x || nombre(a, b);
+    if (orden === "cumplimiento") {
+      return (
+        mayorPrimero(a.totales.cumplimientoPct, b.totales.cumplimientoPct) ||
+        (b.totales.entregas?.aTiempo ?? 0) - (a.totales.entregas?.aTiempo ?? 0) ||
+        nombre(a, b)
+      );
+    }
+    return mayorPrimero(a.totales.productividadPct, b.totales.productividadPct) || nombre(a, b);
   });
 }
 

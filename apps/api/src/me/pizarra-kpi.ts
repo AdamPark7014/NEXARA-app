@@ -7,8 +7,8 @@
  *
  * Contrato del viernes, sección C (y la prioridad/semáforo de la B).
  */
-import { esMultiDia, finDelPeriodo, type Periodo } from '../activities/actividad-periodo.js';
-import { evaluarSemaforo } from '../activities/semaforo-actividad.js';
+import { esMultiDia, type Periodo } from '../activities/actividad-periodo.js';
+import { evaluarSemaforo, limiteDeEntrega, type MotivoSemaforo } from '../activities/semaforo-actividad.js';
 import {
   cruzarTramos,
   minutosDeTramosMs,
@@ -164,6 +164,8 @@ export type ActividadCalculada = {
   vencida: boolean;
   /** Minutos de atraso cuando el semáforo es rojo. */
   minutosAtraso: number | null;
+  /** Rojo: por qué (no la ha iniciado, pasó su límite o pasó su tiempo planeado). */
+  motivoAtraso: MotivoSemaforo | null;
   minutosParaVencer: number | null;
   iniciada: boolean;
   terminada: boolean;
@@ -194,7 +196,14 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
   const iniciada = inicio != null || estatusArrancado(act.estatus) || terminada;
   const referencia = terminada ? (fin ?? ahora) : ahora;
   const periodo = act.periodo ?? null;
-  const limite = periodo ? finDelPeriodo(periodo.fin) : masTemprana(act.fechaMaxima, act.fechaEntregaEsperada);
+  // El mismo límite que pinta el semáforo. Con la fecha máxima cruda, lo que el formulario
+  // guardó igual a la hora de inicio salía «vencido» aunque se entregara ese mismo día.
+  const limite = limiteDeEntrega({
+    fechaInicio: act.fechaInicio ?? null,
+    fechaMaxima: act.fechaMaxima ?? null,
+    fechaEntregaEsperada: act.fechaEntregaEsperada ?? null,
+    periodo,
+  });
   const vencida = limite != null && referencia.getTime() > limite.getTime();
   const variosDias = esMultiDia(periodo);
   const excedida =
@@ -218,6 +227,7 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
     prioridad,
     semaforo: luz.semaforo,
     minutosAtraso: luz.minutosAtraso,
+    motivoAtraso: luz.semaforo === 'rojo' ? luz.motivo : null,
     minutosParaVencer: luz.minutosParaVencer,
     minutosPlan,
     minutosReales,
@@ -318,11 +328,6 @@ export type KpisPersona = {
   productividadPct: number | null;
   rechazadas: number;
 };
-
-function masTemprana(a?: Date | null, b?: Date | null): Date | null {
-  if (a && b) return a.getTime() <= b.getTime() ? a : b;
-  return a ?? b ?? null;
-}
 
 function pct(numerador: number, denominador: number): number | null {
   if (!denominador) return null;

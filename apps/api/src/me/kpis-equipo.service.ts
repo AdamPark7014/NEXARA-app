@@ -7,6 +7,7 @@ import { tiposVisibles } from './equipo-alcance.js';
 import { estatusCerrado, tiemposReales } from './pizarra-kpi.js';
 import { TeamBoardService } from './team-board.service.js';
 import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
+import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
 import {
   calculaKpisPersona,
   diasDelRango,
@@ -20,6 +21,8 @@ import {
   type ChecadaKpi,
   type ComidaKpi,
   type DiaKpi,
+  type EntregaDelRango,
+  type EntregaKpi,
   type EstadoExtra,
   type HorarioKpi,
   type SemaforoKpi,
@@ -29,6 +32,11 @@ import {
 /** Rango máximo: un trimestre. Más que eso es un reporte, no un tablero. */
 export const KPI_MAX_DIAS = 93;
 const DIA_MS = 24 * 3_600_000;
+/**
+ * Cuánto antes del rango se buscan actividades asignadas para medir sus entregas. Una obra
+ * larga puede entregarse meses después de asignarse; más atrás que esto no se califica.
+ */
+const ENTREGAS_ANTES_DIAS = 120;
 
 type Viewer = { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean };
 
@@ -74,6 +82,8 @@ export type KpisPersonaResponse = KpiPersonaFila & {
   supuestos: string[];
   dias: DiaKpi[];
   justificaciones: Array<{ fecha: string; motivo: string }>;
+  /** Sus entregas del rango (a tiempo, tarde, sin entregar), lo más reciente arriba. */
+  entregas: EntregaDelRango[];
 };
 
 const ETIQUETA_HORARIO: Record<string, string> = {
@@ -93,6 +103,7 @@ type DatosPersona = {
   actividades: ActividadKpi[];
   justificadas: Array<{ fecha: string; motivo: string }>;
   aprobacionesExtra: AprobacionExtra[];
+  entregas: EntregaKpi[];
 };
 
 /**
@@ -145,6 +156,7 @@ export class KpisEquipoService {
         actividades: d.actividades,
         justificadas: d.justificadas.map((j) => j.fecha),
         aprobacionesExtra: d.aprobacionesExtra,
+        entregas: d.entregas,
         fechaIngreso: d.fechaIngreso,
       });
       return opciones.conDias ? { ...fila(u, d.horario, totales), dias } : fila(u, d.horario, totales);
@@ -177,7 +189,7 @@ export class KpisEquipoService {
     const tipos = userId === viewer.id ? null : tiposVisibles(viewer);
     const datos = await this.cargar([userId], companyId, rango, tipos);
     const d = datos.get(userId) ?? vacio();
-    const { dias, totales } = calculaKpisPersona({
+    const { dias, totales, entregas } = calculaKpisPersona({
       desde: rango.desde,
       hasta: rango.hasta,
       ahora: now,
@@ -187,6 +199,7 @@ export class KpisEquipoService {
       actividades: d.actividades,
       justificadas: d.justificadas.map((j) => j.fecha),
       aprobacionesExtra: d.aprobacionesExtra,
+      entregas: d.entregas,
       fechaIngreso: d.fechaIngreso,
       detalle: true,
     });
@@ -199,6 +212,7 @@ export class KpisEquipoService {
       // Lo más reciente arriba: es lo que el jefe viene a ver.
       dias: [...dias].reverse(),
       justificaciones: d.justificadas,
+      entregas,
     };
   }
 
@@ -380,6 +394,7 @@ export class KpisEquipoService {
         actividades: [],
         justificadas: [],
         aprobacionesExtra: aprobaciones.get(u.id) ?? [],
+        entregas: [],
       });
     }
 
@@ -429,6 +444,140 @@ export class KpisEquipoService {
       });
     }
 
+    // Entregas: lo último que se lee, aparte, para no cambiar el orden de lo de arriba.
+    const entregas = await this.leerEntregas(userIds, companyId, ini, fin, tipos);
+    for (const [userId, lista] of entregas) {
+      const d = out.get(userId);
+      if (d) d.entregas = lista;
+    }
+
+    return out;
+  }
+
+  /**
+   * Las actividades de estas personas vistas como entregas: hasta cuándo había que entregarlas
+   * (el límite del semáforo), cuándo las entregó cada quien y qué dijo el jefe la primera vez.
+   *
+   * «Entregada» es lo mismo que en la pizarra: envió su evidencia completa o la actividad se
+   * cerró, y la hora es la de SU fin (fin real, foto de salida o evidencia), no la de la
+   * aprobación. Quien solo reparte un despacho no entrega nada. Se leen las asignadas hasta
+   * `ENTREGAS_ANTES_DIAS` antes del rango; el filtro fino (entregó o venció dentro) es de
+   * `entregasDelRango`.
+   */
+  private async leerEntregas(
+    userIds: number[],
+    companyId: number | null,
+    ini: Date,
+    fin: Date,
+    tipos: string[] | null,
+  ): Promise<Map<number, EntregaKpi[]>> {
+    const out = new Map<number, EntregaKpi[]>();
+    const desde = new Date(ini.getTime() - ENTREGAS_ANTES_DIAS * DIA_MS);
+    const filas = ((await this.prisma.activityAssignee.findMany({
+      where: {
+        userId: { in: userIds },
+        retiradoAt: null,
+        ...(companyId != null ? { companyId } : {}),
+        activity: { deletedAt: null, cancelledAt: null, fechaAsignacion: { gte: desde, lte: fin } },
+      },
+      select: {
+        activityId: true,
+        userId: true,
+        rol: true,
+        inicioRealAt: true,
+        finRealAt: true,
+        activity: {
+          select: {
+            anNumber: true,
+            titulo: true,
+            estatus: true,
+            coreKind: true,
+            assignmentCharge: true,
+            fechaInicio: true,
+            fechaMaxima: true,
+            fechaEntregaEsperada: true,
+            fechaFinalizacion: true,
+            periodoInicio: true,
+            periodoFin: true,
+            activityEvidences: {
+              where: { userId: { in: userIds } },
+              select: {
+                userId: true,
+                status: true,
+                completedAt: true,
+                entryPhotoUploadedAt: true,
+                exitPhotoUploadedAt: true,
+              },
+            },
+          },
+        },
+      },
+    })) ?? []);
+    const propias = filas.filter(
+      (f) =>
+        f.activity &&
+        !/cancel/i.test(f.activity.estatus ?? '') &&
+        !(f.activity.assignmentCharge === 'despacho' && String(f.rol) === 'LEAD'),
+    );
+    if (!propias.length) return out;
+
+    // Revisiones de su evidencia, en orden: la primera decide «a la primera».
+    // (Un cliente Prisma sin la tabla —pruebas con mock— se queda sin revisiones, no sin tablero.)
+    const prisma = this.prisma as any;
+    const revisiones: Array<{ activityId: number; evidenceUserId: number; decision: string }> =
+      typeof prisma?.activityEvidenceReview?.findMany === 'function'
+        ? ((await prisma.activityEvidenceReview.findMany({
+            where: {
+              evidenceUserId: { in: userIds },
+              activityId: { in: [...new Set(propias.map((f) => f.activityId))] },
+              ...(companyId != null ? { companyId } : {}),
+            },
+            select: { activityId: true, evidenceUserId: true, decision: true, createdAt: true },
+            orderBy: { createdAt: 'asc' },
+          })) ?? [])
+        : [];
+    const revisionesPor = new Map<string, string[]>();
+    for (const r of revisiones) {
+      const k = `${r.evidenceUserId}:${r.activityId}`;
+      const lista = revisionesPor.get(k) ?? [];
+      lista.push(r.decision);
+      revisionesPor.set(k, lista);
+    }
+
+    for (const f of propias) {
+      const a = f.activity;
+      const ev = (a.activityEvidences ?? []).find((e) => e.userId === f.userId) ?? null;
+      const cerrada = estatusCerrado(a.estatus);
+      const envio = ev?.status === 'COMPLETED';
+      const tiempos = tiemposReales({
+        inicioRealAt: f.inicioRealAt ?? null,
+        finRealAt: f.finRealAt ?? null,
+        entryPhotoUploadedAt: ev?.entryPhotoUploadedAt ?? null,
+        exitPhotoUploadedAt: ev?.exitPhotoUploadedAt ?? null,
+        evidenciaCompletedAt: ev?.completedAt ?? null,
+        fechaFinalizacion: a.fechaFinalizacion,
+        cerrada,
+      });
+      const entregadaAt = envio
+        ? (tiempos.fin ?? ev?.completedAt ?? a.fechaFinalizacion ?? null)
+        : cerrada
+          ? (tiempos.fin ?? a.fechaFinalizacion ?? null)
+          : null;
+      const decisiones = revisionesPor.get(`${f.userId}:${f.activityId}`) ?? [];
+      const devuelta = (d: string) => /^DEVUELTA/i.test(d);
+      const visible = !tipos || (a.coreKind != null && tipos.includes(a.coreKind));
+      const lista = out.get(f.userId) ?? [];
+      lista.push({
+        activityId: f.activityId,
+        anNumber: visible ? a.anNumber : null,
+        titulo: visible ? a.titulo : 'Actividad de otra área',
+        limite: limiteDeEntrega(a),
+        entregadaAt,
+        primeraRevision: decisiones.length ? (devuelta(decisiones[0]) ? 'DEVUELTA' : 'APROBADA') : null,
+        devoluciones: decisiones.filter(devuelta).length,
+      });
+      out.set(f.userId, lista);
+    }
     return out;
   }
 
@@ -527,6 +676,7 @@ function vacio(): DatosPersona {
     actividades: [],
     justificadas: [],
     aprobacionesExtra: [],
+    entregas: [],
   };
 }
 

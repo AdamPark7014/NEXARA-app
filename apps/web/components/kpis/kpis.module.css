@@ -83,6 +83,10 @@
   background: var(--ui-brand);
 }
 
+/* Entregas: a tiempo usa `barraProductiva` (teal); tarde en ámbar y sin entregar en rojo. */
+.barraTarde { background: var(--ui-warning); }
+.barraSinEntregar { background: var(--ui-danger); }
+
 .detalle {
   display: flex;
   align-items: center;
@@ -144,6 +148,8 @@
 }
 
 .muestraProductiva { background: var(--ui-brand); }
+.muestraTarde { background: var(--ui-warning); }
+.muestraSinEntregar { background: var(--ui-danger); }
 
 .muestraComida {
   background: repeating-linear-gradient(135deg, var(--ui-border-strong) 0 2px, transparent 2px 5px);

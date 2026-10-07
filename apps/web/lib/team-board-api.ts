@@ -8,6 +8,8 @@ export type BoardUserStatus = "activo" | "inactivo" | "atrasado" | "libre" | "si
 export type Prioridad = "ALTA" | "MEDIA" | "BAJA";
 export type Semaforo = "rojo" | "amarillo" | "verde";
 export type BoardAceptacion = "PENDIENTE" | "ACEPTADA" | "RECHAZADA";
+/** Por qué va atrasado: sin iniciar a su hora, pasó su límite o pasó su tiempo planeado. */
+export type BoardLateReason = "inicio" | "tope" | "plan";
 
 /** Rango de la pizarra en `AAAA-MM-DD`; sin nada, la API responde el día de hoy. */
 export type BoardRange = { desde?: string | null; hasta?: string | null };
@@ -101,9 +103,29 @@ export type TeamBoardUser = {
   activityElapsedMinutes: number | null;
   /** Atrasado: minutos pasados de la fecha máxima de lo que está haciendo. */
   currentLateMinutes?: number | null;
-  /** Libre: desde cuándo no tiene nada abierto (terminó su última actividad de hoy). */
+  /**
+   * Atrasado: por qué. 'inicio' = no la ha iniciado y ya pasó su hora; 'tope' = pasó su
+   * límite; 'plan' = pasó su tiempo planeado. API vieja: no viene.
+   */
+  currentLateReason?: BoardLateReason | null;
+  /**
+   * Hoy (hora de México), sin importar el rango elegido: primera entrada y última salida.
+   * `salidaHoyAt` null = sigue en jornada (o no checó). API vieja: no vienen (undefined),
+   * y ahí no se puede separar «sin entrada» ni «ya salió» de «sin nada asignado».
+   */
+  entradaHoyAt?: string | null;
+  salidaHoyAt?: string | null;
+  /**
+   * Desde cuándo HOY no tiene nada abierto. Libre: desde que terminó lo último. Sin nada
+   * asignado: lo más tarde entre su entrada de hoy y lo último que terminó hoy (si es igual a
+   * `entradaHoyAt`, lo dejaron sin nada desde que llegó). null si hoy no checó o ya salió.
+   * API vieja: solo venía en «libre».
+   */
   idleSinceAt?: string | null;
-  /** Libre: última actividad que terminó hoy y con cuánto atraso (null = sin fecha máxima). */
+  /**
+   * Última actividad que terminó y con cuánto atraso (0 = a tiempo; null = sin límite).
+   * Libre: la de hoy. Sin nada asignado: la última, de cualquier día (API vieja: solo «libre»).
+   */
   lastFinished?: {
     id: number;
     anNumber: string;

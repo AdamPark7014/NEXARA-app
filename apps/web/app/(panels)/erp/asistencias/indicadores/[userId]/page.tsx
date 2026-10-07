@@ -13,7 +13,18 @@ import HorasExtraPorAprobar from "@/components/kpis/HorasExtraPorAprobar";
 import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
 import { KPIS_PATH, fechaCorta, fetchKpisPersona, formatPctKpi, horaMx, rangoDesdeUrl, type KpisPersonaResponse } from "@/lib/kpis-equipo";
-import { actividadesDelRango, horasEnPalabras, porQueCuenta, resumenEnPalabras, tonoProductividad } from "@/lib/kpis-lectura";
+import {
+  PESOS_CUMPLIMIENTO,
+  actividadesDelRango,
+  estadoDeEntrega,
+  fechaHoraMx,
+  horasEnPalabras,
+  porQueCuenta,
+  resumenEnPalabras,
+  revisionDeEntrega,
+  tonoCumplimiento,
+  tonoProductividad,
+} from "@/lib/kpis-lectura";
 import s from "@/components/kpis/kpis.module.css";
 import st from "./indicadores.module.css";
 
@@ -66,6 +77,11 @@ export default function KpisPersonaPage() {
   const actividades = useMemo(() => actividadesDelRango(data?.dias ?? []), [data]);
   const diasFuera = (data?.dias ?? []).filter((d) => d.actividadesFueraDeJornada > 0);
   const t = data?.totales;
+  // Una API que aún no manda el cumplimiento (undefined) deja la cifra de productividad, como antes.
+  const hayCumplimiento = t != null && t.cumplimientoPct !== undefined;
+  const pctGrande = hayCumplimiento ? (t?.cumplimientoPct ?? null) : (t?.productividadPct ?? null);
+  const partes = t?.cumplimientoPartes ?? [];
+  const entregas = data?.entregas;
 
   return (
     <div className={st.pagina}>
@@ -123,11 +139,18 @@ export default function KpisPersonaPage() {
             <div className={st.resumen}>
               <div className={st.cifra}>
                 <Avatar url={data.persona.avatarUrl} name={data.persona.nombre} size={48} />
-                <div>
-                  <div className={st.pct} data-tono={tonoProductividad(t.productividadPct)}>
-                    {formatPctKpi(t.productividadPct)}
+                <div
+                  title={
+                    hayCumplimiento ? (pctGrande == null ? "Sin entregas que medir en estas fechas" : PESOS_CUMPLIMIENTO) : undefined
+                  }
+                >
+                  <div
+                    className={st.pct}
+                    data-tono={hayCumplimiento ? tonoCumplimiento(pctGrande) : tonoProductividad(pctGrande)}
+                  >
+                    {formatPctKpi(pctGrande)}
                   </div>
-                  <div className={st.pctEtiqueta}>productividad</div>
+                  <div className={st.pctEtiqueta}>{hayCumplimiento ? "cumplimiento" : "productividad"}</div>
                 </div>
               </div>
               <div className={st.lectura}>
@@ -136,12 +159,106 @@ export default function KpisPersonaPage() {
                 </p>
                 <div className={st.datos}>
                   <span>{t.diasConJornada} días con jornada</span>
+                  {hayCumplimiento ? (
+                    <span title="Minutos con el reloj de una actividad corriendo ÷ minutos en jornada">
+                      Tiempo en actividades {formatPctKpi(t.productividadPct)}
+                    </span>
+                  ) : null}
                   <span title="Horas en jornada sin ninguna actividad abierta">Sin actividad {horasEnPalabras(t.minutosInactivos)}</span>
                   {t.minutosExtra ? <span title="Arriba de 8 h netas entre semana, o todo lo del fin de semana">Extra {horasEnPalabras(t.minutosExtra)}</span> : null}
                 </div>
               </div>
             </div>
+            {/* De qué está hecho el cumplimiento: cada parte con su dato y lo que pesa. */}
+            {partes.length ? (
+              <ul className={st.partes} aria-label="Partes del cumplimiento">
+                {partes.map((p) => (
+                  <li key={p.clave} className={st.parte}>
+                    <span className={st.parteCabeza}>
+                      <span className={st.parteEtiqueta}>{p.etiqueta}</span>
+                      <span className={st.partePct} data-tono={tonoCumplimiento(p.pct)}>
+                        {formatPctKpi(p.pct)}
+                      </span>
+                    </span>
+                    <span className={s.barra} aria-hidden="true">
+                      <span className={s.barraProductiva} style={{ width: `${Math.max(0, Math.min(100, p.pct))}%` }} />
+                    </span>
+                    <span className={st.parteDetalle}>
+                      {p.detalle} · pesa {p.peso} %
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </Card>
+
+          {entregas ? (
+            <Card>
+              <CardHead
+                title="Entregas"
+                actions={
+                  <InfoPopover label="Cómo se miden las entregas" title="Cómo se miden">
+                    <p className={st.popParrafo}>
+                      <strong className={st.fuerte}>A tiempo</strong> es que la entregó antes de su límite; cuenta la
+                      hora en que la persona la entregó, no la hora en que el jefe la aprobó. Sin límite, cuenta a
+                      tiempo. <strong className={st.fuerte}>Sin entregar</strong> es que su límite ya pasó y no la ha
+                      entregado. <strong className={st.fuerte}>Aprobada a la primera</strong> es que el jefe no se la
+                      devolvió.
+                    </p>
+                  </InfoPopover>
+                }
+              />
+              {entregas.length ? (
+                <div className={tabla.tabla} role="table" aria-label="Entregas del rango">
+                  <div className={`${tabla.cabeza} ${st.entFila} ${st.entCabeza}`} role="row">
+                    <span role="columnheader">Actividad</span>
+                    <span role="columnheader">Límite</span>
+                    <span role="columnheader" title="Cuándo la entregó la persona, no cuándo la aprobó el jefe">
+                      Entregada
+                    </span>
+                    <span role="columnheader">Estado</span>
+                    <span role="columnheader">Revisión</span>
+                  </div>
+                  {entregas.map((e, i) => {
+                    const estado = estadoDeEntrega(e);
+                    const revision = revisionDeEntrega(e);
+                    return (
+                      <div key={`${e.activityId}-${i}`} className={`${tabla.fila} ${st.entFila}`} role="row">
+                        <span role="cell" className={tabla.celda}>
+                          <span>
+                            {e.anNumber ? (
+                              <Link href={`/erp/actividades/${e.activityId}`} className={s.folio}>
+                                {e.anNumber}
+                              </Link>
+                            ) : null}{" "}
+                            {e.titulo ?? "Actividad"}
+                          </span>
+                        </span>
+                        <span
+                          role="cell"
+                          className={`${tabla.tenue} ${st.num}`}
+                          data-sin-limite={e.limite ? undefined : "true"}
+                        >
+                          {e.limite ? fechaHoraMx(e.limite) : "Sin límite"}
+                        </span>
+                        <span role="cell" className={`${tabla.tenue} ${st.num}`}>
+                          {fechaHoraMx(e.entregadaAt)}
+                        </span>
+                        <span role="cell">
+                          <Badge tone={estado.tono}>{estado.texto}</Badge>
+                        </span>
+                        <span role="cell" className={revision.tono === "neutral" ? tabla.tenue : undefined}>
+                          {revision.tono === "warning" ? <Badge tone="warning">{revision.texto}</Badge> : revision.texto}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState title="Sin entregas en estas fechas" />
+              )}
+            </Card>
+          ) : null}
 
           {/* Calculado no es autorizado: aquí el jefe decide qué se paga de más. */}
           <HorasExtraPorAprobar

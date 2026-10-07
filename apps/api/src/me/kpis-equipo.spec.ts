@@ -2,12 +2,15 @@ import { isLateVsSchedule } from '../attendance/attendance-hybrid.match';
 import {
   armaJornadas,
   calculaKpisPersona,
+  cumplimientoDe,
   diasDelRango,
+  entregasDelRango,
   horarioDePlantilla,
   intersectaTramos,
   minutosDeTramos,
   normalizaTramos,
   restaTramos,
+  resumenEntregas,
   retardoDeEntrada,
   semaforoKpi,
   sumaEquipo,
@@ -542,6 +545,20 @@ describe('semáforo', () => {
     jornadasSinSalida: 0,
     cierresAutomaticos: 0,
     actividadesFueraDeJornada: 0,
+    entregas: {
+      medidas: 5,
+      aTiempo: 5,
+      tarde: 0,
+      sinEntregar: 0,
+      revisadas: 5,
+      aprobadasALaPrimera: 5,
+      devueltas: 0,
+      pctATiempo: 100,
+      pctALaPrimera: 100,
+    },
+    asistenciaPuntual: { esperados: 5, puntuales: 5, pct: 100 },
+    cumplimientoPct: 100,
+    cumplimientoPartes: [],
   };
 
   it('verde cuando todo está en orden', () => {
@@ -558,14 +575,24 @@ describe('semáforo', () => {
         ...base,
         retardos: 1,
         minutosTarde: 20,
-        productividadPct: 40,
+        entregas: { ...base.entregas, aTiempo: 3, tarde: 1, sinEntregar: 1, pctATiempo: 60 },
         uniforme: { ...base.uniforme, pct: 90 },
       }),
     ).toEqual({
       semaforo: 'rojo',
-      motivos: ['Productividad 40 %', '1 retardo (20 min tarde)', 'Uniforme 90 %'],
+      motivos: ['3 de 5 entregas a tiempo (1 tarde, 1 sin entregar)', '1 retardo (20 min tarde)', 'Uniforme 90 %'],
     });
     expect(semaforoKpi({ ...base, diasSinChecada: 2 }).semaforo).toBe('rojo');
+  });
+
+  it('la productividad ya no pinta: el reloj de actividad no dice si cumplió', () => {
+    expect(semaforoKpi({ ...base, productividadPct: 20 }).semaforo).toBe('verde');
+  });
+
+  it('las entregas devueltas también cuentan', () => {
+    expect(
+      semaforoKpi({ ...base, entregas: { ...base.entregas, aprobadasALaPrimera: 4, devueltas: 1, pctALaPrimera: 80 } }),
+    ).toEqual({ semaforo: 'amarillo', motivos: ['1 entrega devuelta de 5 revisadas'] });
   });
 
   it('sin jornada ni faltas no hay con qué calificar', () => {
@@ -577,8 +604,108 @@ describe('semáforo', () => {
         minutosProductivos: 0,
         productividadPct: null,
         uniforme: { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 0, pct: null },
+        entregas: { ...base.entregas, medidas: 0, aTiempo: 0, revisadas: 0, aprobadasALaPrimera: 0, pctATiempo: null, pctALaPrimera: null },
       }).semaforo,
     ).toBe('sin_datos');
+  });
+});
+
+describe('entregas: en tiempo y forma', () => {
+  const ahora = M('16', '12:00');
+  const finDelDia = (dia: string) => M(dia, '23:59');
+
+  it('mide con la hora en que ENTREGÓ, no con la aprobación del jefe', () => {
+    const lista = entregasDelRango(
+      [
+        // Entregó a las 12:45 con límite al fin del día: a tiempo, aunque el jefe la aprobara al día siguiente.
+        { activityId: 1, limite: finDelDia('14'), entregadaAt: M('14', '12:45'), primeraRevision: 'APROBADA' },
+        // Entregó pasado su límite.
+        { activityId: 2, limite: M('14', '13:00'), entregadaAt: M('14', '14:30'), primeraRevision: 'DEVUELTA', devoluciones: 1 },
+        // Venció ayer y no la ha entregado.
+        { activityId: 3, limite: finDelDia('15'), entregadaAt: null },
+        // Vence mañana: todavía no se califica.
+        { activityId: 4, limite: finDelDia('17'), entregadaAt: null },
+        // Se entregó antes del rango: no cuenta.
+        { activityId: 5, limite: finDelDia('10'), entregadaAt: M('10', '12:00') },
+        // Sin límite: cuenta a tiempo.
+        { activityId: 6, limite: null, entregadaAt: M('15', '11:00') },
+      ],
+      '2026-09-14',
+      '2026-09-16',
+      ahora,
+    );
+    expect(lista.map((e) => [e.activityId, e.estado, e.minutosTarde])).toEqual([
+      [3, 'sin_entregar', 12 * 60 + 1],
+      [6, 'a_tiempo', null],
+      [2, 'tarde', 90],
+      [1, 'a_tiempo', null],
+    ]);
+    expect(resumenEntregas(lista)).toEqual({
+      medidas: 4,
+      aTiempo: 2,
+      tarde: 1,
+      sinEntregar: 1,
+      revisadas: 2,
+      aprobadasALaPrimera: 1,
+      devueltas: 1,
+      pctATiempo: 50,
+      pctALaPrimera: 50,
+    });
+  });
+
+  it('cumplimiento: pesos 40/25/25/10 y lo que no tiene dato no pesa', () => {
+    const entregas = resumenEntregas(
+      entregasDelRango(
+        [
+          { activityId: 1, limite: finDelDia('15'), entregadaAt: M('15', '12:00'), primeraRevision: 'APROBADA' },
+          { activityId: 2, limite: M('15', '12:00'), entregadaAt: M('15', '13:00'), primeraRevision: 'APROBADA' },
+        ],
+        '2026-09-15',
+        '2026-09-15',
+        ahora,
+      ),
+    );
+    const sinUniforme = { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 1, pct: null };
+    // entregas 50 % ×40 + forma 100 % ×25 + asistencia 100 % ×25 = 70 de 90 → 78 %.
+    const c = cumplimientoDe(entregas, { esperados: 1, puntuales: 1, pct: 100 }, sinUniforme);
+    expect(c.pct).toBe(78);
+    expect(c.partes.map((p) => [p.clave, p.pct, p.peso, p.detalle])).toEqual([
+      ['entregas', 50, 40, '1 de 2'],
+      ['forma', 100, 25, '2 de 2'],
+      ['asistencia', 100, 25, '1 de 1 día'],
+    ]);
+    // Sin entregas no hay cumplimiento, aunque haya llegado temprano.
+    expect(cumplimientoDe(resumenEntregas([]), { esperados: 3, puntuales: 3, pct: 100 }, sinUniforme).pct).toBeNull();
+  });
+
+  it('quien entrega a tiempo queda arriba de quien solo dejó el reloj corriendo', () => {
+    // Cumplido: 3 entregas a tiempo, poco reloj. Reloj: una obra con el reloj todo el día, entregada tarde.
+    const cumplido = calcula({
+      desde: '2026-09-15',
+      hasta: '2026-09-15',
+      checadas: [entrada('15', '09:50'), salida('15', '18:00')],
+      actividades: [actividad(1, M('15', '10:00'), M('15', '11:00'))],
+      entregas: [1, 2, 3].map((id) => ({
+        activityId: id,
+        limite: finDelDia('15'),
+        entregadaAt: M('15', `1${id}:00`),
+        primeraRevision: 'APROBADA' as const,
+      })),
+    }).totales;
+    const reloj = calcula({
+      desde: '2026-09-15',
+      hasta: '2026-09-15',
+      checadas: [entrada('15', '10:40'), salida('15', '18:00')],
+      actividades: [actividad(9, M('15', '10:40'), M('15', '18:00'))],
+      entregas: [{ activityId: 9, limite: M('15', '12:00'), entregadaAt: M('15', '18:00') }],
+    }).totales;
+    expect(reloj.productividadPct!).toBeGreaterThan(cumplido.productividadPct!);
+    expect(cumplido.cumplimientoPct).toBe(100);
+    expect(reloj.cumplimientoPct).toBe(0);
+    expect(cumplido.asistenciaPuntual).toEqual({ esperados: 1, puntuales: 1, pct: 100 });
+    expect(reloj.asistenciaPuntual).toEqual({ esperados: 1, puntuales: 0, pct: 0 });
+    // El equipo suma conteos, no promedia porcentajes.
+    expect(sumaEquipo([cumplido, reloj]).entregas).toMatchObject({ medidas: 4, aTiempo: 3, tarde: 1, pctATiempo: 75 });
   });
 });
 

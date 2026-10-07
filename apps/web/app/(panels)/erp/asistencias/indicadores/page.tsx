@@ -10,11 +10,21 @@ import RankingPersonas, { LeyendaJornada } from "@/components/kpis/RankingPerson
 import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
 import { KPIS_PATH, fetchKpisEquipo, formatPctKpi, rangoDesdeUrl, type KpiPersonaFila, type KpisEquipoResponse } from "@/lib/kpis-equipo";
-import { horasEnPalabras, ordenaRanking, tonoProductividad, type OrdenRanking } from "@/lib/kpis-lectura";
+import {
+  PESOS_CUMPLIMIENTO,
+  entregasDelEquipo,
+  horasEnPalabras,
+  ordenaRanking,
+  tonoCumplimiento,
+  tonoProductividad,
+  type OrdenRanking,
+} from "@/lib/kpis-lectura";
 import { descargarPreNominaExcel } from "@/lib/asistencia-confiable-api";
 
+// `productividad` conserva su id; en pantalla es lo que mide: tiempo con una actividad corriendo.
 const ORDENES: ReadonlyArray<{ id: OrdenRanking; label: string }> = [
-  { id: "productividad", label: "Productividad" },
+  { id: "cumplimiento", label: "Cumplimiento" },
+  { id: "productividad", label: "Tiempo en actividades" },
   { id: "retardos", label: "Retardos" },
   { id: "nombre", label: "Nombre" },
 ];
@@ -39,7 +49,7 @@ export default function KpisEquipoPage() {
   const [data, setData] = useState<KpisEquipoResponse | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [orden, setOrden] = useState<OrdenRanking>("productividad");
+  const [orden, setOrden] = useState<OrdenRanking>("cumplimiento");
   const [bajando, setBajando] = useState(false);
   const [errorNomina, setErrorNomina] = useState<string | null>(null);
 
@@ -95,7 +105,11 @@ export default function KpisEquipoPage() {
     window.history.replaceState(null, "", `${KPIS_PATH}?${q.toString()}`);
   }, [rango, listo]);
 
-  const personas = useMemo(() => ordenaRanking(data?.personas ?? [], orden), [data, orden]);
+  // Una API que aún no manda el cumplimiento (undefined) deja la pantalla como antes: por tiempo.
+  const hayCumplimiento = data == null || data.equipo.totales.cumplimientoPct !== undefined;
+  const ordenes = hayCumplimiento ? ORDENES : ORDENES.filter((o) => o.id !== "cumplimiento");
+  const ordenVisto: OrdenRanking = !hayCumplimiento && orden === "cumplimiento" ? "productividad" : orden;
+  const personas = useMemo(() => ordenaRanking(data?.personas ?? [], ordenVisto), [data, ordenVisto]);
   const qs = rango.desde && rango.hasta ? `?desde=${rango.desde}&hasta=${rango.hasta}` : "";
   const hrefDe = (p: KpiPersonaFila) => `${KPIS_PATH}/${p.persona.id}${qs}`;
   const soloYo = data != null && data.personas.length === 1 && data.personas[0].persona.id === user?.id;
@@ -182,22 +196,22 @@ export default function KpisEquipoPage() {
 
       {t ? (
         <StatRow>
+          {hayCumplimiento ? (
+            <Stat
+              label="Cumplimiento"
+              value={formatPctKpi(t.cumplimientoPct)}
+              hint={entregasDelEquipo(t.entregas)}
+              title={PESOS_CUMPLIMIENTO}
+              tone={TONO_STAT[tonoCumplimiento(t.cumplimientoPct)]}
+            />
+          ) : null}
+          {/* Ya no es el semáforo: mide reloj corriendo, no si entregó a tiempo. */}
           <Stat
-            label="Productividad"
+            label="Tiempo en actividades"
             value={formatPctKpi(t.productividadPct)}
-            title="Horas en actividades ÷ horas en jornada"
-            tone={TONO_STAT[tonoProductividad(t.productividadPct)]}
-          />
-          <Stat
-            label="Horas productivas"
-            value={
-              <>
-                {Math.round(t.minutosProductivos / 60)} h
-                <span style={{ color: "var(--ui-fg-3)", fontWeight: 500 }}> / {Math.round(t.minutosLaborados / 60)} h</span>
-              </>
-            }
-            hint={`${horasEnPalabras(t.minutosInactivos)} sin actividad`}
-            title="Horas en actividades de las horas en jornada"
+            hint={`${Math.round(t.minutosProductivos / 60)} h de ${Math.round(t.minutosLaborados / 60)} h en jornada`}
+            title="Minutos con el reloj de una actividad corriendo ÷ minutos en jornada"
+            tone={hayCumplimiento ? "default" : TONO_STAT[tonoProductividad(t.productividadPct)]}
           />
           <Stat
             label="Retardos"
@@ -230,8 +244,8 @@ export default function KpisEquipoPage() {
           title={soloYo ? "Tus horas" : "Por persona"}
           actions={
             <>
-              <LeyendaJornada />
-              <Segmented items={ORDENES} value={orden} onChange={setOrden} ariaLabel="Ordenar por" />
+              <LeyendaJornada modo={ordenVisto === "productividad" ? "jornada" : "entregas"} />
+              <Segmented items={ordenes} value={ordenVisto} onChange={setOrden} ariaLabel="Ordenar por" />
             </>
           }
         />
@@ -239,7 +253,7 @@ export default function KpisEquipoPage() {
           <SkeletonRows rows={5} label="Calculando indicadores" />
         ) : personas.length ? (
           <div style={{ opacity: cargando ? 0.6 : 1, transition: "opacity 120ms" }}>
-            <RankingPersonas personas={personas} hrefDe={hrefDe} />
+            <RankingPersonas personas={personas} hrefDe={hrefDe} orden={ordenVisto} />
           </div>
         ) : data ? (
           <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu alcance" />

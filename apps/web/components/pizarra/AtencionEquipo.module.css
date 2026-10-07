@@ -1,0 +1,240 @@
+/* Actividades · «Mi equipo»: tarjeta «Para atender hoy» bajo la franja de KPI.
+   Hasta tres columnas (atrasados, sin nada asignado, sin entrada) que se apilan
+   en pantallas angostas. Solo tokens --ui-*. */
+
+.tarjeta {
+  margin-bottom: var(--ui-page-gap, var(--ui-s5));
+}
+
+.columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--ui-s4) var(--ui-s5);
+  padding: var(--ui-s3) 20px var(--ui-s4);
+}
+
+.columna {
+  display: grid;
+  align-content: start;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.columnaTitulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  font-weight: 600;
+  color: var(--ui-fg-2);
+}
+
+.punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--ui-border-strong);
+}
+
+.puntoAtrasado { background: var(--ui-danger); }
+.puntoSinNada { background: var(--ui-warning); }
+.puntoSinEntrada { background: var(--ui-border-strong); }
+
+.cuenta {
+  font-size: var(--ui-fs-caption);
+  line-height: 1.2;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-hover);
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.lista {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.renglon {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+/* Todo el renglón lleva a la ficha; «＋ Asignar» va fuera (no se anidan enlaces). */
+.enlace {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: var(--ui-radius);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.enlace:hover {
+  background: var(--ui-hover);
+  color: inherit;
+}
+
+.enlace:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+/* El aro de la tarjeta grande, en chico: sin el aire de abajo y con borde más fino. */
+.renglon .avatar {
+  margin: 2px 0 0;
+  padding: 2px;
+  border-width: 2px;
+}
+
+.textos {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.nombre {
+  min-width: 0;
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-label);
+  font-weight: 600;
+  color: var(--ui-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  flex: 0 0 auto;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.principal {
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.secundaria {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+  overflow-wrap: anywhere;
+}
+
+.peligro {
+  color: var(--ui-danger-text);
+  font-weight: 600;
+}
+
+.aviso {
+  color: var(--ui-warning-text);
+  font-weight: 600;
+}
+
+.folio {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.asignar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-brand-border);
+  background: var(--ui-brand-bg);
+  color: var(--ui-brand-text);
+  font-size: var(--ui-fs-caption);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.asignar:hover {
+  border-color: var(--ui-brand);
+  color: var(--ui-brand-text);
+}
+
+.asignar:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.mas {
+  justify-self: start;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  cursor: pointer;
+}
+
+.mas:hover {
+  text-decoration: underline;
+}
+
+.mas:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+  border-radius: var(--ui-radius-sm);
+}
+
+@media (max-width: 480px) {
+  .columnas {
+    padding: var(--ui-s3);
+  }
+}
+
+/* Con dedo, los destinos llegan a 44 px. */
+@media (pointer: coarse) {
+  .enlace {
+    min-height: 44px;
+  }
+  .asignar,
+  .mas {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enlace {
+    transition: none;
+  }
+}

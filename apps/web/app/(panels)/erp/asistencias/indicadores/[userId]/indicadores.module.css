@@ -95,6 +95,63 @@
   color: var(--ui-fg-2);
 }
 
+/* Cumplimiento: sus partes (entregas, forma, asistencia, uniforme) bajo la cifra. */
+.partes {
+  list-style: none;
+  margin: var(--ui-s5) 0 0;
+  padding: var(--ui-s4) 0 0;
+  border-top: 1px solid var(--ui-border);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--ui-s4);
+}
+
+.parte {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.parteCabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+}
+
+.parteEtiqueta {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.partePct {
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.partePct[data-tono="atencion"] {
+  color: var(--ui-warning-text);
+}
+
+.partePct[data-tono="critico"] {
+  color: var(--ui-danger-text);
+}
+
+.parteDetalle {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Entregas: actividad, límite, entregada, estado y revisión. */
+.entFila {
+  grid-template-columns: minmax(0, 1.6fr) 136px 136px minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--ui-s4);
+}
+
 .faltas {
   margin: 0;
   padding: var(--ui-s3) var(--ui-s4) var(--ui-s3) var(--ui-s6);
@@ -108,4 +165,22 @@
   .lectura {
     flex-basis: 100%;
   }
+  .entCabeza {
+    display: none !important;
+  }
+  .entFila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "act act"
+      "limite estado"
+      "entregada revision";
+    row-gap: 4px;
+  }
+  .entFila > :nth-child(1) { grid-area: act; }
+  .entFila > :nth-child(2) { grid-area: limite; }
+  .entFila > :nth-child(3) { grid-area: entregada; }
+  .entFila > :nth-child(4) { grid-area: estado; justify-self: end; }
+  .entFila > :nth-child(5) { grid-area: revision; justify-self: end; }
+  .entFila > :nth-child(2):not([data-sin-limite])::before { content: "Límite "; }
+  .entFila > :nth-child(3)::before { content: "Entregó "; }
 }

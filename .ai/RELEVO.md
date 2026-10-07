@@ -1,5 +1,27 @@
 # RELEVO
 
+- **07-10 ~10:40 (claude-code) — KPIs «en tiempo y forma» + Mi equipo con detalle (pedido de Adam).**
+  - Adam: «los que cumplen más en tiempo y forma son Daniela y Luis» y el ranking los ponía abajo. Causa con datos
+    reales (28-09→07-10): «Productividad» = reloj de actividad ÷ jornada (premiaba dejar el reloj prendido: David
+    98 % con 1 entrega) y «a tiempo» se medía con `fechaFinalizacion` (hora en que el JEFE aprueba) y con la fecha
+    máxima cruda (el formulario la guarda = hora de inicio → todo lo del mismo día salía tarde). Luis 17/18 a tiempo,
+    Daniela 13/14, 0 devueltas.
+  - API: `limiteDeEntrega()` exportado de `activities/semaforo-actividad.ts` (el mismo tope del semáforo) y usado en
+    `pizarra-kpi.ts` (`vencida`/`aTiempo`), `workflow-kpis.ts` (SLA con `entregadaAt` = fin real o evidencia, ya no la
+    aprobación) y KPIs. `me/kpis-equipo.ts`: `EntregaKpi`, `entregasDelRango`, `resumenEntregas`, `cumplimientoDe`
+    (pesos 40 entregas a tiempo / 25 aprobadas a la primera / 25 asistencia puntual / 10 uniforme; null sin entregas);
+    `TotalesKpi` + `entregas`, `asistenciaPuntual`, `cumplimientoPct`, `cumplimientoPartes`; el semáforo ya no usa la
+    productividad. `kpis-equipo.service.ts` `leerEntregas` (asignadas hasta 120 días antes, sin despacho LEAD; revisiones
+    de `activity_evidence_reviews`), detalle por persona trae `entregas[]`.
+  - Mi equipo (`me/board`): `entradaHoyAt`, `salidaHoyAt`, `currentLateReason` ('inicio'|'tope'|'plan'), `idleSinceAt`
+    y `lastFinished` ahora también en «sin_actividad» (última de cualquier día; ocio = máx(entrada de hoy, lo último que
+    terminó hoy)). Web: tarjeta «Para atender hoy» (`components/pizarra/AtencionEquipo.tsx`, solo rango Hoy) con
+    Atrasados / Sin nada asignado / Sin entrada hoy; hint «2 atrasados · 9 sin nada asignado · 3 sin entrada».
+  - Web KPIs: tarjeta «Cumplimiento», «Tiempo en actividades» (antes Productividad), orden por cumplimiento, barra de
+    entregas (a tiempo/tarde/sin entregar) y en el detalle las partes + tabla «Entregas».
+  - **Pendiente:** apps Android/iOS siguen mostrando «Productividad» en KPIs del equipo y Mi equipo sin el detalle nuevo
+    (los campos nuevos son aditivos; no se rompe nada).
+
 - **07-10 ~07:50 (claude-code) — pedido de Adam (iOS sigue sin aprobarse):**
   - **Checar desde la web, 10 días más:** `attendance.web_checkin_until` (companyId 1) = `2026-10-18T05:48:52Z`
     (17-oct 23:48 hora de México), con `apps/api/scripts/set-web-checkin-window.sql` (`hours=256`). Se cierra sola.
