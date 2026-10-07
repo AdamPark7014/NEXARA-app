@@ -1,5 +1,22 @@
 # RELEVO
 
+- **07-10 ~13:00 (claude-code) — adjuntos en actividades comerciales + guardar/compartir PDFs en las apps.**
+  - Adam: «que en actividades de tipo comercial se pueda adjuntar un archivo (evidencias en Excel, Word o PDF) y se vea
+    embebido… en la iOS intento descargar o enviar por WhatsApp las cotizaciones y se queda trabado».
+  - **API (desplegado):** tabla `activity_attachments` (migración `20261007150000_activity_attachments`, aditiva) y
+    `activities/attachments/*`: `GET/POST activities/:id/adjuntos` (multipart `files`, 10 × 25 MB; pdf, imágenes,
+    xlsx/xls/xlsm/csv, docx/doc, pptx/ppt, txt), `DELETE …/:adjuntoId`, `GET …/:adjuntoId/archivo` (nombre original en
+    `filename*`), `GET …/:adjuntoId/vista-previa` (HTML sin scripts de Excel/CSV/Word, CSP propia;
+    `common/files/vista-previa-documento.ts` con exceljs + **mammoth** nuevo en `apps/api`). Adjuntar: equipo de la
+    actividad, dirección o `activities.manage`; quitar: quien subió, responsable/creador o gestor (borrado lógico).
+  - **Causa del bug iOS:** `PDFViewerScreen` compartía `ShareLink(item: data)` (bytes sin nombre ni tipo). Ahora escribe
+    un archivo temporal con nombre + `.pdf` forzado (los folios con varios participantes llevan punto) y ofrece «Guardar
+    en Archivos» + «Compartir» (`UI/Common/PDFViewerView.swift`: `NxArchivoTemporal`, `nxAccionesDeArchivo`,
+    `DocumentoScreen` con Vista Rápida). Android: `ui/common/DocumentoViewer.kt` (`DocumentoDialog` con Guardar por el
+    selector de Android, Compartir, Abrir con…, PDF/imagen/HTML en WebView sin JS).
+  - **En curso:** agentes en web (`components/erp/ArchivosDeActividad.tsx`), Android e iOS con el contrato
+    `scratchpad/CONTRATO-ADJUNTOS.md`.
+
 - **07-10 ~10:40 (claude-code) — KPIs «en tiempo y forma» + Mi equipo con detalle (pedido de Adam).**
   - Adam: «los que cumplen más en tiempo y forma son Daniela y Luis» y el ranking los ponía abajo. Causa con datos
     reales (28-09→07-10): «Productividad» = reloj de actividad ÷ jornada (premiaba dejar el reloj prendido: David

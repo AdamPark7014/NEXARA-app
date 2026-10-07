@@ -988,6 +988,7 @@ model User {
   nominaFilasEditadas     NominaSemanaFila[]    @relation("NominaFilaActualizadoPor")
   nominaDescuentos        NominaDescuento[]     @relation("NominaDescuentoUser")
   nominaDescuentosCreados NominaDescuento[]     @relation("NominaDescuentoCreadoPor")
+  activityAttachments     ActivityAttachment[]  @relation("ActivityAttachmentUploader")
 
   // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
   checadasRechazadas    AttendanceRejection[] @relation("AttendanceRejectionUser")
@@ -1267,6 +1268,8 @@ model Activity {
   geofenceAlerts          ActivityGeofenceAlert[]
   /// Tramos en que corrió el reloj de cada persona (de aquí sale el tiempo real).
   workSessions            ActivityWorkSession[]
+  /// Archivos adjuntos (evidencia en Excel, Word, PDF…; sobre todo en las comerciales).
+  attachments             ActivityAttachment[]
   /// Qué hay que documentar en esta actividad («Cámara 1», «Rack») y en qué momentos.
   evidenceFields          ActivityEvidenceField[]
   evidenceFieldPhotos     ActivityEvidenceFieldPhoto[]
@@ -6121,6 +6124,7 @@ model CompanyProfile {
   nominaSemanaDias        NominaSemanaDia[]
   nominaSemanaFilas       NominaSemanaFila[]
   nominaDescuentos        NominaDescuento[]
+  activityAttachments     ActivityAttachment[]
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   attendanceRejections        AttendanceRejection[]
@@ -7844,4 +7848,31 @@ model IntegraSyncRun {
 
   @@index([companyId, startedAt])
   @@map("integra_sync_runs")
+}
+
+/// Archivo adjunto a una actividad: la evidencia que no es foto (Excel, Word, PDF…). Lo pidió Adam
+/// (07-10-2026) para las comerciales, cuya evidencia son propuestas, listas de precios y minutas.
+/// Se ve embebido en la web y en las apps (`activities/attachments`).
+model ActivityAttachment {
+  id         Int            @id @default(autoincrement())
+  activityId Int
+  companyId  Int
+  /// Quién lo subió.
+  userId     Int?
+  /// Nombre original del archivo, con su extensión («Propuesta Toks.xlsx»).
+  nombre     String         @db.VarChar(255)
+  /// `/uploads/actividades-adjuntos/<archivo>`.
+  fileUrl    String         @db.VarChar(500)
+  mimeType   String?        @db.VarChar(150)
+  sizeBytes  Int?
+  createdAt  DateTime       @default(now())
+  /// Quitado de la actividad (el archivo se conserva en disco).
+  deletedAt  DateTime?
+  activity   Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user       User?          @relation("ActivityAttachmentUploader", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([activityId])
+  @@index([companyId])
+  @@map("activity_attachments")
 }

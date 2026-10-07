@@ -12,6 +12,8 @@ import { ActivityLifecycleService } from './activity-lifecycle.service.js';
 import { ActivityTeamService } from './activity-team.service.js';
 import { ActivityTeamController, ActivityReassignController } from './activity-team.controller.js';
 import { ActivityIssuesService } from './activity-issues.service.js';
+import { ActivityAttachmentsController } from './attachments/activity-attachments.controller.js';
+import { ActivityAttachmentsService } from './attachments/activity-attachments.service.js';
 import {
   ActivityIssuesReportController,
   ActivityIncidentsController,
@@ -33,10 +35,12 @@ import {
     ActivityRecommendationsController,
     ActivityTeamController,
     ActivityReassignController,
+    ActivityAttachmentsController,
     ActivitiesController,
   ],
   providers: [
     ActivityTeamService,
+    ActivityAttachmentsService,
     ActivityIssuesService,
     ActivitiesService,
     TicketAlertsService,
