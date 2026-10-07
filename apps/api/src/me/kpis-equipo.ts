@@ -35,6 +35,12 @@
  *   aprobación del jefe), entregas aprobadas a la primera, asistencia puntual y uniforme.
  *   La productividad (reloj de actividad ÷ jornada) se sigue mostrando, pero ya no califica:
  *   premiaba dejar el reloj corriendo.
+ * - Y el mismo día pidió más (07-10): «que siempre estén haciendo algo y se tarden lo adecuado en
+ *   las actividades… Alejandro un día hizo una sola actividad y Daniela cinco». Por eso el
+ *   cumplimiento suma tiempo adecuado (lo trabajado contra su tiempo máximo), ritmo de entregas
+ *   por día contra el del equipo, carga de trabajo (horas planeadas de lo entregado contra las
+ *   horas trabajadas) y ocupación (tiempo con una actividad, cada una contada solo hasta su
+ *   tiempo máximo, para que dejar el reloj prendido no sume).
  */
 import { horaCierreAutomatico } from '../attendance/asistencia-confiable.js';
 import { expectedEndHm, expectedStartHm, RETARDO_GRACE_MINUTES } from '../attendance/attendance-hybrid.match.js';
@@ -388,6 +394,11 @@ export type ActividadKpi = {
    * obra de diez días cuenta lo que se trabajó cada día, no diez jornadas completas.
    */
   sesiones?: Array<{ startedAt: Date; endedAt: Date | null }> | null;
+  /**
+   * Hasta cuántos minutos por día cuenta esta actividad como ocupación (su tiempo máximo, o su
+   * plan + 25 %). null = sin plan: cuenta hasta `OCUPACION_TOPE_SIN_PLAN_MIN`.
+   */
+  topeDiarioMin?: number | null;
 };
 
 export type TramoActividad = {
@@ -488,9 +499,42 @@ export type EntregaKpi = {
   primeraRevision?: 'APROBADA' | 'DEVUELTA' | null;
   /** Cuántas veces se la devolvieron. */
   devoluciones?: number;
+  /** Minutos planeados: el plan de la persona (`horasPlan`) o el tiempo estimado de la actividad. */
+  minutosPlan?: number | null;
+  /** Tiempo máximo de la actividad (`tiempoMaximoMin`). */
+  minutosMaximo?: number | null;
+  /** Minutos que de verdad trabajó en ella (sus sesiones; sin ellas, inicio → fin con tope de 12 h). */
+  minutosReales?: number | null;
+  /** Días de su periodo (1 si es de un día). El plan es de una jornada. */
+  diasPeriodo?: number | null;
 };
 
 export type EstadoEntrega = 'a_tiempo' | 'tarde' | 'sin_entregar';
+
+/** Sin tiempo máximo, «adecuado» es no pasar el plan más este margen. */
+export const TOLERANCIA_PLAN = 1.25;
+/** Una entrega sin plan aporta a la carga su tiempo real, hasta esto. */
+export const CARGA_SIN_PLAN_MAX_MIN = 120;
+/** Una actividad sin plan cuenta como ocupación hasta esto por día. */
+export const OCUPACION_TOPE_SIN_PLAN_MIN = 240;
+/** Metas: con esto la parte vale 100. */
+export const META_CARGA_PCT = 75;
+export const META_OCUPACION_PCT = 70;
+/** El ritmo del equipo nunca se toma por debajo de una entrega por día. */
+export const RITMO_REFERENCIA_MIN = 1;
+
+/** Minutos positivos y finitos, o null. */
+function minutosValidos(v: number | null | undefined): number | null {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+}
+
+/** El tope de tiempo de una actividad: su máximo, o su plan + 25 %. */
+export function topeDeTiempo(plan?: number | null, maximo?: number | null): number | null {
+  const m = minutosValidos(maximo);
+  if (m != null) return m;
+  const pl = minutosValidos(plan);
+  return pl != null ? Math.round(pl * TOLERANCIA_PLAN) : null;
+}
 
 export type EntregaDelRango = {
   activityId: number;
@@ -503,6 +547,14 @@ export type EntregaDelRango = {
   minutosTarde: number | null;
   primeraRevision: 'APROBADA' | 'DEVUELTA' | null;
   devoluciones: number;
+  minutosPlan: number | null;
+  /** El tope de tiempo con que se midió (máximo, o plan + 25 %). */
+  minutosMaximo: number | null;
+  minutosReales: number | null;
+  /** 'adecuado' = no pasó su tope de tiempo; null = no se puede medir (sin plan o de varios días). */
+  tiempo: 'adecuado' | 'excedido' | null;
+  /** Lo que aporta a la carga: su plan (por día del periodo) o, sin plan, su tiempo real hasta 2 h. */
+  minutosCarga: number;
 };
 
 /**
@@ -539,6 +591,16 @@ export function entregasDelRango(
       minutosTarde = Math.round((ahora.getTime() - limite.getTime()) / 60_000);
     }
     vistas.add(e.activityId);
+    const plan = minutosValidos(e.minutosPlan);
+    const diasPeriodo = Math.max(1, Math.round(e.diasPeriodo ?? 1));
+    const maximo = topeDeTiempo(plan, e.minutosMaximo);
+    const reales =
+      typeof e.minutosReales === 'number' && Number.isFinite(e.minutosReales) && e.minutosReales >= 0
+        ? Math.round(e.minutosReales)
+        : null;
+    // Varios días: el plan es de una jornada y el reloj corre de corrido; no se compara (igual que el semáforo).
+    const tiempo =
+      !entregada || diasPeriodo > 1 || maximo == null || reales == null ? null : reales <= maximo ? 'adecuado' : 'excedido';
     out.push({
       activityId: e.activityId,
       anNumber: e.anNumber ?? null,
@@ -549,6 +611,11 @@ export function entregasDelRango(
       minutosTarde,
       primeraRevision: entregada ? (e.primeraRevision ?? null) : null,
       devoluciones: entregada ? Math.max(0, e.devoluciones ?? 0) : 0,
+      minutosPlan: plan,
+      minutosMaximo: maximo,
+      minutosReales: reales,
+      tiempo,
+      minutosCarga: !entregada ? 0 : plan != null ? plan * diasPeriodo : Math.min(reales ?? 0, CARGA_SIN_PLAN_MAX_MIN),
       orden: (entregada ?? limite ?? ahora).getTime(),
     });
   }
@@ -567,8 +634,15 @@ export type EntregasKpi = {
   aprobadasALaPrimera: number;
   /** Revisadas que le devolvieron al menos una vez. */
   devueltas: number;
+  /** Entregadas a las que se les pudo medir el tiempo dedicado (con plan o máximo, de un día). */
+  conTiempo: number;
+  /** De esas, las que no pasaron su tope de tiempo. */
+  enTiempoAdecuado: number;
+  /** Minutos de trabajo entregado (ver `minutosCarga`). */
+  minutosCarga: number;
   pctATiempo: number | null;
   pctALaPrimera: number | null;
+  pctTiempoAdecuado: number | null;
 };
 
 export function resumenEntregas(lista: EntregaDelRango[]): EntregasKpi {
@@ -581,11 +655,59 @@ export function resumenEntregas(lista: EntregaDelRango[]): EntregasKpi {
     revisadas: revisadas.length,
     aprobadasALaPrimera: revisadas.filter((e) => e.primeraRevision === 'APROBADA').length,
     devueltas: revisadas.filter((e) => e.primeraRevision === 'DEVUELTA' || e.devoluciones > 0).length,
+    conTiempo: lista.filter((e) => e.tiempo != null).length,
+    enTiempoAdecuado: lista.filter((e) => e.tiempo === 'adecuado').length,
+    minutosCarga: lista.reduce((acc, e) => acc + e.minutosCarga, 0),
   });
 }
 
-function armaEntregas(c: Omit<EntregasKpi, 'pctATiempo' | 'pctALaPrimera'>): EntregasKpi {
-  return { ...c, pctATiempo: pct(c.aTiempo, c.medidas), pctALaPrimera: pct(c.aprobadasALaPrimera, c.revisadas) };
+function armaEntregas(c: Omit<EntregasKpi, 'pctATiempo' | 'pctALaPrimera' | 'pctTiempoAdecuado'>): EntregasKpi {
+  return {
+    ...c,
+    pctATiempo: pct(c.aTiempo, c.medidas),
+    pctALaPrimera: pct(c.aprobadasALaPrimera, c.revisadas),
+    pctTiempoAdecuado: pct(c.enTiempoAdecuado, c.conTiempo),
+  };
+}
+
+/** Entregas por día trabajado, contra el ritmo de referencia del equipo. */
+export type RitmoKpi = { entregadas: number; dias: number; porDia: number | null; referencia: number | null };
+/** Minutos sobre las horas trabajadas. */
+export type ProporcionKpi = { minutos: number; pct: number | null };
+
+/** Un decimal, para «2.3 por día». */
+const unDecimal = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Ritmo de referencia del equipo: el de quien va en el percentil 75 (entre quienes trabajaron y
+ * entregaron algo), nunca menos de una entrega por día. Contra el mejor de todos uno solo con un
+ * día raro bajaría a todos; contra el promedio, la mitad del equipo ya estaría «al 100».
+ */
+export function referenciaDeRitmo(lista: Array<Pick<TotalesKpi, 'ritmo'>>): number | null {
+  const ritmos = lista
+    .map((t) => t.ritmo)
+    .filter((r): r is RitmoKpi => r != null && r.dias > 0 && r.entregadas > 0)
+    .map((r) => r.entregadas / r.dias)
+    .sort((a, b) => a - b);
+  if (!ritmos.length) return null;
+  const p75 = ritmos[Math.max(0, Math.ceil(ritmos.length * 0.75) - 1)];
+  return Math.max(RITMO_REFERENCIA_MIN, unDecimal(p75));
+}
+
+/** Los mismos totales, con el cumplimiento medido contra el ritmo del equipo. */
+export function conReferencia(t: TotalesKpi, referencia: number | null): TotalesKpi {
+  const ritmo = t.ritmo ? { ...t.ritmo, referencia } : t.ritmo;
+  const c = cumplimientoDe({ ...t, ritmo }, referencia);
+  return { ...t, ritmo, cumplimientoPct: c.pct, cumplimientoPartes: c.partes };
+}
+
+/** «7 h 20 min», «45 min». */
+function horasTexto(min: number): string {
+  const total = Math.max(0, Math.round(min));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h <= 0) return `${m} min`;
+  return m ? `${h} h ${m} min` : `${h} h`;
 }
 
 export type AsistenciaPuntualKpi = {
@@ -596,11 +718,20 @@ export type AsistenciaPuntualKpi = {
   pct: number | null;
 };
 
-/** Pesos del cumplimiento. Un solo lugar para moverlos si el dueño pide otros. */
-export const PESOS_CUMPLIMIENTO = { entregas: 40, forma: 25, asistencia: 25, uniforme: 10 } as const;
+/** Pesos del cumplimiento (suman 100). Un solo lugar para moverlos si el dueño pide otros. */
+export const PESOS_CUMPLIMIENTO = {
+  entregas: 20,
+  forma: 10,
+  tiempo: 15,
+  ritmo: 20,
+  carga: 10,
+  ocupacion: 10,
+  asistencia: 10,
+  uniforme: 5,
+} as const;
 
 export type ParteCumplimiento = {
-  clave: 'entregas' | 'forma' | 'asistencia' | 'uniforme';
+  clave: keyof typeof PESOS_CUMPLIMIENTO;
   etiqueta: string;
   pct: number;
   peso: number;
@@ -611,42 +742,78 @@ export type ParteCumplimiento = {
  * Cumplimiento en tiempo y forma, 0–100: promedio ponderado de lo que tenga dato (lo que no
  * tiene dato no pesa). Sin ninguna entrega que medir es null: sin actividades no hay con qué
  * decir que cumplió, aunque haya llegado temprano.
+ *
+ * El ritmo solo se califica con `referenciaRitmo` (el del equipo, `referenciaDeRitmo`): una
+ * persona sola no tiene contra quién compararse.
  */
 export function cumplimientoDe(
-  entregas: EntregasKpi,
-  asistencia: AsistenciaPuntualKpi,
-  uniforme: UniformeKpi,
+  t: Pick<
+    TotalesKpi,
+    'entregas' | 'asistenciaPuntual' | 'uniforme' | 'minutosLaborados' | 'ritmo' | 'carga' | 'ocupacion'
+  >,
+  referenciaRitmo: number | null = t.ritmo?.referencia ?? null,
 ): { pct: number | null; partes: ParteCumplimiento[] } {
   const w = PESOS_CUMPLIMIENTO;
+  const { entregas, asistenciaPuntual: asistencia, uniforme } = t;
   const partes: Array<ParteCumplimiento & { razon: number }> = [];
-  const parte = (
-    clave: ParteCumplimiento['clave'],
-    etiqueta: string,
-    num: number,
-    den: number,
-    peso: number,
-    detalle: string,
-  ) => {
-    if (den > 0) partes.push({ clave, etiqueta, razon: num / den, pct: pct(num, den) ?? 0, peso, detalle });
+  /** `razon` entre 0 y 1. */
+  const agrega = (clave: ParteCumplimiento['clave'], etiqueta: string, razon: number, detalle: string) => {
+    const r = Math.max(0, Math.min(1, razon));
+    partes.push({ clave, etiqueta, razon: r, pct: Math.round(r * 100), peso: w[clave], detalle });
   };
-  parte('entregas', 'Entregas a tiempo', entregas.aTiempo, entregas.medidas, w.entregas, `${entregas.aTiempo} de ${entregas.medidas}`);
+  const parte = (clave: ParteCumplimiento['clave'], etiqueta: string, num: number, den: number, detalle: string) => {
+    if (den > 0) agrega(clave, etiqueta, num / den, detalle);
+  };
+  parte('entregas', 'Entregas a tiempo', entregas.aTiempo, entregas.medidas, `${entregas.aTiempo} de ${entregas.medidas}`);
   parte(
     'forma',
     'Aprobadas a la primera',
     entregas.aprobadasALaPrimera,
     entregas.revisadas,
-    w.forma,
     `${entregas.aprobadasALaPrimera} de ${entregas.revisadas}`,
   );
+  parte(
+    'tiempo',
+    'Tiempo adecuado',
+    entregas.enTiempoAdecuado ?? 0,
+    entregas.conTiempo ?? 0,
+    `${entregas.enTiempoAdecuado ?? 0} de ${entregas.conTiempo ?? 0} sin pasar su tiempo máximo`,
+  );
+  const ritmo = t.ritmo;
+  if (ritmo && ritmo.dias > 0 && referenciaRitmo != null && referenciaRitmo > 0) {
+    const porDia = ritmo.entregadas / ritmo.dias;
+    agrega(
+      'ritmo',
+      'Ritmo de entregas',
+      porDia / referenciaRitmo,
+      `${unDecimal(porDia)} por día · el equipo va a ${referenciaRitmo}`,
+    );
+  }
+  const laborados = t.minutosLaborados ?? 0;
+  if (laborados > 0 && t.carga) {
+    agrega(
+      'carga',
+      'Carga de trabajo',
+      t.carga.minutos / laborados / (META_CARGA_PCT / 100),
+      `${horasTexto(t.carga.minutos)} de trabajo entregado en ${horasTexto(laborados)} (${t.carga.pct ?? 0} %; meta ${META_CARGA_PCT} %)`,
+    );
+  }
+  if (laborados > 0 && t.ocupacion) {
+    agrega(
+      'ocupacion',
+      'Siempre con algo',
+      t.ocupacion.minutos / laborados / (META_OCUPACION_PCT / 100),
+      `${horasTexto(t.ocupacion.minutos)} con una actividad de ${horasTexto(laborados)} (${t.ocupacion.pct ?? 0} %; meta ${META_OCUPACION_PCT} %)`,
+    );
+  }
   parte(
     'asistencia',
     'Asistencia puntual',
     asistencia.puntuales,
     asistencia.esperados,
-    w.asistencia,
     `${asistencia.puntuales} de ${asistencia.esperados} ${asistencia.esperados === 1 ? 'día' : 'días'}`,
   );
-  parte('uniforme', 'Uniforme', uniforme.ok, uniforme.revisadas, w.uniforme, `${uniforme.ok} de ${uniforme.revisadas}`);
+  parte('uniforme', 'Uniforme', uniforme.ok, uniforme.revisadas, `${uniforme.ok} de ${uniforme.revisadas}`);
 
   const pesoTotal = partes.reduce((acc, p) => acc + p.peso, 0);
   const valor =
@@ -696,6 +863,8 @@ export type DiaKpi = {
   minutosProductivos: number;
   minutosInactivos: number;
   productividadPct: number | null;
+  /** Tiempo con una actividad, cada una contada solo hasta su tiempo máximo del día. */
+  minutosOcupados: number;
   minutosExtra: number | null;
   /**
    * Qué decidió el jefe sobre el tiempo extra de ese día. null = nadie lo ha visto.
@@ -755,6 +924,12 @@ export type TotalesKpi = {
   entregas: EntregasKpi;
   /** Días laborables en que entró a tiempo, de los que debía checar. */
   asistenciaPuntual: AsistenciaPuntualKpi;
+  /** Entregas por día trabajado (y el ritmo del equipo, si se calculó en equipo). */
+  ritmo: RitmoKpi;
+  /** Trabajo entregado (plan de lo entregado) contra las horas trabajadas. */
+  carga: ProporcionKpi;
+  /** Tiempo con una actividad (cada una hasta su tiempo máximo) contra las horas trabajadas. */
+  ocupacion: ProporcionKpi;
   /** Cumplimiento en tiempo y forma, 0–100; null sin entregas que medir. */
   cumplimientoPct: number | null;
   cumplimientoPartes: ParteCumplimiento[];
@@ -822,6 +997,11 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
   const tramosJornadaTodos = jornadas.map((j) => ({ inicio: j.entrada.getTime(), fin: j.fin.getTime() }));
   const actividades = tramosDeActividades(e.actividades, e.ahora, tz);
   const tramosActividad = actividades.map((a) => ({ inicio: a.inicio.getTime(), fin: a.fin.getTime() }));
+  const tramosOcupados = recortaPorTope(
+    actividades,
+    new Map(e.actividades.map((a) => [a.activityId, a.topeDiarioMin ?? null])),
+    tz,
+  );
   const comidas: Tramo[] = e.comidas
     .filter((c) => c.inicio instanceof Date && !Number.isNaN(c.inicio.getTime()))
     .map((c) => {
@@ -880,6 +1060,7 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
         minutosProductivos: 0,
         minutosInactivos: 0,
         productividadPct: null,
+        minutosOcupados: 0,
         minutosExtra: null,
         extraEstado: null,
         minutosExtraAprobados: 0,
@@ -901,6 +1082,7 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
     const minutosLaborados = minutosDeTramos(laborables);
     const minutosProductivos = Math.min(minutosDeTramos(productivos), minutosLaborados);
     const minutosInactivos = Math.max(0, minutosLaborados - minutosProductivos);
+    const minutosOcupados = Math.min(minutosDeTramos(intersectaTramos(tramosOcupados, laborables)), minutosLaborados);
     const r = laborable ? retardoDeEntrada(primera.entrada, e.horario, tz) : { retardo: false, minutosTarde: 0 };
     const minutosExtra =
       e.horario.jornadaOrdinariaMin == null
@@ -932,6 +1114,7 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
       minutosProductivos,
       minutosInactivos,
       productividadPct: pct(minutosProductivos, minutosLaborados),
+      minutosOcupados,
       minutosExtra,
       extraEstado: decision?.estado ?? null,
       minutosExtraAprobados: decision?.estado === 'APROBADO' ? Math.max(0, decision.minutos) : 0,
@@ -970,6 +1153,37 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
   return { dias, entregas, totales: sumaTotales(dias, enRango, e.horario, resumenEntregas(entregas)) };
 }
 
+/**
+ * Los tramos de actividad, cada actividad cortada en su tope por día: lo que pase de su tiempo
+ * máximo (o de 4 h si no tiene plan) no cuenta como «estar haciendo algo». Así dejar el reloj
+ * prendido toda la tarde no vuelve ocupada a nadie.
+ */
+export function recortaPorTope(
+  tramos: TramoActividad[],
+  topes: Map<number, number | null>,
+  tz: string = WORKDAY_TIMEZONE,
+): Tramo[] {
+  const grupos = new Map<string, TramoActividad[]>();
+  for (const t of tramos) {
+    const k = `${t.activityId}:${workDateKey(t.inicio, tz)}`;
+    const lista = grupos.get(k) ?? [];
+    lista.push(t);
+    grupos.set(k, lista);
+  }
+  const out: Tramo[] = [];
+  for (const lista of grupos.values()) {
+    const tope = topes.get(lista[0].activityId) ?? null;
+    let restante = (minutosValidos(tope) ?? OCUPACION_TOPE_SIN_PLAN_MIN) * 60_000;
+    for (const t of normalizaTramos(lista.map((x) => ({ inicio: x.inicio.getTime(), fin: x.fin.getTime() })))) {
+      if (restante <= 0) break;
+      const fin = Math.min(t.fin, t.inicio + restante);
+      out.push({ inicio: t.inicio, fin });
+      restante -= fin - t.inicio;
+    }
+  }
+  return out;
+}
+
 function sumaTotales(
   dias: DiaKpi[],
   jornadas: JornadaKpi[],
@@ -997,7 +1211,19 @@ function sumaTotales(
     sinRevisar: jornadas.length - ok - noOk,
     pct: pct(ok, ok + noOk),
   };
-  const cumplimiento = cumplimientoDe(entregas, asistenciaPuntual, uniforme);
+  const ritmo: RitmoKpi = {
+    entregadas: entregas.aTiempo + entregas.tarde,
+    dias: conJornada.length,
+    porDia: conJornada.length ? unDecimal((entregas.aTiempo + entregas.tarde) / conJornada.length) : null,
+    referencia: null,
+  };
+  const carga = { minutos: entregas.minutosCarga, pct: pct(entregas.minutosCarga, minutosLaborados) };
+  const minutosOcupados = conJornada.reduce((s, d) => s + d.minutosOcupados, 0);
+  const ocupacion = { minutos: minutosOcupados, pct: pct(minutosOcupados, minutosLaborados) };
+  const cumplimiento = cumplimientoDe(
+    { entregas, asistenciaPuntual, uniforme, minutosLaborados, ritmo, carga, ocupacion },
+    null,
+  );
   return {
     diasConJornada: conJornada.length,
     diasSinChecada: dias.filter((d) => d.sinChecada).length,
@@ -1022,6 +1248,9 @@ function sumaTotales(
     actividadesFueraDeJornada: dias.reduce((s, d) => s + d.actividadesFueraDeJornada, 0),
     entregas,
     asistenciaPuntual,
+    ritmo,
+    carga,
+    ocupacion,
     cumplimientoPct: cumplimiento.pct,
     cumplimientoPartes: cumplimiento.partes,
   };
@@ -1045,6 +1274,9 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     revisadas: ent((x) => x.revisadas),
     aprobadasALaPrimera: ent((x) => x.aprobadasALaPrimera),
     devueltas: ent((x) => x.devueltas),
+    conTiempo: ent((x) => x.conTiempo ?? 0),
+    enTiempoAdecuado: ent((x) => x.enTiempoAdecuado ?? 0),
+    minutosCarga: ent((x) => x.minutosCarga ?? 0),
   });
   const esperados = s((t) => t.asistenciaPuntual?.esperados ?? 0);
   const puntuales = s((t) => t.asistenciaPuntual?.puntuales ?? 0);
@@ -1056,7 +1288,21 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     sinRevisar: s((t) => t.uniforme.sinRevisar),
     pct: pct(ok, ok + noOk),
   };
-  const cumplimiento = cumplimientoDe(entregas, asistenciaPuntual, uniforme);
+  const entregadas = s((t) => t.ritmo?.entregadas ?? 0);
+  const diasTrabajados = s((t) => t.ritmo?.dias ?? 0);
+  const ritmo: RitmoKpi = {
+    entregadas,
+    dias: diasTrabajados,
+    porDia: diasTrabajados ? unDecimal(entregadas / diasTrabajados) : null,
+    referencia: null,
+  };
+  const carga = { minutos: entregas.minutosCarga, pct: pct(entregas.minutosCarga, laborados) };
+  const ocupados = s((t) => t.ocupacion?.minutos ?? 0);
+  const ocupacion = { minutos: ocupados, pct: pct(ocupados, laborados) };
+  const cumplimiento = cumplimientoDe(
+    { entregas, asistenciaPuntual, uniforme, minutosLaborados: laborados, ritmo, carga, ocupacion },
+    null,
+  );
   return {
     diasConJornada: s((t) => t.diasConJornada),
     diasSinChecada: s((t) => t.diasSinChecada),
@@ -1078,6 +1324,9 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     actividadesFueraDeJornada: s((t) => t.actividadesFueraDeJornada),
     entregas,
     asistenciaPuntual,
+    ritmo,
+    carga,
+    ocupacion,
     cumplimientoPct: cumplimiento.pct,
     cumplimientoPartes: cumplimiento.partes,
   };
@@ -1100,6 +1349,9 @@ export const UMBRALES_KPI = {
   /** % aprobadas a la primera: ≥ 90 verde, ≥ 75 amarillo, menos rojo. */
   formaVerde: 90,
   formaAmarillo: 75,
+  /** % entregas sin pasar su tiempo máximo: ≥ 80 verde, ≥ 60 amarillo, menos rojo. */
+  tiempoVerde: 80,
+  tiempoAmarillo: 60,
   /** % uniforme ✓ de lo revisado: ≥ 95 verde, ≥ 80 amarillo, menos rojo. */
   uniformeVerde: 95,
   uniformeAmarillo: 80,
@@ -1139,6 +1391,14 @@ export function semaforoKpi(t: TotalesKpi): { semaforo: SemaforoKpi; motivos: st
       `${ent.aTiempo} de ${ent.medidas} entregas a tiempo${fuera ? ` (${fuera})` : ''}`,
     );
   }
+  if (ent && ent.pctTiempoAdecuado != null) {
+    const p = ent.pctTiempoAdecuado;
+    const pasadas = ent.conTiempo - ent.enTiempoAdecuado;
+    marca(
+      p >= u.tiempoVerde ? 'verde' : p >= u.tiempoAmarillo ? 'amarillo' : 'rojo',
+      `${pasadas} de ${ent.conTiempo} ${ent.conTiempo === 1 ? 'entrega pasó' : 'entregas pasaron'} su tiempo máximo`,
+    );
+  }
   if (ent && ent.pctALaPrimera != null) {
     const p = ent.pctALaPrimera;
     marca(
@@ -1176,7 +1436,11 @@ export function supuestosKpi(): string[] {
   const u = UMBRALES_KPI;
   const w = PESOS_CUMPLIMIENTO;
   return [
-    `Cumplimiento (en tiempo y forma): entregas a tiempo ${w.entregas} %, aprobadas a la primera ${w.forma} %, asistencia puntual ${w.asistencia} % y uniforme ${w.uniforme} %. Lo que no tiene dato no pesa; sin ninguna entrega en las fechas no se califica.`,
+    `Cumplimiento (en tiempo y forma): entregas a tiempo ${w.entregas} %, aprobadas a la primera ${w.forma} %, tiempo adecuado ${w.tiempo} %, ritmo de entregas ${w.ritmo} %, carga de trabajo ${w.carga} %, siempre con algo ${w.ocupacion} %, asistencia puntual ${w.asistencia} % y uniforme ${w.uniforme} %. Lo que no tiene dato no pesa; sin ninguna entrega en las fechas no se califica.`,
+    `Tiempo adecuado: lo que de verdad trabajó en la actividad (sus sesiones de reloj) no pasó su tiempo máximo; si no tiene máximo, su tiempo estimado + ${Math.round((TOLERANCIA_PLAN - 1) * 100)} %. Sin estimado ni máximo, o de varios días, no se mide.`,
+    `Ritmo de entregas: actividades entregadas por día trabajado, contra el ritmo del equipo (el de quien va en el 75 % mejor, mínimo ${RITMO_REFERENCIA_MIN} por día). Igualarlo o pasarlo vale 100.`,
+    `Carga de trabajo: suma del tiempo estimado de lo que entregó (sin estimado, su tiempo real hasta ${CARGA_SIN_PLAN_MAX_MIN / 60} h) contra sus horas trabajadas. ${META_CARGA_PCT} % o más vale 100. Una actividad de un día completo pesa más que una de 20 minutos.`,
+    `Siempre con algo: tiempo con una actividad en curso dentro de su jornada, contando cada actividad solo hasta su tiempo máximo del día (sin estimado, hasta ${OCUPACION_TOPE_SIN_PLAN_MIN / 60} h): dejar el reloj prendido no suma. ${META_OCUPACION_PCT} % de la jornada o más vale 100.`,
     'Entrega a tiempo: la persona la entregó (fin real o evidencia completa) antes de su límite. Se mide con la hora en que ENTREGÓ, no con la hora en que el jefe la aprobó.',
     'Límite: el fin del último día de su periodo; si no tiene periodo, su fecha máxima. Como el formulario guarda la fecha máxima igual a la hora de inicio, una máxima que no queda después del inicio vale hasta el fin de ese día (igual que el semáforo).',
     'Sin entregar: su límite cayó en estas fechas, ya pasó y no la ha entregado. Lo que vence después todavía no se califica.',
@@ -1193,6 +1457,6 @@ export function supuestosKpi(): string[] {
     `Tiempo extra: lo laborado arriba de ${JORNADA_ORDINARIA_MIN / 60} h en día laborable, o todo lo laborado en sábado o domingo. Sin horario no se calcula.`,
     'El tiempo extra calculado no se paga solo: un jefe lo aprueba día por día, y a la pre-nómina solo llega lo aprobado.',
     'Uniforme: el jefe marca ✓ o ✗ en la entrada de cada persona (Asistencias). El % es sobre las entradas revisadas.',
-    `Semáforo: el peor de entregas a tiempo (verde ≥ ${u.entregasVerde} %, amarillo ≥ ${u.entregasAmarillo} %), aprobadas a la primera (verde ≥ ${u.formaVerde} %, amarillo ≥ ${u.formaAmarillo} %), retardos (amarillo desde ${u.retardosAmarillo}, rojo desde ${u.retardosRojo}), uniforme (verde ≥ ${u.uniformeVerde} %, amarillo ≥ ${u.uniformeAmarillo} %) y días sin checada (amarillo ${u.faltasAmarillo}, rojo desde ${u.faltasRojo}).`,
+    `Semáforo: el peor de entregas a tiempo (verde ≥ ${u.entregasVerde} %, amarillo ≥ ${u.entregasAmarillo} %), tiempo adecuado (verde ≥ ${u.tiempoVerde} %, amarillo ≥ ${u.tiempoAmarillo} %), aprobadas a la primera (verde ≥ ${u.formaVerde} %, amarillo ≥ ${u.formaAmarillo} %), retardos (amarillo desde ${u.retardosAmarillo}, rojo desde ${u.retardosRojo}), uniforme (verde ≥ ${u.uniformeVerde} %, amarillo ≥ ${u.uniformeAmarillo} %) y días sin checada (amarillo ${u.faltasAmarillo}, rojo desde ${u.faltasRojo}).`,
   ];
 }

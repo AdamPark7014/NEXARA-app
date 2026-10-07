@@ -41,9 +41,15 @@ export function tonoCumplimiento(pct: number | null | undefined): TonoKpi {
   return "critico";
 }
 
-/** Para el `title` de la cifra: de qué está hecho el cumplimiento. */
+/** Para el `title` de la cifra: de qué está hecho el cumplimiento (los pesos vigentes de la API). */
 export const PESOS_CUMPLIMIENTO =
-  "Entregas a tiempo 40 %, aprobadas a la primera 25 %, asistencia puntual 25 %, uniforme 10 %";
+  "Entregas a tiempo 20 %, ritmo de entregas 20 %, tiempo adecuado 15 %, aprobadas a la primera 10 %, carga de trabajo 10 %, siempre con algo 10 %, asistencia puntual 10 %, uniforme 5 %";
+
+/** «2.3», «1»: entregas por día con un decimal. */
+export function porDiaTexto(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return (Math.round(n * 10) / 10).toLocaleString("es-MX", { maximumFractionDigits: 1 });
+}
 
 /**
  * Las entregas en una frase: «Entregó 18 actividades: 17 a tiempo y 1 tarde; 18 de 18 aprobadas
@@ -69,7 +75,34 @@ export function entregasEnPalabras(e: EntregasKpi): string {
   if (e.revisadas) {
     partes.push(`${e.aprobadasALaPrimera} de ${e.revisadas} ${e.revisadas === 1 ? "aprobada" : "aprobadas"} a la primera`);
   }
+  if (e.conTiempo) {
+    const pasadas = e.conTiempo - (e.enTiempoAdecuado ?? 0);
+    partes.push(
+      pasadas
+        ? `${plural(pasadas, "pasó", "pasaron")} su tiempo máximo (de ${e.conTiempo})`
+        : `ninguna pasó su tiempo máximo`,
+    );
+  }
   return `${partes.join("; ")}.`;
+}
+
+/**
+ * Ritmo, carga y ocupación en una frase: «Entregó 2.3 por día (el equipo va a 1.8); 29 h de trabajo
+ * entregado en 58 h (50 %); con una actividad el 59 % de su jornada.»
+ */
+export function ritmoEnPalabras(t: TotalesKpi): string {
+  const partes: string[] = [];
+  if (t.ritmo && t.ritmo.dias > 0) {
+    const ref = t.ritmo.referencia != null ? ` (el equipo va a ${porDiaTexto(t.ritmo.referencia)})` : "";
+    partes.push(`Entregó ${porDiaTexto(t.ritmo.porDia)} por día${ref}`);
+  }
+  if (t.carga && t.minutosLaborados > 0) {
+    partes.push(`${horasEnPalabras(t.carga.minutos)} de trabajo entregado en ${horasEnPalabras(t.minutosLaborados)} (${t.carga.pct ?? 0} %)`);
+  }
+  if (t.ocupacion && t.minutosLaborados > 0) {
+    partes.push(`con una actividad el ${t.ocupacion.pct ?? 0} % de su jornada`);
+  }
+  return partes.length ? `${partes.join("; ")}.` : "";
 }
 
 /** Pista de la cifra del equipo: «17 de 18 entregas a tiempo · 0 devueltas». */
@@ -89,6 +122,8 @@ export function detalleDeFila(t: TotalesKpi, opciones: { tiempo?: boolean } = {}
   if (!opciones.tiempo && e) {
     if (e.medidas) {
       partes.push(`${e.aTiempo}/${e.medidas} a tiempo`);
+      if (t.ritmo && t.ritmo.dias > 0) partes.push(`${porDiaTexto(t.ritmo.porDia)} por día`);
+      if (e.conTiempo) partes.push(`${e.enTiempoAdecuado ?? 0}/${e.conTiempo} en su tiempo`);
       if (e.revisadas) partes.push(`${e.aprobadasALaPrimera}/${e.revisadas} a la primera`);
     } else {
       partes.push("Sin entregas");
@@ -153,6 +188,8 @@ export function fechaHoraMx(iso: string | null | undefined): string {
 export function resumenEnPalabras(t: TotalesKpi, opciones: { conHorario?: boolean } = {}): string {
   const frases: string[] = [];
   if (t.entregas) frases.push(entregasEnPalabras(t.entregas));
+  const ritmo = ritmoEnPalabras(t);
+  if (ritmo) frases.push(ritmo);
   if (t.minutosLaborados > 0) {
     const pct = t.productividadPct == null ? "" : ` (${Math.round(t.productividadPct)} %)`;
     frases.push(

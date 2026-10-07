@@ -38,21 +38,34 @@ export type EntregasKpi = {
   pctATiempo: number | null;
   /** aprobadasALaPrimera ÷ revisadas. null sin revisadas. */
   pctALaPrimera: number | null;
+  /** Entregadas a las que se les pudo medir el tiempo dedicado (con estimado o máximo, de un día). */
+  conTiempo?: number;
+  /** De esas, las que no pasaron su tiempo máximo. */
+  enTiempoAdecuado?: number;
+  pctTiempoAdecuado?: number | null;
+  /** Minutos de trabajo entregado: el estimado de lo entregado (sin estimado, su tiempo real hasta 2 h). */
+  minutosCarga?: number;
 };
+
+/** Entregas por día trabajado; `referencia` = el ritmo del equipo contra el que se mide. */
+export type RitmoKpi = { entregadas: number; dias: number; porDia: number | null; referencia: number | null };
+/** Minutos sobre las horas trabajadas. */
+export type ProporcionKpi = { minutos: number; pct: number | null };
 
 /** Días laborables en que checó a tiempo ÷ días laborables que debía checar (los sin checar cuentan como no). */
 export type AsistenciaPuntualKpi = { esperados: number; puntuales: number; pct: number | null };
 
 /** Una de las partes del cumplimiento, con su peso en el promedio. */
 export type ParteCumplimiento = {
-  clave: "entregas" | "forma" | "asistencia" | "uniforme";
-  /** «Entregas a tiempo», «Aprobadas a la primera», «Asistencia puntual», «Uniforme». */
+  /** entregas · forma · tiempo · ritmo · carga · ocupacion · asistencia · uniforme (puede haber más). */
+  clave: string;
+  /** «Entregas a tiempo», «Ritmo de entregas», «Siempre con algo»… */
   etiqueta: string;
   /** 0–100. */
   pct: number;
-  /** 40 / 25 / 25 / 10. */
+  /** Peso en el promedio (suman 100). */
   peso: number;
-  /** «17 de 18», «7 de 8 días». */
+  /** «17 de 18», «2.3 por día · el equipo va a 1.8». */
   detalle: string;
 };
 
@@ -63,9 +76,15 @@ export type TotalesKpi = {
    */
   entregas?: EntregasKpi;
   asistenciaPuntual?: AsistenciaPuntualKpi;
+  /** Entregas por día trabajado contra el ritmo del equipo. */
+  ritmo?: RitmoKpi;
+  /** Trabajo entregado (estimado de lo entregado) contra las horas trabajadas. */
+  carga?: ProporcionKpi;
+  /** Tiempo con una actividad (cada una hasta su tiempo máximo) contra las horas trabajadas. */
+  ocupacion?: ProporcionKpi;
   /**
-   * Cumplimiento en tiempo y forma (0–100): promedio ponderado de entregas a tiempo 40,
-   * aprobadas a la primera 25, asistencia puntual 25 y uniforme 10 (lo que no tiene dato no pesa).
+   * Cumplimiento en tiempo y forma (0–100): promedio ponderado de sus partes
+   * (`cumplimientoPartes`, cada una con su peso; lo que no tiene dato no pesa).
    * null si no tuvo ninguna entrega que medir en el rango.
    */
   cumplimientoPct?: number | null;
@@ -179,6 +198,14 @@ export type EntregaKpi = {
   /** null = nadie la ha revisado. */
   primeraRevision: "APROBADA" | "DEVUELTA" | null;
   devoluciones: number;
+  /** Minutos estimados (plan de la persona o tiempo estimado de la actividad). */
+  minutosPlan?: number | null;
+  /** Tope de tiempo con que se midió: su máximo, o el estimado + 25 %. */
+  minutosMaximo?: number | null;
+  /** Lo que de verdad trabajó en ella (sus sesiones de reloj). */
+  minutosReales?: number | null;
+  /** 'adecuado' = no pasó su tope; null = no se puede medir. */
+  tiempo?: "adecuado" | "excedido" | null;
 };
 
 export type KpisPersonaResponse = KpiPersonaFila & {

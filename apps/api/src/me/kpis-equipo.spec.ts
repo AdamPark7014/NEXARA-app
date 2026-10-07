@@ -2,6 +2,7 @@ import { isLateVsSchedule } from '../attendance/attendance-hybrid.match';
 import {
   armaJornadas,
   calculaKpisPersona,
+  conReferencia,
   cumplimientoDe,
   diasDelRango,
   entregasDelRango,
@@ -9,6 +10,8 @@ import {
   intersectaTramos,
   minutosDeTramos,
   normalizaTramos,
+  PESOS_CUMPLIMIENTO,
+  referenciaDeRitmo,
   restaTramos,
   resumenEntregas,
   retardoDeEntrada,
@@ -553,10 +556,17 @@ describe('semáforo', () => {
       revisadas: 5,
       aprobadasALaPrimera: 5,
       devueltas: 0,
+      conTiempo: 5,
+      enTiempoAdecuado: 5,
+      minutosCarga: 1800,
       pctATiempo: 100,
       pctALaPrimera: 100,
+      pctTiempoAdecuado: 100,
     },
     asistenciaPuntual: { esperados: 5, puntuales: 5, pct: 100 },
+    ritmo: { entregadas: 5, dias: 5, porDia: 1, referencia: null },
+    carga: { minutos: 1800, pct: 75 },
+    ocupacion: { minutos: 1700, pct: 71 },
     cumplimientoPct: 100,
     cumplimientoPartes: [],
   };
@@ -604,7 +614,7 @@ describe('semáforo', () => {
         minutosProductivos: 0,
         productividadPct: null,
         uniforme: { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 0, pct: null },
-        entregas: { ...base.entregas, medidas: 0, aTiempo: 0, revisadas: 0, aprobadasALaPrimera: 0, pctATiempo: null, pctALaPrimera: null },
+        entregas: { ...base.entregas, medidas: 0, aTiempo: 0, revisadas: 0, aprobadasALaPrimera: 0, conTiempo: 0, enTiempoAdecuado: 0, pctATiempo: null, pctALaPrimera: null, pctTiempoAdecuado: null },
       }).semaforo,
     ).toBe('sin_datos');
   });
@@ -640,7 +650,7 @@ describe('entregas: en tiempo y forma', () => {
       [2, 'tarde', 90],
       [1, 'a_tiempo', null],
     ]);
-    expect(resumenEntregas(lista)).toEqual({
+    expect(resumenEntregas(lista)).toMatchObject({
       medidas: 4,
       aTiempo: 2,
       tarde: 1,
@@ -653,59 +663,125 @@ describe('entregas: en tiempo y forma', () => {
     });
   });
 
-  it('cumplimiento: pesos 40/25/25/10 y lo que no tiene dato no pesa', () => {
-    const entregas = resumenEntregas(
-      entregasDelRango(
-        [
-          { activityId: 1, limite: finDelDia('15'), entregadaAt: M('15', '12:00'), primeraRevision: 'APROBADA' },
-          { activityId: 2, limite: M('15', '12:00'), entregadaAt: M('15', '13:00'), primeraRevision: 'APROBADA' },
-        ],
-        '2026-09-15',
-        '2026-09-15',
-        ahora,
-      ),
+  it('tiempo adecuado: lo trabajado contra su máximo (o plan + 25 %); la carga es el plan de lo entregado', () => {
+    const lista = entregasDelRango(
+      [
+        // Plan 60, máximo 90, trabajó 80: adecuado.
+        { activityId: 1, limite: null, entregadaAt: M('15', '11:00'), minutosPlan: 60, minutosMaximo: 90, minutosReales: 80 },
+        // Plan 60 sin máximo → tope 75; trabajó 100: excedido.
+        { activityId: 2, limite: null, entregadaAt: M('15', '12:00'), minutosPlan: 60, minutosReales: 100 },
+        // Sin plan: no se mide su tiempo; aporta su real hasta 2 h.
+        { activityId: 3, limite: null, entregadaAt: M('15', '13:00'), minutosReales: 300 },
+        // De tres días: el plan es por jornada (×3) y su tiempo no se compara.
+        { activityId: 4, limite: null, entregadaAt: M('15', '14:00'), minutosPlan: 480, minutosReales: 2000, diasPeriodo: 3 },
+      ],
+      '2026-09-15',
+      '2026-09-15',
+      ahora,
     );
-    const sinUniforme = { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 1, pct: null };
-    // entregas 50 % ×40 + forma 100 % ×25 + asistencia 100 % ×25 = 70 de 90 → 78 %.
-    const c = cumplimientoDe(entregas, { esperados: 1, puntuales: 1, pct: 100 }, sinUniforme);
-    expect(c.pct).toBe(78);
-    expect(c.partes.map((p) => [p.clave, p.pct, p.peso, p.detalle])).toEqual([
-      ['entregas', 50, 40, '1 de 2'],
-      ['forma', 100, 25, '2 de 2'],
-      ['asistencia', 100, 25, '1 de 1 día'],
+    expect(lista.map((e) => [e.activityId, e.tiempo, e.minutosMaximo, e.minutosCarga])).toEqual([
+      [4, null, 600, 1440],
+      [3, null, null, 120],
+      [2, 'excedido', 75, 60],
+      [1, 'adecuado', 90, 60],
     ]);
-    // Sin entregas no hay cumplimiento, aunque haya llegado temprano.
-    expect(cumplimientoDe(resumenEntregas([]), { esperados: 3, puntuales: 3, pct: 100 }, sinUniforme).pct).toBeNull();
+    expect(resumenEntregas(lista)).toMatchObject({ conTiempo: 2, enTiempoAdecuado: 1, pctTiempoAdecuado: 50, minutosCarga: 1680 });
   });
 
-  it('quien entrega a tiempo queda arriba de quien solo dejó el reloj corriendo', () => {
-    // Cumplido: 3 entregas a tiempo, poco reloj. Reloj: una obra con el reloj todo el día, entregada tarde.
-    const cumplido = calcula({
-      desde: '2026-09-15',
-      hasta: '2026-09-15',
-      checadas: [entrada('15', '09:50'), salida('15', '18:00')],
-      actividades: [actividad(1, M('15', '10:00'), M('15', '11:00'))],
-      entregas: [1, 2, 3].map((id) => ({
-        activityId: id,
-        limite: finDelDia('15'),
-        entregadaAt: M('15', `1${id}:00`),
-        primeraRevision: 'APROBADA' as const,
-      })),
+  it('el ritmo se mide contra el percentil 75 del equipo, nunca menos de 1 por día', () => {
+    const r = (entregadas: number, dias: number) => ({ ritmo: { entregadas, dias, porDia: null, referencia: null } });
+    expect(referenciaDeRitmo([r(18, 8), r(14, 8), r(4, 8), r(1, 8)])).toBe(1.8);
+    expect(referenciaDeRitmo([r(1, 8)])).toBe(1);
+    expect(referenciaDeRitmo([r(0, 8)])).toBeNull();
+  });
+
+  it('cumplimiento: ocho partes que suman 100 y lo que no tiene dato no pesa', () => {
+    const base = {
+      entregas: {
+        medidas: 2,
+        aTiempo: 1,
+        tarde: 1,
+        sinEntregar: 0,
+        revisadas: 2,
+        aprobadasALaPrimera: 2,
+        devueltas: 0,
+        conTiempo: 2,
+        enTiempoAdecuado: 1,
+        minutosCarga: 240,
+        pctATiempo: 50,
+        pctALaPrimera: 100,
+        pctTiempoAdecuado: 50,
+      },
+      asistenciaPuntual: { esperados: 1, puntuales: 1, pct: 100 },
+      uniforme: { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 1, pct: null },
+      minutosLaborados: 480,
+      ritmo: { entregadas: 2, dias: 1, porDia: 2, referencia: null },
+      carga: { minutos: 240, pct: 50 },
+      ocupacion: { minutos: 168, pct: 35 },
+    };
+    expect(Object.values(PESOS_CUMPLIMIENTO).reduce((a, b) => a + b, 0)).toBe(100);
+    // entregas ½·20 + forma 1·10 + tiempo ½·15 + ritmo (2 de 4)·20 + carga (50 % de 75)·10 +
+    // ocupación (35 % de 70)·10 + asistencia 1·10 = 59.2 de 95 → 62 %.
+    const c = cumplimientoDe(base, 4);
+    expect(c.pct).toBe(62);
+    expect(c.partes.map((p) => [p.clave, p.pct, p.peso])).toEqual([
+      ['entregas', 50, 20],
+      ['forma', 100, 10],
+      ['tiempo', 50, 15],
+      ['ritmo', 50, 20],
+      ['carga', 67, 10],
+      ['ocupacion', 50, 10],
+      ['asistencia', 100, 10],
+    ]);
+    expect(c.partes.find((p) => p.clave === 'ritmo')!.detalle).toBe('2 por día · el equipo va a 4');
+    // Sin ritmo del equipo, el ritmo no se califica.
+    expect(cumplimientoDe(base, null).pct).toBe(66);
+    // Sin entregas no hay cumplimiento, aunque haya llegado temprano.
+    expect(cumplimientoDe({ ...base, entregas: resumenEntregas([]) }, 4).pct).toBeNull();
+  });
+
+  it('una sola entrega en el día no pesa lo mismo que cinco (Adam: Alejandro contra Daniela)', () => {
+    const dia = { desde: '2026-09-15', hasta: '2026-09-15', checadas: [entrada('15', '10:00'), salida('15', '18:00')] };
+    const entrega = (id: number, hora: string) => ({
+      activityId: id,
+      limite: finDelDia('15'),
+      entregadaAt: M('15', hora),
+      minutosPlan: 60,
+      minutosMaximo: 90,
+      minutosReales: 60,
+    });
+    const daniela = calcula({
+      ...dia,
+      actividades: [10, 11, 12, 13, 14].map((h, i) => actividad(i + 1, M('15', `${h}:00`), M('15', `${h + 1}:00`))),
+      entregas: [11, 12, 13, 14, 15].map((h, i) => entrega(i + 1, `${h}:00`)),
     }).totales;
+    const alejandro = calcula({
+      ...dia,
+      actividades: [actividad(9, M('15', '10:00'), M('15', '11:00'))],
+      entregas: [entrega(9, '11:00')],
+    }).totales;
+    // Los dos entregaron todo a tiempo y dentro de su tiempo…
+    expect(daniela.entregas.pctATiempo).toBe(100);
+    expect(alejandro.entregas.pctATiempo).toBe(100);
+    // …pero el ritmo, la carga y la ocupación los separan.
+    const ref = referenciaDeRitmo([daniela, alejandro]);
+    expect(ref).toBe(5);
+    expect(conReferencia(daniela, ref).cumplimientoPct).toBe(97);
+    expect(conReferencia(alejandro, ref).cumplimientoPct).toBe(62);
+    expect(alejandro.ritmo).toMatchObject({ entregadas: 1, dias: 1, porDia: 1 });
+  });
+
+  it('dejar el reloj prendido no vuelve ocupado a nadie: cada actividad cuenta hasta su máximo', () => {
     const reloj = calcula({
       desde: '2026-09-15',
       hasta: '2026-09-15',
-      checadas: [entrada('15', '10:40'), salida('15', '18:00')],
-      actividades: [actividad(9, M('15', '10:40'), M('15', '18:00'))],
-      entregas: [{ activityId: 9, limite: M('15', '12:00'), entregadaAt: M('15', '18:00') }],
+      checadas: [entrada('15', '10:00'), salida('15', '18:00')],
+      actividades: [{ ...actividad(9, M('15', '10:00'), M('15', '18:00')), topeDiarioMin: 90 }],
+      entregas: [{ activityId: 9, limite: M('15', '12:00'), entregadaAt: M('15', '18:00'), minutosPlan: 60, minutosMaximo: 90, minutosReales: 480 }],
     }).totales;
-    expect(reloj.productividadPct!).toBeGreaterThan(cumplido.productividadPct!);
-    expect(cumplido.cumplimientoPct).toBe(100);
-    expect(reloj.cumplimientoPct).toBe(0);
-    expect(cumplido.asistenciaPuntual).toEqual({ esperados: 1, puntuales: 1, pct: 100 });
-    expect(reloj.asistenciaPuntual).toEqual({ esperados: 1, puntuales: 0, pct: 0 });
-    // El equipo suma conteos, no promedia porcentajes.
-    expect(sumaEquipo([cumplido, reloj]).entregas).toMatchObject({ medidas: 4, aTiempo: 3, tarde: 1, pctATiempo: 75 });
+    expect(reloj.productividadPct).toBe(100);
+    expect(reloj.ocupacion).toEqual({ minutos: 90, pct: 19 });
+    expect(reloj.entregas).toMatchObject({ tarde: 1, conTiempo: 1, enTiempoAdecuado: 0 });
   });
 });
 
