@@ -4,13 +4,17 @@ import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js
 import { workDateColumn, workDateKey, workDayEnd, workDayStart, parseWorkDate } from '../common/time/workday.js';
 import { esMultiDia, periodoDeActividad } from '../activities/actividad-periodo.js';
 import { tiposVisibles } from './equipo-alcance.js';
-import { estatusCerrado, tiemposReales } from './pizarra-kpi.js';
+import { estatusCerrado, minutosPlanDeHoras, tiemposReales } from './pizarra-kpi.js';
+import { minutosTrabajados } from '../activities/sessions/sesiones-trabajo.js';
 import { TeamBoardService } from './team-board.service.js';
 import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
 import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
 import {
   calculaKpisPersona,
+  conReferencia,
   diasDelRango,
+  referenciaDeRitmo,
+  topeDeTiempo,
   horarioDePersona,
   horarioDePlantilla,
   semaforoKpi,
@@ -73,6 +77,8 @@ export type KpisEquipoResponse = {
   supuestos: string[];
   equipo: { totales: TotalesKpi; semaforo: SemaforoKpi; motivos: string[] };
   personas: KpiPersonaFila[];
+  /** Entregas por día contra las que se mide el ritmo de cada quien (percentil 75 del equipo). */
+  ritmoReferencia: number | null;
 };
 
 export type KpisPersonaResponse = KpiPersonaFila & {
@@ -84,6 +90,8 @@ export type KpisPersonaResponse = KpiPersonaFila & {
   justificaciones: Array<{ fecha: string; motivo: string }>;
   /** Sus entregas del rango (a tiempo, tarde, sin entregar), lo más reciente arriba. */
   entregas: EntregaDelRango[];
+  /** El ritmo del equipo con que se le midió. */
+  ritmoReferencia: number | null;
 };
 
 const ETIQUETA_HORARIO: Record<string, string> = {
@@ -144,7 +152,7 @@ export class KpisEquipoService {
     if (soloUserId && !gente.length) throw new NotFoundException('Usuario fuera de tu alcance');
 
     const datos = await this.cargar(gente.map((u) => u.id), companyId, rango, null);
-    const personas = gente.map((u): KpiPersonaFila => {
+    const calculadas = gente.map((u) => {
       const d = datos.get(u.id) ?? vacio();
       const { dias, totales } = calculaKpisPersona({
         desde: rango.desde,
@@ -159,10 +167,16 @@ export class KpisEquipoService {
         entregas: d.entregas,
         fechaIngreso: d.fechaIngreso,
       });
-      return opciones.conDias ? { ...fila(u, d.horario, totales), dias } : fila(u, d.horario, totales);
+      return { u, d, dias, totales };
+    });
+    // El ritmo de cada quien se mide contra el del equipo: hace falta ver a todos primero.
+    const referencia = referenciaDeRitmo(calculadas.map((c) => c.totales));
+    const personas = calculadas.map(({ u, d, dias, totales }): KpiPersonaFila => {
+      const t = conReferencia(totales, referencia);
+      return opciones.conDias ? { ...fila(u, d.horario, t), dias } : fila(u, d.horario, t);
     });
 
-    const totalesEquipo = sumaEquipo(personas.map((p) => p.totales));
+    const totalesEquipo = conReferencia(sumaEquipo(personas.map((p) => p.totales)), referencia);
     return {
       scope: companyWide ? 'company' : 'subtree',
       desde: rango.desde,
@@ -171,6 +185,7 @@ export class KpisEquipoService {
       supuestos: supuestosKpi(),
       equipo: { totales: totalesEquipo, ...semaforoKpi(totalesEquipo) },
       personas,
+      ritmoReferencia: referencia,
     };
   }
 
@@ -184,12 +199,29 @@ export class KpisEquipoService {
     const { scoped, now } = await this.teamBoard.resolveScope(viewer, companyId);
     const persona = scoped.find((u) => u.id === userId);
     if (!persona) throw new NotFoundException('Usuario fuera de tu alcance');
-
     // El detalle propio no esconde lo que le asignaron por ser de otro tipo.
     const tipos = userId === viewer.id ? null : tiposVisibles(viewer);
-    const datos = await this.cargar([userId], companyId, rango, tipos);
+    // Se lee a todo su equipo: su ritmo se mide contra el mismo que en la lista, y así el % coincide.
+    const datos = await this.cargar(scoped.map((u) => u.id), companyId, rango, tipos);
+    const ritmoReferencia = referenciaDeRitmo(
+      scoped.map((u) => {
+        const x = datos.get(u.id) ?? vacio();
+        return calculaKpisPersona({
+          desde: rango.desde,
+          hasta: rango.hasta,
+          ahora: now,
+          horario: x.horario,
+          checadas: x.checadas,
+          comidas: x.comidas,
+          actividades: x.actividades,
+          justificadas: x.justificadas.map((j) => j.fecha),
+          entregas: x.entregas,
+          fechaIngreso: x.fechaIngreso,
+        }).totales;
+      }),
+    );
     const d = datos.get(userId) ?? vacio();
-    const { dias, totales, entregas } = calculaKpisPersona({
+    const { dias, totales: crudos, entregas } = calculaKpisPersona({
       desde: rango.desde,
       hasta: rango.hasta,
       ahora: now,
@@ -203,6 +235,7 @@ export class KpisEquipoService {
       fechaIngreso: d.fechaIngreso,
       detalle: true,
     });
+    const totales = conReferencia(crudos, ritmoReferencia);
     return {
       ...fila(persona, d.horario, totales),
       desde: rango.desde,
@@ -213,6 +246,7 @@ export class KpisEquipoService {
       dias: [...dias].reverse(),
       justificaciones: d.justificadas,
       entregas,
+      ritmoReferencia,
     };
   }
 
@@ -275,7 +309,7 @@ export class KpisEquipoService {
             { inicioRealAt: { lte: ini }, finRealAt: { gte: fin } },
           ],
         },
-        select: { activityId: true, userId: true, inicioRealAt: true, finRealAt: true },
+        select: { activityId: true, userId: true, inicioRealAt: true, finRealAt: true, horasPlan: true },
       }),
       this.prisma.activityEvidence.findMany({
         where: {
@@ -348,12 +382,14 @@ export class KpisEquipoService {
               fechaFinalizacion: true,
               periodoInicio: true,
               periodoFin: true,
+              tiempoEstimadoMin: true,
+              tiempoMaximoMin: true,
               deletedAt: true,
             },
           }),
           this.prisma.activityAssignee.findMany({
             where: { activityId: { in: activityIds }, userId: { in: userIds } },
-            select: { activityId: true, userId: true, inicioRealAt: true, finRealAt: true },
+            select: { activityId: true, userId: true, inicioRealAt: true, finRealAt: true, horasPlan: true },
           }),
           this.prisma.activityEvidence.findMany({
             where: { activityId: { in: activityIds }, userId: { in: userIds } },
@@ -441,6 +477,7 @@ export class KpisEquipoService {
         terminada: cerrada || ev?.status === 'COMPLETED',
         periodoFin: esMultiDia(periodo) ? periodo!.fin : null,
         sesiones: sesiones.get(k) ?? null,
+        topeDiarioMin: topeDeTiempo(planDe(asig?.horasPlan, act.tiempoEstimadoMin), act.tiempoMaximoMin),
       });
     }
 
@@ -486,6 +523,7 @@ export class KpisEquipoService {
         rol: true,
         inicioRealAt: true,
         finRealAt: true,
+        horasPlan: true,
         activity: {
           select: {
             anNumber: true,
@@ -499,6 +537,8 @@ export class KpisEquipoService {
             fechaFinalizacion: true,
             periodoInicio: true,
             periodoFin: true,
+            tiempoEstimadoMin: true,
+            tiempoMaximoMin: true,
             activityEvidences: {
               where: { userId: { in: userIds } },
               select: {
@@ -536,6 +576,14 @@ export class KpisEquipoService {
             orderBy: { createdAt: 'asc' },
           })) ?? [])
         : [];
+    // Sus sesiones de reloj: de ahí sale cuánto trabajó de verdad en cada una.
+    const sesiones = await leerSesiones(this.prisma, {
+      userIds,
+      activityIds: [...new Set(propias.map((f) => f.activityId))],
+      companyId,
+    });
+    const ahora = new Date();
+
     const revisionesPor = new Map<string, string[]>();
     for (const r of revisiones) {
       const k = `${r.evidenceUserId}:${r.activityId}`;
@@ -566,6 +614,7 @@ export class KpisEquipoService {
       const decisiones = revisionesPor.get(`${f.userId}:${f.activityId}`) ?? [];
       const devuelta = (d: string) => /^DEVUELTA/i.test(d);
       const visible = !tipos || (a.coreKind != null && tipos.includes(a.coreKind));
+      const periodo = periodoDeActividad(a);
       const lista = out.get(f.userId) ?? [];
       lista.push({
         activityId: f.activityId,
@@ -575,6 +624,15 @@ export class KpisEquipoService {
         entregadaAt,
         primeraRevision: decisiones.length ? (devuelta(decisiones[0]) ? 'DEVUELTA' : 'APROBADA') : null,
         devoluciones: decisiones.filter(devuelta).length,
+        minutosPlan: planDe(f.horasPlan, a.tiempoEstimadoMin),
+        minutosMaximo: a.tiempoMaximoMin ?? null,
+        minutosReales: minutosTrabajados({
+          inicio: tiempos.inicio,
+          fin: tiempos.fin,
+          sesiones: sesiones.get(`${f.userId}:${f.activityId}`) ?? null,
+          ahora,
+        }),
+        diasPeriodo: periodo ? diasDelRango(periodo.inicio, periodo.fin).length : 1,
       });
       out.set(f.userId, lista);
     }
@@ -665,6 +723,12 @@ export class KpisEquipoService {
     }
     return out;
   }
+}
+
+/** Plan de una persona en una actividad: su `horasPlan` si se lo pusieron, si no el estimado de la actividad. */
+function planDe(horasPlan: unknown, tiempoEstimadoMin?: number | null): number | null {
+  const n = horasPlan == null ? null : Number(horasPlan);
+  return minutosPlanDeHoras(n != null && Number.isFinite(n) ? n : null) ?? tiempoEstimadoMin ?? null;
 }
 
 function vacio(): DatosPersona {

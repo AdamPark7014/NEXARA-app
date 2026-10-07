@@ -203,7 +203,8 @@ export default function KpisPersonaPage() {
                       hora en que la persona la entregó, no la hora en que el jefe la aprobó. Sin límite, cuenta a
                       tiempo. <strong className={st.fuerte}>Sin entregar</strong> es que su límite ya pasó y no la ha
                       entregado. <strong className={st.fuerte}>Aprobada a la primera</strong> es que el jefe no se la
-                      devolvió.
+                      devolvió. <strong className={st.fuerte}>Tiempo</strong> es lo que de verdad trabajó en ella (su
+                      reloj) contra su tiempo máximo, o su estimado + 25 % si no tiene máximo.
                     </p>
                   </InfoPopover>
                 }
@@ -218,6 +219,9 @@ export default function KpisPersonaPage() {
                     </span>
                     <span role="columnheader">Estado</span>
                     <span role="columnheader">Revisión</span>
+                    <span role="columnheader" title="Lo que trabajó en ella contra su tiempo máximo">
+                      Tiempo
+                    </span>
                   </div>
                   {entregas.map((e, i) => {
                     const estado = estadoDeEntrega(e);
@@ -249,6 +253,19 @@ export default function KpisPersonaPage() {
                         </span>
                         <span role="cell" className={revision.tono === "neutral" ? tabla.tenue : undefined}>
                           {revision.tono === "warning" ? <Badge tone="warning">{revision.texto}</Badge> : revision.texto}
+                        </span>
+                        <span
+                          role="cell"
+                          className={e.tiempo === "adecuado" || e.tiempo == null ? `${tabla.tenue} ${st.num}` : st.num}
+                          title={e.minutosPlan ? `Estimado: ${horasEnPalabras(e.minutosPlan)}` : undefined}
+                        >
+                          {e.minutosReales == null && e.minutosMaximo == null
+                            ? "—"
+                            : e.tiempo === "excedido"
+                              ? <Badge tone="warning">{`${horasEnPalabras(e.minutosReales)} de ${horasEnPalabras(e.minutosMaximo)}`}</Badge>
+                              : e.minutosMaximo != null
+                                ? `${horasEnPalabras(e.minutosReales)} de ${horasEnPalabras(e.minutosMaximo)}`
+                                : `${horasEnPalabras(e.minutosReales)} · sin estimado`}
                         </span>
                       </div>
                     );

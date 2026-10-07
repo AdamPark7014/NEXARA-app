@@ -19,8 +19,17 @@
     Atrasados / Sin nada asignado / Sin entrada hoy; hint «2 atrasados · 9 sin nada asignado · 3 sin entrada».
   - Web KPIs: tarjeta «Cumplimiento», «Tiempo en actividades» (antes Productividad), orden por cumplimiento, barra de
     entregas (a tiempo/tarde/sin entregar) y en el detalle las partes + tabla «Entregas».
-  - **Pendiente:** apps Android/iOS siguen mostrando «Productividad» en KPIs del equipo y Mi equipo sin el detalle nuevo
-    (los campos nuevos son aditivos; no se rompe nada).
+  - **v2 (~11:30, Adam: «que siempre estén haciendo algo y se tarden lo adecuado… Alejandro un día hizo una sola y
+    Daniela cinco»):** cumplimiento con 8 partes (`PESOS_CUMPLIMIENTO`): entregas a tiempo 20, ritmo de entregas 20
+    (entregas/día vs percentil 75 del equipo, mín. 1; `referenciaDeRitmo` + `conReferencia`, por eso `getEquipo` calcula
+    en dos pasadas y `getPersona` lee a todo su equipo), tiempo adecuado 15 (minutos reales de sesiones ≤ tiempo máximo o
+    estimado+25 %; varios días no se mide), aprobadas a la primera 10, carga 10 (estimado de lo entregado ÷ horas
+    trabajadas, meta 75 %; sin estimado = real hasta 2 h), siempre con algo 10 (tiempo con actividad, cada una recortada
+    a su máximo del día, sin plan 4 h; `recortaPorTope`; meta 70 %), asistencia puntual 10, uniforme 5. Web: columna
+    «Tiempo» en Entregas del detalle y «N por día · N/N en su tiempo» en el ranking.
+  - **En curso:** apps Android/iOS (KPIs con cumplimiento y Mi equipo con «Para atender hoy») — dos agentes editando
+    `apps/mobile-native/**` con el contrato `scratchpad/CONTRATO-APPS-KPI-EQUIPO.md`; las partes del cumplimiento se
+    pintan genéricas (vienen del API).
 
 - **07-10 ~07:50 (claude-code) — pedido de Adam (iOS sigue sin aprobarse):**
   - **Checar desde la web, 10 días más:** `attendance.web_checkin_until` (companyId 1) = `2026-10-18T05:48:52Z`
