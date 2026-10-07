@@ -1,0 +1,293 @@
+/* Archivos de evidencia de la actividad comercial. Solo tokens --ui-*; el color por tipo llega en --adj-color. */
+
+.zona {
+  position: relative;
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+  border-radius: var(--ui-radius-lg);
+  transition: background var(--ui-duration-fast) var(--ui-ease-out);
+}
+
+.zonaActiva {
+  background: var(--ui-brand-soft);
+}
+
+/* Lo que se ve al pasar archivos por encima. */
+.soltar {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-s2);
+  min-height: 96px;
+  border: 2px dashed var(--ui-brand);
+  border-radius: var(--ui-radius-lg);
+  background: color-mix(in srgb, var(--ui-surface) 82%, transparent);
+  color: var(--ui-brand-text);
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  pointer-events: none;
+}
+
+.soltar :global(svg) {
+  font-size: 22px;
+}
+
+.vacio {
+  display: grid;
+  gap: var(--ui-s1);
+  justify-items: center;
+  padding: var(--ui-s5) var(--ui-s4);
+  border: 1.5px dashed var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  text-align: center;
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-3);
+}
+
+.vacio strong {
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+
+.lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  padding-right: var(--ui-s2);
+  min-width: 0;
+}
+
+.fila + .fila {
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.fila:hover {
+  background: var(--ui-hover);
+}
+
+.abrir {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+  padding: var(--ui-s3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.abrir:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
+  border-radius: var(--ui-radius);
+}
+
+.icono {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--adj-color, #6b7280) 13%, transparent);
+  color: var(--adj-color, #6b7280);
+  font-size: 20px;
+}
+
+.iconoGrande {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ui-radius-lg);
+  font-size: 30px;
+}
+
+.textos {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nombre {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-medium);
+  line-height: 1.35;
+  color: var(--ui-fg);
+}
+
+.meta {
+  font-size: var(--ui-fs-meta);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.pista {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-4);
+}
+
+.avisos {
+  margin: 0;
+  padding-left: var(--ui-s5);
+}
+
+.subiendo {
+  display: grid;
+  gap: var(--ui-s1);
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-2);
+}
+
+/* Barra indeterminada: fetch no da avance de subida. */
+.barra {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-track, var(--ui-border-subtle));
+}
+
+.barra::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: inherit;
+  background: var(--ui-brand);
+  animation: adjuntosAvance 1.1s var(--ui-ease-in-out) infinite;
+}
+
+@keyframes adjuntosAvance {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+/* ── Visor (modal grande) ───────────────────────────────────── */
+
+/* `div.` gana a `.panel` del modal compartido (alto máximo 720 px). */
+div.visor {
+  max-height: 94vh;
+}
+
+div.visor h2 {
+  overflow-wrap: anywhere;
+}
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  height: calc(94vh - 176px);
+  min-height: 280px;
+}
+
+.quitar {
+  margin-right: auto;
+}
+
+.estado {
+  margin: auto;
+  font-size: var(--ui-fs-body);
+  color: var(--ui-fg-3);
+  text-align: center;
+}
+
+.lienzo {
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  overflow: auto;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-sunken, var(--ui-surface-2));
+}
+
+.imagen {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Las vistas previas de Excel/Word vienen pensadas para fondo blanco, también en modo oscuro. */
+.marco {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-lg);
+  background: #fff;
+}
+
+.tarjeta {
+  margin: auto;
+  display: grid;
+  justify-items: center;
+  gap: var(--ui-s2);
+  max-width: 420px;
+  padding: var(--ui-s6) var(--ui-s5);
+  text-align: center;
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-3);
+}
+
+.tarjeta strong {
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.tarjetaAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--ui-s2);
+  margin-top: var(--ui-s2);
+}
+
+@media (max-width: 640px) {
+  div.visor {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .contenido {
+    height: calc(100dvh - 24px - 176px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}

@@ -14,6 +14,7 @@ import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
 import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
+import ArchivosDeActividad from "@/components/erp/ArchivosDeActividad";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
 import { quienMira, useActivityDetail } from "@/components/ops/ActivityDetailShell";
@@ -516,14 +517,18 @@ export default function ActivityDetailPage() {
       ) : null}
 
       {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
-        <RecordSection title="Cotización">
-          <CotizacionDeActividad
-            activityId={activity.id}
-            coreKind={activity.coreKind}
-            cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
-            onLigada={() => void reload()}
-          />
-        </RecordSection>
+        <>
+          <RecordSection title="Cotización">
+            <CotizacionDeActividad
+              activityId={activity.id}
+              coreKind={activity.coreKind}
+              cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
+              onLigada={() => void reload()}
+            />
+          </RecordSection>
+          {/* Excel, Word, PDF o imágenes de la propuesta: se suben aquí y se ven sin salir de la ficha. */}
+          <ArchivosDeActividad activityId={activity.id} />
+        </>
       ) : null}
 
       {/* El checklist va antes de la evidencia: se revisa lo que se lleva y luego se trabaja. */}
