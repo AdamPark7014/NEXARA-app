@@ -1,5 +1,16 @@
 # RELEVO
 
+- **07-10 ~07:50 (claude-code) — pedido de Adam (iOS sigue sin aprobarse):**
+  - **Checar desde la web, 10 días más:** `attendance.web_checkin_until` (companyId 1) = `2026-10-18T05:48:52Z`
+    (17-oct 23:48 hora de México), con `apps/api/scripts/set-web-checkin-window.sql` (`hours=256`). Se cierra sola.
+  - **Jornadas del 06-10 cerradas a mano** (las había cerrado el cierre automático, sin salida real): José Antonio
+    Ramírez (id 39, checa por Safari en iPhone) salida 20:05 → **18:31** (446 min); Mónica García (id 5) 19:05 →
+    **18:00** (475 min). Igual que `corregirChecada`: hora nueva, `validacion` OK, fila en `attendance_corrections`
+    con antes/después/motivo y `porId` 2 (Adam), `AttendanceDay` recalculado. Hecho por SQL en una transacción con
+    comprobación (no se levantó otra instancia del API para no disparar tareas programadas), así que **no les llegó
+    el aviso «Corrigieron tu checada»**. Las entradas siguen como estaban (Antonio PENDIENTE por web, Mónica REVISAR
+    por «sin ubicación»).
+
 - **05-10 ~18:10 (claude-code) — APPS PUBLICADAS (autorizado por Adam).**
   - **Android 1.0.6 (16)** en revisión de Google para producción (lanzamiento completo) junto con **8 capturas
     nuevas** de la ficha (diseño teal; `scripts/store-demo/enmarcar-capturas.py` ya usa el teal y titulares
