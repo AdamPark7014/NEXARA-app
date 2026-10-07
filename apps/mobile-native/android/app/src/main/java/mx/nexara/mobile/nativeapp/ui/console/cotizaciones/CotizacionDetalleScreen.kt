@@ -271,7 +271,10 @@ private fun ImportesDeCotizacion(cotizacion: CotizacionDetalleDto) {
 
     MoreTarjeta {
         FilaImporte("Subtotal", CotizacionesRules.pesos(cotizacion.subtotal))
-        FilaImporte("Impuestos", CotizacionesRules.pesos(cotizacion.taxTotal))
+        FilaImporte(
+            "Impuestos",
+            if (cotizacion.conIva == false) "Sin IVA (sin factura)" else CotizacionesRules.pesos(cotizacion.taxTotal),
+        )
         HorizontalDivider(color = NxColors.Surface)
         FilaImporte(
             etiqueta = "Total",

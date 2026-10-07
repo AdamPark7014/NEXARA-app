@@ -46,6 +46,8 @@ export type CotizacionParaPropuesta = {
   subtotal?: unknown;
   taxTotal?: unknown;
   total?: unknown;
+  /** false = sin factura: la hoja no lleva renglón de IVA. */
+  conIva?: boolean | null;
   /** Personalización (`Cotizacion.opciones`); sin ella, el PDF de siempre. */
   opciones?: unknown;
   items?: Array<
@@ -188,6 +190,7 @@ export function payloadDePropuesta(quote: CotizacionParaPropuesta, extras: Extra
       : [],
     subtotal: numero(quote.subtotal),
     iva: numero(quote.taxTotal),
+    conIva: quote.conIva !== false,
     total: numero(quote.total),
     currency: normalizarMoneda(quote.currency),
     // El anticipo ya se usaba para redactar los términos; ahora también encabeza

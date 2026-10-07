@@ -438,7 +438,10 @@ export default function EditorCotizacion({
   );
 
   // ─── Lo que se ve ──────────────────────────────────────────────────────
-  const totales = useMemo(() => totalesDePartidas(doc.partidas, doc.marginPercent), [doc.partidas, doc.marginPercent]);
+  const totales = useMemo(
+    () => totalesDePartidas(doc.partidas, doc.marginPercent, doc.conIva !== false),
+    [doc.partidas, doc.marginPercent, doc.conIva],
+  );
   const completas = seccionesCompletas(doc, detalle?.planos?.length ?? 0);
   const plantillaSegmento = plantillas.find((p) => p.segmento === doc.segmento) ?? null;
   const version = `${Math.max(1, (detalle?.revision ?? 1) + (detalle?.sentAt && detalle.estado === "BORRADOR" ? 1 : 0))}.0`;
@@ -687,8 +690,8 @@ export default function EditorCotizacion({
               <span className={styles.fichaTotalEtiqueta}>Total</span>
               <strong className={styles.fichaTotalCifra}>{formatoMoneda(totales.total, doc.moneda)}</strong>
               <span className={styles.fichaTotalPie}>
-                {partidasConNombre === 1 ? "1 partida" : `${partidasConNombre} partidas`} · IVA{" "}
-                {formatoMoneda(totales.iva, doc.moneda)}
+                {partidasConNombre === 1 ? "1 partida" : `${partidasConNombre} partidas`} ·{" "}
+                {totales.conIva ? `IVA ${formatoMoneda(totales.iva, doc.moneda)}` : "sin IVA"}
               </span>
             </div>
           </div>

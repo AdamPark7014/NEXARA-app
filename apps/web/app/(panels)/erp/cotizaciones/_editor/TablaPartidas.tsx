@@ -653,7 +653,7 @@ export default function TablaPartidas({
         </div>
         <div className={styles.filaTotal}>
           <span>IVA</span>
-          <span>{formatoMoneda(totales.iva, moneda)}</span>
+          <span>{totales.conIva === false ? "Sin IVA (sin factura)" : formatoMoneda(totales.iva, moneda)}</span>
         </div>
         {margenPorcentaje != null && margenPorcentaje !== 0 ? (
           <div className={styles.filaTotal}>

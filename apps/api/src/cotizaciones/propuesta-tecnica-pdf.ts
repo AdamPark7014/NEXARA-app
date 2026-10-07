@@ -213,6 +213,8 @@ export type PropuestaPayload = {
   grupos: PropuestaGrupo[];
   subtotal: number;
   iva: number;
+  /** false = el cliente no requiere factura: sin renglón de IVA. */
+  conIva?: boolean;
   total: number;
   currency: string;
   /** Porcentaje de anticipo; se enseña en la tira de resumen de la hoja de cotización. */
@@ -1385,7 +1387,7 @@ function seccionCotizacion(ctx: Ctx) {
   const descuento = partidas.length ? Math.round(((Number(payload.subtotal) || 0) - sumaRenglones) * 100) / 100 : 0;
   const filasTotales: Array<[string, number]> = [['SUBTOTAL', Number(payload.subtotal) || 0]];
   if (descuento > Math.max(0.01, partidas.length * 0.005)) filasTotales.push(['DESCUENTO', -descuento]);
-  filasTotales.push(['IVA', Number(payload.iva) || 0]);
+  if (payload.conIva !== false) filasTotales.push(['IVA', Number(payload.iva) || 0]);
   const moneda = String(payload.opciones?.moneda ?? payload.currency ?? '').trim().toUpperCase() || 'MXN';
   // Los totales nunca quedan solos en una hoja: viajan con la última partida.
   const altoFilaTotal = 24;

@@ -12,6 +12,7 @@ import { isAdvancedOnlyModuleId, isNavAdvanced } from '@/lib/nav-mode';
 import { puedeVerModuloClientes } from '@/lib/client-sectors';
 import { PERMISSIONS } from '@/lib/permissions';
 import { canCreateToolLoan, canManageTools } from '@/lib/tools-access';
+import { canManageAlmacen } from '@/lib/almacen-access';
 
 export type SectionViewMode = 'manage' | 'execute' | 'manage_execute';
 
@@ -1793,6 +1794,20 @@ export function getErpInventorySectionConfig(
       canDelete: true,
       canAssign: false,
       canApprove: module === 'procurement',
+      title: copy.title,
+      subtitle: copy.subtitle,
+    };
+  }
+  // Almacén concedido por persona (Iván): lo opera como el equipo de almacén, sin borrar ni aprobar compras.
+  if (module === 'warehouse' && canManageAlmacen(user?.email)) {
+    return {
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: true,
+      canEdit: true,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
       title: copy.title,
       subtitle: copy.subtitle,
     };

@@ -294,3 +294,30 @@ describe('maxDiscountPercent', () => {
     expect(maxDiscountPercent([{ discount: NaN }, { discount: 3 }])).toBe(3);
   });
 });
+
+describe('cotización sin factura (sin IVA)', () => {
+  const partidas = [
+    item({ qty: 2, unitPrice: 1000, tax: 16 }),
+    item({ qty: 1, unitPrice: 0, laborHours: 4, laborRate: 250, tax: 16, retention: 4 }),
+  ];
+
+  it('con IVA, como siempre', () => {
+    expect(calculateTotals(partidas)).toMatchObject({ subtotal: 3000, taxTotal: 480, retentionTotal: 40, total: 3440 });
+  });
+
+  it('sin factura no suma IVA ni retenciones, y el margen va sobre ese total', () => {
+    expect(calculateTotals(partidas, null, { conIva: false })).toMatchObject({
+      subtotal: 3000,
+      taxTotal: 0,
+      retentionTotal: 0,
+      total: 3000,
+    });
+    expect(calculateTotals(partidas, 20, { conIva: false }).total).toBe(3600);
+    expect(calculateLine(partidas[0], { conIva: false }).total).toBe(2000);
+  });
+
+  it('la partida conserva su tasa para cuando se vuelva a encender', () => {
+    calculateTotals(partidas, null, { conIva: false });
+    expect(partidas[0].tax).toBe(16);
+  });
+});

@@ -139,7 +139,19 @@ export type LineAmounts = {
  * Única fuente del cálculo: los totales de la cotización y el `lineTotal` que
  * se guarda por línea salen de aquí, para que no puedan discrepar.
  */
-export function calculateLine(item: NormalizedCotizacionItem): LineAmounts {
+/** Opciones de la cotización que cambian el cálculo de sus partidas. */
+export type OpcionesDeCalculo = {
+  /** false = el cliente no requiere factura: sin IVA ni retenciones (la tasa de cada partida se conserva). */
+  conIva?: boolean;
+};
+
+/** La partida sin los impuestos de factura (IVA y retenciones). */
+export function sinImpuestosDeFactura<T extends { tax: number; retention: number }>(item: T): T {
+  return { ...item, tax: 0, retention: 0 };
+}
+
+export function calculateLine(itemOriginal: NormalizedCotizacionItem, opciones: OpcionesDeCalculo = {}): LineAmounts {
+  const item = opciones.conIva === false ? sinImpuestosDeFactura(itemOriginal) : itemOriginal;
   const productAmount = item.qty * item.unitPrice;
   const laborAmount = item.laborHours * item.laborRate;
   const subtotal = productAmount + laborAmount;
@@ -382,10 +394,11 @@ export function normalizeItems(
 export function calculateTotals(
   items: NormalizedCotizacionItem[],
   margen?: number | null,
+  opciones: OpcionesDeCalculo = {},
 ): CotizacionTotals {
   const acc = items.reduce<CotizacionTotals>(
     (acc, item) => {
-      const line = calculateLine(item);
+      const line = calculateLine(item, opciones);
       return {
         subtotal: acc.subtotal + line.subtotal,
         laborTotal: acc.laborTotal + line.laborAmount,

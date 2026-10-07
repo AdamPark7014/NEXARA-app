@@ -2462,6 +2462,9 @@ model Cotizacion {
   /// Porcentaje sobre el total de las partidas ya con IVA. 20 → total × 1.20.
   /// No es markup por partida. Null = el total es subtotal + IVA.
   marginPercent   Decimal?                 @db.Decimal(7, 2)
+  /// Lleva IVA (el cliente requiere factura). Sin factura (false) no se suma IVA ni retenciones;
+  /// cada partida conserva su tasa para cuando se vuelva a encender.
+  conIva          Boolean                  @default(true)
   note            String?                  @db.Text
   subtotal        Decimal                  @default(0) @db.Decimal(12, 2)
   discountTotal   Decimal                  @default(0) @db.Decimal(12, 2)

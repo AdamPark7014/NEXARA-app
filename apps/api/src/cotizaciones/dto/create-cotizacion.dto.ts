@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsDateString, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { margenDeEntrada } from '../cotizacion-totals.js';
 import { CotizacionItemDto } from './cotizacion-item.dto.js';
 import { SEGMENTOS } from '../terminos-segmento.js';
@@ -128,6 +128,11 @@ export class CreateCotizacionDto {
   @Min(-100)
   @Max(1000)
   marginPercent?: number | null;
+
+  /** Lleva IVA (el cliente requiere factura). false = sin IVA ni retenciones. Por omisión, true. */
+  @IsOptional()
+  @IsBoolean()
+  conIva?: boolean;
 
   @IsOptional()
   @IsString()

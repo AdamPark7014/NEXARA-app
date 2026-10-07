@@ -113,6 +113,13 @@ describe("partidas y totales", () => {
     expect(t.porGrupo.MANO_DE_OBRA).toBe(15000);
   });
 
+  it("sin factura no lleva IVA y el margen va sobre el subtotal", () => {
+    const partidas = [partidaNueva({ name: "Instalación", qty: 1, unitPrice: 1000 })];
+    expect(totalesDePartidas(partidas, null, false)).toMatchObject({ subtotal: 1000, conIva: false, iva: 0, total: 1000 });
+    expect(totalesDePartidas(partidas, 20, false).total).toBe(1200);
+    expect(totalesDePartidas(partidas).iva).toBe(160);
+  });
+
   it("a la API no van renglones vacíos, ni la clave local, y la cantidad es al menos 1", () => {
     const [p, ...resto] = partidasParaApi([
       partidaNueva({ name: " Poste 3 m ", qty: Number.NaN, unitPrice: 2661.58, unit: "" }),

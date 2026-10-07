@@ -1,5 +1,20 @@
 # RELEVO
 
+- **07-10 ~16:00 (claude-code) — IVA opcional en cotizaciones + almacén para Iván.**
+  - **IVA:** `Cotizacion.conIva` (migración `20261007200000_cotizacion_con_iva`, ADD COLUMN default true). Sin factura:
+    `calculateTotals/calculateLine(…, { conIva: false })` ponen IVA y retenciones en 0 (la partida conserva su tasa);
+    servicio (crear/editar/recalcular/PDF interno), vista previa, PDF del cliente (`cotizacion-formato-nexara`: sin renglón
+    de IVA y «sin IVA (no incluye factura)»), propuesta técnica y PDF interno. Web: `Switch` «Requiere factura (lleva
+    IVA)» bajo el margen en `SeccionCotizacion`, totales del editor con `totalesDePartidas(…, conIva)`. Apps: «Sin IVA
+    (sin factura)» en Importes.
+  - **Iván (administracion.ventas@) controla el almacén** sin cambiarle el rol: `api/src/warehouse/almacen-access.ts`
+    (por correo, como herramientas) → `UrlAccessGuard` usa `ALMACEN_POR_CORREO_URL_RULES` (`checkUrlRules`),
+    `AuthService.applyAlmacenByEmail` (STOCK/WAREHOUSE VIEW+MANAGE, CATALOG_VIEW), `me.service` (menú web/apps). Web:
+    `lib/almacen-access.ts` en `canUserAccessPath` y `getErpInventorySectionConfig` (manage sin borrar). Para darlo a otra
+    persona: agregar su correo en los dos archivos.
+  - **Pendiente (Adam):** tipado de artículos de almacén/herramientas (pieza única vs empaque con N piezas vs equipo) y
+    búsqueda rápida; nóminas/tabuladores para cobertura de costo en KPIs.
+
 - **07-10 ~15:15 (claude-code) — KPIs v3: días perdidos y carga MULTIPLICAN el cumplimiento.**
   - Adam: «debe bajar mucho su rendimiento en un día si no lo trabajaron y no está justificado» y «prioriza mucho
     carga de trabajo en relación con horas que estuvieron en la oficina; si es muy bajo deberían bajar mucho».

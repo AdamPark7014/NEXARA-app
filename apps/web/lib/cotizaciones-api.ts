@@ -97,6 +97,8 @@ export type PartidaCotizacion = {
    * de la cotización, que sigue yendo sobre el total ya con IVA.
    */
   marginPercent?: number | null;
+  /** Lleva IVA (el cliente requiere factura). false = sin IVA ni retenciones. */
+  conIva?: boolean;
 };
 
 /** 02 Alcance: una subsección numerada (título, párrafo y viñetas). */
@@ -250,6 +252,8 @@ export type CotizacionDetalle = {
   depositPercent?: number;
   /** Porcentaje sobre el total ya con IVA. 20 → total × 1.20. Null = sin margen. */
   marginPercent?: number | null;
+  /** Lleva IVA (el cliente requiere factura). false = sin IVA ni retenciones. */
+  conIva?: boolean;
   currency?: string | null;
   subtotal: number;
   taxTotal: number;
@@ -327,6 +331,8 @@ export type GuardarCotizacion = {
   depositPercent?: number;
   /** Porcentaje sobre el total ya con IVA. `null` lo quita. */
   marginPercent?: number | null;
+  /** Lleva IVA (el cliente requiere factura). false = sin IVA ni retenciones. */
+  conIva?: boolean;
   /** Términos reescritos por quien cotiza (solo los que cambió), con sus títulos. */
   note?: string | null;
   activityId?: number;

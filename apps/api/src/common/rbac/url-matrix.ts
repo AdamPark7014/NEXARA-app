@@ -1224,6 +1224,31 @@ export function checkUrlAccess(
   return { allowed: false };
 }
 
+/**
+ * Almacén concedido por persona (`warehouse/almacen-access.ts`): la página y mover existencias,
+ * almacenes y catálogo, igual que quien lo opera por su rol.
+ */
+export const ALMACEN_POR_CORREO_URL_RULES: UrlRule[] = [
+  ...ALMACEN_CORE_URL_RULES,
+  { path: '/api/stock/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+  { path: '/api/warehouse/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+  { path: '/api/catalog/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+];
+
+/** Igual que `checkUrlAccess`, contra una lista de reglas dada (concesiones por persona). */
+export function checkUrlRules(
+  rules: UrlRule[],
+  url: string,
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'GET',
+): { allowed: boolean; scope?: Scope; matchedRule?: string } {
+  const path = normalizeUrlToCanonical(url);
+  for (const rule of rules) {
+    if (rule.methods && !rule.methods.includes(method)) continue;
+    if (regexFor(rule.path).test(path)) return { allowed: true, scope: rule.scope, matchedRule: rule.path };
+  }
+  return { allowed: false };
+}
+
 /** Devuelve todas las URLs permitidas para un rol (útil para introspección/UI). */
 export function listAllowedUrls(role: RoleKey): UrlRule[] {
   return URL_MATRIX[role] ?? [];
