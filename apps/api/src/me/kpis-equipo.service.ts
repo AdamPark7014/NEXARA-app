@@ -450,6 +450,11 @@ export class KpisEquipoService {
       // `date` es `@db.Date`: llega a medianoche UTC y se lee en UTC.
       out.get(j.userId)?.justificadas.push({ fecha: j.date.toISOString().slice(0, 10), motivo: j.reason });
     }
+    // Permisos y vacaciones aprobados: esos días tampoco cuentan como perdidos.
+    for (const p of await this.leerPermisos(userIds, rango, companyId)) {
+      const d = out.get(p.userId);
+      if (d && !d.justificadas.some((j) => j.fecha === p.fecha)) d.justificadas.push({ fecha: p.fecha, motivo: p.motivo });
+    }
     for (const k of claves) {
       const [userId, activityId] = k.split(':').map(Number);
       const act = actividadPor.get(activityId);
@@ -637,6 +642,54 @@ export class KpisEquipoService {
       out.set(f.userId, lista);
     }
     return out;
+  }
+
+  /**
+   * Días de permiso o vacaciones aprobados dentro del rango, uno por fecha. Una tabla vacía o
+   * un cliente sin ella (pruebas con mock) devuelve nada: los días cuentan como siempre.
+   */
+  private async leerPermisos(
+    userIds: number[],
+    rango: { desde: string; hasta: string },
+    companyId: number | null,
+  ): Promise<Array<{ userId: number; fecha: string; motivo: string }>> {
+    const prisma = this.prisma as any;
+    if (typeof prisma?.leaveRequest?.findMany !== 'function') return [];
+    const ETIQUETA: Record<string, string> = {
+      VACATION: 'Vacaciones',
+      SICK: 'Incapacidad',
+      PERSONAL: 'Permiso personal',
+      MATERNITY: 'Maternidad',
+      PATERNITY: 'Paternidad',
+      BEREAVEMENT: 'Duelo',
+      UNPAID: 'Permiso sin goce',
+    };
+    try {
+      const filas = await prisma.leaveRequest.findMany({
+        where: {
+          userId: { in: userIds },
+          status: 'APPROVED',
+          startDate: { lte: workDateColumn(parseWorkDate(rango.hasta)) },
+          endDate: { gte: workDateColumn(parseWorkDate(rango.desde)) },
+          ...(companyId != null ? { companyId } : {}),
+        },
+        select: { userId: true, type: true, startDate: true, endDate: true },
+      });
+      const out: Array<{ userId: number; fecha: string; motivo: string }> = [];
+      for (const f of filas ?? []) {
+        // `@db.Date`: medianoche UTC, se lee en UTC.
+        const ini = f.startDate.toISOString().slice(0, 10);
+        const fin = f.endDate.toISOString().slice(0, 10);
+        const desde = ini > rango.desde ? ini : rango.desde;
+        const hasta = fin < rango.hasta ? fin : rango.hasta;
+        for (const fecha of diasDelRango(desde, hasta)) {
+          out.push({ userId: f.userId, fecha, motivo: ETIQUETA[f.type] ?? 'Permiso aprobado' });
+        }
+      }
+      return out;
+    } catch {
+      return [];
+    }
   }
 
   /**

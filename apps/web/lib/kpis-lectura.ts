@@ -43,7 +43,7 @@ export function tonoCumplimiento(pct: number | null | undefined): TonoKpi {
 
 /** Para el `title` de la cifra: de qué está hecho el cumplimiento (los pesos vigentes de la API). */
 export const PESOS_CUMPLIMIENTO =
-  "Entregas a tiempo 20 %, ritmo de entregas 20 %, tiempo adecuado 15 %, aprobadas a la primera 10 %, carga de trabajo 10 %, siempre con algo 10 %, asistencia puntual 10 %, uniforme 5 %";
+  "Entregas a tiempo 20 %, ritmo de entregas 20 %, tiempo adecuado 15 %, siempre con algo 15 %, asistencia puntual 15 %, aprobadas a la primera 10 %, uniforme 5 %; el resultado se multiplica por la carga de trabajo (trabajo entregado ÷ horas en la oficina, meta 50 %) y por los días trabajados de los que debía trabajar";
 
 /** «2.3», «1»: entregas por día con un decimal. */
 export function porDiaTexto(n: number | null | undefined): string {
@@ -124,6 +124,7 @@ export function detalleDeFila(t: TotalesKpi, opciones: { tiempo?: boolean } = {}
       partes.push(`${e.aTiempo}/${e.medidas} a tiempo`);
       if (t.ritmo && t.ritmo.dias > 0) partes.push(`${porDiaTexto(t.ritmo.porDia)} por día`);
       if (e.conTiempo) partes.push(`${e.enTiempoAdecuado ?? 0}/${e.conTiempo} en su tiempo`);
+      if (t.carga && t.minutosLaborados > 0) partes.push(`carga ${t.carga.pct ?? 0} %`);
       if (e.revisadas) partes.push(`${e.aprobadasALaPrimera}/${e.revisadas} a la primera`);
     } else {
       partes.push("Sin entregas");
@@ -232,6 +233,29 @@ export type AvisoKpi = { clave: string; texto: string; tono: "warning" | "danger
 export function avisosDePersona(t: TotalesKpi): AvisoKpi[] {
   const out: AvisoKpi[] = [];
   const e = t.entregas;
+  // Lo que más baja el cumplimiento va primero: días perdidos y poca carga multiplican el total.
+  const dd = t.diasDeTrabajo;
+  if (dd?.sinTrabajar) {
+    out.push({
+      clave: "sin-trabajar",
+      texto: `${plural(dd.sinTrabajar, "día", "días")} sin trabajar`,
+      tono: "danger",
+      titulo: [
+        dd.sinChecar ? `${dd.sinChecar} sin checar` : "",
+        dd.sinTrabajo ? `${dd.sinTrabajo} checó y no hizo nada` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ") + " — sin justificar",
+    });
+  }
+  if (t.carga && t.minutosLaborados > 0 && (t.carga.pct ?? 0) < 50) {
+    out.push({
+      clave: "carga",
+      texto: `Carga ${t.carga.pct ?? 0} %`,
+      tono: (t.carga.pct ?? 0) < 25 ? "danger" : "warning",
+      titulo: "Trabajo entregado (su tiempo estimado) de sus horas en la oficina; debajo de 50 % baja su cumplimiento",
+    });
+  }
   if (e?.tarde) {
     out.push({ clave: "tarde", texto: `${e.tarde} tarde`, tono: "warning", titulo: "Actividades entregadas después de su límite" });
   }
@@ -257,7 +281,8 @@ export function avisosDePersona(t: TotalesKpi): AvisoKpi[] {
   if (t.uniforme.noOk) {
     out.push({ clave: "uniforme", texto: `Uniforme ${t.uniforme.ok}/${t.uniforme.revisadas}`, tono: "warning" });
   }
-  if (t.diasSinChecada) {
+  // Con la API nueva ya va dentro de «días sin trabajar».
+  if (t.diasSinChecada && !dd) {
     out.push({ clave: "sin-checar", texto: `${plural(t.diasSinChecada, "día", "días")} sin checar`, tono: "danger" });
   }
   if (t.actividadesFueraDeJornada) {

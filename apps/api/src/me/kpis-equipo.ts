@@ -41,6 +41,9 @@
  *   por día contra el del equipo, carga de trabajo (horas planeadas de lo entregado contra las
  *   horas trabajadas) y ocupación (tiempo con una actividad, cada una contada solo hasta su
  *   tiempo máximo, para que dejar el reloj prendido no sume).
+ * - Y otra vez (07-10, tarde): «debe bajar mucho su rendimiento en un día si no lo trabajaron y no
+ *   está justificado». Un día laborable no trabajado (sin checar, o checó y no hizo nada) y sin
+ *   justificar multiplica el cumplimiento por días trabajados ÷ días que debía trabajar.
  */
 import { horaCierreAutomatico } from '../attendance/asistencia-confiable.js';
 import { expectedEndHm, expectedStartHm, RETARDO_GRACE_MINUTES } from '../attendance/attendance-hybrid.match.js';
@@ -518,10 +521,21 @@ export const CARGA_SIN_PLAN_MAX_MIN = 120;
 /** Una actividad sin plan cuenta como ocupación hasta esto por día. */
 export const OCUPACION_TOPE_SIN_PLAN_MIN = 240;
 /** Metas: con esto la parte vale 100. */
-export const META_CARGA_PCT = 75;
+/**
+ * Carga de trabajo: con la mitad de sus horas en la oficina cubiertas por trabajo entregado (su
+ * tiempo estimado) el multiplicador es 1; debajo baja en proporción (25 % de carga = ×0.5).
+ * Adam (07-10): «prioriza mucho carga de trabajo en relación con horas que estuvieron en la
+ * oficina; si es muy bajo deberían bajar mucho sus porcentajes». Los estimados suelen quedarse
+ * cortos frente al tiempo real, por eso la meta es 50 % y no 100 %.
+ */
+export const META_CARGA_PCT = 50;
 export const META_OCUPACION_PCT = 70;
 /** El ritmo del equipo nunca se toma por debajo de una entrega por día. */
 export const RITMO_REFERENCIA_MIN = 1;
+/** Un día con jornada cuenta como trabajado con al menos esto con una actividad corriendo (o una entrega). */
+export const MIN_TRABAJO_DIA_MIN = 30;
+/** Hasta qué hora «hoy» todavía no se da por perdido si no llegó o no ha hecho nada (sin hora de salida). */
+export const FIN_DE_JORNADA_POR_OMISION = '18:00';
 
 /** Minutos positivos y finitos, o null. */
 function minutosValidos(v: number | null | undefined): number | null {
@@ -670,6 +684,23 @@ function armaEntregas(c: Omit<EntregasKpi, 'pctATiempo' | 'pctALaPrimera' | 'pct
   };
 }
 
+/**
+ * Los días laborables que debía trabajar y cuántos trabajó. «Esperados» son los laborables ya
+ * terminados (o hoy, si ya trabajó), desde su ingreso y sin los justificados (falta justificada o
+ * permiso/vacaciones aprobados). Un día se pierde si no checó o si checó y no hizo nada.
+ */
+export type DiasDeTrabajoKpi = {
+  esperados: number;
+  trabajados: number;
+  /** Laborables sin checar ni trabajar. */
+  sinChecar: number;
+  /** Laborables en que checó pero no trabajó (menos de 30 min con una actividad y sin entregas). */
+  sinTrabajo: number;
+  /** sinChecar + sinTrabajo. */
+  sinTrabajar: number;
+  pct: number | null;
+};
+
 /** Entregas por día trabajado, contra el ritmo de referencia del equipo. */
 export type RitmoKpi = { entregadas: number; dias: number; porDia: number | null; referencia: number | null };
 /** Minutos sobre las horas trabajadas. */
@@ -724,14 +755,14 @@ export const PESOS_CUMPLIMIENTO = {
   forma: 10,
   tiempo: 15,
   ritmo: 20,
-  carga: 10,
-  ocupacion: 10,
-  asistencia: 10,
+  ocupacion: 15,
+  asistencia: 15,
   uniforme: 5,
 } as const;
 
 export type ParteCumplimiento = {
-  clave: keyof typeof PESOS_CUMPLIMIENTO;
+  /** `carga` y `dias` no pesan: multiplican el total (peso 0). */
+  clave: keyof typeof PESOS_CUMPLIMIENTO | 'carga' | 'dias';
   etiqueta: string;
   pct: number;
   peso: number;
@@ -745,23 +776,27 @@ export type ParteCumplimiento = {
  *
  * El ritmo solo se califica con `referenciaRitmo` (el del equipo, `referenciaDeRitmo`): una
  * persona sola no tiene contra quién compararse.
+ *
+ * Al final se multiplica por los días trabajados de los que debía trabajar (`diasDeTrabajo`): un
+ * día perdido sin justificar pega en todo, no solo en la asistencia. Quien no trabajó ningún día
+ * de los que debía queda en 0 aunque no tenga entregas que medir.
  */
 export function cumplimientoDe(
   t: Pick<
     TotalesKpi,
     'entregas' | 'asistenciaPuntual' | 'uniforme' | 'minutosLaborados' | 'ritmo' | 'carga' | 'ocupacion'
-  >,
+  > & { diasDeTrabajo?: DiasDeTrabajoKpi },
   referenciaRitmo: number | null = t.ritmo?.referencia ?? null,
 ): { pct: number | null; partes: ParteCumplimiento[] } {
   const w = PESOS_CUMPLIMIENTO;
   const { entregas, asistenciaPuntual: asistencia, uniforme } = t;
   const partes: Array<ParteCumplimiento & { razon: number }> = [];
   /** `razon` entre 0 y 1. */
-  const agrega = (clave: ParteCumplimiento['clave'], etiqueta: string, razon: number, detalle: string) => {
+  const agrega = (clave: keyof typeof PESOS_CUMPLIMIENTO, etiqueta: string, razon: number, detalle: string) => {
     const r = Math.max(0, Math.min(1, razon));
     partes.push({ clave, etiqueta, razon: r, pct: Math.round(r * 100), peso: w[clave], detalle });
   };
-  const parte = (clave: ParteCumplimiento['clave'], etiqueta: string, num: number, den: number, detalle: string) => {
+  const parte = (clave: keyof typeof PESOS_CUMPLIMIENTO, etiqueta: string, num: number, den: number, detalle: string) => {
     if (den > 0) agrega(clave, etiqueta, num / den, detalle);
   };
   parte('entregas', 'Entregas a tiempo', entregas.aTiempo, entregas.medidas, `${entregas.aTiempo} de ${entregas.medidas}`);
@@ -790,14 +825,6 @@ export function cumplimientoDe(
     );
   }
   const laborados = t.minutosLaborados ?? 0;
-  if (laborados > 0 && t.carga) {
-    agrega(
-      'carga',
-      'Carga de trabajo',
-      t.carga.minutos / laborados / (META_CARGA_PCT / 100),
-      `${horasTexto(t.carga.minutos)} de trabajo entregado en ${horasTexto(laborados)} (${t.carga.pct ?? 0} %; meta ${META_CARGA_PCT} %)`,
-    );
-  }
   if (laborados > 0 && t.ocupacion) {
     agrega(
       'ocupacion',
@@ -816,11 +843,46 @@ export function cumplimientoDe(
   parte('uniforme', 'Uniforme', uniforme.ok, uniforme.revisadas, `${uniforme.ok} de ${uniforme.revisadas}`);
 
   const pesoTotal = partes.reduce((acc, p) => acc + p.peso, 0);
-  const valor =
-    entregas.medidas > 0 && pesoTotal > 0
-      ? Math.round((partes.reduce((acc, p) => acc + p.razon * p.peso, 0) / pesoTotal) * 100)
-      : null;
-  return { pct: valor, partes: partes.map(({ razon: _razon, ...p }) => p) };
+  const dias = t.diasDeTrabajo;
+  const esperados = dias?.esperados ?? 0;
+  const factor = dias && esperados > 0 ? Math.min(1, dias.trabajados / esperados) : 1;
+  // Carga: trabajo entregado contra horas en la oficina. Multiplica (no promedia): poca carga baja todo.
+  const cargaPct = laborados > 0 && t.carga ? (t.carga.minutos / laborados) * 100 : null;
+  const factorCarga = cargaPct == null ? 1 : Math.min(1, cargaPct / META_CARGA_PCT);
+  const base = pesoTotal > 0 ? partes.reduce((acc, p) => acc + p.razon * p.peso, 0) / pesoTotal : null;
+  let valor: number | null;
+  if (dias && esperados > 0 && dias.trabajados === 0) valor = 0;
+  else if (base != null && (entregas.medidas > 0 || esperados > 0)) valor = Math.round(base * factor * factorCarga * 100);
+  else valor = null;
+
+  const salida: ParteCumplimiento[] = partes.map(({ razon: _razon, ...p }) => p);
+  if (cargaPct != null && t.carga) {
+    salida.push({
+      clave: 'carga',
+      etiqueta: 'Carga de trabajo',
+      pct: Math.round(factorCarga * 100),
+      peso: 0,
+      detalle: `${horasTexto(t.carga.minutos)} de trabajo entregado en ${horasTexto(laborados)} en la oficina (${Math.round(
+        cargaPct,
+      )} %; con ${META_CARGA_PCT} % o más no resta) · multiplica el total`,
+    });
+  }
+  if (dias && esperados > 0) {
+    const perdidos = [
+      dias.sinChecar ? `${dias.sinChecar} sin checar` : '',
+      dias.sinTrabajo ? `${dias.sinTrabajo} sin trabajar` : '',
+    ].filter(Boolean);
+    salida.push({
+      clave: 'dias',
+      etiqueta: 'Días trabajados',
+      pct: Math.round(factor * 100),
+      peso: 0,
+      detalle: `${dias.trabajados} de ${esperados} ${esperados === 1 ? 'día' : 'días'}${
+        perdidos.length ? ` (${perdidos.join(', ')})` : ''
+      } · multiplica el total`,
+    });
+  }
+  return { pct: valor, partes: salida };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -865,6 +927,12 @@ export type DiaKpi = {
   productividadPct: number | null;
   /** Tiempo con una actividad, cada una contada solo hasta su tiempo máximo del día. */
   minutosOcupados: number;
+  /** Trabajó: 30 min o más con una actividad corriendo, o entregó algo ese día. */
+  trabajado: boolean;
+  /** Laborable ya terminado en que checó pero no trabajó, sin justificar. */
+  sinTrabajo: boolean;
+  /** Laborable ya terminado que se perdió (sin checar o sin trabajo), sin justificar: baja el cumplimiento. */
+  noTrabajado: boolean;
   minutosExtra: number | null;
   /**
    * Qué decidió el jefe sobre el tiempo extra de ese día. null = nadie lo ha visto.
@@ -924,6 +992,8 @@ export type TotalesKpi = {
   entregas: EntregasKpi;
   /** Días laborables en que entró a tiempo, de los que debía checar. */
   asistenciaPuntual: AsistenciaPuntualKpi;
+  /** Días que debía trabajar y cuántos trabajó: multiplica el cumplimiento. */
+  diasDeTrabajo: DiasDeTrabajoKpi;
   /** Entregas por día trabajado (y el ritmo del equipo, si se calculó en equipo). */
   ritmo: RitmoKpi;
   /** Trabajo entregado (plan de lo entregado) contra las horas trabajadas. */
@@ -1018,6 +1088,16 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
     porDia.set(j.dia, lista);
   }
 
+  // Las entregas se calculan antes: un día con una entrega es un día trabajado.
+  const entregas = entregasDelRango(e.entregas ?? [], e.desde, e.hasta, e.ahora, tz);
+  const diasConEntrega = new Set(
+    entregas.filter((x) => x.entregadaAt).map((x) => workDateKey(new Date(x.entregadaAt as string), tz)),
+  );
+  // «Hoy» solo se da por perdido pasada su hora de salida: antes todavía puede llegar o ponerse a trabajar.
+  const [hhFin, mmFin] = (horaValida(e.horario.salida) ?? FIN_DE_JORNADA_POR_OMISION).split(':').map(Number);
+  const hoyTerminado = ahoraMs >= workDayAtClock(e.ahora, hhFin, mmFin, tz).getTime();
+  const terminado = (fecha: string) => fecha < hoy || (fecha === hoy && hoyTerminado);
+
   const dias: DiaKpi[] = [];
   const hastaEfectivo = e.hasta < hoy ? e.hasta : hoy;
   for (const fecha of diasDelRango(e.desde, hastaEfectivo)) {
@@ -1037,8 +1117,12 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
       const pasado = fecha < hoy;
       const faltaJustificada = justificadas.has(fecha);
       const sinChecada = laborable && pasado && !antesDeIngresar && !faltaJustificada;
+      // Sin checar pero con trabajo (actividades sin entrada, o una entrega): trabajó, aunque no checó.
+      const trabajado = fuera > 0 || diasConEntrega.has(fecha);
+      const noTrabajado = laborable && terminado(fecha) && !antesDeIngresar && !faltaJustificada && !trabajado;
       // En el detalle también sale «hoy, aún sin entrada»; un sábado vacío no dice nada.
-      const incluir = sinChecada || faltaJustificada || fuera > 0 || (e.detalle && laborable && fecha === hoy);
+      const incluir =
+        sinChecada || noTrabajado || faltaJustificada || fuera > 0 || trabajado || (e.detalle && laborable && fecha === hoy);
       if (!incluir) continue;
       dias.push({
         fecha,
@@ -1061,6 +1145,9 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
         minutosInactivos: 0,
         productividadPct: null,
         minutosOcupados: 0,
+        trabajado,
+        sinTrabajo: false,
+        noTrabajado,
         minutosExtra: null,
         extraEstado: null,
         minutosExtraAprobados: 0,
@@ -1083,6 +1170,8 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
     const minutosProductivos = Math.min(minutosDeTramos(productivos), minutosLaborados);
     const minutosInactivos = Math.max(0, minutosLaborados - minutosProductivos);
     const minutosOcupados = Math.min(minutosDeTramos(intersectaTramos(tramosOcupados, laborables)), minutosLaborados);
+    const trabajado = minutosProductivos >= MIN_TRABAJO_DIA_MIN || diasConEntrega.has(fecha);
+    const sinTrabajo = laborable && !trabajado && terminado(fecha) && !justificadas.has(fecha);
     const r = laborable ? retardoDeEntrada(primera.entrada, e.horario, tz) : { retardo: false, minutosTarde: 0 };
     const minutosExtra =
       e.horario.jornadaOrdinariaMin == null
@@ -1115,6 +1204,9 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
       minutosInactivos,
       productividadPct: pct(minutosProductivos, minutosLaborados),
       minutosOcupados,
+      trabajado,
+      sinTrabajo,
+      noTrabajado: sinTrabajo,
       minutosExtra,
       extraEstado: decision?.estado ?? null,
       minutosExtraAprobados: decision?.estado === 'APROBADO' ? Math.max(0, decision.minutos) : 0,
@@ -1149,7 +1241,6 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
   }
 
   const enRango = jornadas.filter((j) => j.dia >= e.desde && j.dia <= e.hasta);
-  const entregas = entregasDelRango(e.entregas ?? [], e.desde, e.hasta, e.ahora, tz);
   return { dias, entregas, totales: sumaTotales(dias, enRango, e.horario, resumenEntregas(entregas)) };
 }
 
@@ -1220,8 +1311,20 @@ function sumaTotales(
   const carga = { minutos: entregas.minutosCarga, pct: pct(entregas.minutosCarga, minutosLaborados) };
   const minutosOcupados = conJornada.reduce((s, d) => s + d.minutosOcupados, 0);
   const ocupacion = { minutos: minutosOcupados, pct: pct(minutosOcupados, minutosLaborados) };
+  const laborablesContados = dias.filter((d) => d.laborable && !d.faltaJustificada && (d.trabajado || d.noTrabajado));
+  const trabajados = laborablesContados.filter((d) => d.trabajado).length;
+  const sinChecar = dias.filter((d) => d.noTrabajado && !d.conJornada).length;
+  const sinTrabajo = dias.filter((d) => d.sinTrabajo).length;
+  const diasDeTrabajo: DiasDeTrabajoKpi = {
+    esperados: laborablesContados.length,
+    trabajados,
+    sinChecar,
+    sinTrabajo,
+    sinTrabajar: sinChecar + sinTrabajo,
+    pct: pct(trabajados, laborablesContados.length),
+  };
   const cumplimiento = cumplimientoDe(
-    { entregas, asistenciaPuntual, uniforme, minutosLaborados, ritmo, carga, ocupacion },
+    { entregas, asistenciaPuntual, uniforme, minutosLaborados, ritmo, carga, ocupacion, diasDeTrabajo },
     null,
   );
   return {
@@ -1248,6 +1351,7 @@ function sumaTotales(
     actividadesFueraDeJornada: dias.reduce((s, d) => s + d.actividadesFueraDeJornada, 0),
     entregas,
     asistenciaPuntual,
+    diasDeTrabajo,
     ritmo,
     carga,
     ocupacion,
@@ -1299,8 +1403,17 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
   const carga = { minutos: entregas.minutosCarga, pct: pct(entregas.minutosCarga, laborados) };
   const ocupados = s((t) => t.ocupacion?.minutos ?? 0);
   const ocupacion = { minutos: ocupados, pct: pct(ocupados, laborados) };
+  const dd = (f: (x: DiasDeTrabajoKpi) => number) => lista.reduce((acc, t) => acc + (t.diasDeTrabajo ? f(t.diasDeTrabajo) : 0), 0);
+  const diasDeTrabajo: DiasDeTrabajoKpi = {
+    esperados: dd((x) => x.esperados),
+    trabajados: dd((x) => x.trabajados),
+    sinChecar: dd((x) => x.sinChecar),
+    sinTrabajo: dd((x) => x.sinTrabajo),
+    sinTrabajar: dd((x) => x.sinTrabajar),
+    pct: pct(dd((x) => x.trabajados), dd((x) => x.esperados)),
+  };
   const cumplimiento = cumplimientoDe(
-    { entregas, asistenciaPuntual, uniforme, minutosLaborados: laborados, ritmo, carga, ocupacion },
+    { entregas, asistenciaPuntual, uniforme, minutosLaborados: laborados, ritmo, carga, ocupacion, diasDeTrabajo },
     null,
   );
   return {
@@ -1324,6 +1437,7 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     actividadesFueraDeJornada: s((t) => t.actividadesFueraDeJornada),
     entregas,
     asistenciaPuntual,
+    diasDeTrabajo,
     ritmo,
     carga,
     ocupacion,
@@ -1358,9 +1472,9 @@ export const UMBRALES_KPI = {
   /** Retardos en el rango: 1–2 amarillo, 3 o más rojo. */
   retardosAmarillo: 1,
   retardosRojo: 3,
-  /** Días laborables sin checada: 1 amarillo, 2 o más rojo. */
+  /** Días laborables sin trabajar (sin checar o sin hacer nada) y sin justificar: desde 1 es rojo. */
   faltasAmarillo: 1,
-  faltasRojo: 2,
+  faltasRojo: 1,
 } as const;
 
 const PESO: Record<SemaforoKpi, number> = { sin_datos: 0, verde: 1, amarillo: 2, rojo: 3 };
@@ -1417,11 +1531,18 @@ export function semaforoKpi(t: TotalesKpi): { semaforo: SemaforoKpi; motivos: st
     const p = t.uniforme.pct;
     marca(p >= u.uniformeVerde ? 'verde' : p >= u.uniformeAmarillo ? 'amarillo' : 'rojo', `Uniforme ${p} %`);
   }
-  if (t.diasSinChecada > 0) {
-    const f = t.diasSinChecada;
+  // Días perdidos sin justificar: sin checar o checó y no hizo nada (antes solo contaba sin checar).
+  const dd = t.diasDeTrabajo;
+  const f = dd ? dd.sinTrabajar : t.diasSinChecada;
+  if (f > 0) {
+    const detalle = dd
+      ? [dd.sinChecar ? `${dd.sinChecar} sin checar` : '', dd.sinTrabajo ? `${dd.sinTrabajo} sin actividad` : '']
+          .filter(Boolean)
+          .join(', ')
+      : 'sin checada';
     marca(
       f >= u.faltasRojo ? 'rojo' : f >= u.faltasAmarillo ? 'amarillo' : 'verde',
-      `${f} día${f === 1 ? '' : 's'} sin checada`,
+      `${f} día${f === 1 ? '' : 's'} sin trabajar sin justificar (${detalle})`,
     );
   }
 
@@ -1436,14 +1557,15 @@ export function supuestosKpi(): string[] {
   const u = UMBRALES_KPI;
   const w = PESOS_CUMPLIMIENTO;
   return [
-    `Cumplimiento (en tiempo y forma): entregas a tiempo ${w.entregas} %, aprobadas a la primera ${w.forma} %, tiempo adecuado ${w.tiempo} %, ritmo de entregas ${w.ritmo} %, carga de trabajo ${w.carga} %, siempre con algo ${w.ocupacion} %, asistencia puntual ${w.asistencia} % y uniforme ${w.uniforme} %. Lo que no tiene dato no pesa; sin ninguna entrega en las fechas no se califica.`,
+    `Cumplimiento (en tiempo y forma): entregas a tiempo ${w.entregas} %, ritmo de entregas ${w.ritmo} %, tiempo adecuado ${w.tiempo} %, siempre con algo ${w.ocupacion} %, asistencia puntual ${w.asistencia} %, aprobadas a la primera ${w.forma} % y uniforme ${w.uniforme} % (lo que no tiene dato no pesa). Ese promedio se MULTIPLICA por la carga de trabajo y por los días trabajados: poca carga o días perdidos bajan todo.`,
     `Tiempo adecuado: lo que de verdad trabajó en la actividad (sus sesiones de reloj) no pasó su tiempo máximo; si no tiene máximo, su tiempo estimado + ${Math.round((TOLERANCIA_PLAN - 1) * 100)} %. Sin estimado ni máximo, o de varios días, no se mide.`,
     `Ritmo de entregas: actividades entregadas por día trabajado, contra el ritmo del equipo (el de quien va en el 75 % mejor, mínimo ${RITMO_REFERENCIA_MIN} por día). Igualarlo o pasarlo vale 100.`,
-    `Carga de trabajo: suma del tiempo estimado de lo que entregó (sin estimado, su tiempo real hasta ${CARGA_SIN_PLAN_MAX_MIN / 60} h) contra sus horas trabajadas. ${META_CARGA_PCT} % o más vale 100. Una actividad de un día completo pesa más que una de 20 minutos.`,
+    `Carga de trabajo (multiplica): suma del tiempo estimado de lo que entregó (sin estimado, su tiempo real hasta ${CARGA_SIN_PLAN_MAX_MIN / 60} h) contra sus horas en la oficina. Con ${META_CARGA_PCT} % o más no resta; debajo multiplica en proporción (la mitad de la meta = ×0.5). Una actividad de un día completo pesa más que una de 20 minutos.`,
     `Siempre con algo: tiempo con una actividad en curso dentro de su jornada, contando cada actividad solo hasta su tiempo máximo del día (sin estimado, hasta ${OCUPACION_TOPE_SIN_PLAN_MIN / 60} h): dejar el reloj prendido no suma. ${META_OCUPACION_PCT} % de la jornada o más vale 100.`,
     'Entrega a tiempo: la persona la entregó (fin real o evidencia completa) antes de su límite. Se mide con la hora en que ENTREGÓ, no con la hora en que el jefe la aprobó.',
     'Límite: el fin del último día de su periodo; si no tiene periodo, su fecha máxima. Como el formulario guarda la fecha máxima igual a la hora de inicio, una máxima que no queda después del inicio vale hasta el fin de ese día (igual que el semáforo).',
     'Sin entregar: su límite cayó en estas fechas, ya pasó y no la ha entregado. Lo que vence después todavía no se califica.',
+    `Días trabajados: cada día laborable que debía trabajar y no trabajó —no checó, o checó y no tuvo ni ${MIN_TRABAJO_DIA_MIN} min con una actividad ni una entrega— sin falta justificada ni permiso o vacaciones aprobados, multiplica el cumplimiento por días trabajados ÷ días que debía trabajar (1 de 5 perdido = ×0.8). Si no trabajó ninguno, queda en 0. Hoy cuenta hasta pasada su hora de salida (${FIN_DE_JORNADA_POR_OMISION} si no tiene).`,
     'Aprobada a la primera: la primera revisión de su evidencia fue «aprobada»; si se la devolvieron, no cuenta aunque luego se aprobara.',
     'Asistencia puntual: días laborables en que entró a tiempo, de los que debía checar (un día sin checar cuenta como no; una falta justificada no cuenta).',
     'Jornada: de la entrada a la salida. Si hoy no hay salida, cuenta hasta ahora; en un día pasado sin salida se cierra como el cierre automático (entrada + 9 h, a más tardar 23:30).',
@@ -1457,6 +1579,6 @@ export function supuestosKpi(): string[] {
     `Tiempo extra: lo laborado arriba de ${JORNADA_ORDINARIA_MIN / 60} h en día laborable, o todo lo laborado en sábado o domingo. Sin horario no se calcula.`,
     'El tiempo extra calculado no se paga solo: un jefe lo aprueba día por día, y a la pre-nómina solo llega lo aprobado.',
     'Uniforme: el jefe marca ✓ o ✗ en la entrada de cada persona (Asistencias). El % es sobre las entradas revisadas.',
-    `Semáforo: el peor de entregas a tiempo (verde ≥ ${u.entregasVerde} %, amarillo ≥ ${u.entregasAmarillo} %), tiempo adecuado (verde ≥ ${u.tiempoVerde} %, amarillo ≥ ${u.tiempoAmarillo} %), aprobadas a la primera (verde ≥ ${u.formaVerde} %, amarillo ≥ ${u.formaAmarillo} %), retardos (amarillo desde ${u.retardosAmarillo}, rojo desde ${u.retardosRojo}), uniforme (verde ≥ ${u.uniformeVerde} %, amarillo ≥ ${u.uniformeAmarillo} %) y días sin checada (amarillo ${u.faltasAmarillo}, rojo desde ${u.faltasRojo}).`,
+    `Semáforo: el peor de entregas a tiempo (verde ≥ ${u.entregasVerde} %, amarillo ≥ ${u.entregasAmarillo} %), tiempo adecuado (verde ≥ ${u.tiempoVerde} %, amarillo ≥ ${u.tiempoAmarillo} %), aprobadas a la primera (verde ≥ ${u.formaVerde} %, amarillo ≥ ${u.formaAmarillo} %), retardos (amarillo desde ${u.retardosAmarillo}, rojo desde ${u.retardosRojo}), uniforme (verde ≥ ${u.uniformeVerde} %, amarillo ≥ ${u.uniformeAmarillo} %) y días sin trabajar sin justificar (rojo desde ${u.faltasRojo}).`,
   ];
 }

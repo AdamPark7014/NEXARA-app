@@ -275,7 +275,8 @@ object KpisEquipoRules {
             val valor = listOfNotNull(
                 p.detalle?.trim()?.ifEmpty { null },
                 p.pct?.takeIf { it.isFinite() }?.let { pct(it) },
-                p.peso?.takeIf { it.isFinite() }?.let { "pesa ${numero(it)} %" },
+                // Peso 0 = multiplica el total (carga, días trabajados): su detalle ya lo dice.
+                p.peso?.takeIf { it.isFinite() && it > 0 }?.let { "pesa ${numero(it)} %" },
             ).joinToString(" · ")
             Linea(etiqueta, valor.ifEmpty { "—" })
         }
