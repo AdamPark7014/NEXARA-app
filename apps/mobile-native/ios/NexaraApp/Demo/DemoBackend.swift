@@ -85,6 +85,10 @@ extension DemoStore {
         case "me":
             return routeMe(method: method, parts: parts, query: query, json: json, now: now)
         case "activities":
+            // activities/:id/adjuntos/* (multipart y binarios: `DemoFixtures+Adjuntos`).
+            if parts.count >= 3, parts[2] == "adjuntos", let id = intAt(parts, 1) {
+                return routeAdjuntos(method: method, activityId: id, parts: parts, body: body, now: now)
+            }
             return routeActivities(method: method, parts: parts, json: json)
         case "activity-evidence":
             if !isGet, let id = intAt(parts, 1) { reanudarPorEvidencia(id, now: now) }

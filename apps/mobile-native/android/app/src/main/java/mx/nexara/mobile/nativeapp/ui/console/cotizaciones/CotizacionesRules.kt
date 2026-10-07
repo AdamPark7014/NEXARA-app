@@ -442,6 +442,12 @@ object CotizacionesRules {
         return "$nombre.pdf"
     }
 
+    /** Título del visor del PDF: el folio, o «Cotización» si todavía no tiene. */
+    fun tituloPdf(folio: String?, interno: Boolean = false): String {
+        val base = folio?.trim()?.ifEmpty { null } ?: "Cotización"
+        return if (interno) "$base · interno" else base
+    }
+
     /** Qué no hace esta pantalla. */
     const val LIMITE =
         "Consulta. Crear y editar una cotización, mandarla al cliente y decidirla se hacen desde la computadora."

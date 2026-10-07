@@ -224,14 +224,14 @@ struct PortalServicesView: View {
                     loading: downloading == "inv-\(id)-pdf",
                     enabled: downloading == nil && id > 0,
                     fullWidth: true
-                ) { Task { await downloadInvoice(id: id, kind: "pdf") } }
+                ) { Task { await downloadInvoice(id: id, kind: "pdf", folio: portalServicesStr(inv, "invoiceNumber")) } }
                 NxSecondaryButton(
                     "XML",
                     systemImage: "doc.text",
                     loading: downloading == "inv-\(id)-xml",
                     enabled: downloading == nil && id > 0,
                     fullWidth: true
-                ) { Task { await downloadInvoice(id: id, kind: "xml") } }
+                ) { Task { await downloadInvoice(id: id, kind: "xml", folio: portalServicesStr(inv, "invoiceNumber")) } }
             }
             .padding(.top, NxSpacing.s)
         }
@@ -252,7 +252,7 @@ struct PortalServicesView: View {
                 loading: downloading == "quote-\(id)",
                 enabled: downloading == nil && id > 0,
                 fullWidth: true
-            ) { Task { await downloadQuote(id: id) } }
+            ) { Task { await downloadQuote(id: id, folio: portalServicesStr(q, "quoteNumber")) } }
             .padding(.top, NxSpacing.s)
         }
     }
@@ -277,7 +277,14 @@ struct PortalServicesView: View {
         loading = false
     }
 
-    private func downloadInvoice(id: Int64, kind: String) async {
+    /// Título del visor = nombre del archivo al guardar o compartir: «Factura F-1024».
+    /// Solo «Factura» o «Cotización» hacía que dos PDF se llamaran igual en WhatsApp.
+    private static func tituloPdf(_ base: String, folio: String) -> String {
+        let limpio = folio.trimmingCharacters(in: .whitespacesAndNewlines)
+        return limpio.isEmpty ? base : "\(base) \(limpio)"
+    }
+
+    private func downloadInvoice(id: Int64, kind: String, folio: String = "") async {
         guard id > 0, downloading == nil else { return }
         downloading = "inv-\(id)-\(kind)"
         defer { downloading = nil }
@@ -287,20 +294,20 @@ struct PortalServicesView: View {
                 xmlItem = try PortalServicesXMLItem(invoiceId: id, data: data)
             } else {
                 let data = try await TicketsRepository.shared.downloadInvoicePdf(id: id)
-                pdfItem = PortalPDFItem(title: "Factura", data: data)
+                pdfItem = PortalPDFItem(title: Self.tituloPdf("Factura", folio: folio), data: data)
             }
         } catch {
             actionError = NxFriendlyError.text(error.toUserMessage())
         }
     }
 
-    private func downloadQuote(id: Int64) async {
+    private func downloadQuote(id: Int64, folio: String = "") async {
         guard id > 0, downloading == nil else { return }
         downloading = "quote-\(id)"
         defer { downloading = nil }
         do {
             let data = try await TicketsRepository.shared.downloadQuotePdf(id: id)
-            pdfItem = PortalPDFItem(title: "Cotización", data: data)
+            pdfItem = PortalPDFItem(title: Self.tituloPdf("Cotización", folio: folio), data: data)
         } catch {
             actionError = NxFriendlyError.text(error.toUserMessage())
         }

@@ -3,6 +3,7 @@ package mx.nexara.mobile.nativeapp.ui.console.cotizaciones
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,9 +14,8 @@ import mx.nexara.mobile.nativeapp.data.api.CotizacionDetalleDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionResumenDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CotizacionesRepository
+import mx.nexara.mobile.nativeapp.ui.common.guardarEnCache
 import mx.nexara.mobile.nativeapp.ui.console.more.CargaUiState
-import mx.nexara.mobile.nativeapp.ui.util.openFile
-import mx.nexara.mobile.nativeapp.ui.util.savePdfToCache
 
 /**
  * La lista de cotizaciones.
@@ -109,9 +109,14 @@ data class CotizacionDetalleUiState(
     val avisoRefresco: String? = null,
     val descargandoPdf: Boolean = false,
     val errorPdf: String? = null,
+    /** El PDF ya bajado, abierto dentro de la app (Guardar · Compartir · Abrir con…). */
+    val pdfAbierto: PdfDeCotizacion? = null,
 ) {
     val hayDatos: Boolean get() = cotizacion != null
 }
+
+/** El PDF en la caché, con el folio por nombre de archivo y por título del visor. */
+data class PdfDeCotizacion(val archivo: File, val titulo: String)
 
 class CotizacionDetalleViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CotizacionesRepository(app.applicationContext)
@@ -160,13 +165,17 @@ class CotizacionDetalleViewModel(app: Application) : AndroidViewModel(app) {
 
     fun limpiarErrorPdf() = _state.update { it.copy(errorPdf = null) }
 
+    fun cerrarPdf() = _state.update { it.copy(pdfAbierto = null) }
+
     /**
-     * Descarga el PDF y lo abre con el visor del teléfono.
+     * Descarga el PDF y lo abre **dentro de la app** (`DocumentoDialog`), con
+     * Guardar, Compartir y Abrir con….
      *
-     * Es la propuesta tal como la recibe el cliente, así que se puede enseñar
-     * en una visita o reenviar desde el propio visor. El archivo se llama como
-     * el folio: en la carpeta de descargas, «NEX-LJ75100126-0007.pdf» dice qué
-     * es, y «cotizacion-482.pdf» no.
+     * Antes se mandaba a otra app con `ACTION_VIEW`: sin lector de PDF instalado
+     * no pasaba nada y no había forma de guardarla ni de mandarla por WhatsApp
+     * (Adam, 07-10). El archivo se llama como el folio, con `.pdf` forzado
+     * aunque el folio lleve punto («NEX-1-JA.CE-R2.pdf»): en Descargas o en un
+     * chat, «NEX-LJ75100126-0007.pdf» dice qué es, y «cotizacion-482.pdf» no.
      *
      * Un fallo aquí no toca el detalle que está en pantalla: se avisa aparte,
      * porque no poder bajar el PDF no invalida lo que se está leyendo.
@@ -184,10 +193,11 @@ class CotizacionDetalleViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val bytes = if (interno) repo.pdfInterno(id) else repo.pdf(id)
                 val app = getApplication<Application>()
-                val nombre = CotizacionesRules.nombreArchivoPdf(id, _state.value.cotizacion?.folio, interno)
-                val archivo = withContext(Dispatchers.IO) { savePdfToCache(app, nombre, bytes) }
-                openFile(app, archivo, "application/pdf")
-                _state.update { it.copy(descargandoPdf = false) }
+                val folio = _state.value.cotizacion?.folio
+                val nombre = CotizacionesRules.nombreArchivoPdf(id, folio, interno)
+                val archivo = withContext(Dispatchers.IO) { guardarEnCache(app, nombre, bytes, "pdf") }
+                val titulo = CotizacionesRules.tituloPdf(folio, interno)
+                _state.update { it.copy(descargandoPdf = false, pdfAbierto = PdfDeCotizacion(archivo, titulo)) }
             } catch (e: Throwable) {
                 _state.update {
                     it.copy(

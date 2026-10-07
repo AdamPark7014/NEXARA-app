@@ -181,6 +181,18 @@ struct ActivityCoreDetailView: View {
     private var canExecute: Bool { soyResponsable && !canManage }
     private var canEdit: Bool { canManage || canExecute }
 
+    /// «Adjuntar archivo» (espejo de `ActivityAttachmentsService.agregar`): su equipo
+    /// —responsable, quien la creó, asignados activos— o quien gestiona actividades y
+    /// dirección. El API vuelve a validar y contesta 403 con su mensaje.
+    private var puedeAdjuntar: Bool {
+        guard let user = session.currentUser, let myId else { return false }
+        let creadorId = ActivityParse.int((raw["creador"] as? [String: Any])?["id"]) ?? ActivityParse.int(raw["creadoPorId"])
+        if soyResponsable || creadorId == myId || miFila != nil { return true }
+        if user.isSuperAdmin || user.roleKey == "ceo" || CoreOrg.isCeo(user.email) { return true }
+        if CoreOrg.normalized(user.email) == CoreOrg.developerEmail { return true }
+        return user.permissions.contains("activities.manage")
+    }
+
     private var cancelAviso: String? {
         ActivityDetailRules.avisoCancelada(
             estatus: estatus,
@@ -476,6 +488,15 @@ struct ActivityCoreDetailView: View {
                         TeamEvidenceCompactView(activityId: activityId, refreshToken: teamRefresh) {
                             tab = .evidencias
                         }
+                    }
+                    // Comercial: la propuesta en Excel, la minuta en Word, el PDF del cliente.
+                    if CoreEvidence.isComercial(coreKind) {
+                        ActivityAdjuntosSection(
+                            activityId: activityId,
+                            puedeAdjuntar: puedeAdjuntar,
+                            refreshToken: recarga,
+                            onAviso: { snack = $0 }
+                        )
                     }
                 }
             }

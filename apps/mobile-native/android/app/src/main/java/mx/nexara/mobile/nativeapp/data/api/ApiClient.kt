@@ -187,10 +187,16 @@ object ApiClient {
 
     private val retrofitNoAuth: Retrofit = retrofit(httpClient(tokenProvider = null))
 
+    /**
+     * `withOffline = false` para lo que no tiene sentido sin red: subir o bajar archivos. La
+     * cola offline contestaría `{"queued":true}` a una subida que la pantalla espera como lista,
+     * y la caché de GET guardaría como texto los primeros 512 KB de un PDF o un Excel.
+     */
     fun authed(
         tokenProvider: () -> String?,
         companyIdProvider: (() -> Long?)? = null,
-    ): Retrofit = retrofit(httpClient(tokenProvider, companyIdProvider))
+        withOffline: Boolean = true,
+    ): Retrofit = retrofit(httpClient(tokenProvider, companyIdProvider, withOffline))
 
     val auth: AuthApi = retrofitNoAuth.create(AuthApi::class.java)
     val portalAuth: PortalAuthApi = retrofitNoAuth.create(PortalAuthApi::class.java)

@@ -14,8 +14,15 @@
     en Archivos» + «Compartir» (`UI/Common/PDFViewerView.swift`: `NxArchivoTemporal`, `nxAccionesDeArchivo`,
     `DocumentoScreen` con Vista Rápida). Android: `ui/common/DocumentoViewer.kt` (`DocumentoDialog` con Guardar por el
     selector de Android, Compartir, Abrir con…, PDF/imagen/HTML en WebView sin JS).
-  - **En curso:** agentes en web (`components/erp/ArchivosDeActividad.tsx`), Android e iOS con el contrato
-    `scratchpad/CONTRATO-ADJUNTOS.md`.
+  - **Web (desplegada):** `components/erp/ArchivosDeActividad.tsx` + `lib/actividad-adjuntos-api.ts` en el detalle de la
+    actividad comercial (PDF con pdf.js, imagen, Excel/CSV/Word con `<iframe sandbox srcDoc>` de `/vista-previa`).
+  - **Android:** `ActividadAdjuntosSection` en el Detalle (comercial), `DocumentoDialog` para la cotización y
+    `ProtectedPdfDialog` (Guardar con selector, Compartir, Abrir con…; PDF página por página). `ApiClient.authed` tiene
+    `withOffline` (subir/bajar/quitar adjuntos sin la capa offline). El portal de tickets aún abre PDFs con `openFile`.
+  - **iOS:** `ActivityAdjuntosSection` (Archivos o Fotos, Vista Rápida a pantalla completa, quitar con confirmación);
+    demo con AN-0155 comercial y adjuntos reales (xlsx/docx/pdf) en `Demo/DemoFixtures+Adjuntos.swift`. Pendiente
+    revisar en iPhone: `EvidenceCaptureFlowView.swift` tiene dos `.fileImporter` seguidos (líneas ~306 y ~319).
+  - **No publicado en tiendas.**
 
 - **07-10 ~10:40 (claude-code) — KPIs «en tiempo y forma» + Mi equipo con detalle (pedido de Adam).**
   - Adam: «los que cumplen más en tiempo y forma son Daniela y Luis» y el ranking los ponía abajo. Causa con datos

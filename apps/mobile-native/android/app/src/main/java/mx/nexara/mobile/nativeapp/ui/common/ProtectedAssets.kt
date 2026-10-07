@@ -9,10 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -22,9 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,12 +34,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.ImageLoader
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
@@ -59,8 +52,6 @@ import mx.nexara.mobile.nativeapp.data.api.resolveProtectedUploadUrl
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.ui.util.downloadAuthedToCache
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
-import mx.nexara.mobile.nativeapp.ui.util.openPdfFile
-import mx.nexara.mobile.nativeapp.ui.util.savePdfToCache
 import okhttp3.OkHttpClient
 
 /**
@@ -232,11 +223,16 @@ fun ProtectedPdfButton(
                     error = null
                     try {
                         file = withContext(Dispatchers.IO) {
-                            downloadAuthedToCache(
+                            val bajado = downloadAuthedToCache(
                                 context,
                                 ProtectedAssets.resolve(url),
                                 "evidencia-${abs(url.hashCode())}.pdf",
                             )
+                            // Con el título por nombre («Hoja de servicio.pdf»): es el que ve
+                            // quien lo recibe por WhatsApp o lo guarda en Descargas.
+                            runCatching { guardarEnCache(context, title, bajado.readBytes(), "pdf") }
+                                .onSuccess { bajado.delete() }
+                                .getOrDefault(bajado)
                         }
                     } catch (e: Exception) {
                         error = if (e.message.orEmpty().contains("HTTP 404")) {
@@ -267,38 +263,11 @@ fun ProtectedPdfButton(
     }
 }
 
+/**
+ * El PDF protegido dentro de la app, con **Guardar**, **Compartir** y **Abrir con…**
+ * (antes solo había «Abrir con…», que sin lector de PDF instalado no hacía nada).
+ */
 @Composable
 fun ProtectedPdfDialog(file: File, title: String, onClose: () -> Unit) {
-    val context = LocalContext.current
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
-            Column(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    TextButton(onClick = onClose) { Text("Cerrar") }
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                    )
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                val copy = savePdfToCache(context, file.name, file.readBytes())
-                                openPdfFile(context, copy)
-                            }
-                        },
-                    ) { Text("Abrir con…") }
-                }
-                PdfViewer(file = file, modifier = Modifier.weight(1f))
-            }
-        }
-    }
+    DocumentoDialog(archivo = file, titulo = title, mime = "application/pdf", onClose = onClose)
 }

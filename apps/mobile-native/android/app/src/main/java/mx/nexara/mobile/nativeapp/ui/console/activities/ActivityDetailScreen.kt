@@ -476,17 +476,27 @@ fun ActivityDetailScreen(
                                 }
                             },
                             extraContent = {
-                                NxPanelShell {
-                                    Text(
-                                        "Evidencias del equipo",
-                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = c.fg,
-                                    )
-                                    TeamEvidenceSection(
-                                        activityId = detail.id,
-                                        compact = true,
-                                        onOpenFull = { selectedTab = ACTIVITY_TAB_EVIDENCIAS },
-                                    )
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    // Comercial: la propuesta, la minuta y lo que manda el cliente (Adam, 07-10).
+                                    if (ActividadAdjuntosRules.aplica(detail.coreKind)) {
+                                        ActividadAdjuntosSection(
+                                            activityId = detail.id,
+                                            refreshKey = recarga,
+                                            onAviso = { mensaje -> scope.launch { snackbarHostState.showSnackbar(mensaje) } },
+                                        )
+                                    }
+                                    NxPanelShell {
+                                        Text(
+                                            "Evidencias del equipo",
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = c.fg,
+                                        )
+                                        TeamEvidenceSection(
+                                            activityId = detail.id,
+                                            compact = true,
+                                            onOpenFull = { selectedTab = ACTIVITY_TAB_EVIDENCIAS },
+                                        )
+                                    }
                                 }
                             },
                         )
