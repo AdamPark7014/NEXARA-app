@@ -27,9 +27,14 @@
     trabajadas, meta 75 %; sin estimado = real hasta 2 h), siempre con algo 10 (tiempo con actividad, cada una recortada
     a su máximo del día, sin plan 4 h; `recortaPorTope`; meta 70 %), asistencia puntual 10, uniforme 5. Web: columna
     «Tiempo» en Entregas del detalle y «N por día · N/N en su tiempo» en el ranking.
-  - **En curso:** apps Android/iOS (KPIs con cumplimiento y Mi equipo con «Para atender hoy») — dos agentes editando
-    `apps/mobile-native/**` con el contrato `scratchpad/CONTRATO-APPS-KPI-EQUIPO.md`; las partes del cumplimiento se
-    pintan genéricas (vienen del API).
+  - **Apps (~11:20):** Android e iOS con lo mismo que la web: KPIs ordenados por cumplimiento (tira Cumplimiento /
+    Puntualidad / Tiempo en actividades sin semáforo / Uniforme / Extra; tarjeta Cumplimiento · Entregas · Puntualidad;
+    al desplegar, las partes que mande el API, genéricas) y Mi equipo con desglose de «Con retraso» y «Para atender
+    hoy» (solo rango Hoy; sin «＋ Asignar» porque esa pestaña no asigna). API vieja: Android/iOS distinguen
+    `entradaHoyAt` ausente de nulo (iOS `traeJornadaHoy` con `c.contains`). `NxMetric` acepta pie de varios renglones
+    en las dos. iOS demo: Fernanda sin entrada hoy, Javier atrasado, Ricardo sin nada desde que entró, Paola ya salió.
+    Android: suite completa de pruebas en verde. iOS: sin target de pruebas unitarias; compila en CI.
+    **No publicado en tiendas** (iOS build 9 sigue en revisión; Android 1.0.6 en revisión).
 
 - **07-10 ~07:50 (claude-code) — pedido de Adam (iOS sigue sin aprobarse):**
   - **Checar desde la web, 10 días más:** `attendance.web_checkin_until` (companyId 1) = `2026-10-18T05:48:52Z`

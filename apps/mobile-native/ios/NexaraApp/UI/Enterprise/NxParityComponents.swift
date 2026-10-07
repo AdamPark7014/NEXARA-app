@@ -549,6 +549,9 @@ struct NxMetric: Identifiable {
     var pista: String? = nil
     /// `nil` = tinta normal.
     var color: Color? = nil
+    /// Renglones que puede ocupar la pista (Android `pistaLineas`): casi siempre uno; un
+    /// desglose que no se puede cortar («2 atrasados · 4 sin entrada») pide más.
+    var pistaLineas: Int = 1
 
     var id: String { clave }
 }
@@ -618,7 +621,7 @@ struct NxMetricStrip: View {
                 Text(pista)
                     .font(.system(size: 11))
                     .foregroundStyle(NxColors.muted)
-                    .lineLimit(1)
+                    .lineLimit(max(metric.pistaLineas, 1))
             }
         }
         .padding(.horizontal, 12)

@@ -26,6 +26,60 @@ struct DemoKpiSeed {
     let productivity: Double
     let uniform: Double
     let extra: Int
+    /// Entregas de una semana de 5 días (07-10): a tiempo, tarde y vencidas sin entregar.
+    var aTiempo = 0
+    var tarde = 0
+    var sinEntregar = 0
+    /// De lo entregado y revisado: aprobadas a la primera y devueltas.
+    var aLaPrimera = 0
+    var devueltas = 0
+    /// Entregadas que pasaron su tiempo máximo («Tiempo adecuado»).
+    var fueraDeTiempo = 0
+}
+
+/// Los números de una persona (o del equipo entero) en el rango, ya escalados a sus días.
+struct DemoKpiCuenta {
+    var dias = 0
+    var withWork = 0
+    var missing = 0
+    var late = 0
+    var lateMinutes = 0
+    var extra = 0
+    var worked = 0
+    var productive = 0
+    var reviewed = 0
+    var okCount = 0
+    var aTiempo = 0
+    var tarde = 0
+    var sinEntregar = 0
+    var aLaPrimera = 0
+    var devueltas = 0
+    var enTiempoAdecuado = 0
+
+    var medidas: Int { aTiempo + tarde + sinEntregar }
+    var entregadas: Int { aTiempo + tarde }
+    var revisadas: Int { aLaPrimera + devueltas }
+    /// Días laborables en que entró a tiempo (un día sin checar cuenta como no).
+    var puntuales: Int { max(0, withWork - late) }
+
+    mutating func suma(_ o: DemoKpiCuenta) {
+        dias += o.dias
+        withWork += o.withWork
+        missing += o.missing
+        late += o.late
+        lateMinutes += o.lateMinutes
+        extra += o.extra
+        worked += o.worked
+        productive += o.productive
+        reviewed += o.reviewed
+        okCount += o.okCount
+        aTiempo += o.aTiempo
+        tarde += o.tarde
+        sinEntregar += o.sinEntregar
+        aLaPrimera += o.aLaPrimera
+        devueltas += o.devueltas
+        enTiempoAdecuado += o.enTiempoAdecuado
+    }
 }
 
 extension DemoStore {
@@ -248,110 +302,281 @@ extension DemoStore {
 
     // MARK: KPIs del equipo
 
+    /// Una semana de 5 días por persona. Quien más cumple en tiempo y forma son Luis
+    /// Fernando y Sofía (todo a tiempo, nada devuelto) aunque su «tiempo en actividades»
+    /// no sea el más alto; Javier se va al fondo con entregas tarde y sin entregar, y
+    /// Andrea (almacén) no tuvo entregas que medir: sin cumplimiento, al final.
     static let kpiSeeds: [DemoKpiSeed] = [
-        DemoKpiSeed(id: 101, late: 1, lateMinutes: 12, missing: 0, productivity: 91, uniform: 100, extra: 120),
-        DemoKpiSeed(id: 102, late: 0, lateMinutes: 0, missing: 0, productivity: 88, uniform: 100, extra: 60),
-        DemoKpiSeed(id: 103, late: 2, lateMinutes: 25, missing: 0, productivity: 84, uniform: 95, extra: 0),
-        DemoKpiSeed(id: 104, late: 4, lateMinutes: 62, missing: 1, productivity: 66, uniform: 80, extra: 0),
-        DemoKpiSeed(id: 105, late: 1, lateMinutes: 8, missing: 0, productivity: 93, uniform: 100, extra: 30),
-        DemoKpiSeed(id: 106, late: 3, lateMinutes: 41, missing: 0, productivity: 79, uniform: 90, extra: 0),
-        DemoKpiSeed(id: 107, late: 0, lateMinutes: 0, missing: 0, productivity: 95, uniform: 100, extra: 0),
-        DemoKpiSeed(id: 108, late: 1, lateMinutes: 10, missing: 0, productivity: 89, uniform: 100, extra: 90),
+        DemoKpiSeed(id: 101, late: 1, lateMinutes: 12, missing: 0, productivity: 91, uniform: 100, extra: 120,
+                    aTiempo: 11, tarde: 1, sinEntregar: 0, aLaPrimera: 10, devueltas: 1, fueraDeTiempo: 1),
+        DemoKpiSeed(id: 102, late: 0, lateMinutes: 0, missing: 0, productivity: 88, uniform: 100, extra: 60,
+                    aTiempo: 9, tarde: 1, sinEntregar: 0, aLaPrimera: 8, devueltas: 1, fueraDeTiempo: 1),
+        DemoKpiSeed(id: 103, late: 2, lateMinutes: 25, missing: 0, productivity: 84, uniform: 95, extra: 0,
+                    aTiempo: 6, tarde: 1, sinEntregar: 1, aLaPrimera: 6, devueltas: 1, fueraDeTiempo: 2),
+        DemoKpiSeed(id: 104, late: 4, lateMinutes: 62, missing: 1, productivity: 66, uniform: 80, extra: 0,
+                    aTiempo: 5, tarde: 2, sinEntregar: 2, aLaPrimera: 4, devueltas: 3, fueraDeTiempo: 3),
+        DemoKpiSeed(id: 105, late: 0, lateMinutes: 0, missing: 0, productivity: 82, uniform: 100, extra: 30,
+                    aTiempo: 11, tarde: 0, sinEntregar: 0, aLaPrimera: 10, devueltas: 0, fueraDeTiempo: 0),
+        DemoKpiSeed(id: 106, late: 3, lateMinutes: 41, missing: 0, productivity: 79, uniform: 90, extra: 0,
+                    aTiempo: 5, tarde: 2, sinEntregar: 0, aLaPrimera: 5, devueltas: 2, fueraDeTiempo: 2),
+        DemoKpiSeed(id: 107, late: 0, lateMinutes: 0, missing: 0, productivity: 95, uniform: 100, extra: 0,
+                    aTiempo: 6, tarde: 0, sinEntregar: 1, aLaPrimera: 5, devueltas: 0, fueraDeTiempo: 1),
+        DemoKpiSeed(id: 108, late: 0, lateMinutes: 0, missing: 0, productivity: 76, uniform: 100, extra: 90,
+                    aTiempo: 14, tarde: 0, sinEntregar: 0, aLaPrimera: 13, devueltas: 0, fueraDeTiempo: 0),
         DemoKpiSeed(id: 109, late: 0, lateMinutes: 0, missing: 0, productivity: 90, uniform: 100, extra: 0),
     ]
 
-    func kpiTotals(_ seed: DemoKpiSeed, workdays: Int, personas: Int = 1) -> DemoJSON {
-        // La semilla es de una semana de 5 días: se escala a los días del rango y nunca hay
-        // más faltas ni retardos que días (con «Semana» un lunes solo hay uno; antes salían
-        // 3 retardos en 1 día). Jornada 10:00–18:30 con una hora de comida = 450 min.
+    /// «Cómo se calculan estos números», en las palabras del API (`supuestosKpi`).
+    static let kpiSupuestos: [String] = [
+        "Cumplimiento (en tiempo y forma): promedio ponderado de sus partes; cada parte dice cuánto pesa. "
+            + "Lo que no tiene dato no pesa; sin ninguna entrega en las fechas no se califica.",
+        "Entrega a tiempo: la persona la entregó antes de su límite. Se mide con la hora en que ENTREGÓ, "
+            + "no con la hora en que el jefe la aprobó.",
+        "Sin entregar: su límite cayó en estas fechas, ya pasó y no la ha entregado.",
+        "Aprobada a la primera: la primera revisión de su evidencia fue «aprobada»; si se la devolvieron, "
+            + "no cuenta aunque luego se aprobara.",
+        "Asistencia puntual: días laborables en que entró a tiempo, de los que debía checar.",
+        "Tiempo en actividades (antes «productividad»): tiempo con el reloj de una actividad corriendo, "
+            + "dentro de las horas laboradas. Informa cuánto se usó el reloj; no califica.",
+        "Retardo: entrada después de su hora (10:00; la salida normal es a las 18:00) más los minutos de "
+            + "gracia, de lunes a viernes.",
+        "Semáforo: el peor de entregas a tiempo, aprobadas a la primera, retardos, uniforme y días sin checada.",
+    ]
+
+    /// Pesos de las partes del cumplimiento en el demo. El API manda los suyos con cada
+    /// parte; la app no los conoce de antemano (pinta la lista que llegue).
+    static let kpiPesos: [String: Int] = [
+        "entregas": 20, "forma": 10, "tiempo": 15, "ritmo": 20,
+        "carga": 10, "ocupacion": 10, "asistencia": 10, "uniforme": 5,
+    ]
+
+    /// La semilla es de una semana de 5 días: se escala a los días del rango y nunca hay
+    /// más faltas, retardos ni devoluciones que días o entregas (con «Semana» un lunes solo
+    /// hay uno). Jornada 10:00–18:00 y una hora de comida; con lo que cada quien se queda
+    /// de más, ~450 min netos al día.
+    func kpiCuenta(_ seed: DemoKpiSeed, workdays: Int) -> DemoKpiCuenta {
         let dias = max(1, workdays)
-        let personaDias = dias * max(1, personas)
         func escala(_ valor: Int) -> Int { Int((Double(valor) * Double(dias) / 5).rounded()) }
-        let missing = min(escala(seed.missing), personaDias)
-        let withWork = max(0, personaDias - missing)
-        let late = min(escala(seed.late), withWork)
-        let lateMinutes = seed.late > 0 ? seed.lateMinutes * late / seed.late : 0
-        let extra = escala(seed.extra)
-        let worked = withWork * 450
-        let productive = Int(Double(worked) * seed.productivity / 100)
-        let reviewed = withWork
-        let okCount = Int(Double(reviewed) * seed.uniform / 100)
+        var c = DemoKpiCuenta()
+        c.dias = dias
+        c.missing = min(escala(seed.missing), dias)
+        c.withWork = max(0, dias - c.missing)
+        c.late = min(escala(seed.late), c.withWork)
+        c.lateMinutes = seed.late > 0 ? seed.lateMinutes * c.late / seed.late : 0
+        c.extra = escala(seed.extra)
+        c.worked = c.withWork * 450
+        c.productive = Int(Double(c.worked) * seed.productivity / 100)
+        c.reviewed = c.withWork
+        c.okCount = min(c.reviewed, Int((Double(c.reviewed) * seed.uniform / 100).rounded()))
+        c.aTiempo = escala(seed.aTiempo)
+        c.tarde = escala(seed.tarde)
+        c.sinEntregar = escala(seed.sinEntregar)
+        c.devueltas = min(escala(seed.devueltas), c.entregadas)
+        c.aLaPrimera = min(escala(seed.aLaPrimera), c.entregadas - c.devueltas)
+        c.enTiempoAdecuado = max(0, c.entregadas - min(escala(seed.fueraDeTiempo), c.entregadas))
+        return c
+    }
+
+    /// `num ÷ den` en % redondeado; nil sin denominador.
+    private func kpiPct(_ num: Int, _ den: Int) -> Int? {
+        den > 0 ? Int((Double(num) * 100 / Double(den)).rounded()) : nil
+    }
+
+    private func kpiNulo(_ valor: Int?) -> Any {
+        if let valor { return valor }
+        return NSNull()
+    }
+
+    /// «29 h 10 min» · «45 min».
+    private func kpiHoras(_ minutos: Int) -> String {
+        let h = minutos / 60
+        let m = minutos % 60
+        if h == 0 { return "\(m) min" }
+        return m == 0 ? "\(h) h" : "\(h) h \(m) min"
+    }
+
+    /// Ritmo de referencia del equipo, como el API: las entregas por día de quien va en el
+    /// percentil 75 (entre quienes trabajaron y entregaron algo).
+    func kpiReferenciaRitmo(_ cuentas: [DemoKpiCuenta]) -> Double? {
+        let ritmos = cuentas
+            .filter { $0.withWork > 0 && $0.entregadas > 0 }
+            .map { Double($0.entregadas) / Double($0.withWork) }
+            .sorted()
+        guard !ritmos.isEmpty else { return nil }
+        let i = min(ritmos.count - 1, Int((Double(ritmos.count - 1) * 0.75).rounded()))
+        return (ritmos[i] * 10).rounded() / 10
+    }
+
+    /// Las partes del cumplimiento y su promedio ponderado, como el API: lo que no tiene
+    /// dato no pesa y sin ninguna entrega que medir no hay cumplimiento (nulo).
+    func kpiCumplimiento(_ c: DemoKpiCuenta, referenciaRitmo: Double?) -> (pct: Int?, partes: [DemoJSON]) {
+        var partes: [(clave: String, etiqueta: String, razon: Double, detalle: String)] = []
+        func agrega(_ clave: String, _ etiqueta: String, _ razon: Double, _ detalle: String) {
+            partes.append((clave, etiqueta, min(1, max(0, razon)), detalle))
+        }
+        func parte(_ clave: String, _ etiqueta: String, _ num: Int, _ den: Int, _ detalle: String) {
+            if den > 0 { agrega(clave, etiqueta, Double(num) / Double(den), detalle) }
+        }
+        parte("entregas", "Entregas a tiempo", c.aTiempo, c.medidas, "\(c.aTiempo) de \(c.medidas)")
+        parte("forma", "Aprobadas a la primera", c.aLaPrimera, c.revisadas, "\(c.aLaPrimera) de \(c.revisadas)")
+        parte("tiempo", "Tiempo adecuado", c.enTiempoAdecuado, c.entregadas,
+              "\(c.enTiempoAdecuado) de \(c.entregadas) sin pasar su tiempo máximo")
+        if let ref = referenciaRitmo, ref > 0, c.withWork > 0 {
+            let porDia = Double(c.entregadas) / Double(c.withWork)
+            agrega("ritmo", "Ritmo de entregas", porDia / ref,
+                   "\(String(format: "%.1f", porDia)) por día · el equipo va a \(String(format: "%.1f", ref))")
+        }
+        if c.worked > 0 {
+            let carga = Int(Double(c.productive) * 0.92)
+            let pctCarga = kpiPct(carga, c.worked) ?? 0
+            agrega("carga", "Carga de trabajo", Double(carga) / Double(c.worked) / 0.70,
+                   "\(kpiHoras(carga)) de trabajo entregado en \(kpiHoras(c.worked)) (\(pctCarga) %; meta 70 %)")
+            let ocupado = min(c.worked, Int(Double(c.productive) * 1.08))
+            let pctOcupado = kpiPct(ocupado, c.worked) ?? 0
+            agrega("ocupacion", "Siempre con algo", Double(ocupado) / Double(c.worked) / 0.85,
+                   "\(kpiHoras(ocupado)) con una actividad de \(kpiHoras(c.worked)) (\(pctOcupado) %; meta 85 %)")
+        }
+        parte("asistencia", "Asistencia puntual", c.puntuales, c.dias,
+              "\(c.puntuales) de \(c.dias) \(c.dias == 1 ? "día" : "días")")
+        parte("uniforme", "Uniforme", c.okCount, c.reviewed, "\(c.okCount) de \(c.reviewed)")
+
+        let pesoDe = { (clave: String) -> Int in DemoStore.kpiPesos[clave] ?? 0 }
+        let pesoTotal = partes.reduce(0) { $0 + pesoDe($1.clave) }
+        var pct: Int?
+        if c.medidas > 0 && pesoTotal > 0 {
+            let suma = partes.reduce(0.0) { $0 + $1.razon * Double(pesoDe($1.clave)) }
+            pct = Int((suma / Double(pesoTotal) * 100).rounded())
+        }
+        let json = partes.map { p in
+            dj([
+                "clave": p.clave,
+                "etiqueta": p.etiqueta,
+                "pct": Int((p.razon * 100).rounded()),
+                "peso": pesoDe(p.clave),
+                "detalle": p.detalle,
+            ])
+        }
+        return (pct, json)
+    }
+
+    /// Semáforo del API: el peor de entregas a tiempo, aprobadas a la primera, retardos,
+    /// uniforme y días sin checar (el tiempo en actividades ya no lo pinta).
+    func kpiSemaforo(_ c: DemoKpiCuenta) -> (semaforo: String, motivos: [String]) {
+        let peso = ["sin_datos": 0, "verde": 1, "amarillo": 2, "rojo": 3]
+        var peor = "sin_datos"
+        var motivos: [(nivel: String, texto: String)] = []
+        func marca(_ nivel: String, _ texto: String) {
+            if (peso[nivel] ?? 0) > (peso[peor] ?? 0) { peor = nivel }
+            if nivel != "verde" { motivos.append((nivel, texto)) }
+        }
+        func corte(_ pct: Int, verde: Int, amarillo: Int) -> String {
+            pct >= verde ? "verde" : (pct >= amarillo ? "amarillo" : "rojo")
+        }
+        if let p = kpiPct(c.aTiempo, c.medidas) {
+            let fuera = [c.tarde > 0 ? "\(c.tarde) tarde" : "", c.sinEntregar > 0 ? "\(c.sinEntregar) sin entregar" : ""]
+                .filter { !$0.isEmpty }
+                .joined(separator: ", ")
+            marca(corte(p, verde: 90, amarillo: 75),
+                  "\(c.aTiempo) de \(c.medidas) entregas a tiempo\(fuera.isEmpty ? "" : " (\(fuera))")")
+        }
+        if let p = kpiPct(c.aLaPrimera, c.revisadas) {
+            marca(corte(p, verde: 90, amarillo: 75),
+                  "\(c.devueltas) \(c.devueltas == 1 ? "entrega devuelta" : "entregas devueltas") de \(c.revisadas) revisadas")
+        }
+        if c.withWork > 0 {
+            let r = c.late
+            marca(r >= 3 ? "rojo" : (r >= 1 ? "amarillo" : "verde"),
+                  "\(r) retardo\(r == 1 ? "" : "s") (\(c.lateMinutes) min tarde)")
+        }
+        if let p = kpiPct(c.okCount, c.reviewed) {
+            marca(corte(p, verde: 95, amarillo: 80), "Uniforme \(p) %")
+        }
+        if c.missing > 0 {
+            let f = c.missing
+            marca(f >= 2 ? "rojo" : "amarillo", "\(f) día\(f == 1 ? "" : "s") sin checada")
+        }
+        let ordenados = motivos.sorted { (peso[$0.nivel] ?? 0) > (peso[$1.nivel] ?? 0) }.map { $0.texto }
+        return (peor, ordenados)
+    }
+
+    func kpiTotalesJSON(_ c: DemoKpiCuenta, referenciaRitmo: Double?) -> DemoJSON {
+        let cumplimiento = kpiCumplimiento(c, referenciaRitmo: referenciaRitmo)
         return dj([
-            "diasConJornada": withWork,
-            "diasSinChecada": missing,
+            "diasConJornada": c.withWork,
+            "diasSinChecada": c.missing,
             "faltasJustificadas": 0,
-            "retardos": late,
-            "minutosTarde": lateMinutes,
+            "retardos": c.late,
+            "minutosTarde": c.lateMinutes,
             "uniforme": dj([
-                "revisadas": reviewed,
-                "ok": okCount,
-                "noOk": reviewed - okCount,
+                "revisadas": c.reviewed,
+                "ok": c.okCount,
+                "noOk": c.reviewed - c.okCount,
                 "sinRevisar": 0,
-                "pct": seed.uniform,
+                "pct": kpiNulo(kpiPct(c.okCount, c.reviewed)),
             ]),
-            "minutosLaborados": worked,
-            "minutosProductivos": productive,
-            "minutosInactivos": worked - productive,
-            "productividadPct": seed.productivity,
-            "minutosExtra": extra,
-            "minutosExtraAprobados": extra / 2,
-            "minutosExtraPendientes": extra - extra / 2,
-            "diasExtraPendientes": extra > 0 ? 1 : 0,
+            "minutosLaborados": c.worked,
+            "minutosProductivos": c.productive,
+            "minutosInactivos": c.worked - c.productive,
+            "productividadPct": kpiNulo(kpiPct(c.productive, c.worked)),
+            "minutosExtra": c.extra,
+            "minutosExtraAprobados": c.extra / 2,
+            "minutosExtraPendientes": c.extra - c.extra / 2,
+            "diasExtraPendientes": c.extra > 0 ? 1 : 0,
             "jornadasAbiertas": 0,
             "jornadasSinSalida": 0,
             "cierresAutomaticos": 0,
+            // 07-10: el «en tiempo y forma».
+            "entregas": dj([
+                "medidas": c.medidas,
+                "aTiempo": c.aTiempo,
+                "tarde": c.tarde,
+                "sinEntregar": c.sinEntregar,
+                "revisadas": c.revisadas,
+                "aprobadasALaPrimera": c.aLaPrimera,
+                "devueltas": c.devueltas,
+                "pctATiempo": kpiNulo(kpiPct(c.aTiempo, c.medidas)),
+                "pctALaPrimera": kpiNulo(kpiPct(c.aLaPrimera, c.revisadas)),
+            ]),
+            "asistenciaPuntual": dj([
+                "esperados": c.dias,
+                "puntuales": c.puntuales,
+                "pct": kpiNulo(kpiPct(c.puntuales, c.dias)),
+            ]),
+            "cumplimientoPct": kpiNulo(cumplimiento.pct),
+            "cumplimientoPartes": cumplimiento.partes,
         ])
     }
 
     func fxKpis(desde: String, hasta: String) -> DemoJSON {
         let days = DemoClock.daysBetween(desde, hasta)
         let workdays = max(1, days * 5 / 7)
+        // Primero las cuentas de todos: el ritmo de cada quien se mide contra el del equipo.
+        let cuentas = DemoStore.kpiSeeds.map { (seed: $0, cuenta: kpiCuenta($0, workdays: workdays)) }
+        let referencia = kpiReferenciaRitmo(cuentas.map { $0.cuenta })
+        var equipo = DemoKpiCuenta()
         var people: [DemoJSON] = []
-        var semaforos: [String] = []
-        for seed in DemoStore.kpiSeeds {
-            let p = DemoData.person(seed.id)
-            var semaforo = "verde"
-            var motivos: [String] = []
-            if seed.productivity < 70 {
-                semaforo = "rojo"
-                motivos.append("Productividad por debajo del 70 %")
-            }
-            if seed.late >= 3 {
-                if semaforo == "verde" { semaforo = "amarillo" }
-                motivos.append("\(seed.late) retardos en la semana")
-            }
-            semaforos.append(semaforo)
+        for item in cuentas {
+            let p = DemoData.person(item.seed.id)
+            equipo.suma(item.cuenta)
+            let semaforo = kpiSemaforo(item.cuenta)
             people.append(dj([
                 "persona": dj(["id": p.id, "nombre": p.nombre, "email": p.email, "puesto": p.puesto]),
                 "horario": dj(["etiqueta": "Lun–Vie · 10:00 a 18:00", "entrada": "10:00", "salida": "18:00"]),
-                "totales": kpiTotals(seed, workdays: workdays),
-                "semaforo": semaforo,
-                "motivos": motivos,
+                "totales": kpiTotalesJSON(item.cuenta, referenciaRitmo: referencia),
+                "semaforo": semaforo.semaforo,
+                "motivos": semaforo.motivos,
             ]))
         }
-        let totalSeed = DemoKpiSeed(
-            id: 0,
-            late: DemoStore.kpiSeeds.map { $0.late }.reduce(0, +),
-            lateMinutes: DemoStore.kpiSeeds.map { $0.lateMinutes }.reduce(0, +),
-            missing: DemoStore.kpiSeeds.map { $0.missing }.reduce(0, +),
-            productivity: 86,
-            uniform: 96,
-            extra: DemoStore.kpiSeeds.map { $0.extra }.reduce(0, +)
-        )
-        let teamTotals = kpiTotals(totalSeed, workdays: workdays, personas: DemoStore.kpiSeeds.count)
-        let teamSemaforo = semaforos.contains("rojo") ? "amarillo" : "verde"
+        let semaforoEquipo = kpiSemaforo(equipo)
         return dj([
             "scope": "company",
             "desde": desde,
             "hasta": hasta,
-            "supuestos": [
-                "Horario de oficina de lunes a viernes, de 10:00 a 18:00.",
-                "La productividad se calcula con el tiempo en actividades contra la jornada.",
-            ],
+            "supuestos": DemoStore.kpiSupuestos,
             "equipo": dj([
-                "totales": teamTotals,
-                "semaforo": teamSemaforo,
-                "motivos": ["Un compañero con productividad baja"],
+                "totales": kpiTotalesJSON(equipo, referenciaRitmo: referencia),
+                "semaforo": semaforoEquipo.semaforo,
+                "motivos": semaforoEquipo.motivos,
             ]),
             "personas": people,
         ])

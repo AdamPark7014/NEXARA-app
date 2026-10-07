@@ -99,6 +99,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxEstadoPantalla
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import java.io.IOException
+import java.time.Instant
 
 private const val ACTIVIDADES_PREFS = "nexara_actividades"
 private const val VISTA_KEY = "vista"
@@ -316,6 +317,10 @@ private fun TeamBoardContent(
     val visibles = EquipoEstado.filtrar(users, filtro)
     val metricas = EquipoEstado.metricas(users)
     val estado = nxEstadoPantalla(cargando = loading, error = error, hayDatos = users.isNotEmpty())
+    // Los «hace X min» se cuentan contra el último refresco de la pizarra (cada 30 s), como en la web.
+    val ahora = remember(users) { Instant.now() }
+    // «Desde hace cuánto» es de hoy: con Semana o Mes la sección no aplica.
+    val paraAtender = if (rango == BoardRange.HOY) EquipoEstado.gruposAtencion(users, ahora) else emptyList()
 
     Column(Modifier.fillMaxSize()) {
         // Regla 8: el rango y el estado viven en la MISMA fila; ni cajas ni dos renglones.
@@ -376,6 +381,12 @@ private fun TeamBoardContent(
                                 },
                             )
                         }
+                        // A quién hay que ir a ver hoy y por qué; sin nadie, no ocupa lugar.
+                        if (paraAtender.isNotEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                ParaAtenderHoy(grupos = paraAtender, onOpenPerson = onOpenPerson)
+                            }
+                        }
                         if (visibles.isEmpty()) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 NxEmptyState(
@@ -387,7 +398,7 @@ private fun TeamBoardContent(
                             }
                         }
                         gridItems(visibles, key = { it.id }) { u ->
-                            PersonBoardCard(user = u, meId = meId, onClick = { onOpenPerson(u.id) })
+                            PersonBoardCard(user = u, meId = meId, ahora = ahora, onClick = { onOpenPerson(u.id) })
                         }
                     }
                 }
@@ -417,6 +428,129 @@ private fun TeamBoardContent(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * «Para atender hoy» — `AtencionEquipo.tsx` de la web: atrasados, sin nada
+ * asignado y sin entrada hoy. En el teléfono los grupos se apilan, cada uno en
+ * la misma superficie con filas que «Asignadas por mí», y enseñan cinco
+ * renglones antes de «Ver N más». Tocar un renglón abre a la persona.
+ */
+@Composable
+private fun ParaAtenderHoy(grupos: List<EquipoEstado.GrupoAtencion>, onOpenPerson: (Long) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        NxDenseSectionHeader(title = "Para atender hoy")
+        grupos.forEach { grupo ->
+            GrupoParaAtender(grupo = grupo, onOpenPerson = onOpenPerson)
+        }
+    }
+}
+
+@Composable
+private fun GrupoParaAtender(grupo: EquipoEstado.GrupoAtencion, onOpenPerson: (Long) -> Unit) {
+    var todos by rememberSaveable(grupo.clave) { mutableStateOf(false) }
+    val visibles = if (todos) grupo.renglones else grupo.renglones.take(EquipoEstado.VISIBLES_POR_GRUPO)
+    val resto = grupo.renglones.size - EquipoEstado.VISIBLES_POR_GRUPO
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(NxUi.RadiusLg))
+            .background(NxColors.Card)
+            .border(1.dp, NxUi.Border, RoundedCornerShape(NxUi.RadiusLg)),
+    ) {
+        // Título del grupo: punto y palabra, con cuántos son.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            NxStatusDot(
+                grupo.titulo,
+                color = grupo.color,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                grupo.renglones.size.toString(),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = NxColors.Muted,
+            )
+        }
+        visibles.forEach { r ->
+            HorizontalDivider(color = NxUi.BorderSubtle)
+            RenglonParaAtender(r, onClick = { onOpenPerson(r.persona.id) })
+        }
+        if (resto > 0) {
+            HorizontalDivider(color = NxUi.BorderSubtle)
+            TextButton(
+                onClick = { todos = !todos },
+                modifier = Modifier.fillMaxWidth().heightIn(min = NxUi.TouchH),
+            ) {
+                Text(
+                    if (todos) "Ver menos" else "Ver $resto más",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = NxColors.Brand,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenglonParaAtender(r: EquipoEstado.RenglonAtencion, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        PersonAvatar(r.persona.nombre, r.persona.avatarUrl, 32.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    r.persona.nombre ?: "—",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NxColors.Slate,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                r.meta?.let {
+                    Text(it, fontSize = 12.sp, color = NxColors.Muted, maxLines = 1)
+                }
+            }
+            Text(
+                r.principal,
+                fontSize = 12.5.sp,
+                fontWeight = if (r.colorPrincipal != null) FontWeight.SemiBold else FontWeight.Normal,
+                color = r.colorPrincipal?.let { Color(it) } ?: NxColors.Slate,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            r.secundaria?.let {
+                Text(
+                    it,
+                    fontSize = 12.sp,
+                    fontWeight = if (r.colorSecundaria != null) FontWeight.SemiBold else FontWeight.Normal,
+                    color = r.colorSecundaria?.let { c -> Color(c) } ?: NxColors.Muted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -493,7 +627,12 @@ private fun AsignadaPorMiRow(a: BoardAsignadaPorMiDto, onClick: () -> Unit) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PersonBoardCard(user: TeamBoardUserDto, meId: Long?, onClick: () -> Unit) {
+private fun PersonBoardCard(
+    user: TeamBoardUserDto,
+    meId: Long?,
+    ahora: Instant = Instant.now(),
+    onClick: () -> Unit,
+) {
     val aro = EquipoEstado.aro(user.status)
     val aroColor = Color(aro.color)
     val esYo = meId != null && user.id == meId
@@ -548,13 +687,24 @@ private fun PersonBoardCard(user: TeamBoardUserDto, meId: Long?, onClick: () -> 
             textAlign = TextAlign.Center,
         )
         Text(
-            EquipoEstado.contexto(user),
+            EquipoEstado.contexto(user, ahora),
             fontSize = 11.sp,
             color = if (aro == EquipoAro.RETRASO) aroColor else NxColors.Muted,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
+        // Sin nada abierto: el folio y cuándo terminó lo último («Última: AN-0091 · ayer 18:11»).
+        EquipoEstado.ultimaDeTarjeta(user, ahora)?.let { ultima ->
+            Text(
+                ultima,
+                fontSize = 11.sp,
+                color = NxColors.Muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
         // El avance de lo que trae entre manos: es dato, no adorno.
         abierta?.progressPct?.let { pct ->
             val v = pct.coerceIn(0.0, 100.0)

@@ -217,6 +217,10 @@ data class TeamBoardOpenActivityDto(
     val minutosPlan: Double? = null,
     val minutosReales: Double? = null,
     val excedida: Boolean? = null,
+    /** Pasó la hora de inicio sin arrancar, o el tope sin terminarse. */
+    val atrasada: Boolean? = null,
+    /** Minutos de ese atraso, para «Atrasada · 2 h 15 min». */
+    val minutosAtraso: Double? = null,
     /** Emails del equipo activo: dice si un despacho ya se repartió. */
     val teamEmails: List<String>? = null,
     /** En despacho esta persona (LEAD) solo reparte. */
@@ -235,13 +239,16 @@ data class TeamBoardOpenActivityDto(
     val sesionAbiertaDesde: String? = null,
 )
 
-/** Última actividad que la persona terminó hoy (estado `libre`). */
+/**
+ * Última actividad que la persona terminó: en «libre», la de hoy; en
+ * «sin_actividad», la última de cualquier día (desde el 07-10; antes solo venía en «libre»).
+ */
 data class TeamBoardLastFinishedDto(
     val id: Long? = null,
     val anNumber: String? = null,
     val titulo: String? = null,
     val finishedAt: String? = null,
-    /** Minutos contra la fecha máxima; null = no tenía fecha máxima. */
+    /** Minutos de atraso con que la entregó (0 = a tiempo); null = no tenía límite. */
     val lateMinutes: Double? = null,
 )
 
@@ -261,7 +268,13 @@ data class TeamBoardUserDto(
     val activityElapsedMinutes: Double? = null,
     /** Atrasado: minutos pasados de la fecha máxima de lo que está haciendo. */
     val currentLateMinutes: Double? = null,
-    /** Libre: desde cuándo no tiene nada abierto. */
+    /** Atrasado: por qué. `inicio` (no la ha iniciado) · `tope` (pasó su límite) · `plan` (pasó su tiempo planeado). */
+    val currentLateReason: String? = null,
+    /**
+     * Desde cuándo HOY no tiene nada abierto. En «libre», desde que terminó lo
+     * último; en «sin_actividad» (desde el 07-10), lo más tarde entre su entrada
+     * de hoy y lo último que terminó hoy. `null` si no checó hoy o ya salió.
+     */
     val idleSinceAt: String? = null,
     val lastFinished: TeamBoardLastFinishedDto? = null,
     /** Actividades suyas entregadas que nadie ha aprobado. */
@@ -272,7 +285,33 @@ data class TeamBoardUserDto(
     val kpis: TeamBoardKpisDto? = null,
     /** Solo en `me/board/:userId`: quien mira es su jefe (o el CEO) y puede pausarle una actividad. */
     val puedePausar: Boolean? = null,
-)
+    /**
+     * `entradaHoyAt` tal como vino: primera entrada de HOY (hora de México), sin
+     * importar el rango. Se lee con [entradaHoyAt] y [jornadaHoyConocida].
+     *
+     * La API nueva lo manda siempre (`null` = no checó hoy); la vieja no lo
+     * manda. Moshi no distingue un campo ausente de un `null`, salvo por el valor
+     * por omisión: si el campo no vino, aquí queda [NO_VINO]. Sin esa diferencia,
+     * a las 8 de la mañana —nadie ha checado— la API nueva se leería como la vieja.
+     */
+    @Json(name = "entradaHoyAt") val entradaHoyAtJson: String? = NO_VINO,
+    /** Última salida de hoy; `null` = sigue en jornada (o no checó). */
+    val salidaHoyAt: String? = null,
+) {
+    /** Primera entrada de hoy; `null` si no checó o si la API es vieja (ver [jornadaHoyConocida]). */
+    val entradaHoyAt: String? get() = entradaHoyAtJson.takeUnless { it == NO_VINO }
+
+    /**
+     * `false` con la API vieja: no hay cómo separar «sin entrada» ni «ya salió»
+     * de «sin nada asignado», y la pantalla se queda como antes.
+     */
+    val jornadaHoyConocida: Boolean get() = entradaHoyAtJson != NO_VINO
+
+    companion object {
+        /** Marca de «el campo no vino»: nunca es una fecha que mande el API. */
+        const val NO_VINO = "\u0000sin-campo"
+    }
+}
 
 /**
  * KPI de una persona en el rango (`me/board?desde&hasta`).

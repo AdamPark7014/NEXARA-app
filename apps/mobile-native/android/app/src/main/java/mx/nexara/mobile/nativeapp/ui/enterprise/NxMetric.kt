@@ -21,4 +21,9 @@ data class NxMetric(
     val pista: String? = null,
     /** ARGB. `null` = tinta normal, que es lo que debe pasar cuando todo va bien. */
     val color: Long? = null,
+    /**
+     * Renglones que puede ocupar la pista. Casi siempre uno; un desglose que no se
+     * puede cortar sin perder qué dice («2 atrasados · 4 sin entrada») pide más.
+     */
+    val pistaLineas: Int = 1,
 )

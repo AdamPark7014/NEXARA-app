@@ -37,6 +37,86 @@ struct KpiUniforme: Decodable, Hashable {
     }
 }
 
+/// Entregas de actividades del rango: el «en tiempo y forma» (07-10). Llega en los
+/// totales de cada persona y del equipo; con la API vieja no viene.
+struct KpiEntregas: Decodable, Hashable {
+    /// Entregadas en el rango + las que vencieron en el rango sin entregarse.
+    var medidas: Int = 0
+    /// Entregadas antes de su límite (sin límite cuentan a tiempo).
+    var aTiempo: Int = 0
+    var tarde: Int = 0
+    /// Su límite ya pasó y no la ha entregado.
+    var sinEntregar: Int = 0
+    /// Con al menos una revisión del jefe.
+    var revisadas: Int = 0
+    var aprobadasALaPrimera: Int = 0
+    var devueltas: Int = 0
+    /// aTiempo ÷ medidas; `nil` sin medidas.
+    var pctATiempo: Double?
+    /// aprobadasALaPrimera ÷ revisadas; `nil` sin revisadas.
+    var pctALaPrimera: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case medidas, aTiempo, tarde, sinEntregar, revisadas, aprobadasALaPrimera, devueltas
+        case pctATiempo, pctALaPrimera
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func entero(_ key: CodingKeys) -> Int { (try? c.decode(Int.self, forKey: key)) ?? 0 }
+        medidas = entero(.medidas)
+        aTiempo = entero(.aTiempo)
+        tarde = entero(.tarde)
+        sinEntregar = entero(.sinEntregar)
+        revisadas = entero(.revisadas)
+        aprobadasALaPrimera = entero(.aprobadasALaPrimera)
+        devueltas = entero(.devueltas)
+        pctATiempo = try? c.decode(Double.self, forKey: .pctATiempo)
+        pctALaPrimera = try? c.decode(Double.self, forKey: .pctALaPrimera)
+    }
+}
+
+/// Días laborables en que checó a tiempo de los que debía checar.
+struct KpiAsistenciaPuntual: Decodable, Hashable {
+    var esperados: Int = 0
+    var puntuales: Int = 0
+    var pct: Double?
+
+    private enum CodingKeys: String, CodingKey { case esperados, puntuales, pct }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        esperados = (try? c.decode(Int.self, forKey: .esperados)) ?? 0
+        puntuales = (try? c.decode(Int.self, forKey: .puntuales)) ?? 0
+        pct = try? c.decode(Double.self, forKey: .pct)
+    }
+}
+
+/// Una parte del cumplimiento («Entregas a tiempo», «Asistencia puntual»…). El API
+/// puede sumar partes nuevas con otras claves y otros pesos: aquí no se fija
+/// ninguna; se pinta lo que llegue, en el orden en que llega.
+struct KpiParteCumplimiento: Decodable, Hashable {
+    var clave: String = ""
+    var etiqueta: String = ""
+    /// 0–100.
+    var pct: Double?
+    /// Lo que pesa en el promedio (el API manda el número tal cual: 40 = «pesa 40 %»).
+    var peso: Double?
+    /// «17 de 18», «7 de 8 días».
+    var detalle: String = ""
+
+    private enum CodingKeys: String, CodingKey { case clave, etiqueta, pct, peso, detalle }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        clave = (try? c.decode(String.self, forKey: .clave)) ?? ""
+        etiqueta = (try? c.decode(String.self, forKey: .etiqueta)) ?? ""
+        pct = try? c.decode(Double.self, forKey: .pct)
+        peso = try? c.decode(Double.self, forKey: .peso)
+        detalle = (try? c.decode(String.self, forKey: .detalle)) ?? ""
+    }
+}
+
 struct KpiTotales: Decodable, Hashable {
     var diasConJornada: Int = 0
     var diasSinChecada: Int = 0
@@ -56,12 +136,23 @@ struct KpiTotales: Decodable, Hashable {
     var jornadasAbiertas: Int = 0
     var jornadasSinSalida: Int = 0
     var cierresAutomaticos: Int = 0
+    /// Entregas del rango (07-10); `nil` con la API vieja.
+    var entregas: KpiEntregas?
+    var asistenciaPuntual: KpiAsistenciaPuntual?
+    /// Cumplimiento en tiempo y forma, 0–100. `nil` sin entregas que medir (no es un cero).
+    var cumplimientoPct: Double?
+    var cumplimientoPartes: [KpiParteCumplimiento] = []
+    /// El API ya manda el cumplimiento: viene `cumplimientoPct` (aunque sea nulo, que es
+    /// «sin entregas que medir»), `entregas` o las partes. Con la API vieja no viene nada
+    /// de eso y la pantalla se queda como antes: por productividad y semáforo.
+    var traeCumplimiento = false
 
     private enum CodingKeys: String, CodingKey {
         case diasConJornada, diasSinChecada, faltasJustificadas, retardos, minutosTarde
         case uniforme, minutosLaborados, minutosProductivos, minutosInactivos, productividadPct
         case minutosExtra, minutosExtraAprobados, minutosExtraPendientes, diasExtraPendientes
         case jornadasAbiertas, jornadasSinSalida, cierresAutomaticos
+        case entregas, asistenciaPuntual, cumplimientoPct, cumplimientoPartes
     }
 
     init(from decoder: Decoder) throws {
@@ -84,6 +175,11 @@ struct KpiTotales: Decodable, Hashable {
         jornadasAbiertas = entero(.jornadasAbiertas)
         jornadasSinSalida = entero(.jornadasSinSalida)
         cierresAutomaticos = entero(.cierresAutomaticos)
+        entregas = try? c.decode(KpiEntregas.self, forKey: .entregas)
+        asistenciaPuntual = try? c.decode(KpiAsistenciaPuntual.self, forKey: .asistenciaPuntual)
+        cumplimientoPct = try? c.decode(Double.self, forKey: .cumplimientoPct)
+        cumplimientoPartes = (try? c.decode([KpiParteCumplimiento].self, forKey: .cumplimientoPartes)) ?? []
+        traeCumplimiento = c.contains(.cumplimientoPct) || c.contains(.entregas) || c.contains(.cumplimientoPartes)
     }
 }
 

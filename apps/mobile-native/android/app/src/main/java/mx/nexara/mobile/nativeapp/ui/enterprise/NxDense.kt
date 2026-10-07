@@ -164,7 +164,7 @@ private fun NxMetricCell(
                 it,
                 fontSize = 11.sp,
                 color = NxColors.Muted,
-                maxLines = 1,
+                maxLines = metric.pistaLineas.coerceAtLeast(1),
                 overflow = TextOverflow.Ellipsis,
             )
         }
