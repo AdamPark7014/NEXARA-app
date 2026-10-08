@@ -16,8 +16,9 @@
     Caja/Paquete o presentación en metros, «1 bote = 100 pz»; tras alta abre la Entrada); existencias en empaques
     («3 botes + 40 pz»). `useEmpaquesDeArticulos` solo pide los que `stock/levels` no traiga.
   - Pendiente: alta por código del Escáner (`stock/products/por-codigo`) aún sin tipo; apps sin tipo ni búsqueda rápida.
-  - Desplegado 08-10 ~09:40 con `--with-migrate` (migración aplicada). En producción hay 1 herramienta (Martillo) y 0
-    artículos de almacén: la búsqueda funciona, pero Iván tiene que dar de alta el inventario.
+  - Desplegado 08-10 ~09:40 con `--with-migrate` (migración aplicada). La búsqueda funciona. 08-10 ~10:05 Adam pidió «elimina el
+    martillo, empezamos de cero»: borrada la herramienta 1 (empresa 1, sin préstamos ni kits; respaldo en el servidor
+    `/root/respaldos/martillo-tool_inventory_items-1-2026-10-08.json`). Empresa 1 queda con 0 herramientas y 0 artículos.
 
 - **08-10 ~09:30 (claude-code) — iOS: menú vivo + un solo escáner (paridad con Android).**
   - `AuthRepository.refreshNavigation(forzar:)` (máx. cada 5 min, una sola petición en curso, conserva el menú si
