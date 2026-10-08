@@ -67,7 +67,38 @@ export type KpiPersonaFila = {
   motivos: string[];
   /** Solo si se pidieron (`conDias`): el día por día, sin los tramos de la línea de tiempo. */
   dias?: DiaKpi[];
+  /** Los días laborables (y los que trabajó aunque no lo fueran), compactos, para la tabla de actividad por día. */
+  actividadPorDia?: ActividadDelDiaFila[];
 };
+
+/** Un día de una persona en la tabla «Actividad por día». */
+export type ActividadDelDiaFila = {
+  fecha: string;
+  /** trabajado · sin_trabajo (checó y no hizo nada) · sin_checar · justificado · pendiente (hoy, aún no termina). */
+  estado: 'trabajado' | 'sin_trabajo' | 'sin_checar' | 'justificado' | 'pendiente';
+  actividades: number;
+  entregas: number;
+};
+
+/** Del día por día completo a la fila compacta de la tabla. */
+export function actividadPorDiaDe(dias: DiaKpi[]): ActividadDelDiaFila[] {
+  return dias
+    .filter((d) => d.laborable || (d.actividadesDelDia ?? 0) > 0)
+    .map((d) => ({
+      fecha: d.fecha,
+      estado: d.faltaJustificada
+        ? 'justificado'
+        : d.trabajado
+          ? 'trabajado'
+          : d.sinTrabajo
+            ? 'sin_trabajo'
+            : d.noTrabajado
+              ? 'sin_checar'
+              : 'pendiente',
+      actividades: d.actividadesDelDia ?? 0,
+      entregas: d.entregasDelDia ?? 0,
+    }));
+}
 
 export type KpisEquipoResponse = {
   scope: 'company' | 'subtree';
@@ -173,7 +204,8 @@ export class KpisEquipoService {
     const referencia = referenciaDeRitmo(calculadas.map((c) => c.totales));
     const personas = calculadas.map(({ u, d, dias, totales }): KpiPersonaFila => {
       const t = conReferencia(totales, referencia);
-      return opciones.conDias ? { ...fila(u, d.horario, t), dias } : fila(u, d.horario, t);
+      const base = { ...fila(u, d.horario, t), actividadPorDia: actividadPorDiaDe(dias) };
+      return opciones.conDias ? { ...base, dias } : base;
     });
 
     const totalesEquipo = conReferencia(sumaEquipo(personas.map((p) => p.totales)), referencia);

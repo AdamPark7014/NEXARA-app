@@ -798,6 +798,27 @@ describe('entregas: en tiempo y forma', () => {
     expect(calcula(dosDias).totales.cumplimientoPct).toBe(0);
   });
 
+  it('actividad por día: cuántas tocó cada día, y los días con ninguna o con solo una', () => {
+    const t = calcula({
+      desde: '2026-09-14',
+      hasta: '2026-09-16',
+      checadas: [
+        entrada('14', '10:00'), salida('14', '18:00'),
+        entrada('15', '10:00'), salida('15', '18:00'),
+      ],
+      actividades: [
+        actividad(1, M('14', '10:00'), M('14', '11:00')),
+        actividad(2, M('14', '12:00'), M('14', '13:00')),
+        actividad(3, M('15', '10:00'), M('15', '11:00')),
+      ],
+      entregas: [{ activityId: 2, limite: null, entregadaAt: M('14', '13:00') }],
+    });
+    const porDia = Object.fromEntries(t.dias.map((d) => [d.fecha, [d.actividadesDelDia, d.entregasDelDia]]));
+    expect(porDia).toEqual({ '2026-09-14': [2, 1], '2026-09-15': [1, 0], '2026-09-16': [0, 0] });
+    // El 16 no checó: cuenta como día sin actividad. El 15, solo una.
+    expect(t.totales.actividadDiaria).toEqual({ esperados: 3, sinActividad: 1, conUna: 1, promedio: 1 });
+  });
+
   it('checar y no hacer nada también es un día perdido', () => {
     const t = calcula({ desde: '2026-09-15', hasta: '2026-09-15', checadas: [entrada('15', '10:00'), salida('15', '18:00')] }).totales;
     expect(t.diasDeTrabajo).toMatchObject({ esperados: 1, trabajados: 0, sinChecar: 0, sinTrabajo: 1 });

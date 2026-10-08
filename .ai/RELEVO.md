@@ -1,5 +1,18 @@
 # RELEVO
 
+- **08-10 ~09:10 (claude-code) — KPIs: «Actividad por día» (quién no tocó nada o solo una).**
+  - Adam: «profundizar más en las actividades: ayer tal solo registró una actividad o ayer no registró ninguna; quiénes
+    casi no han sido productivos».
+  - API `me/kpis-equipo.ts`: `DiaKpi.actividadesDelDia` (actividades distintas con reloj corriendo ese día o entregadas
+    ese día) y `entregasDelDia`; `TotalesKpi.actividadDiaria` = { esperados, sinActividad, conUna, promedio } sobre los
+    días que debía trabajar (equipo: suma y promedio ponderado). Servicio: `KpiPersonaFila.actividadPorDia` (filas
+    compactas `ActividadDelDiaFila` con estado trabajado/sin_trabajo/sin_checar/justificado/pendiente) vía
+    `actividadPorDiaDe`. No cambia el cumplimiento (es lectura).
+  - Web: `components/kpis/ActividadPorDia.tsx` en Indicadores (entre las tarjetas y «Por persona», no en «solo yo»):
+    tabla persona × últimos 15 días (verde ≥2, ámbar 1, rojo 0/F, J justificado), columna «Sin · Una · Prom.», orden
+    por días sin nada y resumen del último día terminado con nombres. Pruebas: `ActividadPorDia.spec.tsx`.
+  - Apps: aún no lo muestran (los datos ya vienen en `GET me/kpis-equipo`).
+
 - **07-10 ~16:00 (claude-code) — IVA opcional en cotizaciones + almacén para Iván.**
   - **IVA:** `Cotizacion.conIva` (migración `20261007200000_cotizacion_con_iva`, ADD COLUMN default true). Sin factura:
     `calculateTotals/calculateLine(…, { conIva: false })` ponen IVA y retenciones en 0 (la partida conserva su tasa);

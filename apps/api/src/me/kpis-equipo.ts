@@ -701,6 +701,19 @@ export type DiasDeTrabajoKpi = {
   pct: number | null;
 };
 
+/**
+ * Actividad día por día: de los días laborables que debía trabajar, en cuántos no tocó ninguna
+ * actividad y en cuántos solo una (Adam, 08-10: «ayer tal solo registró una actividad o ayer no
+ * registró ninguna; quiénes casi no han sido productivos»).
+ */
+export type ActividadDiariaKpi = {
+  esperados: number;
+  sinActividad: number;
+  conUna: number;
+  /** Actividades distintas por día esperado, un decimal. */
+  promedio: number | null;
+};
+
 /** Entregas por día trabajado, contra el ritmo de referencia del equipo. */
 export type RitmoKpi = { entregadas: number; dias: number; porDia: number | null; referencia: number | null };
 /** Minutos sobre las horas trabajadas. */
@@ -933,6 +946,10 @@ export type DiaKpi = {
   sinTrabajo: boolean;
   /** Laborable ya terminado que se perdió (sin checar o sin trabajo), sin justificar: baja el cumplimiento. */
   noTrabajado: boolean;
+  /** Actividades distintas que tocó ese día: con su reloj corriendo o entregadas ese día. */
+  actividadesDelDia: number;
+  /** De esas, las que entregó ese día. */
+  entregasDelDia: number;
   minutosExtra: number | null;
   /**
    * Qué decidió el jefe sobre el tiempo extra de ese día. null = nadie lo ha visto.
@@ -994,6 +1011,8 @@ export type TotalesKpi = {
   asistenciaPuntual: AsistenciaPuntualKpi;
   /** Días que debía trabajar y cuántos trabajó: multiplica el cumplimiento. */
   diasDeTrabajo: DiasDeTrabajoKpi;
+  /** Cuántas actividades toca por día: los días sin ninguna y con solo una (de los que debía trabajar). */
+  actividadDiaria: ActividadDiariaKpi;
   /** Entregas por día trabajado (y el ritmo del equipo, si se calculó en equipo). */
   ritmo: RitmoKpi;
   /** Trabajo entregado (plan de lo entregado) contra las horas trabajadas. */
@@ -1093,6 +1112,21 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
   const diasConEntrega = new Set(
     entregas.filter((x) => x.entregadaAt).map((x) => workDateKey(new Date(x.entregadaAt as string), tz)),
   );
+  // Qué actividades tocó cada día: las que tuvieron su reloj corriendo ese día y las que entregó ese día.
+  const entregasPorDia = new Map<string, number>();
+  const actividadesPorDia = new Map<string, Set<number>>();
+  const anota = (dia: string, activityId: number) => {
+    const set = actividadesPorDia.get(dia) ?? new Set<number>();
+    set.add(activityId);
+    actividadesPorDia.set(dia, set);
+  };
+  for (const a of actividades) anota(workDateKey(a.inicio, tz), a.activityId);
+  for (const x of entregas) {
+    if (!x.entregadaAt) continue;
+    const dia = workDateKey(new Date(x.entregadaAt), tz);
+    entregasPorDia.set(dia, (entregasPorDia.get(dia) ?? 0) + 1);
+    anota(dia, x.activityId);
+  }
   // «Hoy» solo se da por perdido pasada su hora de salida: antes todavía puede llegar o ponerse a trabajar.
   const [hhFin, mmFin] = (horaValida(e.horario.salida) ?? FIN_DE_JORNADA_POR_OMISION).split(':').map(Number);
   const hoyTerminado = ahoraMs >= workDayAtClock(e.ahora, hhFin, mmFin, tz).getTime();
@@ -1148,6 +1182,8 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
         trabajado,
         sinTrabajo: false,
         noTrabajado,
+        actividadesDelDia: actividadesPorDia.get(fecha)?.size ?? 0,
+        entregasDelDia: entregasPorDia.get(fecha) ?? 0,
         minutosExtra: null,
         extraEstado: null,
         minutosExtraAprobados: 0,
@@ -1207,6 +1243,8 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
       trabajado,
       sinTrabajo,
       noTrabajado: sinTrabajo,
+      actividadesDelDia: actividadesPorDia.get(fecha)?.size ?? 0,
+      entregasDelDia: entregasPorDia.get(fecha) ?? 0,
       minutosExtra,
       extraEstado: decision?.estado ?? null,
       minutosExtraAprobados: decision?.estado === 'APROBADO' ? Math.max(0, decision.minutos) : 0,
@@ -1323,6 +1361,13 @@ function sumaTotales(
     sinTrabajar: sinChecar + sinTrabajo,
     pct: pct(trabajados, laborablesContados.length),
   };
+  const sumaActividades = laborablesContados.reduce((s, d) => s + (d.actividadesDelDia ?? 0), 0);
+  const actividadDiaria: ActividadDiariaKpi = {
+    esperados: laborablesContados.length,
+    sinActividad: laborablesContados.filter((d) => (d.actividadesDelDia ?? 0) === 0).length,
+    conUna: laborablesContados.filter((d) => d.actividadesDelDia === 1).length,
+    promedio: laborablesContados.length ? unDecimal(sumaActividades / laborablesContados.length) : null,
+  };
   const cumplimiento = cumplimientoDe(
     { entregas, asistenciaPuntual, uniforme, minutosLaborados, ritmo, carga, ocupacion, diasDeTrabajo },
     null,
@@ -1352,6 +1397,7 @@ function sumaTotales(
     entregas,
     asistenciaPuntual,
     diasDeTrabajo,
+    actividadDiaria,
     ritmo,
     carga,
     ocupacion,
@@ -1412,6 +1458,15 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     sinTrabajar: dd((x) => x.sinTrabajar),
     pct: pct(dd((x) => x.trabajados), dd((x) => x.esperados)),
   };
+  const ad = (f: (x: ActividadDiariaKpi) => number) =>
+    lista.reduce((acc, t) => acc + (t.actividadDiaria ? f(t.actividadDiaria) : 0), 0);
+  const esperadosAct = ad((x) => x.esperados);
+  const actividadDiaria: ActividadDiariaKpi = {
+    esperados: esperadosAct,
+    sinActividad: ad((x) => x.sinActividad),
+    conUna: ad((x) => x.conUna),
+    promedio: esperadosAct ? unDecimal(ad((x) => (x.promedio ?? 0) * x.esperados) / esperadosAct) : null,
+  };
   const cumplimiento = cumplimientoDe(
     { entregas, asistenciaPuntual, uniforme, minutosLaborados: laborados, ritmo, carga, ocupacion, diasDeTrabajo },
     null,
@@ -1438,6 +1493,7 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     entregas,
     asistenciaPuntual,
     diasDeTrabajo,
+    actividadDiaria,
     ritmo,
     carga,
     ocupacion,

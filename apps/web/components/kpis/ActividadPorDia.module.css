@@ -1,0 +1,132 @@
+.resumen {
+  padding: 0 var(--ui-s4) var(--ui-s3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+  line-height: 1.5;
+}
+
+.resumenDia {
+  color: var(--ui-fg);
+  text-transform: capitalize;
+}
+
+.malo {
+  color: var(--ui-danger-text);
+  font-weight: 600;
+}
+
+.regular {
+  color: var(--ui-warning-text, var(--ui-warning));
+  font-weight: 600;
+}
+
+.contenedor {
+  overflow-x: auto;
+  border-top: 1px solid var(--ui-border);
+}
+
+.tabla {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--ui-text-sm);
+}
+
+.tabla th,
+.tabla td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ui-border);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tabla thead th {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-fg-3);
+  text-transform: capitalize;
+  position: sticky;
+  top: 0;
+  background: var(--ui-surface);
+}
+
+.colPersona {
+  text-align: left !important;
+  position: sticky;
+  left: 0;
+  background: var(--ui-surface);
+  z-index: 1;
+  min-width: 200px;
+}
+
+.colDia {
+  min-width: 44px;
+}
+
+.colResumen {
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg-2);
+}
+
+.persona {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  color: var(--ui-fg);
+  text-decoration: none;
+  max-width: 240px;
+}
+
+.persona:hover .nombre {
+  text-decoration: underline;
+}
+
+.nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.celda {
+  padding: 4px !important;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--ui-text-xs);
+}
+
+.verde {
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+}
+
+.ambar {
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text, var(--ui-warning));
+}
+
+.rojo {
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-text);
+}
+
+.neutro {
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-3);
+}
+
+.leyenda {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s4);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  line-height: 2;
+}
