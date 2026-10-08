@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.apiBaseUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -84,7 +85,9 @@ object OfflineSyncCoordinator {
                         val expanded = NexaraOffline.mediaStore().expandMediaRefs(item.body)
                         expanded?.toRequestBody(item.contentType.toMediaType())
                     }
-                    val reqBuilder = Request.Builder()
+                    // Misma identidad que Retrofit: sin ella una checada reenviada llegaba
+                    // como «Escritorio · PC» y el servidor la rechazaba por venir de la web.
+                    val reqBuilder = ApiClient.aplicarIdentidad(Request.Builder())
                         .url(item.url)
                         .method(item.method, body)
                         .header("Authorization", "Bearer $bearerToken")
@@ -197,7 +200,7 @@ object OfflineSyncCoordinator {
                 val expanded = NexaraOffline.mediaStore().expandMediaRefs(item.body)
                 expanded?.toRequestBody(item.contentType.toMediaType())
             }
-            val reqBuilder = Request.Builder()
+            val reqBuilder = ApiClient.aplicarIdentidad(Request.Builder())
                 .url(item.url)
                 .method(item.method, body)
                 .header("Authorization", "Bearer $bearerToken")

@@ -47,6 +47,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.apiAssetOrigin
 import mx.nexara.mobile.nativeapp.data.api.resolveProtectedUploadUrl
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
@@ -78,13 +79,15 @@ object ProtectedAssets {
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val request = chain.request()
-                val token = auth.token()
                 val sameHost = apiHost == null || request.url.host.equals(apiHost, ignoreCase = true)
-                if (token.isNullOrBlank() || !sameHost) {
-                    return@addInterceptor chain.proceed(request)
+                if (!sameHost) return@addInterceptor chain.proceed(request)
+                // Al API siempre con la identidad del teléfono; la sesión, si la hay.
+                val builder = ApiClient.aplicarIdentidad(request.newBuilder())
+                val token = auth.token()
+                if (!token.isNullOrBlank()) {
+                    builder.header("Authorization", "Bearer $token")
+                    auth.companyId()?.takeIf { it > 0L }?.let { builder.header("X-Company-Id", it.toString()) }
                 }
-                val builder = request.newBuilder().header("Authorization", "Bearer $token")
-                auth.companyId()?.takeIf { it > 0L }?.let { builder.header("X-Company-Id", it.toString()) }
                 chain.proceed(builder.build())
             }
             .build()

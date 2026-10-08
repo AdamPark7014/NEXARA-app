@@ -1,5 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import mx.nexara.mobile.nativeapp.util.UbicacionFalla
+
 /**
  * Textos y decisiones de la checada (contrato A), sin Android: se prueban en la
  * JVM (`AttendanceCheckInTest`).
@@ -79,13 +81,33 @@ object AttendanceCheckIn {
         return texto.contains("ubicación simulada") || texto.contains("ubicacion simulada")
     }
 
-    /** Sufijo de la confirmación: « · GPS ±12m», « (sin GPS — activa ubicación)». */
-    fun notaGps(hayCoords: Boolean, accuracyM: Float?, mock: Boolean = false): String = when {
-        !hayCoords -> " (sin GPS — activa ubicación)"
+    /**
+     * Sufijo de la confirmación: « · GPS ±12m» o, sin coordenadas, el motivo
+     * ([sinUbicacion]).
+     *
+     * @param falla por qué no hubo coordenadas (`UbicacionFalla`); solo cuenta si
+     * [hayCoords] es false.
+     */
+    fun notaGps(hayCoords: Boolean, accuracyM: Float?, mock: Boolean = false, falla: String? = null): String = when {
+        !hayCoords -> sinUbicacion(falla)
         mock -> " · ubicación simulada detectada"
         accuracyM == null -> " · GPS ok"
         accuracyM > PRECISION_A_REVISAR -> " · GPS ±${accuracyM.toInt()}m (quedará para revisar)"
         accuracyM > PRECISION_BAJA -> " · GPS ±${accuracyM.toInt()}m (baja precisión)"
         else -> " · GPS ±${accuracyM.toInt()}m"
+    }
+
+    /**
+     * Por qué la checada se fue sin ubicación, con los mismos textos que iOS.
+     *
+     * Antes se decía siempre « (sin GPS — activa ubicación)», también a quien ya la
+     * tenía encendida y solo estaba adentro; ahora se dice lo que de verdad pasó.
+     * Un motivo desconocido no se adivina.
+     */
+    fun sinUbicacion(falla: String?): String = when (falla) {
+        UbicacionFalla.PERMISO_NEGADO -> " · sin ubicación: NEXARA no tiene permiso de ubicación"
+        UbicacionFalla.UBICACION_APAGADA -> " · sin ubicación: la ubicación del teléfono está apagada"
+        UbicacionFalla.SIN_SENAL -> " · sin ubicación: el teléfono no consiguió señal a tiempo"
+        else -> " · sin ubicación"
     }
 }

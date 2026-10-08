@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import mx.nexara.mobile.nativeapp.util.UbicacionFalla
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -32,8 +33,37 @@ class AttendanceCheckInTest {
     }
 
     @Test
+    fun `sin coordenadas la nota dice por que`() {
+        assertEquals(
+            " · sin ubicación: NEXARA no tiene permiso de ubicación",
+            AttendanceCheckIn.notaGps(hayCoords = false, accuracyM = null, falla = UbicacionFalla.PERMISO_NEGADO),
+        )
+        assertEquals(
+            " · sin ubicación: la ubicación del teléfono está apagada",
+            AttendanceCheckIn.notaGps(hayCoords = false, accuracyM = null, falla = UbicacionFalla.UBICACION_APAGADA),
+        )
+        assertEquals(
+            " · sin ubicación: el teléfono no consiguió señal a tiempo",
+            AttendanceCheckIn.notaGps(hayCoords = false, accuracyM = null, falla = UbicacionFalla.SIN_SENAL),
+        )
+        assertEquals(
+            " · sin ubicación",
+            AttendanceCheckIn.notaGps(hayCoords = false, accuracyM = null, falla = UbicacionFalla.ERROR),
+        )
+        // Sin motivo no se adivina uno (antes decía «activa ubicación» a quien ya la tenía).
+        assertEquals(" · sin ubicación", AttendanceCheckIn.notaGps(hayCoords = false, accuracyM = null))
+    }
+
+    @Test
+    fun `con coordenadas el motivo no se muestra`() {
+        assertEquals(
+            " · GPS ±12m",
+            AttendanceCheckIn.notaGps(hayCoords = true, accuracyM = 12f, falla = UbicacionFalla.SIN_SENAL),
+        )
+    }
+
+    @Test
     fun `la nota de gps dice la precision y cuando quedara para revisar`() {
-        assertEquals(" (sin GPS — activa ubicación)", AttendanceCheckIn.notaGps(hayCoords = false, accuracyM = null))
         assertEquals(" · GPS ok", AttendanceCheckIn.notaGps(hayCoords = true, accuracyM = null))
         assertEquals(" · GPS ±12m", AttendanceCheckIn.notaGps(hayCoords = true, accuracyM = 12f))
         assertEquals(" · GPS ±150m (baja precisión)", AttendanceCheckIn.notaGps(hayCoords = true, accuracyM = 150f))

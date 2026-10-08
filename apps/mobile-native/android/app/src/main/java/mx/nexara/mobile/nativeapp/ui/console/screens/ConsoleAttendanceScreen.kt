@@ -405,9 +405,11 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(checkInLoading = true, checkInMessage = null) }
         viewModelScope.launch {
             try {
-                val coords = withContext(Dispatchers.IO) {
-                    DeviceLocation.current(getApplication())
+                // Balanceada y, si sale vacía, GPS fino; sin coordenadas, el motivo.
+                val lectura = withContext(Dispatchers.IO) {
+                    DeviceLocation.lecturaParaChecada(getApplication())
                 }
+                val coords = lectura.coords
                 val res = withContext(Dispatchers.IO) {
                     repo.attendanceCheckIn(
                         type,
@@ -419,6 +421,8 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         // De cuándo es la medición: el servidor no acepta una posición
                         // guardada de hace media hora como si fuera de ahora.
                         fixAgeMs = coords?.fixAgeMs,
+                        // Para que sus jefes lean «Sin ubicación: …» y no un hueco sin motivo.
+                        ubicacionFalla = lectura.falla.takeIf { coords == null },
                         photoBase64 = photoBase64,
                     )
                 }
@@ -429,6 +433,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                     hayCoords = coords != null,
                     accuracyM = coords?.accuracyM,
                     mock = coords?.mock == true,
+                    falla = lectura.falla,
                 )
                 val aviso = AttendanceBadges.deRegistro(res)
                     .takeIf { it.isNotEmpty() }

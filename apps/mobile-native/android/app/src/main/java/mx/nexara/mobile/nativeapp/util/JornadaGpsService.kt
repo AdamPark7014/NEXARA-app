@@ -5,11 +5,14 @@ import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -26,6 +29,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import mx.nexara.mobile.nativeapp.MainActivity
 import mx.nexara.mobile.nativeapp.R
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
@@ -118,6 +123,57 @@ object JornadaGps {
             app.stopService(intent)
         }
         running = false
+        // Termina la jornada: la siguiente empieza sin estado de ubicación enviado.
+        envios.launch { estadoMutex.withLock { guardarEstadoEnviado(app, null) } }
+    }
+
+    private const val KEY_ESTADO_UBICACION = "estado_ubicacion"
+
+    /**
+     * Los envíos de estado no viven en el servicio: cuando falta el permiso se manda
+     * SIN_PERMISO y el servicio se detiene en el mismo instante, y su scope se cancela.
+     */
+    private val envios = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val estadoMutex = Mutex()
+
+    /** Último estado que llegó al API en esta jornada; sobrevive a que Android mate el proceso. */
+    private fun estadoEnviado(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_ESTADO_UBICACION, null)
+
+    private fun guardarEstadoEnviado(context: Context, estado: String?) {
+        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        if (estado == null) editor.remove(KEY_ESTADO_UBICACION) else editor.putString(KEY_ESTADO_UBICACION, estado)
+        editor.apply()
+    }
+
+    /**
+     * Manda a `attendance/estado-ubicacion` si la ubicación se apagó, se quedó sin
+     * permiso o volvió ([EstadoUbicacion.debeEnviar]). Solo lo llama el servicio,
+     * es decir, con la jornada abierta.
+     *
+     * Cada envío vuelve a leer el teléfono dentro del candado: si Android avisa tres
+     * veces seguidas, o un apagado y un encendido llegan cruzados, el último que pasa
+     * manda lo que de verdad hay ahora y no un estado viejo.
+     */
+    internal fun reportarEstadoUbicacion(context: Context) {
+        val app = context.applicationContext
+        envios.launch {
+            estadoMutex.withLock {
+                val actual = EstadoUbicacion.estadoDeUbicacion(
+                    tienePermiso = canTrack(app),
+                    ubicacionEncendida = DeviceLocation.ubicacionEncendida(app),
+                )
+                if (!EstadoUbicacion.debeEnviar(estadoEnviado(app), actual)) return@withLock
+                try {
+                    ConsoleRepository(app).gpsEstado(actual)
+                    // Sin red la cola contesta 202 y lo reenvía después: cuenta como enviado.
+                    guardarEstadoEnviado(app, actual)
+                } catch (e: Exception) {
+                    // No se guarda: el siguiente aviso de Android (o arranque) lo vuelve a intentar.
+                    Log.w(TAG, "No se pudo enviar el estado de ubicación ($actual): ${e.message}")
+                }
+            }
+        }
     }
 
     internal const val TAG = "JornadaGps"
@@ -149,6 +205,12 @@ class JornadaGpsService : Service() {
         }
     }
 
+    /**
+     * Interruptor de ubicación, solo mientras corre la jornada: Android avisa cada vez
+     * que alguien lo apaga o lo enciende, y cada aviso se reporta ([JornadaGps.reportarEstadoUbicacion]).
+     */
+    private var receptorUbicacion: BroadcastReceiver? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -157,6 +219,9 @@ class JornadaGpsService : Service() {
             return START_NOT_STICKY
         }
         if (!JornadaGps.canTrack(this)) {
+            // Se le quitó el permiso con la jornada abierta (Android mata el proceso y el
+            // servicio vuelve solo): se avisa SIN_PERMISO antes de detenerse.
+            JornadaGps.reportarEstadoUbicacion(this)
             stopTracking()
             return START_NOT_STICKY
         }
@@ -171,6 +236,7 @@ class JornadaGpsService : Service() {
     }
 
     override fun onDestroy() {
+        dejarDeEscucharUbicacion()
         client?.removeLocationUpdates(callback)
         client = null
         JornadaGps.markRunning(false)
@@ -220,10 +286,45 @@ class JornadaGpsService : Service() {
         } catch (e: Exception) {
             Log.w(JornadaGps.TAG, "requestLocationUpdates falló: ${e.message}")
             stopTracking()
+            return
+        }
+        escucharUbicacion()
+        // Al arrancar se manda el estado actual si no es ENCENDIDA (o si cambió desde
+        // lo último que se mandó en esta jornada, si Android reinició el servicio).
+        JornadaGps.reportarEstadoUbicacion(this)
+    }
+
+    private fun escucharUbicacion() {
+        if (receptorUbicacion != null) return
+        val receptor = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                // La salida pudo registrarse antes de que el servicio se detenga: sin jornada, nada.
+                if (JornadaGps.isRunning()) JornadaGps.reportarEstadoUbicacion(context)
+            }
+        }
+        try {
+            // Exportado como pide Android para avisos del sistema; PROVIDERS_CHANGED es
+            // protegido, así que ninguna otra app puede mandarlo.
+            ContextCompat.registerReceiver(
+                this,
+                receptor,
+                IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION),
+                ContextCompat.RECEIVER_EXPORTED,
+            )
+            receptorUbicacion = receptor
+        } catch (e: Exception) {
+            Log.w(JornadaGps.TAG, "No se pudo escuchar el interruptor de ubicación: ${e.message}")
         }
     }
 
+    private fun dejarDeEscucharUbicacion() {
+        val receptor = receptorUbicacion ?: return
+        receptorUbicacion = null
+        runCatching { unregisterReceiver(receptor) }
+    }
+
     private fun stopTracking() {
+        dejarDeEscucharUbicacion()
         JornadaGps.markRunning(false)
         client?.removeLocationUpdates(callback)
         client = null

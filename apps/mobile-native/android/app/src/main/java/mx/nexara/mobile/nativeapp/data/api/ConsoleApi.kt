@@ -409,6 +409,12 @@ data class AttendanceRegisterRequest(
      * dónde está su dueño.
      */
     val fixAgeMs: Long? = null,
+    /**
+     * Por qué no hay coordenadas (`UbicacionFalla`): PERMISO_NEGADO, UBICACION_APAGADA,
+     * SIN_SENAL o ERROR. Solo cuando `latitude/longitude` van null; el servidor lo
+     * convierte en el motivo «Sin ubicación: …» que ven los jefes.
+     */
+    val ubicacionFalla: String? = null,
     val photoBase64: String,
 )
 
@@ -597,6 +603,12 @@ interface ConsoleApi {
         @retrofit2.http.Body body: GpsConsentRequest,
     ): GpsConsentResponse
 
+    /** Ubicación apagada / sin permiso / encendida durante la jornada (ver `EstadoUbicacion`). */
+    @retrofit2.http.POST("attendance/estado-ubicacion")
+    suspend fun postEstadoUbicacion(
+        @retrofit2.http.Body body: EstadoUbicacionRequest,
+    ): EstadoUbicacionResponse
+
     // ── Tools ────────────────────────────────────────────────────────────────
 
     @GET("users/profile/me")
@@ -759,6 +771,20 @@ data class GpsConsentRequest(
 
 data class GpsConsentResponse(
     val consent: Boolean? = null,
+)
+
+/**
+ * `POST attendance/estado-ubicacion`: APAGADA | SIN_PERMISO | ENCENDIDA. La hora, el
+ * origen y el equipo los pone el servidor (cabeceras de identidad), no el cuerpo.
+ */
+data class EstadoUbicacionRequest(
+    val estado: String,
+)
+
+/** `registrado: false` si repetía el último estado. Sin red, la cola contesta `{queued:true}`. */
+data class EstadoUbicacionResponse(
+    val ok: Boolean? = null,
+    val registrado: Boolean? = null,
 )
 
 data class UserProfileMeDto(
