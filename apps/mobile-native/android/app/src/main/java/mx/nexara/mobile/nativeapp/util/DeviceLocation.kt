@@ -5,13 +5,18 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
+import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 /**
@@ -39,6 +44,15 @@ data class DeviceCoords(
 }
 
 fun DeviceCoords?.messageSuffixOrNone(): String = this?.messageSuffix() ?: " (sin GPS)"
+
+/**
+ * Lectura de la checada: las coordenadas o, si no las hay, por qué
+ * ([UbicacionFalla]). Exactamente uno de los dos va con valor.
+ */
+data class LecturaUbicacion(
+    val coords: DeviceCoords?,
+    val falla: String?,
+)
 
 fun DeviceCoords?.mergeIntoNotes(notes: String?): String {
     val line = this?.noteLine()
@@ -77,6 +91,73 @@ object DeviceLocation {
         // última conocida antes de rendirse.
         fresh?.toCoords()?.let { return it }
         return awaitTask { fused.lastLocation }?.toCoords()
+    }
+
+    /** Tope de la segunda lectura (GPS fino) de la checada. */
+    private const val FINO_MAX_MS = 12_000L
+
+    /**
+     * Ubicación para la checada, con el motivo si no se consiguió.
+     *
+     * La lectura balanceada usa Wi-Fi y celda, no GPS: adentro o con datos malos
+     * regresa null aunque haya permiso (así llegaron sin coordenadas checadas de
+     * gente cuyo GPS de jornada mandó puntos minutos después). Por eso, si sale
+     * vacía, se intenta una vez con GPS fino (máx. [FINO_MAX_MS]) antes de caer a
+     * la última conocida. [current] no cambia: las evidencias la llaman con sus
+     * propios tiempos y no deben esperar 12 s más.
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun lecturaParaChecada(context: Context): LecturaUbicacion {
+        if (!hasPermission(context)) return LecturaUbicacion(null, UbicacionFalla.PERMISO_NEGADO)
+        val cts = CancellationTokenSource()
+        return try {
+            val fused = LocationServices.getFusedLocationProviderClient(context)
+            val balanceada = awaitTask {
+                fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+            }
+            balanceada?.toCoords()?.let { return LecturaUbicacion(it, null) }
+
+            val encendida = ubicacionEncendida(context)
+            // Con la ubicación apagada el GPS no va a contestar: no se hace esperar a nadie.
+            if (encendida) {
+                val fina = CurrentLocationRequest.Builder()
+                    .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                    .setDurationMillis(FINO_MAX_MS)
+                    .build()
+                // Red de seguridad por si el teléfono no respeta la duración.
+                val lectura = withTimeoutOrNull(FINO_MAX_MS + 3_000L) {
+                    awaitTask { fused.getCurrentLocation(fina, cts.token) }
+                }
+                lectura?.toCoords()?.let { return LecturaUbicacion(it, null) }
+            }
+
+            awaitTask { fused.lastLocation }?.toCoords()?.let { return LecturaUbicacion(it, null) }
+
+            // Se vuelve a leer el permiso: pudo quitarse mientras se esperaba al GPS.
+            LecturaUbicacion(
+                null,
+                UbicacionFalla.fallaDeUbicacion(
+                    tienePermiso = hasPermission(context),
+                    ubicacionEncendida = encendida,
+                ),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            LecturaUbicacion(null, UbicacionFalla.ERROR)
+        } finally {
+            // Si la pantalla se cerró a media lectura, el GPS deja de buscar.
+            cts.cancel()
+        }
+    }
+
+    /**
+     * Interruptor de ubicación del teléfono; si no se puede leer, se da por encendido.
+     * También lo usa el GPS de jornada para avisar cuando lo apagan ([EstadoUbicacion]).
+     */
+    fun ubicacionEncendida(context: Context): Boolean {
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return true
+        return LocationManagerCompat.isLocationEnabled(manager)
     }
 
     /**

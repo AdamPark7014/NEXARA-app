@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -34,7 +35,7 @@ fun downloadAuthedToCache(context: Context, urlOrPath: String, preferredFilename
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    val req = Request.Builder()
+    val req = ApiClient.aplicarIdentidad(Request.Builder())
         .url(abs)
         .header("Authorization", "Bearer $token")
         .build()

@@ -262,6 +262,9 @@ class ConsoleRepository(context: Context) {
      * se manda `timestamp`. `capturedAt` viaja como referencia y solo se usa
      * cuando la checada salió de la cola sin conexión — ahí es la cola quien
      * agrega `offline: true` (ver `OfflineQueueBody`), nunca esta llamada.
+     *
+     * @param ubicacionFalla por qué no hay coordenadas (`UbicacionFalla`); se descarta
+     * si sí las hay, para que el servidor nunca reciba las dos cosas.
      */
     suspend fun attendanceCheckIn(
         type: String,
@@ -270,6 +273,7 @@ class ConsoleRepository(context: Context) {
         accuracyM: Float? = null,
         mockLocation: Boolean = false,
         fixAgeMs: Long? = null,
+        ubicacionFalla: String? = null,
         photoBase64: String,
         capturedAt: String = java.time.Instant.now().toString(),
     ) =
@@ -282,6 +286,7 @@ class ConsoleRepository(context: Context) {
                 accuracyM = accuracyM?.takeIf { it.isFinite() && it >= 0f }?.toDouble(),
                 mockLocation = mockLocation,
                 fixAgeMs = fixAgeMs?.takeIf { it >= 0L },
+                ubicacionFalla = ubicacionFalla?.takeIf { lat == null || lng == null },
                 photoBase64 = photoBase64,
             )
         )
@@ -318,6 +323,13 @@ class ConsoleRepository(context: Context) {
 
     suspend fun gpsUpdateConsent(enabled: Boolean) =
         api.patchGpsConsent(mx.nexara.mobile.nativeapp.data.api.GpsConsentRequest(enabled = enabled))
+
+    /**
+     * Estado de la ubicación del teléfono en la jornada (`EstadoUbicacion`). Va por el
+     * cliente normal: lleva la identidad del equipo y, sin red, se queda en la cola.
+     */
+    suspend fun gpsEstado(estado: String) =
+        api.postEstadoUbicacion(mx.nexara.mobile.nativeapp.data.api.EstadoUbicacionRequest(estado = estado))
 
     suspend fun myProfile() = api.getMyProfile()
 

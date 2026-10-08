@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.apiAssetOrigin
 import mx.nexara.mobile.nativeapp.data.api.resolveProtectedUploadUrl
 import okhttp3.OkHttpClient
@@ -87,6 +88,8 @@ internal object NotificationAvatars {
         val apiHost = runCatching { java.net.URI(apiAssetOrigin()).host }.getOrNull()
         val host = runCatching { java.net.URI(url).host }.getOrNull()
         if (apiHost != null && host != null && host.equals(apiHost, ignoreCase = true)) {
+            // La identidad del teléfono solo va al API, igual que la sesión.
+            ApiClient.aplicarIdentidad(builder)
             val auth = AuthRepository(context)
             auth.token()?.takeIf { it.isNotBlank() }?.let { builder.header("Authorization", "Bearer $it") }
             auth.companyId()?.takeIf { it > 0L }?.let { builder.header("X-Company-Id", it.toString()) }

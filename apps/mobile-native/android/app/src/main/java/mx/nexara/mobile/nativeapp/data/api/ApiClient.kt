@@ -24,24 +24,6 @@ object ApiClient {
         .build()
 
     /**
-     * Identidad de la app en cada petición.
-     *
-     * OkHttp no fija `User-Agent`, así que el servidor recibía uno vacío y
-     * `detectDeviceFromUserAgent` lo resolvía como "Escritorio · PC": todos los
-     * fichajes hechos desde el teléfono quedaban registrados como si fueran de
-     * una computadora, y no había forma de auditar de dónde salió cada uno.
-     *
-     * Formato: `NexaraApp/1.2.3 (Android 14; samsung SM-A536B) OkHttp`. Lleva
-     * la palabra "Android" a propósito — es lo que el detector del servidor
-     * busca para clasificar el registro como móvil.
-     */
-    private val userAgent: String by lazy {
-        val version = BuildConfig.VERSION_NAME.ifBlank { "0" }
-        val release = Build.VERSION.RELEASE ?: "?"
-        "NexaraApp/$version (Android $release; $deviceModel) OkHttp"
-    }
-
-    /**
      * Nombre del teléfono como lo ve la persona (Ajustes → Acerca del teléfono), p. ej. «Galaxy S24
      * Ultra». Lo fija `NexaraApplication` al arrancar; sirve para avisos tipo «Iniciaste sesión desde…».
      * Viaja codificado en URL porque puede traer acentos y OkHttp solo admite ASCII en cabeceras.
@@ -50,11 +32,31 @@ object ApiClient {
     var deviceDisplayName: String? = null
 
     /** Modelo legible para la ficha de dispositivo del servidor. */
-    private val deviceModel: String by lazy {
-        listOf(Build.MANUFACTURER, Build.MODEL)
-            .filter { !it.isNullOrBlank() }
-            .joinToString(" ")
-            .ifBlank { "Android" }
+    private val deviceModel: String by lazy { AppIdentity.modelo(Build.MANUFACTURER, Build.MODEL) }
+
+    /**
+     * Identidad de la app en cada petición (formato en [AppIdentity]).
+     *
+     * OkHttp no fija `User-Agent`, así que el servidor recibía uno vacío y
+     * `detectDeviceFromUserAgent` lo resolvía como "Escritorio · PC": todos los
+     * fichajes hechos desde el teléfono quedaban registrados como si fueran de
+     * una computadora, y no había forma de auditar de dónde salió cada uno.
+     *
+     * Pública para los clientes OkHttp propios que también hablan con el API
+     * (cola sin conexión, descargas, imágenes protegidas): sin ella, una checada
+     * reenviada después llega como si fuera de un navegador de PC.
+     */
+    fun identidad(): Map<String, String> = AppIdentity.cabeceras(
+        version = BuildConfig.VERSION_NAME,
+        release = Build.VERSION.RELEASE,
+        modelo = deviceModel,
+        nombreVisible = deviceDisplayName,
+    )
+
+    /** Pone [identidad] en [builder] (reemplaza lo que hubiera) y lo devuelve. */
+    fun aplicarIdentidad(builder: Request.Builder): Request.Builder {
+        identidad().forEach { (nombre, valor) -> builder.header(nombre, valor) }
+        return builder
     }
 
     private fun httpClient(
@@ -75,21 +77,7 @@ object ApiClient {
                 // La identidad del dispositivo va en TODAS las peticiones,
                 // también en las que no llevan token (login incluido): es ahí
                 // donde el servidor registra `lastLoginDevice`.
-                val builder = original.newBuilder()
-                    .header("User-Agent", userAgent)
-                    .header("X-Device-Model", deviceModel)
-                    // El servidor usa esta cabecera como "navegador" al
-                    // describir el registro; así un fichaje desde la app se lee
-                    // "Móvil · Android · NEXARA App" y no se confunde con
-                    // Chrome en el mismo teléfono. Exigirla en el servidor para
-                    // los fichajes que digan venir del móvil queda pendiente de
-                    // que la v2 esté desplegada: ver
-                    // `.ai/auditoria-2026-09/14-integridad-datos-remediacion.md`.
-                    .header("X-Device-Browser", "NEXARA App")
-                    .header("X-Device-OS", "Android ${Build.VERSION.RELEASE ?: ""}".trim())
-                deviceDisplayName?.takeIf { it.isNotBlank() }?.let {
-                    builder.header("X-Device-Name", java.net.URLEncoder.encode(it, "UTF-8"))
-                }
+                val builder = aplicarIdentidad(original.newBuilder())
 
                 val token = tokenProvider?.invoke()
                 if (token.isNullOrBlank()) {
