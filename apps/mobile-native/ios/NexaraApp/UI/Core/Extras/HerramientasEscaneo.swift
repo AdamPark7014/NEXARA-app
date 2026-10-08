@@ -1,132 +1,23 @@
 import SwiftUI
 
-/// Escáner de etiquetas de herramienta (Code 128 con la nomenclatura interna, p. ej.
-/// `MUL-12345`): enseña la herramienta, quién la tiene y, si hay un préstamo aprobado
-/// o en uso, deja registrar la salida o la entrada. Entregar y recibir son de almacén
-/// (`tools.manage`): a los demás el API contesta 403 y aquí se explica.
+/// Escáner de la pantalla de Herramientas. Desde el 07-10 es el escáner único
+/// (`EscanerDeCodigos`): lee la etiqueta de herramienta (Code 128 con la nomenclatura
+/// interna, p. ej. `MUL-12345`) y enseña la herramienta, quién la tiene y, si hay un
+/// préstamo aprobado o en uso, deja registrar la salida o la entrada. Quien también abre
+/// Almacén puede leer aquí un artículo («Escanear herramienta o artículo»). Entregar y
+/// recibir son de almacén (`tools.manage`): a los demás el API contesta 403 y se explica.
 ///
-/// Espejo de `HerramientasEscaneo.kt` en Android: una tarjeta blanca (`MoreTarjeta`)
-/// con el botón de cámara, el campo para teclear el código y el resultado debajo.
+/// Espejo de `HerramientasEscaneo.kt` en Android.
 struct EscanerDeHerramientas: View {
     var onMovimiento: () -> Void = {}
 
-    @State private var buscando = false
-    @State private var error: String?
-    @State private var aviso: String?
-    @State private var resultado: HerramientaPorCodigo?
-    @State private var manual = ""
-    @State private var escaneando = false
-
     var body: some View {
-        MoreTarjeta {
-            Text("Escanear herramienta")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(NxColors.fg)
-                .accessibilityAddTraits(.isHeader)
-            Text("Lee la etiqueta NEXARA de la herramienta (o escribe su código) para ver quién la tiene.")
-                .font(NxType.labelMedium)
-                .foregroundStyle(NxColors.muted)
-                .fixedSize(horizontal: false, vertical: true)
-
-            escanearOEscribir
-
-            if let error {
-                Text(error)
-                    .font(NxType.bodyMedium)
-                    .foregroundStyle(NxColors.danger)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let aviso {
-                Text(aviso)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(NxColors.success)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let r = resultado {
-                HerrDivisor()
-                HerramientaEscaneadaVista(r: r)
-                if let accion = EscaneoReglas.accion(r), let prestamoId = r.prestamo?.id {
-                    AccionDeHerramienta(r: r, accion: accion, prestamoId: prestamoId) { mensaje in
-                        onMovimiento()
-                        Task { await buscar(r.codigo ?? "", avisoPrevio: mensaje) }
-                    }
-                    .id(prestamoId)
-                }
-                Button("Escanear otra") {
-                    resultado = nil
-                    aviso = nil
-                    error = nil
-                }
-                .buttonStyle(HerrBotonTextoStyle())
-            }
-        }
-        .fullScreenCover(isPresented: $escaneando) {
-            BarcodeScannerSheet(
-                titulo: "Escanear herramienta",
-                formatos: .etiquetaHerramienta,
-                onCodigo: { codigo in
-                    escaneando = false
-                    manual = codigo
-                    Task { await buscar(codigo) }
-                },
-                onCancel: { escaneando = false }
-            )
-        }
-    }
-
-    /// Android `EscanearOEscribirCodigo`: botón de cámara a todo lo ancho y, debajo,
-    /// el campo para escribir el código con su «Buscar» (etiquetas rotas o sin luz).
-    private var escanearOEscribir: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button(buscando ? "Buscando…" : "Escanear con la cámara") { escaneando = true }
-                .buttonStyle(HerrBotonLlenoStyle(alto: 52, anchoCompleto: true))
-                .disabled(buscando)
-            HStack(alignment: .center, spacing: 8) {
-                HerrCampoContorno(
-                    etiqueta: "Código de la etiqueta",
-                    texto: $manual,
-                    mayusculas: true,
-                    limite: CodigoBarras.largoMaximo + 8,
-                    alEnviar: { buscarManual() }
-                )
-                Button("Buscar") { buscarManual() }
-                    .buttonStyle(HerrBotonContornoStyle(alto: 52))
-                    .disabled(buscando || manual.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-    }
-
-    private func buscarManual() {
-        let texto = manual.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !texto.isEmpty, !buscando else { return }
-        Task { await buscar(texto) }
-    }
-
-    @MainActor
-    private func buscar(_ valor: String, avisoPrevio: String? = nil) async {
-        if let motivo = CodigoBarras.motivoEtiquetaInvalida(valor) {
-            error = motivo
-            return
-        }
-        let codigo = CodigoBarras.normalizarEtiquetaHerramienta(valor)
-        buscando = true
-        error = nil
-        aviso = avisoPrevio
-        defer { buscando = false }
-        do {
-            resultado = try await EscaneoRepository.shared.herramientaPorCodigo(codigo)
-        } catch {
-            resultado = nil
-            self.error = EscaneoReglas.mensaje(
-                error, accion: "consultar herramientas", fallback: "No se pudo buscar la etiqueta"
-            )
-        }
+        EscanerDeCodigos(enAlmacen: false, onMovimiento: onMovimiento)
     }
 }
 
 /// La herramienta leída: nombre, código y serie, su estado, el del préstamo y quién la tiene.
-private struct HerramientaEscaneadaVista: View {
+struct HerramientaEscaneadaVista: View {
     let r: HerramientaPorCodigo
 
     private var tono: NxTone {
@@ -179,7 +70,7 @@ private struct HerramientaEscaneadaVista: View {
 
 /// Registrar la salida (préstamo aprobado, con el código de recolección) o la entrada
 /// (préstamo en uso, con daño opcional) de la herramienta escaneada.
-private struct AccionDeHerramienta: View {
+struct AccionDeHerramienta: View {
     let r: HerramientaPorCodigo
     let accion: EscaneoReglas.AccionHerramienta
     let prestamoId: Int

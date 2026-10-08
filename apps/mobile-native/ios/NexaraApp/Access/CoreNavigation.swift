@@ -209,6 +209,12 @@ enum CoreNavigation {
         return CoreExtraModule.allCases.first { $0.claves.contains(buscada) }
     }
 
+    /// ¿Puede abrir este módulo de «Más»? Espejo de `CoreMenu.canOpenExtra` en Android
+    /// (p. ej. el escáner de Herramientas solo busca artículos si abre Almacén).
+    static func canOpenExtra(_ user: SessionUser?, _ module: CoreExtraModule) -> Bool {
+        extraModules(for: user).contains(module)
+    }
+
     /// Cliente / sucursal: solo el portal de tickets, nunca Core.
     static func isExternal(_ user: SessionUser?) -> Bool {
         guard let user else { return false }

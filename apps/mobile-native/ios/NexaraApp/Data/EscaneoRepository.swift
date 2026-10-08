@@ -185,6 +185,18 @@ struct HerramientaPorCodigo: Decodable, Hashable {
     let esMia: Bool?
 }
 
+// MARK: - Escáner único
+
+/// Lo que salió de buscar un código en el escáner (el de Almacén y el de Herramientas
+/// son el mismo y entienden las dos cosas). Espejo de `ResultadoEscaneo` en Android.
+enum ResultadoEscaneo: Equatable {
+    case herramienta(HerramientaPorCodigo)
+    case articulo(ProductoPorCodigo)
+    /// Ni herramienta ni artículo. Con `puedeDarDeAlta` (quien abre Almacén) se ofrece
+    /// el alta del artículo con ese código; sin él, «No es una herramienta registrada».
+    case noEncontrado(codigo: String, puedeDarDeAlta: Bool)
+}
+
 // MARK: - Repositorio
 
 final class EscaneoRepository {
@@ -239,6 +251,16 @@ final class EscaneoRepository {
     func herramientaPorCodigo(_ codigo: String) async throws -> HerramientaPorCodigo {
         let data = try await api.get("tool-requests/inventory/por-codigo", query: ["code": codigo])
         return try decode(HerramientaPorCodigo.self, from: data)
+    }
+
+    /// El escáner único (`EscaneoReglas.resolver`) con las búsquedas del API.
+    func resolver(_ valor: String, puedeAbrirAlmacen: Bool) async throws -> ResultadoEscaneo {
+        try await EscaneoReglas.resolver(
+            valor,
+            puedeAbrirAlmacen: puedeAbrirAlmacen,
+            buscarHerramienta: { try await self.herramientaPorCodigo($0) },
+            buscarArticulo: { try await self.productoPorCodigo($0) }
+        )
     }
 
     /// `POST tool-requests/:id/deliver` (`tools.manage`): salida de almacén de un préstamo aprobado.
@@ -440,5 +462,101 @@ enum EscaneoReglas {
             return textoSinPermiso(accion, servidor: mensajeServidor(error))
         }
         return error.toUserMessage(fallback: fallback)
+    }
+
+    // MARK: Escáner único
+
+    /// Dónde se busca un código: etiqueta de herramienta o artículo de almacén.
+    enum Fuente: Equatable {
+        case herramienta
+        case articulo
+    }
+
+    static let noEsHerramienta = "No es una herramienta registrada."
+
+    /// Qué se busca y en qué orden. Quien no puede abrir Almacén solo busca herramientas,
+    /// como siempre. Quien sí: forma de etiqueta (`MUL-12345`) → herramienta y luego
+    /// artículo; cualquier otro código → artículo y luego herramienta (una herramienta
+    /// puede traer el código de barras del fabricante, y sin esa segunda búsqueda se
+    /// ofrecería darla de alta como artículo). Espejo de `EscaneoRules.ordenDeBusqueda`.
+    static func ordenDeBusqueda(_ valor: String?, puedeAbrirAlmacen: Bool) -> [Fuente] {
+        guard puedeAbrirAlmacen else { return [.herramienta] }
+        return CodigoBarras.esFormaEtiquetaHerramienta(valor) ? [.herramienta, .articulo] : [.articulo, .herramienta]
+    }
+
+    /// Por qué no se puede buscar; nil si se puede. Se valida como lo primero que se va a buscar.
+    static func motivoInvalido(_ valor: String?, puedeAbrirAlmacen: Bool) -> String? {
+        ordenDeBusqueda(valor, puedeAbrirAlmacen: puedeAbrirAlmacen).first == .herramienta
+            ? CodigoBarras.motivoEtiquetaInvalida(valor)
+            : CodigoBarras.motivoInvalido(valor)
+    }
+
+    /// El código tal como lo espera cada búsqueda: la etiqueta en mayúsculas, el artículo tal cual.
+    static func codigoPara(_ fuente: Fuente, _ valor: String?) -> String {
+        switch fuente {
+        case .herramienta: return CodigoBarras.normalizarEtiquetaHerramienta(valor)
+        case .articulo: return CodigoBarras.limpiar(valor)
+        }
+    }
+
+    /// Busca `valor` en el orden de `ordenDeBusqueda`. Un 404 pasa a la siguiente búsqueda;
+    /// un 403 también (p. ej. alguien de almacén sin permiso de herramientas), salvo que
+    /// todas den 403: entonces el problema es el permiso y se lanza ese error. Cualquier
+    /// otro fallo (red, 5xx) se lanza tal cual: no es «no encontrado». Las búsquedas
+    /// llegan de fuera para que la regla no dependa del API. Espejo de `EscaneoRules.resolver`.
+    static func resolver(
+        _ valor: String,
+        puedeAbrirAlmacen: Bool,
+        buscarHerramienta: (String) async throws -> HerramientaPorCodigo,
+        buscarArticulo: (String) async throws -> ProductoPorCodigo
+    ) async throws -> ResultadoEscaneo {
+        let orden = ordenDeBusqueda(valor, puedeAbrirAlmacen: puedeAbrirAlmacen)
+        var primerProhibido: Error?
+        var noEncontrados = 0
+        var articuloProhibido = false
+        for fuente in orden {
+            let codigo = codigoPara(fuente, valor)
+            do {
+                switch fuente {
+                case .herramienta: return .herramienta(try await buscarHerramienta(codigo))
+                case .articulo: return .articulo(try await buscarArticulo(codigo))
+                }
+            } catch {
+                let http = codigoHttp(error)
+                if http == 404 {
+                    noEncontrados += 1
+                } else if http == 403 {
+                    if primerProhibido == nil { primerProhibido = error }
+                    if fuente == .articulo { articuloProhibido = true }
+                } else {
+                    throw error
+                }
+            }
+        }
+        if noEncontrados == 0, let prohibido = primerProhibido { throw prohibido }
+        let buscaArticulo = orden.contains(.articulo)
+        return .noEncontrado(
+            codigo: codigoPara(buscaArticulo ? .articulo : .herramienta, valor),
+            puedeDarDeAlta: buscaArticulo && !articuloProhibido && CodigoBarras.motivoInvalido(valor) == nil
+        )
+    }
+
+    /// Título del escáner (tarjeta y cámara) según la pantalla y si la persona abre Almacén.
+    static func tituloEscaner(enAlmacen: Bool, puedeAbrirAlmacen: Bool) -> String {
+        if enAlmacen { return "Escanear artículo o herramienta" }
+        return puedeAbrirAlmacen ? "Escanear herramienta o artículo" : "Escanear herramienta"
+    }
+
+    static func subtituloEscaner(enAlmacen: Bool, puedeAbrirAlmacen: Bool) -> String {
+        if enAlmacen || puedeAbrirAlmacen {
+            return "Lee el código de barras o la etiqueta (o escríbelo): de un artículo ves existencias y "
+                + "registras entradas o salidas; de una herramienta, quién la tiene."
+        }
+        return "Lee la etiqueta NEXARA de la herramienta (o escribe su código) para ver quién la tiene."
+    }
+
+    /// Etiqueta del campo para teclear el código.
+    static func etiquetaCampoEscaner(puedeAbrirAlmacen: Bool) -> String {
+        puedeAbrirAlmacen ? "Código de barras o etiqueta" : "Código de la etiqueta"
     }
 }

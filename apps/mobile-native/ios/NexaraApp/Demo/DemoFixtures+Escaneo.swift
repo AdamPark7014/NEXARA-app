@@ -403,7 +403,7 @@ extension FormatosDeEscaneo {
     var codigoDeMuestraDemo: String {
         switch self {
         case .producto: return DemoStore.codigoDeMuestraAlmacen
-        case .etiquetaHerramienta: return DemoStore.codigoDeMuestraHerramienta
+        case .etiquetaHerramienta, .herramientaOProducto: return DemoStore.codigoDeMuestraHerramienta
         }
     }
 }

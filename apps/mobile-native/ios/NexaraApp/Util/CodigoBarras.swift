@@ -121,6 +121,15 @@ enum CodigoBarras {
         return sinPrefijoAim(base).trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
 
+    /// ¿Tiene forma de etiqueta de herramienta? Nomenclatura `PREFIJO-SERIE` (`MUL-12345`),
+    /// la misma que reconoce `pistaDeSerie` en `tool-nomenclature.ts`. Decide qué se busca
+    /// primero en el escáner; no garantiza nada: una clave interna de almacén puede tener
+    /// la misma forma (por eso, si no es herramienta, se busca después como artículo).
+    static func esFormaEtiquetaHerramienta(_ valor: String?) -> Bool {
+        normalizarEtiquetaHerramienta(valor)
+            .range(of: "^[A-Z]{3}-[A-Z0-9-]{1,32}$", options: .regularExpression) != nil
+    }
+
     static func motivoEtiquetaInvalida(_ valor: String?) -> String? {
         let codigo = normalizarEtiquetaHerramienta(valor)
         if codigo.isEmpty { return "Escanea o escribe la etiqueta de la herramienta" }

@@ -10,10 +10,13 @@ enum FormatosDeEscaneo {
     case producto
     /// Herramientas: la etiqueta Code 128 que imprime el inventario.
     case etiquetaHerramienta
+    /// Herramientas para quien también abre Almacén: la etiqueta y los códigos de producto
+    /// (lee lo mismo que `.producto`; en la demostración la muestra es una herramienta).
+    case herramientaOProducto
 
     var tipos: [AVMetadataObject.ObjectType] {
         switch self {
-        case .producto: return [.ean13, .ean8, .upce, .code128]
+        case .producto, .herramientaOProducto: return [.ean13, .ean8, .upce, .code128]
         case .etiquetaHerramienta: return [.code128]
         }
     }

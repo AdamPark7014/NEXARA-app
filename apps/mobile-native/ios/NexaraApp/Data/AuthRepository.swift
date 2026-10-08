@@ -97,6 +97,7 @@ final class AuthRepository {
         SessionStore.shared.save(user)
         user = await enrichSession(user)
         SessionStore.shared.save(user)
+        await Self.anotarNavegacionLeida()
         QuickProfileStore.remember(user)
         return user
     }
@@ -251,15 +252,72 @@ final class AuthRepository {
 
         // Los permisos se refrescan aquí y no sólo al iniciar sesión: es el
         // único punto que la app vuelve a pisar de forma periódica
-        // (`NexaraApp.swift` lo llama al volver a primer plano).
+        // (`NexaraApp.swift` lo llama al volver a primer plano). El menú pasa por
+        // `refreshNavigation`, el mismo que usa el shell: así no se piden dos veces
+        // y el perfil se lee después de que el menú quedó guardado.
         guard let latest = SessionStore.shared.currentUser, latest.id == current.id else { return }
-        var enriched = await enrichSession(latest)
-        if let now = SessionStore.shared.currentUser, now.id == enriched.id {
-            enriched.token = now.token
-            enriched.expiresAt = now.expiresAt
-            SessionStore.shared.save(enriched)
-        }
+        await refreshNavigation()
         _ = await refreshProfile()
+    }
+
+    // MARK: Menú (`me/navigation`)
+
+    /// Cada cuánto, como mucho, se vuelve a pedir el menú (Android `MainActivity`).
+    static let intervaloNavegacion: TimeInterval = 5 * 60
+    /// Cuándo se pidió el menú por última vez; `nil` = todavía no en esta ejecución.
+    @MainActor private static var ultimaNavegacion: Date?
+    /// La recarga en curso: quien llega mientras viaja espera la misma.
+    @MainActor private static var navegacionEnCurso: Task<Void, Never>?
+
+    /// Recarga `company/mine` + `me/navigation` y la guarda en la sesión: cuando a
+    /// alguien le dan o le quitan un módulo, el menú («Más», barra inferior) cambia sin
+    /// volver a entrar. La piden el shell al montarse y al volver a primer plano, y
+    /// `maybeExtendSession`. Como mucho cada 5 min; `forzar` se salta la espera (sesión
+    /// que todavía no trae menú). Una sola a la vez. En demo y en cuentas de portal no se
+    /// pide nada.
+    @MainActor
+    func refreshNavigation(forzar: Bool = false) async {
+        if let enCurso = Self.navegacionEnCurso {
+            await enCurso.value
+            return
+        }
+        guard let user = SessionStore.shared.currentUser,
+              !user.isClient, !user.isBranchUser, !DemoMode.isActive else { return }
+        if !forzar, let ultima = Self.ultimaNavegacion,
+           Date().timeIntervalSince(ultima) < Self.intervaloNavegacion {
+            return
+        }
+        Self.ultimaNavegacion = Date()
+        let tarea = Task { @MainActor in
+            await AuthRepository.shared.guardarNavegacion(de: user)
+        }
+        Self.navegacionEnCurso = tarea
+        await tarea.value
+        Self.navegacionEnCurso = nil
+    }
+
+    /// El login acaba de leer el menú: el shell no lo vuelve a pedir al montarse.
+    @MainActor
+    private static func anotarNavegacionLeida() {
+        ultimaNavegacion = Date()
+    }
+
+    /// Pide el menú y copia SOLO sus campos sobre la sesión vigente: mientras viajaba la
+    /// petición el token pudo renovarse o `refreshProfile` guardar permisos, y eso no se
+    /// pisa. Nunca resucita una sesión cerrada ni toca la de otra cuenta.
+    @MainActor
+    private func guardarNavegacion(de user: SessionUser) async {
+        let enriched = await enrichSession(user)
+        guard let now = SessionStore.shared.currentUser, now.id == user.id else { return }
+        var merged = now
+        if enriched.companyId != user.companyId { merged.companyId = enriched.companyId }
+        if enriched.roleKey != user.roleKey { merged.roleKey = enriched.roleKey }
+        if enriched.orgRoleKey != user.orgRoleKey { merged.orgRoleKey = enriched.orgRoleKey }
+        if enriched.navPanels != user.navPanels { merged.navPanels = enriched.navPanels }
+        if enriched.navModules != user.navModules { merged.navModules = enriched.navModules }
+        if enriched.navPaths != user.navPaths { merged.navPaths = enriched.navPaths }
+        guard merged != now else { return }
+        SessionStore.shared.save(merged)
     }
 
     /// `POST auth/session/refresh`. Una sola renovación a la vez para toda la app.
