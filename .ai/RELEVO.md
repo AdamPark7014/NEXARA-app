@@ -1,5 +1,15 @@
 # RELEVO
 
+- **08-10 ~09:30 (claude-code) — iOS: menú vivo + un solo escáner (paridad con Android).**
+  - `AuthRepository.refreshNavigation(forzar:)` (máx. cada 5 min, una sola petición en curso, conserva el menú si
+    falla, solo guarda si cambió y respeta el token vigente); `CoreShellView` la llama al montar y en cada
+    `scenePhase == .active` (forzada si la sesión no trae menú); `maybeExtendSession` pasa por ella; el login anota la
+    lectura. Demo y cliente/sucursal no piden nada.
+  - `UI/Core/Extras/EscanerDeCodigos.swift` (nuevo) usado por Almacén y Herramientas con el mismo orden, errores y
+    textos que Android; reglas puras en `EscaneoReglas`; `CodigoBarras` con la forma de etiqueta; `canOpenExtra` en
+    `Access/CoreNavigation.swift`; cámara EAN/UPC + Code 128 con acceso a Almacén.
+  - Verificado: `scripts/ios-static-check.py` 0 problemas. Compilación: la del CI (sin Mac local).
+
 - **08-10 ~09:25 (claude-code) — Android: menú vivo + un solo escáner (herramienta o artículo) para Iván.**
   - Adam: «Iván solo tiene para escanear herramientas… las que se escanean son las de almacén, y él no tiene el módulo».
   - Menú: `MainActivity` relee `me/navigation` en cada vuelta a primer plano, máx. cada 5 min

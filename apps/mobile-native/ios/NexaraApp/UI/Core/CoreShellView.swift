@@ -95,6 +95,7 @@ private enum CoreShellTab: String, Hashable, CaseIterable {
 /// nativa oculta: la que se ve es `NxBottomBar`.
 struct CoreShellView: View {
     @EnvironmentObject var session: SessionStore
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
     @StateObject private var inicio = InicioStore()
     @StateObject private var chrome = NxShellChrome()
@@ -159,6 +160,11 @@ struct CoreShellView: View {
         .onChange(of: selected) { _, _ in actualizarBarraDeEstado() }
         .onChange(of: overlay?.id) { _, _ in actualizarBarraDeEstado() }
         .onChange(of: modules) { _, _ in syncSelection() }
+        // De vuelta en primer plano: el menú se relee (como mucho cada 5 min).
+        .onChange(of: scenePhase) { _, fase in
+            guard fase == .active else { return }
+            Task { await refreshNavigationIfNeeded() }
+        }
         .onChange(of: deepLink.pending) { _, _ in applyDeepLink() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             tecladoVisible = true
@@ -432,21 +438,17 @@ struct CoreShellView: View {
 
     // MARK: Datos
 
-    /// `GET me/navigation` define el menú; se pide si la sesión aún no lo trae. También si le
-    /// faltan las rutas (`navPaths`): las sesiones abiertas antes de guardarlas solo tenían claves
-    /// y, sin rutas, dirección se quedaba sin Chat ni Asistencia hasta volver a entrar.
+    /// `GET me/navigation` define el menú. Se pide al montar el shell y cada vez que la app
+    /// vuelve a primer plano, como mucho cada 5 min (`AuthRepository.refreshNavigation`):
+    /// cuando a alguien le dan o le quitan un módulo, la barra y «Más» cambian sin volver a
+    /// entrar (`session` publica la sesión nueva). La primera de cada arranque no espera, así
+    /// que las sesiones guardadas sin rutas (`navPaths`: dirección se quedaba sin Chat ni
+    /// Asistencia) se completan al abrir; sin menú todavía (login sin red) se reintenta en
+    /// cada vuelta. Si la petición falla se conserva el menú guardado. En demo no se pide nada.
     @MainActor
     private func refreshNavigationIfNeeded() async {
-        guard let user = session.currentUser,
-              user.navModules == nil || (user.navPaths == nil && !DemoMode.isActive)
-        else { return }
-        var enriched = await AuthRepository.shared.enrichSession(user)
-        if enriched != user, let now = SessionStore.shared.currentUser, now.id == user.id {
-            // El token pudo renovarse mientras tanto: se guarda el vigente.
-            enriched.token = now.token
-            enriched.expiresAt = now.expiresAt
-            SessionStore.shared.save(enriched)
-        }
+        guard let user = session.currentUser, !DemoMode.isActive else { return }
+        await AuthRepository.shared.refreshNavigation(forzar: user.navModules == nil)
     }
 
     /// Como la web: el contador de no leídas se refresca cada 45 s. Con él se

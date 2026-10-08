@@ -1,114 +1,19 @@
 import SwiftUI
 
-/// Escáner de Almacén: lee EAN-13/EAN-8/UPC-A/UPC-E/Code 128 con la cámara (o se teclea),
-/// enseña el producto con sus existencias por almacén y deja registrar una entrada o una
-/// salida. Si el código no existe, ofrece darlo de alta con los datos del catálogo
-/// internacional ya puestos.
+/// Escáner de la pantalla de Almacén. Desde el 07-10 es el escáner único
+/// (`EscanerDeCodigos`, «Escanear artículo o herramienta»): lee EAN-13/EAN-8/UPC-A/UPC-E/
+/// Code 128 con la cámara (o se teclea). Un artículo enseña sus existencias por almacén y
+/// deja registrar una entrada o una salida; si el código no existe, ofrece darlo de alta
+/// con los datos del catálogo internacional ya puestos. Una etiqueta de herramienta
+/// enseña la herramienta y deja entregarla o recibirla.
 ///
-/// Espejo de `AlmacenEscaneo.kt` en Android: UNA tarjeta blanca (`MoreTarjeta`, relleno 14
-/// y 8 entre piezas) con el título, la indicación, el botón de cámara, el campo para
-/// teclear el código y, debajo de un divisor, el resultado. Va como primera fila de la
-/// lista de `AlmacenView`.
+/// Espejo de `AlmacenEscaneo.kt` en Android. Va como primera fila de la lista de
+/// `AlmacenView`. Aquí siguen las piezas del artículo (producto, movimiento y alta).
 struct EscanerDeAlmacen: View {
     let onMovimiento: () -> Void
 
-    /// Qué se está viendo después de escanear.
-    private enum Estado: Equatable {
-        case encontrado(ProductoPorCodigo)
-        case noExiste(String)
-    }
-
-    @State private var buscando = false
-    @State private var error: String?
-    @State private var aviso: String?
-    @State private var estado: Estado?
-    @State private var almacenes: [StockAlmacenRef]?
-
     var body: some View {
-        MoreTarjeta {
-            Text("Escanear producto")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(NxColors.fg)
-                .accessibilityAddTraits(.isHeader)
-            Text("Lee el código de barras o escríbelo para ver existencias y registrar entradas o salidas.")
-                .font(NxType.labelMedium)
-                .foregroundStyle(NxColors.muted)
-                .fixedSize(horizontal: false, vertical: true)
-
-            EscanearOEscribirCodigo(
-                titulo: "Escanear producto",
-                formatos: .producto,
-                buscando: buscando
-            ) { valor in
-                Task { await buscar(valor) }
-            }
-
-            if let error {
-                TextoDeError(texto: error)
-            }
-            if let aviso {
-                Text(aviso)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(NxColors.success)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            switch estado {
-            case .encontrado(let r):
-                DivisorDeEscaner()
-                ProductoEscaneadoVista(r: r)
-                MovimientoPorCodigoVista(r: r, almacenes: almacenes) { mensaje in
-                    onMovimiento()
-                    Task { await buscar(r.codigoBarras ?? r.product?.sku ?? "", avisoPrevio: mensaje) }
-                }
-                // Android `remember(r.codigoBarras)`: otro código empieza el formulario de cero.
-                .id(r.codigoBarras ?? r.product?.sku ?? "")
-                Button("Escanear otro") {
-                    estado = nil
-                    aviso = nil
-                    error = nil
-                }
-                .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.brand)))
-            case .noExiste(let codigo):
-                DivisorDeEscaner()
-                AltaPorCodigoVista(
-                    codigo: codigo,
-                    onCreado: { Task { await buscar(codigo, avisoPrevio: "Producto dado de alta.") } },
-                    onCancelar: { estado = nil }
-                )
-                .id(codigo)
-            case nil:
-                EmptyView()
-            }
-        }
-    }
-
-    @MainActor
-    private func buscar(_ valor: String, avisoPrevio: String? = nil) async {
-        if let motivo = CodigoBarras.motivoInvalido(valor) {
-            error = motivo
-            return
-        }
-        let codigo = CodigoBarras.limpiar(valor)
-        buscando = true
-        error = nil
-        aviso = avisoPrevio
-        defer { buscando = false }
-        do {
-            estado = .encontrado(try await EscaneoRepository.shared.productoPorCodigo(codigo))
-            if almacenes == nil {
-                almacenes = (try? await EscaneoRepository.shared.almacenes()) ?? []
-            }
-        } catch {
-            if EscaneoReglas.codigoHttp(error) == 404 {
-                estado = .noExiste(codigo)
-            } else {
-                estado = nil
-                self.error = EscaneoReglas.mensaje(
-                    error, accion: "consultar el almacén", fallback: "No se pudo buscar el código"
-                )
-            }
-        }
+        EscanerDeCodigos(enAlmacen: true, onMovimiento: onMovimiento)
     }
 }
 
@@ -173,7 +78,7 @@ private func botonLleno(alto: CGFloat, llenaAncho: Bool = false) -> BotonMateria
 
 /// Android `ProductoEscaneado`: nombre, clave y tipo de código, aviso de caja, la
 /// existencia total y un renglón por almacén con lo apartado.
-private struct ProductoEscaneadoVista: View {
+struct ProductoEscaneadoVista: View {
     let r: ProductoPorCodigo
 
     private var detalle: String {
@@ -241,7 +146,7 @@ private struct ProductoEscaneadoVista: View {
 
 /// Android `MovimientoPorCodigo`: entrada o salida, el almacén (en salida solo donde hay
 /// existencia), la cantidad en la unidad de lo escaneado y una nota opcional.
-private struct MovimientoPorCodigoVista: View {
+struct MovimientoPorCodigoVista: View {
     let r: ProductoPorCodigo
     let almacenes: [StockAlmacenRef]?
     let onHecho: (String) -> Void
@@ -390,7 +295,7 @@ private struct MovimientoPorCodigoVista: View {
 
 /// Android `AltaPorCodigo`: el código no existe; «Dar de alta» abre el formulario con lo
 /// que sepa el catálogo internacional (solo UPC/EAN de 12 a 14 dígitos).
-private struct AltaPorCodigoVista: View {
+struct AltaPorCodigoVista: View {
     let codigo: String
     let onCreado: () -> Void
     let onCancelar: () -> Void
