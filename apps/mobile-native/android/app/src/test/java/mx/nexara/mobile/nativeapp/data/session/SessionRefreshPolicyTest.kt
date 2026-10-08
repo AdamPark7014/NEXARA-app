@@ -175,4 +175,23 @@ class SessionRefreshPolicyTest {
         assertNull(SessionRefreshPolicy.parseIsoInstantMs(""))
         assertNull(SessionRefreshPolicy.parseIsoInstantMs("2026-13-01T00:00:00Z"))
     }
+
+    // ---- Menú (me/navigation) al volver a primer plano ------------------------
+
+    @Test
+    fun `el menu se relee la primera vez y luego como maximo cada 5 minutos`() {
+        val t0 = 1_000_000L
+        val cinco = SessionRefreshPolicy.NAVIGATION_REFRESH_MIN_INTERVAL_MS
+        assertEquals(5L * 60_000L, cinco)
+        assertTrue(SessionRefreshPolicy.shouldRefreshNavigation(null, t0))
+        assertFalse(SessionRefreshPolicy.shouldRefreshNavigation(t0, t0))
+        assertFalse(SessionRefreshPolicy.shouldRefreshNavigation(t0, t0 + cinco - 1))
+        assertTrue(SessionRefreshPolicy.shouldRefreshNavigation(t0, t0 + cinco))
+        assertTrue(SessionRefreshPolicy.shouldRefreshNavigation(t0, t0 + 3 * cinco))
+    }
+
+    @Test
+    fun `si el reloj se fue hacia atras el menu se relee`() {
+        assertTrue(SessionRefreshPolicy.shouldRefreshNavigation(lastRefreshAtMs = 10_000_000L, nowMs = 5_000L))
+    }
 }

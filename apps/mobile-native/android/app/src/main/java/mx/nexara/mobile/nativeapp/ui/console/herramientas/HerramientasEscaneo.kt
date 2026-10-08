@@ -10,8 +10,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,15 +22,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import mx.nexara.mobile.nativeapp.access.CoreKeys
+import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.SessionRevision
 import mx.nexara.mobile.nativeapp.data.api.HerramientaPorCodigoDto
 import mx.nexara.mobile.nativeapp.data.api.isForbidden
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.EscaneoRepository
-import mx.nexara.mobile.nativeapp.ui.common.CodigoBarrasRules
-import mx.nexara.mobile.nativeapp.ui.common.EscanearOEscribirCodigo
-import mx.nexara.mobile.nativeapp.ui.common.FormatosDeEscaneo
+import mx.nexara.mobile.nativeapp.ui.console.CoreMenu
+import mx.nexara.mobile.nativeapp.ui.console.more.EscanerDeCodigos
 import mx.nexara.mobile.nativeapp.ui.console.more.EscaneoRules
-import mx.nexara.mobile.nativeapp.ui.console.more.MoreTarjeta
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
@@ -43,82 +44,23 @@ private fun Throwable.mensajeHerramienta(accion: String, fallback: String): Stri
  * `MUL-12345`): enseña la herramienta, quién la tiene y, si hay un préstamo aprobado
  * o en uso, deja registrar la salida o la entrada. Entregar y recibir son de almacén
  * (`tools.manage`): a los demás el API contesta 403 y aquí se explica.
+ *
+ * Quien puede abrir Almacén lee aquí también artículos (es el mismo escáner,
+ * [EscanerDeCodigos]); se relee con la sesión, así que si le dan o quitan Almacén
+ * cambia sin volver a entrar.
  */
 @Composable
 fun EscanerDeHerramientas(onMovimiento: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val repo = remember(context) { EscaneoRepository(context) }
-    val scope = rememberCoroutineScope()
-
-    var buscando by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var aviso by remember { mutableStateOf<String?>(null) }
-    var resultado by remember { mutableStateOf<HerramientaPorCodigoDto?>(null) }
-
-    fun buscar(valor: String, avisoPrevio: String? = null) {
-        val motivo = CodigoBarrasRules.motivoEtiquetaInvalida(valor)
-        if (motivo != null) {
-            error = motivo
-            return
-        }
-        val codigo = CodigoBarrasRules.normalizarEtiquetaHerramienta(valor)
-        scope.launch {
-            buscando = true
-            error = null
-            aviso = avisoPrevio
-            try {
-                resultado = repo.herramientaPorCodigo(codigo)
-            } catch (e: Exception) {
-                resultado = null
-                error = e.mensajeHerramienta("consultar herramientas", "No se pudo buscar la etiqueta")
-            } finally {
-                buscando = false
-            }
-        }
+    val revision by SessionRevision.valor.collectAsState()
+    val puedeAlmacen = remember(context, revision) {
+        CoreMenu.canOpenExtra(AuthRepository(context).loadSession(), CoreKeys.ALMACEN)
     }
-
-    MoreTarjeta(modifier = modifier) {
-        Text(
-            "Escanear herramienta",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = NxColors.Slate,
-        )
-        Text(
-            "Lee la etiqueta NEXARA de la herramienta (o escribe su código) para ver quién la tiene.",
-            style = MaterialTheme.typography.labelMedium,
-            color = NxColors.Muted,
-        )
-        EscanearOEscribirCodigo(
-            titulo = "Escanear herramienta",
-            formatos = FormatosDeEscaneo.ETIQUETA_HERRAMIENTA,
-            buscando = buscando,
-            onCodigo = { buscar(it) },
-            etiquetaCampo = "Código de la etiqueta",
-            mayusculas = true,
-        )
-        error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = NxColors.Danger) }
-        aviso?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = NxColors.Success)
-        }
-
-        resultado?.let { r ->
-            HorizontalDivider()
-            HerramientaEscaneada(r)
-            AccionDeHerramienta(
-                r = r,
-                repo = repo,
-                onHecho = { mensaje ->
-                    onMovimiento()
-                    buscar(r.codigo.orEmpty(), avisoPrevio = mensaje)
-                },
-            )
-            TextButton(onClick = { resultado = null; aviso = null; error = null }) { Text("Escanear otra") }
-        }
-    }
+    EscanerDeCodigos(enAlmacen = false, puedeAlmacen = puedeAlmacen, onMovimiento = onMovimiento, modifier = modifier)
 }
 
 @Composable
-private fun HerramientaEscaneada(r: HerramientaPorCodigoDto) {
+internal fun HerramientaEscaneada(r: HerramientaPorCodigoDto) {
     Text(
         EscaneoRules.nombreHerramienta(r),
         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -153,7 +95,7 @@ private fun HerramientaEscaneada(r: HerramientaPorCodigoDto) {
 }
 
 @Composable
-private fun AccionDeHerramienta(
+internal fun AccionDeHerramienta(
     r: HerramientaPorCodigoDto,
     repo: EscaneoRepository,
     onHecho: (String) -> Unit,

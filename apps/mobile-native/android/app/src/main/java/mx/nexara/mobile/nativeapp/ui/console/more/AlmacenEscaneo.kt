@@ -24,7 +24,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -37,118 +36,26 @@ import mx.nexara.mobile.nativeapp.data.api.isForbidden
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.EscaneoRepository
 import mx.nexara.mobile.nativeapp.ui.common.CodigoBarrasRules
-import mx.nexara.mobile.nativeapp.ui.common.EscanearOEscribirCodigo
-import mx.nexara.mobile.nativeapp.ui.common.FormatosDeEscaneo
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
-import retrofit2.HttpException
-
-/** Qué se está viendo después de escanear. */
-private sealed interface EscaneoAlmacen {
-    data class Encontrado(val r: ProductoPorCodigoDto) : EscaneoAlmacen
-    data class NoExiste(val codigo: String) : EscaneoAlmacen
-}
 
 private fun Throwable.mensajeAlmacen(accion: String, fallback: String): String =
     if (isForbidden()) EscaneoRules.textoSinPermiso(accion, toUserMessage(fallback)) else toUserMessage(fallback)
 
 /**
  * Escáner de Almacén: lee EAN-13/EAN-8/UPC-A/UPC-E/Code 128 con la cámara (o se
- * teclea), enseña el producto con sus existencias y deja registrar una entrada o
- * una salida. Si el código no existe, ofrece darlo de alta con los datos del
- * catálogo internacional ya puestos.
+ * teclea). Un artículo enseña sus existencias y deja registrar una entrada o una
+ * salida; si no existe, ofrece darlo de alta con los datos del catálogo
+ * internacional ya puestos. Una etiqueta de herramienta enseña la herramienta con
+ * entregar/recibir: es el mismo escáner que el de Herramientas ([EscanerDeCodigos]).
  */
 @Composable
 fun EscanerDeAlmacen(onMovimiento: () -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val repo = remember(context) { EscaneoRepository(context) }
-    val scope = rememberCoroutineScope()
-
-    var buscando by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var aviso by remember { mutableStateOf<String?>(null) }
-    var estado by remember { mutableStateOf<EscaneoAlmacen?>(null) }
-    var almacenes by remember { mutableStateOf<List<StockAlmacenDto>?>(null) }
-
-    fun buscar(valor: String, avisoPrevio: String? = null) {
-        val motivo = CodigoBarrasRules.motivoInvalido(valor)
-        if (motivo != null) {
-            error = motivo
-            return
-        }
-        val codigo = CodigoBarrasRules.limpiar(valor)
-        scope.launch {
-            buscando = true
-            error = null
-            aviso = avisoPrevio
-            try {
-                estado = EscaneoAlmacen.Encontrado(repo.productoPorCodigo(codigo))
-                if (almacenes == null) almacenes = runCatching { repo.almacenes() }.getOrDefault(emptyList())
-            } catch (e: Exception) {
-                if ((e as? HttpException)?.code() == 404) {
-                    estado = EscaneoAlmacen.NoExiste(codigo)
-                } else {
-                    estado = null
-                    error = e.mensajeAlmacen("consultar el almacén", "No se pudo buscar el código")
-                }
-            } finally {
-                buscando = false
-            }
-        }
-    }
-
-    MoreTarjeta(modifier = modifier) {
-        Text(
-            "Escanear producto",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = NxColors.Slate,
-        )
-        Text(
-            "Lee el código de barras o escríbelo para ver existencias y registrar entradas o salidas.",
-            style = MaterialTheme.typography.labelMedium,
-            color = NxColors.Muted,
-        )
-        EscanearOEscribirCodigo(
-            titulo = "Escanear producto",
-            formatos = FormatosDeEscaneo.PRODUCTO,
-            buscando = buscando,
-            onCodigo = { buscar(it) },
-        )
-        error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = NxColors.Danger) }
-        aviso?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = NxColors.Success)
-        }
-
-        when (val actual = estado) {
-            is EscaneoAlmacen.Encontrado -> {
-                HorizontalDivider()
-                ProductoEscaneado(actual.r)
-                MovimientoPorCodigo(
-                    r = actual.r,
-                    almacenes = almacenes,
-                    repo = repo,
-                    onHecho = { mensaje ->
-                        onMovimiento()
-                        buscar(actual.r.codigoBarras ?: actual.r.product?.sku.orEmpty(), avisoPrevio = mensaje)
-                    },
-                )
-                TextButton(onClick = { estado = null; aviso = null; error = null }) { Text("Escanear otro") }
-            }
-            is EscaneoAlmacen.NoExiste -> {
-                HorizontalDivider()
-                AltaPorCodigo(
-                    codigo = actual.codigo,
-                    repo = repo,
-                    onCreado = { buscar(actual.codigo, avisoPrevio = "Producto dado de alta.") },
-                    onCancelar = { estado = null },
-                )
-            }
-            null -> Unit
-        }
-    }
+    // Quien ve esta pantalla puede abrir Almacén (ConsoleNavHost solo la monta así).
+    EscanerDeCodigos(enAlmacen = true, puedeAlmacen = true, onMovimiento = onMovimiento, modifier = modifier)
 }
 
 @Composable
-private fun ProductoEscaneado(r: ProductoPorCodigoDto) {
+internal fun ProductoEscaneado(r: ProductoPorCodigoDto) {
     val p = r.product
     Text(
         p?.name?.takeIf { it.isNotBlank() } ?: "Producto",
@@ -194,7 +101,7 @@ private fun ProductoEscaneado(r: ProductoPorCodigoDto) {
 }
 
 @Composable
-private fun MovimientoPorCodigo(
+internal fun MovimientoPorCodigo(
     r: ProductoPorCodigoDto,
     almacenes: List<StockAlmacenDto>?,
     repo: EscaneoRepository,
@@ -322,7 +229,7 @@ private fun MovimientoPorCodigo(
 }
 
 @Composable
-private fun AltaPorCodigo(
+internal fun AltaPorCodigo(
     codigo: String,
     repo: EscaneoRepository,
     onCreado: () -> Unit,

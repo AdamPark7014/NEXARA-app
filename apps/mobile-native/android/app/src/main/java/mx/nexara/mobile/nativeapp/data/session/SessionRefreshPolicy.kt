@@ -20,6 +20,28 @@ object SessionRefreshPolicy {
     const val FOREGROUND_CHECK_INTERVAL_MS: Long = 30L * 60_000L
 
     /**
+     * El menú (`GET me/navigation`) se relee al volver a primer plano, pero no
+     * más de una vez cada 5 min: así a quien le dan o quitan un módulo le aparece
+     * sin cerrar sesión, sin pedirlo en cada vistazo a la app.
+     */
+    const val NAVIGATION_REFRESH_MIN_INTERVAL_MS: Long = 5L * 60_000L
+
+    /**
+     * ¿Toca releer la navegación? Nunca leída en este proceso → sí. Si el reloj
+     * del teléfono se fue hacia atrás (ahora < última), también: esperar a que
+     * vuelva a alcanzarla podría dejar el menú viejo horas.
+     */
+    fun shouldRefreshNavigation(
+        lastRefreshAtMs: Long?,
+        nowMs: Long,
+        minIntervalMs: Long = NAVIGATION_REFRESH_MIN_INTERVAL_MS,
+    ): Boolean {
+        if (lastRefreshAtMs == null) return true
+        if (nowMs < lastRefreshAtMs) return true
+        return nowMs - lastRefreshAtMs >= minIntervalMs
+    }
+
+    /**
      * Tras un fallo transitorio (red/5xx) no se vuelve a pegar al servidor con el
      * mismo token durante esta ventana: evita que diez 401 simultáneos sin red
      * lancen diez renovaciones seguidas.

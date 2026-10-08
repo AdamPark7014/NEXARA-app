@@ -210,15 +210,17 @@ class AuthRepository(
             companies.firstOrNull()?.id
         }.getOrNull()?.takeIf { it > 0L } ?: user.companyId
 
-        val nav = runCatching { api.meNavigation() }.getOrNull()
+        // Sin red (o 5xx) se conserva el menú que ya había: ahora se relee en cada
+        // vuelta a primer plano, y borrarlo dejaba «Más» con lo de todo el personal.
+        val nav = runCatching { api.meNavigation() }.getOrNull() ?: return user.copy(companyId = companyId)
 
         return user.copy(
             companyId = companyId,
-            roleKey = nav?.roleKey ?: user.roleKey,
-            orgRoleKey = nav?.orgRoleKey ?: user.orgRoleKey,
-            navModuleKeys = nav?.moduleKeys?.takeIf { it.isNotEmpty() },
-            navPanels = nav?.panels?.takeIf { it.isNotEmpty() },
-            navPaths = nav?.paths?.takeIf { it.isNotEmpty() },
+            roleKey = nav.roleKey ?: user.roleKey,
+            orgRoleKey = nav.orgRoleKey ?: user.orgRoleKey,
+            navModuleKeys = nav.moduleKeys?.takeIf { it.isNotEmpty() },
+            navPanels = nav.panels?.takeIf { it.isNotEmpty() },
+            navPaths = nav.paths?.takeIf { it.isNotEmpty() },
         )
     }
 
@@ -239,11 +241,16 @@ class AuthRepository(
         return merged
     }
 
-    /** Refresca paneles/módulos desde /me/navigation (login o resume). */
+    /**
+     * Refresca paneles/módulos desde /me/navigation (login o vuelta a primer plano).
+     * Solo guarda si algo cambió: cada guardado sube `SessionRevision` y recompone el shell.
+     */
     suspend fun refreshNavigation() {
         val current = sessionStore.load() ?: return
         if (current.isClient || current.isBranchUser) return
-        saveEnriched(enrichSession(current))
+        val enriched = enrichSession(current)
+        if (enriched == current) return
+        saveEnriched(enriched)
     }
 
     /**

@@ -78,6 +78,23 @@ class CodigoBarrasRulesTest {
     }
 
     @Test
+    fun formaDeEtiquetaDeHerramienta() {
+        assertTrue(CodigoBarrasRules.esFormaEtiquetaHerramienta("MUL-12345"))
+        // El lector puede traer minúsculas, espacios o el prefijo AIM.
+        assertTrue(CodigoBarrasRules.esFormaEtiquetaHerramienta(" ]C1mul-12345\r\n"))
+        assertTrue(CodigoBarrasRules.esFormaEtiquetaHerramienta("TAL-SN-88-A"))
+        assertTrue(CodigoBarrasRules.esFormaEtiquetaHerramienta("HER-SINSERIE"))
+        // Un EAN, una clave sin prefijo de tres letras o con símbolos no son etiqueta.
+        assertFalse(CodigoBarrasRules.esFormaEtiquetaHerramienta("7501055363025"))
+        assertFalse(CodigoBarrasRules.esFormaEtiquetaHerramienta("CABLE-001"))
+        assertFalse(CodigoBarrasRules.esFormaEtiquetaHerramienta("MU-1"))
+        assertFalse(CodigoBarrasRules.esFormaEtiquetaHerramienta("MUL-"))
+        assertFalse(CodigoBarrasRules.esFormaEtiquetaHerramienta("MUL-12/3"))
+        assertFalse(CodigoBarrasRules.esFormaEtiquetaHerramienta("MUL-" + "1".repeat(33)))
+        assertFalse(CodigoBarrasRules.esFormaEtiquetaHerramienta(null))
+    }
+
+    @Test
     fun cantidades() {
         assertEquals(3.0, CodigoBarrasRules.parseCantidad("3")!!, 0.0)
         assertEquals(2.5, CodigoBarrasRules.parseCantidad("2,5")!!, 0.0)
