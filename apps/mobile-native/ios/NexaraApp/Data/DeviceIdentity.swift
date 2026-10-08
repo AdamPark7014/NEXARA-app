@@ -42,6 +42,16 @@ enum DeviceIdentity {
         ]
     }
 
+    /// Pone estas cabeceras en una petición. La usan `ApiClient` y todo lo que habla con el
+    /// API por su cuenta (la cola sin conexión, las imágenes de `/uploads`): sin ellas
+    /// URLSession manda «CFNetwork … Darwin» y el servidor no reconoce a la app. En Android
+    /// la cola salía así y las checadas capturadas sin señal se rechazaban como checadas web.
+    static func aplicar(a req: inout URLRequest) {
+        for (header, value) in headers {
+            req.setValue(value, forHTTPHeaderField: header)
+        }
+    }
+
     private static let marketingNames: [String: String] = [
         "iPhone12,1": "iPhone 11", "iPhone12,3": "iPhone 11 Pro", "iPhone12,5": "iPhone 11 Pro Max",
         "iPhone12,8": "iPhone SE (2nd gen)",

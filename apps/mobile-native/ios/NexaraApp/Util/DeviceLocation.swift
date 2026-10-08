@@ -49,6 +49,14 @@ struct DeviceCoords {
     }
 }
 
+/// Lo que salió de buscar la ubicación para una checada: las coordenadas o, si no hubo,
+/// por qué (`UbicacionFalla`). Espejo de `LecturaUbicacion` de Android.
+struct LecturaUbicacion {
+    let coords: DeviceCoords?
+    /// Código para `ubicacionFalla`; `nil` cuando sí hubo coordenadas.
+    let falla: String?
+}
+
 extension Optional where Wrapped == DeviceCoords {
     var messageSuffixOrNone: String {
         self?.messageSuffix ?? " (sin GPS)"
@@ -68,6 +76,11 @@ final class DeviceLocation: NSObject, ObservableObject, CLLocationManagerDelegat
 
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<DeviceCoords?, Never>?
+    /// Número de la lectura en curso: el plazo de una lectura que ya terminó no corta la
+    /// siguiente (antes, el temporizador de la primera resolvía la segunda antes de tiempo).
+    private var lecturaEnCurso = 0
+    /// Error que Core Location reportó en la lectura en curso; lo usa el diagnóstico de la checada.
+    private var errorDeLectura: Error?
 
     private override init() {
         super.init()
@@ -86,20 +99,78 @@ final class DeviceLocation: NSObject, ObservableObject, CLLocationManagerDelegat
         if !hasPermission {
             manager.requestWhenInUseAuthorization()
         }
+        return await leer(precision: kCLLocationAccuracyHundredMeters, segundos: 8)
+    }
+
+    /// Lectura para la checada: las coordenadas o, si no las hubo, POR QUÉ.
+    ///
+    /// La lectura de siempre pide 100 m (Wi-Fi y celdas): adentro de un edificio o con datos
+    /// malos regresa vacía y antes nadie reintentaba. Si sale vacía y hay permiso, se intenta
+    /// una vez con `kCLLocationAccuracyBest`, que sí enciende el GPS. Si tampoco, se dice por
+    /// qué (`UbicacionFalla`) y el jefe lo lee en el motivo «Sin ubicación: …».
+    ///
+    /// - Parameter previaVacia: quien llama ya hizo la lectura de siempre y salió vacía (la
+    ///   cámara de la checada la hace al tomar la foto): se va directo a la de máxima precisión.
+    func lecturaChecada(previaVacia: Bool = false) async -> LecturaUbicacion {
+        if DemoMode.isActive { return LecturaUbicacion(coords: DemoImages.coords, falla: nil) }
+        var coords: DeviceCoords?
+        if !previaVacia {
+            coords = await current()
+        }
+        if coords == nil, hasPermission {
+            coords = await leer(precision: kCLLocationAccuracyBest, segundos: 12)
+        }
+        if let coords {
+            return LecturaUbicacion(coords: coords, falla: nil)
+        }
+        let encendida = await Self.ubicacionEncendida()
+        let falla = UbicacionFalla.de(
+            tienePermiso: hasPermission,
+            ubicacionEncendida: encendida,
+            huboError: Self.esFallaDeLectura(errorDeLectura)
+        )
+        return LecturaUbicacion(coords: nil, falla: falla)
+    }
+
+    /// Una lectura con la precisión pedida y un plazo; al vencer el plazo se usa la última
+    /// posición que guardó el sistema.
+    private func leer(precision: CLLocationAccuracy, segundos: UInt64) async -> DeviceCoords? {
+        manager.desiredAccuracy = precision
+        errorDeLectura = nil
+        lecturaEnCurso += 1
+        let numero = lecturaEnCurso
         return await withCheckedContinuation { cont in
             continuation?.resume(returning: nil)
             continuation = cont
             manager.requestLocation()
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                if let c = self.continuation {
-                    self.continuation = nil
-                    // `manager.location` es la última que el sistema guardó: puede ser vieja.
-                    // No se descarta aquí — su `fixAgeMs` viaja y el servidor decide.
-                    c.resume(returning: self.manager.location.map { $0.toCoords() })
-                }
+                try? await Task.sleep(nanoseconds: segundos * 1_000_000_000)
+                guard numero == self.lecturaEnCurso, let c = self.continuation else { return }
+                self.continuation = nil
+                // La petición del sistema sigue viva: se cancela para que su respuesta tardía
+                // no conteste la lectura siguiente.
+                self.manager.stopUpdatingLocation()
+                // `manager.location` es la última que el sistema guardó: puede ser vieja.
+                // No se descarta aquí — su `fixAgeMs` viaja y el servidor decide.
+                c.resume(returning: self.manager.location.map { $0.toCoords() })
             }
         }
+    }
+
+    /// `locationServicesEnabled()` le pregunta al sistema de forma síncrona y Apple pide no
+    /// llamarla en el hilo principal (puede trabar la pantalla): se pregunta fuera de él.
+    static func ubicacionEncendida() async -> Bool {
+        await Task.detached(priority: .userInitiated) {
+            CLLocationManager.locationServicesEnabled()
+        }.value
+    }
+
+    /// «Todavía no hay lectura» (`locationUnknown`) es falta de señal, no una falla. El
+    /// permiso negado y la ubicación apagada los explica `UbicacionFalla` antes que esto.
+    private static func esFallaDeLectura(_ error: Error?) -> Bool {
+        guard let error else { return false }
+        if let cl = error as? CLError, cl.code == .locationUnknown { return false }
+        return true
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -111,6 +182,7 @@ final class DeviceLocation: NSObject, ObservableObject, CLLocationManagerDelegat
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
+            if continuation != nil { errorDeLectura = error }
             continuation?.resume(returning: manager.location.map { $0.toCoords() })
             continuation = nil
         }

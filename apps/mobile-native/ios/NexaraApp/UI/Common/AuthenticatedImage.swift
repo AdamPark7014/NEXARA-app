@@ -114,6 +114,8 @@ actor AuthenticatedAssetLoader {
         var request = URLRequest(url: url)
         request.setValue("*/*", forHTTPHeaderField: "Accept")
         if isOwnOrigin(url) {
+            // Mismas cabeceras de identidad que `ApiClient`: es la app pidiendo al API.
+            DeviceIdentity.aplicar(a: &request)
             if let token = SessionStore.shared.token {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }

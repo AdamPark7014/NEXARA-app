@@ -373,7 +373,16 @@ final class AttendanceVM: ObservableObject {
         checkInBloqueo = nil
         defer { checkInLoading = false }
         var coords = photo.coords
-        if coords == nil { coords = await DeviceLocation.shared.current() }
+        // Por qué no hubo coordenadas (solo se manda si faltan): el jefe lo lee como
+        // «Sin ubicación: …» en vez de un «Sin ubicación» a secas.
+        var falla: String?
+        if coords == nil {
+            // La cámara ya hizo la lectura de siempre al tomar la foto y salió vacía: ahora
+            // la de máxima precisión y, si tampoco, el diagnóstico.
+            let lectura = await DeviceLocation.shared.lecturaChecada(previaVacia: true)
+            coords = lectura.coords
+            falla = lectura.falla
+        }
         do {
             let result = try await ConsoleRepository.shared.attendanceCheckInResult(
                 type: type,
@@ -385,8 +394,12 @@ final class AttendanceVM: ObservableObject {
                 // De cuándo es la medición: el servidor no acepta una posición guardada
                 // de hace media hora como si fuera de ahora.
                 fixAgeMs: coords?.fixAgeMs,
-                photoBase64: photo.dataUrl
+                photoBase64: photo.dataUrl,
+                ubicacionFalla: coords == nil ? falla : nil
             )
+            // Con la ubicación apagada o sin permiso, el servidor deja registrado ese estado
+            // con la checada: se recuerda para avisar «ENCENDIDA» cuando se arregle.
+            EstadoUbicacionMonitor.shared.checadaRegistrada(falla: coords == nil ? falla : nil)
             if (result.raw["queued"] as? Bool) == true {
                 checkInNotice = "Sin conexión: tu checada se enviará sola en cuanto vuelva la red."
             } else {
@@ -396,7 +409,8 @@ final class AttendanceVM: ObservableObject {
                 let geo = AttendanceCheckInNota.notaGps(
                     hayCoords: coords != nil,
                     accuracyM: coords?.accuracyM,
-                    mock: coords?.mock == true
+                    mock: coords?.mock == true,
+                    falla: falla
                 )
                 let gps: String
                 if type == "entrada" {

@@ -167,9 +167,7 @@ final class ApiClient {
         req.httpMethod = method
         // Modelo y sistema del teléfono en cada petición (login incluido): el aviso de inicio de sesión
         // dice «desde iPhone 16 Pro Max (iOS 18.1)».
-        for (header, value) in DeviceIdentity.headers {
-            req.setValue(value, forHTTPHeaderField: header)
-        }
+        DeviceIdentity.aplicar(a: &req)
         if let token = SessionStore.shared.token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }

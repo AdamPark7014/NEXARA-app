@@ -296,9 +296,10 @@ enum AttendanceCheckInNota {
     /// Baja precisión: se avisa en pantalla antes de que el servidor lo marque.
     static let precisionBaja: Double = 100
 
-    /// Sufijo de la confirmación: « · GPS ±12m», « (sin GPS — activa ubicación)».
-    static func notaGps(hayCoords: Bool, accuracyM: Double?, mock: Bool) -> String {
-        if !hayCoords { return " (sin GPS — activa ubicación)" }
+    /// Sufijo de la confirmación: « · GPS ±12m» o, sin coordenadas, el porqué
+    /// (« · sin ubicación: la ubicación del teléfono está apagada», `UbicacionFalla.nota`).
+    static func notaGps(hayCoords: Bool, accuracyM: Double?, mock: Bool, falla: String? = nil) -> String {
+        if !hayCoords { return UbicacionFalla.nota(falla) }
         if mock { return " · ubicación simulada detectada" }
         guard let acc = accuracyM, acc.isFinite else { return " · GPS ok" }
         let metros = Int(acc)

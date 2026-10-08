@@ -43,6 +43,9 @@ final class OfflineSyncCoordinator {
             }
             var req = URLRequest(url: URL(string: item.url)!)
             req.httpMethod = item.method
+            // La misma identidad que `ApiClient`: una checada que esperó en la cola tiene que
+            // llegar como de la app, no como «CFNetwork» (el servidor la tomaría por navegador).
+            DeviceIdentity.aplicar(a: &req)
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             req.setValue(item.contentType, forHTTPHeaderField: "Content-Type")
             if let binario = OfflineMediaStore.shared.cuerpoBinario(item.body) {
