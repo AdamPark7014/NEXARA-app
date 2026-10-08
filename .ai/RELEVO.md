@@ -1,5 +1,22 @@
 # RELEVO
 
+- **08-10 ~11:10 (claude-code) — «Sin ubicación» dice por qué + la cola sin conexión ya no se toma por PC.**
+  - Adam (captura de Asistencias): «por qué hay muchos usuarios sin ubicación… que diga por qué».
+  - Diagnóstico con datos: Iván, Mónica y Roberto (Android) mandaron la checada sin coordenadas y sin causa (tienen
+    permiso; su GPS de jornada mandó puntos minutos después): `DeviceLocation.current()` usa BALANCED (Wi-Fi/celda) y
+    no reintenta con GPS. Salvador checó sin señal: la app la mandó después por `OfflineSyncCoordinator`, que usaba un
+    OkHttp sin identidad (`okhttp/4.x`) → el API la leía como PC/WEB; con la excepción web cerrada eso se RECHAZA
+    (5 checadas reales rechazadas así del 28-09 al 06-10: infraestructura 28-09 entrada, finanzas 29-09 salida y
+    30-09 entrada, Daniela 30-09, soporte 06-10 salida). La excepción web está abierta hasta el 18-10.
+  - API: `ubicacionFalla` en `CreateAttendanceDto` (PERMISO_NEGADO, UBICACION_APAGADA, SIN_SENAL, NO_DISPONIBLE,
+    ERROR) → `motivoSinUbicacion` («Sin ubicación: ubicación del teléfono apagada», «…: checada desde el navegador»,
+    sin causa: «…: la app no informó la causa (versión anterior)»). `clienteNativoSinIdentidad`: `okhttp/…` = Android,
+    `CFNetwork … Darwin` = iOS (origen y deviceInfo «… NEXARA App (envío diferido)»).
+  - Web: `AttendanceForm` manda `ubicacionFalla` con `fallaDeGeolocalizacion` (código 1/2/3 del navegador).
+  - Apps (en curso por agentes): identidad en la cola sin conexión, reintento con GPS fino, diagnóstico y
+    `ubicacionFalla`. Pendiente pedido nuevo de Adam: «que nos registre si hay algún dispositivo con la ubicación
+    apagada» (durante la jornada, no solo al checar).
+
 - **08-10 ~09:45 (claude-code) — Almacén: tipo de artículo + capacidad de empaque + búsqueda rápida (API y web).**
   - Adam: «tipado más fuerte… búsqueda rápida en stock y almacén… un taladro es uno y uno, otro un bote de cinchos
     con 100 piezas»; aprobó 4 tipos (Herramienta, Equipo, Consumible, Por medida) y búsqueda «en ambas» pantallas.

@@ -137,7 +137,25 @@ describe('lo que no se puede comprobar se marca, no se rechaza', () => {
 
     const guardada = fila(prisma);
     expect(guardada.validacion).toBe('REVISAR');
-    expect(guardada.motivoValidacion).toBe(MOTIVO_VALIDACION.sinUbicacion);
+    expect(guardada.motivoValidacion).toBe(`${MOTIVO_VALIDACION.sinUbicacion}: la app no informó la causa (versión anterior)`);
+  });
+
+  it('sin ubicación con el diagnóstico de la app: el jefe lee la causa', async () => {
+    const { service, prisma } = build();
+
+    await service.register(entrada({ ubicacionFalla: 'UBICACION_APAGADA' }) as any, 3, PETICION_APP, 7);
+
+    expect(fila(prisma).motivoValidacion).toBe('Sin ubicación: ubicación del teléfono apagada');
+  });
+
+  it('la cola sin conexión de una app vieja (okhttp) no se toma por una PC ni se rechaza', async () => {
+    const { service, prisma } = build();
+
+    await service.register(entrada({ offline: true }) as any, 3, { headers: { 'user-agent': 'okhttp/4.12.0' } }, 7);
+
+    const guardada = fila(prisma);
+    expect(guardada.origen).toBe('ANDROID');
+    expect(guardada.deviceInfo).toBe('Móvil · Android · NEXARA App (envío diferido)');
   });
 
   it('precisión de 500 m: se acepta y queda a revisar', async () => {

@@ -51,6 +51,8 @@ import {
   coordenadaRepetida,
   edadDelPunto,
   evaluarUbicacion,
+  clienteNativoSinIdentidad,
+  deviceInfoNativo,
   horaCierreAutomatico,
   motivoCorreccionValido,
   origenChecada,
@@ -1440,8 +1442,10 @@ export class AttendanceService {
     const tenantId = requireCompanyId(companyId);
 
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
-    const deviceInfo = detectDeviceFromUserAgent(userAgent, req?.headers);
     const origen = origenChecada(userAgent, req?.headers);
+    // La cola sin conexión de las apps viejas manda `okhttp/…` sin identidad: no es una PC.
+    const nativo = clienteNativoSinIdentidad(userAgent);
+    const deviceInfo = nativo ? deviceInfoNativo(nativo) : detectDeviceFromUserAgent(userAgent, req?.headers);
     const coordsIntento = this.realCoords(dto.latitude, dto.longitude);
     /** Todo lo que necesita un rechazo para quedar registrado. */
     const contexto = {
@@ -1519,6 +1523,8 @@ export class AttendanceService {
     const ubicacion = evaluarUbicacion({
       coords,
       accuracyM: dto.accuracyM,
+      falla: dto.ubicacionFalla,
+      origen,
       // Con guardia trabaja donde lo manden: sin sitios no hay «fuera de sitio».
       sitios: guardia === 'CON_GUARDIA' ? [] : await this.sitiosPermitidos(userId, now, tenantId),
     });

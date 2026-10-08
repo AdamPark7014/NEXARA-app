@@ -30,6 +30,46 @@ export const MOTIVO_VALIDACION = {
 } as const;
 
 /**
+ * Por qué una checada llegó sin coordenadas, según el propio cliente (`ubicacionFalla`).
+ *
+ * Adam (08-10): «que diga por qué sin ubicación». Antes solo se guardaba «Sin ubicación» y el jefe
+ * no sabía si el teléfono tenía el GPS apagado, si negaron el permiso o si no hubo señal. Las apps
+ * y la web lo diagnostican al no obtener posición y lo mandan; el servidor lo vuelve texto.
+ */
+export const FALLA_UBICACION = {
+  PERMISO_NEGADO: 'permiso de ubicación negado',
+  UBICACION_APAGADA: 'ubicación del teléfono apagada',
+  SIN_SENAL: 'el teléfono no consiguió señal a tiempo',
+  NO_DISPONIBLE: 'el equipo no tiene GPS',
+  ERROR: 'falló la lectura del GPS',
+} as const;
+
+export type FallaUbicacion = keyof typeof FALLA_UBICACION;
+
+/**
+ * Motivo «Sin ubicación: …» con lo que se sepa. Empieza siempre igual para que se lea (y se busque)
+ * como la misma familia. Sin diagnóstico del cliente se dice lo que el servidor sí sabe: desde una
+ * computadora no hay GPS; una app vieja no informa la causa.
+ */
+export function motivoSinUbicacion(params: {
+  falla?: string | null;
+  /** En la web «el teléfono» es «el navegador». */
+  origen?: OrigenChecada | null;
+}): string {
+  const base = MOTIVO_VALIDACION.sinUbicacion;
+  const clave = String(params.falla ?? '').trim().toUpperCase() as FallaUbicacion;
+  const web = params.origen === 'WEB';
+  if (clave in FALLA_UBICACION) {
+    let texto: string = FALLA_UBICACION[clave];
+    if (web && clave === 'PERMISO_NEGADO') texto = 'el navegador no dio permiso de ubicación';
+    if (web && clave === 'SIN_SENAL') texto = 'el navegador no consiguió la ubicación a tiempo';
+    return `${base}: ${texto}`;
+  }
+  if (web) return `${base}: checada desde el navegador`;
+  return `${base}: la app no informó la causa (versión anterior)`;
+}
+
+/**
  * Ventana temporal para checar desde el navegador.
  *
  * Por decisión del dueño nadie checa desde la web (la ubicación de una pestaña se falsea). A veces hace
@@ -202,12 +242,15 @@ export function evaluarUbicacion(params: {
   coords?: { latitude: number; longitude: number } | null;
   accuracyM?: number | null;
   sitios: SitioPermitido[];
+  /** Diagnóstico del cliente cuando no hubo coordenadas (`ubicacionFalla`). */
+  falla?: string | null;
+  origen?: OrigenChecada | null;
 }): UbicacionChecada {
   const { coords, sitios } = params;
   if (!coords) {
     return {
       validacion: 'REVISAR',
-      motivo: MOTIVO_VALIDACION.sinUbicacion,
+      motivo: motivoSinUbicacion({ falla: params.falla, origen: params.origen }),
       fueraDeSitio: false,
       distanciaSitioM: null,
       sitioNombre: null,
@@ -285,6 +328,8 @@ export type OrigenChecada = 'ANDROID' | 'IOS' | 'WEB';
  * checa: la ubicación de una pestaña no se puede comprobar.
  */
 export function origenChecada(userAgent?: string | null, headers?: Record<string, unknown>): OrigenChecada {
+  const nativo = clienteNativoSinIdentidad(userAgent);
+  if (nativo) return nativo;
   const detalle = detectDeviceDetails(userAgent, headers as never);
   if (!detalle.isApp) return 'WEB';
   const so = `${detalle.os} ${userAgent ?? ''}`.toLowerCase();
@@ -292,6 +337,27 @@ export function origenChecada(userAgent?: string | null, headers?: Record<string
   if (/android/.test(so)) return 'ANDROID';
   // App NEXARA de un sistema que no reconocemos: es app, no navegador.
   return 'ANDROID';
+}
+
+/**
+ * Cliente HTTP nativo que no se identificó como la app: ningún navegador manda estos User-Agent.
+ *
+ * La cola sin conexión de Android (`OfflineSyncCoordinator`) usaba su propio OkHttp sin las
+ * cabeceras de la app y mandaba `okhttp/4.x`: el servidor la leía como «Escritorio · PC», origen
+ * WEB, y con la excepción web cerrada RECHAZABA checadas reales capturadas sin señal (5 entre el
+ * 28-09 y el 06-10). `CFNetwork … Darwin` es el equivalente de URLSession en iOS. Las apps
+ * nuevas ya mandan su identidad; esto cubre las versiones instaladas.
+ */
+export function clienteNativoSinIdentidad(userAgent?: string | null): 'ANDROID' | 'IOS' | null {
+  const ua = String(userAgent ?? '').trim().toLowerCase();
+  if (/^okhttp\//.test(ua)) return 'ANDROID';
+  if (/cfnetwork\/.*darwin\//.test(ua) && !/mozilla\//.test(ua)) return 'IOS';
+  return null;
+}
+
+/** Cómo se describe el equipo de una checada que llegó de un cliente nativo sin identidad. */
+export function deviceInfoNativo(origen: 'ANDROID' | 'IOS'): string {
+  return origen === 'IOS' ? 'Móvil · iOS · NEXARA App (envío diferido)' : 'Móvil · Android · NEXARA App (envío diferido)';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

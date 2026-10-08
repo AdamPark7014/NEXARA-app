@@ -16,6 +16,7 @@ import rec from '@/components/asistencias/recorrido.module.css';
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
+import { fallaDeGeolocalizacion } from '@/lib/attendance-validacion';
 
 /** Lo que trae `attendance/history` de cada checada: hora, foto, punto y marcas del servidor. */
 type ChecadaDelDia = ChecadaValidable & {
@@ -502,6 +503,8 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
       let latitude: number | undefined;
       let longitude: number | undefined;
       let accuracyM: number | undefined;
+      // Por qué no hubo ubicación (el jefe lo lee en «Sin ubicación: …»).
+      let ubicacionFalla: string | undefined = navigator.geolocation ? undefined : "NO_DISPONIBLE";
       
       if (navigator.geolocation) {
         try {
@@ -516,7 +519,8 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           // Precisión real del navegador: peor que 200 m el servidor lo marca para revisar.
           accuracyM = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : undefined;
         } catch (gpsErr) {
-          // Si no puede obtener GPS, continúa sin él
+          // Si no puede obtener GPS, continúa sin él, pero dice por qué.
+          ubicacionFalla = fallaDeGeolocalizacion(gpsErr);
           console.warn('⚠️ No se pudo obtener ubicación GPS:', gpsErr);
         }
       }
@@ -530,6 +534,7 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
         latitude,
         longitude,
         accuracyM,
+        ubicacionFalla: typeof latitude === 'number' ? undefined : ubicacionFalla ?? 'ERROR',
         offline: false,
       };
 
