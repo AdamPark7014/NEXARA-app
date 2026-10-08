@@ -57,11 +57,13 @@ import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail, isNonEmployeeEmail } 
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import {
+  avisoUbicacion,
   checadaDelTipo,
   insigniasChecada,
   MOTIVO_CORRECCION_MINIMO,
   type ChecadaValidable,
   type InsigniaChecada,
+  type TramoSinUbicacion,
 } from "@/lib/attendance-validacion";
 import {
   faltaDelDia,
@@ -115,6 +117,8 @@ interface ApiAttendanceUser {
   })[];
   /** Días sin checada que Christian justificó (API nueva; opcional). */
   justificaciones?: FaltaJustificada[];
+  /** Tramos con la ubicación del teléfono apagada o sin permiso (API del 08-10; opcional). */
+  sinUbicacion?: TramoSinUbicacion[];
 }
 
 interface LocationRecord {
@@ -283,6 +287,8 @@ export default function ErpAsistenciasPage() {
     else if (inicial === "trayectoria" && canLiveGps) setTab(inicial);
   }, [canLiveGps, isManager]);
   const [dateFilter, setDateFilter] = useState(todayIso());
+  // Un tramo sin cierre solo «sigue» si el día que se ve es hoy.
+  const esHoy = dateFilter === todayIso();
   const [filterEstado, setFilterEstado] = useState<FilterEstado>("TODOS");
   const [busqueda, setBusqueda] = useState("");
   const [vista, setVista] = useState<ViewId>("lista");
@@ -706,14 +712,26 @@ export default function ErpAsistenciasPage() {
     {
       key: "estado",
       label: "Estado",
-      render: (m) => (
-        <StatusBadge
-          label={ESTADO_META[m.estado].label}
-          tone={ESTADO_META[m.estado].tone}
-          size="sm"
-          title={m.falta ? `Falta justificada · ${m.falta.motivo}` : undefined}
-        />
-      ),
+      render: (m) => {
+        const aviso = avisoUbicacion(m.sinUbicacion, esHoy);
+        return (
+          <>
+            <StatusBadge
+              label={ESTADO_META[m.estado].label}
+              tone={ESTADO_META[m.estado].tone}
+              size="sm"
+              title={m.falta ? `Falta justificada · ${m.falta.motivo}` : undefined}
+            />
+            {aviso ? (
+              <span className={styles.insignias}>
+                <Badge tone={aviso.tono} size="sm" title={aviso.detalle}>
+                  {aviso.texto}
+                </Badge>
+              </span>
+            ) : null}
+          </>
+        );
+      },
     },
   ];
 

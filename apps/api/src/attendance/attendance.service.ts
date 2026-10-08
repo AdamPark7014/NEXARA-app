@@ -65,6 +65,7 @@ import {
   type SitioPermitido,
   type ValidacionChecada,
 } from './asistencia-confiable.js';
+import { estadoPorFalla, registrarEstadoUbicacion, tramosSinUbicacionDe } from './estado-ubicacion.js';
 
 @Injectable()
 export class AttendanceService {
@@ -1660,6 +1661,9 @@ export class AttendanceService {
         });
       }
 
+      // Ubicación apagada o sin permiso al checar: queda en el registro de estados (y una checada
+      // con coordenadas cierra un tramo apagado que siguiera abierto).
+      await this.anotarEstadoUbicacion({ userId, tenantId, coords, falla: dto.ubicacionFalla, origen, deviceInfo, now });
       this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
 
       try {
@@ -1777,6 +1781,9 @@ export class AttendanceService {
       data: { estaActivo: false, ultimaActualizacion: now },
     });
 
+    // Ubicación apagada o sin permiso al checar: queda en el registro de estados (y una checada
+    // con coordenadas cierra un tramo apagado que siguiera abierto).
+    await this.anotarEstadoUbicacion({ userId, tenantId, coords, falla: dto.ubicacionFalla, origen, deviceInfo, now });
     this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
 
     try {
@@ -1847,6 +1854,30 @@ export class AttendanceService {
       titulo: marca.fueraDeSitio ? 'Checada fuera de sitio' : 'Checada por revisar',
       mensaje: partes.join(' · '),
       attendanceId,
+    });
+  }
+
+  /** Anota en `location_status_events` lo que la checada dice de la ubicación del teléfono. */
+  private async anotarEstadoUbicacion(p: {
+    userId: number;
+    tenantId: number;
+    coords: { latitude: number; longitude: number } | null;
+    falla?: string | null;
+    origen: string;
+    deviceInfo?: string | null;
+    now: Date;
+  }) {
+    const estado = p.coords ? 'ENCENDIDA' : estadoPorFalla(p.falla);
+    if (!estado) return;
+    await registrarEstadoUbicacion(this.prisma, {
+      userId: p.userId,
+      companyId: p.tenantId,
+      estado,
+      fuente: 'CHECADA',
+      origen: p.origen,
+      deviceInfo: p.deviceInfo ?? null,
+      // La hora del registro, no la de captura: es cuando el servidor supo del teléfono.
+      ahora: new Date(),
     });
   }
 
@@ -2315,13 +2346,21 @@ export class AttendanceService {
         ? Math.round(totalMinutesAll / userStats.length)
         : 0;
 
+    // Tramos con la ubicación apagada o sin permiso (Adam, 08-10): «Ubicación apagada desde 10:15».
+    const sinUbicacion = await tramosSinUbicacionDe(this.prisma, {
+      companyId: tenantId,
+      userIds: accessibleUserIds,
+      desde: start,
+      hasta: end,
+    });
+
     return {
       rangeStart: start.toISOString().split('T')[0],
       rangeEnd: end.toISOString().split('T')[0],
       totalUsers: userStats.length,
       totalMinutesAll,
       avgMinutesPerUser: avgTime,
-      users: userStats,
+      users: userStats.map((u) => ({ ...u, sinUbicacion: sinUbicacion.get(u.userId) ?? [] })),
     };
   }
 
