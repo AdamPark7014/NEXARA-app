@@ -10,6 +10,7 @@ import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
 import PictureAsPdfOutlined from "@mui/icons-material/PictureAsPdfOutlined";
 import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
 import EditOutlined from "@mui/icons-material/EditOutlined";
+import CategoryOutlined from "@mui/icons-material/CategoryOutlined";
 import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
 import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
 import TrendingDownOutlined from "@mui/icons-material/TrendingDownOutlined";
@@ -53,7 +54,22 @@ import {
   type TabItem,
 } from "@/components/base";
 import { CeldaExistencia, CeldaProducto, claseMono } from "@/components/almacen/PiezasAlmacen";
+import ArticuloDialog, { type ProductoEditable } from "@/components/almacen/ArticuloDialog";
+import { IconoTipoArticulo } from "@/components/almacen/TipoArticulo";
+import { useEmpaquesDeArticulos } from "@/components/almacen/useEmpaquesDeArticulos";
 import { useUser } from "@/components/UserContext";
+import { PERMISSIONS, hasPermission } from "@/lib/permissions";
+import {
+  empaqueDeProducto,
+  etiquetaTipoArticulo,
+  existenciaCorta,
+  metaTipoArticulo,
+  normalizarTipoArticulo,
+  unidadDeArticulo,
+  type EmpaqueBase,
+  type TipoArticulo,
+} from "@/lib/tipos-articulo";
+import type { ArticuloGuardado } from "@/lib/almacen-api";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { ALMACEN_PATH, HERRAMIENTAS_PATH } from "@/lib/recursos-core";
 import {
@@ -86,6 +102,7 @@ import {
   type InventoryInsights,
   type CycleCountRow,
   type StockReservationRow,
+  type ProductoDeCatalogo,
 } from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
 import { crearEmpaque, listarEmpaques, type Empaque } from "@/lib/almacen-api";
@@ -115,8 +132,17 @@ const InteligenciaInventario = dynamic(() => import("./InteligenciaInventario"),
 });
 const HistorialProducto = dynamic(() => import("./HistorialProducto"), { ssr: false });
 
-/** Fila de stock; `foto` llega cuando la API de niveles trae la imagen del producto. */
-type StockRow = ReturnType<typeof mapStockLevelToRow> & { foto?: string | null };
+/**
+ * Fila de stock; `foto` llega cuando la API de niveles trae la imagen del producto.
+ * `tipo` y `empaque` (07-10-2026) cuando los trae; `empaque` undefined = no se sabe aún
+ * (se pide aparte), null = no tiene.
+ */
+type StockRow = ReturnType<typeof mapStockLevelToRow> & {
+  foto?: string | null;
+  tipo?: TipoArticulo | null;
+  empaque?: EmpaqueBase | null;
+  unidadBase?: string | null;
+};
 
 const TABS = [
   { key: "dashboard", label: "Resumen" },
@@ -225,7 +251,10 @@ export function VistaAlmacen({
   const [editing, setEditing] = useState<StockRow | null>(null);
   const [minimo, setMinimo] = useState(5);
   const [savingMinimo, setSavingMinimo] = useState(false);
-  const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
+  const [products, setProducts] = useState<ProductoDeCatalogo[]>([]);
+  // Alta / edición de artículo con su tipo (Equipo, Consumible, Por medida).
+  const puedeEditarCatalogo = hasPermission(user, PERMISSIONS.CATALOG_MANAGE);
+  const [articulo, setArticulo] = useState<{ producto: ProductoEditable | null; empaque?: EmpaqueBase | null } | null>(null);
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
   const [showMovementForm, setShowMovementForm] = useState(false);
   const [movement, setMovement] = useState({ ...MOVIMIENTO_VACIO });
@@ -283,7 +312,8 @@ export function VistaAlmacen({
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const pid = params.get("productId");
+    // `?producto=` es el que manda la búsqueda rápida; `?productId=`, los avisos.
+    const pid = params.get("productId") ?? params.get("producto");
     setProductFilter(pid);
     setMovementId(params.get("movementId"));
     if (pid) setMovementProductFilter(pid);
@@ -338,6 +368,9 @@ export function VistaAlmacen({
         levels.map((level) => ({
           ...mapStockLevelToRow(level),
           foto: (level.product as { imageUrl?: string | null } | null | undefined)?.imageUrl ?? null,
+          tipo: normalizarTipoArticulo(level.product?.tipoArticulo),
+          empaque: Array.isArray(level.product?.packagings) ? empaqueDeProducto(level.product) : undefined,
+          unidadBase: level.product?.unitName ?? null,
         })),
       );
       setCargadoUnaVez(true);
@@ -361,6 +394,46 @@ export function VistaAlmacen({
     if (!token) return;
     void listCatalogProducts(token).then(setProducts).catch(() => undefined);
   }, [token]);
+
+  // Tipo de cada fila: el que trae la existencia o, si la API de niveles aún no lo manda,
+  // el del catálogo. El empaque de consumibles y material por medida se pide aparte si falta.
+  const tipoPorProducto = useMemo(
+    () => new Map(products.map((p) => [p.id, normalizarTipoArticulo(p.tipoArticulo)])),
+    [products],
+  );
+  const tipoDe = useCallback(
+    (r: StockRow): TipoArticulo | null => r.tipo ?? (r.productId ? (tipoPorProducto.get(r.productId) ?? null) : null),
+    [tipoPorProducto],
+  );
+  const idsSinEmpaque = useMemo(
+    () =>
+      items
+        .filter((r) => r.productId && r.empaque === undefined && metaTipoArticulo(tipoDe(r))?.empaque)
+        .map((r) => r.productId as number),
+    [items, tipoDe],
+  );
+  const { empaques: empaquesPedidos, olvidar: olvidarEmpaque } = useEmpaquesDeArticulos(token, idsSinEmpaque);
+  const empaqueDe = (r: StockRow): EmpaqueBase | null =>
+    r.empaque !== undefined ? r.empaque : r.productId ? (empaquesPedidos.get(r.productId) ?? null) : null;
+  const categoriasConocidas = useMemo(() => {
+    const todas = new Set<string>();
+    for (const p of products) if (p.category?.trim()) todas.add(p.category.trim());
+    for (const r of items) if (r.categoria && r.categoria !== "—") todas.add(r.categoria);
+    return [...todas].sort((a, b) => a.localeCompare(b, "es"));
+  }, [products, items]);
+
+  /** Tras dar de alta un artículo se propone su primera entrada; tras editarlo, se recarga. */
+  const alGuardarArticulo = async (guardado: ArticuloGuardado, modo: "alta" | "editar") => {
+    setArticulo(null);
+    olvidarEmpaque(guardado.id);
+    const lista = await listCatalogProducts(token).catch(() => null);
+    if (lista) setProducts(lista);
+    void load();
+    if (modo === "alta" && cfg.canCreate) {
+      setMovement({ ...MOVIMIENTO_VACIO, productId: String(guardado.id) });
+      setShowMovementForm(true);
+    }
+  };
 
   const vistasVisibles = useMemo(
     () => (embedded?.views ? TABS.filter((t) => embedded.views.includes(t.key)) : [...TABS]),
@@ -887,11 +960,12 @@ export function VistaAlmacen({
       rows = rows.filter((r) =>
         (r.nombre ?? "").toLowerCase().includes(q) ||
         (r.sku ?? "").toLowerCase().includes(q) ||
-        (r.categoria ?? "").toLowerCase().includes(q)
+        (r.categoria ?? "").toLowerCase().includes(q) ||
+        (tipoDe(r) ? etiquetaTipoArticulo(tipoDe(r)).toLowerCase().includes(q) : false)
       );
     }
     return rows;
-  }, [items, productFilter, busqueda]);
+  }, [items, productFilter, busqueda, tipoDe]);
 
   const conteoEstado = useMemo(() => {
     let agotado = 0;
@@ -925,11 +999,23 @@ export function VistaAlmacen({
       key: "nombre",
       label: "Producto",
       render: (r) => {
-        const meta = [r.categoria !== "—" ? r.categoria : null, r.ubicacion].filter(Boolean).join(" · ");
+        const tipo = tipoDe(r);
+        const meta = [tipo ? etiquetaTipoArticulo(tipo) : null, r.categoria !== "—" ? r.categoria : null, r.ubicacion]
+          .filter(Boolean)
+          .join(" · ");
         return (
           <CeldaProducto
             nombre={r.nombre}
-            meta={meta}
+            meta={
+              tipo ? (
+                <>
+                  <IconoTipoArticulo tipo={tipo} size="xs" className={s.iconoTipo} />
+                  {meta}
+                </>
+              ) : (
+                meta
+              )
+            }
             foto={r.foto}
             onClick={r.productId ? () => void openProductTrace(r.productId!, r.sku, r.nombre) : undefined}
             title="Ver historial de movimientos"
@@ -943,7 +1029,12 @@ export function VistaAlmacen({
       label: "Existencia",
       render: (r) => {
         const nivel = NIVEL_STOCK[nivelStock(r.existencia, r.minimo)];
-        return <CeldaExistencia existencia={r.existencia} minimo={r.minimo} texto={nivel.texto} tono={nivel.tono} formato={cantidad} />;
+        const tipo = tipoDe(r);
+        // Con tipo, en sus empaques: «3 botes + 40 pz», «2 bobinas + 120 m».
+        const formato = tipo
+          ? (n: number) => existenciaCorta(n, empaqueDe(r), unidadDeArticulo(tipo, r.unidadBase))
+          : cantidad;
+        return <CeldaExistencia existencia={r.existencia} minimo={r.minimo} texto={nivel.texto} tono={nivel.tono} formato={formato} />;
       },
       width: 180,
     },
@@ -963,6 +1054,23 @@ export function VistaAlmacen({
           aria-label={`Ver historial de ${r.nombre}`}
         >
           <HistoryOutlined fontSize="small" />
+        </Button>
+      ) : null}
+      {puedeEditarCatalogo && r.productId ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon
+          onClick={() =>
+            setArticulo({
+              producto: { id: r.productId!, name: r.nombre, sku: r.sku, category: r.categoria, tipoArticulo: tipoDe(r) },
+              empaque: r.empaque !== undefined ? r.empaque : r.productId ? empaquesPedidos.get(r.productId) : undefined,
+            })
+          }
+          title="Editar artículo (tipo y empaque)"
+          aria-label={`Editar artículo ${r.nombre}`}
+        >
+          <CategoryOutlined fontSize="small" />
         </Button>
       ) : null}
       {cfg.canEdit ? (
@@ -1190,11 +1298,22 @@ export function VistaAlmacen({
       {recargando ? "Actualizando…" : "Actualizar"}
     </Button>
   );
-  const accionSecundaria = cfg.canCreate ? (
-    <Button variant="secondary" iconStart={<WarehouseOutlined fontSize="small" />} onClick={() => setShowWarehouseForm(true)}>
-      Nuevo almacén
+  const botonNuevoArticulo = puedeEditarCatalogo ? (
+    <Button variant="secondary" iconStart={<CategoryOutlined fontSize="small" />} onClick={() => setArticulo({ producto: null })}>
+      Nuevo artículo
     </Button>
   ) : null;
+  const accionSecundaria =
+    cfg.canCreate || botonNuevoArticulo ? (
+      <>
+        {botonNuevoArticulo}
+        {cfg.canCreate ? (
+          <Button variant="secondary" iconStart={<WarehouseOutlined fontSize="small" />} onClick={() => setShowWarehouseForm(true)}>
+            Nuevo almacén
+          </Button>
+        ) : null}
+      </>
+    ) : null;
   const accionPrimaria = cfg.canCreate ? (
     <Button variant="primary" iconStart={<AddOutlined fontSize="small" />} onClick={abrirEntrada}>
       {embedded ? "Entrada" : "Entrada de stock"}
@@ -1266,6 +1385,16 @@ export function VistaAlmacen({
           </div>
         </div>
       ) : null}
+
+      {/* ── Alta / edición de artículo con su tipo (disponible desde cualquier pestaña) ── */}
+      <ArticuloDialog
+        open={articulo !== null}
+        onClose={() => setArticulo(null)}
+        producto={articulo?.producto ?? null}
+        empaque={articulo?.empaque}
+        categorias={categoriasConocidas}
+        onGuardado={(guardado, modo) => void alGuardarArticulo(guardado, modo)}
+      />
 
       {/* ── Nuevo almacén (disponible desde cualquier pestaña) ── */}
       <Modal
@@ -1601,10 +1730,19 @@ export function VistaAlmacen({
                 : {
                     icon: <Inventory2Outlined />,
                     title: "Aún no hay stock registrado",
-                    description: "Crea un almacén y registra la primera entrada para empezar el inventario.",
-                    action: cfg.canCreate ? (
-                      <Button size="sm" variant="primary" iconStart={<AddOutlined fontSize="small" />} onClick={abrirEntrada}>Entrada de stock</Button>
-                    ) : undefined,
+                    // Sin artículos en el catálogo no hay a qué darle entrada: primero el alta.
+                    description:
+                      products.length === 0 && puedeEditarCatalogo
+                        ? "Da de alta el primer artículo (equipo, consumible o por medida) y registra su entrada."
+                        : "Crea un almacén y registra la primera entrada para empezar el inventario.",
+                    action:
+                      products.length === 0 && puedeEditarCatalogo ? (
+                        <Button size="sm" variant="primary" iconStart={<AddOutlined fontSize="small" />} onClick={() => setArticulo({ producto: null })}>
+                          Nuevo artículo
+                        </Button>
+                      ) : cfg.canCreate ? (
+                        <Button size="sm" variant="primary" iconStart={<AddOutlined fontSize="small" />} onClick={abrirEntrada}>Entrada de stock</Button>
+                      ) : undefined,
                     secondaryAction: cfg.canCreate ? (
                       <Button size="sm" variant="secondary" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
                     ) : undefined,

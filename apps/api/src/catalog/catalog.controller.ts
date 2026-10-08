@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CatalogService } from './catalog.service.js';
+// Importados como valor (no `import type`): el ValidationPipe necesita la clase en los metadatos.
+import { CrearProductoDto, EditarProductoDto } from './dto/producto.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
@@ -24,20 +26,8 @@ export class CatalogController {
   @RBAC({ permissions: [PERMISSIONS.CATALOG_MANAGE] })
   createProduct(
     @CurrentCompanyId() companyId: number | null,
-    @Body() dto: {
-    sku?: string;
-    name: string;
-    category?: string;
-    subcategory?: string;
-    price?: number;
-    currency?: string;
-    unit?: string;
-    imageUrl?: string;
-    description?: string;
-    satProductKey?: string;
-    satUnitKey?: string;
-    unitName?: string;
-  }) {
+    @Body() dto: CrearProductoDto,
+  ) {
     return this.catalogService.createProduct({ ...dto, companyId });
   }
 
@@ -47,19 +37,7 @@ export class CatalogController {
   updateProduct(
     @Param('id', ParseIntPipe) id: number,
     @CurrentCompanyId() companyId: number | null,
-    @Body() dto: {
-      name?: string;
-      category?: string;
-      subcategory?: string;
-      price?: number;
-      currency?: string;
-      unit?: string;
-      imageUrl?: string;
-      description?: string;
-      satProductKey?: string;
-      satUnitKey?: string;
-      unitName?: string;
-    },
+    @Body() dto: EditarProductoDto,
   ) {
     return this.catalogService.updateProduct(id, dto, companyId);
   }

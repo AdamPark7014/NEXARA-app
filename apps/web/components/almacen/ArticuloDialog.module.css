@@ -1,0 +1,41 @@
+/* Alta / edición de artículo: tipo arriba, luego los datos. Solo tokens --ui-*. */
+
+.form {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.tipo {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.rotulo {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label, var(--ui-fw-semibold));
+  color: var(--ui-fg-label, var(--ui-fg));
+}
+
+.obligatorio {
+  color: var(--ui-danger-text);
+}
+
+.ayuda,
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-muted);
+}
+
+.error {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-danger-text);
+}
+
+.unidad {
+  padding-inline: var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-muted);
+}

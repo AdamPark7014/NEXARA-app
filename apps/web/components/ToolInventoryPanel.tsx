@@ -73,10 +73,17 @@ type Poseedor = { nombre: string; tipo: 'kit' | 'prestamo' };
 
 type FiltroEstado = 'todas' | InventoryItem['status'];
 
-const ToolInventoryPanel: React.FC = () => {
+type ToolInventoryPanelProps = {
+  /** Búsqueda con que abre (la búsqueda rápida manda aquí el nombre de la herramienta). */
+  busquedaInicial?: string;
+  /** Abre ya desplegado el alta («Nueva herramienta» desde el alta de artículo). */
+  abrirAlta?: boolean;
+};
+
+const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial = '', abrirAlta = false }) => {
   const { user } = useUser();
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(busquedaInicial);
   const [includeRetired, setIncludeRetired] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +126,7 @@ const ToolInventoryPanel: React.FC = () => {
 
   // Presentación: filtro por estado, alta plegada y quién tiene cada herramienta.
   const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstado>('todas');
-  const [altaAbierta, setAltaAbierta] = useState(false);
+  const [altaAbierta, setAltaAbierta] = useState(abrirAlta);
   const [poseedores, setPoseedores] = useState<Map<number, Poseedor>>(() => new Map());
   // «Completar códigos»: confirmación ligera en línea y la llamada en curso.
   const [confirmarCodigos, setConfirmarCodigos] = useState(false);

@@ -1,0 +1,121 @@
+/* Tipo de artículo: cuadrito con icono y selector de cuatro opciones. Solo tokens --ui-*. */
+
+.icono {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ui-radius-md, 10px);
+  font-size: 18px;
+  background: var(--ui-neutral-bg);
+  color: var(--ui-neutral-text);
+}
+
+.icono[data-size="sm"] {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--ui-radius-sm, 6px);
+  font-size: 13px;
+}
+
+.icono[data-size="xs"] {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--ui-radius-xs, 4px);
+  font-size: 11px;
+}
+
+.icono[data-tono="brand"] {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.icono[data-tono="violet"] {
+  background: var(--ui-violet-bg);
+  color: var(--ui-violet-text);
+}
+
+.icono[data-tono="success"] {
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+}
+
+.icono[data-tono="info"] {
+  background: var(--ui-info-bg);
+  color: var(--ui-info-text);
+}
+
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s1);
+  min-width: 0;
+}
+
+/* ─── Selector ─────────────────────────────────────────────────────────── */
+
+.selector {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ui-s2);
+}
+
+@media (max-width: 560px) {
+  .selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-height: var(--ui-control-h-lg, 44px);
+  padding: 0 var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-medium);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ui-duration-fast) var(--ui-ease-standard),
+    background var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.opcion:hover:not(:disabled) {
+  background: var(--ui-hover);
+}
+
+.opcion:focus-visible {
+  outline: var(--ui-focus-outline, 2px solid var(--ui-brand));
+  outline-offset: 2px;
+}
+
+.opcion[data-activo="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  box-shadow: inset 0 0 0 1px var(--ui-brand);
+}
+
+.opcion:disabled {
+  cursor: not-allowed;
+  color: var(--ui-fg-disabled);
+  opacity: 0.6;
+}
+
+.opcionTexto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selector[aria-invalid="true"] .opcion:not([data-activo="true"]) {
+  border-color: var(--ui-danger-border);
+}

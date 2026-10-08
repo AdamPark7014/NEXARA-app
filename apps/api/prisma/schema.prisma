@@ -48,6 +48,11 @@ model Product {
   compraMinima       Decimal? @db.Decimal(14, 4)
   /// Días de consumo que se guardan de colchón sobre el lead time.
   stockSeguridadDias Int?
+  /// Tipo de artículo de almacén: 'EQUIPO' (por pieza, se instala o se vende), 'CONSUMIBLE'
+  /// (se gasta; piezas guardadas en empaque: bote de 100 cinchos) o 'MEDIDA' (por metro en
+  /// bobina o tramo). null = sin tipo (productos anteriores al 07-10-2026). Las herramientas
+  /// no son productos: viven en `ToolInventoryItem`. Ver `catalog/tipo-articulo.ts`.
+  tipoArticulo    String?         @db.VarChar(20)
   companyId       Int
   brand           Brand?          @relation(fields: [brandId], references: [id])
   company         CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -82,6 +87,7 @@ model Product {
   @@index([companyId])
   @@index([companyId, upc])
   @@index([companyId, ean])
+  @@index([companyId, tipoArticulo])
 }
 
 /// Presentación en que se compra o se captura un producto: «Caja» = 100 piezas, «Rollo» = 305 m.

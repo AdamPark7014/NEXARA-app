@@ -6,6 +6,7 @@
  * siempre) para no tocar lo que ya funciona mientras este frente se construye.
  */
 import { buildApiUrl } from "@/lib/api-base";
+import type { PayloadArticulo } from "@/lib/tipos-articulo";
 
 async function mensajeDeError(res: Response, fallback: string) {
   const texto = await res.text().catch(() => "");
@@ -518,4 +519,42 @@ export function completarCodigosHerramientas(token: string) {
     { method: "POST" },
     "No se pudieron completar los códigos",
   );
+}
+
+// ── Artículos de almacén (catálogo con tipo y empaque) ──────────────
+
+/** Lo que devuelve la API al dar de alta o editar un artículo. */
+export type ArticuloGuardado = {
+  id: number;
+  sku: string;
+  name: string;
+  category?: string | null;
+  unitName?: string | null;
+  /** Ausente si el servidor todavía no guarda el tipo (API anterior al 07-10-2026). */
+  tipoArticulo?: string | null;
+  packagings?: Array<{ id?: number; nombre: string; piezasPorUnidad: number | string; esDefaultCompra?: boolean }>;
+};
+
+/** Alta de artículo con su tipo (Equipo, Consumible, Por medida) y, si lleva, su empaque. */
+export function crearArticulo(token: string, payload: PayloadArticulo) {
+  return pedir<ArticuloGuardado>(
+    "catalog/products",
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+    "No se pudo dar de alta el artículo",
+  );
+}
+
+export function editarArticulo(token: string, productId: number, payload: PayloadArticulo) {
+  return pedir<ArticuloGuardado>(
+    `catalog/products/${productId}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(payload) },
+    "No se pudo guardar el artículo",
+  );
+}
+
+/** `true` si la respuesta trae el tipo: el servidor ya lo guarda. */
+export function servidorGuardaTipo(respuesta: unknown): boolean {
+  return Boolean(respuesta && typeof respuesta === "object" && "tipoArticulo" in respuesta);
 }

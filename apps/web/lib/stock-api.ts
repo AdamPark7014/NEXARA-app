@@ -15,6 +15,10 @@ export type StockLevelRow = {
     price?: number | null;
     imageUrl?: string | null;
     unitName?: string | null;
+    /** 'EQUIPO' | 'CONSUMIBLE' | 'MEDIDA'; null = sin tipo. Solo si la API ya lo manda. */
+    tipoArticulo?: string | null;
+    /** Empaques del producto, si la API los incluye (si no, se piden aparte). */
+    packagings?: Array<{ nombre: string; piezasPorUnidad: number | string; esDefaultCompra?: boolean }>;
   } | null;
   warehouse?: { id: number; code?: string; name: string } | null;
   location?: { id: number; code?: string; name?: string } | null;
@@ -82,8 +86,18 @@ export async function listWarehouses(token: string) {
   return unwrapArray(raw);
 }
 
+/** Lo que se usa del catálogo en los selectores de almacén (la API manda el producto entero). */
+export type ProductoDeCatalogo = {
+  id: number;
+  name: string;
+  sku: string;
+  category?: string | null;
+  unitName?: string | null;
+  tipoArticulo?: string | null;
+};
+
 export async function listCatalogProducts(token: string) {
-  const raw = await stockRequest<Array<{ id: number; name: string; sku: string }> | { data: Array<{ id: number; name: string; sku: string }> }>("catalog/products?take=200", token, {}, "No se pudieron cargar productos");
+  const raw = await stockRequest<ProductoDeCatalogo[] | { data: ProductoDeCatalogo[] }>("catalog/products?take=200", token, {}, "No se pudieron cargar productos");
   return unwrapArray(raw);
 }
 

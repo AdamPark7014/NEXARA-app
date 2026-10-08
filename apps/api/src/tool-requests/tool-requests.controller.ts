@@ -33,6 +33,7 @@ import {
   ResolveKitEventDto,
 } from './tool-requests.service.js';
 import { assertCanCreateToolLoan, assertCanManageTools, hasToolsManageAccess } from './tools-access.js';
+import { BusquedaRapidaService } from './busqueda-rapida.service.js';
 
 interface MulterFile {
   filename: string;
@@ -41,7 +42,10 @@ interface MulterFile {
 @Controller('tool-requests')
 @UseGuards(RbacGuard)
 export class ToolRequestsController {
-  constructor(private readonly toolRequestsService: ToolRequestsService) {}
+  constructor(
+    private readonly toolRequestsService: ToolRequestsService,
+    private readonly busquedaRapidaService: BusquedaRapidaService,
+  ) {}
 
   // ===== INVENTARIO INTELIGENTE =====
 
@@ -49,6 +53,23 @@ export class ToolRequestsController {
   @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_REQUEST, PERMISSIONS.TOOLS_MANAGE] })
   async searchInventory(@Query('q') q: string, @CurrentCompanyId() companyId: number | null) {
     return this.toolRequestsService.searchInventoryOptions(q || '', companyId);
+  }
+
+  /**
+   * Búsqueda rápida de inventario (Almacén y Herramientas): una caja, también con lector.
+   * Herramientas para todo el personal; artículos de almacén solo con `stock.view`
+   * (`incluyeAlmacen` lo dice). Va antes de `:id` para que no la tome como id.
+   */
+  @Get('busqueda-rapida')
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_REQUEST, PERMISSIONS.TOOLS_MANAGE, PERMISSIONS.STOCK_VIEW] })
+  async busquedaRapida(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('q') q?: string,
+    @Query('tipo') tipo?: string,
+    @Query('limite') limite?: string,
+  ) {
+    return this.busquedaRapidaService.buscar({ q, tipo, limite, usuario: user }, companyId);
   }
 
   @Get('inventory')
