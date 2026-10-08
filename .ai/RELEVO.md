@@ -1,5 +1,18 @@
 # RELEVO
 
+- **08-10 ~09:25 (claude-code) — Android: menú vivo + un solo escáner (herramienta o artículo) para Iván.**
+  - Adam: «Iván solo tiene para escanear herramientas… las que se escanean son las de almacén, y él no tiene el módulo».
+  - Menú: `MainActivity` relee `me/navigation` en cada vuelta a primer plano, máx. cada 5 min
+    (`SessionRefreshPolicy.shouldRefreshNavigation`, hora a nivel de proceso). `AuthRepository`: sin red/5xx conserva el
+    menú guardado; `refreshNavigation()` solo guarda si cambió. `ConsoleNavHost`: la barra de abajo también sigue a la
+    sesión (destino inicial fijo desde el rediseño v2).
+  - Escáner: `ui/console/more/EscanerUnificado.kt` (`EscanerDeCodigos`) usado por Almacén y Herramientas. Orden
+    (`EscaneoRules`): sin acceso a Almacén → solo herramienta («No es una herramienta registrada.»); con acceso y forma
+    de etiqueta (`CodigoBarrasRules.esFormaEtiquetaHerramienta`, `ABC-…`) → herramienta y luego artículo; otro código →
+    artículo y luego herramienta (código de fabricante); nada → «Dar de alta». 404/403 pasan a la siguiente búsqueda;
+    red/5xx se muestra. Títulos «Escanear artículo o herramienta» / «Escanear herramienta o artículo».
+  - Verificado: `compileDebugKotlin` y `testDebugUnitTest` (778, 0 fallos). Requiere nueva versión en Play.
+
 - **08-10 ~09:20 (claude-code) — iOS: rechazo de Apple 2.5.4 → GPS de jornada solo en primer plano.**
   - Apple rechazó 1.0.0 (9) el 07-10 (guía 2.5.4): `location` en `UIBackgroundModes` solo para seguir a empleados no
     se acepta. Texto íntegro, causa y respuesta en inglés en `docs/store/IOS-RESPUESTA-APPLE.md` (sección del 07-10).

@@ -319,11 +319,16 @@ fun ConsoleNavHost(
      * menú de «Más» se quedaba recortado a los cuatro que tiene todo el personal
      * —sin Cotizaciones, Proyectos, Almacén ni KPIs— hasta que se cerraba la app.
      *
-     * **Sólo alimenta «Más».** Las pestañas de abajo y el destino inicial del
-     * grafo siguen saliendo de la primera lectura a propósito: cambiar
+     * Alimenta «Más» y la barra de abajo: `MainActivity` relee `me/navigation`
+     * al volver a primer plano (máx. cada 5 min), y a quien le dan o quitan un
+     * módulo le aparece sin cerrar sesión.
+     *
+     * Lo que NO se mueve es el destino inicial del grafo: cambiar
      * `startDestination` con el NavHost ya vivo deja la pila incoherente y las
-     * pestañas dejan de responder —probado: con esto enchufado a `modules`, el
-     * botón de Chat no abría nada y ninguna pestaña quedaba marcada—.
+     * pestañas dejan de responder —probado el 21-09, cuando el destino inicial
+     * salía de `modules`: el botón de Chat no abría nada y ninguna pestaña quedaba
+     * marcada—. Desde el rediseño v2 es fijo (Inicio) y todas las rutas están
+     * siempre en el grafo, así que las pestañas ya pueden seguir a la sesión.
      */
     val revisionSesion by SessionRevision.valor.collectAsState()
     val userAlDia = remember(revisionSesion) { authRepo.loadSession() } ?: user
@@ -340,7 +345,7 @@ fun ConsoleNavHost(
     /** Mensajes de chat sin leer (suma de `unreadCount` de `chat/channels`), para la insignia. */
     var chatUnread by remember { mutableIntStateOf(0) }
 
-    val modules = remember(user) { CoreMenu.modulesFor(user) }
+    val modules = remember(userAlDia) { CoreMenu.modulesFor(userAlDia) }
     /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos). */
     val extras = remember(userAlDia) { CoreMenu.extraModulesFor(userAlDia) }
     val tabs = remember(modules) { shellTabsFor(modules) }

@@ -135,15 +135,17 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    /** Navegación RBAC: una vez por instancia de la Activity (como antes). */
-    private var navigationRefreshed = false
-
     /**
      * La sesión no se cierra sola. Cada vez que la Activity entra en STARTED
      * (arranque en frío con sesión guardada y cada vuelta desde segundo plano) y
      * luego cada 30 min mientras siga en primer plano:
      * renueva el token si faltan < 60 min o se desconoce el vencimiento, y
      * arranca/reanuda realtime con la sesión guardada. Se cancela en onStop.
+     *
+     * En las mismas vueltas relee el menú (`me/navigation`), como máximo cada
+     * 5 min ([SessionRefreshPolicy.shouldRefreshNavigation]): a quien le dan o
+     * quitan un módulo le aparece sin cerrar sesión. Guardar la sesión sube
+     * `SessionRevision`, y «Más» y la barra de abajo se recomponen con eso.
      */
     private fun startSessionKeepAlive() {
         lifecycleScope.launch {
@@ -152,9 +154,11 @@ class MainActivity : FragmentActivity() {
                 while (true) {
                     try {
                         repo.ensureSessionFresh()
-                        if (!navigationRefreshed) {
+                        val ahora = System.currentTimeMillis()
+                        if (SessionRefreshPolicy.shouldRefreshNavigation(lastNavigationRefreshAtMs, ahora)) {
+                            // Se anota antes de pedir: sin red no se reintenta en cada vistazo.
+                            lastNavigationRefreshAtMs = ahora
                             withContext(Dispatchers.IO) { repo.refreshNavigation() }
-                            navigationRefreshed = true
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -264,5 +268,14 @@ class MainActivity : FragmentActivity() {
                 }.onFailure { Log.w("MainActivity", "registerPushToken: ${it.message}") }
             }
         }
+    }
+
+    private companion object {
+        /**
+         * Hora de la última lectura de `me/navigation`. Del proceso, no de la
+         * Activity: girar el teléfono recrea la Activity y no debe volver a pedirla.
+         */
+        @Volatile
+        var lastNavigationRefreshAtMs: Long? = null
     }
 }

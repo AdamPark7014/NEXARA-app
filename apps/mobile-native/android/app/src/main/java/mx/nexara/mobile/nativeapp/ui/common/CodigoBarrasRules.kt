@@ -93,6 +93,17 @@ object CodigoBarrasRules {
     fun normalizarEtiquetaHerramienta(valor: String?): String =
         valor.orEmpty().replace(CONTROL, "").trim().replace(PREFIJO_AIM, "").trim().uppercase()
 
+    /** Nomenclatura `PREFIJO-SERIE` (`MUL-12345`), la misma que reconoce `pistaDeSerie` en `tool-nomenclature.ts`. */
+    private val FORMA_ETIQUETA = Regex("^[A-Z]{3}-[A-Z0-9-]{1,32}$")
+
+    /**
+     * ¿Tiene forma de etiqueta de herramienta? Decide qué se busca primero en el
+     * escáner; no garantiza nada: una clave interna de almacén puede tener la misma
+     * forma (por eso, si no es herramienta, se busca después como artículo).
+     */
+    fun esFormaEtiquetaHerramienta(valor: String?): Boolean =
+        FORMA_ETIQUETA.matches(normalizarEtiquetaHerramienta(valor))
+
     fun motivoEtiquetaInvalida(valor: String?): String? {
         val codigo = normalizarEtiquetaHerramienta(valor)
         return when {
