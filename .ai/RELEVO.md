@@ -8,7 +8,7 @@
   - API: `catalog/tipo-articulo.ts`; `catalog/dto/producto.dto.ts` (alta/edición validadas: con el
     `forbidNonWhitelisted` global, campos de más → 400; PATCH acepta `sku` con 409 si se repite); HERRAMIENTA no es
     producto (400) y EQUIPO no lleva empaque; el empaque (nombre + capacidad) se crea o corrige como default de compra.
-    `GET tool-requests/inventory/busqueda-rapida?q=&tipo=&limite=` (`busqueda-rapida.service.ts` +
+    `GET tool-requests/busqueda-rapida?q=&tipo=&limite=` (`busqueda-rapida.service.ts` +
     `warehouse/busqueda-rapida.ts` puro): herramientas y artículos juntos, sin acentos, por código del empaque, quién
     la tiene, conteos por tipo. `stock/levels` trae `tipoArticulo` y `packagings` del producto.
   - Web: `BusquedaRapidaInventario` en Almacén («Todos») y Herramientas («Herramientas»), chips con conteo, Enter del
@@ -16,6 +16,8 @@
     Caja/Paquete o presentación en metros, «1 bote = 100 pz»; tras alta abre la Entrada); existencias en empaques
     («3 botes + 40 pz»). `useEmpaquesDeArticulos` solo pide los que `stock/levels` no traiga.
   - Pendiente: alta por código del Escáner (`stock/products/por-codigo`) aún sin tipo; apps sin tipo ni búsqueda rápida.
+  - Desplegado 08-10 ~09:40 con `--with-migrate` (migración aplicada). En producción hay 1 herramienta (Martillo) y 0
+    artículos de almacén: la búsqueda funciona, pero Iván tiene que dar de alta el inventario.
 
 - **08-10 ~09:30 (claude-code) — iOS: menú vivo + un solo escáner (paridad con Android).**
   - `AuthRepository.refreshNavigation(forzar:)` (máx. cada 5 min, una sola petición en curso, conserva el menú si
