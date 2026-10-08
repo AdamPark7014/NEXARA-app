@@ -23,11 +23,15 @@ struct NexaraApp: App {
                 // (si no, tras un relanzamiento por ubicación el GPS de la jornada no se re-arma).
                 guard session.currentUser != nil else { return }
                 await ShiftGpsTracker.shared.resumeIfNeeded()
+                await EstadoUbicacionMonitor.shared.revisar()
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active, session.currentUser != nil else { return }
                 Task { await AuthRepository.shared.maybeExtendSession() }
                 Task { await ShiftGpsTracker.shared.resumeIfNeeded() }
+                // Ubicación apagada o sin permiso durante la jornada: se avisa al volver a la app
+                // (iOS no deja mirarlo en segundo plano).
+                Task { await EstadoUbicacionMonitor.shared.revisar() }
             }
         }
     }

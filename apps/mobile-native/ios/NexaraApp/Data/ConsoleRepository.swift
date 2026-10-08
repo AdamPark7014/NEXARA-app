@@ -40,6 +40,9 @@ final class ConsoleRepository {
     /// `capturedAt` es la hora del teléfono y es informativa: la hora del registro la pone
     /// el servidor (contrato A). Igual que Android ya no se manda `timestamp`, el campo
     /// viejo de la app 1.0.2 que el API solo tolera por compatibilidad.
+    ///
+    /// `ubicacionFalla` dice por qué no hubo coordenadas (`UbicacionFalla`); solo viaja si
+    /// de verdad faltan: con coordenadas no hay nada que explicar.
     func attendanceCheckInResult(
         type: String,
         lat: Double? = nil,
@@ -47,7 +50,8 @@ final class ConsoleRepository {
         accuracyM: Double? = nil,
         mockLocation: Bool = false,
         fixAgeMs: Int? = nil,
-        photoBase64: String? = nil
+        photoBase64: String? = nil,
+        ubicacionFalla: String? = nil
     ) async throws -> AttendanceCheckInResult {
         struct Body: Encodable {
             let type: String
@@ -58,6 +62,7 @@ final class ConsoleRepository {
             let accuracyM: Double?
             let mockLocation: Bool
             let fixAgeMs: Int?
+            let ubicacionFalla: String?
         }
         let data = try await api.postJSON("attendance", body: Body(
             type: type,
@@ -67,9 +72,20 @@ final class ConsoleRepository {
             longitude: lng,
             accuracyM: accuracyM.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil },
             mockLocation: mockLocation,
-            fixAgeMs: fixAgeMs.flatMap { $0 >= 0 ? $0 : nil }
+            fixAgeMs: fixAgeMs.flatMap { $0 >= 0 ? $0 : nil },
+            ubicacionFalla: (lat == nil || lng == nil) ? ubicacionFalla : nil
         ))
         return AttendanceCheckInResult(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// `POST attendance/estado-ubicacion { estado }`: APAGADA, SIN_PERMISO o ENCENDIDA
+    /// (`EstadoUbicacion`). Va por el cliente normal, con la identidad del teléfono, y sin
+    /// conexión espera en la cola como cualquier otro envío. El servidor pone la hora.
+    func attendanceEstadoUbicacion(_ estado: String) async throws {
+        struct Body: Encodable {
+            let estado: String
+        }
+        _ = try await api.postJSON("attendance/estado-ubicacion", body: Body(estado: estado))
     }
 
     // MARK: Clients

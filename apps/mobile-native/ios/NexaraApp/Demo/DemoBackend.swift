@@ -387,7 +387,8 @@ extension DemoStore {
     private func routeAttendance(method: String, parts: [String], query: [String: String], json: DemoJSON, now: Date) -> DemoReply {
         let sub = parts.count > 1 ? parts[1] : ""
         if method == "POST" {
-            if sub == "justificaciones" { return empty() }
+            // El estado de la ubicación no es una checada: no debe abrir ni cerrar la jornada demo.
+            if sub == "justificaciones" || sub == "estado-ubicacion" { return empty() }
             return checkIn(json: json, now: now)
         }
         let today = DemoClock.day(now)
