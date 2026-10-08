@@ -652,3 +652,9 @@
     padding-right: var(--ui-s4);
   }
 }
+
+/* Icono del tipo de artículo al inicio de la línea gris del producto («▣ Consumible · Fijación»). */
+.iconoTipo {
+  margin-right: 4px;
+  vertical-align: -3px;
+}

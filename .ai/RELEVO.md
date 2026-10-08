@@ -1,5 +1,22 @@
 # RELEVO
 
+- **08-10 ~09:45 (claude-code) — Almacén: tipo de artículo + capacidad de empaque + búsqueda rápida (API y web).**
+  - Adam: «tipado más fuerte… búsqueda rápida en stock y almacén… un taladro es uno y uno, otro un bote de cinchos
+    con 100 piezas»; aprobó 4 tipos (Herramienta, Equipo, Consumible, Por medida) y búsqueda «en ambas» pantallas.
+  - **Migración `20261007220000_tipo_articulo`** (aditiva, idempotente): `Product.tipoArticulo` VARCHAR(20) null +
+    índice (companyId, tipoArticulo). Desplegar con `--with-migrate`.
+  - API: `catalog/tipo-articulo.ts`; `catalog/dto/producto.dto.ts` (alta/edición validadas: con el
+    `forbidNonWhitelisted` global, campos de más → 400; PATCH acepta `sku` con 409 si se repite); HERRAMIENTA no es
+    producto (400) y EQUIPO no lleva empaque; el empaque (nombre + capacidad) se crea o corrige como default de compra.
+    `GET tool-requests/inventory/busqueda-rapida?q=&tipo=&limite=` (`busqueda-rapida.service.ts` +
+    `warehouse/busqueda-rapida.ts` puro): herramientas y artículos juntos, sin acentos, por código del empaque, quién
+    la tiene, conteos por tipo. `stock/levels` trae `tipoArticulo` y `packagings` del producto.
+  - Web: `BusquedaRapidaInventario` en Almacén («Todos») y Herramientas («Herramientas»), chips con conteo, Enter del
+    lector abre el código exacto, flechas/Esc; `ArticuloDialog` (alta/edición con tipo obligatorio, empaque Bote/Bolsa/
+    Caja/Paquete o presentación en metros, «1 bote = 100 pz»; tras alta abre la Entrada); existencias en empaques
+    («3 botes + 40 pz»). `useEmpaquesDeArticulos` solo pide los que `stock/levels` no traiga.
+  - Pendiente: alta por código del Escáner (`stock/products/por-codigo`) aún sin tipo; apps sin tipo ni búsqueda rápida.
+
 - **08-10 ~09:30 (claude-code) — iOS: menú vivo + un solo escáner (paridad con Android).**
   - `AuthRepository.refreshNavigation(forzar:)` (máx. cada 5 min, una sola petición en curso, conserva el menú si
     falla, solo guarda si cambió y respeta el token vigente); `CoreShellView` la llama al montar y en cada

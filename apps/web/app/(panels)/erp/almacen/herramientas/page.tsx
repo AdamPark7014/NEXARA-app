@@ -22,6 +22,8 @@ import ToolRequestsTable from "@/components/ToolRequestsTable";
 import ToolRenewalsTable from "@/components/ToolRenewalsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 import HerramientasPorEtiquetaPanel from "@/components/almacen/HerramientasPorEtiquetaPanel";
+import BusquedaRapidaInventario from "@/components/almacen/BusquedaRapidaInventario";
+import { esMismaPagina, type ResultadoBusqueda } from "@/lib/busqueda-inventario-api";
 import s from "../almacen-portada.module.css";
 
 type ManagerTab = "inventory" | "kits" | "requests" | "renewals" | "approvals";
@@ -40,10 +42,21 @@ export default function ToolsPage() {
   // `?tab=` y `?highlight=` se leen de la URL al montar (sin useSearchParams).
   const [urlTab, setUrlTab] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  // La búsqueda rápida trae `?herramienta=<id>&q=<nombre>`; el alta de artículo, `?nueva=1`.
+  const [busquedaInventario, setBusquedaInventario] = useState("");
+  const [abrirAlta, setAbrirAlta] = useState(false);
+  const [vueltasInventario, setVueltasInventario] = useState(0);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setUrlTab(params.get("tab"));
+    const busqueda = (params.get("q") ?? "").trim();
+    const nueva = params.get("nueva") === "1";
+    const alInventario = Boolean(params.get("herramienta") || busqueda || nueva);
+    setBusquedaInventario(busqueda);
+    setAbrirAlta(nueva);
+    setUrlTab(params.get("tab") ?? (alInventario ? "inventory" : null));
     setHighlightId(params.get("highlight"));
+    // El inventario lee la búsqueda y el alta al montar: se vuelve a montar con ellos.
+    if (alInventario) setVueltasInventario((n) => n + 1);
   }, [pathname]);
 
   const [managerTab, setManagerTab] = useState<ManagerTab>("inventory");
@@ -106,7 +119,33 @@ export default function ToolsPage() {
 
   const tabActiva: ToolsTab = showLoanPane ? `loan:${loanTab}` : `manage:${managerTab}`;
 
+  /**
+   * Una herramienta cae aquí mismo: quien administra la ve en su inventario, ya filtrada;
+   * quien pide prestado va a «Pedir prestado».
+   */
+  const abrirDesdeBusqueda = (resultado: ResultadoBusqueda, href: string) => {
+    if (resultado.origen !== "herramienta" || !esMismaPagina(href, pathname)) return false;
+    window.history.pushState(null, "", href);
+    if (canManage) {
+      setPane("manage");
+      setManagerTab("inventory");
+      setBusquedaInventario(resultado.nombre);
+      setAbrirAlta(false);
+      setVueltasInventario((n) => n + 1);
+    } else if (canRequest) {
+      setPane("loan");
+      setLoanTab("myrequests");
+    }
+    return true;
+  };
+
+  // Las pestañas de préstamos y kits escuchan el lector en toda la pantalla: ahí la caja no toma el foco.
+  const buscadorConFoco = !(showManagePane && (managerTab === "requests" || managerTab === "kits"));
+
   const cambiarTab = (key: ToolsTab) => {
+    // Lo que trajo la URL (búsqueda, alta abierta) vale para la primera vista, no para siempre.
+    setBusquedaInventario("");
+    setAbrirAlta(false);
     const [panel, sub] = key.split(":");
     if (panel === "manage") {
       setPane("manage");
@@ -137,6 +176,13 @@ export default function ToolsPage() {
       />
 
       <div className={s.cuerpo}>
+        <BusquedaRapidaInventario
+          tipoInicial="HERRAMIENTA"
+          placeholder="Buscar herramienta por nombre, modelo, serie o etiqueta…"
+          autoFocus={buscadorConFoco}
+          onAbrir={abrirDesdeBusqueda}
+        />
+
         {highlightId && (
           <Alert tone="info" role="status">
             Vienes de un aviso: la solicitud está resaltada en la lista.
@@ -146,7 +192,9 @@ export default function ToolsPage() {
         {showManagePane && managerTab === "approvals" && (
           <ToolRequestsTable highlightId={highlightId} />
         )}
-        {showManagePane && managerTab === "inventory" && <ToolInventoryPanel />}
+        {showManagePane && managerTab === "inventory" && (
+          <ToolInventoryPanel key={vueltasInventario} busquedaInicial={busquedaInventario} abrirAlta={abrirAlta} />
+        )}
         {showManagePane && managerTab === "kits" && <ToolUserKitPanel />}
         {showManagePane && managerTab === "requests" && (
           // Entregar y recibir con la etiqueta; la tabla de abajo se recarga sola por socket.

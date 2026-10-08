@@ -55,6 +55,11 @@ vi.mock("@/components/ToolRequestsTable", () => ({ default: () => <div data-test
 vi.mock("@/components/ToolRequestForm", () => ({ default: () => <div data-testid="tool-form" /> }));
 vi.mock("@/components/ToolUserKitPanel", () => ({ default: () => <div data-testid="kits-equipo" /> }));
 vi.mock("@/components/ToolMyKitPanel", () => ({ default: () => <div data-testid="mi-kit" /> }));
+vi.mock("@/components/almacen/BusquedaRapidaInventario", () => ({
+  default: ({ tipoInicial, autoFocus }: { tipoInicial?: string; autoFocus?: boolean }) => (
+    <div data-testid="busqueda-rapida" data-tipo={tipoInicial} data-foco={autoFocus ? "si" : "no"} />
+  ),
+}));
 
 describe("portada de almacén", () => {
   it("enseña las seis pestañas del frente (incluye Escáner)", () => {
@@ -119,5 +124,19 @@ describe("portada de almacén", () => {
     ponerUrl("tab=inventado");
     render(<AlmacenPage />);
     expect(screen.getByTestId("almacen-stock")).toBeInTheDocument();
+  });
+
+  it("la búsqueda rápida va arriba con todos los tipos, y en Escáner no estorba al lector", async () => {
+    ponerUrl("");
+    render(<AlmacenPage />);
+    const busqueda = screen.getByTestId("busqueda-rapida");
+    expect(busqueda).toHaveAttribute("data-tipo", "TODOS");
+    expect(busqueda).toHaveAttribute("data-foco", "si");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Herramientas" }));
+    expect(screen.getByTestId("busqueda-rapida")).toHaveAttribute("data-foco", "no");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Escáner" }));
+    expect(screen.queryByTestId("busqueda-rapida")).not.toBeInTheDocument();
   });
 });

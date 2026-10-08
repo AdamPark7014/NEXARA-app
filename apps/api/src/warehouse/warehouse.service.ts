@@ -145,7 +145,18 @@ export class WarehouseService {
       // valor del inventario sale del costo promedio de cada existencia (`unitCost`).
       include: {
         product: {
-          select: { id: true, name: true, sku: true, category: true, price: true, imageUrl: true, unitName: true },
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            category: true,
+            price: true,
+            imageUrl: true,
+            unitName: true,
+            // Tipo y empaques: la web dice «3 botes + 40 pz» sin pedirlos uno por uno.
+            tipoArticulo: true,
+            packagings: { select: { nombre: true, piezasPorUnidad: true, esDefaultCompra: true } },
+          },
         },
         warehouse: { select: { id: true, code: true, name: true, companyId: true } },
         location: true,

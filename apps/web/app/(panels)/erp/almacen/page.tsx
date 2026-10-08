@@ -23,6 +23,8 @@ import ToolRequestForm from "@/components/ToolRequestForm";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
 import ToolMyKitPanel from "@/components/ToolMyKitPanel";
 import ToolInventoryPanel from "@/components/ToolInventoryPanel";
+import BusquedaRapidaInventario from "@/components/almacen/BusquedaRapidaInventario";
+import { esMismaPagina, type ResultadoBusqueda } from "@/lib/busqueda-inventario-api";
 import s from "./almacen-portada.module.css";
 
 /**
@@ -70,6 +72,9 @@ export default function AlmacenPage() {
   // Cada entrega o devolución por etiqueta vuelve a montar el mostrador de
   // recolección: su lista de «esperando a que las recojan» no escucha el socket.
   const [movimientosPorEtiqueta, setMovimientosPorEtiqueta] = useState(0);
+  // Abrir un artículo desde la búsqueda rápida vuelve a montar el inventario, que lee
+  // `?producto=` al montar (el router no lo vuelve a montar si solo cambia la query).
+  const [vueltasInventario, setVueltasInventario] = useState(0);
 
   // Los avisos traen `?tab=`: reabastecimiento, una recolección o una revisión de kit.
   useEffect(() => {
@@ -90,6 +95,18 @@ export default function AlmacenPage() {
     [pathname, router],
   );
 
+  /** Un artículo cae aquí mismo (`/erp/almacen?producto=`): inventario filtrado a ese producto. */
+  const abrirDesdeBusqueda = useCallback(
+    (resultado: ResultadoBusqueda, href: string) => {
+      if (resultado.origen !== "articulo" || !esMismaPagina(href, pathname)) return false;
+      window.history.pushState(null, "", href);
+      setTab("inventario");
+      setVueltasInventario((n) => n + 1);
+      return true;
+    },
+    [pathname],
+  );
+
   return (
     <>
       <PageHead
@@ -102,9 +119,23 @@ export default function AlmacenPage() {
 
       <div className={s.cuerpo}>
 
+        {/*
+          Búsqueda rápida de todo lo que hay (herramientas, equipo, consumibles, por medida).
+          En Escáner no va: ahí el lector manda, y una caja con el foco le quitaría las lecturas.
+          Por lo mismo solo toma el foco en las pestañas que no escuchan el lector.
+        */}
+        {tab !== "scanner" && (
+          <BusquedaRapidaInventario
+            tipoInicial="TODOS"
+            autoFocus={tab === "inventario" || tab === "movimientos" || tab === "reabastecimiento"}
+            onAbrir={abrirDesdeBusqueda}
+          />
+        )}
+
         {/* Inventario y sus vistas hermanas: la pantalla de almacén, sin su encabezado. */}
         {tab === "inventario" && (
           <VistaAlmacen
+            key={vueltasInventario}
             embedded={{ views: ["inventario", "dashboard", "lotes", "valuacion", "conteos"] }}
           />
         )}
