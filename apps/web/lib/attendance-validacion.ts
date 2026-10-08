@@ -129,3 +129,16 @@ export function checadaDelTipo(
 export function requiereRevision(lista?: ChecadaValidable[] | null): boolean {
   return (lista ?? []).some((c) => c.validacion === "REVISAR" || c.fueraDeSitio);
 }
+
+/**
+ * Por qué el navegador no dio la ubicación, en el código que entiende el API (`ubicacionFalla`).
+ * `GeolocationPositionError`: 1 permiso negado, 2 posición no disponible (una PC sin GPS ni Wi-Fi
+ * útil), 3 tiempo agotado. Cualquier otra cosa es un error genérico.
+ */
+export function fallaDeGeolocalizacion(err: unknown): "PERMISO_NEGADO" | "NO_DISPONIBLE" | "SIN_SENAL" | "ERROR" {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (code === 1) return "PERMISO_NEGADO";
+  if (code === 2) return "NO_DISPONIBLE";
+  if (code === 3) return "SIN_SENAL";
+  return "ERROR";
+}

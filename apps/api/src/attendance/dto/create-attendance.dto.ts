@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsISO8601 } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsISO8601, MaxLength } from 'class-validator';
 
 export class CreateAttendanceDto {
   @IsEnum(['entrada', 'salida'], { message: 'type debe ser "entrada" o "salida"' })
@@ -53,6 +53,16 @@ export class CreateAttendanceDto {
   @IsOptional()
   @IsBoolean({ message: 'mockLocation debe ser booleano' })
   mockLocation?: boolean;
+
+  /**
+   * Por qué no hubo coordenadas, según el cliente: PERMISO_NEGADO, UBICACION_APAGADA, SIN_SENAL,
+   * NO_DISPONIBLE (equipo sin GPS) o ERROR. Solo informa: el motivo «Sin ubicación: …» que ve el jefe.
+   * Texto libre acotado para que una app vieja o un código nuevo nunca tumben la checada.
+   */
+  @IsOptional()
+  @IsString({ message: 'ubicacionFalla debe ser un texto' })
+  @MaxLength(40, { message: 'ubicacionFalla es demasiado largo' })
+  ubicacionFalla?: string;
 
   /** Se capturó sin conexión y se manda después: se respeta `capturedAt` si es razonable. */
   @IsOptional()

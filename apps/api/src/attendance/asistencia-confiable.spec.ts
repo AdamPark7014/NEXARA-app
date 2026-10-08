@@ -1,9 +1,12 @@
 import {
   MENSAJE_UBICACION_SIMULADA,
   MOTIVO_VALIDACION,
+  clienteNativoSinIdentidad,
   combinarValidacion,
   distanciaMetros,
   evaluarUbicacion,
+  motivoSinUbicacion,
+  origenChecada,
   horaCierreAutomatico,
   motivoCorreccionValido,
   puedeVerGpsDireccion,
@@ -139,9 +142,15 @@ describe('sitios permitidos', () => {
   it('sin ubicación se acepta, pero a revisar', () => {
     const r = evaluarUbicacion({ coords: null, sitios: [OFICINA] });
     expect(r.validacion).toBe('REVISAR');
-    expect(r.motivo).toBe(MOTIVO_VALIDACION.sinUbicacion);
+    expect(r.motivo).toBe(`${MOTIVO_VALIDACION.sinUbicacion}: la app no informó la causa (versión anterior)`);
     expect(r.fueraDeSitio).toBe(false);
     expect(r.distanciaSitioM).toBeNull();
+  });
+
+  it('sin ubicación dice por qué cuando el cliente lo diagnosticó', () => {
+    const r = evaluarUbicacion({ coords: null, sitios: [OFICINA], falla: 'UBICACION_APAGADA', origen: 'ANDROID' });
+    expect(r.validacion).toBe('REVISAR');
+    expect(r.motivo).toBe('Sin ubicación: ubicación del teléfono apagada');
   });
 
   it('una precisión peor que 200 m no sirve para decir dónde estuvo', () => {
@@ -237,5 +246,51 @@ describe('detalles del contrato que los clientes ya escribieron', () => {
     expect(motivoCorreccionValido('error')).toBe(false);
     expect(motivoCorreccionValido('   nueve   ')).toBe(false);
     expect(motivoCorreccionValido('Olvidó checar al entrar a planta')).toBe(true);
+  });
+});
+
+describe('motivo de «Sin ubicación» (Adam, 08-10: «que diga por qué»)', () => {
+  it('traduce el diagnóstico de la app', () => {
+    expect(motivoSinUbicacion({ falla: 'PERMISO_NEGADO', origen: 'ANDROID' })).toBe(
+      'Sin ubicación: permiso de ubicación negado',
+    );
+    expect(motivoSinUbicacion({ falla: 'sin_senal', origen: 'IOS' })).toBe(
+      'Sin ubicación: el teléfono no consiguió señal a tiempo',
+    );
+    expect(motivoSinUbicacion({ falla: 'ERROR', origen: 'ANDROID' })).toBe('Sin ubicación: falló la lectura del GPS');
+  });
+
+  it('en la web habla del navegador', () => {
+    expect(motivoSinUbicacion({ falla: 'PERMISO_NEGADO', origen: 'WEB' })).toBe(
+      'Sin ubicación: el navegador no dio permiso de ubicación',
+    );
+    expect(motivoSinUbicacion({ falla: 'NO_DISPONIBLE', origen: 'WEB' })).toBe('Sin ubicación: el equipo no tiene GPS');
+    expect(motivoSinUbicacion({ origen: 'WEB' })).toBe('Sin ubicación: checada desde el navegador');
+  });
+
+  it('un código desconocido o ninguno no rompe: dice que la app no informó', () => {
+    expect(motivoSinUbicacion({ falla: 'ALGO_NUEVO', origen: 'ANDROID' })).toBe(
+      'Sin ubicación: la app no informó la causa (versión anterior)',
+    );
+  });
+});
+
+describe('cliente nativo sin identidad (cola sin conexión de las apps viejas)', () => {
+  it('okhttp es la app de Android, no una PC', () => {
+    expect(clienteNativoSinIdentidad('okhttp/4.12.0')).toBe('ANDROID');
+    expect(origenChecada('okhttp/4.12.0', {})).toBe('ANDROID');
+  });
+
+  it('CFNetwork/Darwin es URLSession de iOS', () => {
+    expect(clienteNativoSinIdentidad('NEXARA/9 CFNetwork/1568.100.1 Darwin/24.0.0')).toBe('IOS');
+    expect(origenChecada('NEXARA/9 CFNetwork/1568.100.1 Darwin/24.0.0', {})).toBe('IOS');
+  });
+
+  it('un navegador sigue siendo WEB', () => {
+    const chrome =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36';
+    expect(clienteNativoSinIdentidad(chrome)).toBeNull();
+    expect(origenChecada(chrome, {})).toBe('WEB');
+    expect(clienteNativoSinIdentidad('')).toBeNull();
   });
 });

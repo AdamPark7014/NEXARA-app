@@ -1,5 +1,6 @@
 import {
   checadaDelTipo,
+  fallaDeGeolocalizacion,
   insigniasChecada,
   requiereRevision,
   type ChecadaValidable,
@@ -101,5 +102,15 @@ describe("resumen del día", () => {
 
   it("y uno con algo fuera de sitio sí", () => {
     expect(requiereRevision([base(), base({ id: 2, fueraDeSitio: true })])).toBe(true);
+  });
+});
+
+describe("fallaDeGeolocalizacion", () => {
+  it("traduce el error del navegador al código del API", () => {
+    expect(fallaDeGeolocalizacion({ code: 1 })).toBe("PERMISO_NEGADO");
+    expect(fallaDeGeolocalizacion({ code: 2 })).toBe("NO_DISPONIBLE");
+    expect(fallaDeGeolocalizacion({ code: 3 })).toBe("SIN_SENAL");
+    expect(fallaDeGeolocalizacion(new Error("x"))).toBe("ERROR");
+    expect(fallaDeGeolocalizacion(null)).toBe("ERROR");
   });
 });
