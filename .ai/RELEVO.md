@@ -1,5 +1,15 @@
 # RELEVO
 
+- **08-10 ~09:20 (claude-code) — iOS: rechazo de Apple 2.5.4 → GPS de jornada solo en primer plano.**
+  - Apple rechazó 1.0.0 (9) el 07-10 (guía 2.5.4): `location` en `UIBackgroundModes` solo para seguir a empleados no
+    se acepta. Texto íntegro, causa y respuesta en inglés en `docs/store/IOS-RESPUESTA-APPLE.md` (sección del 07-10).
+  - `Info.plist`: sin `location` en `UIBackgroundModes` y sin el texto del permiso «Siempre». `ShiftGpsTracker.swift`:
+    solo «Mientras se usa la app», sin `allowsBackgroundLocationUpdates` ni cambios significativos; `resumeIfNeeded()`
+    re-arma al volver a primer plano. En iOS el recorrido solo se registra con la app abierta; Android igual que antes.
+  - **Pendiente (con OK de Adam):** workflow `ios-testflight.yml` version=1.0.0 build=10 upload=true; en App Store
+    Connect cambiar descripción y Notes (ya en el doc), elegir el build 10, responder y reenviar. Si Adam necesita
+    seguir con la app cerrada, la vía es Custom App por Apple Business Manager, no la tienda pública.
+
 - **08-10 ~09:10 (claude-code) — KPIs: «Actividad por día» (quién no tocó nada o solo una).**
   - Adam: «profundizar más en las actividades: ayer tal solo registró una actividad o ayer no registró ninguna; quiénes
     casi no han sido productivos».
