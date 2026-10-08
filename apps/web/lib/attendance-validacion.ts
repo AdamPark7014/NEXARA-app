@@ -142,3 +142,43 @@ export function fallaDeGeolocalizacion(err: unknown): "PERMISO_NEGADO" | "NO_DIS
   if (code === 3) return "SIN_SENAL";
   return "ERROR";
 }
+
+/** Un tramo con la ubicación apagada o sin permiso (`sinUbicacion` de `attendance/hierarchy/range`). */
+export type TramoSinUbicacion = {
+  estado: "APAGADA" | "SIN_PERMISO";
+  desde: string;
+  /** null: nadie avisó que se volvió a encender. */
+  hasta: string | null;
+  minutos: number;
+};
+
+const horaMx = new Intl.DateTimeFormat("es-MX", { timeZone: "America/Mexico_City", hour: "numeric", minute: "2-digit" });
+
+function horaTramo(iso: string): string {
+  return horaMx.format(new Date(iso)).replace(/\s?a\.\s?m\./, " a.m.").replace(/\s?p\.\s?m\./, " p.m.");
+}
+
+/**
+ * Aviso de Asistencias para un teléfono con la ubicación apagada (Adam, 08-10: «que nos registre
+ * si hay algún dispositivo con la ubicación apagada»). Rojo si sigue apagada; ámbar si ya volvió.
+ * `esHoy` false: un tramo sin cierre en un día pasado no «sigue», solo no avisó cuándo se encendió.
+ */
+export function avisoUbicacion(
+  tramos: TramoSinUbicacion[] | undefined,
+  esHoy: boolean,
+): { texto: string; tono: "danger" | "warning"; detalle: string } | null {
+  if (!tramos?.length) return null;
+  const nombre = (t: TramoSinUbicacion) => (t.estado === "SIN_PERMISO" ? "sin permiso de ubicación" : "ubicación apagada");
+  const detalle = tramos
+    .map((t) => `${horaTramo(t.desde)}–${t.hasta ? horaTramo(t.hasta) : esHoy ? "ahora" : "sin aviso"} · ${nombre(t)}`)
+    .join("\n");
+  const abierto = [...tramos].reverse().find((t) => t.hasta === null);
+  if (abierto && esHoy) {
+    const que = abierto.estado === "SIN_PERMISO" ? "Sin permiso de ubicación" : "Ubicación apagada";
+    return { texto: `${que} desde ${horaTramo(abierto.desde)}`, tono: "danger", detalle };
+  }
+  const minutos = tramos.reduce((s, t) => s + t.minutos, 0);
+  const veces = tramos.length > 1 ? `${tramos.length} veces · ` : "";
+  const duracion = minutos >= 60 ? `${Math.floor(minutos / 60)} h ${minutos % 60} min` : `${minutos} min`;
+  return { texto: `Ubicación apagada ${veces}${duracion}`, tono: "warning", detalle };
+}

@@ -6,6 +6,7 @@ import { CreateGpsDto } from './dto/create-gps.dto.js';
 import { parseWorkDate, workDateColumn, workDayBounds } from '../common/time/workday.js';
 import { ActivityGeofenceService } from '../activities/geofence/activity-geofence.service.js';
 import { puedeVerGpsDireccion } from '../attendance/asistencia-confiable.js';
+import { registrarEstadoUbicacion } from '../attendance/estado-ubicacion.js';
 
 @Injectable()
 export class GpsService {
@@ -130,6 +131,13 @@ export class GpsService {
       }
       throw err;
     }
+    // Un punto recibido prueba que la ubicación ya está encendida: cierra un tramo «apagada».
+    void registrarEstadoUbicacion(this.prisma, {
+      userId: createGpsDto.usuarioId,
+      companyId: resolvedCompanyId,
+      estado: 'ENCENDIDA',
+      fuente: 'GPS',
+    });
     // Geocerca de actividades: se mide sin hacer esperar al teléfono.
     void Promise.resolve(
       this.geofence?.evaluarPunto({

@@ -1,5 +1,22 @@
 # RELEVO
 
+- **08-10 ~11:30 (claude-code) — Registro de teléfonos con la ubicación apagada.**
+  - Adam: «que nos registre si hay algún dispositivo con la ubicación apagada».
+  - **Migración `20261008120000_estado_ubicacion`** (aditiva): tabla `location_status_events` (userId, companyId,
+    estado APAGADA/SIN_PERMISO/ENCENDIDA, fuente APP/CHECADA/GPS, origen, deviceInfo, at). Desplegar con
+    `--with-migrate`.
+  - API `attendance/estado-ubicacion.ts`: solo cambios (`debeRegistrarse`: ENCENDIDA solo cierra un tramo abierto;
+    el mismo aviso de otro día abre tramo nuevo), `tramosSinUbicacion`. `POST attendance/estado-ubicacion`
+    (`EstadoUbicacionController`, registrado antes de `AttendanceController`); la checada anota APAGADA/SIN_PERMISO
+    por `ubicacionFalla` y ENCENDIDA si trae coordenadas; cada punto de `POST gps` cierra un tramo.
+    `attendance/hierarchy/range` trae `sinUbicacion` por persona.
+  - Web Asistencias (columna Estado): «Ubicación apagada desde 10:15» (rojo, sigue apagada) o «Ubicación apagada
+    2 veces · 1 h 35 min» (ámbar), detalle en el `title` (`avisoUbicacion` en `lib/attendance-validacion.ts`).
+  - Android: `JornadaGpsService` escucha `PROVIDERS_CHANGED_ACTION` con la jornada abierta y manda el estado
+    (`util/EstadoUbicacion.kt`). iOS: `Util/EstadoUbicacionMonitor.swift` (solo permiso, sin pedir ubicaciones) al
+    volver a primer plano y en `locationManagerDidChangeAuthorization`; en iOS «apagada» se revisa antes que el
+    permiso (con la ubicación apagada el permiso sale `.denied`). Ambas requieren nueva versión en tiendas.
+
 - **08-10 ~11:10 (claude-code) — «Sin ubicación» dice por qué + la cola sin conexión ya no se toma por PC.**
   - Adam (captura de Asistencias): «por qué hay muchos usuarios sin ubicación… que diga por qué».
   - Diagnóstico con datos: Iván, Mónica y Roberto (Android) mandaron la checada sin coordenadas y sin causa (tienen
@@ -13,9 +30,8 @@
     sin causa: «…: la app no informó la causa (versión anterior)»). `clienteNativoSinIdentidad`: `okhttp/…` = Android,
     `CFNetwork … Darwin` = iOS (origen y deviceInfo «… NEXARA App (envío diferido)»).
   - Web: `AttendanceForm` manda `ubicacionFalla` con `fallaDeGeolocalizacion` (código 1/2/3 del navegador).
-  - Apps (en curso por agentes): identidad en la cola sin conexión, reintento con GPS fino, diagnóstico y
-    `ubicacionFalla`. Pendiente pedido nuevo de Adam: «que nos registre si hay algún dispositivo con la ubicación
-    apagada» (durante la jornada, no solo al checar).
+  - Apps (hechas 08-10 ~11:30): identidad en la cola sin conexión y en los clientes propios (Android `AppIdentity`,
+    iOS `DeviceIdentity.aplicar`), reintento con GPS fino (12 s) y `ubicacionFalla` con nota en la confirmación.
 
 - **08-10 ~09:45 (claude-code) — Almacén: tipo de artículo + capacidad de empaque + búsqueda rápida (API y web).**
   - Adam: «tipado más fuerte… búsqueda rápida en stock y almacén… un taladro es uno y uno, otro un bote de cinchos

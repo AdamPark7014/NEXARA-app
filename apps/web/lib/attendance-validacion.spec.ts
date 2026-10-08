@@ -1,4 +1,5 @@
 import {
+  avisoUbicacion,
   checadaDelTipo,
   fallaDeGeolocalizacion,
   insigniasChecada,
@@ -112,5 +113,42 @@ describe("fallaDeGeolocalizacion", () => {
     expect(fallaDeGeolocalizacion({ code: 3 })).toBe("SIN_SENAL");
     expect(fallaDeGeolocalizacion(new Error("x"))).toBe("ERROR");
     expect(fallaDeGeolocalizacion(null)).toBe("ERROR");
+  });
+});
+
+describe("avisoUbicacion (teléfono con la ubicación apagada)", () => {
+  const t = (desde: string, hasta: string | null, minutos: number, estado: "APAGADA" | "SIN_PERMISO" = "APAGADA") => ({
+    estado,
+    desde: `2026-10-08T${desde}:00-06:00`,
+    hasta: hasta ? `2026-10-08T${hasta}:00-06:00` : null,
+    minutos,
+  });
+
+  it("sin tramos no hay aviso", () => {
+    expect(avisoUbicacion([], true)).toBeNull();
+    expect(avisoUbicacion(undefined, true)).toBeNull();
+  });
+
+  it("si sigue apagada hoy: rojo y desde qué hora", () => {
+    const a = avisoUbicacion([t("10:15", null, 45)], true);
+    expect(a?.tono).toBe("danger");
+    expect(a?.texto).toMatch(/^Ubicación apagada desde 10:15/);
+  });
+
+  it("sin permiso se dice distinto", () => {
+    expect(avisoUbicacion([t("09:00", null, 10, "SIN_PERMISO")], true)?.texto).toMatch(/^Sin permiso de ubicación desde/);
+  });
+
+  it("si ya volvió: ámbar con cuántas veces y cuánto tiempo", () => {
+    const a = avisoUbicacion([t("10:15", "10:40", 25), t("12:00", "13:10", 70)], true);
+    expect(a?.tono).toBe("warning");
+    expect(a?.texto).toBe("Ubicación apagada 2 veces · 1 h 35 min");
+    expect(a?.detalle.split("\n")).toHaveLength(2);
+  });
+
+  it("un día pasado sin aviso de encendido no dice «desde»", () => {
+    const a = avisoUbicacion([t("17:00", null, 60)], false);
+    expect(a?.tono).toBe("warning");
+    expect(a?.detalle).toContain("sin aviso");
   });
 });

@@ -998,6 +998,7 @@ model User {
 
   // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
   checadasRechazadas    AttendanceRejection[] @relation("AttendanceRejectionUser")
+  estadosUbicacion      LocationStatusEvent[] @relation("LocationStatusEventUser")
   toolRequestsRecogidas ToolRequest[]         @relation("ToolRequestPickedUpBy")
   activityToolChecks    ActivityToolCheck[]   @relation("ActivityToolCheckUser")
   toolKitInspections    ToolKitInspection[]   @relation("ToolKitInspectionInspector")
@@ -1978,6 +1979,30 @@ model Attendance {
   @@unique([companyId, userId, workDate, type])
   @@index([companyId])
   @@index([userId, timestamp])
+}
+
+/// Cuándo un teléfono tuvo la ubicación apagada o sin permiso durante la jornada (Adam, 08-10:
+/// «que nos registre si hay algún dispositivo con la ubicación apagada»). Solo cambios de estado:
+/// APAGADA / SIN_PERMISO abren un tramo y ENCENDIDA lo cierra. Lo informa la app, lo deduce el
+/// API de una checada sin ubicación (`ubicacionFalla`) y lo cierra un punto de GPS recibido.
+model LocationStatusEvent {
+  id         Int            @id @default(autoincrement())
+  userId     Int
+  companyId  Int
+  /// APAGADA | SIN_PERMISO | ENCENDIDA
+  estado     String         @db.VarChar(20)
+  /// APP (el teléfono lo avisó) | CHECADA (diagnóstico al checar) | GPS (llegó un punto).
+  fuente     String         @db.VarChar(10)
+  /// ANDROID | IOS | WEB
+  origen     String?        @db.VarChar(10)
+  deviceInfo String?
+  at         DateTime       @default(now())
+  user       User           @relation("LocationStatusEventUser", fields: [userId], references: [id], onDelete: Cascade)
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, at])
+  @@index([userId, at])
+  @@map("location_status_events")
 }
 
 /// Corrección de hora de una checada: sólo dirección y RH, siempre con motivo.
@@ -6137,6 +6162,7 @@ model CompanyProfile {
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   attendanceRejections        AttendanceRejection[]
+  locationStatusEvents        LocationStatusEvent[]
   overtimeApprovals           OvertimeApproval[]
   activityPeerRequests        ActivityPeerRequest[]
   workSchedules               WorkSchedule[]
