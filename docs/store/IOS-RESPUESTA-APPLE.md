@@ -53,6 +53,35 @@ Thank you,
 NEXARA team
 ```
 
+## Rechazo del 07-10-2026 · build 1.0.0 (9) · guía 2.5.4 (ubicación en segundo plano)
+
+Apple (revisado en iPad Air 11" M3): la app declara `location` en `UIBackgroundModes` y la única función que lo usa es
+seguir a empleados, lo cual no acepta. Opciones que da: grabar otra función que necesite ubicación persistente (no la
+hay), o distribuir por otra vía (Custom App por Apple Business Manager) si seguir a empleados es el único uso.
+
+**Hecho (para el build 10):** `Info.plist` sin `location` en `UIBackgroundModes` y sin
+`NSLocationAlwaysAndWhenInUseUsageDescription`; `ShiftGpsTracker.swift` solo pide «Mientras se usa la app», sin
+`allowsBackgroundLocationUpdates` ni cambios significativos, y re-arma al volver a primer plano. En iOS el recorrido de
+jornada solo se registra con la app abierta (como la web); Android no cambia.
+
+Respuesta en App Store Connect (enviar solo cuando el build 10 esté elegido y Adam lo apruebe):
+
+```
+Hello,
+
+Thank you for the review. We agree that employee tracking is not an appropriate use of the location background mode, and we have removed it in build 1.0.0 (10):
+
+- "location" has been removed from UIBackgroundModes (only "remote-notification" remains, for push notifications).
+- The app no longer requests "Always" location permission; NSLocationAlwaysAndWhenInUseUsageDescription has been removed. It only requests "While Using the App".
+- The app no longer uses background location updates or significant-location-change monitoring.
+
+Location is now used only while the app is open on screen: to stamp the clock-in/clock-out photo and job evidence, and, while the user's workday is open and the app is in use, to record the workday route. When the app goes to the background, location collection stops. The user sees a "Compartiendo ubicación de jornada" (Sharing workday location) notice with a "Dejar de compartir" (Stop sharing) button, and sharing ends automatically at clock-out.
+
+The app can still be reviewed without an account: on the sign-in screen tap "Explorar NEXARA con datos de muestra" (demo mode, no real location is collected).
+
+Best regards
+```
+
 ## Campos de App Store Connect (versión 1.0)
 
 **Texto promocional** (≤170):
@@ -73,7 +102,7 @@ Con NEXARA tu equipo puede:
 
 ¿Tu empresa aún no usa NEXARA? Solicita tu espacio de trabajo en nexara.com.mx/contacto. ¿Quieres verla antes? Abre la app y toca «Explorar NEXARA con datos de muestra»: recorres todas las funciones sin cuenta.
 
-Cada empresa da de alta a las personas de su equipo y decide qué ve cada una. La ubicación en segundo plano solo se usa mientras tu jornada está abierta y se detiene al marcar tu salida.
+Cada empresa da de alta a las personas de su equipo y decide qué ve cada una. La ubicación solo se usa con la app abierta y deja de compartirse al marcar tu salida.
 
 Aviso de privacidad: https://nexara.com.mx/legal/privacidad
 ```
@@ -106,8 +135,10 @@ NEXARA API (https://api.nexara.com.mx), Firebase Cloud Messaging and Apple Push 
 No advertising, no third-party analytics, no tracking, no in-app purchases.
 
 LOCATION
-Location is used to stamp attendance and job evidence. Background location runs ONLY while the user has an open workday, to share
-position with their supervisor, and stops when they check out. The purpose strings explain this.
+Location is used only while the app is in use ("While Using the App" permission). It stamps clock-in/clock-out photos and job
+evidence, and while the user's workday is open and the app is on screen it records the workday route shared with their supervisor.
+The app does not declare the location background mode, does not request "Always" permission and does not collect location in the
+background. Sharing stops at clock-out or with "Dejar de compartir".
 
 ACCOUNT DELETION
 Profile > "Eliminar mi cuenta" (opens https://nexara.com.mx/legal/eliminar-cuenta). Accounts are created by the customer company.

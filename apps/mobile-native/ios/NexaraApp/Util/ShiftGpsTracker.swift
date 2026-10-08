@@ -9,6 +9,15 @@ import UIKit
 /// y se apaga al marcar **salida**. No sigue a nadie fuera de su jornada: el
 /// propio API cruza el consentimiento con `AttendanceDay.isOpen`, así que un
 /// punto enviado con la jornada cerrada no lo ve ningún encargado.
+///
+/// **Solo en primer plano** (permiso «Mientras se usa la app»), igual que la web.
+/// Apple rechazó 1.0.0 (9) el 07-10-2026 por la guía 2.5.4: el modo de fondo
+/// `location` no se acepta cuando su único uso es seguir a empleados. Por eso
+/// NO hay `UIBackgroundModes: location`, ni permiso «Siempre», ni
+/// `allowsBackgroundLocationUpdates` (con `true` y sin ese modo, CoreLocation
+/// tumba la app), ni cambios significativos de ubicación. Al pasar a segundo
+/// plano iOS suspende la app y deja de entregar puntos; al volver a abrirla,
+/// `resumeIfNeeded()` reanuda si la jornada sigue abierta.
 @MainActor
 final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = ShiftGpsTracker()
@@ -50,7 +59,10 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         isTracking = UserDefaults.standard.bool(forKey: ShiftGpsTracker.activeKey)
     }
 
-    var isAlways: Bool { DemoMode.isActive || authorization == .authorizedAlways }
+    /// Hay permiso de ubicación (cualquiera de los dos; solo se pide «Mientras se usa»).
+    var isAuthorized: Bool {
+        DemoMode.isActive || authorization == .authorizedWhenInUse || authorization == .authorizedAlways
+    }
     var isDenied: Bool { !DemoMode.isActive && (authorization == .denied || authorization == .restricted) }
 
     /// ¿Se puede compartir el trayecto? (`JornadaGps.canTrack` de Android). Con la
@@ -60,28 +72,20 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
 
     /// Texto para explicar el permiso antes de pedirlo (lo pinta la pantalla).
     var authorizationLabel: String {
-        if DemoMode.isActive { return "Permitido siempre" }
+        if DemoMode.isActive { return "Mientras usas la app" }
         switch authorization {
-        case .authorizedAlways: return "Permitido siempre"
-        case .authorizedWhenInUse: return "Solo con la app abierta"
+        case .authorizedAlways, .authorizedWhenInUse: return "Mientras usas la app"
         case .denied, .restricted: return "Ubicación bloqueada"
         default: return "Sin permiso todavía"
         }
     }
 
-    /// Pide «Permitir siempre». En iOS el salto se hace en dos pasos: primero
-    /// «mientras la app esté abierta» y después la ampliación; pedirlo así es lo
-    /// que hace que el sistema enseñe el segundo aviso.
-    func requestAlwaysAuthorization() {
+    /// Pide «Permitir mientras se usa la app». Nunca «Siempre»: ver la nota del tipo.
+    func requestAuthorization() {
         // Modo demostración: no se pide ningún permiso de ubicación.
         if DemoMode.isActive { return }
-        switch authorization {
-        case .notDetermined:
+        if authorization == .notDetermined {
             manager.requestWhenInUseAuthorization()
-        case .authorizedWhenInUse:
-            manager.requestAlwaysAuthorization()
-        default:
-            break
         }
     }
 
@@ -97,14 +101,9 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         UserDefaults.standard.set(true, forKey: ShiftGpsTracker.activeKey)
         isTracking = true
         lastError = nil
-        requestAlwaysAuthorization()
+        requestAuthorization()
         guard !isDenied else { return }
-        if authorization == .authorizedAlways {
-            // Solo con «Siempre» es legal (y útil) seguir en segundo plano.
-            manager.allowsBackgroundLocationUpdates = true
-            manager.showsBackgroundLocationIndicator = true
-            manager.startMonitoringSignificantLocationChanges()
-        }
+        // Primer plano: iOS deja de entregar puntos en cuanto la app se suspende.
         manager.startUpdatingLocation()
     }
 
@@ -117,8 +116,6 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         UserDefaults.standard.set(false, forKey: ShiftGpsTracker.activeKey)
         isTracking = false
         manager.stopUpdatingLocation()
-        manager.stopMonitoringSignificantLocationChanges()
-        manager.allowsBackgroundLocationUpdates = false
         lastPoint = nil
         lastSent = nil
     }
@@ -135,7 +132,9 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         }
         let consent = (try? await AsistenciasRepository.shared.gpsConsentIsOn()) ?? false
         if consent {
-            if !isTracking || authorization == .authorizedAlways { start() }
+            // Se re-arma siempre al volver a primer plano: sin modo de fondo,
+            // las actualizaciones se cortaron al suspenderse la app.
+            start()
         } else if isTracking {
             stop()
         }

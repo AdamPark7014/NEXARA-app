@@ -44,9 +44,7 @@
         <string>UIInterfaceOrientationPortrait</string>
     </array>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Tu ubicación se guarda con la foto de entrada y salida, y con la evidencia que subes desde sitio.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Mientras tu jornada esté abierta, NEXARA comparte tu ubicación con tu encargado, aunque la app esté cerrada. Se detiene al marcar tu salida.</string>
+    <string>NEXARA usa tu ubicación solo mientras la app está abierta: la guarda con tu foto de entrada y salida y con la evidencia que subes desde sitio, y, con tu jornada abierta, comparte tu recorrido con tu encargado hasta que marcas tu salida.</string>
     <key>NSCameraUsageDescription</key>
     <string>NEXARA usa la cámara para tomar las fotos de evidencia de tu trabajo (entrada, salida y actividades) y adjuntarlas a tu jornada, y para leer códigos de barras de productos y herramientas en el almacén.</string>
     <key>NSPhotoLibraryUsageDescription</key>
@@ -60,7 +58,6 @@
     <key>UIBackgroundModes</key>
     <array>
         <string>remote-notification</string>
-        <string>location</string>
     </array>
     <key>NSAppTransportSecurity</key>
     <dict>
