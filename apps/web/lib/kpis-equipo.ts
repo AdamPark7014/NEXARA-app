@@ -82,6 +82,8 @@ export type TotalesKpi = {
   carga?: ProporcionKpi;
   /** Tiempo con una actividad (cada una hasta su tiempo máximo) contra las horas trabajadas. */
   ocupacion?: ProporcionKpi;
+  /** De los días que debía trabajar: sin ninguna actividad, con solo una y el promedio por día. */
+  actividadDiaria?: { esperados: number; sinActividad: number; conUna: number; promedio: number | null };
   /** Días que debía trabajar y cuántos trabajó (multiplica el cumplimiento). */
   diasDeTrabajo?: {
     esperados: number;
@@ -179,6 +181,18 @@ export type KpiPersonaFila = {
   totales: TotalesKpi;
   semaforo: SemaforoKpi;
   motivos: string[];
+  /** Los días laborables (compactos) para la tabla «Actividad por día». */
+  actividadPorDia?: ActividadDelDiaFila[];
+};
+
+/** Un día de una persona en «Actividad por día». */
+export type ActividadDelDiaFila = {
+  fecha: string;
+  /** trabajado · sin_trabajo (checó y no hizo nada) · sin_checar · justificado · pendiente (hoy, aún no termina). */
+  estado: "trabajado" | "sin_trabajo" | "sin_checar" | "justificado" | "pendiente";
+  /** Actividades distintas que tocó ese día (con su reloj corriendo o entregadas). */
+  actividades: number;
+  entregas: number;
 };
 
 export type KpisEquipoResponse = {

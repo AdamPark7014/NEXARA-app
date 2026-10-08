@@ -7,6 +7,7 @@ import { Alert, Button, Card, CardHead, EmptyState, InfoPopover, PageHead, Segme
 import { useUser } from "@/components/UserContext";
 import { PRESETS_NOMINA, RangoSelector } from "@/components/pizarra/PizarraKpi";
 import RankingPersonas, { LeyendaJornada } from "@/components/kpis/RankingPersonas";
+import ActividadPorDia from "@/components/kpis/ActividadPorDia";
 import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
 import { KPIS_PATH, fetchKpisEquipo, formatPctKpi, rangoDesdeUrl, type KpiPersonaFila, type KpisEquipoResponse } from "@/lib/kpis-equipo";
@@ -238,6 +239,8 @@ export default function KpisEquipoPage() {
           />
         </StatRow>
       ) : null}
+
+      {data && !soloYo ? <ActividadPorDia personas={data.personas} hrefDe={hrefDe} /> : null}
 
       <Card>
         <CardHead
