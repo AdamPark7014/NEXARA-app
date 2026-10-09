@@ -46,6 +46,9 @@ const base: TotalesKpi = {
   minutosInactivos: 650,
   productividadPct: 73,
   minutosExtra: 0,
+  minutosExtraAprobados: 0,
+  minutosExtraPendientes: 0,
+  diasExtraPendientes: 0,
   jornadasAbiertas: 0,
   jornadasSinSalida: 0,
   cierresAutomaticos: 0,
@@ -192,7 +195,7 @@ describe("entregas del detalle", () => {
 describe("ranking", () => {
   const fila = (id: number, nombre: string, pct: number | null, retardos = 0): KpiPersonaFila => ({
     persona: { id, nombre, email: "", avatarUrl: null, puesto: null },
-    horario: { clave: null, etiqueta: "", entrada: null, graciaMin: 15, jornadaOrdinariaMin: null },
+    horario: { clave: null, etiqueta: "", entrada: null, salida: null, graciaMin: 15, jornadaOrdinariaMin: null, dias: [], personalizado: false },
     totales: { ...base, productividadPct: pct, retardos },
     semaforo: "verde",
     motivos: [],

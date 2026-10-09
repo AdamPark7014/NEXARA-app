@@ -61,7 +61,7 @@ describe("mis vehículos", () => {
 
     // Sale dos veces: en la tarjeta de uso y en la solicitud aprobada.
     expect((await screen.findAllByText("Ranger 2021")).length).toBe(2);
-    expect(String(fetchMock.mock.calls[0][0])).toContain("vehicles/mis-vehiculos");
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("vehicles/mis-vehiculos");
     expect(screen.getByText("120,000 km")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Registrar salida" })).not.toBeInTheDocument();
 

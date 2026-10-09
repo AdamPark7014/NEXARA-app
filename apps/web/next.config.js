@@ -8,6 +8,8 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: process.env.NEXT_IGNORE_TYPE_ERRORS === '1',
+    // tsconfig.json incluye las pruebas (el editor y `typecheck:web` las revisan); la compilación no.
+    tsconfigPath: 'tsconfig.build.json',
   },
   
   // Habilitar SWC para compilación más rápida

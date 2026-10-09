@@ -212,7 +212,7 @@ describe("EvidenciaPorCampos", () => {
     expect(zip[0]).toMatch(/\/api\/activity-evidence\/5\/evidencia\.zip$/);
     expect(zip[1].credentials).toBe("include");
     expect((zip[1].headers as Record<string, string>).Authorization).toBe("Bearer jwt");
-    const downloadArgs = triggerBlobDownload.mock.calls[0];
+    const downloadArgs = triggerBlobDownload.mock.calls[0] as unknown[];
     expect(downloadArgs.length).toBe(3);
     expect(downloadArgs[0]).toEqual(expect.objectContaining({ type: "application/zip", size: expect.any(Number) }));
     expect(downloadArgs[1]).toBe("AN-0005 Cámaras.zip");

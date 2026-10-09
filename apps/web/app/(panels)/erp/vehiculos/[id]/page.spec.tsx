@@ -77,7 +77,7 @@ describe("ficha del vehículo", () => {
     render(<VehiculoDetallePage />);
 
     expect(await screen.findByText("Historial · 1 viajes")).toBeInTheDocument();
-    expect(String(fetchMock.mock.calls[0][0])).toContain("vehicles/flotilla/3");
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("vehicles/flotilla/3");
     expect(screen.getByText("120,345 km")).toBeInTheDocument();
     expect(screen.getByText(/AN-2026-014/)).toBeInTheDocument();
 

@@ -9,7 +9,8 @@
       "DOM.Iterable"
     ],
     "types": [
-      "node"
+      "node",
+      "vitest/globals"
     ],
     "paths": {
       "@/components/*": [
@@ -52,10 +53,6 @@
   "exclude": [
     "node_modules",
     "build",
-    "public/sw.js",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
-    "**/*.test.ts",
-    "**/*.test.tsx"
+    "public/sw.js"
   ]
 }
