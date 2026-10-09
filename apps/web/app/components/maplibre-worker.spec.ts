@@ -19,7 +19,7 @@ describe("worker de MapLibre en /public", () => {
     expect(MAPLIBRE_WORKER_URL).toBe("/maplibre/maplibre-gl-worker.mjs");
   });
 
-  it.each(["maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"])("%s es copia exacta del paquete instalado", (archivo) => {
+  it.each(["maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"])("%s es copia exacta del paquete instalado", (archivo: string) => {
     const publicado = leer(join(publicDir, "maplibre", archivo));
     const instalado = leer(join(dist, archivo));
     expect(publicado === instalado).toBe(true);

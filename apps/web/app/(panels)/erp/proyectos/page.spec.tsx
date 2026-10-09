@@ -76,7 +76,7 @@ describe("lista de proyectos", () => {
     render(<ProyectosPage />);
 
     expect(await screen.findByText("Acceso corporativo Torre A")).toBeInTheDocument();
-    expect(String(fetchMock.mock.calls[0][0])).toContain("proyectos?incluirCancelados=1");
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("proyectos?incluirCancelados=1");
     expect(screen.getByText("CCTV bodega Cuautlancingo")).toBeInTheDocument();
     expect(screen.queryByText("Red de sucursales Sur")).not.toBeInTheDocument();
     // La fila dice qué sigue y cuánto va.

@@ -84,7 +84,7 @@ describe("VehicleCheckoutForm", () => {
     await user.click(screen.getByRole("button", { name: "Registrar devolución" }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    const payload = onSubmit.mock.calls[0][0] as unknown as {
+    const payload = (onSubmit.mock.calls[0] as unknown[])[0] as {
       files: Record<string, File>;
       meta: Record<string, { capturedAt: string }>;
       odometroKm: number;

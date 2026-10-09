@@ -73,7 +73,7 @@ describe("lista de cotizaciones", () => {
 
     // Cada cotización es un renglón de la tabla; el folio es el enlace a su ficha.
     const fila = (await screen.findByText("Plaza Norte")).closest("tr")!;
-    expect(String(fetchMock.mock.calls[0]![0])).toContain("cotizaciones/core");
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("cotizaciones/core");
     expect(within(fila).getAllByRole("link")[0]).toHaveAttribute("href", "/erp/cotizaciones/7");
     expect(within(fila).getByText("Enviada")).toBeInTheDocument();
     expect(within(fila).getByText("Luis Joel Aguilar · su #7 · revisión 2")).toBeInTheDocument();

@@ -156,7 +156,7 @@ describe("el cliente del proyecto sale del padrón único", () => {
     await waitFor(() => expect(llamadas.some((l) => l.method === "POST" && /ventas\/clientes$/.test(l.url))).toBe(true));
     const alta = llamadas.find((l) => l.method === "POST" && /ventas\/clientes$/.test(l.url))!;
     // Ada no está en la matriz de sectores ni tiene rol de padrón: solo el nombre.
-    expect(alta.body.altaProyecto).toBe(true);
+    expect((alta.body as { altaProyecto?: boolean }).altaProyecto).toBe(true);
   });
 
   it("si el nombre ya está en el padrón y no es suyo, el alta rápida lo dice con las palabras del servidor", async () => {
