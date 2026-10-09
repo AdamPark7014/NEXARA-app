@@ -209,6 +209,11 @@ describe('el consentimiento de ubicación sólo lo otorga el usuario', () => {
     expect(prisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { locationConsent: false } }),
     );
+    // Los puntos se apagan sin cambiarles la hora: de ella sale el recorrido del día.
+    expect(prisma.locationTracking.updateMany).toHaveBeenCalledWith({
+      where: { usuarioId: 3, estaActivo: true },
+      data: { estaActivo: false },
+    });
   });
 });
 

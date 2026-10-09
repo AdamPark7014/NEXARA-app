@@ -185,7 +185,8 @@ export class GpsService {
     if (!enabled) {
       await this.prisma['locationTracking'].updateMany({
         where: { usuarioId: userId, estaActivo: true },
-        data: { estaActivo: false, ultimaActualizacion: new Date() },
+        // Sin tocar `ultimaActualizacion`: es la hora del punto y de ella sale el recorrido.
+        data: { estaActivo: false },
       });
     }
     return { consent: Boolean(user.locationConsent) };
