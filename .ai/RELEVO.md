@@ -1,5 +1,14 @@
 # RELEVO
 
+- **09-10 ~12:10 (claude-code) — iOS build 10 listo para reenvío + Android 1.0.7 (17).**
+  - iOS: build 1.0.0 (10) subido (workflow `ios-testflight.yml`), en ASC descripción y Notes sin ubicación en
+    segundo plano, build 10 en la versión 1.0, respuesta a Apple publicada, «Actualizar revisión» → elemento «Listo
+    para revisión». El clic final «Volver a enviar a revisión de apps» lo da Adam.
+  - Android: `gradle.properties` VERSION_CODE 17 / VERSION_NAME 1.0.7; `bundleRelease` firmado (26 MB) copiado a
+    `Descargas/NEXARA-android-1.0.7-17.aab`; 793 pruebas JVM en verde. Incluye escáner único y menú vivo, motivo de
+    sin ubicación + aviso de ubicación apagada, identidad en la cola sin conexión, adjuntos comerciales, cotización
+    sin IVA. El AAB no cabe por `file_upload` (tope 10 MB): Adam lo arrastra en Play Console.
+
 - **09-10 ~10:30 (claude-code) — Iván «compartiendo ubicación» en la app vs «Sin ubicación» en la web + horas del recorrido.**
   - No es contradicción: la app dice que la jornada está abierta y el GPS de jornada encendido; la web marca la
     CHECADA de las 9:21, que llegó sin coordenadas (app instalada: lectura balanceada sin reintento; la versión de
