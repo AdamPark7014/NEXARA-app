@@ -1776,9 +1776,12 @@ export class AttendanceService {
       data: { locationConsent: false },
     });
 
+    // Solo se apagan: la hora de cada punto es cuándo se midió. Antes también se les ponía
+    // `ultimaActualizacion: now` y todo el recorrido del día quedaba a la hora de la salida
+    // (el 08-10 los 28 puntos de Iván salían a las 18:37).
     await this.prisma['locationTracking'].updateMany({
       where: { usuarioId: userId, estaActivo: true },
-      data: { estaActivo: false, ultimaActualizacion: now },
+      data: { estaActivo: false },
     });
 
     // Ubicación apagada o sin permiso al checar: queda en el registro de estados (y una checada

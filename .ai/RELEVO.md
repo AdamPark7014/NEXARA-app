@@ -1,5 +1,15 @@
 # RELEVO
 
+- **09-10 ~10:30 (claude-code) — Iván «compartiendo ubicación» en la app vs «Sin ubicación» en la web + horas del recorrido.**
+  - No es contradicción: la app dice que la jornada está abierta y el GPS de jornada encendido; la web marca la
+    CHECADA de las 9:21, que llegó sin coordenadas (app instalada: lectura balanceada sin reintento; la versión de
+    `main` ya reintenta con GPS fino). El GPS de jornada manda un punto cada 30 min y solo si se movió 500 m
+    (`JornadaGps.INTERVAL_MS`/`MIN_DISTANCE_M`): hoy solo uno a las 10:10.
+  - Bug corregido: al checar la salida (`attendance.service`) y al apagar el consentimiento (`gps.service`) se hacía
+    `updateMany({ estaActivo: false, ultimaActualizacion: now })` y TODO el recorrido del día quedaba a la hora de la
+    salida (los 28 puntos de Iván del 08-10 dicen 18:37). Ahora solo `estaActivo: false`. Lo ya sobrescrito no se
+    puede recuperar.
+
 - **08-10 ~11:30 (claude-code) — Registro de teléfonos con la ubicación apagada.**
   - Adam: «que nos registre si hay algún dispositivo con la ubicación apagada».
   - **Migración `20261008120000_estado_ubicacion`** (aditiva): tabla `location_status_events` (userId, companyId,
