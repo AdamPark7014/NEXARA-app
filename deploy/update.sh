@@ -157,9 +157,22 @@ fi
 
 # build mobile omitido: servicio deprecado.
 
+# Transcriptor propio (whisper): se activa poniendo TRANSCRIPTOR_URL en el .env. Con el perfil
+# exportado, `--remove-orphans` no lo borra en cada deploy.
+TRANSCRIPTOR_ON=false
+if grep -Eq '^TRANSCRIPTOR_URL=.+' "$ENV_FILE"; then
+  TRANSCRIPTOR_ON=true
+  export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}transcriptor"
+fi
+
 echo "Starting services..."
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans db
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans --no-build api web
+if [[ "$TRANSCRIPTOR_ON" == true ]]; then
+  # La primera vez compila whisper y baja el modelo (varios minutos); después no hace nada.
+  echo "Starting transcriptor..."
+  DOCKER_BUILDKIT=1 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d transcriptor
+fi
 
 if [[ "$RUN_MIGRATE" == true ]]; then
   echo "Running Prisma migrate deploy..."
