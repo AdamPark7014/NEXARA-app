@@ -1,17 +1,18 @@
 import { ROLES } from './roles.v2';
 import { checkUrlAccess } from './url-matrix';
 
-/** «Asignar con IA» abre solo para quien asigna; crear sigue en `POST /api/activities`. */
+/** «Asignar con IA» es solo del CEO; crear sigue en `POST /api/activities`. */
 describe('matriz: asistente de actividades con IA', () => {
-  it.each([ROLES.CEO, ROLES.DIR_OPERACIONES, ROLES.COORD_OPERACIONES, ROLES.ENC_SOPORTE, ROLES.ARQUITECTO])(
-    '%s puede interpretar instrucciones',
+  it('el CEO interpreta instrucciones y ve a quién asignar', () => {
+    expect(checkUrlAccess(ROLES.CEO, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(true);
+    expect(checkUrlAccess(ROLES.CEO, '/api/ai/asistente/estado', 'GET').allowed).toBe(true);
+    expect(checkUrlAccess(ROLES.CEO, '/api/users/assignable', 'GET').allowed).toBe(true);
+  });
+
+  it.each([ROLES.DIR_OPERACIONES, ROLES.COORD_OPERACIONES, ROLES.ENC_SOPORTE, ROLES.ARQUITECTO, ROLES.ING_CAMPO])(
+    '%s no lo usa',
     (role) => {
-      expect(checkUrlAccess(role, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(true);
-      expect(checkUrlAccess(role, '/api/ai/asistente/estado', 'GET').allowed).toBe(true);
+      expect(checkUrlAccess(role, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(false);
     },
   );
-
-  it('un ingeniero de campo no la usa', () => {
-    expect(checkUrlAccess(ROLES.ING_CAMPO, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(false);
-  });
 });
