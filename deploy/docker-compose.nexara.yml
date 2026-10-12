@@ -53,6 +53,11 @@ services:
         condition: service_healthy
       go2rtc:
         condition: service_started
+    # Clave de Anthropic compartida por todos los proyectos del servidor (fuera del repo y del
+    # .env). No va también en `environment`: ahí ganaría sobre este archivo.
+    env_file:
+      - path: /etc/ai/anthropic.env
+        required: false
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -87,7 +92,6 @@ services:
       BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL}
       BREVO_SENDER_NAME: ${BREVO_SENDER_NAME}
       BREVO_NEWSLETTER_LIST_ID: ${BREVO_NEWSLETTER_LIST_ID}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
       SMTP_HOST: ${SMTP_HOST}
