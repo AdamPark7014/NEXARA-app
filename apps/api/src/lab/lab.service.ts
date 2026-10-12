@@ -105,8 +105,9 @@ export class LabService {
     const provider = isAnthropic ? 'anthropic' : 'openai';
     const anthropicBaseUrl = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1').replace(/\/+$/, '');
     const anthropicToken = (process.env.ANTHROPIC_AUTH_TOKEN || '').trim();
+    // El token va con ANTHROPIC_BASE_URL (proxy); ANTHROPIC_API_KEY es la de Anthropic directo.
     const apiKey = isAnthropic
-      ? (process.env.ANTHROPIC_API_KEY || anthropicToken)
+      ? (anthropicToken || process.env.ANTHROPIC_API_KEY)
       : process.env.OPENAI_API_KEY;
     const liveEnabled = await this.isEnabled('lab.ai.live');
 
