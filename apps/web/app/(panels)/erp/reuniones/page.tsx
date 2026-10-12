@@ -38,6 +38,7 @@ import {
   addAgreement,
   closeMeeting,
   createMeeting,
+  downloadMeetingPdf,
   formatMeetingDate,
   getMeeting,
   listLessons,
@@ -121,6 +122,7 @@ export default function ReunionesPage() {
   const [detalle, setDetalle] = useState<MeetingDetail | null>(null);
   const [detalleAbierto, setDetalleAbierto] = useState(false);
   const [detalleCargando, setDetalleCargando] = useState(false);
+  const [bajandoPdf, setBajandoPdf] = useState<number | null>(null);
 
   const [personas, setPersonas] = useState<ApiUserRow[]>([]);
   const puedeConvocar = useMemo(() => canLeadMeetings(resolveV2RoleKey(user)), [user]);
@@ -212,6 +214,18 @@ export default function ReunionesPage() {
       setDetalleAbierto(false);
     } finally {
       setDetalleCargando(false);
+    }
+  };
+
+  const bajarPdf = async (id: number) => {
+    if (!token || bajandoPdf) return;
+    setBajandoPdf(id);
+    try {
+      await downloadMeetingPdf(token, id);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo generar el acta en PDF."));
+    } finally {
+      setBajandoPdf(null);
     }
   };
 
@@ -410,7 +424,7 @@ export default function ReunionesPage() {
           )}
         </Section>
       ) : tab === "reuniones" ? (
-        <Section title="Reuniones" subtitle="De la más reciente a la más antigua.">
+        <Section title="Reuniones" subtitle="El archivo de juntas, de la más reciente a la más antigua. Cada una baja su acta en PDF.">
           {primeraCarga ? (
             <SkeletonList />
           ) : reuniones.length === 0 ? (
@@ -423,7 +437,7 @@ export default function ReunionesPage() {
           ) : (
             <ul className={s.list}>
               {reuniones.map((r) => (
-                <li key={r.id}>
+                <li key={r.id} className={s.meetingRow}>
                   <button type="button" className={s.meeting} onClick={() => void abrirDetalle(r.id)}>
                     <span className={s.meetingIcon} aria-hidden="true">📅</span>
                     <span style={{ minWidth: 0 }}>
@@ -441,6 +455,15 @@ export default function ReunionesPage() {
                       </span>
                     </span>
                   </button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    aria-label={`Descargar acta en PDF: ${r.titulo}`}
+                    loading={bajandoPdf === r.id}
+                    onClick={() => void bajarPdf(r.id)}
+                  >
+                    PDF
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -592,6 +615,11 @@ export default function ReunionesPage() {
         footer={
           <>
             <Button variant="secondary" onClick={cerrarDetalle}>Cerrar</Button>
+            {detalle && (
+              <Button variant="secondary" loading={bajandoPdf === detalle.id} onClick={() => void bajarPdf(detalle.id)}>
+                Descargar acta (PDF)
+              </Button>
+            )}
             {detalle?.estado === "PROGRAMADA" && (
               <Button variant="primary" onClick={() => void cerrarJunta()} loading={cerrandoJunta}>
                 Marcar como realizada

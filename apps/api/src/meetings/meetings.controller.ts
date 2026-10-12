@@ -8,11 +8,15 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { Response } from 'express';
 import { MeetingsService } from './meetings.service.js';
 import { ActaIaService } from './acta-ia.service.js';
+import { GrabacionService } from './grabacion.service.js';
+import { generarActaPdf, nombreArchivoActa } from './acta-pdf.js';
 import type {
   AgreementKind,
   AgreementStatus,
@@ -42,6 +46,7 @@ export class MeetingsController {
   constructor(
     private readonly service: MeetingsService,
     private readonly actaIa: ActaIaService,
+    private readonly grabacion: GrabacionService,
   ) {}
 
   // ── Rutas literales ───────────────────────────────────────────────────
@@ -108,6 +113,21 @@ export class MeetingsController {
   @Get(':id')
   get(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.service.get(id, companyId);
+  }
+
+  /** Acta en PDF: datos, asistencia, agenda, minuta, acuerdos y la transcripción si hubo grabación. */
+  @Get(':id/pdf')
+  async actaPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    const reunion = await this.service.get(id, companyId);
+    const grabacion = await this.grabacion.estado(id, companyId).catch(() => null);
+    const pdf = await generarActaPdf({ ...reunion, transcripcion: grabacion?.texto ?? null });
+    res.header('Content-Type', 'application/pdf');
+    res.header('Content-Disposition', `attachment; filename="${nombreArchivoActa(reunion)}"`);
+    res.send(pdf);
   }
 
   @Patch(':id')

@@ -81,6 +81,13 @@
 
 .meeting:hover { border-color: var(--border-strong, var(--border)); background: var(--surface-2); }
 
+.meetingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .meetingIcon { font-size: 18px; }
 
 .meetingTitle {

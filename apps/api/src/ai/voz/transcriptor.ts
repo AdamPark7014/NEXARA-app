@@ -24,6 +24,20 @@ export function limpiarTextoWhisper(texto: string): string {
     .trim();
 }
 
+/**
+ * Vocabulario de la empresa para whisper: con él escribe bien marcas, siglas y clientes que
+ * sin contexto confunde («Hikvision», «NVR», «IPADE»). Corto a propósito: un prompt largo
+ * hace que whisper lo repita sobre los silencios. `TRANSCRIPTOR_PROMPT` lo reemplaza.
+ */
+export const PROMPT_TRANSCRIPTOR =
+  'Junta de trabajo de NEXARA, integrador de seguridad en México. Se habla de actividades, ' +
+  'cotizaciones, clientes y sucursales: CCTV, cámaras Hikvision, NVR, DVR, control de acceso, ' +
+  'cableado, fibra, Banorte, IPADE, Integra.';
+
+export function promptTranscriptor(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.TRANSCRIPTOR_PROMPT || '').trim() || PROMPT_TRANSCRIPTOR;
+}
+
 /** Formatos que graban los navegadores (Chrome/Edge/Firefox: webm u ogg; Safari: mp4). */
 const EXTENSIONES: Record<string, string> = {
   'audio/webm': 'webm',

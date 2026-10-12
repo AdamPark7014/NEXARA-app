@@ -4,6 +4,8 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'pizarra',
   'asistencias',
   'chat',
+  // Reuniones y acuerdos: convocar, grabar, acta con IA y archivo de actas en PDF.
+  'reuniones',
   'my-profile',
   // Vista ejecutiva (KPIs) — visible para dirección en Core.
   'executive',
