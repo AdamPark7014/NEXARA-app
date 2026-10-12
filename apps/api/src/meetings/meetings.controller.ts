@@ -193,10 +193,12 @@ export class MeetingsController {
       responsableId?: number | null;
       fechaCompromiso?: string | null;
       activityId?: number | null;
+      crearActividad?: boolean;
     },
+    @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.addAgreement(id, body, companyId);
+    return this.service.addAgreement(id, body, companyId, Number(user?.id) || null);
   }
 
   @Patch(':id/acuerdos/:agreementId')

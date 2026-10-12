@@ -8,8 +8,9 @@
  * los acuerdos y las lecciones aprendidas no quedaban ligados a las actividades
  * de las que se hablaba.
  *
- * La pantalla abre en **Mis acuerdos**, no en el listado de reuniones: lo que
- * cada persona necesita al entrar es qué le toca, no el archivo de juntas.
+ * Quien conduce abre en **Reuniones**, con «Empezar reunión ahora»: un toque crea la junta,
+ * graba, y al terminar la IA escribe el acta y cada acuerdo cae como actividad del responsable.
+ * El resto del personal abre en **Mis acuerdos**: lo que le toca, no el archivo de juntas.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -60,9 +61,23 @@ import PersonalCalendar from "@/components/calendar/PersonalCalendar";
 import ActaIA from "./ActaIA";
 import s from "./reuniones.module.css";
 
-type Tab = "mios" | "reuniones" | "vencidos" | "lecciones" | "agenda";
+type Tab = "mios" | "reuniones" | "agenda";
 
-const TAB_IDS: Tab[] = ["mios", "reuniones", "agenda", "vencidos", "lecciones"];
+const TAB_IDS: Tab[] = ["mios", "reuniones", "agenda"];
+
+type FiltroMios = "abiertos" | "fuera" | "todos-fuera";
+
+const FILTROS_MIOS: Array<{ key: FiltroMios; label: string }> = [
+  { key: "abiertos", label: "Abiertos" },
+  { key: "fuera", label: "Míos tarde" },
+  { key: "todos-fuera", label: "Todos fuera de fecha" },
+];
+
+/** Hora local `HH:MM` para la junta que empieza ya. */
+const horaAhora = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 const KIND_ICON: Record<AgreementKind, string> = {
   ACUERDO: "🤝",
@@ -91,7 +106,13 @@ const nuevaJuntaVacia = () => ({
   asistentes: [] as number[],
 });
 
-const acuerdoVacio = { tipo: "ACUERDO" as AgreementKind, descripcion: "", responsableId: "", fechaCompromiso: "" };
+const acuerdoVacio = {
+  tipo: "ACUERDO" as AgreementKind,
+  descripcion: "",
+  responsableId: "",
+  fechaCompromiso: "",
+  crearActividad: true,
+};
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("es-MX")} ${n === 1 ? one : many}`;
 
@@ -107,7 +128,6 @@ export default function ReunionesPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
 
-  const [tab, setTab] = useState<Tab>("mios");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -126,17 +146,29 @@ export default function ReunionesPage() {
 
   const [personas, setPersonas] = useState<ApiUserRow[]>([]);
   const puedeConvocar = useMemo(() => canLeadMeetings(resolveV2RoleKey(user)), [user]);
+  const [tabElegida, setTabElegida] = useState<Tab | null>(null);
+  const tab: Tab = tabElegida ?? (puedeConvocar ? "reuniones" : "mios");
+  const [filtroMios, setFiltroMios] = useState<FiltroMios>("abiertos");
+  const [verLecciones, setVerLecciones] = useState(false);
 
   useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("tab") as Tab | null;
-    if (t && TAB_IDS.includes(t)) setTab(t);
+    const t = new URLSearchParams(window.location.search).get("tab");
+    // Enlaces viejos: «vencidos» y «lecciones» eran pestañas; ahora son filtros.
+    if (t === "vencidos") {
+      setTabElegida("mios");
+      setFiltroMios("todos-fuera");
+    } else if (t === "lecciones") {
+      setTabElegida("reuniones");
+      setVerLecciones(true);
+    } else if (t && (TAB_IDS as string[]).includes(t)) {
+      setTabElegida(t as Tab);
+    }
   }, []);
 
   const cambiarTab = useCallback((next: Tab) => {
-    setTab(next);
+    setTabElegida(next);
     const url = new URL(window.location.href);
-    if (next === "mios") url.searchParams.delete("tab");
-    else url.searchParams.set("tab", next);
+    url.searchParams.set("tab", next);
     window.history.replaceState(null, "", url.toString());
   }, []);
 
@@ -185,7 +217,7 @@ export default function ReunionesPage() {
 
   useEffect(() => {
     if (!token) return;
-    if (tab === "vencidos" && vencidos === null) {
+    if (tab === "mios" && filtroMios === "todos-fuera" && vencidos === null) {
       listOverdueAgreements(token)
         .then((r) => setVencidos(r?.acuerdos ?? []))
         .catch((e) => {
@@ -193,7 +225,7 @@ export default function ReunionesPage() {
           setError(formatApiError(e, "No pudimos cargar los acuerdos fuera de fecha."));
         });
     }
-    if (tab === "lecciones" && lecciones === null) {
+    if (tab === "reuniones" && verLecciones && lecciones === null) {
       listLessons(token)
         .then(setLecciones)
         .catch((e) => {
@@ -201,7 +233,7 @@ export default function ReunionesPage() {
           setError(formatApiError(e, "No pudimos cargar las lecciones aprendidas."));
         });
     }
-  }, [tab, token, vencidos, lecciones]);
+  }, [tab, filtroMios, verLecciones, token, vencidos, lecciones]);
 
   const abrirDetalle = async (id: number) => {
     if (!token) return;
@@ -230,6 +262,7 @@ export default function ReunionesPage() {
   };
 
   const cerrarDetalle = () => {
+    setGrabarEn(null);
     setDetalleAbierto(false);
     setDetalle(null);
     setNuevoAcuerdo(acuerdoVacio);
@@ -283,6 +316,30 @@ export default function ReunionesPage() {
     }
   };
 
+  /** Un toque: crea la junta de hoy con la hora de ahora, la abre y empieza a grabar. */
+  const [empezando, setEmpezando] = useState(false);
+  const [grabarEn, setGrabarEn] = useState<number | null>(null);
+  const empezarAhora = async () => {
+    if (!token || empezando) return;
+    setEmpezando(true);
+    try {
+      const creada = await createMeeting(token, {
+        tipo: suggestedTypeForToday(),
+        fecha: todayInput(),
+        horaInicio: horaAhora(),
+      });
+      setGrabarEn(creada.id);
+      cambiarTab("reuniones");
+      setVerLecciones(false);
+      await abrirDetalle(creada.id);
+      void cargar();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo empezar la reunión."));
+    } finally {
+      setEmpezando(false);
+    }
+  };
+
   // ── Registrar acuerdo / lección / riesgo ────────────────────────────────
 
   const [nuevoAcuerdo, setNuevoAcuerdo] = useState(acuerdoVacio);
@@ -292,16 +349,21 @@ export default function ReunionesPage() {
     if (!token || !detalle) return;
     setGuardandoAcuerdo(true);
     try {
-      await addAgreement(token, detalle.id, {
+      const esAcuerdo = nuevoAcuerdo.tipo === "ACUERDO";
+      const r = await addAgreement(token, detalle.id, {
         tipo: nuevoAcuerdo.tipo,
         descripcion: nuevoAcuerdo.descripcion,
         responsableId: nuevoAcuerdo.responsableId ? Number(nuevoAcuerdo.responsableId) : null,
         fechaCompromiso: nuevoAcuerdo.fechaCompromiso || null,
+        crearActividad: esAcuerdo && Boolean(nuevoAcuerdo.responsableId) && nuevoAcuerdo.crearActividad,
       });
+      if (r.avisoActividad) toast.error(r.avisoActividad);
       setNuevoAcuerdo(acuerdoVacio);
       setLecciones(null);
       await refrescarDetalle();
-      toast.success(`${AGREEMENT_KIND_LABEL[nuevoAcuerdo.tipo]} registrado`);
+      toast.success(
+        `${AGREEMENT_KIND_LABEL[nuevoAcuerdo.tipo]} registrado${r.activity?.id && nuevoAcuerdo.crearActividad ? " y asignado como actividad" : ""}`,
+      );
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo registrar."));
     } finally {
@@ -350,6 +412,7 @@ export default function ReunionesPage() {
   // ── Derivados ───────────────────────────────────────────────────────────
 
   const proximas = useMemo(() => reuniones.filter((r) => r.estado === "PROGRAMADA").length, [reuniones]);
+  const miosVisibles = useMemo(() => (filtroMios === "fuera" ? mios.filter((a) => a.vencido) : mios), [mios, filtroMios]);
 
   const buscarLecciones = async () => {
     if (!token) return;
@@ -372,7 +435,16 @@ export default function ReunionesPage() {
         eyebrow="Hoy"
         title="Reuniones y acuerdos"
         subtitle="La diaria de las 10:00, la planeación del lunes, la revisión del miércoles y la junta de cierre del viernes."
-        actions={puedeConvocar ? <Button variant="primary" iconLeft="＋" onClick={() => setConvocando(true)}>Convocar reunión</Button> : null}
+        actions={
+          puedeConvocar ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={() => setConvocando(true)}>Programar</Button>
+              <Button variant="primary" iconLeft="●" onClick={() => void empezarAhora()} loading={empezando}>
+                Empezar reunión ahora
+              </Button>
+            </div>
+          ) : null
+        }
       />
 
       {error && (
@@ -390,7 +462,15 @@ export default function ReunionesPage() {
             ariaLabel="Resumen de reuniones"
             metrics={[
               { label: "mis acuerdos abiertos", value: mios.length, onClick: () => cambiarTab("mios") },
-              { label: "míos fuera de fecha", value: miosVencidos, tone: miosVencidos > 0 ? "danger" : "default", onClick: () => cambiarTab("mios") },
+              {
+                label: "míos fuera de fecha",
+                value: miosVencidos,
+                tone: miosVencidos > 0 ? "danger" : "default",
+                onClick: () => {
+                  setFiltroMios("fuera");
+                  cambiarTab("mios");
+                },
+              },
               { label: "reuniones programadas", value: proximas, onClick: () => cambiarTab("reuniones") },
               { label: "reuniones registradas", value: reuniones.length, onClick: () => cambiarTab("reuniones") },
             ]}
@@ -403,36 +483,121 @@ export default function ReunionesPage() {
         value={tab}
         onChange={cambiarTab}
         tabs={[
-          { key: "mios", label: "Mis acuerdos", badge: miosVencidos > 0 ? `${miosVencidos} tarde` : mios.length || undefined },
           { key: "reuniones", label: "Reuniones" },
+          { key: "mios", label: "Mis acuerdos", badge: miosVencidos > 0 ? `${miosVencidos} tarde` : mios.length || undefined },
           { key: "agenda", label: "Agenda" },
-          { key: "vencidos", label: "Fuera de fecha" },
-          { key: "lecciones", label: "Lecciones aprendidas" },
         ]}
       />
 
       {tab === "agenda" ? (
         <PersonalCalendar embedded />
       ) : tab === "mios" ? (
-        <Section title="Lo que me toca" subtitle="Acuerdos a tu nombre que siguen abiertos.">
-          {primeraCarga ? (
+        <Section
+          title={filtroMios === "todos-fuera" ? "Acuerdos fuera de fecha" : "Lo que me toca"}
+          subtitle={
+            filtroMios === "todos-fuera"
+              ? "De todo el equipo: el tablero con el que arranca la junta de cierre."
+              : "Acuerdos a tu nombre que siguen abiertos."
+          }
+          actions={
+            <div className={s.chips} role="group" aria-label="Filtrar acuerdos">
+              {FILTROS_MIOS.map((f) => (
+                <Button
+                  key={f.key}
+                  size="sm"
+                  variant={filtroMios === f.key ? "primary" : "ghost"}
+                  aria-pressed={filtroMios === f.key}
+                  onClick={() => setFiltroMios(f.key)}
+                >
+                  {f.label}
+                </Button>
+              ))}
+            </div>
+          }
+        >
+          {filtroMios === "todos-fuera" ? (
+            vencidos === null ? (
+              <SkeletonList />
+            ) : vencidos.length === 0 ? (
+              <EmptyState icon="🎯" title="Nada fuera de fecha" description="Todos los acuerdos van en tiempo." />
+            ) : (
+              <ListaAcuerdos acuerdos={vencidos} mostrarReunion mostrarResponsable />
+            )
+          ) : primeraCarga ? (
             <SkeletonList />
-          ) : mios.length === 0 ? (
-            <EmptyState icon="✅" title="Nada pendiente" description="No tienes acuerdos abiertos a tu nombre." />
+          ) : miosVisibles.length === 0 ? (
+            <EmptyState
+              icon="✅"
+              title={filtroMios === "fuera" ? "Nada tarde" : "Nada pendiente"}
+              description={filtroMios === "fuera" ? "Tus acuerdos van en tiempo." : "No tienes acuerdos abiertos a tu nombre."}
+            />
           ) : (
-            <ListaAcuerdos acuerdos={mios} mostrarReunion onEstado={cambiarEstadoPropio} estadosDisponibles={["EN_PROCESO", "CUMPLIDO"]} />
+            <ListaAcuerdos acuerdos={miosVisibles} mostrarReunion onEstado={cambiarEstadoPropio} estadosDisponibles={["EN_PROCESO", "CUMPLIDO"]} />
           )}
         </Section>
-      ) : tab === "reuniones" ? (
-        <Section title="Reuniones" subtitle="El archivo de juntas, de la más reciente a la más antigua. Cada una baja su acta en PDF.">
+      ) : verLecciones ? (
+        <Section
+          title="Lecciones aprendidas"
+          subtitle="Lo que se dijo el viernes y antes se olvidaba el lunes."
+          actions={
+            <form
+              role="search"
+              style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void buscarLecciones();
+              }}
+            >
+              <input
+                className={s.input}
+                type="search"
+                aria-label="Buscar lecciones"
+                value={busquedaLeccion}
+                onChange={(e) => setBusquedaLeccion(e.target.value)}
+                placeholder="Buscar lecciones…"
+                style={{ width: 220, maxWidth: "100%" }}
+              />
+              <Button size="sm" variant="secondary" type="submit">Buscar</Button>
+              <Button size="sm" variant="ghost" onClick={() => setVerLecciones(false)}>Ver reuniones</Button>
+            </form>
+          }
+        >
+          {lecciones === null ? (
+            <SkeletonList />
+          ) : lecciones.length === 0 ? (
+            <EmptyState
+              icon="💡"
+              title={busquedaLeccion ? "Sin coincidencias" : "Sin lecciones registradas"}
+              description={
+                busquedaLeccion
+                  ? "Prueba con otras palabras."
+                  : "En la junta de cierre, registra lo aprendido: queda escrito y ligado al servicio del que salió."
+              }
+            />
+          ) : (
+            <ListaAcuerdos acuerdos={lecciones} mostrarReunion />
+          )}
+        </Section>
+      ) : (
+        <Section
+          title="Reuniones"
+          subtitle="De la más reciente a la más antigua. Cada una baja su acta en PDF."
+          actions={<Button size="sm" variant="ghost" onClick={() => setVerLecciones(true)}>💡 Lecciones aprendidas</Button>}
+        >
           {primeraCarga ? (
             <SkeletonList />
           ) : reuniones.length === 0 ? (
             <EmptyState
               icon="📅"
               title="Todavía no hay reuniones"
-              description="Convoca la primera: la agenda se genera sola según el tipo."
-              action={puedeConvocar ? <Button variant="primary" onClick={() => setConvocando(true)}>Convocar reunión</Button> : undefined}
+              description={puedeConvocar ? "Toca «Empezar reunión ahora»: se graba y la IA escribe el acta." : "Aquí verás las juntas a las que te convoquen."}
+              action={
+                puedeConvocar ? (
+                  <Button variant="primary" onClick={() => void empezarAhora()} loading={empezando}>
+                    Empezar reunión ahora
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <ul className={s.list}>
@@ -467,58 +632,6 @@ export default function ReunionesPage() {
                 </li>
               ))}
             </ul>
-          )}
-        </Section>
-      ) : tab === "vencidos" ? (
-        <Section title="Acuerdos fuera de fecha" subtitle="El tablero con el que arranca la junta de cierre.">
-          {vencidos === null ? (
-            <SkeletonList />
-          ) : vencidos.length === 0 ? (
-            <EmptyState icon="🎯" title="Nada fuera de fecha" description="Todos los acuerdos van en tiempo." />
-          ) : (
-            <ListaAcuerdos acuerdos={vencidos} mostrarReunion mostrarResponsable />
-          )}
-        </Section>
-      ) : (
-        <Section
-          title="Lecciones aprendidas"
-          subtitle="Lo que se dijo el viernes y antes se olvidaba el lunes."
-          actions={
-            <form
-              role="search"
-              style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                void buscarLecciones();
-              }}
-            >
-              <input
-                className={s.input}
-                type="search"
-                aria-label="Buscar lecciones"
-                value={busquedaLeccion}
-                onChange={(e) => setBusquedaLeccion(e.target.value)}
-                placeholder="Buscar lecciones…"
-                style={{ width: 220, maxWidth: "100%" }}
-              />
-              <Button size="sm" variant="secondary" type="submit">Buscar</Button>
-            </form>
-          }
-        >
-          {lecciones === null ? (
-            <SkeletonList />
-          ) : lecciones.length === 0 ? (
-            <EmptyState
-              icon="💡"
-              title={busquedaLeccion ? "Sin coincidencias" : "Sin lecciones registradas"}
-              description={
-                busquedaLeccion
-                  ? "Prueba con otras palabras."
-                  : "En la junta de cierre, registra lo aprendido: queda escrito y ligado al servicio del que salió."
-              }
-            />
-          ) : (
-            <ListaAcuerdos acuerdos={lecciones} mostrarReunion />
           )}
         </Section>
       )}
@@ -652,13 +765,15 @@ export default function ReunionesPage() {
               </div>
             )}
 
-            {detalle.estado !== "CANCELADA" && (
+            {/* Grabar y el acta con IA: solo encargados de área (Adam, 12-10). */}
+            {puedeConvocar && detalle.estado !== "CANCELADA" && (
               <ActaIA
                 key={detalle.id}
                 token={token}
                 meetingId={detalle.id}
                 personas={personas}
-                puedeGuardar={puedeConvocar}
+                puedeGuardar
+                grabarAlAbrir={grabarEn === detalle.id}
                 onGuardada={refrescarDetalle}
               />
             )}
@@ -725,6 +840,14 @@ export default function ReunionesPage() {
                       onChange={(e) => setNuevoAcuerdo({ ...nuevoAcuerdo, fechaCompromiso: e.target.value })}
                     />
                   </div>
+                  <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={nuevoAcuerdo.crearActividad}
+                      onChange={(e) => setNuevoAcuerdo({ ...nuevoAcuerdo, crearActividad: e.target.checked })}
+                    />
+                    Asignarlo como actividad al responsable
+                  </label>
                   <p className={s.hint} style={{ margin: 0 }}>
                     Un acuerdo necesita responsable. Una lección o un riesgo no: son conocimiento, no tarea.
                   </p>

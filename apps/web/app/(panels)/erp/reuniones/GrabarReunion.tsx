@@ -29,10 +29,13 @@ type Pendiente = { parte: number; audio: Blob };
 export default function GrabarReunion({
   token,
   meetingId,
+  autoIniciar = false,
   onTranscripcion,
 }: {
   token: string;
   meetingId: number;
+  /** Arranca a grabar en cuanto el transcriptor responde («Empezar reunión ahora»). */
+  autoIniciar?: boolean;
   onTranscripcion: (texto: string) => void;
 }) {
   const [disponible, setDisponible] = useState(false);
@@ -127,14 +130,23 @@ export default function GrabarReunion({
     }
   }, [estado, entregada, grabadora.grabando, enviando]);
 
-  if (!disponible || !grabadora.soportado) return null;
-
   const iniciar = async () => {
     setError(null);
     setEntregada(false);
     base.current = estado?.partes.length ? Math.max(...estado.partes.map((p) => p.parte)) : 0;
     await grabadora.iniciar();
   };
+
+  // Una sola vez por montaje: si la persona la detiene, no vuelve a arrancar sola.
+  const autoArrancada = useRef(false);
+  useEffect(() => {
+    if (!autoIniciar || autoArrancada.current || !disponible || !grabadora.soportado || grabadora.grabando) return;
+    autoArrancada.current = true;
+    void iniciar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoIniciar, disponible, grabadora.soportado]);
+
+  if (!disponible || !grabadora.soportado) return null;
 
   const borrar = async () => {
     if (!window.confirm("¿Borrar el audio y la transcripción de esta reunión? El acta guardada no se toca.")) return;

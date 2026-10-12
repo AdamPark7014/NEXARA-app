@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import {
@@ -17,6 +17,8 @@ import {
   type MeetingStatus,
   type MeetingType,
 } from './meeting-rhythm.js';
+import { ActivitiesService } from '../activities/activities.service.js';
+import { actividadDeAcuerdo } from './acuerdo-actividad.js';
 
 const USER_BRIEF = { select: { id: true, nombre: true, email: true } };
 
@@ -30,7 +32,12 @@ const USER_BRIEF = { select: { id: true, nombre: true, email: true } };
  */
 @Injectable()
 export class MeetingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(MeetingsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly activities?: ActivitiesService,
+  ) {}
 
   // ── Reuniones ─────────────────────────────────────────────────────────
 
@@ -258,11 +265,14 @@ export class MeetingsService {
       responsableId?: number | null;
       fechaCompromiso?: string | null;
       activityId?: number | null;
+      /** Crea también una actividad para el responsable y la deja ligada al acuerdo. */
+      crearActividad?: boolean;
     },
     companyId?: number | null,
+    creadoPorId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
-    await this.loadMeeting(meetingId, tenantId);
+    const reunion = await this.loadMeeting(meetingId, tenantId);
 
     const tipo = dto.tipo ? parseEnum(dto.tipo, AGREEMENT_KINDS, 'tipo') : 'ACUERDO';
     const descripcion = requireText(dto.descripcion, 'descripción');
@@ -288,7 +298,41 @@ export class MeetingsService {
         activity: { select: { id: true, anNumber: true, titulo: true } },
       },
     });
+
+    if (dto.crearActividad && tipo === 'ACUERDO' && creado.responsableId && !creado.activityId && creadoPorId) {
+      const ligado = await this.crearActividadDeAcuerdo(creado, reunion, creadoPorId, tenantId);
+      if (ligado) return this.decorateAgreement(ligado);
+      return { ...this.decorateAgreement(creado), avisoActividad: 'El acuerdo se guardó, pero no se pudo crear su actividad.' };
+    }
     return this.decorateAgreement(creado);
+  }
+
+  /**
+   * El acuerdo cae como actividad interna del responsable por el mismo camino que una alta normal
+   * (folio, equipo, aviso push). Si falla, el acuerdo ya quedó guardado: se avisa y no se revierte.
+   */
+  private async crearActividadDeAcuerdo(
+    acuerdo: { id: number; descripcion: string; responsableId: number | null; fechaCompromiso: Date | null },
+    reunion: { titulo: string; fecha: Date },
+    creadoPorId: number,
+    tenantId: number,
+  ) {
+    if (!this.activities || !acuerdo.responsableId) return null;
+    try {
+      const dto = actividadDeAcuerdo(acuerdo, reunion, creadoPorId);
+      const actividad = await this.activities.create(dto as any, tenantId);
+      return await this.prisma.meetingAgreement.update({
+        where: { id: acuerdo.id },
+        data: { activityId: actividad.id },
+        include: {
+          responsable: USER_BRIEF,
+          activity: { select: { id: true, anNumber: true, titulo: true } },
+        },
+      });
+    } catch (e) {
+      this.logger.warn(`Acuerdo ${acuerdo.id}: no se creó la actividad: ${(e as Error)?.message}`);
+      return null;
+    }
   }
 
   async updateAgreement(
@@ -439,7 +483,7 @@ export class MeetingsService {
   private async loadMeeting(id: number, companyId: number) {
     const reunion = await this.prisma.operationalMeeting.findFirst({
       where: { id, ...companyWhere(companyId) },
-      select: { id: true, estado: true, realizadaAt: true, notas: true },
+      select: { id: true, estado: true, realizadaAt: true, notas: true, titulo: true, fecha: true },
     });
     if (!reunion) throw new NotFoundException('Reunión no encontrada');
     return reunion;

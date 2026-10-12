@@ -248,3 +248,57 @@ describe('mis acuerdos', () => {
     expect(mios.vencidos).toBe(1);
   });
 });
+
+describe('el acuerdo se vuelve actividad del responsable', () => {
+  const conActividades = (create = jest.fn().mockResolvedValue({ id: 77 })) => {
+    const prisma = build({
+      operationalMeeting: {
+        findFirst: jest.fn().mockResolvedValue({ ...REUNION, titulo: 'Planeación', fecha: new Date('2026-10-12T00:00:00Z') }),
+      },
+    }).prisma;
+    prisma.meetingAgreement.create.mockResolvedValue({
+      ...ACUERDO,
+      descripcion: 'Cotizar cámaras de Tox',
+      activityId: null,
+      fechaCompromiso: new Date('2026-10-16T00:00:00Z'),
+    });
+    const activities = { create };
+    return { service: new MeetingsService(prisma as any, activities as any), prisma, activities };
+  };
+
+  it('con la casilla crea una tarea interna con periodo hasta la fecha compromiso y la liga', async () => {
+    const { service, prisma, activities } = conActividades();
+    await service.addAgreement(5, { descripcion: 'Cotizar cámaras de Tox', responsableId: 3, crearActividad: true }, 7, 1);
+    const dto = activities.create.mock.calls[0][0];
+    expect(dto).toMatchObject({
+      titulo: 'Cotizar cámaras de Tox',
+      responsableId: 3,
+      creadoPorId: 1,
+      activityType: 'INTERNAL',
+      coreKind: 'tarea',
+      periodoInicio: '2026-10-12',
+      periodoFin: '2026-10-16',
+    });
+    expect(activities.create.mock.calls[0][1]).toBe(7);
+    expect(prisma.meetingAgreement.update.mock.calls[0][0].data.activityId).toBe(77);
+  });
+
+  it('sin la casilla no crea nada', async () => {
+    const { service, activities } = conActividades();
+    await service.addAgreement(5, { descripcion: 'x', responsableId: 3 }, 7, 1);
+    expect(activities.create).not.toHaveBeenCalled();
+  });
+
+  it('una lección nunca crea actividad', async () => {
+    const { service, activities } = conActividades();
+    await service.addAgreement(5, { tipo: 'LECCION', descripcion: 'x', crearActividad: true }, 7, 1);
+    expect(activities.create).not.toHaveBeenCalled();
+  });
+
+  it('si la actividad falla, el acuerdo queda guardado y avisa', async () => {
+    const { service, prisma } = conActividades(jest.fn().mockRejectedValue(new Error('inactivo')));
+    const r: any = await service.addAgreement(5, { descripcion: 'x', responsableId: 3, crearActividad: true }, 7, 1);
+    expect(prisma.meetingAgreement.create).toHaveBeenCalled();
+    expect(r.avisoActividad).toMatch(/no se pudo crear/);
+  });
+});

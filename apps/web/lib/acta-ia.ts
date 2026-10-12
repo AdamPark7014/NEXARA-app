@@ -32,6 +32,8 @@ export type AcuerdoEditable = {
   descripcion: string;
   responsableId: string;
   fechaCompromiso: string;
+  /** El acuerdo cae también como actividad del responsable. */
+  crearActividad: boolean;
 };
 
 export function editables(acta: ActaPropuesta): AcuerdoEditable[] {
@@ -41,6 +43,7 @@ export function editables(acta: ActaPropuesta): AcuerdoEditable[] {
     descripcion: a.descripcion,
     responsableId: a.responsable ? String(a.responsable.id) : "",
     fechaCompromiso: a.fechaCompromiso ?? "",
+    crearActividad: true,
   }));
 }
 
@@ -57,6 +60,7 @@ export function cuerposParaGuardar(lista: AcuerdoEditable[]) {
       descripcion: a.descripcion.trim(),
       responsableId: a.tipo === "ACUERDO" && a.responsableId ? Number(a.responsableId) : null,
       fechaCompromiso: a.tipo === "ACUERDO" && a.fechaCompromiso ? a.fechaCompromiso : null,
+      crearActividad: a.tipo === "ACUERDO" && Boolean(a.responsableId) && a.crearActividad,
     }));
 }
 

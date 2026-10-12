@@ -1,5 +1,10 @@
 # RELEVO
 
+- **12-10 ~21:35 (claude-code, nube) — Reuniones simple (`.ai/REUNIONES-SIMPLE-SPEC.md`).**
+  - IA de reuniones (grabar, transcribir, acta) solo encargados de área: fuera de `MEETINGS_STAFF_URL_RULES`; ENC_SOPORTE conduce (lead).
+  - `POST reuniones/:id/acuerdos` acepta `crearActividad`: crea Tarea·Junta INTERNAL del responsable (`acuerdo-actividad.ts`, vía `ActivitiesService.create`) y la liga; si falla, el acuerdo queda y responde `avisoActividad`.
+  - Web: «Empezar reunión ahora» (crea, abre y graba sola), acta se genera sola al terminar la transcripción, 3 pestañas (Reuniones, Mis acuerdos, Agenda); vencidos y lecciones son filtros.
+  - Pendiente de lo que encontró la revisión en la lap: cerrar el detalle corta la grabación; minuta a mano sin IA; error de saldo claro.
 - **12-10 ~06:00 (claude-code, nube) — Voz a texto propia (whisper), sin proveedores.**
   - Adam: «lo que pensabas hacer con un proveedor debemos hacerlo nosotros con código». Sustituye la idea de AssemblyAI.
   - `deploy/docker/Dockerfile.transcriptor` + servicio `transcriptor` (perfil, red interna): whisper.cpp v1.9.5

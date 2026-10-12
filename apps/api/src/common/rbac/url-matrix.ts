@@ -60,12 +60,8 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
  * internas, y por eso esto no vive en `SHARED_SESSION_URL_RULES`.
  */
 export const MEETINGS_STAFF_URL_RULES: UrlRule[] = [
-  // Grabar, transcribir y proponer el acta con IA: todo el personal (Adam, 12-10). Guardar la
-  // minuta y los acuerdos sigue siendo de quien conduce.
-  { path: '/api/ai/voz/estado', methods: ['GET'], scope: 'read' },
-  { path: '/api/ai/voz/transcribir', methods: ['POST'], scope: 'write' },
-  { path: '/api/reuniones/*/acta-ia', methods: ['POST'], scope: 'write' },
-  { path: '/api/grabaciones-reuniones/**', scope: 'write' },
+  // Grabar, transcribir y el acta con IA son solo de los encargados de área (Adam, 12-10):
+  // van en MEETINGS_LEAD_URL_RULES. Instaladores, soporte y contabilidad no los tienen.
   { path: '/api/reuniones/mis-acuerdos/**', methods: ['GET', 'PATCH'], scope: 'write' },
   { path: '/api/reuniones/mis-acuerdos', methods: ['GET'], scope: 'read' },
   { path: '/api/reuniones/lecciones', methods: ['GET'], scope: 'read' },
@@ -854,7 +850,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.ENC_SOPORTE]: [
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
-    ...MEETINGS_STAFF_URL_RULES,
+    ...MEETINGS_LEAD_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,

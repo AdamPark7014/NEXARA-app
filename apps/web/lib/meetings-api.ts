@@ -32,6 +32,7 @@ export const MEETING_LEAD_ROLES: RoleKey[] = [
   ROLES.COORD_VENTAS,
   ROLES.LIDER_DISENO,
   ROLES.RH,
+  ROLES.ENC_SOPORTE,
 ];
 
 export const canLeadMeetings = (roleKey: RoleKey | null | undefined): boolean =>
@@ -249,9 +250,10 @@ export const addAgreement = (
     responsableId?: number | null;
     fechaCompromiso?: string | null;
     activityId?: number | null;
+    crearActividad?: boolean;
   },
 ) =>
-  apiFetch<Agreement>(`reuniones/${meetingId}/acuerdos`, token, {
+  apiFetch<Agreement & { avisoActividad?: string }>(`reuniones/${meetingId}/acuerdos`, token, {
     method: "POST",
     body: JSON.stringify(body),
   });

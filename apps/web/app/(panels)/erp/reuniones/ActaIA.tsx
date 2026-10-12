@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { toast } from "@/components/Toast";
@@ -20,14 +20,16 @@ import { unirDictado } from "@/lib/use-dictado";
 import s from "./reuniones.module.css";
 
 /**
- * «Acta con IA» dentro del detalle de una reunión: se pega (o se sube) la transcripción,
- * Claude propone minuta y acuerdos, y se guarda solo lo que se deja marcado.
+ * «Acta con IA» dentro del detalle de una reunión: se graba (o se pega) la junta, Claude
+ * propone minuta y acuerdos en cuanto termina la transcripción, y se guarda solo lo que se
+ * deja marcado. Cada acuerdo puede caer como actividad de su responsable.
  */
 export default function ActaIA({
   token,
   meetingId,
   personas,
   puedeGuardar,
+  grabarAlAbrir = false,
   onGuardada,
 }: {
   token: string;
@@ -35,6 +37,8 @@ export default function ActaIA({
   personas: Array<{ id: number; nombre: string }>;
   /** Guardar minuta y acuerdos es de quien conduce; el resto graba, genera y copia. */
   puedeGuardar: boolean;
+  /** «Empezar reunión ahora»: la grabación arranca sola al abrir. */
+  grabarAlAbrir?: boolean;
   onGuardada: () => Promise<void> | void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -55,11 +59,14 @@ export default function ActaIA({
     setTexto(limpiarTranscripcion(await file.text()));
   };
 
-  const generar = async () => {
+  const textoRef = useRef(texto);
+  textoRef.current = texto;
+
+  const generar = async (fuente: string = textoRef.current) => {
     setGenerando(true);
     setError(null);
     try {
-      const r = await proponerActa(token, meetingId, texto);
+      const r = await proponerActa(token, meetingId, fuente);
       setActa(r);
       setMinuta(r.minuta);
       setAcuerdos(editables(r));
@@ -78,8 +85,19 @@ export default function ActaIA({
     try {
       if (minuta.trim()) await updateMeeting(token, meetingId, { notas: minuta.trim() });
       const cuerpos = cuerposParaGuardar(acuerdos);
-      for (const cuerpo of cuerpos) await addAgreement(token, meetingId, cuerpo);
-      toast.success(`Acta guardada${cuerpos.length ? ` con ${cuerpos.length} registro${cuerpos.length === 1 ? "" : "s"}` : ""}`);
+      let actividades = 0;
+      let fallidas = 0;
+      for (const cuerpo of cuerpos) {
+        const r = await addAgreement(token, meetingId, cuerpo);
+        if (r.activity?.id && cuerpo.crearActividad) actividades++;
+        if (r.avisoActividad) fallidas++;
+      }
+      const partes = [
+        `Acta guardada${cuerpos.length ? ` con ${cuerpos.length} registro${cuerpos.length === 1 ? "" : "s"}` : ""}`,
+        actividades ? `${actividades} actividad${actividades === 1 ? "" : "es"} asignada${actividades === 1 ? "" : "s"}` : "",
+      ].filter(Boolean);
+      toast.success(partes.join(" · "));
+      if (fallidas) toast.error(`${fallidas === 1 ? "Un acuerdo no pudo" : `${fallidas} acuerdos no pudieron`} crear su actividad; asígnala a mano.`);
       setActa(null);
       setTexto("");
       setAbierto(false);
@@ -114,9 +132,13 @@ export default function ActaIA({
     <GrabarReunion
       token={token}
       meetingId={meetingId}
+      autoIniciar={grabarAlAbrir}
       onTranscripcion={(t) => {
-        setTexto((actual) => (actual.trim() ? `${actual.trim()}\n\n${t}` : t));
+        const junto = textoRef.current.trim() ? `${textoRef.current.trim()}\n\n${t}` : t;
+        setTexto(junto);
         setAbierto(true);
+        // Transcripción lista: el acta se escribe sola, sin otro clic.
+        if (!acta && !generando && junto.trim().length >= 40) void generar(junto);
       }}
     />
   );
@@ -163,7 +185,7 @@ export default function ActaIA({
           </p>
           {error ? <InlineAlert variant="danger" message={error} /> : null}
           <div style={{ display: "flex", gap: 8 }}>
-            <Button size="sm" variant="primary" onClick={() => void generar()} loading={generando} disabled={texto.trim().length < 40}>
+            <Button size="sm" variant="primary" onClick={() => void generar(texto)} loading={generando} disabled={texto.trim().length < 40}>
               {generando ? "Escribiendo el acta…" : "Generar acta"}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setAbierto(false)} disabled={generando}>
@@ -230,10 +252,23 @@ export default function ActaIA({
                     />
                   </div>
                 ) : null}
-                <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
-                  <input type="checkbox" checked={a.incluir} onChange={(e) => cambiar(i, { incluir: e.target.checked })} />
-                  Guardar este registro
-                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                  <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+                    <input type="checkbox" checked={a.incluir} onChange={(e) => cambiar(i, { incluir: e.target.checked })} />
+                    Guardar este registro
+                  </label>
+                  {a.tipo === "ACUERDO" && puedeGuardar ? (
+                    <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={a.crearActividad}
+                        disabled={!a.incluir}
+                        onChange={(e) => cambiar(i, { crearActividad: e.target.checked })}
+                      />
+                      Asignarlo como actividad
+                    </label>
+                  ) : null}
+                </div>
               </div>
             );
           })}
