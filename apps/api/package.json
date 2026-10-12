@@ -31,6 +31,7 @@
     "pac:preflight": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/pac/pac-preflight.cli.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/cli": "^10.0.0",
     "@nestjs/common": "^10.0.0",
