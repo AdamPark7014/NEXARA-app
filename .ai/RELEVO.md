@@ -1,5 +1,19 @@
 # RELEVO
 
+- **12-10 ~05:30 (claude-code, nube) — IA con Claude: asignar actividades y actas de reunión.**
+  - Adam: «que el CEO escriba "que Antonio vaya a Tox a las 3" y la IA asigne»; luego actas de reunión.
+  - API `ai/claude/claude.service.ts`: único cliente de Claude (SDK `@anthropic-ai/sdk`), clave solo en
+    `ANTHROPIC_API_KEY`, salida JSON con esquema, caché del prompt, tope diario por empresa
+    (`CLAUDE_TOPE_DIARIO`, 300). Sin clave, todo se oculta o responde 503 con mensaje claro.
+  - Asistente: `POST ai/asistente/interpretar` (Haiku por omisión, `ANTHROPIC_ASSISTANT_MODEL`) propone; la web
+    (`components/pizarra/AsistenteIA.tsx`, en Actividades) confirma con `POST /activities`. Matriz:
+    `ASISTENTE_IA_URL_RULES` dentro de superiores y del selector de personas.
+  - Actas: `POST reuniones/:id/acta-ia` (Sonnet, `ANTHROPIC_ACTAS_MODEL`, tope 110 s por el corte de 120 s del API)
+    propone minuta y acuerdos; `reuniones/ActaIA.tsx` guarda con `PATCH :id` y `POST :id/acuerdos`.
+  - Falta: poner la clave en el `.env` del servidor y probar con Claude real; grabación + transcripción de audio
+    (requiere servicio de voz a texto, p. ej. AssemblyAI) y PDF del acta.
+  - Pruebas: 4 de `accounting/qa-adversarial.spec.ts` fallan igual en `main` (zona horaria del contenedor).
+
 - **09-10 ~12:10 (claude-code) — iOS build 10 listo para reenvío + Android 1.0.7 (17).**
   - iOS: build 1.0.0 (10) subido (workflow `ios-testflight.yml`), en ASC descripción y Notes sin ubicación en
     segundo plano, build 10 en la versión 1.0, respuesta a Apple publicada, «Actualizar revisión» → elemento «Listo

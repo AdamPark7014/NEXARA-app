@@ -56,6 +56,7 @@ import {
   type MeetingType,
 } from "@/lib/meetings-api";
 import PersonalCalendar from "@/components/calendar/PersonalCalendar";
+import ActaIA from "./ActaIA";
 import s from "./reuniones.module.css";
 
 type Tab = "mios" | "reuniones" | "vencidos" | "lecciones" | "agenda";
@@ -614,6 +615,23 @@ export default function ReunionesPage() {
                 <span className={s.fieldLabel}>Agenda</span>
                 <pre className={s.agenda}>{detalle.agenda}</pre>
               </div>
+            )}
+
+            {detalle.notas && (
+              <div>
+                <span className={s.fieldLabel}>Minuta</span>
+                <pre className={s.agenda}>{detalle.notas}</pre>
+              </div>
+            )}
+
+            {puedeConvocar && detalle.estado !== "CANCELADA" && (
+              <ActaIA
+                key={detalle.id}
+                token={token}
+                meetingId={detalle.id}
+                personas={personas}
+                onGuardada={refrescarDetalle}
+              />
             )}
 
             <div>
