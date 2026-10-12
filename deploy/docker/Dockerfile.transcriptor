@@ -1,0 +1,43 @@
+# Transcriptor propio de NEXARA: voz a texto en español con whisper.cpp, sin proveedores.
+#
+# El API le manda el audio por la red interna (`POST /inference`) y recibe el texto. Nada
+# sale del servidor. Se compila aquí mismo con las instrucciones del CPU que lo corre
+# (GGML_NATIVE), por eso la imagen se construye en el servidor, como las demás.
+#
+# Modelo (WHISPER_MODEL):
+#   small        466 MB · ~1 GB de RAM · buena calidad en español (por omisión)
+#   medium-q5_0  515 MB · ~1.5 GB de RAM · mejor con ruido y acentos, ~2× más lento
+#   base         142 MB · ~400 MB de RAM · rápido, se equivoca más
+FROM debian:bookworm-slim AS build
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git cmake build-essential ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+
+ARG WHISPER_VERSION=v1.9.5
+RUN git clone --depth 1 --branch "${WHISPER_VERSION}" https://github.com/ggml-org/whisper.cpp /src
+WORKDIR /src
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF \
+ && cmake --build build -j"$(nproc)" --target whisper-server
+
+ARG WHISPER_MODEL=small
+RUN mkdir -p /models \
+ && sh ./models/download-ggml-model.sh "${WHISPER_MODEL}" /models \
+ && sh ./models/download-vad-model.sh silero-v6.2.0 /models \
+ && mv "/models/ggml-${WHISPER_MODEL}.bin" /models/modelo.bin \
+ && test -s /models/modelo.bin && test -s /models/ggml-silero-v6.2.0.bin
+
+FROM debian:bookworm-slim
+# ffmpeg convierte lo que graban los navegadores (webm/ogg/mp4) a WAV de 16 kHz.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg libgomp1 ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --system --home /app transcriptor \
+ && mkdir -p /app/tmp && chown transcriptor /app/tmp
+COPY --from=build /src/build/bin/whisper-server /usr/local/bin/whisper-server
+COPY --from=build /models /models
+USER transcriptor
+WORKDIR /app/tmp
+ENV WHISPER_THREADS=4
+EXPOSE 8080
+# --vad recorta los silencios: menos tiempo de CPU y sin frases inventadas en los huecos.
+CMD ["sh", "-c", "exec whisper-server --host 0.0.0.0 --port 8080 -m /models/modelo.bin -l es --convert -t ${WHISPER_THREADS} --vad -vm /models/ggml-silero-v6.2.0.bin"]

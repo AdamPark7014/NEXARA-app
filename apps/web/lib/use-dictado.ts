@@ -4,9 +4,8 @@
  * Dictado por voz con el reconocimiento del navegador (Web Speech API).
  *
  * No cuesta nada ni necesita claves: Chrome, Edge y Safari pasan la voz a texto ellos
- * mismos (Chrome usa los servidores de Google). Firefox no lo trae: ahí el botón no
- * aparece. Sirve para dictar instrucciones y notas; para grabar horas de junta conviene un
- * servicio de transcripción dedicado.
+ * mismos (Chrome usa los servidores de Google). Es el respaldo: si el servidor tiene
+ * transcriptor propio (whisper), `DictadoBoton` usa ese y la voz no sale de NEXARA.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
