@@ -67,8 +67,20 @@ export const MEETINGS_STAFF_URL_RULES: UrlRule[] = [
   { path: '/api/reuniones', methods: ['GET'], scope: 'read' },
 ];
 
+/**
+ * Voz a texto con el transcriptor propio (whisper en nuestro servidor): dictar en «Asignar con
+ * IA» y en las actas. Va con el asistente y con quien conduce reuniones.
+ */
+export const VOZ_IA_URL_RULES: UrlRule[] = [
+  { path: '/api/ai/voz/estado', methods: ['GET'], scope: 'read' },
+  { path: '/api/ai/voz/transcribir', methods: ['POST'], scope: 'write' },
+];
+
 /** Quien conduce la reunión: convoca, cierra y deja los acuerdos por escrito. */
 export const MEETINGS_LEAD_URL_RULES: UrlRule[] = [
+  ...VOZ_IA_URL_RULES,
+  // Audio y transcripción de la junta: fuera de `/api/reuniones/**`, que todo el personal lee.
+  { path: '/api/grabaciones-reuniones/**', scope: 'write' },
   { path: '/api/reuniones/**', scope: 'write' },
   { path: '/api/reuniones', scope: 'write' },
 ];
@@ -251,6 +263,7 @@ export const CLIENT_ADMIN_WRITE_URL_RULES: UrlRule[] = [
  * con sus permisos. Va con quien asigna (superiores y quien usa el selector de personas).
  */
 export const ASISTENTE_IA_URL_RULES: UrlRule[] = [
+  ...VOZ_IA_URL_RULES,
   { path: '/api/ai/asistente/estado', methods: ['GET'], scope: 'read' },
   { path: '/api/ai/asistente/interpretar', methods: ['POST'], scope: 'write' },
 ];

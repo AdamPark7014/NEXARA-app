@@ -5,11 +5,13 @@ import { MeetingsService } from './meetings.service.js';
 import { MeetingsController } from './meetings.controller.js';
 import { AiModule } from '../ai/ai.module.js';
 import { ActaIaService } from './acta-ia.service.js';
+import { GrabacionService } from './grabacion.service.js';
+import { GrabacionController } from './grabacion.controller.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, AiModule],
-  controllers: [MeetingsController],
-  providers: [MeetingsService, ActaIaService],
+  controllers: [MeetingsController, GrabacionController],
+  providers: [MeetingsService, ActaIaService, GrabacionService],
   exports: [MeetingsService],
 })
 export class MeetingsModule {}

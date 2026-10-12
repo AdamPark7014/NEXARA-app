@@ -15,6 +15,7 @@ import {
   type ActaPropuesta,
 } from "@/lib/acta-ia";
 import DictadoBoton from "@/components/DictadoBoton";
+import GrabarReunion from "./GrabarReunion";
 import { unirDictado } from "@/lib/use-dictado";
 import s from "./reuniones.module.css";
 
@@ -41,16 +42,6 @@ export default function ActaIA({
   const [acta, setActa] = useState<ActaPropuesta | null>(null);
   const [minuta, setMinuta] = useState("");
   const [acuerdos, setAcuerdos] = useState<AcuerdoEditable[]>([]);
-
-  if (!abierto) {
-    return (
-      <div>
-        <Button size="sm" variant="secondary" onClick={() => setAbierto(true)}>
-          Generar acta con IA
-        </Button>
-      </div>
-    );
-  }
 
   const leerArchivo = async (file: File | undefined) => {
     if (!file) return;
@@ -99,8 +90,34 @@ export default function ActaIA({
 
   const sinResponsable = acuerdos.filter(faltaResponsable).length;
 
+  // La grabadora va siempre en el mismo lugar: si se desmontara al abrir el panel, se cortaría la grabación.
+  const grabadora = (
+    <GrabarReunion
+      token={token}
+      meetingId={meetingId}
+      onTranscripcion={(t) => {
+        setTexto((actual) => (actual.trim() ? `${actual.trim()}\n\n${t}` : t));
+        setAbierto(true);
+      }}
+    />
+  );
+
+  if (!abierto) {
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        {grabadora}
+        <div>
+          <Button size="sm" variant="secondary" onClick={() => setAbierto(true)}>
+            Generar acta con IA
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={s.divider}>
+      {grabadora}
       <span className={s.fieldLabel} style={{ marginBottom: 0 }}>Acta con IA</span>
 
       {!acta ? (
@@ -109,7 +126,7 @@ export default function ActaIA({
             className={s.input}
             rows={6}
             aria-label="Transcripción o notas de la reunión"
-            placeholder="Pega la transcripción, escribe tus notas o pulsa «Dictar» y deja el micrófono escuchando la reunión"
+            placeholder="Pega la transcripción, escribe o dicta tus notas, o usa «Grabar reunión» y el texto llega aquí solo"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
           />

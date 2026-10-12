@@ -26,7 +26,7 @@ import {
   isSafeFetchSite,
   resolveCorsOrigin,
 } from './common/security/security.utils';
-import { isPublicUploadPath, readUploadToken } from './common/security/uploads-access';
+import { isPrivateUploadPath, isPublicUploadPath, readUploadToken } from './common/security/uploads-access';
 import { uploadHeadersFor } from './common/security/upload-content-type.js';
 
 const toPositiveInt = (rawValue: string | undefined, fallback: number): number => {
@@ -454,6 +454,11 @@ async function bootstrap() {
   app.use('/uploads', (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (req.method.toUpperCase() === 'OPTIONS') {
       next();
+      return;
+    }
+
+    if (isPrivateUploadPath(req.path || req.url || '')) {
+      res.status(404).json({ statusCode: 404, message: 'Not found' });
       return;
     }
 

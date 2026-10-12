@@ -51,7 +51,25 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      go2rtc:
+      # Transcriptor propio (whisper.cpp): voz a texto para dictados y grabaciones de juntas.
+  # Opcional: `docker compose --profile transcriptor up -d --build transcriptor` y en la API
+  # TRANSCRIPTOR_URL=http://transcriptor:8080. Sin él, la web dicta con el navegador.
+  transcriptor:
+    profiles: ["transcriptor"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.transcriptor
+      args:
+        WHISPER_MODEL: ${WHISPER_MODEL:-small}
+    container_name: nexara-transcriptor
+    restart: unless-stopped
+    mem_limit: ${TRANSCRIPTOR_MEM_LIMIT:-2048m}
+    environment:
+      WHISPER_THREADS: ${WHISPER_THREADS:-4}
+    networks:
+      - internal
+
+  go2rtc:
         condition: service_started
     environment:
       NODE_ENV: production
@@ -63,6 +81,8 @@ services:
       REDIS_URL: redis://redis:6379
       # 1 = API also runs BullMQ workers (default). Set 0 when `worker` profile is up.
       JOBS_RUN_WORKERS: ${JOBS_RUN_WORKERS:-1}
+      # Transcriptor propio (perfil `transcriptor`). Vacío = sin voz propia.
+      TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
       # SaaS hard multi-tenant: set to 0 when all clients send X-Company-Id
       TENANT_ALLOW_PRIMARY_FALLBACK: ${TENANT_ALLOW_PRIMARY_FALLBACK:-1}
       CORS_ORIGIN: ${CORS_ORIGIN:-}
@@ -194,6 +214,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379
       JOBS_RUN_WORKERS: "1"
+      TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
       JWT_SECRET: ${JWT_SECRET}
       UPLOADS_ROOT: /app/uploads
     command: ["node", "/app/apps/api/dist/worker.js"]

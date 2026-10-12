@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AiTriageService } from './ai-triage.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -6,6 +16,11 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { AsistenteActividadesService } from './asistente/asistente-actividades.service.js';
 import { InterpretarInstruccionDto } from './asistente/dto/interpretar.dto.js';
+import { TranscriptorService } from './voz/transcriptor.service.js';
+import { extensionAudio } from './voz/transcriptor.js';
+
+/** Un dictado son segundos o un par de minutos: 10 MB sobran en opus. */
+const MAX_DICTADO_BYTES = 10 * 1024 * 1024;
 
 @Controller('ai')
 @UseGuards(RbacGuard)
@@ -13,6 +28,7 @@ export class AiController {
   constructor(
     private readonly triage: AiTriageService,
     private readonly asistente: AsistenteActividadesService,
+    private readonly transcriptor: TranscriptorService,
   ) {}
 
   @Post('triage')
@@ -50,5 +66,26 @@ export class AiController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.asistente.interpretar(body.texto, user, companyId);
+  }
+
+  /** ¿Hay transcriptor propio? Si no, la web dicta con el reconocimiento del navegador. */
+  @Get('voz/estado')
+  async estadoVoz() {
+    return { disponible: await this.transcriptor.disponible() };
+  }
+
+  /**
+   * Dictado con nuestro propio transcriptor: la web graba, sube el audio y recibe el texto.
+   * El audio no se guarda.
+   */
+  @Post('voz/transcribir')
+  @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: MAX_DICTADO_BYTES } }))
+  async transcribir(@UploadedFile() file?: { buffer: Buffer; mimetype: string; size: number }) {
+    if (!file?.buffer?.length) throw new BadRequestException('No llegó el audio.');
+    const ext = extensionAudio(file.mimetype);
+    if (!ext) throw new BadRequestException('Ese archivo no es de audio.');
+    // El API corta toda petición a los 120 s: el dictado debe transcribirse antes.
+    const texto = await this.transcriptor.transcribir(file.buffer, `dictado.${ext}`, file.mimetype, 100_000);
+    return { texto };
   }
 }

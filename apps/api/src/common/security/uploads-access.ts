@@ -15,6 +15,27 @@ export const PUBLIC_UPLOAD_PREFIXES = ['hero', 'page-media', 'news', 'case-studi
 export { SESSION_COOKIE_NAME };
 
 /**
+ * Subdirectorios que nunca se sirven por `/uploads`, ni con sesión: el audio de las juntas
+ * solo lo lee el propio API para transcribirlo (`meetings/grabacion.service.ts`).
+ */
+export const PRIVATE_UPLOAD_PREFIXES = ['grabaciones-reuniones'];
+
+/** True si la ruta cae (aunque venga codificada) bajo un subdirectorio privado. */
+export function isPrivateUploadPath(rawPath: string): boolean {
+  let decoded = rawPath.split('?')[0] || '';
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    return true;
+  }
+  const segments = decoded
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((segment) => segment.length > 0 && segment !== '.');
+  return segments.length > 0 && PRIVATE_UPLOAD_PREFIXES.includes(segments[0].toLowerCase());
+}
+
+/**
  * True solo si la ruta cae bajo un prefijo público. Normaliza separadores y
  * porcentaje-codificación para que `..%2f` o `\` no puedan simular un prefijo
  * público y escapar a una carpeta privada.

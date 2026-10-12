@@ -6,11 +6,12 @@ import { AiTriageService } from './ai-triage.service.js';
 import { AiController } from './ai.controller.js';
 import { ClaudeService } from './claude/claude.service.js';
 import { AsistenteActividadesService } from './asistente/asistente-actividades.service.js';
+import { TranscriptorService } from './voz/transcriptor.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, UsersModule],
-  providers: [AiTriageService, ClaudeService, AsistenteActividadesService],
+  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService],
   controllers: [AiController],
-  exports: [AiTriageService, ClaudeService],
+  exports: [AiTriageService, ClaudeService, TranscriptorService],
 })
 export class AiModule {}

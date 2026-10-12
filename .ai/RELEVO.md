@@ -1,5 +1,19 @@
 # RELEVO
 
+- **12-10 ~06:00 (claude-code, nube) — Voz a texto propia (whisper), sin proveedores.**
+  - Adam: «lo que pensabas hacer con un proveedor debemos hacerlo nosotros con código». Sustituye la idea de AssemblyAI.
+  - `deploy/docker/Dockerfile.transcriptor` + servicio `transcriptor` (perfil, red interna): whisper.cpp v1.9.5
+    compilado en el servidor, modelo `WHISPER_MODEL` (small por omisión) + VAD silero, `POST /inference`.
+    Activar: `docker compose --profile transcriptor up -d --build transcriptor` y `TRANSCRIPTOR_URL=http://transcriptor:8080`.
+  - API: `ai/voz/transcriptor.service.ts`; `GET ai/voz/estado`, `POST ai/voz/transcribir` (dictado, síncrono).
+    Juntas: `grabaciones-reuniones/:id` (GET/DELETE) y `:id/partes` (POST); trabajo de cola `reunion.transcribir-parte`.
+    Estado en disco (`uploads/grabaciones-reuniones/<empresa>/<reunión>/parte-NNNN.{webm,txt,err}`), carpeta bloqueada
+    en `/uploads`. Audio se borra tras transcribir salvo `GRABACION_CONSERVAR_AUDIO=1`. Matriz: `VOZ_IA_URL_RULES`.
+  - Web: `DictadoBoton` usa el transcriptor propio si existe (si no, el del navegador); `reuniones/GrabarReunion.tsx`
+    graba en partes de 5 min (`lib/use-grabadora.ts`) y deja el texto en ActaIA.
+  - Probado: compilación de whisper-server, contrato HTTP y servicio contra el binario real con modelo de prueba,
+    partes de MediaRecorder decodificables por ffmpeg. No probado con modelo real (HuggingFace bloqueado aquí).
+
 - **12-10 ~05:30 (claude-code, nube) — IA con Claude: asignar actividades y actas de reunión.**
   - Adam: «que el CEO escriba "que Antonio vaya a Tox a las 3" y la IA asigne»; luego actas de reunión.
   - API `ai/claude/claude.service.ts`: único cliente de Claude (SDK `@anthropic-ai/sdk`), clave solo en
@@ -11,7 +25,7 @@
   - Actas: `POST reuniones/:id/acta-ia` (Sonnet, `ANTHROPIC_ACTAS_MODEL`, tope 110 s por el corte de 120 s del API)
     propone minuta y acuerdos; `reuniones/ActaIA.tsx` guarda con `PATCH :id` y `POST :id/acuerdos`.
   - Falta: poner la clave en el `.env` del servidor y probar con Claude real; grabación + transcripción de audio
-    (requiere servicio de voz a texto, p. ej. AssemblyAI) y PDF del acta.
+    (hecho después con whisper propio, ver arriba) y PDF del acta.
   - Pruebas: 4 de `accounting/qa-adversarial.spec.ts` fallan igual en `main` (zona horaria del contenedor).
 
 - **09-10 ~12:10 (claude-code) — iOS build 10 listo para reenvío + Android 1.0.7 (17).**
