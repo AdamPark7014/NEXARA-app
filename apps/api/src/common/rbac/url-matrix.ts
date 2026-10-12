@@ -247,10 +247,20 @@ export const CLIENT_ADMIN_WRITE_URL_RULES: UrlRule[] = [
 ];
 
 /**
+ * Asignar con IA: la IA solo propone; crear sigue pasando por `POST /api/activities`
+ * con sus permisos. Va con quien asigna (superiores y quien usa el selector de personas).
+ */
+export const ASISTENTE_IA_URL_RULES: UrlRule[] = [
+  { path: '/api/ai/asistente/estado', methods: ['GET'], scope: 'read' },
+  { path: '/api/ai/asistente/interpretar', methods: ['POST'], scope: 'write' },
+];
+
+/**
  * Cancelar una actividad o pasarla a otro compañero, para roles de dirección y administración que
  * no tienen escritura general sobre actividades. El servicio exige ser superior de quien la ejecuta.
  */
 export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
+  ...ASISTENTE_IA_URL_RULES,
   { path: '/api/activities/*/acciones', methods: ['GET'], scope: 'read' },
   { path: '/api/activities/*/cancelar', methods: ['POST'], scope: 'approve' },
   { path: '/api/activities/*/reasignar', methods: ['POST'], scope: 'approve' },
@@ -287,6 +297,7 @@ export const ACTIVIDAD_PROPIA_URL_RULES: UrlRule[] = [
 /** Quien asigna actividades necesita el selector. No abre el resto de `/api/users`. */
 export const USERS_ASSIGNABLE_URL_RULES: UrlRule[] = [
   { path: '/api/users/assignable', methods: ['GET'], scope: 'read' },
+  ...ASISTENTE_IA_URL_RULES,
 ];
 
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */

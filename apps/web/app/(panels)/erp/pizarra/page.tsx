@@ -34,6 +34,7 @@ import CentroOperativo from "@/components/pizarra/CentroOperativo";
 import EquipoPersonaCard, { rejillaEquipo } from "@/components/pizarra/EquipoPersonaCard";
 import ResumenEquipo, { type FiltroEquipo } from "@/components/pizarra/ResumenEquipo";
 import AtencionEquipo from "@/components/pizarra/AtencionEquipo";
+import AsistenteIA from "@/components/pizarra/AsistenteIA";
 import { ARO_DE_ESTADO, ARO_LABEL, hayFlujo, resumenEquipo } from "@/components/pizarra/equipo-estado";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
@@ -486,7 +487,16 @@ export default function PizarraPage() {
             </>
           ) : null
         }
-        before={avisoRefresco}
+        before={
+          verEquipo || verAsignadas ? (
+            <>
+              {avisoRefresco}
+              <AsistenteIA onCreada={() => void load()} />
+            </>
+          ) : (
+            avisoRefresco
+          )
+        }
         toolbar={barraEquipo}
         card={verEquipo}
         listLabel={verEquipo ? "Personas del equipo" : undefined}

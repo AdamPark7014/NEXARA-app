@@ -1,0 +1,33 @@
+/* Asignar con IA (sistema visual v2, solo tokens --ui-*). */
+.caja {
+  min-width: 0;
+}
+
+.icono {
+  color: var(--ui-brand-text);
+}
+
+.propuesta {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  min-width: 0;
+}
+
+.resumen {
+  margin: 0;
+}
+
+.ajustes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.costo {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-muted);
+}
