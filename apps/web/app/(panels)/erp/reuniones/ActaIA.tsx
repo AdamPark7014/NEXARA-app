@@ -14,6 +14,8 @@ import {
   type AcuerdoEditable,
   type ActaPropuesta,
 } from "@/lib/acta-ia";
+import DictadoBoton from "@/components/DictadoBoton";
+import { unirDictado } from "@/lib/use-dictado";
 import s from "./reuniones.module.css";
 
 /**
@@ -107,16 +109,19 @@ export default function ActaIA({
             className={s.input}
             rows={6}
             aria-label="Transcripción o notas de la reunión"
-            placeholder="Pega aquí la transcripción de la grabación o tus notas de la reunión"
+            placeholder="Pega la transcripción, escribe tus notas o pulsa «Dictar» y deja el micrófono escuchando la reunión"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
           />
-          <input
-            type="file"
-            accept=".txt,.vtt,.srt,text/plain"
-            aria-label="Subir transcripción"
-            onChange={(e) => void leerArchivo(e.target.files?.[0])}
-          />
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <DictadoBoton onTexto={(frase) => setTexto((t) => unirDictado(t, frase))} disabled={generando} />
+            <input
+              type="file"
+              accept=".txt,.vtt,.srt,text/plain"
+              aria-label="Subir transcripción"
+              onChange={(e) => void leerArchivo(e.target.files?.[0])}
+            />
+          </div>
           <p className={s.hint} style={{ margin: 0 }}>
             Claude escribe el resumen, los temas, las decisiones y los acuerdos con responsable. Nada se guarda hasta que lo revises.
           </p>
