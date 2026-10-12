@@ -42,6 +42,10 @@ export type PeticionJson = {
   esquema: Record<string, unknown>;
   modelo?: string;
   maxTokens?: number;
+  /** Esfuerzo de razonamiento. `low` para clasificar; más alto para resumir textos largos. */
+  esfuerzo?: 'low' | 'medium' | 'high';
+  /** Tiempo máximo de la llamada (por omisión 60 s). */
+  timeoutMs?: number;
 };
 
 export function estimarUsd(modelo: string, entrada: number, salida: number): number | null {
@@ -67,7 +71,11 @@ export class ClaudeService {
       );
     }
     if (!this.cliente) {
-      this.cliente = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY!.trim(), maxRetries: 2, timeout: 60_000 });
+      this.cliente = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY!.trim(),
+        maxRetries: 2,
+        timeout: 60_000,
+      });
     }
     return this.cliente;
   }
@@ -83,7 +91,8 @@ export class ClaudeService {
       );
     }
     // Limpia los días anteriores para que el mapa no crezca.
-    for (const k of this.llamadasPorDia.keys()) if (!k.endsWith(`:${dia}`)) this.llamadasPorDia.delete(k);
+    for (const k of this.llamadasPorDia.keys())
+      if (!k.endsWith(`:${dia}`)) this.llamadasPorDia.delete(k);
     this.llamadasPorDia.set(clave, usadas + 1);
   }
 
@@ -95,28 +104,37 @@ export class ClaudeService {
     const sistema: Anthropic.TextBlockParam[] = peticion.sistema.map((text, i) => ({
       type: 'text',
       text,
-      ...(i === peticion.sistema.length - 1 ? { cache_control: { type: 'ephemeral' as const } } : {}),
+      ...(i === peticion.sistema.length - 1
+        ? { cache_control: { type: 'ephemeral' as const } }
+        : {}),
     }));
 
     let respuesta: Anthropic.Message;
     try {
-      respuesta = await cliente.messages.create({
-        model: modelo,
-        max_tokens: peticion.maxTokens ?? 4096,
-        system: sistema,
-        messages: [{ role: 'user', content: peticion.usuario }],
-        output_config: {
-          effort: 'low',
-          format: { type: 'json_schema', schema: peticion.esquema },
+      respuesta = await cliente.messages.create(
+        {
+          model: modelo,
+          max_tokens: peticion.maxTokens ?? 4096,
+          system: sistema,
+          messages: [{ role: 'user', content: peticion.usuario }],
+          output_config: {
+            effort: peticion.esfuerzo ?? 'low',
+            format: { type: 'json_schema', schema: peticion.esquema },
+          },
         },
-      });
+        { timeout: peticion.timeoutMs ?? 60_000 },
+      );
     } catch (error) {
       if (error instanceof Anthropic.AuthenticationError) {
         this.logger.error(`[${peticion.proceso}] ANTHROPIC_API_KEY inválida`);
-        throw new ServiceUnavailableException('La clave de la IA no es válida. Revisa ANTHROPIC_API_KEY en el servidor.');
+        throw new ServiceUnavailableException(
+          'La clave de la IA no es válida. Revisa ANTHROPIC_API_KEY en el servidor.',
+        );
       }
       if (error instanceof Anthropic.RateLimitError) {
-        throw new ServiceUnavailableException('La IA está saturada en este momento. Intenta de nuevo en un minuto.');
+        throw new ServiceUnavailableException(
+          'La IA está saturada en este momento. Intenta de nuevo en un minuto.',
+        );
       }
       if (error instanceof Anthropic.APIError) {
         this.logger.error(`[${peticion.proceso}] Anthropic ${error.status}: ${error.message}`);
@@ -127,7 +145,8 @@ export class ClaudeService {
 
     const uso: UsoClaude = {
       modelo,
-      tokensEntrada: respuesta.usage.input_tokens + (respuesta.usage.cache_creation_input_tokens ?? 0),
+      tokensEntrada:
+        respuesta.usage.input_tokens + (respuesta.usage.cache_creation_input_tokens ?? 0),
       tokensSalida: respuesta.usage.output_tokens,
       tokensCacheLeidos: respuesta.usage.cache_read_input_tokens ?? 0,
       usdAprox: null,
@@ -138,10 +157,14 @@ export class ClaudeService {
     );
 
     if (respuesta.stop_reason === 'refusal') {
-      throw new ServiceUnavailableException('La IA no quiso procesar esa instrucción. Reescríbela con otras palabras.');
+      throw new ServiceUnavailableException(
+        'La IA no quiso procesar esa instrucción. Reescríbela con otras palabras.',
+      );
     }
     if (respuesta.stop_reason === 'max_tokens') {
-      throw new ServiceUnavailableException('La instrucción es demasiado larga para procesarla de una vez. Divídela.');
+      throw new ServiceUnavailableException(
+        'La instrucción es demasiado larga para procesarla de una vez. Divídela.',
+      );
     }
     const texto = respuesta.content
       .map((b) => (b.type === 'text' ? b.text : ''))
@@ -151,7 +174,9 @@ export class ClaudeService {
       return { datos: JSON.parse(texto) as T, uso };
     } catch {
       this.logger.error(`[${peticion.proceso}] respuesta no es JSON: ${texto.slice(0, 200)}`);
-      throw new ServiceUnavailableException('La IA respondió en un formato inesperado. Intenta de nuevo.');
+      throw new ServiceUnavailableException(
+        'La IA respondió en un formato inesperado. Intenta de nuevo.',
+      );
     }
   }
 }

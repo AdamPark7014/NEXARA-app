@@ -11,6 +11,7 @@
  */
 import { buildApiUrl } from "@/lib/api-base";
 import { ROLES, type RoleKey } from "@/lib/rbac";
+import type { ActaPropuesta } from "@/lib/acta-ia";
 
 /**
  * Roles que conducen la reunión: convocan, cierran y registran acuerdos ajenos.
@@ -329,3 +330,12 @@ export const suggestedTypeForToday = (at: Date = new Date()): MeetingType => {
       return "DIARIA";
   }
 };
+
+// ── Acta con IA ───────────────────────────────────────────────────────────
+
+/** Propone minuta y acuerdos desde la transcripción. No guarda nada. */
+export const proponerActa = (token: string, meetingId: number, transcripcion: string) =>
+  apiFetch<ActaPropuesta>(`reuniones/${meetingId}/acta-ia`, token, {
+    method: "POST",
+    body: JSON.stringify({ transcripcion }),
+  });

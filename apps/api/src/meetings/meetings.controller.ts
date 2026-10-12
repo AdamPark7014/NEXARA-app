@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { MeetingsService } from './meetings.service.js';
+import { ActaIaService } from './acta-ia.service.js';
 import type {
   AgreementKind,
   AgreementStatus,
@@ -38,7 +39,10 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 @Controller('reuniones')
 @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
 export class MeetingsController {
-  constructor(private readonly service: MeetingsService) {}
+  constructor(
+    private readonly service: MeetingsService,
+    private readonly actaIa: ActaIaService,
+  ) {}
 
   // ── Rutas literales ───────────────────────────────────────────────────
 
@@ -132,6 +136,20 @@ export class MeetingsController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.service.close(id, body ?? {}, companyId);
+  }
+
+  /**
+   * Propone el acta con IA a partir de la transcripción o las notas. No guarda nada: la
+   * web guarda la minuta (`PATCH :id`) y los acuerdos (`POST :id/acuerdos`) que se confirmen.
+   * Misma regla de la matriz que cerrar: solo quien conduce.
+   */
+  @Post(':id/acta-ia')
+  proposeMinutes(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { transcripcion?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.actaIa.proponer(id, String(body?.transcripcion ?? ''), companyId);
   }
 
   @Put(':id/asistencia')
