@@ -624,12 +624,13 @@ export default function ReunionesPage() {
               </div>
             )}
 
-            {puedeConvocar && detalle.estado !== "CANCELADA" && (
+            {detalle.estado !== "CANCELADA" && (
               <ActaIA
                 key={detalle.id}
                 token={token}
                 meetingId={detalle.id}
                 personas={personas}
+                puedeGuardar={puedeConvocar}
                 onGuardada={refrescarDetalle}
               />
             )}

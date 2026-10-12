@@ -6,7 +6,8 @@ import Anthropic from '@anthropic-ai/sdk';
  * actividades, actas de reunión, etc.).
  *
  * - La clave se lee SOLO de `ANTHROPIC_API_KEY` en el entorno del servidor. Nunca va en el
- *   repo, en la base ni en el navegador.
+ *   repo, en la base ni en el navegador. Las llamadas van directo a api.anthropic.com
+ *   (ignoran `ANTHROPIC_BASE_URL`); otra URL solo con `CLAUDE_BASE_URL`.
  * - Modelo barato por defecto (`claude-haiku-5-5`): clasificar y extraer datos no necesita
  *   un modelo grande. Cada proceso puede pedir otro con su propia variable de entorno.
  * - Salida estructurada (JSON Schema): la respuesta siempre trae los campos esperados.
@@ -73,6 +74,11 @@ export class ClaudeService {
     if (!this.cliente) {
       this.cliente = new Anthropic({
         apiKey: process.env.ANTHROPIC_API_KEY!.trim(),
+        // Directo a Anthropic. El SDK tomaría solo ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN del
+        // entorno (el servidor los tiene para otro proveedor): ir por otro lado tiene que ser a
+        // propósito, con CLAUDE_BASE_URL.
+        baseURL: (process.env.CLAUDE_BASE_URL || '').trim() || 'https://api.anthropic.com',
+        authToken: null,
         maxRetries: 2,
         timeout: 60_000,
       });

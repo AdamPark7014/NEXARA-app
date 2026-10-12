@@ -10,6 +10,7 @@ import { unirDictado } from "@/lib/use-dictado";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES } from "@/lib/rbac";
 import {
   bloqueos,
   crearActividad,
@@ -29,7 +30,7 @@ type Estado = { creando?: boolean; creada?: { id: number; folio?: string }; erro
 
 /**
  * «Que Antonio vaya a Tox a las 3 con el cliente» → la IA propone tipo, persona, cliente y
- * hora; la persona revisa y confirma. Solo se muestra si el servidor tiene la IA activa.
+ * hora; el CEO revisa y confirma. Solo se muestra al CEO y si el servidor tiene la IA activa.
  */
 export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const { user, token } = useUser();
@@ -42,9 +43,11 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const [estados, setEstados] = useState<Record<number, Estado>>({});
   const [personas, setPersonas] = useState<PersonaAsignable[]>([]);
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
+  // Solo el CEO asigna con IA (la matriz del API lo vuelve a exigir).
+  const esCeo = v2 === ROLES.CEO || Boolean(user?.isSuperAdmin);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !esCeo) return;
     let vivo = true;
     estadoAsistente(token)
       .then((r) => {
@@ -58,9 +61,9 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     return () => {
       vivo = false;
     };
-  }, [token]);
+  }, [token, esCeo]);
 
-  if (!disponible || !token) return null;
+  if (!esCeo || !disponible || !token) return null;
 
   const enviar = async () => {
     if (!texto.trim() || pensando) return;

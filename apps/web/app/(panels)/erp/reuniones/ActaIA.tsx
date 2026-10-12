@@ -27,11 +27,14 @@ export default function ActaIA({
   token,
   meetingId,
   personas,
+  puedeGuardar,
   onGuardada,
 }: {
   token: string;
   meetingId: number;
   personas: Array<{ id: number; nombre: string }>;
+  /** Guardar minuta y acuerdos es de quien conduce; el resto graba, genera y copia. */
+  puedeGuardar: boolean;
   onGuardada: () => Promise<void> | void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -89,6 +92,22 @@ export default function ActaIA({
   };
 
   const sinResponsable = acuerdos.filter(faltaResponsable).length;
+
+  const copiar = async () => {
+    const lineas = acuerdos
+      .filter((a) => a.incluir)
+      .map((a) => {
+        const quien = personas.find((p) => String(p.id) === String(a.responsableId))?.nombre;
+        return `- [${AGREEMENT_KIND_LABEL[a.tipo]}] ${a.descripcion}${quien ? ` · ${quien}` : ""}${a.fechaCompromiso ? ` · ${a.fechaCompromiso}` : ""}`;
+      });
+    const texto = [minuta.trim(), lineas.length ? `ACUERDOS\n${lineas.join("\n")}` : ""].filter(Boolean).join("\n\n");
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast.success("Acta copiada. Pásala a quien conduce la reunión para guardarla.");
+    } catch {
+      toast.error("No se pudo copiar.");
+    }
+  };
 
   // La grabadora va siempre en el mismo lugar: si se desmontara al abrir el panel, se cortaría la grabación.
   const grabadora = (
@@ -219,7 +238,12 @@ export default function ActaIA({
             );
           })}
 
-          {sinResponsable ? (
+          {!puedeGuardar ? (
+            <p className={s.hint} style={{ margin: 0 }}>
+              Guardar el acta en la reunión le toca a quien la conduce: cópiala y compártela.
+            </p>
+          ) : null}
+          {puedeGuardar && sinResponsable ? (
             <p className={s.hint} style={{ margin: 0 }}>
               {sinResponsable === 1 ? "Un acuerdo no tiene" : `${sinResponsable} acuerdos no tienen`} responsable: elige uno o desmárcalo para guardar lo demás.
             </p>
@@ -230,9 +254,15 @@ export default function ActaIA({
             </p>
           ) : null}
           <div style={{ display: "flex", gap: 8 }}>
-            <Button size="sm" variant="primary" onClick={() => void guardar()} loading={guardando} disabled={sinResponsable > 0}>
-              Guardar acta
-            </Button>
+            {puedeGuardar ? (
+              <Button size="sm" variant="primary" onClick={() => void guardar()} loading={guardando} disabled={sinResponsable > 0}>
+                Guardar acta
+              </Button>
+            ) : (
+              <Button size="sm" variant="primary" onClick={() => void copiar()}>
+                Copiar acta
+              </Button>
+            )}
             <Button size="sm" variant="secondary" onClick={() => setActa(null)} disabled={guardando}>
               Volver a generar
             </Button>

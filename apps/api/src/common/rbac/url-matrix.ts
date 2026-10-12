@@ -60,6 +60,12 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
  * internas, y por eso esto no vive en `SHARED_SESSION_URL_RULES`.
  */
 export const MEETINGS_STAFF_URL_RULES: UrlRule[] = [
+  // Grabar, transcribir y proponer el acta con IA: todo el personal (Adam, 12-10). Guardar la
+  // minuta y los acuerdos sigue siendo de quien conduce.
+  { path: '/api/ai/voz/estado', methods: ['GET'], scope: 'read' },
+  { path: '/api/ai/voz/transcribir', methods: ['POST'], scope: 'write' },
+  { path: '/api/reuniones/*/acta-ia', methods: ['POST'], scope: 'write' },
+  { path: '/api/grabaciones-reuniones/**', scope: 'write' },
   { path: '/api/reuniones/mis-acuerdos/**', methods: ['GET', 'PATCH'], scope: 'write' },
   { path: '/api/reuniones/mis-acuerdos', methods: ['GET'], scope: 'read' },
   { path: '/api/reuniones/lecciones', methods: ['GET'], scope: 'read' },
@@ -69,7 +75,7 @@ export const MEETINGS_STAFF_URL_RULES: UrlRule[] = [
 
 /**
  * Voz a texto con el transcriptor propio (whisper en nuestro servidor): dictar en «Asignar con
- * IA» y en las actas. Va con el asistente y con quien conduce reuniones.
+ * IA» y en las actas. Va con el asistente y con las reuniones.
  */
 export const VOZ_IA_URL_RULES: UrlRule[] = [
   { path: '/api/ai/voz/estado', methods: ['GET'], scope: 'read' },
@@ -273,7 +279,6 @@ export const ASISTENTE_IA_URL_RULES: UrlRule[] = [
  * no tienen escritura general sobre actividades. El servicio exige ser superior de quien la ejecuta.
  */
 export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
-  ...ASISTENTE_IA_URL_RULES,
   { path: '/api/activities/*/acciones', methods: ['GET'], scope: 'read' },
   { path: '/api/activities/*/cancelar', methods: ['POST'], scope: 'approve' },
   { path: '/api/activities/*/reasignar', methods: ['POST'], scope: 'approve' },
@@ -310,7 +315,6 @@ export const ACTIVIDAD_PROPIA_URL_RULES: UrlRule[] = [
 /** Quien asigna actividades necesita el selector. No abre el resto de `/api/users`. */
 export const USERS_ASSIGNABLE_URL_RULES: UrlRule[] = [
   { path: '/api/users/assignable', methods: ['GET'], scope: 'read' },
-  ...ASISTENTE_IA_URL_RULES,
 ];
 
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
@@ -354,6 +358,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    // «Asignar con IA» es solo del CEO (Adam, 12-10). Trae el selector de personas.
+    ...ASISTENTE_IA_URL_RULES,
+    { path: '/api/users/assignable', methods: ['GET'], scope: 'read' },
     ...ACTIVIDAD_PROPIA_URL_RULES,
     // «Acceso a cuentas»: el API solo deja pasar al dueño de la plataforma; aquí solo se permite el camino.
     { path: '/api/account-access/**', methods: ['GET', 'POST'], scope: 'write' },
