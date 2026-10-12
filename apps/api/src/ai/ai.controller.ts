@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Post,
   UploadedFile,
@@ -18,6 +19,7 @@ import { AsistenteActividadesService } from './asistente/asistente-actividades.s
 import { InterpretarInstruccionDto } from './asistente/dto/interpretar.dto.js';
 import { TranscriptorService } from './voz/transcriptor.service.js';
 import { extensionAudio } from './voz/transcriptor.js';
+import { isChainTopAuthority } from '../activities/activity-superiors.js';
 
 /** Un dictado son segundos o un par de minutos: 10 MB sobran en opus. */
 const MAX_DICTADO_BYTES = 10 * 1024 * 1024;
@@ -46,10 +48,14 @@ export class AiController {
     return this.triage.suggestNextActions(companyId);
   }
 
-  /** ¿Hay IA configurada en el servidor? (la web oculta el asistente si no). */
+  /**
+   * ¿Hay IA configurada en el servidor? (la web oculta el asistente si no). «Asignar con IA»
+   * es solo del CEO: la matriz no basta porque los directores tienen `/api/**`.
+   */
   @Get('asistente/estado')
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })
-  estadoAsistente() {
+  estadoAsistente(@CurrentUser() user: any) {
+    if (!isChainTopAuthority(user)) return { disponible: false };
     return this.asistente.estado();
   }
 
@@ -65,6 +71,7 @@ export class AiController {
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    if (!isChainTopAuthority(user)) throw new ForbiddenException('«Asignar con IA» es solo del CEO.');
     return this.asistente.interpretar(body.texto, user, companyId);
   }
 
