@@ -7,6 +7,7 @@ const a = (x: Partial<AcuerdoEditable>): AcuerdoEditable => ({
   descripcion: "Enviar cotización",
   responsableId: "7",
   fechaCompromiso: "2026-10-16",
+  crearActividad: true,
   ...x,
 });
 
@@ -19,11 +20,17 @@ describe("acta con IA", () => {
       a({ tipo: "RIESGO", responsableId: "", fechaCompromiso: "2026-10-20" }),
     ]);
     expect(cuerpos).toEqual([
-      { tipo: "ACUERDO", descripcion: "Enviar cotización", responsableId: 7, fechaCompromiso: "2026-10-16" },
-      { tipo: "RIESGO", descripcion: "Enviar cotización", responsableId: null, fechaCompromiso: null },
+      { tipo: "ACUERDO", descripcion: "Enviar cotización", responsableId: 7, fechaCompromiso: "2026-10-16", crearActividad: true },
+      { tipo: "RIESGO", descripcion: "Enviar cotización", responsableId: null, fechaCompromiso: null, crearActividad: false },
     ]);
     expect(faltaResponsable(a({ responsableId: "" }))).toBe(true);
     expect(faltaResponsable(a({ responsableId: "", incluir: false }))).toBe(false);
+  });
+
+  it("solo un acuerdo con responsable y la casilla marcada crea actividad", () => {
+    const [con, sin] = cuerposParaGuardar([a({}), a({ crearActividad: false })]);
+    expect(con.crearActividad).toBe(true);
+    expect(sin.crearActividad).toBe(false);
   });
 
   it("quita números y tiempos de un archivo de subtítulos", () => {
