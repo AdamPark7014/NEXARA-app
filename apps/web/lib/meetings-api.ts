@@ -10,6 +10,7 @@
  * el permiso real se comprueba en el servidor.
  */
 import { buildApiUrl } from "@/lib/api-base";
+import { triggerBlobDownload } from "@/lib/file-download";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import type { ActaPropuesta } from "@/lib/acta-ia";
 
@@ -185,6 +186,16 @@ export const listMeetings = async (
 
 export const getMeeting = (token: string, id: number) =>
   apiFetch<MeetingDetail>(`reuniones/${id}`, token);
+
+/** Acta en PDF (minuta, acuerdos y transcripción); el nombre del archivo lo pone el servidor. */
+export async function downloadMeetingPdf(token: string, id: number): Promise<void> {
+  const res = await fetch(buildApiUrl(`reuniones/${id}/pdf`), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error((await res.text().catch(() => "")) || `HTTP ${res.status}`);
+  const nombre = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? `acta-reunion-${id}.pdf`;
+  await triggerBlobDownload(await res.blob(), nombre, { mimeType: "application/pdf" });
+}
 
 export const createMeeting = (
   token: string,

@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { limpiarTextoWhisper } from './transcriptor.js';
+import { limpiarTextoWhisper, promptTranscriptor } from './transcriptor.js';
 
 /**
  * Cliente del transcriptor propio (whisper.cpp, `deploy/docker/Dockerfile.transcriptor`).
@@ -52,6 +52,7 @@ export class TranscriptorService {
     form.append('response_format', 'json');
     form.append('language', 'es');
     form.append('temperature', '0');
+    form.append('prompt', promptTranscriptor());
 
     const t0 = Date.now();
     let respuesta: Response;
