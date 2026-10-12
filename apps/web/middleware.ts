@@ -180,7 +180,8 @@ const applySecurityHeaders = (response: NextResponse) => {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
   response.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
-  response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(self)');
+  // Micrófono solo del propio sitio: el dictado por voz de «Asignar con IA» y las actas.
+  response.headers.set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self), payment=(self)');
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   response.headers.set('Cross-Origin-Resource-Policy', 'same-site');
   response.headers.set('Origin-Agent-Cluster', '?1');

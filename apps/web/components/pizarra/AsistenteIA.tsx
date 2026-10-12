@@ -5,6 +5,8 @@ import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { Alert, Badge, Button, ButtonLink, Card, Field, Select, Textarea } from "@/components/base";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
+import DictadoBoton from "@/components/DictadoBoton";
+import { unirDictado } from "@/lib/use-dictado";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -98,7 +100,7 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
         <div className={c.fila}>
           <AutoAwesomeOutlinedIcon className={s.icono} aria-hidden />
           <strong>Asignar con IA</strong>
-          <span className={c.tenue}>Escríbelo como se lo dirías a alguien. Nada se crea hasta que confirmes.</span>
+          <span className={c.tenue}>Escríbelo o díctalo como se lo dirías a alguien. Nada se crea hasta que confirmes.</span>
         </div>
         <Textarea
           rows={2}
@@ -112,6 +114,7 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
           }}
         />
         <div className={c.fila}>
+          <DictadoBoton onTexto={(frase) => setTexto((t) => unirDictado(t, frase).slice(0, 2000))} disabled={pensando} />
           <Button variant="primary" className={c.tap} onClick={() => void enviar()} disabled={!texto.trim() || pensando} aria-busy={pensando}>
             {pensando ? "Interpretando…" : "Interpretar"}
           </Button>
