@@ -189,6 +189,7 @@ export const ETIQUETA_MOTIVO_CHECADA_RECHAZADA: Record<string, string> = {
   ORIGEN_WEB: 'Intento desde el navegador',
   VIAJE_IMPOSIBLE: 'Viaje imposible entre checadas',
   UBICACION_VIEJA: 'Ubicación guardada, no del momento',
+  SIN_CONEXION_FUERA_DE_VENTANA: 'Sin conexión, fuera de ventana',
 };
 
 // ─────────────────────────────────── CRM y contabilidad (packs de «Exportar»)

@@ -41,6 +41,7 @@ import {
   ventanaWebCheckin,
   type VentanaWebCheckin,
   MENSAJE_UBICACION_SIMULADA,
+  MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA,
   MENSAJE_UBICACION_VIEJA,
   MENSAJE_VIAJE_IMPOSIBLE,
   MOTIVO_RECHAZO,
@@ -1500,6 +1501,18 @@ export class AttendanceService {
       capturedAt: dto.capturedAt ?? dto.timestamp ?? null,
       offline: dto.offline,
     });
+    // Captura sin conexión de hace más de 12 h (o con el reloj del teléfono muy adelantado): no dice
+    // cuándo pasó, así que no puede abrir ni cerrar la jornada de hoy. Se rechaza y avisa a sus jefes;
+    // el registro queda en AttendanceRejection con la hora que dijo el teléfono.
+    if (hora.fueraDeVentana) {
+      await this.rechazar(
+        contexto,
+        MOTIVO_RECHAZO.sinConexionFueraDeVentana,
+        MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA,
+        hora.clientCapturedAt ? `Capturada sin conexión ${horaAviso(hora.clientCapturedAt)}` : undefined,
+      );
+    }
+
     const now = hora.at;
     const today = this.getDateOnly(now);
 

@@ -31,6 +31,7 @@ const MOTIVOS = [
   { id: "UBICACION_VIEJA", label: "Ubicación vieja" },
   { id: "ORIGEN_WEB", label: "Navegador" },
   { id: "FIN_DE_SEMANA_SIN_GUARDIA", label: "Sin guardia" },
+  { id: "SIN_CONEXION_FUERA_DE_VENTANA", label: "Fuera de ventana" },
 ] as const;
 
 /** Un rechazo por GPS falso no es lo mismo que uno por abrir la web: se pintan distinto. */
@@ -38,6 +39,7 @@ const TONO: Record<string, "danger" | "warning" | "outline"> = {
   MOCK_LOCATION: "danger",
   VIAJE_IMPOSIBLE: "danger",
   UBICACION_VIEJA: "warning",
+  SIN_CONEXION_FUERA_DE_VENTANA: "warning",
   ORIGEN_WEB: "outline",
   FIN_DE_SEMANA_SIN_GUARDIA: "outline",
 };
