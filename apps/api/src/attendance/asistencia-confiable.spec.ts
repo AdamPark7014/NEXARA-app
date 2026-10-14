@@ -67,13 +67,13 @@ describe('la hora la pone el servidor', () => {
     expect(r.validacion).toBe('PENDIENTE');
   });
 
-  it('sin conexión pero de hace dos días: hora del servidor y a revisar', () => {
+  it('sin conexión pero de hace dos días: fuera de ventana, a revisar y sin aceptarla', () => {
     const r = resolverHoraChecada({
       ahora: AHORA,
       offline: true,
       capturedAt: '2026-09-15T15:00:00Z',
     });
-    expect(r.at).toEqual(AHORA);
+    expect(r.fueraDeVentana).toBe(true);
     expect(r.validacion).toBe('REVISAR');
     expect(r.motivo).toBe(MOTIVO_VALIDACION.horaTelefono);
   });
@@ -90,6 +90,66 @@ describe('la hora la pone el servidor', () => {
     expect(r.at).toEqual(AHORA);
     expect(r.clientCapturedAt).toBeNull();
     expect(r.validacion).toBe('OK');
+  });
+});
+
+describe('captura sin conexión fuera de la ventana (caso del 14-10)', () => {
+  // Carolina Juárez: salida capturada el 13-10 a las 18:19 (México) y enviada el 14-10 a las 10:22.
+  const CAPTURA = '2026-10-14T00:19:00Z'; // 13-10 18:19 mx
+  const LLEGADA = new Date('2026-10-14T16:22:00Z'); // 14-10 10:22 mx
+
+  it('una salida de ayer por la tarde que llega hoy por la mañana queda fuera de ventana', () => {
+    const r = resolverHoraChecada({ ahora: LLEGADA, offline: true, capturedAt: CAPTURA });
+    expect(r.fueraDeVentana).toBe(true);
+    expect(r.validacion).toBe('REVISAR');
+    expect(r.motivo).toBe(MOTIVO_VALIDACION.horaTelefono);
+  });
+
+  it('dentro de las 12 h exactas sigue valiendo', () => {
+    const r = resolverHoraChecada({
+      ahora: AHORA,
+      offline: true,
+      capturedAt: new Date(AHORA.getTime() - 12 * 60 * 60 * 1000).toISOString(),
+    });
+    expect(r.fueraDeVentana).toBe(false);
+    expect(r.validacion).toBe('PENDIENTE');
+  });
+
+  it('un segundo más de 12 h ya queda fuera', () => {
+    const r = resolverHoraChecada({
+      ahora: AHORA,
+      offline: true,
+      capturedAt: new Date(AHORA.getTime() - 12 * 60 * 60 * 1000 - 1000).toISOString(),
+    });
+    expect(r.fueraDeVentana).toBe(true);
+  });
+
+  it('un reloj de teléfono adelantado más de 2 min también queda fuera', () => {
+    const dentro = resolverHoraChecada({
+      ahora: AHORA,
+      offline: true,
+      capturedAt: new Date(AHORA.getTime() + 2 * 60 * 1000).toISOString(),
+    });
+    const fuera = resolverHoraChecada({
+      ahora: AHORA,
+      offline: true,
+      capturedAt: new Date(AHORA.getTime() + 2 * 60 * 1000 + 1000).toISOString(),
+    });
+    expect(dentro.fueraDeVentana).toBe(false);
+    expect(fuera.fueraDeVentana).toBe(true);
+  });
+
+  it('una captura de hace 16 h que fue en línea no es esta regla: la hora del servidor con REVISAR', () => {
+    const r = resolverHoraChecada({ ahora: LLEGADA, capturedAt: CAPTURA });
+    expect(r.fueraDeVentana).toBe(false);
+    expect(r.at).toEqual(LLEGADA);
+    expect(r.validacion).toBe('REVISAR');
+  });
+
+  it('sin hora de captura no se decide por ventana (se conserva PENDIENTE)', () => {
+    const r = resolverHoraChecada({ ahora: LLEGADA, offline: true });
+    expect(r.fueraDeVentana).toBe(false);
+    expect(r.validacion).toBe('PENDIENTE');
   });
 });
 

@@ -106,6 +106,57 @@ describe('la hora del teléfono no decide nada', () => {
   });
 });
 
+describe('una captura sin conexión fuera de la ventana no toca la jornada de hoy', () => {
+  // Caso real del 14-10: la salida de Carolina (capturada el 13-10 a las 18:19) llegó a las 10:22
+  // y cerró la jornada de hoy, 17 min después de su entrada. Aquí se fija que ya no pasa.
+  const hace16h = new Date(Date.now() - 16 * 60 * 60 * 1000).toISOString();
+
+  it('una salida de hace 16 h se rechaza: 422, no se escribe ninguna fila ni se cierra el día', async () => {
+    const { service, prisma } = build();
+
+    await expect(
+      service.register(
+        { type: 'salida', photoBase64: FOTO, offline: true, capturedAt: hace16h } as any,
+        3,
+        PETICION_APP,
+        7,
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
+    expect(prisma.attendance.update).not.toHaveBeenCalled();
+    expect(prisma.attendanceDay.update).not.toHaveBeenCalled();
+    expect(prisma.attendanceDay.upsert).not.toHaveBeenCalled();
+  });
+
+  it('una entrada de hace 16 h tampoco abre jornada', async () => {
+    const { service, prisma } = build();
+
+    await expect(
+      service.register({ type: 'entrada', photoBase64: FOTO, offline: true, capturedAt: hace16h } as any, 3, PETICION_APP, 7),
+    ).rejects.toThrow(UnprocessableEntityException);
+
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
+    expect(prisma.attendanceDay.upsert).not.toHaveBeenCalled();
+  });
+
+  it('el rechazo avisa a sus jefes con la hora que dijo el teléfono', async () => {
+    const { service, notifyAttendanceFlagged } = build();
+
+    await service
+      .register({ type: 'salida', photoBase64: FOTO, offline: true, capturedAt: hace16h } as any, 3, PETICION_APP, 7)
+      .catch(() => undefined);
+
+    expect(notifyAttendanceFlagged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 3,
+        titulo: 'Checada rechazada por el servidor',
+        mensaje: expect.stringContaining('Capturada sin conexión'),
+      }),
+    );
+  });
+});
+
 describe('ubicación simulada', () => {
   it('no se registra: 422 con el mensaje del contrato', async () => {
     const { service, prisma } = build();

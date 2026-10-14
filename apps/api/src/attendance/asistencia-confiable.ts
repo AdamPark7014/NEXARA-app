@@ -95,6 +95,10 @@ export function ventanaWebCheckin(valor: string | null | undefined, ahora: Date)
   return { abierta: ahora.getTime() < hasta.getTime(), hasta };
 }
 
+/** 422 cuando una captura sin conexión llegó fuera de la ventana (más de 12 h tarde, o con el reloj adelantado). */
+export const MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA =
+  'La checada se guardó sin conexión y llegó fuera de la ventana permitida (12 h): no se registra sola. Avisamos a tu jefe para que la revise.';
+
 /** 422 cuando el teléfono reporta ubicación simulada. */
 export const MENSAJE_UBICACION_SIMULADA =
   'Detectamos una ubicación simulada. Desactiva cualquier app de GPS falso para checar.';
@@ -169,6 +173,11 @@ export type HoraChecada = {
   offline: boolean;
   validacion: ValidacionChecada;
   motivo: string | null;
+  /**
+   * Captura sin conexión fuera de la ventana: su hora no es confiable y `at` NO es la
+   * de la checada. Quien la use la rechaza; no puede abrir ni cerrar la jornada de hoy.
+   */
+  fueraDeVentana: boolean;
 };
 
 /**
@@ -179,6 +188,12 @@ export type HoraChecada = {
  * cae dentro de la ventana razonable, y aun así queda PENDIENTE para que
  * alguien la mire. Un teléfono con la hora corrida (el truco más fácil para
  * fabricar una entrada puntual) se guarda con la hora del servidor y REVISAR.
+ *
+ * Una captura sin conexión fuera de la ventana (llegó más de 12 h tarde) no se
+ * guarda con la hora del servidor: esa hora no es la de la checada. Pondría una
+ * salida de ayer como si fuera de hoy y cerraría la jornada de hoy (caso del
+ * 14-10: salida de la tarde anterior, llegada a las 10:22, cerró la entrada de
+ * las 10:05). Va con `fueraDeVentana` para que se rechace y avise a sus jefes.
  */
 export function resolverHoraChecada(params: {
   ahora: Date;
@@ -194,6 +209,7 @@ export function resolverHoraChecada(params: {
     offline,
     validacion: 'OK',
     motivo: null,
+    fueraDeVentana: false,
   };
 
   if (offline) {
@@ -212,8 +228,13 @@ export function resolverHoraChecada(params: {
         motivo: MOTIVO_VALIDACION.sinConexion,
       };
     }
-    // Fuera de ventana: una captura «de ayer por la madrugada» no se acepta a ciegas.
-    return { ...base, validacion: 'REVISAR', motivo: MOTIVO_VALIDACION.horaTelefono };
+    // Fuera de ventana: no se sabe cuándo pasó. No se acepta ni con la hora del teléfono ni con la del servidor.
+    return {
+      ...base,
+      validacion: 'REVISAR',
+      motivo: MOTIVO_VALIDACION.horaTelefono,
+      fueraDeVentana: true,
+    };
   }
 
   if (capturada && Math.abs(capturada.getTime() - ahora.getTime()) > DESFASE_MAXIMO_MS) {
@@ -371,6 +392,7 @@ export const MOTIVO_RECHAZO = {
   viajeImposible: 'VIAJE_IMPOSIBLE',
   ubicacionVieja: 'UBICACION_VIEJA',
   finDeSemanaSinGuardia: 'FIN_DE_SEMANA_SIN_GUARDIA',
+  sinConexionFueraDeVentana: 'SIN_CONEXION_FUERA_DE_VENTANA',
 } as const;
 
 export type MotivoRechazo = (typeof MOTIVO_RECHAZO)[keyof typeof MOTIVO_RECHAZO];
@@ -382,6 +404,7 @@ export const ETIQUETA_MOTIVO_RECHAZO: Record<string, string> = {
   VIAJE_IMPOSIBLE: 'Viaje imposible entre checadas',
   UBICACION_VIEJA: 'Ubicación guardada, no del momento',
   FIN_DE_SEMANA_SIN_GUARDIA: 'Fin de semana sin guardia',
+  SIN_CONEXION_FUERA_DE_VENTANA: 'Sin conexión fuera de ventana',
 };
 
 /**
