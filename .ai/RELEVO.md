@@ -1,5 +1,20 @@
 # RELEVO
 
+- **19-10 ~11:30 (claude-code) — Cuarto rechazo iOS (12-10, 2.3.10) diagnosticado: captura de iPad con imagen Android.**
+  - Adam: «revisa el nuevo rechazo… y verifica cómo ajustar todo para que no nos vuelvan a rechazar».
+  - Build 1.0.0 (10) rechazado el 12-10 (iPad Air M3) por «non-iOS status bar images». Apple adjuntó la imagen
+    de marketing de Android de septiembre. Por la API interna de ASC: la versión 1.0 conserva un juego
+    `APP_IPAD_PRO_3GEN_129` con esa sola imagen (`imgonline-com-ua-resize-L2apCDrgZOu.png`, 2048×2732), oculto en
+    la pestaña iPhone porque la app es solo iPhone. Explica también el rechazo 2.3.10 del 04-10.
+  - **Adam debe pulsar**: Gestor de recursos multimedia → iPad → «Eliminar todo» → Guardar → «Actualizar
+    revisión» → responder (texto en `docs/store/IOS-RESPUESTA-APPLE.md`) → «Volver a enviar». El clasificador
+    de permisos bloquea a Claude el borrado y la API DELETE. Sin build nuevo.
+  - Verificado en ASC: sin adjuntos, sin vistas previas, descripción sin «Android», solo es-MX, categorías
+    Negocios/Productividad, demo `play.review@nexara.com.mx`. Android **1.0.7 (17) publicada** en Play desde el
+    12-10 (2 países, base 93 %).
+  - Nueva «Lista de verificación antes de CADA envío» al final de `docs/store/IOS-RESPUESTA-APPLE.md` (revisar
+    iPhone/iPad/Watch/iMessage en el Gestor multimedia, textos, binario, 2.1, flujo de reenvío).
+  - Los 14 archivos de reuniones sin commitear son del turno anterior: no se tocaron.
 - **12-10 ~21:35 (claude-code, nube) — Reuniones simple (`.ai/REUNIONES-SIMPLE-SPEC.md`).**
   - IA de reuniones (grabar, transcribir, acta) solo encargados de área: fuera de `MEETINGS_STAFF_URL_RULES`; ENC_SOPORTE conduce (lead).
   - `POST reuniones/:id/acuerdos` acepta `crearActividad`: crea Tarea·Junta INTERNAL del responsable (`acuerdo-actividad.ts`, vía `ActivitiesService.create`) y la liga; si falla, el acuerdo queda y responde `avisoActividad`.
