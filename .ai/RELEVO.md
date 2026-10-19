@@ -14,7 +14,13 @@
     12-10 (2 países, base 93 %).
   - Nueva «Lista de verificación antes de CADA envío» al final de `docs/store/IOS-RESPUESTA-APPLE.md` (revisar
     iPhone/iPad/Watch/iMessage en el Gestor multimedia, textos, binario, 2.1, flujo de reenvío).
-  - Los 14 archivos de reuniones sin commitear son del turno anterior: no se tocaron.
+  - **~11:40: reenviada.** Adam pulsó «Eliminar todo» (juego de iPad vacío, verificado por la API); Claude pulsó
+    «Actualizar revisión», publicó la respuesta en el Resolution Center (hoy 11:34) y «Volver a enviar»:
+    **1.0.0 (10) «Pendiente de revisión»**. Nada que hacer hasta que Apple conteste.
+  - Los 14 archivos de reuniones sin commitear son del turno anterior: no se tocaron. **main local y remoto
+    divergieron** (remoto: `63accdee` reuniones 12-10 + `399cd877` asistencia 14-10; local: `283ce9b6` + docs
+    `f66b13c7`); los cambios sin commitear NO coinciden con lo del remoto. Adam decide cómo reconciliar; los
+    commits de docs de este turno están solo en local.
 - **12-10 ~21:35 (claude-code, nube) — Reuniones simple (`.ai/REUNIONES-SIMPLE-SPEC.md`).**
   - IA de reuniones (grabar, transcribir, acta) solo encargados de área: fuera de `MEETINGS_STAFF_URL_RULES`; ENC_SOPORTE conduce (lead).
   - `POST reuniones/:id/acuerdos` acepta `crearActividad`: crea Tarea·Junta INTERNAL del responsable (`acuerdo-actividad.ts`, vía `ActivitiesService.create`) y la liga; si falla, el acuerdo queda y responde `avisoActividad`.
