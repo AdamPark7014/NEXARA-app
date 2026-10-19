@@ -154,3 +154,92 @@ The app behaves the same in every region. The interface is in Spanish (Mexico); 
 3. En App Store Connect: capturas 6.9" nuevas (quitar las 8 de Android y cualquier de iPad), campos de arriba, nuevo build, quitar el .mp4.
 4. Confirmar la contraseña demo: `apps/mobile-native/ios/scripts/verificar-cuenta-revision.ps1` (y `resembrar-cuenta-revision.ps1` si da 401).
 5. Responder en Resolution Center con el texto de arriba y «Volver a enviar a revisión de apps».
+
+## Rechazo del 12-10-2026 · build 1.0.0 (10) · guía 2.3.10 (otra vez «barra de estado que no es de iOS»)
+
+Envío `a7982a31-fb80-4b33-8b19-520ce4bcfae6`, revisado en iPad Air 11" (M3). Apple adjuntó
+`270b278403d6ff84aa936f8ee10a12d47dfb76fa.png`: es la imagen de marketing **de Android** («Tu equipo en tiempo
+real», teléfono con barra de estado y gestos de Android, tema azul) que se subió con el primer envío de septiembre.
+
+**Causa real (verificada el 19-10 por la API interna de App Store Connect):** la versión 1.0 tenía DOS juegos de
+capturas en es-MX:
+
+| Juego (`screenshotDisplayType`) | Capturas | Origen |
+|---|---|---|
+| `APP_IPHONE_67` (iPhone con Dynamic Island, pantalla grande) | 10 (`01-inicio.png` … `10-mi-perfil.png`, 1320×2868) | Simulador iOS, flujo `ios-screenshots.yml` del 05-10 |
+| `APP_IPAD_PRO_3GEN_129` (iPad 12,9"/13") | **1: `imgonline-com-ua-resize-L2apCDrgZOu.png`, 2048×2732** | **Imagen Android de septiembre, redimensionada** |
+
+La app es solo iPhone, así que la pestaña «iPhone» de ASC no enseña el juego de iPad y los tres reenvíos (28-09,
+04-10, 05-10) lo dieron por vacío. Apple lo ve: el aviso del rechazo lo dice literalmente («some screenshots may
+only be viewed and updated by selecting *View All Sizes in Media Manager*»). Los rechazos 2.3.10 del 04-10 y del
+12-10 se explican con esa sola imagen; el arreglo del `DemoBanner` del 04-10 fue de paso.
+
+**Arreglo:** Gestor de recursos multimedia → pestaña **iPad** → «iPad pantalla de 13"» → **Eliminar todo** →
+Guardar. Verificar después que la versión solo tenga el juego `APP_IPHONE_67` (en la pestaña iPad debe decir
+«0 de 10 capturas»). No hace falta build nuevo: el 10 sigue elegido.
+
+**Regla nueva (va en la lista de verificación de abajo):** antes de cada envío revisar en el Gestor de recursos
+multimedia las CUATRO pestañas (iPhone, iPad, Apple Watch, App para iMessage) y todos los tamaños de cada una, no
+solo el que enseña la ficha.
+
+Respuesta en el Resolution Center (enviar después de borrar la captura de iPad y de pulsar «Actualizar revisión»):
+
+```
+Hello,
+
+Thank you for the attached image: it helped us find the problem. That screenshot was not in the iPhone
+screenshot set we replaced in our previous resubmissions. It was an old 12.9-inch iPad screenshot, uploaded with
+our very first submission in September from the Android version of the app. Because the app is iPhone-only, the
+iPad set was hidden in the default App Store Connect view, and we did not see it when we replaced the iPhone
+screenshots.
+
+We have now removed that iPad screenshot entirely (the iPad set is empty). The version now contains only the 10
+iPhone 6.9-inch screenshots captured on the iOS Simulator (iPhone 17 Pro Max, iOS 26.2), which show the iOS status
+bar and the app in use. There are no app previews and no other attachments. No references to other platforms
+remain in the binary, the screenshots or the metadata.
+
+Build 1.0.0 (10) is unchanged. It can still be reviewed without an account: on the sign-in screen tap
+"Explorar NEXARA con datos de muestra" (demo mode).
+
+Best regards,
+NEXARA team
+```
+
+## Lista de verificación antes de CADA envío a App Review (NEXARA y ARTA)
+
+Hecha con los cuatro rechazos de NEXARA (25-09, 04-10, 07-10, 12-10) y los dos de ARTA (06-10, 12-10). Marcar
+todo antes de pulsar «Volver a enviar a revisión de apps».
+
+**Capturas y multimedia (2.3.10 / 2.3.3)**
+- [ ] Gestor de recursos multimedia → **iPhone, iPad, Apple Watch y App para iMessage**: en cada pestaña, cada
+      tamaño con «0 de N» salvo el iPhone 6,9". Ningún juego de iPad en apps solo iPhone.
+- [ ] Las capturas vienen del simulador de iOS (flujo `ios-screenshots.yml`): barra de estado 9:41 con señal,
+      WiFi y batería de iOS, sin marcos de teléfono Android, sin titulares de marketing.
+- [ ] Ninguna captura con franja de color sólido detrás de la barra de estado con la hora en negro (se lee como
+      barra de Android). Si la cabecera es de color, la hora va en blanco (`NxStatusBar`), o la cabecera es clara.
+- [ ] 0 vistas previas (videos) a menos que sean grabación del simulador de iOS; ningún `.mp4` de Android.
+- [ ] «Archivo adjunto» de Información de revisión: vacío o solo el video del simulador de iOS que piden en 2.1.
+
+**Ficha (3.2 / 2.3)**
+- [ ] Descripción, texto promocional, palabras clave, novedades y notas sin las palabras *Android*, *Google Play*,
+      *emulador*, *solo empleados*, *not for the general public*, *authorized employees*.
+- [ ] Descripción como plataforma multiempresa con vía pública de contratación (`/contacto`) y modo demo.
+- [ ] Subtítulo ≤ 30 caracteres; URL de soporte y de privacidad abren (200) sin login.
+
+**Binario**
+- [ ] `UIBackgroundModes` solo `remote-notification`; sin `NSLocationAlwaysAndWhenInUseUsageDescription`
+      (2.5.4). `TARGETED_DEVICE_FAMILY = 1`. `PrivacyInfo.xcprivacy` en la raíz del `.app`.
+- [ ] Todas las cadenas `NS*UsageDescription` explican el uso real (ubicación, cámara, fotos, micrófono, Face ID).
+- [ ] «Eliminar mi cuenta» visible en Mi perfil / Más (5.1.1(v)); privacidad y términos alcanzables sin login.
+- [ ] Nada que diga *Android* en pantalla (solo en comentarios del código).
+
+**Revisión (2.1)**
+- [ ] Modo demo abre sin cuenta y sin red, también en iPad (compatibilidad): es donde revisa Apple.
+- [ ] Cuenta demo verificada ese día por Adam con `verificar-cuenta-revision.ps1` (activa, sin MFA, sin candado,
+      contraseña sin espacios al pegarla).
+- [ ] Notas en inglés con la ruta exacta para cada función que Apple pidió ver (eliminar cuenta, reportar,
+      bloquear, ubicación).
+
+**Flujo de reenvío en ASC**
+- [ ] Guardar cambios de la versión → «Actualizar revisión» → esperar a «Listo para revisión» → responder en el
+      Resolution Center → «Volver a enviar a revisión de apps» → no navegar hasta ver «Pendiente de revisión».
