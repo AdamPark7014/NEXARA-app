@@ -4,7 +4,7 @@ import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js
 import { workDateColumn, workDateKey, workDayEnd, workDayStart, parseWorkDate } from '../common/time/workday.js';
 import { esMultiDia, periodoDeActividad } from '../activities/actividad-periodo.js';
 import { tiposVisibles } from './equipo-alcance.js';
-import { estatusCerrado, minutosPlanDeHoras, tiemposReales } from './pizarra-kpi.js';
+import { estatusCerrado, estatusNoCumplida, minutosPlanDeHoras, tiemposReales } from './pizarra-kpi.js';
 import { minutosTrabajados } from '../activities/sessions/sesiones-trabajo.js';
 import { TeamBoardService } from './team-board.service.js';
 import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
@@ -632,7 +632,8 @@ export class KpisEquipoService {
     for (const f of propias) {
       const a = f.activity;
       const ev = (a.activityEvidences ?? []).find((e) => e.userId === f.userId) ?? null;
-      const cerrada = estatusCerrado(a.estatus);
+      // Una no cumplida está cerrada pero nadie la entregó: cuenta como «sin entregar».
+      const cerrada = estatusCerrado(a.estatus) && !estatusNoCumplida(a.estatus);
       const envio = ev?.status === 'COMPLETED';
       const tiempos = tiemposReales({
         inicioRealAt: f.inicioRealAt ?? null,

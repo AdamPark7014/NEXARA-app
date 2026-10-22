@@ -871,6 +871,8 @@ model User {
   peerRequestsSent          ActivityPeerRequest[]      @relation("PeerRequestFrom")
   peerRequestsReceived      ActivityPeerRequest[]      @relation("PeerRequestTo")
   reprogramacionesHechas    ActivityScheduleChange[]   @relation("ActivityScheduleChangedBy")
+  incumplimientosRegistrados ActivityNonCompliance[]   @relation("NonComplianceRegisteredBy")
+  incumplimientosReprogramados ActivityNonCompliance[] @relation("NonComplianceRescheduledBy")
   evidenceReviewsHechas     ActivityEvidenceReview[]   @relation("EvidenceReviewAuthor")
   evidenceReviewsRecibidas  ActivityEvidenceReview[]   @relation("EvidenceReviewSubject")
   reasignacionesDesde       ActivityReassignment[]     @relation("ActivityReassignFrom")
@@ -1239,6 +1241,10 @@ model Activity {
   /// Equipo asignado. `responsableId` sigue siendo el líder.
   assignees               ActivityAssignee[]
   scheduleChanges         ActivityScheduleChange[]
+  /// Registros de incumplimiento (cierre de jornada sin entrega o registro de un superior).
+  nonCompliances          ActivityNonCompliance[]
+  /// Cuándo se avisó que se acerca el cierre de jornada (una sola vez; se limpia al reprogramar).
+  cierreAvisadoAt         DateTime?
   evidenceReviews         ActivityEvidenceReview[]
   /// Historial de reasignaciones (quién la tenía, quién la movió y por qué).
   reassignments           ActivityReassignment[]
@@ -6122,6 +6128,7 @@ model CompanyProfile {
   payments                   Payment[]
   ActivityAssignee           ActivityAssignee[]
   ActivityScheduleChange     ActivityScheduleChange[]
+  ActivityNonCompliance      ActivityNonCompliance[]
   ActivityEvidenceReview     ActivityEvidenceReview[]
   ActivityReassignment       ActivityReassignment[]
   supplierPriceBreaks        SupplierPriceBreak[]
@@ -6599,6 +6606,41 @@ model ActivityScheduleChange {
   @@index([activityId])
   @@index([companyId])
   @@map("activity_schedule_changes")
+}
+
+/// Incumplimiento de una actividad: no se entregó al cierre de la jornada del día en que vencía
+/// (lo registra el sistema) o un superior la dio por no cumplida. Se conserva aunque después se
+/// reprograme: es lo que miden los KPI de «en tiempo y forma». Reglas en `activities/incumplimiento.ts`.
+model ActivityNonCompliance {
+  id                   Int       @id @default(autoincrement())
+  activityId           Int
+  companyId            Int
+  /// CIERRE_JORNADA (sistema) | MANUAL (un superior).
+  origen               String    @db.VarChar(20)
+  /// Clave de `CAUSAS_INCUMPLIMIENTO`.
+  causa                String    @db.VarChar(30)
+  observaciones        String?   @db.Text
+  /// El cierre que no se cumplió.
+  limite               DateTime?
+  estatusPrevio        String    @db.VarChar(50)
+  /// Quienes no la entregaron a tiempo.
+  pendientesIds        Int[]     @default([])
+  registradoAt         DateTime  @default(now())
+  /// null = el sistema, al cierre de la jornada.
+  registradoPorId      Int?
+  reprogramadaAt       DateTime?
+  reprogramadaPorId    Int?
+  reprogramadaPara     DateTime?
+  motivoReprogramacion String?   @db.VarChar(500)
+
+  activity        Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  registradoPor   User?          @relation("NonComplianceRegisteredBy", fields: [registradoPorId], references: [id], onDelete: SetNull)
+  reprogramadaPor User?          @relation("NonComplianceRescheduledBy", fields: [reprogramadaPorId], references: [id], onDelete: SetNull)
+
+  @@index([activityId])
+  @@index([companyId, registradoAt])
+  @@map("activity_non_compliances")
 }
 
 /// Revisiones de evidencia por persona: quién aprobó o devolvió, qué pasos, por qué y con qué calificación.

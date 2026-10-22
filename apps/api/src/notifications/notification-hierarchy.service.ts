@@ -1381,6 +1381,133 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Una hora antes del cierre de jornada: a quien todavía no la entrega, que si no la entrega
+   * quedará registrada como no cumplida. Una sola vez (la marca la lleva el cierre de jornada).
+   */
+  async notifyActivityClosingSoon(params: { activityId: number; pendientesIds: number[]; cierre: Date }) {
+    try {
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: params.activityId },
+        select: { titulo: true, companyId: true, client: { select: { name: true } } },
+      });
+      if (!activity) return;
+      const hora = horaAviso(params.cierre);
+      for (const userId of new Set(params.pendientesIds)) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_OVERDUE',
+          category: 'activities',
+          title: `${nombreActividad(activity.titulo)} cierra a las ${hora}`,
+          message: unir(
+            'Si no la entregas antes del cierre de la jornada, quedará registrada como no cumplida',
+            activity.client?.name,
+          ),
+          icon: 'vencida',
+          relatedEntityId: params.activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${params.activityId}`,
+          priority: 'high',
+          channel: 'ops',
+          collapseKey: `nx_cierre_${params.activityId}`,
+          dedupeSeconds: 0,
+          companyId: activity.companyId,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityClosingSoon', error);
+    }
+  }
+
+  /**
+   * Quedó registrada como no cumplida. Al cierre de jornada (`actorId` null) le llega a quienes no
+   * la entregaron, al responsable, a quien la asignó y al jefe directo de cada pendiente. Si la
+   * registró un superior, además a la cadena de mando, como una cancelación.
+   */
+  async notifyActivityNonCompliance(params: {
+    activityId: number;
+    actorId: number | null;
+    pendientesIds: number[];
+    causa: string;
+    observaciones?: string | null;
+    cierre?: Date | null;
+  }) {
+    const { activityId, actorId } = params;
+    try {
+      const [activity, team] = await Promise.all([
+        this.prisma.activity.findUnique({
+          where: { id: activityId },
+          select: {
+            titulo: true,
+            companyId: true,
+            responsableId: true,
+            creadoPorId: true,
+            client: { select: { name: true } },
+          },
+        }),
+        this.prisma.activityAssignee.findMany({
+          where: { activityId, retiradoAt: null },
+          select: { userId: true },
+        }),
+      ]);
+      if (!activity) return;
+      const pendientes = new Set<number>(params.pendientesIds.length ? params.pendientesIds : [activity.responsableId]);
+      const targets = new Set<number>([...pendientes, activity.responsableId]);
+      if (activity.creadoPorId) targets.add(activity.creadoPorId);
+      if (actorId == null) {
+        const jefes = await this.prisma.user.findMany({
+          where: { id: { in: [...pendientes] } },
+          select: { managerId: true },
+        });
+        for (const j of jefes) if (j.managerId) targets.add(j.managerId);
+      } else {
+        for (const t of team) targets.add(t.userId);
+        for (const id of pendientes) {
+          for (const jefe of await this.lunchReviewerIds(id)) targets.add(jefe);
+        }
+        targets.delete(actorId);
+      }
+
+      const nombres = await this.prisma.user.findMany({
+        where: { id: { in: [...pendientes] } },
+        select: { id: true, nombre: true },
+      });
+      const quienesNo = nombres.map((n) => persona(n.nombre)).join(', ');
+      const title = `${nombreActividad(activity.titulo)}: no cumplida`;
+      const origen =
+        actorId == null
+          ? `Sin entrega al cierre de la jornada${params.cierre ? ` (${horaAviso(params.cierre)})` : ''}`
+          : `${persona(await this.resolveActorName(actorId))} la registró: ${params.causa}`;
+      for (const userId of targets) {
+        const esPendiente = pendientes.has(userId);
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_OVERDUE',
+          category: 'activities',
+          title,
+          message: unir(
+            origen,
+            !esPendiente && quienesNo ? `Pendiente de ${quienesNo}` : null,
+            params.observaciones ? params.observaciones.trim().slice(0, 160) : null,
+            activity.client?.name,
+          ),
+          icon: 'vencida',
+          triggerUserId: actorId ?? undefined,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}`,
+          priority: 'high',
+          channel: 'ops',
+          collapseKey: `nx_cierre_${activityId}`,
+          dedupeSeconds: 0,
+          companyId: activity.companyId,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityNonCompliance', error);
+    }
+  }
+
+  /**
    * Inició la actividad que le asignaron (quien la recibe ya no acepta ni rechaza,
    * solo inicia): le llega a quien se la pasó y al responsable, con la hora real.
    * El tipo sigue siendo ACTIVITY_ACCEPTED_BY_ASSIGNEE para no tocar el enum de la base.

@@ -34,7 +34,7 @@ type Db = { activityWorkSession?: any; [modelo: string]: any };
 export type SesionFila = SesionTrabajo & { id: number; activityId: number; userId: number };
 
 const cerradaPorEstatus = (estatus?: string | null) =>
-  /finalizada|completada|cancelada|aprobada/i.test(estatus || '');
+  /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(estatus || '');
 
 const claveSesion = (userId: number, activityId: number) => `${userId}:${activityId}`;
 

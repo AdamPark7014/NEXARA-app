@@ -10,6 +10,7 @@ import { ActivitiesService } from '../activities/activities.service.js';
 import { ActivityTeamService, type AssigneeRole } from '../activities/activity-team.service.js';
 import { ActivityEvidenceService } from '../activities/evidence/activity-evidence.service.js';
 import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
+import { esNoCumplida } from '../activities/incumplimiento.js';
 import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -194,6 +195,8 @@ export type MyActivitiesResponse = {
   /** Despachadas por este usuario: ya hizo su parte, da seguimiento. */
   seguimiento: MyActivityItem[];
   doneToday: MyActivityItem[];
+  /** Se cerraron sin entregarse en los últimos 7 días: la persona las ve, no le desaparecen. */
+  noCumplidas?: MyActivityItem[];
 };
 
 export type ReorderMyActivitiesDto = {
@@ -205,7 +208,7 @@ export type ReorderMyActivitiesDto = {
 const norm = (email?: string | null) => (email || '').trim().toLowerCase();
 
 const isClosed = (estatus: string) =>
-  /finalizada|completada|cancelada|aprobada/.test((estatus || '').toLowerCase());
+  /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/.test((estatus || '').toLowerCase());
 
 /** null/undefined al final. */
 const nullsLast = (a: number | null | undefined, b: number | null | undefined) => {
@@ -1151,8 +1154,20 @@ export class MyActivitiesService {
       )
       .sort((a, b) => (b.fechaFinalizacion?.getTime() ?? 0) - (a.fechaFinalizacion?.getTime() ?? 0));
 
+    const hace7Dias = ahora.getTime() - 7 * 24 * 60 * 60 * 1000;
+    const noCumplidas = items
+      .filter(
+        (item) =>
+          esNoCumplida(item.estatus) &&
+          (item.fechaInicio ?? item.fechaAsignacion).getTime() >= hace7Dias,
+      )
+      .sort(
+        (a, b) =>
+          (b.fechaInicio ?? b.fechaAsignacion).getTime() - (a.fechaInicio ?? a.fechaAsignacion).getTime(),
+      );
+
     const manager = this.isAreaManager(viewer.email);
-    return { canReorder: manager, canSelfAssign: true, open, seguimiento, doneToday };
+    return { canReorder: manager, canSelfAssign: true, open, seguimiento, doneToday, noCumplidas };
   }
 
   async reorder(

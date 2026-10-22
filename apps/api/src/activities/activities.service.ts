@@ -11,6 +11,8 @@ import { generateTicketReportPdf } from './ticket-report-pdf.js';
 import { generateActivitiesReportPdf } from './activities-report-pdf.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, isFinishedStatus } from './activity-status.js';
+import { esNoCumplida } from './incumplimiento.js';
+import { leerIncumplimientos } from './incumplimiento-lectura.js';
 import { esCerrada, normalizarPrioridad, tiemposDto } from './actividad-tiempos.js';
 import { leerSesiones, sesionesDe } from './sessions/activity-sessions.service.js';
 import { evaluarSemaforo } from './semaforo-actividad.js';
@@ -494,10 +496,13 @@ export class ActivitiesService {
       ...tiemposDto(a, activity, ahora, sesionesDe(sesiones, a.userId, activity.id)),
     }));
     const propia = equipo.find((a) => a.userId === activity.responsableId) ?? equipo[0] ?? null;
+    // El último incumplimiento: vigente si está «No cumplida», historial si ya se reprogramó.
+    const [incumplimiento] = await leerIncumplimientos(this.prisma, activity.id, activity.companyId, 1);
     return {
       ...activity,
       prioridad: activity.prioridad == null ? null : normalizarPrioridad(activity.prioridad),
       assignees: equipo,
+      incumplimiento: incumplimiento ?? null,
       /** Resumen de la actividad: el del responsable, o el del primero del equipo. */
       semaforo: propia?.semaforo ?? null,
       minutosAtraso: propia?.minutosAtraso ?? null,
@@ -531,6 +536,7 @@ export class ActivitiesService {
     const inProgress = new Set(['En Proceso', 'EN_PROCESO', 'Por Validar', 'POR_VALIDAR']);
 
     let abiertas = 0;
+    let noCumplidas = 0;
     let enProceso = 0;
     let completadas = 0;
     let vencidas = 0;
@@ -540,7 +546,10 @@ export class ActivitiesService {
       const isClosed = closed.has(status);
       const isProgress = inProgress.has(status);
 
-      if (isClosed) {
+      // Cerrada, pero como falla: ni completada ni abierta.
+      if (esNoCumplida(status)) {
+        noCumplidas += 1;
+      } else if (isClosed) {
         completadas += 1;
       } else if (isProgress) {
         enProceso += 1;
@@ -557,6 +566,7 @@ export class ActivitiesService {
       abiertas,
       enProceso,
       completadas,
+      noCumplidas,
       vencidas,
       total: rows.length,
     };
@@ -574,7 +584,7 @@ export class ActivitiesService {
     startOfToday.setHours(0, 0, 0, 0);
     const now = new Date();
 
-    const closed = new Set(['Finalizada', 'Finalizado', 'COMPLETADA', 'Cancelada', 'CANCELADA', 'Rechazada']);
+    const closed = new Set(['Finalizada', 'Finalizado', 'COMPLETADA', 'Cancelada', 'CANCELADA', 'Rechazada', 'No cumplida']);
     const inProgress = new Set(['En Proceso', 'EN_PROCESO', 'EN_CURSO']);
     const porValidar = new Set(['Por Validar', 'POR_VALIDAR']);
 
@@ -1072,6 +1082,19 @@ export class ActivitiesService {
       Number(updateActivityDto.responsableId) !== Number(prev.responsableId)
     ) {
       await this.assertResponsableActivo(updateActivityDto.responsableId);
+    }
+
+    // «No cumplida» tampoco se pone ni se quita editando el estatus: lleva causa y registro, y
+    // reabrirla es reprogramarla con fecha nueva.
+    if (updateActivityDto.estatus !== undefined) {
+      if (esNoCumplida(updateActivityDto.estatus) && !esNoCumplida(prev.estatus)) {
+        throw new BadRequestException(
+          'Para registrar que no se cumplió usa «Registrar incumplimiento»: pide causa y observaciones',
+        );
+      }
+      if (esNoCumplida(prev.estatus) && !esNoCumplida(updateActivityDto.estatus)) {
+        throw new BadRequestException('Esta actividad no se cumplió: para reabrirla usa «Reprogramar» con fecha nueva');
+      }
     }
 
     // La cancelación documentada no se puede saltar editando el estatus.

@@ -31,6 +31,12 @@ export const ACTIVITY_STATUS = {
   FINALIZADA: 'Finalizada',
   RECHAZADA: 'Rechazada',
   CANCELADA: 'Cancelada',
+  /**
+   * No se entregó al cierre de la jornada del día en que vencía, o un superior la registró como
+   * no cumplida (ver `incumplimiento.ts`). Cierra la actividad como falla: no es éxito ni se cuenta
+   * como entregada. Un superior la reabre con «Reprogramar».
+   */
+  NO_CUMPLIDA: 'No cumplida',
 } as const;
 
 export type ActivityStatus = (typeof ACTIVITY_STATUS)[keyof typeof ACTIVITY_STATUS];
@@ -49,12 +55,14 @@ const STATUS_ALIASES: Record<ActivityStatus, string[]> = {
   [ACTIVITY_STATUS.FINALIZADA]: ['finalizada', 'finalizado', 'completada', 'completado'],
   [ACTIVITY_STATUS.RECHAZADA]: ['rechazada', 'rechazado'],
   [ACTIVITY_STATUS.CANCELADA]: ['cancelada', 'cancelado'],
+  [ACTIVITY_STATUS.NO_CUMPLIDA]: ['nocumplida', 'nocumplido', 'incumplida', 'incumplido'],
 };
 
 /** Estados que cierran la actividad: no consumen SLA ni cuentan como abiertas. */
 export const CLOSED_STATUSES: ActivityStatus[] = [
   ACTIVITY_STATUS.FINALIZADA,
   ACTIVITY_STATUS.CANCELADA,
+  ACTIVITY_STATUS.NO_CUMPLIDA,
 ];
 
 function normalizeKey(value: unknown): string {
@@ -94,6 +102,8 @@ export function statusVariants(status: ActivityStatus): string[] {
     else if (alias === 'envalidacion') out.add('En Validacion');
     else if (alias === 'pendientevalidacion') out.add('Pendiente Validacion');
     else if (alias === 'enproceso') out.add('En Proceso');
+    else if (alias === 'nocumplida') out.add('No cumplida');
+    else if (alias === 'nocumplido') out.add('No cumplido');
     else if (alias === 'enprogreso') {
       out.add('En Progreso');
       out.add('EN_PROGRESO');

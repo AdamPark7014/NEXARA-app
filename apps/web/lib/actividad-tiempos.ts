@@ -73,7 +73,7 @@ export function evaluarSemaforoActividad(params: {
   const cerrada =
     Boolean(params.cerrada) ||
     Boolean(aFecha(params.finRealAt)) ||
-    /finalizada|completada|cancelada|aprobada/i.test(params.estatus ?? "");
+    /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(params.estatus ?? "");
   if (cerrada || params.periodoEstado === "programada" || params.periodoEstado === "cerrada") return EN_TIEMPO;
 
   const iniciada = Boolean(aFecha(params.inicioRealAt)) || /proceso|validar/i.test(params.estatus ?? "");
@@ -194,6 +194,6 @@ export function puedeIniciar(a: {
 }): boolean {
   if (!a.aceptacion) return false;
   if (a.despachador) return false;
-  if (/finalizada|completada|cancelada|aprobada/i.test(a.estatus ?? "")) return false;
+  if (/finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(a.estatus ?? "")) return false;
   return !a.inicioRealAt;
 }

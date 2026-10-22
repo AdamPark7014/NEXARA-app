@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { appUrls } from '../common/app-urls.js';
+import { closedStatusVariants } from './activity-status.js';
 import {
   CLAVE_RECORDATORIO_ATRASO,
   decisionAvisoAtraso,
@@ -70,12 +71,19 @@ export class ActivityOverdueAlertsService {
     const filas = (await this.prisma.activity.findMany({
       where: {
         deletedAt: null,
+        // Solo lo abierto (y lo que hay que limpiar): con las cerradas en la lista, el lote de
+        // 400 se llenaba de historia y lo nuevo dejaba de revisarse.
         OR: [
           { overdueAlertedAt: { not: null } },
-          { fechaInicio: { lt: ahora } },
-          { fechaMaxima: { lt: ahora } },
-          { fechaEntregaEsperada: { lt: ahora } },
-          { periodoFin: { lt: hoy } },
+          {
+            estatus: { notIn: closedStatusVariants() },
+            OR: [
+              { fechaInicio: { lt: ahora } },
+              { fechaMaxima: { lt: ahora } },
+              { fechaEntregaEsperada: { lt: ahora } },
+              { periodoFin: { lt: hoy } },
+            ],
+          },
         ],
       },
       select: {

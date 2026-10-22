@@ -87,7 +87,10 @@ export function notificationKind(category?: string | null, title?: string | null
   // ATTENDANCE_ABSENCE (push `icon: falta_justificada`): «Tu falta del jue 17 sep quedó justificada».
   if (t.includes("falta del") && t.includes("justificada")) return "falta_justificada";
   if (c.startsWith("lunch") || t.includes("comida")) return "comida";
-  if (c === "sla-breach" || t.includes("vencid")) return "vencida";
+  // Cierre de jornada (push `icon: vencida`): «X: no cumplida» y «X cierra a las 18:00».
+  if (c === "sla-breach" || t.includes("vencid") || t.includes("no cumplida") || t.includes("cierra a las")) {
+    return "vencida";
+  }
   if (c === "sla-alert" || t.includes("atras") || t.includes("retras")) return "atraso";
   if (c === "attendance") {
     // ATTENDANCE_FLAGGED (push `icon: asistencia_alerta`): checada fuera de sitio, por revisar,

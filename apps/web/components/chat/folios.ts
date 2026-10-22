@@ -69,7 +69,7 @@ export function tonoDeEstado(estado: string | null | undefined): "proc" | "val" 
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
   if (!e) return "neu";
-  if (/(cancel|rechaz|vencid|perdid)/.test(e)) return "alta";
+  if (/(cancel|rechaz|vencid|perdid|no cumplid|incumplid)/.test(e)) return "alta";
   if (/(finaliz|complet|cerrad|aprob|firmad|ganad|aceptad)/.test(e)) return "fin";
   if (/(valid|revis|pendiente de|espera)/.test(e)) return "val";
   if (/(proceso|curso|enviad|asignad|progreso)/.test(e)) return "proc";

@@ -93,6 +93,8 @@ export type MyActivitiesResponse = {
   /** Ya repartidas por este usuario: da seguimiento. */
   seguimiento: MyActivityItem[];
   doneToday: MyActivityItem[];
+  /** Se cerraron sin entregarse en los últimos 7 días (cierre de jornada o registro de un superior). */
+  noCumplidas?: MyActivityItem[];
 };
 
 export type ReorderMyActivitiesInput = {

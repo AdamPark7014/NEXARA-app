@@ -19,6 +19,8 @@ import {
   type ChainActor,
 } from './activity-superiors.js';
 import { asignaEnTodaLaEmpresa, puedeAsignarA, tiposVisibles, type Alcanzador } from '../me/equipo-alcance.js';
+import { admiteRegistroManual, CAUSAS_INCUMPLIMIENTO, esNoCumplida, horaDeCierre } from './incumplimiento.js';
+import { leerIncumplimientos } from './incumplimiento-lectura.js';
 import { puedePedirApoyoEntreAreas } from './asignacion-departamento.js';
 
 /**
@@ -322,8 +324,9 @@ export class ActivityTeamService {
   }
 
   /**
-   * Qué puede hacer quien consulta como superior en esta actividad: cancelarla y a quién puede
-   * reemplazar («Pasar a otro compañero»). Web y apps solo muestran los botones que aplican.
+   * Qué puede hacer quien consulta como superior en esta actividad: cancelarla, registrarla como no
+   * cumplida o reprogramarla, y a quién puede reemplazar («Pasar a otro compañero»). Web y apps solo
+   * muestran los botones que aplican.
    */
   async superiorActions(activityId: number, actor: ChainActor, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
@@ -341,13 +344,18 @@ export class ActivityTeamService {
             responsable: id === chain.responsableId,
             ejecuta: ejecutores.has(id),
           }));
+    const superior = canCancelActivity(actor, chain);
     return {
       estatus: chain.estatus,
       cerrada,
-      puedeCancelar: !cerrada && canCancelActivity(actor, chain),
+      puedeCancelar: !cerrada && superior,
       puedePasar: personas.length > 0,
       personas,
       motivoMinimo: MOTIVO_MINIMO,
+      // No cumplida: registrarla mientras siga abierta; reprogramarla (reabrir) una vez cerrada así.
+      puedeRegistrarIncumplimiento: superior && admiteRegistroManual(chain.estatus),
+      puedeReprogramar: superior && esNoCumplida(chain.estatus),
+      causasIncumplimiento: CAUSAS_INCUMPLIMIENTO.map((c) => ({ clave: c.clave, etiqueta: c.etiqueta })),
     };
   }
 
@@ -741,6 +749,30 @@ export class ActivityTeamService {
         title: `Cancelada por ${activity.cancelledBy?.nombre ?? 'un superior'}`,
         subtitle: activity.cancelReason ? `Motivo: ${activity.cancelReason}` : undefined,
         icon: '🚫',
+      });
+    }
+
+    // Incumplimientos: el cierre de jornada sin entrega o el registro de un superior. Si después se
+    // reprogramó, la reapertura ya sale como cambio de agenda.
+    for (const inc of await leerIncumplimientos(this.prisma, activityId, tenantId)) {
+      const pendientes = inc.pendientes.map((p) => p.nombre).join(', ');
+      events.push({
+        id: `no-cumplida-${inc.id}`,
+        at: inc.registradoAt,
+        kind: 'no_cumplida',
+        title:
+          inc.origen === 'CIERRE_JORNADA'
+            ? `No cumplida: sin entrega al cierre de la jornada${inc.limite ? ` (${horaDeCierre(new Date(inc.limite))})` : ''}`
+            : `Registrada como no cumplida por ${inc.registradoPor?.nombre ?? 'un superior'}`,
+        subtitle:
+          [
+            inc.origen === 'MANUAL' ? `Causa: ${inc.causaEtiqueta}` : null,
+            inc.observaciones,
+            pendientes ? `Pendiente de: ${pendientes}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || undefined,
+        icon: '⛔',
       });
     }
 

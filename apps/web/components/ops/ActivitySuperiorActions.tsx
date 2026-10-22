@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Modal from "@/components/ui/Modal";
-import { Alert, Button, Field, Select, Textarea } from "@/components/base";
+import { Alert, Button, Field, Input, Select, Textarea } from "@/components/base";
 import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { fetchTeamBoard } from "@/lib/team-board-api";
 import {
@@ -12,9 +12,13 @@ import {
   getActivitySuperiorActions,
   listAssignableUsers,
   reassignActivity,
+  registrarIncumplimiento,
+  reprogramarNoCumplida,
   type ActivitySuperiorActions as Acciones,
 } from "@/lib/ops-activities-api";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import EditCalendarOutlinedIcon from "@mui/icons-material/EditCalendarOutlined";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { MoreMenu, type MenuAction } from "./_piezas";
 import s from "./ActivitySuperiorActions.module.css";
@@ -39,14 +43,38 @@ type Props = {
 
 const MOTIVO_MIN = 10;
 
+type Dialogo = "cancelar" | "pasar" | "incumplimiento" | "reprogramar";
+
+/** Si la API no manda el catálogo (servidor viejo), el mismo de `incumplimiento.ts`. */
+const CAUSAS_RESPALDO = [
+  { clave: "SIN_ENTREGA", etiqueta: "Sin entrega al cierre de la jornada" },
+  { clave: "MATERIAL", etiqueta: "Falta de material, herramienta o equipo" },
+  { clave: "ACCESO", etiqueta: "Sin acceso al sitio o cliente no disponible" },
+  { clave: "PERSONAL", etiqueta: "Personal asignado no disponible" },
+  { clave: "PLANEACION", etiqueta: "Alcance o tiempo mal planeado" },
+  { clave: "CALIDAD", etiqueta: "La entrega no cumple lo solicitado" },
+  { clave: "OTRA", etiqueta: "Otra causa" },
+];
+
+/** Mañana a las 10:00, en el formato de `datetime-local`. */
+function mananaALasDiez(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}T10:00`;
+}
+
 /**
- * «Cancelar actividad» y «Pasar a otro compañero». Solo se muestran a los superiores de quien la
- * ejecuta (la API responde qué puede hacer quien consulta y vuelve a validarlo al guardar).
+ * «Cancelar actividad», «Registrar incumplimiento», «Reprogramar» y «Pasar a otro compañero».
+ * Solo se muestran a los superiores de quien la ejecuta (la API responde qué puede hacer quien
+ * consulta y vuelve a validarlo al guardar).
  */
 export default function ActivitySuperiorActions({ activityId, token, onDone, extra, menuItems, actionsTarget }: Props) {
   const [acciones, setAcciones] = useState<Acciones | null>(null);
-  const [dialogo, setDialogo] = useState<"cancelar" | "pasar" | null>(null);
+  const [dialogo, setDialogo] = useState<Dialogo | null>(null);
   const [motivo, setMotivo] = useState("");
+  const [causa, setCausa] = useState("");
+  const [fecha, setFecha] = useState("");
   const [deUsuarioId, setDeUsuarioId] = useState<number | "">("");
   const [aUsuarioId, setAUsuarioId] = useState<number | "">("");
   const [companeros, setCompaneros] = useState<Companero[]>([]);
@@ -93,8 +121,10 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
     }
   }, [token]);
 
-  const abrir = (tipo: "cancelar" | "pasar") => {
+  const abrir = (tipo: Dialogo) => {
     setMotivo("");
+    setCausa("");
+    setFecha(tipo === "reprogramar" ? mananaALasDiez() : "");
     setError(null);
     setAviso(null);
     setAUsuarioId("");
@@ -123,6 +153,41 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
     }
   };
 
+  const confirmarIncumplimiento = async () => {
+    if (!motivoOk || !causa) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await registrarIncumplimiento(token, activityId, causa, motivo.trim());
+      setDialogo(null);
+      setAviso("Quedó registrada como no cumplida. Avisamos a quienes la tenían, al responsable y a sus jefes.");
+      await cargar();
+      onDone();
+    } catch (e) {
+      setError(apiErrorMessage(e, "No se pudo registrar el incumplimiento"));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const fechaOk = Boolean(fecha) && !Number.isNaN(new Date(fecha).getTime());
+  const confirmarReprogramar = async () => {
+    if (!motivoOk || !fechaOk) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await reprogramarNoCumplida(token, activityId, new Date(fecha).toISOString(), motivo.trim());
+      setDialogo(null);
+      setAviso("La actividad se reabrió con la nueva fecha. El incumplimiento queda en su historial.");
+      await cargar();
+      onDone();
+    } catch (e) {
+      setError(apiErrorMessage(e, "No se pudo reprogramar la actividad"));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const confirmarPasar = async () => {
     if (!motivoOk || !deUsuarioId || !aUsuarioId) return;
     setGuardando(true);
@@ -145,8 +210,23 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
     }
   };
 
-  const haySuperiores = Boolean(acciones && (acciones.puedeCancelar || acciones.puedePasar));
+  const haySuperiores = Boolean(
+    acciones &&
+      (acciones.puedeCancelar || acciones.puedePasar || acciones.puedeRegistrarIncumplimiento || acciones.puedeReprogramar),
+  );
+  const causas = acciones?.causasIncumplimiento?.length ? acciones.causasIncumplimiento : CAUSAS_RESPALDO;
   const menu: MenuAction[] = [
+    ...(acciones?.puedeRegistrarIncumplimiento
+      ? [
+          {
+            id: "incumplimiento",
+            label: "Registrar incumplimiento",
+            danger: true,
+            icon: <EventBusyOutlinedIcon fontSize="inherit" />,
+            onSelect: () => abrir("incumplimiento"),
+          },
+        ]
+      : []),
     ...(acciones?.puedeCancelar
       ? [
           {
@@ -173,6 +253,15 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
     <>
       <MoreMenu items={menu} label="Más acciones de la actividad" />
       {extra}
+      {acciones?.puedeReprogramar ? (
+        <Button
+          variant="primary"
+          onClick={() => abrir("reprogramar")}
+          iconStart={<EditCalendarOutlinedIcon fontSize="inherit" />}
+        >
+          Reprogramar
+        </Button>
+      ) : null}
       {acciones?.puedePasar ? (
         <Button variant="secondary" onClick={() => abrir("pasar")} iconStart={<SwapHorizIcon fontSize="inherit" />}>
           Pasar a otro compañero
@@ -217,6 +306,104 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
               rows={4}
               maxLength={400}
               placeholder="Ej. El cliente pospuso el servicio hasta nuevo aviso."
+            />
+          </Field>
+          {error ? (
+            <Alert tone="danger" role="alert">
+              {error}
+            </Alert>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        open={dialogo === "incumplimiento"}
+        onClose={() => !guardando && setDialogo(null)}
+        title="Registrar incumplimiento"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setDialogo(null)} disabled={guardando}>
+              Volver
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void confirmarIncumplimiento()}
+              disabled={!motivoOk || !causa}
+              loading={guardando}
+            >
+              Registrar como no cumplida
+            </Button>
+          </>
+        }
+      >
+        <div className={s.cuerpo}>
+          <p className={s.nota}>
+            La actividad se cierra como «No cumplida» y cuenta en los indicadores de cumplimiento de quienes no la
+            entregaron. Queda en su historial con la causa y tus observaciones; si el trabajo sigue pendiente, después
+            puedes reprogramarla.
+          </p>
+          <Field label="Causa" required>
+            <Select value={causa} onChange={(e) => setCausa(e.target.value)}>
+              <option value="">Elige la causa</option>
+              {causas.map((c) => (
+                <option key={c.clave} value={c.clave}>
+                  {c.etiqueta}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Observaciones" required hint={contador}>
+            <Textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={4}
+              maxLength={400}
+              placeholder="Ej. No se presentó al sitio y no avisó; el cliente reportó que nadie llegó."
+            />
+          </Field>
+          {error ? (
+            <Alert tone="danger" role="alert">
+              {error}
+            </Alert>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        open={dialogo === "reprogramar"}
+        onClose={() => !guardando && setDialogo(null)}
+        title="Reprogramar actividad no cumplida"
+        footer={
+          <>
+            <Button variant="tertiary" onClick={() => setDialogo(null)} disabled={guardando}>
+              Volver
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void confirmarReprogramar()}
+              disabled={!motivoOk || !fechaOk}
+              loading={guardando}
+            >
+              Reprogramar
+            </Button>
+          </>
+        }
+      >
+        <div className={s.cuerpo}>
+          <p className={s.nota}>
+            Se reabre con la nueva fecha y el equipo recibe el aviso. El incumplimiento anterior no se borra: sigue
+            contando en los indicadores.
+          </p>
+          <Field label="Nueva fecha y hora" required>
+            <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </Field>
+          <Field label="Motivo" required hint={contador}>
+            <Textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={3}
+              maxLength={400}
+              placeholder="Ej. Llegó el material faltante; se ejecuta mañana a primera hora."
             />
           </Field>
           {error ? (

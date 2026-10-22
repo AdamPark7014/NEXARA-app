@@ -23,6 +23,8 @@ export function priorityUi(p?: string | null) {
 
 /** Estatus del backend → etiqueta clara para campo. */
 export const ESTATUS_UI: Array<[RegExp, LabelUi]> = [
+  // Antes que todo: «No cumplida» es cierre por falla (sin entrega al cierre de jornada o registro de un superior).
+  [/no cumplida|incumplida/i, { label: "No cumplida", color: "#b91c1c", tone: "danger" }],
   [/proceso/i, { label: "En curso", color: "#2563eb", tone: "info" }],
   [/validar/i, { label: "En revisión", color: "#7c3aed", tone: "violet" }],
   [/rechazada/i, { label: "Te la regresaron", color: "#dc2626", tone: "danger" }],

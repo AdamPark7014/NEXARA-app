@@ -271,13 +271,18 @@ export const ASISTENTE_IA_URL_RULES: UrlRule[] = [
 ];
 
 /**
- * Cancelar una actividad o pasarla a otro compañero, para roles de dirección y administración que
- * no tienen escritura general sobre actividades. El servicio exige ser superior de quien la ejecuta.
+ * Cancelar una actividad, registrarla como no cumplida, reprogramarla o pasarla a otro compañero,
+ * para roles de dirección y administración que no tienen escritura general sobre actividades. El
+ * servicio exige ser superior de quien la ejecuta.
  */
 export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
   { path: '/api/activities/*/acciones', methods: ['GET'], scope: 'read' },
   { path: '/api/activities/*/cancelar', methods: ['POST'], scope: 'approve' },
   { path: '/api/activities/*/reasignar', methods: ['POST'], scope: 'approve' },
+  // Registrar que no se cumplió y reabrirla con fecha nueva: mismos superiores que cancelar.
+  { path: '/api/activities/*/no-cumplida', methods: ['POST'], scope: 'approve' },
+  { path: '/api/activities/*/reprogramar', methods: ['POST'], scope: 'approve' },
+  { path: '/api/activities/*/incumplimientos', methods: ['GET'], scope: 'read' },
 ];
 
 /**

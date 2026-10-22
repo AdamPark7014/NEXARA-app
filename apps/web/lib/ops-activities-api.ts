@@ -99,6 +99,8 @@ export type ActivityDetail = {
   cancelledAt?: string | null;
   cancelledById?: number | null;
   cancelledBy?: { id: number; nombre: string } | null;
+  /** Último incumplimiento: vigente si el estatus es «No cumplida»; historial si ya se reprogramó. */
+  incumplimiento?: Incumplimiento | null;
   /** Periodo de varios días (días `AAAA-MM-DD`); la API manda también `periodo` ya calculado. */
   periodoInicio?: string | null;
   periodoFin?: string | null;
@@ -252,6 +254,42 @@ export function cancelActivity(token: string, activityId: number, motivo: string
   });
 }
 
+/** Registrar que no se cumplió, con causa y observaciones (mín. 10): solo superiores de quien la ejecuta. */
+export function registrarIncumplimiento(token: string, activityId: number, causa: string, observaciones: string) {
+  return apiFetch<ActivityDetail>(`activities/${activityId}/no-cumplida`, token, {
+    method: "POST",
+    body: JSON.stringify({ causa, observaciones }),
+  });
+}
+
+/** Reabrir una no cumplida con fecha nueva (ISO) y motivo. El incumplimiento queda registrado. */
+export function reprogramarNoCumplida(token: string, activityId: number, fecha: string, motivo: string) {
+  return apiFetch<ActivityDetail>(`activities/${activityId}/reprogramar`, token, {
+    method: "POST",
+    body: JSON.stringify({ fecha, motivo }),
+  });
+}
+
+/** Registro de incumplimiento (cierre de jornada sin entrega o registro de un superior). */
+export type Incumplimiento = {
+  id: number;
+  origen: "CIERRE_JORNADA" | "MANUAL";
+  causa: string;
+  causaEtiqueta: string;
+  observaciones: string | null;
+  limite: string | null;
+  registradoAt: string;
+  /** null = el sistema, al cierre de la jornada. */
+  registradoPor: { id: number; nombre: string } | null;
+  pendientes: Array<{ id: number; nombre: string }>;
+  reprogramadaAt: string | null;
+  reprogramadaPara: string | null;
+  reprogramadaPor: { id: number; nombre: string } | null;
+  motivoReprogramacion: string | null;
+};
+
+export type CausaIncumplimiento = { clave: string; etiqueta: string };
+
 export type ActivitySuperiorActions = {
   estatus: string;
   cerrada: boolean;
@@ -260,6 +298,10 @@ export type ActivitySuperiorActions = {
   /** Personas cuyo trabajo puede pasar a otro compañero quien consulta. */
   personas: Array<{ userId: number; nombre: string; rol: string; responsable: boolean; ejecuta: boolean }>;
   motivoMinimo: number;
+  /** Puede registrarla como no cumplida (sigue abierta) o reabrirla con fecha nueva (ya no cumplida). */
+  puedeRegistrarIncumplimiento?: boolean;
+  puedeReprogramar?: boolean;
+  causasIncumplimiento?: CausaIncumplimiento[];
 };
 
 export function getActivitySuperiorActions(token: string, activityId: number) {

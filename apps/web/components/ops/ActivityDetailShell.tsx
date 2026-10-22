@@ -110,6 +110,7 @@ export function pasosDeActividad(activity: ActivityDetail): RecordStep[] {
   const iniciada = Boolean(inicioReal) || /proceso|curso|rechaz/i.test(estatus) || enRevision;
   const enSitio = Boolean(llegada) || enRevision;
   const cancelada = /cancel/i.test(estatus);
+  const noCumplida = /no cumplida|incumplida/i.test(estatus);
 
   const alcanzados = [true, iniciada, enSitio, enRevision, completada];
   let fase = 0;
@@ -126,12 +127,14 @@ export function pasosDeActividad(activity: ActivityDetail): RecordStep[] {
       label: "En revisión",
       hint: enRevision ? corta(activity.activityEvidence?.completedAt) ?? "Enviada" : "Falta enviar",
     },
-    { id: "completada", label: "Completada", hint: completada ? corta(activity.fechaFinalizacion) ?? "Aprobada" : null },
+    noCumplida
+      ? { id: "completada", label: "No cumplida", hint: "Cerrada sin entrega" }
+      : { id: "completada", label: "Completada", hint: completada ? corta(activity.fechaFinalizacion) ?? "Aprobada" : null },
   ];
 
   return base.map((p, i) => {
     let state: RecordStep["state"] = "pending";
-    if (i < fase || (i === fase && (completada || cancelada))) state = "done";
+    if (i < fase || (i === fase && (completada || cancelada || noCumplida))) state = "done";
     else if (i === fase) state = "current";
     return { id: p.id, label: p.label, hint: p.hint ?? undefined, state };
   });
@@ -329,7 +332,7 @@ export default function ActivityDetailShell({
   /* Quién mira: quien ejecuta (captura), quien reparte o quien revisa. */
   const estatus = activity.estatus ?? "";
   const { miFila, despacho, mostrarIniciar, puedeCapturar: ejecuta } = quienMira(activity, user, core);
-  const cerrada = /validar|validaci|finaliz|complet|aprobad|cancel/i.test(estatus);
+  const cerrada = /validar|validaci|finaliz|complet|aprobad|cancel|no cumplida|incumplida/i.test(estatus);
   const porRevisar = /validar|validaci/i.test(estatus);
 
   const iniciar = async () => {

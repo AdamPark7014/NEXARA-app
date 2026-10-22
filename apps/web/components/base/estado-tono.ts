@@ -10,6 +10,7 @@ import type { Tone } from "./piezas";
  */
 export const STATUS_TONE_RULES: ReadonlyArray<readonly [RegExp, Tone]> = [
   [/cancelad/i, "neutral"],
+  [/no cumplid|incumplid/i, "danger"],
   [/rechazad|regresaron|denegad/i, "danger"],
   [/atrasad|retrasad|vencid|\bfalta\b|faltó|sin señal|\berror\b|fallid|\bfalla\b/i, "danger"],
   [/\bvence\b|por vencer|retardo|riesgo|stock bajo|bajo m[ií]nimo/i, "warning"],
