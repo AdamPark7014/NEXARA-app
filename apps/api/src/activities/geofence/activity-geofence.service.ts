@@ -7,7 +7,7 @@ import { exigeMismaUbicacionPorTipo } from './misma-ubicacion.js';
 import { puedeVerGpsDireccion } from '../../attendance/asistencia-confiable.js';
 
 /** Estatus de actividad que ya no se siguen. */
-const CERRADAS = ['Finalizada', 'Cancelada', 'Completada'];
+const CERRADAS = ['Finalizada', 'Cancelada', 'Completada', 'No cumplida'];
 
 type AlertaFila = {
   id: number;

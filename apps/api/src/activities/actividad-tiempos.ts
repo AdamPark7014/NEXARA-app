@@ -263,7 +263,7 @@ export function tiemposDto(
 
 /** Estatus cerrados (mismo criterio que el resto de actividades). */
 export function esCerrada(estatus?: string | null): boolean {
-  return /finalizada|completada|cancelada|aprobada/.test(String(estatus ?? '').toLowerCase());
+  return /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/.test(String(estatus ?? '').toLowerCase());
 }
 
 /** `horasPlan` válido para guardar (Decimal 6,2): entre 0 y 999.99 horas, o null. */

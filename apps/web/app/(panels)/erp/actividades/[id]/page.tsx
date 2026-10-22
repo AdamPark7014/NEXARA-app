@@ -17,6 +17,7 @@ import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/C
 import ArchivosDeActividad from "@/components/erp/ArchivosDeActividad";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
+import AvisoIncumplimiento from "@/components/ops/AvisoIncumplimiento";
 import { quienMira, useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -394,6 +395,7 @@ export default function ActivityDetailPage() {
           {activity.cancelReason ? `Motivo: ${activity.cancelReason}` : null}
         </Alert>
       ) : null}
+      {activity.incumplimiento ? <AvisoIncumplimiento estatus={activity.estatus} inc={activity.incumplimiento} /> : null}
       {missingEvidence && missingEvidence.length > 0 ? (
         <Alert
           tone="warning"

@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ActivityTeamService, type AssigneeRole } from './activity-team.service.js';
+import { ActivityNonComplianceService } from './activity-non-compliance.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -86,7 +87,56 @@ export class ActivityTeamController {
 @Controller('activities/:id')
 @UseGuards(AuthGuard('jwt'), RbacGuard)
 export class ActivityReassignController {
-  constructor(private readonly service: ActivityTeamService) {}
+  constructor(
+    private readonly service: ActivityTeamService,
+    private readonly incumplimientos: ActivityNonComplianceService,
+  ) {}
+
+  /**
+   * Registrar que no se cumplió, con causa y observaciones (mín. 10). Mismo guard amplio que
+   * cancelar: quién puede (superiores de quien la ejecuta) lo decide el servicio.
+   */
+  @Post('no-cumplida')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  noCumplida(
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: { causa?: string; observaciones?: string },
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.incumplimientos.registrar(
+      activityId,
+      body ?? {},
+      { id: Number(user?.id), email: user?.email ?? null },
+      companyId,
+    );
+  }
+
+  /** Reabrir una actividad no cumplida con fecha nueva y motivo. El incumplimiento queda registrado. */
+  @Post('reprogramar')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  reprogramar(
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: { fecha?: string; motivo?: string },
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.incumplimientos.reprogramar(
+      activityId,
+      body ?? {},
+      { id: Number(user?.id), email: user?.email ?? null },
+      companyId,
+    );
+  }
+
+  @Get('incumplimientos')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE] })
+  incumplimientosDe(
+    @Param('id', ParseIntPipe) activityId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.incumplimientos.historial(activityId, companyId);
+  }
 
   /**
    * «Pasar a otro compañero» con motivo. Guard amplio a propósito: un encargado sin

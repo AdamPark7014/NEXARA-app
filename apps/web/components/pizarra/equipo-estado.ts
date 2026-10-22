@@ -424,6 +424,7 @@ export function estadoDeActividad(a: {
 }): string {
   const est = (a.estatus || "").toLowerCase();
   if (/cancel/.test(est)) return "Cancelada";
+  if (/no cumplida|incumplida/.test(est)) return "No cumplida";
   if (/finaliz|complet|aprob/.test(est)) return "Terminada";
   if (a.atrasada || a.semaforo === "rojo" || /atraso/i.test(a.periodo?.etiqueta || "")) {
     const t = formatMinutes(a.minutosAtraso);

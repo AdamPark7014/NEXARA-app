@@ -741,7 +741,7 @@ export class TeamBoardService {
     return activities.map((a) => {
       const ev = a.activityEvidences[0] ?? null;
       const fila = porActividad.get(a.id) ?? null;
-      const cerrada = /finalizada|completada|cancelada|aprobada/i.test(a.estatus || '');
+      const cerrada = /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(a.estatus || '');
       const tiempos = tiemposReales({
         inicioRealAt: fechaOpcional(fila, 'inicioRealAt'),
         finRealAt: fechaOpcional(fila, 'finRealAt'),
@@ -869,7 +869,7 @@ export class TeamBoardService {
       const act = fila.activity;
       if (!act) continue;
       const ev = act.activityEvidences.find((e) => e.userId === fila.userId) ?? null;
-      const cerrada = /finalizada|completada|cancelada|aprobada/i.test(act.estatus || '');
+      const cerrada = /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(act.estatus || '');
       const tiempos = tiemposReales({
         inicioRealAt: fechaOpcional(fila, 'inicioRealAt'),
         finRealAt: fechaOpcional(fila, 'finRealAt'),
@@ -1029,7 +1029,9 @@ export class TeamBoardService {
         s.includes('finalizada') ||
         s.includes('completada') ||
         s.includes('cancelada') ||
-        s.includes('aprobada')
+        s.includes('aprobada') ||
+        s.includes('no cumplida') ||
+        s.includes('incumplida')
       );
     };
 

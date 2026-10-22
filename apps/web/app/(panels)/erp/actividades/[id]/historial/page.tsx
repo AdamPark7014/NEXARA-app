@@ -34,6 +34,7 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 
 /** La API manda `icon` como emoji; lo traducimos por code point a un icono MUI. */
 const TIMELINE_ICON_BY_CODEPOINT: Record<number, SvgIconComponent> = {
@@ -55,6 +56,7 @@ const TIMELINE_ICON_BY_CODEPOINT: Record<number, SvgIconComponent> = {
   0x1f4dd: DescriptionOutlinedIcon, // hoja de servicio
   0x1f4f8: PhotoCameraOutlinedIcon, // evidencia revisada
   0x1f6ab: BlockOutlinedIcon, // cancelada (con motivo)
+  0x26d4: EventBusyOutlinedIcon, // no cumplida (cierre de jornada o registro de un superior)
 };
 
 const TIMELINE_ICON_BY_KIND: Record<string, SvgIconComponent> = {
@@ -72,6 +74,7 @@ const TIMELINE_ICON_BY_KIND: Record<string, SvgIconComponent> = {
   cumplida: TaskAltIcon,
   revision: RateReviewOutlinedIcon,
   cancelada: BlockOutlinedIcon,
+  no_cumplida: EventBusyOutlinedIcon,
 };
 
 function timelineIcon(ev: ActivityTimelineEvent): SvgIconComponent {
@@ -79,9 +82,10 @@ function timelineIcon(ev: ActivityTimelineEvent): SvgIconComponent {
   return (cp !== undefined ? TIMELINE_ICON_BY_CODEPOINT[cp] : undefined) ?? TIMELINE_ICON_BY_KIND[ev.kind] ?? ScheduleOutlinedIcon;
 }
 
-/** El suceso más reciente va resaltado; una cancelación o una incidencia, en rojo. */
+/** El suceso más reciente va resaltado; una cancelación, un incumplimiento o una incidencia, en rojo. */
 function timelineState(ev: ActivityTimelineEvent, idx: number): TimelineState {
-  if (/cancel/i.test(ev.kind)) return "danger";
+  // Antes que /cumplida/: «no_cumplida» no es un logro.
+  if (/cancel|no_cumplida/i.test(ev.kind)) return "danger";
   if (idx === 0) return "current";
   if (/cumplida|revision/i.test(ev.kind)) return "done";
   return "default";

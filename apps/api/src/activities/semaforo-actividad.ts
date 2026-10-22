@@ -232,7 +232,7 @@ function estatusArrancado(estatus?: string | null): boolean {
 }
 
 function esEstatusCerrado(estatus?: string | null): boolean {
-  return /finalizada|completada|cancelada|aprobada/i.test(estatus ?? '');
+  return /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(estatus ?? '');
 }
 
 function aFecha(valor?: Date | string | null): Date | null {

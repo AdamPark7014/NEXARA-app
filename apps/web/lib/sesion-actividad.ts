@@ -36,7 +36,8 @@ export const MENSAJE_TOPE_12H =
 export const MOTIVO_PAUSA_MIN = 10;
 export const MOTIVO_PAUSA_MAX = 500;
 
-const cerrada = (estatus?: string | null) => /finalizada|completada|cancelada|aprobada/i.test(estatus ?? "");
+const cerrada = (estatus?: string | null) =>
+  /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(estatus ?? "");
 
 const primerNombre = (nombre?: string | null) => (nombre ?? "").trim().split(/\s+/).slice(0, 2).join(" ");
 

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityLinkService } from '../identity/identity-link.service';
 import { IntegraPushService } from './integra-push.service';
 
-const CLOSED_ACTIVITY = /finaliz|completad|cancelad|aprobad|approved/i;
+const CLOSED_ACTIVITY = /finaliz|completad|cancelad|aprobad|approved|no cumplida|incumplid/i;
 const OPEN_LEAD = ['NEW', 'QUALIFIED', 'NURTURING'] as const;
 const OPEN_OPP = [
   'DISCOVERY',

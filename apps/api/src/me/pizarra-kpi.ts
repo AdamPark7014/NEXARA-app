@@ -67,14 +67,22 @@ export function estatusArrancado(estatus?: string | null): boolean {
   return /proceso|validar/i.test(estatus ?? '');
 }
 
-/** ¿El estatus dice que ya se cerró? */
+/** ¿Se cerró como no cumplida? (`incumplimiento.ts`) */
+export function estatusNoCumplida(estatus?: string | null): boolean {
+  const s = sinAcentos(estatus ?? '');
+  return s.includes('no cumplida') || s.includes('incumplida');
+}
+
+/** ¿El estatus dice que ya se cerró? (incluye las no cumplidas: cerradas, pero sin entregar) */
 export function estatusCerrado(estatus?: string | null): boolean {
   const s = sinAcentos(estatus ?? '');
   return (
     s.includes('finalizada') ||
     s.includes('completada') ||
     s.includes('cancelada') ||
-    s.includes('aprobada')
+    s.includes('aprobada') ||
+    s.includes('no cumplida') ||
+    s.includes('incumplida')
   );
 }
 
@@ -170,6 +178,8 @@ export type ActividadCalculada = {
   iniciada: boolean;
   terminada: boolean;
   cancelada: boolean;
+  /** Se cerró sin entregarse (cierre de jornada o registro de un superior): cuenta como falla. */
+  noCumplida: boolean;
   rechazada: boolean;
   retirado: boolean;
   /** Solo cuando terminó: ¿cerró dentro de su fecha máxima? Sin fecha máxima cuenta a tiempo. */
@@ -187,7 +197,9 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
   const prioridad = normalizaPrioridad(act.prioridad);
   const inicio = act.inicio ?? null;
   const fin = act.fin ?? null;
-  const terminada = Boolean(act.terminada);
+  const noCumplida = estatusNoCumplida(act.estatus);
+  // Una no cumplida está cerrada pero no terminada: nadie la entregó.
+  const terminada = Boolean(act.terminada) && !noCumplida;
   const cancelada = Boolean(act.cancelada);
   const minutosPlan = act.minutosPlan ?? null;
   // Antes era `fin − inicio` de corrido: una actividad de varios días sumaba noches enteras.
@@ -215,7 +227,7 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
     inicioRealAt: inicio,
     finRealAt: fin,
     estatus: act.estatus,
-    cerrada: terminada,
+    cerrada: terminada || noCumplida,
     cancelada,
     periodo,
     minutosPlan,
@@ -236,6 +248,7 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
     iniciada,
     terminada,
     cancelada,
+    noCumplida,
     rechazada: act.rechazadaAt != null,
     retirado: Boolean(act.retirado),
     aTiempo: terminada ? !vencida : null,
@@ -327,6 +340,8 @@ export type KpisPersona = {
   minutosEnActividad: number;
   productividadPct: number | null;
   rechazadas: number;
+  /** Se cerraron sin entregarse. Siguen contando en `asignadas`, nunca en `cerradas`. */
+  noCumplidas: number;
 };
 
 function pct(numerador: number, denominador: number): number | null {
@@ -379,6 +394,7 @@ export function kpisDePersona(
     minutosEnActividad,
     productividadPct: minutos && minutos > 0 ? pct(minutosEnActividad, minutos) : null,
     rechazadas: actividades.filter((a) => a.rechazada && !a.cancelada).length,
+    noCumplidas: propias.filter((a) => a.noCumplida).length,
   };
 }
 

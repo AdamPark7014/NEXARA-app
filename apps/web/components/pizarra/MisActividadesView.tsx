@@ -13,6 +13,7 @@ import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CheckIcon from "@mui/icons-material/Check";
@@ -142,6 +143,7 @@ export default function MisActividadesPage() {
 
   const open = data?.open ?? [];
   const done = data?.doneToday ?? [];
+  const noCumplidas = data?.noCumplidas ?? [];
   const seguimiento = data?.seguimiento ?? [];
   const urgentes = open.filter((a) => priorityUi(a.prioridad).label === "Urgente").length;
   const canReorder = Boolean(data?.canReorder) && open.length > 1;
@@ -620,6 +622,28 @@ export default function MisActividadesPage() {
               ))}
             </ul>
           ) : null}
+        </Card>
+      ) : null}
+
+      {noCumplidas.length ? (
+        <Card pad={false} className={m.bloque}>
+          <div className={m.bloqueCabeza}>
+            <CardHead
+              title={`No cumplidas (${noCumplidas.length})`}
+              subtitle="Se cerraron sin entregarse en los últimos 7 días. Si el trabajo sigue pendiente, tu superior puede reprogramarlas."
+            />
+          </div>
+          <ul className={m.hechas}>
+            {noCumplidas.map((a) => (
+              <li key={a.id}>
+                <Link className={m.hecha} href={`/erp/actividades/${a.id}`}>
+                  <EventBusyOutlinedIcon aria-hidden="true" className={m.hechaIco} />
+                  <span className={m.hechaTitulo}>{a.titulo}</span>
+                  <span className={m.hechaHora}>{formatWhen(a.fechaInicio ?? a.fechaAsignacion) ?? "No cumplida"}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
 

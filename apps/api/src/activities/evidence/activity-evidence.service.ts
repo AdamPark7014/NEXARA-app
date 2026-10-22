@@ -25,6 +25,7 @@ import {
   RADIO_SITIO_M,
 } from '../actividad-tiempos.js';
 import { distanciaAlSitio, sitioDeActividad, type PrismaSitio } from '../sitio-actividad.js';
+import { esNoCumplida } from '../incumplimiento.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import {
   clampEvidencePhotoRequired,
@@ -436,6 +437,11 @@ export class ActivityEvidenceService {
     }
     if (/cancel/i.test(activity.estatus || '')) {
       throw new ForbiddenException('La actividad fue cancelada y ya no recibe evidencias');
+    }
+    if (esNoCumplida(activity.estatus)) {
+      throw new ForbiddenException(
+        'La actividad quedó como no cumplida y ya no recibe evidencias; tu superior puede reprogramarla',
+      );
     }
 
     // Quien pasó la actividad a otro compañero ya no sube evidencia: su avance quedó guardado.
