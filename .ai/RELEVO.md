@@ -1,5 +1,23 @@
 # RELEVO
 
+- **22-10 ~15:40 (claude-code) — «No cumplida» al cierre de jornada (desplegado) + propuesta del evaluador IA.**
+  - Adam: «cualquier actividad que no se acabe después de la jornada laboral se toma como incumplida… y que se
+    pueda poner que una actividad no se cumplió, pero mucho más profesional».
+  - Commit `5d800f59`, desplegado con `--with-migrate` (migración `20261022200000_actividad_no_cumplida`
+    aplicada; web compiló con revisión de tipos). Estatus «No cumplida» + tabla `activity_non_compliances`.
+  - Cron cada 5 min (`ActivityNonComplianceService`): cierre = salida más tarde de quienes la ejecutan (18:00 por
+    omisión), aviso 1 h antes, «Por Validar» nunca se cierra, solo lo que vence desde el 22-10. Simulación de solo
+    lectura en producción: 10 actividades de hoy cerraban a las 18:00 si no se entregaban; las 6 vencidas antes
+    (AN-0009, 0189, 0232, 0241, 0249 y AN-0001 sin fecha) siguen abiertas a propósito: Adam decide.
+  - Superiores: «Registrar incumplimiento» (causa + observaciones) y «Reprogramar» (reabre; el registro queda).
+    KPIs: cuenta como «sin entregar». Web: etiqueta roja, diálogos, aviso en detalle, historial, «No cumplidas» en
+    Mis actividades. No verificado visualmente (sin sesión en el panel).
+  - Bug corregido de paso: el aviso de atrasos leía 400 actividades incluyendo cerradas (con >400 dejaba de avisar).
+  - **Propuesta** `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` (complejidad + tiempo estándar, integridad, evaluador IA):
+    esperando 4 decisiones de Adam; no construir antes.
+  - Main local y remoto quedaron reconciliados (rebase; la versión local de reuniones del 12-10 se guardó en
+    `.ai/salvado/2026-10-12-reuniones-local/` y en `git stash`, sin aplicar: Adam decide).
+
 - **19-10 ~11:30 (claude-code) — Cuarto rechazo iOS (12-10, 2.3.10) diagnosticado: captura de iPad con imagen Android.**
   - Adam: «revisa el nuevo rechazo… y verifica cómo ajustar todo para que no nos vuelvan a rechazar».
   - Build 1.0.0 (10) rechazado el 12-10 (iPad Air M3) por «non-iOS status bar images». Apple adjuntó la imagen
