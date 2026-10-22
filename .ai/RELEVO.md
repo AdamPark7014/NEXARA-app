@@ -19,6 +19,8 @@
     **1.0.0 (10) «Pendiente de revisión»**. Nada que hacer hasta que Apple conteste.
   - **22-10: APROBADA.** La versión 1.0 está en `PENDING_DEVELOPER_RELEASE` (lanzamiento manual): falta pulsar
     «Publicar esta versión» en ASC para que salga en la App Store. Adam decide cuándo.
+  - **22-10 ~10:20: PUBLICADA.** Adam autorizó; Claude pulsó «Publicar esta versión» (175 países). Estado
+    `READY_FOR_DISTRIBUTION`; la ficha https://apps.apple.com/mx/app/id6814597698 tarda unas horas en aparecer.
   - Los 14 archivos de reuniones sin commitear son del turno anterior: no se tocaron. **main local y remoto
     divergieron** (remoto: `63accdee` reuniones 12-10 + `399cd877` asistencia 14-10; local: `283ce9b6` + docs
     `f66b13c7`); los cambios sin commitear NO coinciden con lo del remoto. Adam decide cómo reconciliar; los
