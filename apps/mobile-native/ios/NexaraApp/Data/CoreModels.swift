@@ -611,7 +611,7 @@ struct MyActivityItem: Decodable, Identifiable, Hashable {
         guard let aceptacion, !aceptacion.isEmpty else { return false }
         if despachador == true { return false }
         let cerrada = (estatus ?? "").range(
-            of: "finalizada|completada|cancelada|aprobada",
+            of: "finalizada|completada|cancelada|aprobada|no cumplida|incumplida",
             options: [.regularExpression, .caseInsensitive]
         ) != nil
         if cerrada { return false }

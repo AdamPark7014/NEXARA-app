@@ -12,7 +12,9 @@ import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
 import mx.nexara.mobile.nativeapp.data.api.CancelActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.ConsoleApi
 import mx.nexara.mobile.nativeapp.data.api.JustificarFaltaRequest
+import mx.nexara.mobile.nativeapp.data.api.NoCumplidaRequest
 import mx.nexara.mobile.nativeapp.data.api.ReassignActivityRequest
+import mx.nexara.mobile.nativeapp.data.api.ReprogramarActividadRequest
 
 class ConsoleRepository(context: Context) {
     private val authRepo = AuthRepository(context)
@@ -70,6 +72,16 @@ class ConsoleRepository(context: Context) {
             activityId,
             ReassignActivityRequest(aUsuarioId = aUsuarioId, deUsuarioId = deUsuarioId, motivo = motivo.trim()),
         ).close()
+    }
+
+    /** «Registrar incumplimiento»: [causa] es la clave del catálogo (SIN_ENTREGA, MATERIAL…). */
+    suspend fun registrarNoCumplida(activityId: Long, causa: String, observaciones: String) {
+        api.registrarNoCumplida(activityId, NoCumplidaRequest(causa.trim(), observaciones.trim())).close()
+    }
+
+    /** Reabre una «No cumplida»: [fechaIso] es el nuevo inicio en ISO-8601. */
+    suspend fun reprogramarNoCumplida(activityId: Long, fechaIso: String, motivo: String) {
+        api.reprogramarActividad(activityId, ReprogramarActividadRequest(fechaIso, motivo.trim())).close()
     }
 
     private fun parseJsonArray(raw: String): List<Map<String, Any?>> {

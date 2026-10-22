@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Actividad sobre la que un superior va a actuar (cancelar o pasar a otro compañero).
+/// Actividad sobre la que un superior va a actuar (cancelar, pasar a otro compañero,
+/// registrar incumplimiento o reprogramar).
 struct ActivitySuperiorTarget: Identifiable {
     /// Id de la actividad.
     let id: Int
@@ -25,6 +26,17 @@ enum ActivitySuperiorUIRules {
 
     static func motivoOk(_ motivo: String, minimo: Int) -> Bool {
         motivoLimpio(motivo).count >= minimo
+    }
+
+    /// Lo que pide «Registrar incumplimiento»: causa elegida y observaciones con el mínimo.
+    static func incumplimientoListo(causa: String?, observaciones: String, minimo: Int) -> Bool {
+        !(causa ?? "").isEmpty && motivoOk(observaciones, minimo: minimo)
+    }
+
+    /// «Reprogramar»: la nueva fecha tiene que ser posterior a ahora.
+    static func fechaReprogramadaOk(_ fecha: Date?, ahora: Date = Date()) -> Bool {
+        guard let fecha else { return false }
+        return fecha > ahora
     }
 
     /// Quién la deja: quienes ejecutan; si ninguna viene marcada (API vieja o
@@ -58,24 +70,39 @@ struct CoreMotivoCounter: View {
 
 // MARK: - Botones del superior
 
-/// «Pasar a otro compañero» y «Cancelar actividad» (en rojo) como botones de
-/// contorno de Material, en una fila que se acomoda (Android `ActivitySuperiorActions`).
-/// Solo se pintan si el API dice que quien consulta puede (`acciones.hayAlgo`).
+/// «Pasar a otro compañero», «Registrar incumplimiento», «Reprogramar» y «Cancelar
+/// actividad» (los de falla en rojo) como botones de contorno de Material, en una fila
+/// que se acomoda (Android `ActivitySuperiorActions`). Solo se pintan si el API dice que
+/// quien consulta puede (`acciones.hayAlgo`); cerrada como «No cumplida» queda «Reprogramar».
 struct ActivitySuperiorActionsBar: View {
     let acciones: ActivitySuperiorActions
     let onPasar: () -> Void
+    let onNoCumplida: () -> Void
+    let onReprogramar: () -> Void
     let onCancelar: () -> Void
 
     var body: some View {
         if acciones.hayAlgo {
             CoreFlowLayout(spacing: 8) {
-                if acciones.puedePasar {
+                if acciones.muestraPasar {
                     Button(action: onPasar) {
                         boton("Pasar a otro compañero", systemImage: "arrow.left.arrow.right")
                     }
                     .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.brand, border: NxColors.borderStrong))
                 }
-                if acciones.puedeCancelar {
+                if acciones.muestraNoCumplida {
+                    Button(action: onNoCumplida) {
+                        boton("Registrar incumplimiento", systemImage: "calendar.badge.exclamationmark")
+                    }
+                    .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.danger, border: NxColors.borderStrong))
+                }
+                if acciones.muestraReprogramar {
+                    Button(action: onReprogramar) {
+                        boton("Reprogramar", systemImage: "calendar.badge.clock")
+                    }
+                    .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.brand, border: NxColors.borderStrong))
+                }
+                if acciones.muestraCancelar {
                     Button(action: onCancelar) {
                         boton("Cancelar actividad", systemImage: "nosign")
                     }
@@ -165,6 +192,221 @@ struct ActivityCancelSheet: View {
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo cancelar la actividad")
+        }
+    }
+}
+
+// MARK: - Registrar incumplimiento
+
+/// «Registrar incumplimiento» (`POST activities/:id/no-cumplida { causa, observaciones }`):
+/// causa del catálogo y observaciones con el mismo mínimo que cancelar. Diálogo como el de
+/// Android: la actividad se cierra como «No cumplida» y después se puede reprogramar.
+struct ActivityNoCumplidaSheet: View {
+    let target: ActivitySuperiorTarget
+    let onDone: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var causa: String?
+    @State private var observaciones = ""
+    @State private var saving = false
+    @State private var error: String?
+
+    private var minimo: Int { target.acciones.motivoMinimo }
+    private var limpio: String { ActivitySuperiorUIRules.motivoLimpio(observaciones) }
+    private var listo: Bool {
+        ActivitySuperiorUIRules.incumplimientoListo(causa: causa, observaciones: observaciones, minimo: minimo)
+    }
+
+    var body: some View {
+        ActivityDialogSheet(title: "Registrar incumplimiento", titleWeight: .bold) {
+            Text("La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar. "
+                + "La causa y tus observaciones quedan en el historial y cuentan en los KPI. "
+                + "Después puedes reprogramarla.")
+                .font(.system(size: 13))
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Causa *")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(NxColors.muted)
+            ForEach(target.acciones.causasIncumplimiento) { opcion in
+                filaCausa(opcion)
+            }
+
+            ActivityOutlinedField(
+                label: "Observaciones *",
+                text: $observaciones,
+                placeholder: "Ej. El cliente no dio acceso al sitio y no hubo forma de reagendar hoy.",
+                minLines: 3,
+                enabled: !saving
+            )
+            CoreMotivoCounter(count: limpio.count, minimo: minimo)
+            if let error {
+                Text(error)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } actions: {
+            Button("Volver") { dismiss() }
+                .buttonStyle(ActivityDialogTextButtonStyle())
+                .disabled(saving)
+            Button(saving ? "Registrando…" : "Registrar") {
+                Task { await save() }
+            }
+            .buttonStyle(NxPillButtonStyle(fill: NxColors.danger, foreground: .white))
+            .disabled(saving || !listo)
+        }
+        .interactiveDismissDisabled(saving)
+        .onChange(of: observaciones) { _, value in
+            if value.count > ActivitySuperiorUIRules.motivoMaximo {
+                observaciones = String(value.prefix(ActivitySuperiorUIRules.motivoMaximo))
+            }
+        }
+    }
+
+    /// Renglón con radio, en rojo al elegirlo (Android `NoCumplidaDialog`).
+    private func filaCausa(_ opcion: ActivityNonComplianceCause) -> some View {
+        let on = causa == opcion.clave
+        return Button {
+            causa = opcion.clave
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().strokeBorder(on ? NxColors.danger : NxColors.muted, lineWidth: 2)
+                    if on { Circle().fill(NxColors.danger).frame(width: 10, height: 10) }
+                }
+                .frame(width: 20, height: 20)
+                .padding(.leading, 12)
+                Text(opcion.etiqueta)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.fg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 8)
+                    .padding(.trailing, 10)
+            }
+            .frame(minHeight: 44)
+            .background(on ? NxColors.dangerSoft : NxColors.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(on ? NxColors.danger : NxColors.border, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(saving)
+        .accessibilityAddTraits(on ? AccessibilityTraits.isSelected : [])
+    }
+
+    @MainActor
+    private func save() async {
+        guard let elegida = causa, listo else { return }
+        saving = true
+        error = nil
+        defer { saving = false }
+        do {
+            try await CoreRepository.shared.registrarNoCumplida(activityId: target.id, causa: elegida, observaciones: limpio)
+            onDone("La actividad quedó como no cumplida. Puedes reprogramarla cuando haya fecha.")
+            dismiss()
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo registrar el incumplimiento")
+        }
+    }
+}
+
+// MARK: - Reprogramar
+
+/// «Reprogramar» una no cumplida (`POST activities/:id/reprogramar { fecha, motivo }`): nuevo
+/// día y hora de inicio, en hora de México, y por qué. La reabre; el incumplimiento se queda.
+struct ActivityReprogramarSheet: View {
+    let target: ActivitySuperiorTarget
+    let onDone: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var fecha: Date = ActivityReprogramarSheet.fechaInicial()
+    @State private var motivo = ""
+    @State private var saving = false
+    @State private var error: String?
+
+    private var minimo: Int { target.acciones.motivoMinimo }
+    private var limpio: String { ActivitySuperiorUIRules.motivoLimpio(motivo) }
+    private var fechaOk: Bool { ActivitySuperiorUIRules.fechaReprogramadaOk(fecha) }
+    private var listo: Bool { fechaOk && ActivitySuperiorUIRules.motivoOk(motivo, minimo: minimo) }
+
+    /// Mañana a las 9:00 en México: un punto de partida razonable que siempre es futuro.
+    static func fechaInicial(ahora: Date = Date()) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = CoreSchedule.mexico
+        let manana = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: ahora)) ?? ahora
+        return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: manana) ?? manana
+    }
+
+    var body: some View {
+        ActivityDialogSheet(title: "Reprogramar", titleWeight: .bold) {
+            Text("La actividad se reabre con la nueva fecha. El incumplimiento no se borra: "
+                + "queda en el historial y en los KPI.")
+                .font(.system(size: 13))
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            DatePicker("Nuevo inicio *", selection: $fecha, displayedComponents: [.date, .hourAndMinute])
+                .font(.system(size: 14))
+                .tint(NxColors.brand)
+                .environment(\.timeZone, CoreSchedule.mexico)
+                .environment(\.locale, Locale(identifier: "es_MX"))
+                .disabled(saving)
+            if !fechaOk {
+                Text("Elige un día y una hora posteriores a este momento.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(NxColors.danger)
+            }
+
+            ActivityOutlinedField(
+                label: "Motivo *",
+                text: $motivo,
+                placeholder: "Ej. El cliente confirmó acceso para el lunes temprano.",
+                minLines: 3,
+                enabled: !saving
+            )
+            CoreMotivoCounter(count: limpio.count, minimo: minimo)
+            if let error {
+                Text(error)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } actions: {
+            Button("Volver") { dismiss() }
+                .buttonStyle(ActivityDialogTextButtonStyle())
+                .disabled(saving)
+            Button(saving ? "Reprogramando…" : "Reprogramar") {
+                Task { await save() }
+            }
+            .buttonStyle(NxPillButtonStyle(fill: NxColors.brand, foreground: .white))
+            .disabled(saving || !listo)
+        }
+        .interactiveDismissDisabled(saving)
+        .onChange(of: motivo) { _, value in
+            if value.count > ActivitySuperiorUIRules.motivoMaximo {
+                motivo = String(value.prefix(ActivitySuperiorUIRules.motivoMaximo))
+            }
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard listo else { return }
+        saving = true
+        error = nil
+        defer { saving = false }
+        do {
+            try await CoreRepository.shared.reprogramarNoCumplida(activityId: target.id, fecha: fecha, motivo: limpio)
+            let cuando = ActivityDetailFormat.when(ActivityDetailFormat.isoString(fecha)).map { " para \($0)" } ?? ""
+            onDone("Actividad reprogramada\(cuando). Vuelve a estar abierta; el incumplimiento queda en el historial.")
+            dismiss()
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo reprogramar la actividad")
         }
     }
 }

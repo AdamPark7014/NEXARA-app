@@ -23,6 +23,9 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 internal val ActivStatusColors = mapOf(
+    // Primero: «No cumplida» es un fallo (rojo), no un cierre neutro.
+    "no cumplida" to Color(0xFFEF4444),
+    "incumplida" to Color(0xFFEF4444),
     "pendiente" to Color(0xFFF59E0B),
     "en proceso" to Color(0xFF3B82F6),
     "proceso" to Color(0xFF3B82F6),
@@ -44,6 +47,7 @@ fun activStatusColor(estatus: String): Color {
 fun activStatusTone(estatus: String): NxTone {
     val s = estatus.lowercase()
     return when {
+        s.contains("no cumplida") || s.contains("incumplida") -> NxTone.Danger
         s.contains("finaliz") || s.contains("complet") -> NxTone.Success
         s.contains("cancel") || s.contains("rechaz") -> NxTone.Danger
         s.contains("pendiente") -> NxTone.Warning

@@ -53,6 +53,8 @@ class SesionActividadRulesTest {
         assertTrue(SesionActividadRules.puedeReanudar(enPausa, despachador = false, estatus = "En Proceso"))
         assertFalse(SesionActividadRules.puedeReanudar(enPausa, despachador = true, estatus = "En Proceso"))
         assertFalse(SesionActividadRules.puedeReanudar(enPausa, despachador = false, estatus = "Finalizada"))
+        assertFalse(SesionActividadRules.puedeReanudar(enPausa, despachador = false, estatus = "No cumplida"))
+        assertTrue(SesionActividadRules.cerrada("No cumplida"))
         assertFalse(SesionActividadRules.puedeReanudar(SesionActividad(enCurso = true), false, "En Proceso"))
     }
 

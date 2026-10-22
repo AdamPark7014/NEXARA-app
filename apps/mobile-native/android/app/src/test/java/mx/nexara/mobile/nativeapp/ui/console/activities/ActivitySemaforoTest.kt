@@ -63,6 +63,7 @@ class ActivitySemaforoTest {
         assertFalse(ActivitySemaforo.puedeIniciar("ACEPTADA", "2026-09-18T15:00:00.000Z", false, "En Proceso"))
         assertFalse(ActivitySemaforo.puedeIniciar("PENDIENTE", null, false, "Finalizada"))
         assertFalse(ActivitySemaforo.puedeIniciar("PENDIENTE", null, false, "Cancelada"))
+        assertFalse(ActivitySemaforo.puedeIniciar("PENDIENTE", null, false, "No cumplida"))
         assertFalse(ActivitySemaforo.puedeIniciar("PENDIENTE", null, true, "Pendiente"))
         // API anterior al contrato: la foto de entrada marca el inicio como siempre.
         assertFalse(ActivitySemaforo.puedeIniciar(null, null, false, "Pendiente"))

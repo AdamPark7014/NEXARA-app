@@ -200,6 +200,7 @@ class ActividadesUxTest {
     @Test
     fun loQuePideAccionOCierraSiLlevaColor() {
         assertEquals(CoreActivityRules.ROJO, ActividadesUx.colorEstatus("RECHAZADA"))
+        assertEquals(CoreActivityRules.ROJO, ActividadesUx.colorEstatus("No cumplida"))
         assertEquals(CoreActivityRules.VERDE, ActividadesUx.colorEstatus("Finalizada"))
     }
 

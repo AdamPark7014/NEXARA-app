@@ -26,6 +26,7 @@ class ActivityDockRulesTest {
     fun cerradaNoTieneDock() {
         assertNull(dock(estatus = "Finalizada", puedeIniciar = true))
         assertNull(dock(estatus = "Cancelada"))
+        assertNull(dock(estatus = "No cumplida", puedeIniciar = true))
     }
 
     @Test

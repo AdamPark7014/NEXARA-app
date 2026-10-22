@@ -341,7 +341,7 @@ enum ActividadesSemaforo {
     }
 
     static func cerrada(_ estatus: String?) -> Bool {
-        (estatus ?? "").range(of: "finalizada|completada|cancelada|aprobada", options: [.regularExpression, .caseInsensitive]) != nil
+        (estatus ?? "").range(of: "finalizada|completada|cancelada|aprobada|no cumplida|incumplida", options: [.regularExpression, .caseInsensitive]) != nil
     }
 }
 
@@ -412,10 +412,10 @@ enum ActividadesUx {
         }
     }
 
-    /// «Te la regresaron» en rojo y «Terminada» en verde; el flujo normal va en gris.
+    /// «Te la regresaron» y «No cumplida» en rojo, «Terminada» en verde; el flujo normal va en gris.
     static func colorEstatus(_ estatus: String?) -> Color? {
         let label = CoreStatusUI.estatus(estatus).label
-        if label == "Te la regresaron" { return NxColors.rojo }
+        if label == "Te la regresaron" || label == "No cumplida" { return NxColors.rojo }
         if label == "Terminada" { return NxColors.verde }
         return nil
     }

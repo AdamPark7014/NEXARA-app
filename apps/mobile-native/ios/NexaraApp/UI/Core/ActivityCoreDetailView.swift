@@ -25,7 +25,7 @@ enum CoreDetailTab: String, CaseIterable, Identifiable {
 
 /// Detalle de actividad de Core (`/erp/actividades/:id`), espejo de
 /// `ActivityDetailScreen.kt` de Android: barra teal «Detalle de actividad», cabecera
-/// con tipo/estado/folio, aviso de cancelada, acciones de superior, pestañas
+/// con tipo/estado/folio, aviso de cancelada o no cumplida, acciones de superior, pestañas
 /// subrayadas Detalle · Evidencias · Historial y el dock inferior fijo con la acción
 /// grande al alcance del pulgar. Toda la captura vive en `EvidenceCaptureFlowView`;
 /// el dock solo lleva ahí o repite su botón.
@@ -43,10 +43,12 @@ struct ActivityCoreDetailView: View {
     /// detalle, las acciones de superior y el flujo (Android `recarga`).
     @State private var recarga = 0
     @State private var teamRefresh = 0
-    /// Cancelar / pasar a otro compañero (solo superiores de quien la ejecuta).
+    /// Cancelar / pasar / no cumplida / reprogramar (solo superiores de quien la ejecuta).
     @State private var acciones: ActivitySuperiorActions?
     @State private var cancelar: ActivitySuperiorTarget?
     @State private var pasar: ActivitySuperiorTarget?
+    @State private var noCumplida: ActivitySuperiorTarget?
+    @State private var reprogramar: ActivitySuperiorTarget?
     /// Flujo de evidencia propio: alimenta la lista de pasos y el dock. `nil` = sin empezar.
     @State private var flow: EvidenceFlowState?
     @State private var flowTick = 0
@@ -202,6 +204,17 @@ struct ActivityCoreDetailView: View {
         )
     }
 
+    /// Último registro de «No cumplida» (también en una ya reprogramada, como historial).
+    private var incumplimiento: ActivityNonCompliance? { ActivityNonCompliance(map: raw["incumplimiento"]) }
+
+    private var noCumplidaAviso: ActivityNoCumplidaAviso? {
+        ActivityDetailRules.avisoNoCumplida(estatus: estatus, registro: incumplimiento)
+    }
+
+    private var notaReprogramada: String? {
+        ActivityDetailRules.notaReprogramada(estatus: estatus, registro: incumplimiento)
+    }
+
     private var lugarTitulo: String {
         let cliente = nested("client", "name").trimmingCharacters(in: .whitespacesAndNewlines)
         if !cliente.isEmpty { return cliente }
@@ -324,6 +337,16 @@ struct ActivityCoreDetailView: View {
                 afterSuperiorAction(message)
             }
         }
+        .sheet(item: $noCumplida) { target in
+            ActivityNoCumplidaSheet(target: target) { message in
+                afterSuperiorAction(message)
+            }
+        }
+        .sheet(item: $reprogramar) { target in
+            ActivityReprogramarSheet(target: target) { message in
+                afterSuperiorAction(message)
+            }
+        }
         .sheet(isPresented: $pausando) {
             PausarPropiaSheet(activityId: activityId) { mensaje in
                 pausando = false
@@ -383,10 +406,80 @@ struct ActivityCoreDetailView: View {
                 .padding(.vertical, 4)
             }
 
+            // «No cumplida»: causa, quién la registró (o el cierre de jornada) y quién no entregó.
+            if let aviso = noCumplidaAviso {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(NxColors.danger)
+                        .frame(width: 18, height: 18)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(aviso.titulo)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(NxColors.dangerText)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text([aviso.origen, ActivityDetailFormat.when(aviso.registradoAt)].compactMap { $0 }.joined(separator: " · "))
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(NxColors.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let observaciones = aviso.observaciones {
+                            Text(observaciones)
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(NxColors.fg2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let pendientes = aviso.pendientes {
+                            Text(pendientes)
+                                .font(.system(size: 12))
+                                .foregroundStyle(NxColors.dangerText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(NxColors.dangerSoft, in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+            }
+
+            // Reprogramada tras no cumplirse: queda como historial, sin alarma.
+            if let nota = notaReprogramada {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(NxColors.muted)
+                        .frame(width: 18, height: 18)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(nota)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(NxColors.fg2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let motivo = incumplimiento?.motivoReprogramacion {
+                            Text("Motivo: \(motivo)")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(NxColors.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(NxColors.sunken, in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
+            }
+
             if let acciones, acciones.hayAlgo {
                 ActivitySuperiorActionsBar(
                     acciones: acciones,
                     onPasar: { pasar = superiorTarget(acciones) },
+                    onNoCumplida: { noCumplida = superiorTarget(acciones) },
+                    onReprogramar: { reprogramar = superiorTarget(acciones) },
                     onCancelar: { cancelar = superiorTarget(acciones) }
                 )
                 .padding(.horizontal, 16)
@@ -406,7 +499,8 @@ struct ActivityCoreDetailView: View {
         }
     }
 
-    /// Tras cancelar o pasarla: aviso, detalle, acciones, evidencias e historial al día.
+    /// Tras cancelar, pasarla, registrar incumplimiento o reprogramar: aviso, detalle,
+    /// acciones, evidencias e historial al día.
     private func afterSuperiorAction(_ message: String) {
         snack = message
         teamRefresh += 1
@@ -662,15 +756,25 @@ struct ActivityCoreDetailView: View {
     // MARK: Historial
 
     private var historialTab: some View {
-        let cerrada = !text("fechaFinalizacion").trimmingCharacters(in: .whitespaces).isEmpty
+        let fallo = CoreStatusUI.esNoCumplida(estatus)
+        let cerrada = !fallo && !text("fechaFinalizacion").trimmingCharacters(in: .whitespaces).isEmpty
+        let chipTexto: String
+        let chipColor: Color
+        if fallo {
+            chipTexto = "No cumplida"
+            chipColor = NxColors.rojo
+        } else if cerrada {
+            chipTexto = "Finalizada"
+            chipColor = NxColors.verde
+        } else {
+            chipTexto = estatus.isEmpty ? "Sin estado" : estatus
+            chipColor = NxColors.azul
+        }
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center, spacing: 8) {
                     CoreChip(icon: "calendar", text: "\(events.count) evento\(events.count == 1 ? "" : "s")")
-                    CoreChip(
-                        text: cerrada ? "Finalizada" : (estatus.isEmpty ? "Sin estado" : estatus),
-                        color: cerrada ? NxColors.verde : NxColors.azul
-                    )
+                    CoreChip(text: chipTexto, color: chipColor)
                     Spacer(minLength: 8)
                     Button("↻") { Task { await loadTimeline() } }
                         .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.brand, border: NxColors.borderStrong))

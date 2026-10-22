@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Icon
@@ -371,6 +373,52 @@ fun ActivityDetailScreen(
                         Text(aviso, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.dangerText)
                         CoreActivityRules.formatWhen(detail.cancelledAt)?.let {
                             Text(it, fontSize = 11.5.sp, color = c.muted)
+                        }
+                    }
+                }
+            }
+
+            // «No cumplida»: causa, quién la registró (o el cierre de jornada) y quién no entregó.
+            ActivitySuperiorRules.avisoNoCumplida(detail)?.let { aviso ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(NxDimens.ControlRadius))
+                        .background(c.dangerSoft)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.EventBusy, contentDescription = null, tint = c.danger, modifier = Modifier.size(18.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(aviso.titulo, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.dangerText)
+                        Text(
+                            listOfNotNull(aviso.origen, CoreActivityRules.formatWhen(aviso.registradoAt)).joinToString(" · "),
+                            fontSize = 11.5.sp,
+                            color = c.muted,
+                        )
+                        aviso.observaciones?.let { Text(it, fontSize = 12.5.sp, color = c.fg2) }
+                        aviso.pendientes?.let { Text(it, fontSize = 12.sp, color = c.dangerText) }
+                    }
+                }
+            }
+
+            // Reprogramada tras no cumplirse: queda como historial, sin alarma.
+            ActivitySuperiorRules.notaReprogramada(detail)?.let { nota ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(NxDimens.ControlRadius))
+                        .background(c.sunken)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = c.muted, modifier = Modifier.size(18.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(nota, fontSize = 12.5.sp, color = c.fg2)
+                        detail.incumplimiento?.motivoReprogramacion?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                            Text("Motivo: $it", fontSize = 11.5.sp, color = c.muted)
                         }
                     }
                 }

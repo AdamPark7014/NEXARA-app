@@ -4,6 +4,8 @@ import java.time.Instant
 import java.time.ZoneId
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
+import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotoDto
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotoRequest
@@ -335,6 +337,13 @@ class CoreActivityRulesTest {
         assertEquals("En curso", CoreActivityRules.estatusUi("En Proceso").label)
         assertEquals("En revisión", CoreActivityRules.estatusUi("Por Validar").label)
         assertEquals("Por empezar", CoreActivityRules.estatusUi("Pendiente").label)
+        // «No cumplida» es un cierre con falla: rojo, no el gris de «Cancelada».
+        assertEquals(CoreActivityRules.Tone("No cumplida", CoreActivityRules.ROJO), CoreActivityRules.estatusUi("No cumplida"))
+        assertEquals("No cumplida", CoreActivityRules.estatusUi("INCUMPLIDA").label)
+        assertTrue(CoreActivityRules.esNoCumplida("No cumplida"))
+        assertFalse(CoreActivityRules.esNoCumplida("Cumplida"))
+        assertEquals("No cumplida", CoreActivityRules.timelineKindLabel("no_cumplida"))
+        assertEquals("Reprogramada", CoreActivityRules.timelineKindLabel("reprogramada"))
         assertEquals("Tarea · Junta", CoreActivityRules.kindLabel("tarea", "Junta"))
         assertEquals("Servicio", CoreActivityRules.kindLabel("servicio", "Junta"))
         assertEquals(NxGlyph.SERVICE, CoreActivityRules.kindTone("servicio", null).glyph)
@@ -759,5 +768,36 @@ class CoreActivityRulesTest {
             "https://real.jpg",
             CoreActivityRules.fotoDeCampo(CoreActivityRules.conFoto(servido, "EN_PROGRESO", "data:x"), "EN_PROGRESO"),
         )
+    }
+
+    @Test
+    fun accionesDeUnaApiViejaYDeLaNueva() {
+        val adapter = moshi.adapter(ActivityAccionesDto::class.java)
+        val vieja = adapter.fromJson("""{"puedeCancelar":true,"puedePasar":false,"cerrada":false,"motivoMinimo":10}""")!!
+        assertNull(vieja.puedeRegistrarIncumplimiento)
+        assertNull(vieja.puedeReprogramar)
+        assertNull(vieja.causasIncumplimiento)
+
+        val nueva = adapter.fromJson(
+            """{"cerrada":true,"estatus":"No cumplida","puedeRegistrarIncumplimiento":false,"puedeReprogramar":true,
+               "causasIncumplimiento":[{"clave":"SIN_ENTREGA","etiqueta":"Sin entrega al cierre de la jornada"}]}""",
+        )!!
+        assertEquals(true, nueva.puedeReprogramar)
+        assertEquals("SIN_ENTREGA", nueva.causasIncumplimiento?.single()?.clave)
+    }
+
+    @Test
+    fun detalleConIncumplimiento() {
+        val a = moshi.adapter(ActivityDto::class.java).fromJson(
+            """{"id":12,"estatus":"No cumplida","incumplimiento":{"id":1,"origen":"CIERRE_JORNADA","causa":"SIN_ENTREGA",
+               "causaEtiqueta":"Sin entrega al cierre de la jornada","observaciones":null,"limite":"2026-10-23T00:00:00.000Z",
+               "registradoAt":"2026-10-23T00:00:05.000Z","registradoPor":null,"pendientes":[{"id":7,"nombre":"Ana López"}],
+               "reprogramadaAt":null,"reprogramadaPara":null,"reprogramadaPor":null,"motivoReprogramacion":null}}""",
+        )!!
+        assertEquals("CIERRE_JORNADA", a.incumplimiento?.origen)
+        assertNull(a.incumplimiento?.registradoPor)
+        assertEquals("Ana López", a.incumplimiento?.pendientes?.single()?.nombre)
+        // Sin el campo (API vieja) el detalle sigue cargando.
+        assertNull(moshi.adapter(ActivityDto::class.java).fromJson("""{"id":1,"estatus":"Pendiente"}""")!!.incumplimiento)
     }
 }

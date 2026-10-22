@@ -35,7 +35,7 @@ extension DemoStore {
 
     func isClosed(_ a: DemoActivity) -> Bool {
         let status = effectiveStatus(a)
-        return status == "Por Validar" || status == "Finalizada" || status == "Cancelada"
+        return status == "Por Validar" || status == "Finalizada" || status == "Cancelada" || status == "No cumplida"
     }
 
     /// Estatus con lo que ya hizo el usuario en esta sesión (iniciar, subir evidencia, revisar).
