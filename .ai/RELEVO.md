@@ -15,6 +15,9 @@
   - Bug corregido de paso: el aviso de atrasos leía 400 actividades incluyendo cerradas (con >400 dejaba de avisar).
   - **Propuesta** `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` (complejidad + tiempo estándar, integridad, evaluador IA):
     esperando 4 decisiones de Adam; no construir antes.
+  - Móvil (`23fdf90f`): paridad en Android e iOS (estatus, aviso, registrar y reprogramar). Android 115 pruebas JVM
+    y `assembleDebug` OK. **iOS sin compilar aquí**: lo compila el workflow «iOS capturas de App Store (simulador)»
+    que disparó ese push; revisar su resultado. Sin cambio de versión: sale en la próxima publicación de tiendas.
   - Main local y remoto quedaron reconciliados (rebase; la versión local de reuniones del 12-10 se guardó en
     `.ai/salvado/2026-10-12-reuniones-local/` y en `git stash`, sin aplicar: Adam decide).
 
