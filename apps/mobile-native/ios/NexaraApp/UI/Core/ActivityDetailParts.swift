@@ -160,6 +160,8 @@ enum ActivityDetailRules {
     static func estado(estatus: String?, sesion: SesionActividad?) -> (label: String, color: Color) {
         if sesion?.enPausa == true { return ("En pausa", NxColors.warning) }
         if sesion?.enCurso == true { return ("En curso", NxColors.info) }
+        // Antes que todo: «No cumplida» es un cierre con falla (rojo), no el gris de «Cancelada».
+        if CoreStatusUI.esNoCumplida(estatus) { return ("No cumplida", NxColors.danger) }
         if contains(estatus, "proceso") { return ("En curso", NxColors.info) }
         if contains(estatus, "validar") { return ("En revisión", NxColors.info) }
         if contains(estatus, "rechazada") { return ("Te la regresaron", NxColors.danger) }
@@ -229,6 +231,49 @@ enum ActivityDetailRules {
         return ActivityCancelNotice.text(motivo: motivo, canceladaPor: canceladaPor) ?? "Cancelada"
     }
 
+    /// Aviso rojo de una «No cumplida» (`ActivitySuperiorRules.avisoNoCumplida`). Solo mientras
+    /// siga así: reprogramada, el registro es historial (`notaReprogramada`). Sin registro
+    /// (API vieja) queda el título solo. La fecha la formatea la pantalla.
+    static func avisoNoCumplida(estatus: String?, registro: ActivityNonCompliance?) -> ActivityNoCumplidaAviso? {
+        guard CoreStatusUI.esNoCumplida(estatus) else { return nil }
+        guard let registro else {
+            return ActivityNoCumplidaAviso(
+                titulo: "No cumplida",
+                origen: "Se cerró sin entregarse",
+                registradoAt: nil,
+                observaciones: nil,
+                pendientes: nil
+            )
+        }
+        let causa = registro.causaEtiqueta
+        let origen: String
+        if registro.automatica {
+            origen = "Cierre automático de la jornada"
+        } else {
+            origen = "Registrada por \(registro.registradoPor)"
+        }
+        return ActivityNoCumplidaAviso(
+            titulo: causa.isEmpty ? "No cumplida" : "No cumplida · \(causa)",
+            origen: origen,
+            registradoAt: registro.registradoAt,
+            observaciones: registro.observaciones,
+            pendientes: registro.pendientes.isEmpty
+                ? nil
+                : "Pendientes de entrega: " + registro.pendientes.joined(separator: ", ")
+        )
+    }
+
+    /// Historial de una que ya se reabrió: «Reprogramada por Luis Pérez para lun 26 oct · 09:00 ·
+    /// no se cumplió: Falta de material, herramienta o equipo». `nil` si sigue «No cumplida».
+    static func notaReprogramada(estatus: String?, registro: ActivityNonCompliance?) -> String? {
+        guard !CoreStatusUI.esNoCumplida(estatus), let registro else { return nil }
+        guard !(registro.reprogramadaAt ?? "").isEmpty else { return nil }
+        var texto = registro.reprogramadaPor.isEmpty ? "Reprogramada" : "Reprogramada por \(registro.reprogramadaPor)"
+        if let para = ActivityDetailFormat.when(registro.reprogramadaPara) { texto += " para \(para)" }
+        let causa = registro.causaEtiqueta.isEmpty ? ActivityNonComplianceCause.etiquetaDe(registro.causa) : registro.causaEtiqueta
+        return texto + " · no se cumplió: \(causa)"
+    }
+
     /// Prioridad en palabras (`NxStatusLabels.priority`); `nil` sin prioridad.
     static func priorityLabel(_ raw: String?) -> String? {
         let key = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
@@ -256,6 +301,7 @@ enum ActivityDetailRules {
         switch k {
         case "enviada": return "Enviada"
         case "reprogramada": return "Reprogramada"
+        case "no_cumplida", "no cumplida": return "No cumplida"
         case "cumplida": return "Cumplida"
         case "revision", "revisión": return "Revisión"
         case "evidencia": return "Evidencia"
@@ -279,6 +325,7 @@ enum ActivityDetailRules {
         switch (kind ?? "").lowercased() {
         case "enviada", "despacho": return NxColors.azul
         case "reprogramada": return NxColors.naranja
+        case "no_cumplida": return NxColors.rojo
         case "cumplida": return NxColors.verde
         case "revision", "revisión": return NxColors.morado
         default: return nil

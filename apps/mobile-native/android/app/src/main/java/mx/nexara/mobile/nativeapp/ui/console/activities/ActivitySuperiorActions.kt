@@ -19,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -50,17 +52,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
+import mx.nexara.mobile.nativeapp.data.api.CausaIncumplimientoDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
-private enum class DialogoSuperior { CANCELAR, PASAR }
-
 /**
- * «Cancelar actividad» y «Pasar a otro compañero». Solo aparecen si la API dice que
- * quien consulta puede (`GET activities/:id/acciones`); al guardar lo vuelve a validar.
+ * «Cancelar actividad», «Pasar a otro compañero», «Registrar incumplimiento» y
+ * «Reprogramar». Solo aparecen si la API dice que quien consulta puede
+ * (`GET activities/:id/acciones`); al guardar lo vuelve a validar.
  * [onDone] recibe el mensaje de éxito y recarga el detalle.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -75,7 +77,7 @@ internal fun ActivitySuperiorActions(
     val repo = remember(context) { ConsoleRepository(context) }
     val coreRepo = remember(context) { CoreActivitiesRepository(context) }
     var acciones by remember(activityId) { mutableStateOf<ActivityAccionesDto?>(null) }
-    var dialogo by remember { mutableStateOf<DialogoSuperior?>(null) }
+    var dialogo by remember { mutableStateOf<ActivitySuperiorRules.Accion?>(null) }
 
     LaunchedEffect(activityId, refreshKey) {
         // Opcional: sin respuesta (403, sin red) no se muestra nada.
@@ -91,25 +93,43 @@ internal fun ActivitySuperiorActions(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (a.puedePasar == true) {
-            OutlinedButton(onClick = { dialogo = DialogoSuperior.PASAR }) {
-                Icon(Icons.Outlined.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("Pasar a otro compañero", fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
-            }
-        }
-        if (a.puedeCancelar == true) {
+        ActivitySuperiorRules.botones(a).forEach { accion ->
+            val peligro = accion == ActivitySuperiorRules.Accion.CANCELAR ||
+                accion == ActivitySuperiorRules.Accion.NO_CUMPLIDA
             OutlinedButton(
-                onClick = { dialogo = DialogoSuperior.CANCELAR },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = NxColors.Danger),
+                onClick = { dialogo = accion },
+                colors = if (peligro) {
+                    ButtonDefaults.outlinedButtonColors(contentColor = NxColors.Danger)
+                } else {
+                    ButtonDefaults.outlinedButtonColors()
+                },
             ) {
-                Icon(Icons.Outlined.Block, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("Cancelar actividad", fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
+                Icon(
+                    when (accion) {
+                        ActivitySuperiorRules.Accion.PASAR -> Icons.Outlined.SwapHoriz
+                        ActivitySuperiorRules.Accion.NO_CUMPLIDA -> Icons.Outlined.EventBusy
+                        ActivitySuperiorRules.Accion.REPROGRAMAR -> Icons.Outlined.CalendarMonth
+                        ActivitySuperiorRules.Accion.CANCELAR -> Icons.Outlined.Block
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    when (accion) {
+                        ActivitySuperiorRules.Accion.PASAR -> "Pasar a otro compañero"
+                        ActivitySuperiorRules.Accion.NO_CUMPLIDA -> "Registrar incumplimiento"
+                        ActivitySuperiorRules.Accion.REPROGRAMAR -> "Reprogramar"
+                        ActivitySuperiorRules.Accion.CANCELAR -> "Cancelar actividad"
+                    },
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
             }
         }
     }
 
     when (dialogo) {
-        DialogoSuperior.CANCELAR -> CancelarActividadDialog(
+        ActivitySuperiorRules.Accion.CANCELAR -> CancelarActividadDialog(
             minimo = minimo,
             onDismiss = { dialogo = null },
             onConfirm = { motivo ->
@@ -118,7 +138,7 @@ internal fun ActivitySuperiorActions(
                 onDone("La actividad quedó cancelada. Se avisó al equipo, a sus jefes y a Christian.")
             },
         )
-        DialogoSuperior.PASAR -> PasarActividadDialog(
+        ActivitySuperiorRules.Accion.PASAR -> PasarActividadDialog(
             acciones = a,
             minimo = minimo,
             cargarEquipo = { withContext(Dispatchers.IO) { coreRepo.board() }.users.orEmpty() },
@@ -128,6 +148,26 @@ internal fun ActivitySuperiorActions(
                 dialogo = null
                 val quien = CoreActivityRules.shortName(para.nombre).ifBlank { "tu compañero" }
                 onDone("La actividad pasó a $quien. Continuará donde se quedó con sus propias fotos de entrada y salida.")
+            },
+        )
+        ActivitySuperiorRules.Accion.NO_CUMPLIDA -> NoCumplidaDialog(
+            causas = ActivitySuperiorRules.causas(a),
+            minimo = minimo,
+            onDismiss = { dialogo = null },
+            onConfirm = { causa, observaciones ->
+                withContext(Dispatchers.IO) { repo.registrarNoCumplida(activityId, causa, observaciones) }
+                dialogo = null
+                onDone("La actividad quedó como no cumplida. Puedes reprogramarla cuando haya fecha.")
+            },
+        )
+        ActivitySuperiorRules.Accion.REPROGRAMAR -> ReprogramarDialog(
+            minimo = minimo,
+            onDismiss = { dialogo = null },
+            onConfirm = { fechaIso, motivo ->
+                withContext(Dispatchers.IO) { repo.reprogramarNoCumplida(activityId, fechaIso, motivo) }
+                dialogo = null
+                val cuando = CoreActivityRules.formatWhen(fechaIso)?.let { " para $it" }.orEmpty()
+                onDone("Actividad reprogramada$cuando. Vuelve a estar abierta; el incumplimiento queda en el historial.")
             },
         )
         null -> Unit
@@ -141,12 +181,13 @@ private fun MotivoField(
     minimo: Int,
     placeholder: String,
     enabled: Boolean,
+    label: String = "Motivo *",
 ) {
     val ok = ActivitySuperiorRules.motivoOk(motivo, minimo)
     OutlinedTextField(
         value = motivo,
-        onValueChange = { onChange(it.take(400)) },
-        label = { Text("Motivo *") },
+        onValueChange = { onChange(it.take(ActivitySuperiorRules.TEXTO_MAXIMO)) },
+        label = { Text(label) },
         placeholder = { Text(placeholder) },
         minLines = 3,
         enabled = enabled,
@@ -330,6 +371,174 @@ private fun PasarActividadDialog(
                 enabled = listo && !saving,
                 colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
             ) { Text(if (saving) "Pasando…" else "Pasar actividad") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Volver") }
+        },
+    )
+}
+
+/** «Registrar incumplimiento»: causa del catálogo y observaciones con el mismo mínimo que cancelar. */
+@Composable
+private fun NoCumplidaDialog(
+    causas: List<CausaIncumplimientoDto>,
+    minimo: Int,
+    onDismiss: () -> Unit,
+    onConfirm: suspend (causa: String, observaciones: String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var causa by remember { mutableStateOf<String?>(null) }
+    var observaciones by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val listo = ActivitySuperiorRules.incumplimientoListo(causa, observaciones, minimo)
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Registrar incumplimiento", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar. " +
+                        "La causa y tus observaciones quedan en el historial y cuentan en los KPI. " +
+                        "Después puedes reprogramarla.",
+                    fontSize = 13.sp,
+                    color = NxColors.Muted,
+                )
+                Text("Causa *", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
+                causas.forEach { opcion ->
+                    val clave = opcion.clave.orEmpty()
+                    val on = causa == clave
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (on) NxColors.DangerSoft else Color.White)
+                            .border(1.dp, if (on) NxColors.Danger else Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
+                            .clickable(enabled = !saving) { causa = clave },
+                    ) {
+                        RadioButton(selected = on, onClick = { causa = clave }, enabled = !saving)
+                        Text(
+                            opcion.etiqueta.orEmpty().ifBlank { ActivitySuperiorRules.etiquetaCausa(clave) },
+                            fontSize = 13.sp,
+                            color = NxColors.Slate,
+                            modifier = Modifier.padding(end = 10.dp),
+                        )
+                    }
+                }
+                MotivoField(
+                    motivo = observaciones,
+                    onChange = { observaciones = it },
+                    minimo = minimo,
+                    placeholder = "Ej. El cliente no dio acceso al sitio y no hubo forma de reagendar hoy.",
+                    enabled = !saving,
+                    label = "Observaciones *",
+                )
+                error?.let { Text(it, fontSize = 13.sp, color = NxColors.Danger) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val elegida = causa ?: return@Button
+                    scope.launch {
+                        saving = true
+                        error = null
+                        try {
+                            onConfirm(elegida, ActivitySuperiorRules.motivoLimpio(observaciones))
+                        } catch (e: Exception) {
+                            error = e.toUserMessage("No se pudo registrar el incumplimiento")
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+                enabled = listo && !saving,
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Danger, contentColor = Color.White),
+            ) { Text(if (saving) "Registrando…" else "Registrar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Volver") }
+        },
+    )
+}
+
+/** «Reprogramar» una no cumplida: nuevo día y hora de inicio, y por qué. */
+@Composable
+private fun ReprogramarDialog(
+    minimo: Int,
+    onDismiss: () -> Unit,
+    onConfirm: suspend (fechaIso: String, motivo: String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var fecha by remember { mutableStateOf("") }
+    var motivo by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val iso = CoreActivityRules.localInputToIso(fecha)
+    val fechaOk = ActivitySuperiorRules.fechaReprogramadaOk(iso)
+    val listo = fechaOk && ActivitySuperiorRules.motivoOk(motivo, minimo)
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Reprogramar", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "La actividad se reabre con la nueva fecha. El incumplimiento no se borra: " +
+                        "queda en el historial y en los KPI.",
+                    fontSize = 13.sp,
+                    color = NxColors.Muted,
+                )
+                DateTimePickerField(
+                    label = "Nuevo inicio *",
+                    value = fecha,
+                    onValueChange = { fecha = it },
+                )
+                if (fecha.isNotBlank() && !fechaOk) {
+                    Text(
+                        "Elige un día y una hora posteriores a este momento.",
+                        fontSize = 11.5.sp,
+                        color = NxColors.Danger,
+                    )
+                }
+                MotivoField(
+                    motivo = motivo,
+                    onChange = { motivo = it },
+                    minimo = minimo,
+                    placeholder = "Ej. El cliente confirmó acceso para el lunes temprano.",
+                    enabled = !saving,
+                )
+                error?.let { Text(it, fontSize = 13.sp, color = NxColors.Danger) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val nueva = iso ?: return@Button
+                    scope.launch {
+                        saving = true
+                        error = null
+                        try {
+                            onConfirm(nueva, ActivitySuperiorRules.motivoLimpio(motivo))
+                        } catch (e: Exception) {
+                            error = e.toUserMessage("No se pudo reprogramar la actividad")
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+                enabled = listo && !saving,
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) { Text(if (saving) "Reprogramando…" else "Reprogramar") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !saving) { Text("Volver") }

@@ -115,9 +115,9 @@ object ActividadesUx {
     }
 
     /**
-     * «Te la regresaron» en rojo porque hay que corregirla hoy y «Terminada» en
-     * verde porque cierra el asunto. «En curso» y «En revisión» son el flujo
-     * normal: van en gris.
+     * «Te la regresaron» en rojo porque hay que corregirla hoy, «No cumplida» en
+     * rojo porque se cerró sin entregarse y «Terminada» en verde porque cierra el
+     * asunto. «En curso» y «En revisión» son el flujo normal: van en gris.
      */
     fun colorEstatus(estatus: String?): Long? = when (CoreActivityRules.estatusUi(estatus).color) {
         CoreActivityRules.ROJO -> CoreActivityRules.ROJO

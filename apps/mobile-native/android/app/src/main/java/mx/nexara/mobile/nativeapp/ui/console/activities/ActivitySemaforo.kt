@@ -91,7 +91,7 @@ object ActivitySemaforo {
         return if (m.isEmpty()) "Rechazada" else "Rechazada: $m"
     }
 
-    private val CERRADA = Regex("finalizada|completada|cancelada|aprobada", RegexOption.IGNORE_CASE)
+    private val CERRADA = Regex("finalizada|completada|cancelada|aprobada|no cumplida|incumplida", RegexOption.IGNORE_CASE)
 
     /** «Asignada por Luis»; `null` si nadie la asignó (auto-asignada). */
     fun asignadaPorTexto(nombre: String?): String? =

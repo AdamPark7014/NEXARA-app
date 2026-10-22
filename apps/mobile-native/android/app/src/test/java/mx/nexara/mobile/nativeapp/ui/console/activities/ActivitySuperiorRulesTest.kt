@@ -3,16 +3,20 @@ package mx.nexara.mobile.nativeapp.ui.console.activities
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionPersonaDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
+import mx.nexara.mobile.nativeapp.data.api.ActivityIncumplimientoDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityPersonRefDto
 import mx.nexara.mobile.nativeapp.data.api.AvanceAnteriorDto
+import mx.nexara.mobile.nativeapp.data.api.CausaIncumplimientoDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
+import java.time.ZoneId
 
-/** Cancelar y pasar a otro compañero: solo superiores, siempre con motivo. */
+/** Cancelar, pasar, no cumplida y reprogramar: solo superiores, siempre con motivo. */
 class ActivitySuperiorRulesTest {
 
     private val luis = ActivityAccionPersonaDto(userId = 1, nombre = "Luis Pérez", rol = "LEAD", responsable = true, ejecuta = false)
@@ -104,5 +108,150 @@ class ActivitySuperiorRulesTest {
         )
         assertEquals("Cancelada por Luis Pérez · El cliente pospuso el servicio", ActivitySuperiorRules.avisoCancelada(cancelada))
         assertEquals("Cancelada", ActivitySuperiorRules.avisoCancelada(activa.copy(estatus = "Cancelada")))
+    }
+
+    // ── No cumplida y reprogramar ───────────────────────────────────────────
+
+    @Test
+    fun botonesEnOrdenYSoloLosQuePermiteLaApi() {
+        val todo = ActivityAccionesDto(
+            puedeCancelar = true,
+            puedePasar = true,
+            puedeRegistrarIncumplimiento = true,
+        )
+        assertEquals(
+            listOf(ActivitySuperiorRules.Accion.PASAR, ActivitySuperiorRules.Accion.NO_CUMPLIDA, ActivitySuperiorRules.Accion.CANCELAR),
+            ActivitySuperiorRules.botones(todo),
+        )
+        assertTrue(ActivitySuperiorRules.muestraAcciones(ActivityAccionesDto(puedeRegistrarIncumplimiento = true)))
+        // API vieja: sin los campos nuevos se ve igual que antes.
+        assertEquals(listOf(ActivitySuperiorRules.Accion.CANCELAR), ActivitySuperiorRules.botones(ActivityAccionesDto(puedeCancelar = true)))
+    }
+
+    @Test
+    fun cerradaComoNoCumplidaSoloDejaReprogramar() {
+        val noCumplida = ActivityAccionesDto(
+            cerrada = true,
+            estatus = "No cumplida",
+            puedeCancelar = true,
+            puedePasar = true,
+            puedeRegistrarIncumplimiento = true,
+            puedeReprogramar = true,
+        )
+        assertEquals(listOf(ActivitySuperiorRules.Accion.REPROGRAMAR), ActivitySuperiorRules.botones(noCumplida))
+        assertTrue(ActivitySuperiorRules.muestraAcciones(noCumplida))
+        assertFalse(ActivitySuperiorRules.muestraAcciones(noCumplida.copy(puedeReprogramar = false)))
+    }
+
+    @Test
+    fun causasDeLaApiOElRespaldo() {
+        val respaldo = ActivitySuperiorRules.causas(null)
+        assertEquals(7, respaldo.size)
+        assertEquals("SIN_ENTREGA", respaldo.first().clave)
+        assertEquals("Otra causa", respaldo.last().etiqueta)
+
+        val api = ActivityAccionesDto(
+            causasIncumplimiento = listOf(
+                CausaIncumplimientoDto("MATERIAL", "Falta de material"),
+                CausaIncumplimientoDto("", "Sin clave"),
+                CausaIncumplimientoDto("ACCESO", null),
+                CausaIncumplimientoDto("MATERIAL", "Repetida"),
+            ),
+        )
+        val causas = ActivitySuperiorRules.causas(api)
+        assertEquals(listOf("MATERIAL", "ACCESO"), causas.map { it.clave })
+        assertEquals("Falta de material", causas[0].etiqueta)
+        // Sin etiqueta se usa la del catálogo local.
+        assertEquals("Sin acceso al sitio o cliente no disponible", causas[1].etiqueta)
+        assertEquals(respaldo, ActivitySuperiorRules.causas(ActivityAccionesDto(causasIncumplimiento = emptyList())))
+    }
+
+    @Test
+    fun registroPideCausaYObservaciones() {
+        assertFalse(ActivitySuperiorRules.incumplimientoListo(null, "El cliente no dio acceso", 10))
+        assertFalse(ActivitySuperiorRules.incumplimientoListo("ACCESO", "corto", 10))
+        assertTrue(ActivitySuperiorRules.incumplimientoListo("ACCESO", "El cliente no dio acceso", 10))
+    }
+
+    @Test
+    fun reprogramarSoloAFuturo() {
+        val ahora = Instant.parse("2026-10-22T18:00:00Z")
+        assertTrue(ActivitySuperiorRules.fechaReprogramadaOk("2026-10-23T15:00:00Z", ahora))
+        assertFalse(ActivitySuperiorRules.fechaReprogramadaOk("2026-10-22T17:59:00Z", ahora))
+        assertFalse(ActivitySuperiorRules.fechaReprogramadaOk(null, ahora))
+        assertFalse(ActivitySuperiorRules.fechaReprogramadaOk("mañana", ahora))
+    }
+
+    @Test
+    fun avisoDeNoCumplidaPorCierreDeJornada() {
+        val a = ActivityDto(
+            id = 1,
+            estatus = "No cumplida",
+            incumplimiento = ActivityIncumplimientoDto(
+                origen = "CIERRE_JORNADA",
+                causa = "SIN_ENTREGA",
+                causaEtiqueta = "Sin entrega al cierre de la jornada",
+                registradoAt = "2026-10-23T00:00:00.000Z",
+                pendientes = listOf(
+                    ActivityPersonRefDto(7, "Ana López"),
+                    ActivityPersonRefDto(8, " "),
+                    ActivityPersonRefDto(9, "Beto Ruiz"),
+                ),
+            ),
+        )
+        val aviso = ActivitySuperiorRules.avisoNoCumplida(a)!!
+        assertEquals("No cumplida · Sin entrega al cierre de la jornada", aviso.titulo)
+        assertEquals("Cierre automático de la jornada", aviso.origen)
+        assertEquals("2026-10-23T00:00:00.000Z", aviso.registradoAt)
+        assertNull(aviso.observaciones)
+        assertEquals("Pendientes de entrega: Ana López, Beto Ruiz", aviso.pendientes)
+    }
+
+    @Test
+    fun avisoDeNoCumplidaRegistradaPorUnSuperior() {
+        val a = ActivityDto(
+            id = 1,
+            estatus = "No cumplida",
+            incumplimiento = ActivityIncumplimientoDto(
+                origen = "MANUAL",
+                causa = "MATERIAL",
+                observaciones = "  No llegó el cable a tiempo.  ",
+                registradoPor = ActivityPersonRefDto(5, "Luis Pérez"),
+            ),
+        )
+        val aviso = ActivitySuperiorRules.avisoNoCumplida(a)!!
+        // Sin etiqueta de la API: la del catálogo.
+        assertEquals("No cumplida · Falta de material, herramienta o equipo", aviso.titulo)
+        assertEquals("Registrada por Luis Pérez", aviso.origen)
+        assertEquals("No llegó el cable a tiempo.", aviso.observaciones)
+        assertNull(aviso.pendientes)
+
+        // API vieja, sin registro: solo el título.
+        val sinRegistro = ActivitySuperiorRules.avisoNoCumplida(ActivityDto(id = 2, estatus = "No cumplida"))!!
+        assertEquals("No cumplida", sinRegistro.titulo)
+    }
+
+    @Test
+    fun reprogramadaEsHistorialNoAviso() {
+        val inc = ActivityIncumplimientoDto(
+            origen = "CIERRE_JORNADA",
+            causa = "SIN_ENTREGA",
+            causaEtiqueta = "Sin entrega al cierre de la jornada",
+            reprogramadaAt = "2026-10-23T15:00:00.000Z",
+            reprogramadaPara = "2026-10-26T15:00:00.000Z",
+            reprogramadaPor = ActivityPersonRefDto(5, "Luis Pérez"),
+            motivoReprogramacion = "El cliente confirmó acceso.",
+        )
+        val reabierta = ActivityDto(id = 1, estatus = "Pendiente", incumplimiento = inc)
+        assertNull(ActivitySuperiorRules.avisoNoCumplida(reabierta))
+        val nota = ActivitySuperiorRules.notaReprogramada(reabierta, ZoneId.of("America/Mexico_City"))!!
+        assertTrue(nota, nota.startsWith("Reprogramada por Luis Pérez para "))
+        assertTrue(nota, nota.contains("09:00"))
+        assertTrue(nota, nota.endsWith(" · no se cumplió: Sin entrega al cierre de la jornada"))
+
+        // Mientras siga «No cumplida» no hay nota de historial.
+        assertNull(ActivitySuperiorRules.notaReprogramada(reabierta.copy(estatus = "No cumplida")))
+        // Sin reprogramar tampoco.
+        assertNull(ActivitySuperiorRules.notaReprogramada(reabierta.copy(incumplimiento = inc.copy(reprogramadaAt = null))))
     }
 }

@@ -361,9 +361,16 @@ object CoreActivityRules {
 
     const val MIN_REORDER_REASON = 10
 
+    /** «No cumplida»: cerrada como Cancelada, pero es un fallo y va en rojo. */
+    private val NO_CUMPLIDA = Regex("no cumplida|incumplida", RegexOption.IGNORE_CASE)
+
+    fun esNoCumplida(estatus: String?): Boolean = NO_CUMPLIDA.containsMatchIn(estatus.orEmpty())
+
     fun estatusUi(estatus: String?): Tone {
         val s = estatus.orEmpty()
         return when {
+            // Antes que todo: ninguna otra regla debe ganarle a «No cumplida».
+            esNoCumplida(s) -> Tone("No cumplida", ROJO)
             Regex("proceso", RegexOption.IGNORE_CASE).containsMatchIn(s) -> Tone("En curso", AZUL)
             Regex("validar", RegexOption.IGNORE_CASE).containsMatchIn(s) -> Tone("En revisión", MORADO)
             Regex("rechazada", RegexOption.IGNORE_CASE).containsMatchIn(s) -> Tone("Te la regresaron", ROJO)
@@ -779,6 +786,7 @@ object CoreActivityRules {
     fun timelineKindLabel(kind: String?): String = when (kind?.trim()?.lowercase()) {
         "enviada" -> "Enviada"
         "reprogramada" -> "Reprogramada"
+        "no_cumplida", "no cumplida" -> "No cumplida"
         "cumplida" -> "Cumplida"
         "revision", "revisión" -> "Revisión"
         "evidencia" -> "Evidencia"

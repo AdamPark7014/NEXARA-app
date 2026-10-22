@@ -15,8 +15,15 @@ enum CorePalette {
 
 /// Etiquetas de estatus en lenguaje de campo (espejo de MisActividadesView web).
 enum CoreStatusUI {
+    /// «No cumplida»: cerrada como Cancelada, pero es un fallo y va en rojo.
+    static func esNoCumplida(_ raw: String?) -> Bool {
+        (raw ?? "").range(of: "no cumplida|incumplida", options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
     static func estatus(_ raw: String?) -> (label: String, color: Color?) {
         let s = (raw ?? "").lowercased()
+        // Antes que todo: ninguna otra regla debe ganarle a «No cumplida».
+        if esNoCumplida(raw) { return ("No cumplida", CorePalette.red) }
         if s.contains("proceso") { return ("En curso", CorePalette.blue) }
         if s.contains("validar") { return ("En revisión", CorePalette.purple) }
         if s.contains("rechazada") { return ("Te la regresaron", CorePalette.red) }

@@ -33,7 +33,7 @@ object SesionActividadRules {
         "Tu reloj vuelve a correr. Se detiene al pausar, al checar salida, a las 12 h o al terminar el día."
     const val PLACEHOLDER_MOTIVO_JEFE = "Ej. Salió una falla urgente en el cliente; que la atienda primero."
 
-    private val CERRADA = Regex("finalizada|completada|cancelada|aprobada", RegexOption.IGNORE_CASE)
+    private val CERRADA = Regex("finalizada|completada|cancelada|aprobada|no cumplida|incumplida", RegexOption.IGNORE_CASE)
 
     fun cerrada(estatus: String?): Boolean = CERRADA.containsMatchIn(estatus.orEmpty())
 

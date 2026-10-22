@@ -143,10 +143,19 @@ fun ActivityHistorialTab(activity: ActivityDto) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ToneChip("${events.size} evento${if (events.size == 1) "" else "s"}", icon = NxIcons.Calendar)
-                val cerrada = !activity.fechaFinalizacion.isNullOrBlank()
+                val noCumplida = CoreActivityRules.esNoCumplida(activity.estatus)
+                val cerrada = !noCumplida && !activity.fechaFinalizacion.isNullOrBlank()
                 ToneChip(
-                    if (cerrada) "Finalizada" else activity.estatus.ifBlank { "Sin estado" },
-                    if (cerrada) CoreActivityRules.VERDE else CoreActivityRules.AZUL,
+                    when {
+                        noCumplida -> "No cumplida"
+                        cerrada -> "Finalizada"
+                        else -> activity.estatus.ifBlank { "Sin estado" }
+                    },
+                    when {
+                        noCumplida -> CoreActivityRules.ROJO
+                        cerrada -> CoreActivityRules.VERDE
+                        else -> CoreActivityRules.AZUL
+                    },
                 )
                 Spacer(Modifier.weight(1f))
                 OutlinedButton(onClick = { reload++ }, enabled = !loading) { Text("↻") }
@@ -179,6 +188,7 @@ private fun TimelineEventCard(ev: Map<String, Any?>, highlighted: Boolean) {
     val color = when (kind.lowercase()) {
         "enviada", "despacho" -> CoreActivityRules.AZUL
         "reprogramada" -> CoreActivityRules.NARANJA
+        "no_cumplida" -> CoreActivityRules.ROJO
         "cumplida" -> CoreActivityRules.VERDE
         "revision", "revisión" -> CoreActivityRules.MORADO
         else -> null

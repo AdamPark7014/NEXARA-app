@@ -99,6 +99,7 @@ enum InicioRules {
         if a.enCurso == true { return Estado(label: "En curso", tono: .info) }
         let s = (a.estatus ?? "").lowercased()
         let label = CoreStatusUI.estatus(a.estatus).label
+        if CoreStatusUI.esNoCumplida(a.estatus) { return Estado(label: label, tono: .danger) }
         if s.contains("proceso") || s.contains("validar") { return Estado(label: label, tono: .info) }
         if s.contains("rechazada") { return Estado(label: label, tono: .danger) }
         if s.contains("finalizada") || s.contains("completada") || s.contains("aprobada") {

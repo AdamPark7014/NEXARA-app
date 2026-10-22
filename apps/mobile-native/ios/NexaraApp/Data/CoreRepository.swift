@@ -334,6 +334,36 @@ final class CoreRepository {
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 
+    /// `POST activities/:id/no-cumplida { causa, observaciones }`: la cierra como «No cumplida».
+    /// `causa` es la clave del catálogo (SIN_ENTREGA, MATERIAL…); observaciones de 10 a 400.
+    func registrarNoCumplida(activityId: Int, causa: String, observaciones: String) async throws {
+        struct Body: Encodable {
+            let causa: String
+            let observaciones: String
+        }
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "activities/\(activityId)/no-cumplida",
+            body: Body(causa: causa, observaciones: observaciones)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `POST activities/:id/reprogramar { fecha, motivo }`: reabre una «No cumplida» con nuevo
+    /// inicio; el incumplimiento queda registrado. No es el `PATCH me/…/reprogramar` del despacho.
+    func reprogramarNoCumplida(activityId: Int, fecha: Date, motivo: String) async throws {
+        struct Body: Encodable {
+            let fecha: String
+            let motivo: String
+        }
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "activities/\(activityId)/reprogramar",
+            body: Body(fecha: CoreFormat.isoString(fecha), motivo: motivo)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
     // MARK: Evidencias del equipo
 
     func teamEvidence(activityId: Int) async throws -> TeamEvidenceResponse {

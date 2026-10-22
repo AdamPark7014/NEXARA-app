@@ -261,6 +261,7 @@ enum NxStatusText {
         "approved": "Aprobado", "aprobado": "Aprobado", "aprobada": "Aprobada",
         "rejected": "Rechazado", "rechazado": "Rechazado", "rechazada": "Rechazada",
         "cancelled": "Cancelado", "canceled": "Cancelado", "cancelado": "Cancelado", "cancelada": "Cancelada",
+        "no_cumplida": "No cumplida", "incumplida": "No cumplida",
         "completed": "Terminado", "done": "Terminado", "finished": "Terminado",
         "completado": "Terminado", "completada": "Terminada", "finalizado": "Terminado", "finalizada": "Terminada",
         "closed": "Cerrado", "cerrado": "Cerrado", "cerrada": "Cerrada",
@@ -292,7 +293,8 @@ enum NxStatusText {
                   "parcial", "partially_paid", "draft", "borrador", "por_comprobar", "medium", "media",
                   "mantenimiento", "maintenance", "por_validar", "en_revision", "review"],
         danger: ["rejected", "rechazado", "rechazada", "overdue", "vencido", "vencida", "urgent",
-                 "urgente", "high", "alta", "cancelled", "canceled", "cancelado", "cancelada"],
+                 "urgente", "high", "alta", "cancelled", "canceled", "cancelado", "cancelada",
+                 "no_cumplida", "incumplida"],
         info: ["open", "abierto", "abierta", "new", "nuevo", "in_progress", "en_proceso", "en_curso",
                "proceso", "assigned", "asignado", "asignada", "sent", "enviado", "enviada", "scheduled",
                "programado", "programada", "en_uso", "in_use", "returned", "devuelto", "devuelta"]

@@ -59,7 +59,7 @@ struct SesionActividad: Hashable {
 
     static func cerrada(_ estatus: String?) -> Bool {
         (estatus ?? "").range(
-            of: "finalizada|completada|cancelada|aprobada",
+            of: "finalizada|completada|cancelada|aprobada|no cumplida|incumplida",
             options: [.regularExpression, .caseInsensitive]
         ) != nil
     }

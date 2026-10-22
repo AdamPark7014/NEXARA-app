@@ -69,6 +69,11 @@ data class ActivityDto(
     val cancelReason: String? = null,
     val cancelledAt: String? = null,
     val cancelledBy: ActivityPersonRefDto? = null,
+    /**
+     * Último registro de «No cumplida» (cierre de jornada o un superior). Sigue llegando
+     * aunque se haya reprogramado: entonces es historial, no el estado actual.
+     */
+    val incumplimiento: ActivityIncumplimientoDto? = null,
     // ── Contrato B en el detalle; opcionales (la API vieja no los manda).
     /** PENDIENTE | ACEPTADA | RECHAZADA — lo de quien consulta. */
     val aceptacion: String? = null,
@@ -87,6 +92,32 @@ data class ActivityDto(
 data class ActivityPersonRefDto(
     val id: Long? = null,
     val nombre: String? = null,
+)
+
+/** Registro de «No cumplida»; todo opcional para no tumbar el detalle si falta algo. */
+data class ActivityIncumplimientoDto(
+    val id: Long? = null,
+    /** CIERRE_JORNADA | MANUAL */
+    val origen: String? = null,
+    val causa: String? = null,
+    val causaEtiqueta: String? = null,
+    val observaciones: String? = null,
+    val limite: String? = null,
+    val registradoAt: String? = null,
+    /** `null` = lo cerró el sistema al terminar la jornada. */
+    val registradoPor: ActivityPersonRefDto? = null,
+    /** Quienes no entregaron. */
+    val pendientes: List<ActivityPersonRefDto>? = null,
+    val reprogramadaAt: String? = null,
+    val reprogramadaPara: String? = null,
+    val reprogramadaPor: ActivityPersonRefDto? = null,
+    val motivoReprogramacion: String? = null,
+)
+
+/** Causa del catálogo de incumplimiento: clave para la API, etiqueta para la gente. */
+data class CausaIncumplimientoDto(
+    val clave: String? = null,
+    val etiqueta: String? = null,
 )
 
 /** Persona de la actividad que quien consulta puede reemplazar. */
@@ -108,9 +139,26 @@ data class ActivityAccionesDto(
     val cerrada: Boolean? = null,
     val estatus: String? = null,
     val motivoMinimo: Int? = null,
+    // «No cumplida» y «Reprogramar»; la API vieja no los manda.
+    val puedeRegistrarIncumplimiento: Boolean? = null,
+    /** Llega `true` con la actividad cerrada como «No cumplida»: reprogramar la reabre. */
+    val puedeReprogramar: Boolean? = null,
+    val causasIncumplimiento: List<CausaIncumplimientoDto>? = null,
 )
 
 data class CancelActivityRequest(
+    val motivo: String,
+)
+
+/** «Registrar incumplimiento»: clave del catálogo y observaciones. */
+data class NoCumplidaRequest(
+    val causa: String,
+    val observaciones: String,
+)
+
+/** «Reprogramar» una no cumplida: nuevo inicio (ISO) y por qué. */
+data class ReprogramarActividadRequest(
+    val fecha: String,
     val motivo: String,
 )
 
@@ -579,6 +627,20 @@ interface ConsoleApi {
     suspend fun reassignActivity(
         @Path("id") id: Long,
         @Body body: ReassignActivityRequest,
+    ): okhttp3.ResponseBody
+
+    /** Los mismos superiores que pueden cancelar; la cierra como «No cumplida». */
+    @POST("activities/{id}/no-cumplida")
+    suspend fun registrarNoCumplida(
+        @Path("id") id: Long,
+        @Body body: NoCumplidaRequest,
+    ): okhttp3.ResponseBody
+
+    /** Reabre una «No cumplida» con fecha nueva; el incumplimiento queda registrado. */
+    @POST("activities/{id}/reprogramar")
+    suspend fun reprogramarActividad(
+        @Path("id") id: Long,
+        @Body body: ReprogramarActividadRequest,
     ): okhttp3.ResponseBody
 
     @GET("gps/me")
