@@ -17,6 +17,8 @@
   - **~11:40: reenviada.** Adam pulsó «Eliminar todo» (juego de iPad vacío, verificado por la API); Claude pulsó
     «Actualizar revisión», publicó la respuesta en el Resolution Center (hoy 11:34) y «Volver a enviar»:
     **1.0.0 (10) «Pendiente de revisión»**. Nada que hacer hasta que Apple conteste.
+  - **22-10: APROBADA.** La versión 1.0 está en `PENDING_DEVELOPER_RELEASE` (lanzamiento manual): falta pulsar
+    «Publicar esta versión» en ASC para que salga en la App Store. Adam decide cuándo.
   - Los 14 archivos de reuniones sin commitear son del turno anterior: no se tocaron. **main local y remoto
     divergieron** (remoto: `63accdee` reuniones 12-10 + `399cd877` asistencia 14-10; local: `283ce9b6` + docs
     `f66b13c7`); los cambios sin commitear NO coinciden con lo del remoto. Adam decide cómo reconciliar; los
