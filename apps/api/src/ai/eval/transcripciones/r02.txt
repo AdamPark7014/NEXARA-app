@@ -1,0 +1,26 @@
+Llamada Hospital San Rafael - mié 14/oct/2026
+Asist: Carolina Pérez (yo), Roberto Castillo (soporte), ing. Ochoa (mantenimiento HSR)
+
+- Ochoa arranca molesto. Dice q la semana pasada urgencias se quedó sin cámaras como 6 hrs, "seis horas, Carolina, en urgencias". Q no es posible en un hospital
+- Roberto explica q fue falla en el DVR y q parte del cableado analogico ya está muy viejo, mucho ruido en la señal, se cae x tramos
+- Ochoa: q eso ya lo sabíamos desde antes y no se había hecho nada. Yo le dije q tiene razón en el enojo, q vamos a darle solución real y no solo parche
+- Roberto propone cambiar 6 cámaras analogicas a IP, las de urgencias y el pasillo de ingreso. Q con IP ya no dependen del DVR viejo y se ve mejor la imagen
+- Ochoa pregunta si es mucho obra. Roberto: no, se reaprovecha parte del cable, se revisa en sitio
+- **Roberto envía la propuesta p/ cambiar las 6 cámaras analogicas a IP a más tardar el lunes** (Ochoa la revisa con su dirección)
+- Ochoa pregunta x el mantenimiento, q hace rato no los ven x allá
+- **Yo agendo el preventivo trimestral p/ la primera semana de noviembre.** Le confirmo día exacto x correo cuando cuadre con su gente
+- Ochoa pide q el preventivo incluya revisar todo el cableado de urgencias, Roberto dice q sí entra en la revisión
+- RIESGO: Ochoa lo dijo muy claro, si urgencias se vuelve a quedar sin cámaras la dirección podría rescindir el contrato. Ya se lo están pidiendo desde arriba. Q no es amenaza, es la situación
+- Roberto dice q entiende, q van a estar encima
+- Tema cobro: Ochoa reclama q le cobraron la visita de emergencia del 10 de oct completa y q ni se resolvió bien
+- Yo y Roberto lo hablamos en la llamada, **se acuerda cobrar la visita de emergencia del 10 de octubre a mitad de precio** (decisión). Ochoa dice q así sí le sirve para justificarlo con administración
+- Ochoa menciona q el site del 3er piso estaba cerrado cuando fue el técnico y se perdió rato esperando. Nadie sabe quién tiene la llave, ni ellos ni nosotros bien. Se queda ahí, sin dueño, pendiente averiguar quién la tiene
+- Ochoa se despide más tranquilo pero dejó claro q está a prueba la cuenta
+- Tono final cordial. Dijo q espera la propuesta y el aviso del preventivo
+
+Resumen rápido:
+- Propuesta IP (6 cams) -> Roberto, lunes
+- Preventivo trimestral -> Carolina, 1a semana de noviembre
+- Visita 10/oct a 50% -> decidido
+- Riesgo: rescindir contrato si urgencias se queda sin cámaras otra vez
+- Llave site 3er piso -> pendiente, sin responsable

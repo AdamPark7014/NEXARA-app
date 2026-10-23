@@ -1,0 +1,173 @@
+Diana Sánchez: Bueno, pues buenas tardes a todos. Ingeniero Salazar, ¿nos escucha bien?
+
+Ing. Salazar (Hotel Real): Sí, sí, buenas tardes. Los escucho perfecto, Diana. Perdón, es que estoy aquí en el cuarto de máquinas y hay un poco de ruido, pero creo que se oye bien.
+
+Diana Sánchez: Sí, se oye bien. Mire, ahorita estamos Ricardo, Roberto y yo. Ricardo es el supervisor de obra, Roberto es el jefe de soporte, y pues yo llevo la parte de ingeniería del proyecto.
+
+Ricardo Hernández: Qué tal, ingeniero. Ya habíamos platicado por teléfono, ¿no? Cuando fui a recorrer el segundo piso.
+
+Ing. Salazar (Hotel Real): Ah, sí, Ricardo, claro, cómo no. Me acuerdo, usted traía el casco amarillo.
+
+Ricardo Hernández: Ese mero, jaja.
+
+Roberto Castillo: Hola, ingeniero, mucho gusto. Roberto Castillo, yo veo todo lo de soporte y la puesta en marcha ya que se entrega.
+
+Ing. Salazar (Hotel Real): Mucho gusto, Roberto.
+
+Diana Sánchez: Pues la idea de la junta es esta, ingeniero: son como quince minutos, queremos aterrizar tres cosas. El diseño de la red, la canalización, o sea por dónde va a ir todo el cableado, y cómo vamos a dejar el acceso remoto para que ustedes puedan ver las cámaras. Si le parece empezamos con el diseño de red.
+
+Ing. Salazar (Hotel Real): Sí, adelante, adelante.
+
+Diana Sánchez: Okey. Entonces, este, lo que nosotros tenemos ahorita es la propuesta que le mandamos, con el número de cámaras por piso y los puntos de control de acceso. Pero para armar bien el diseño de red, o sea, cómo se va a segmentar, qué va en cada VLAN, dónde van los switches, necesito los planos arquitectónicos. Y los que tenemos son los de la primera etapa, que ya están viejos, ¿verdad?
+
+Ing. Salazar (Hotel Real): Sí, sí, esos ya no sirven mucho. Es que hicimos modificaciones en el tercer piso y en la parte de atrás, donde estaba la bodega. Quitamos unos muros y se hizo un salón de usos múltiples.
+
+Diana Sánchez: Ajá, justo. Entonces necesitaríamos esos planos actualizados. ¿Usted los tiene o los tiene que pedir con el arquitecto?
+
+Ing. Salazar (Hotel Real): No, yo los tengo, los tengo en digital. Nada más déjeme sacarlos bien porque hay una carpeta con varias versiones y no quiero mandarle los que no son. Pero yo se los mando mañana, sin falla.
+
+Diana Sánchez: Perfecto, ingeniero. Entonces usted nos manda los planos arquitectónicos actualizados mañana.
+
+Ing. Salazar (Hotel Real): Sí, mañana se los mando. A su correo, ¿verdad?
+
+Diana Sánchez: A mi correo, sí, el mismo donde le llegó la propuesta. Y con copia a Ricardo, por favor, porque él los necesita para la obra.
+
+Ricardo Hernández: Sí, con copia a mí, porque sin los planos no puedo ni medir los tramos de tubería.
+
+Ing. Salazar (Hotel Real): Sí, con copia a los dos. Listo.
+
+Diana Sánchez: Muy bien. Ya con eso yo me pongo a armar el diseño. Les cuento cómo lo estoy pensando, ingeniero. Estaba pensando en separar la red en varias VLAN: una para cámaras, otra para control de acceso, otra para la administración y otra aparte para lo que sea de ustedes, de mantenimiento. Para que si pasa algo en una, no se contamine la otra.
+
+Ing. Salazar (Hotel Real): Ah, mire, eso me parece muy bien. Porque nosotros tenemos una red del hotel que es la de huéspedes y otra que es la de administración, y no quisiera que nada se cruce con eso. Sobre todo el wifi de los huéspedes.
+
+Diana Sánchez: No, no, para nada. Va a ir totalmente aparte. O sea, la red de seguridad va a vivir sola, con sus propias VLAN, y nada más habrá un punto de conexión controlado, si es que lo necesitan, hacia la red de administración.
+
+Roberto Castillo: Y eso también nos ayuda a nosotros en soporte, ingeniero, porque si algo falla es mucho más fácil ubicar dónde está el problema.
+
+Ing. Salazar (Hotel Real): Sí, sí, tiene lógica. Ahora, ¿y para cuándo tendría usted ese diseño, Diana?
+
+Diana Sánchez: Mire, yo se lo entrego en dos semanas. Ya con los planos de mañana, yo calculo que en dos semanas tengo el diseño de red completo, con las VLAN, el direccionamiento y el diagrama.
+
+Ing. Salazar (Hotel Real): Perfecto. Dos semanas, entonces.
+
+Diana Sánchez: Sí, dos semanas, a partir de hoy.
+
+Roberto Castillo: Diana, una duda de equipo. ¿Ya definimos qué switches van en cada piso? Porque eso también va en el diseño.
+
+Diana Sánchez: Sí, justo iba a tocar eso. Yo proponía poner switches PoE de veinticuatro puertos en cada piso. Hicimos la cuenta y con las cámaras, los lectores y algún punto de acceso, veinticuatro nos alcanzan con un poco de holgura.
+
+Roberto Castillo: Sí, a mí me parece bien. Veinticuatro puertos PoE, uno por piso, y así alimentamos las cámaras directo sin tener que andar con fuentes aparte.
+
+Ricardo Hernández: Y para la obra también es más fácil, porque es un solo gabinete por piso y de ahí salen los tendidos.
+
+Ing. Salazar (Hotel Real): ¿Y eso de PoE es que la cámara se alimenta por el mismo cable de red?
+
+Roberto Castillo: Exacto, ingeniero. Un solo cable lleva datos y energía. Se ahorra mucho cable y mucho trabajo.
+
+Ing. Salazar (Hotel Real): Ah, qué bien. Pues por mi parte adelante, me parece bien.
+
+Diana Sánchez: Entonces quedamos: switches PoE de veinticuatro puertos en cada piso.
+
+Ing. Salazar (Hotel Real): De acuerdo.
+
+Ricardo Hernández: Okey, ahora sí, la canalización. Ingeniero, esto es lo que a mí me toca. Lo que vamos a hacer es instalar la tubería y las charolas por donde va a ir todo el cable. En los pasillos va a ir por el plafón, y en la parte de atrás, donde hicieron el salón, probablemente vaya aparente por unos tramos.
+
+Ing. Salazar (Hotel Real): Ajá. Ahí en el salón el plafón es más bajo, ojo con eso.
+
+Ricardo Hernández: Sí, por eso necesito los planos, para revisar esas alturas. Y, este, otra cosa: me va a tocar coordinarme con ustedes para los horarios, porque hay ruido, hay taladro, y el hotel está operando.
+
+Ing. Salazar (Hotel Real): Sí, eso sí. Lo ideal es trabajar entre las diez de la mañana y las cinco de la tarde, cuando ya salieron los huéspedes y todavía no regresan. Y en áreas comunes, a veces tienen que ser de noche.
+
+Ricardo Hernández: Perfecto, eso lo vemos ya en obra con usted. Entonces, sobre fechas, yo programo la instalación de la canalización a partir del tres de noviembre.
+
+Ing. Salazar (Hotel Real): ¿Tres de noviembre? Déjeme ver. Sí, ese día no tengo nada importante. Está bien.
+
+Ricardo Hernández: Sí, a partir del tres de noviembre arrancamos con la canalización. Yo me encargo de programarlo con mi cuadrilla.
+
+Diana Sánchez: Y ojo, Ricardo, que para entonces ya tengo que haber entregado el diseño, o sea que cuadra bien.
+
+Ricardo Hernández: Sí, cuadra. Con dos semanas de Diana llegamos justo a tiempo.
+
+Diana Sánchez: Sí, de hecho viene bien.
+
+Ing. Salazar (Hotel Real): Oigan, y otra cosa que quería preguntar. Lo de ver las cámaras desde fuera. Porque al director le interesa poder ver desde su celular, aunque no esté en el hotel.
+
+Roberto Castillo: Sí, ingeniero, eso es el acceso remoto. Nosotros vamos a dejar configurado el NVR, que es la grabadora donde se guardan todas las cámaras, para que ustedes puedan entrar de manera remota, desde la computadora o desde el celular, con usuario y contraseña.
+
+Ing. Salazar (Hotel Real): ¿Y eso es seguro? Porque me da cierto temor que alguien se meta.
+
+Roberto Castillo: Sí, no se preocupe. Se configura con usuarios individuales, con permisos distintos según quién sea, y el tráfico va cifrado. Y además, como Diana va a dejar la red segmentada, el NVR queda protegido.
+
+Diana Sánchez: Sí, justo, eso va dentro del diseño también.
+
+Ing. Salazar (Hotel Real): Está bien. ¿Y cuándo podrían tenerlo?
+
+Roberto Castillo: Mire, yo configuro el acceso remoto al NVR para el hotel el lunes. O sea, este lunes que entra.
+
+Ing. Salazar (Hotel Real): ¿Este lunes? Qué bien, qué rápido.
+
+Roberto Castillo: Sí, el lunes lo dejo. Lo que pasa es que vamos a hacerlo primero con el NVR que ya tenemos de prueba, y cuando se instale el definitivo se replica. Pero el lunes ya lo tienen para que el director se vaya familiarizando.
+
+Ing. Salazar (Hotel Real): Perfecto, se lo agradezco mucho.
+
+Diana Sánchez: Entonces el lunes Roberto, ¿eh? Para que quede claro.
+
+Roberto Castillo: Sí, sí, el lunes, no se me olvida.
+
+Ricardo Hernández: Oye, Roberto, ¿y el NVR de prueba ya lo tienes en el laboratorio?
+
+Roberto Castillo: Sí, ya está. Nada más lo conecto y ya.
+
+Ricardo Hernández: Va.
+
+Ing. Salazar (Hotel Real): Bueno, y ya que están, otra cosa. Cuando ya esté todo instalado, ¿ustedes nos dan capacitación, verdad? Para saber usar el sistema, ver las grabaciones, exportar un video si pasa algo.
+
+Diana Sánchez: Sí, claro, se incluye la capacitación. Eso va en la propuesta.
+
+Roberto Castillo: Sí, la damos nosotros ya al final, cuando entreguemos.
+
+Ing. Salazar (Hotel Real): Es que ahí no sé a quién del hotel le toque. Podría ser alguien de mi equipo de mantenimiento, o de seguridad, o a lo mejor alguien de sistemas, la verdad no lo tengo claro.
+
+Diana Sánchez: Ajá, sí, pues habría que ver quién.
+
+Roberto Castillo: Sí, quién lo vaya a operar de verdad.
+
+Ing. Salazar (Hotel Real): Ándale, pues sí. Ya vemos eso.
+
+Ricardo Hernández: Bueno, y de la canalización, ingeniero, una cosa más. ¿Hay algún piso donde no podamos entrar a ciertas horas? Por ejemplo, si hay un evento o algo así.
+
+Ing. Salazar (Hotel Real): Déjeme checar la agenda de eventos. En noviembre hay unas bodas en el salón de la planta baja, creo que dos fines de semana. Pero entre semana no hay problema.
+
+Ricardo Hernández: Perfecto, entre semana trabajamos, y los fines de semana evitamos esa zona. Con eso me basta.
+
+Ing. Salazar (Hotel Real): Sí, eso sí.
+
+Diana Sánchez: Ingeniero, otra cosa chiquita. En el cuarto de máquinas donde está usted, ¿hay espacio para un rack? Porque ahí iría el equipo principal, el NVR definitivo y el switch central.
+
+Ing. Salazar (Hotel Real): Sí, hay espacio. Es esa pared del fondo, hay como dos metros libres. Tiene corriente y tiene ventilación, aunque eso sí hace calor en verano.
+
+Diana Sánchez: Okey, lo tomo en cuenta para el diseño. Ya con los planos veo bien la ubicación.
+
+Ing. Salazar (Hotel Real): Perfecto.
+
+Roberto Castillo: Y ahí también tengo que ver el internet, ingeniero, para el acceso remoto. Pero eso ya lo veo el lunes cuando configure.
+
+Ing. Salazar (Hotel Real): Sí, ahí le dan el servicio de siempre, ya después le paso los datos con calma.
+
+Roberto Castillo: Va, está bien.
+
+Diana Sánchez: Muy bien, pues yo creo que ya cubrimos todo, ¿no? Repasando: usted nos manda los planos mañana, yo entrego el diseño de red con las VLAN en dos semanas, Ricardo arranca la canalización a partir del tres de noviembre, y Roberto deja el acceso remoto al NVR el lunes.
+
+Ricardo Hernández: Y los switches PoE de veinticuatro puertos en cada piso.
+
+Diana Sánchez: Eso, sí, quedó decidido.
+
+Ing. Salazar (Hotel Real): Perfecto. Todo claro de mi lado. Muchas gracias a todos.
+
+Ricardo Hernández: Gracias a usted, ingeniero.
+
+Roberto Castillo: Gracias, ingeniero, buen día.
+
+Diana Sánchez: Gracias, ingeniero Salazar. Que esté muy bien.
+
+Ing. Salazar (Hotel Real): Igualmente. Hasta luego.

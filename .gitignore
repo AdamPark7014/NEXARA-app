@@ -122,3 +122,6 @@ apps/web/NUL
 .tools/
 
 .ai/drafts/
+
+# Detalle de las corridas del eval de IA (respuestas completas): se resume en apps/api/src/ai/eval/resultados.
+.ai/eval-ia/

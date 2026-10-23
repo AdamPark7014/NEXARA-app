@@ -3,16 +3,19 @@ import Anthropic from '@anthropic-ai/sdk';
 
 /**
  * Cliente único de Claude para los procesos automáticos de NEXARA (asistente de
- * actividades, actas de reunión, etc.).
+ * actividades, actas de reunión, triage, Lab).
  *
- * - La clave se lee SOLO de `ANTHROPIC_API_KEY` en el entorno del servidor. Nunca va en el
- *   repo, en la base ni en el navegador. Las llamadas van directo a api.anthropic.com
- *   (ignoran `ANTHROPIC_BASE_URL`); otra URL solo con `CLAUDE_BASE_URL`.
- * - Modelo barato por defecto (`claude-haiku-5-5`): clasificar y extraer datos no necesita
- *   un modelo grande. Cada proceso puede pedir otro con su propia variable de entorno.
+ * - Todo pasa por la puerta única de IA de Adam (`C:\dev\scripts\ai-os\IA-CLAUDE.md`):
+ *   `CLAUDE_BASE_URL` = la puerta (`http://puerta-ia:8080` entre contenedores del Hetzner) y
+ *   `ANTHROPIC_API_KEY` = el token de NEXARA en la puerta, no la llave de Anthropic. Sin
+ *   `CLAUDE_BASE_URL` va directo a api.anthropic.com (solo para evals locales). Nunca va en el
+ *   repo, en la base ni en el navegador.
+ * - Modelo barato por defecto (`claude-haiku-5-5`): el eval (`src/ai/eval/`) decide cada
+ *   proceso. Cada proceso puede pedir otro con su propia variable de entorno.
  * - Salida estructurada (JSON Schema): la respuesta siempre trae los campos esperados.
  * - Tope diario de llamadas por empresa (`CLAUDE_TOPE_DIARIO`, 300 por omisión) para que
- *   un error o un abuso no dispare la factura. Vive en memoria: se reinicia con el proceso.
+ *   un error o un abuso no dispare la factura. Vive en memoria: se reinicia con el proceso. La
+ *   puerta además corta al llegar al presupuesto mensual del proyecto.
  */
 
 export const MODELO_POR_OMISION = 'claude-haiku-5-5';
@@ -23,36 +26,96 @@ const PRECIOS_USD_POR_MTOK: Record<string, { entrada: number; salida: number }> 
   'claude-sonnet-5-5': { entrada: 2, salida: 10 },
   'claude-opus-5-5': { entrada: 4, salida: 20 },
 };
+/** Escribir en la caché (5 min) cuesta 1.25× la entrada; leerla, 0.1×. */
+const FACTOR_CACHE_ESCRITA = 1.25;
+const FACTOR_CACHE_LEIDA = 0.1;
 
 export type UsoClaude = {
   modelo: string;
+  /** Entrada a precio completo + la escrita en caché (lo que no salió de la caché). */
   tokensEntrada: number;
   tokensSalida: number;
   tokensCacheLeidos: number;
+  tokensCacheEscritos: number;
+  /** Parte de la salida que fue razonamiento (ya incluida en `tokensSalida`). */
+  tokensPensamiento: number;
   /** Estimación en dólares; null si el modelo no está en la tabla de precios. */
   usdAprox: number | null;
 };
 
-export type PeticionJson = {
+type PeticionBase = {
   /** Nombre del proceso, para el log y el tope (p. ej. «asistente-actividades»). */
   proceso: string;
   companyId: number;
-  /** Bloques de sistema estables primero: el último se marca para caché. */
+  /** Bloques de sistema estables primero: cada uno se marca para caché (máx. 3). */
   sistema: string[];
   usuario: string;
-  esquema: Record<string, unknown>;
   modelo?: string;
   maxTokens?: number;
-  /** Esfuerzo de razonamiento. `low` para clasificar; más alto para resumir textos largos. */
+  /** Esfuerzo de razonamiento. `low` para clasificar y extraer. */
   esfuerzo?: 'low' | 'medium' | 'high';
+  /**
+   * Razonamiento adaptativo (por omisión). `false` lo apaga cuando el eval demuestra que no
+   * hace falta: en Sonnet 5.5 se manda `between_tools`, que es su forma de apagarlo.
+   */
+  pensar?: boolean;
   /** Tiempo máximo de la llamada (por omisión 60 s). */
   timeoutMs?: number;
 };
 
-export function estimarUsd(modelo: string, entrada: number, salida: number): number | null {
+export type PeticionJson = PeticionBase & {
+  esquema: Record<string, unknown>;
+};
+
+export type PeticionTexto = PeticionBase;
+
+/** Precio de una llamada a partir del `usage` de la respuesta. */
+export function estimarUsd(
+  modelo: string,
+  uso: { entrada: number; salida: number; cacheLeida?: number; cacheEscrita?: number },
+): number | null {
   const p = PRECIOS_USD_POR_MTOK[modelo];
   if (!p) return null;
-  return Number(((entrada * p.entrada + salida * p.salida) / 1_000_000).toFixed(6));
+  const entrada =
+    uso.entrada * p.entrada +
+    (uso.cacheEscrita ?? 0) * p.entrada * FACTOR_CACHE_ESCRITA +
+    (uso.cacheLeida ?? 0) * p.entrada * FACTOR_CACHE_LEIDA;
+  return Number(((entrada + uso.salida * p.salida) / 1_000_000).toFixed(6));
+}
+
+/** `usage` de la API → uso con costo. */
+export function usoDeRespuesta(modelo: string, usage: Anthropic.Usage): UsoClaude {
+  const cacheEscrita = usage.cache_creation_input_tokens ?? 0;
+  const cacheLeida = usage.cache_read_input_tokens ?? 0;
+  return {
+    modelo,
+    tokensEntrada: usage.input_tokens + cacheEscrita,
+    tokensSalida: usage.output_tokens,
+    tokensCacheLeidos: cacheLeida,
+    tokensCacheEscritos: cacheEscrita,
+    tokensPensamiento: usage.output_tokens_details?.thinking_tokens ?? 0,
+    usdAprox: estimarUsd(modelo, {
+      entrada: usage.input_tokens,
+      salida: usage.output_tokens,
+      cacheLeida,
+      cacheEscrita,
+    }),
+  };
+}
+
+/** Configuración de razonamiento para el modelo. Omitirla = adaptativo. */
+export function configuracionPensamiento(
+  modelo: string,
+  pensar: boolean | undefined,
+): Anthropic.ThinkingConfigParam | undefined {
+  if (pensar !== false) return undefined;
+  return modelo.startsWith('claude-sonnet-5-5') ? { type: 'between_tools' } : { type: 'disabled' };
+}
+
+/** Tipo de error que manda la puerta (o Anthropic) en el cuerpo: `budget_exceeded`, etc. */
+function tipoDeError(error: InstanceType<typeof Anthropic.APIError>): string | null {
+  const cuerpo = error.error as { error?: { type?: unknown } } | undefined;
+  return typeof cuerpo?.error?.type === 'string' ? cuerpo.error.type : null;
 }
 
 @Injectable()
@@ -74,9 +137,8 @@ export class ClaudeService {
     if (!this.cliente) {
       this.cliente = new Anthropic({
         apiKey: process.env.ANTHROPIC_API_KEY!.trim(),
-        // Directo a Anthropic. El SDK tomaría solo ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN del
-        // entorno (el servidor los tiene para otro proveedor): ir por otro lado tiene que ser a
-        // propósito, con CLAUDE_BASE_URL.
+        // La puerta (o Anthropic directo si no hay CLAUDE_BASE_URL). Sin Authorization: la
+        // puerta lee `x-api-key`, y un ANTHROPIC_AUTH_TOKEN viejo del entorno no debe colarse.
         baseURL: (process.env.CLAUDE_BASE_URL || '').trim() || 'https://api.anthropic.com',
         authToken: null,
         maxRetries: 2,
@@ -102,18 +164,24 @@ export class ClaudeService {
     this.llamadasPorDia.set(clave, usadas + 1);
   }
 
-  /** Una llamada con salida JSON validada por el esquema. Devuelve el objeto y el uso. */
-  async json<T>(peticion: PeticionJson): Promise<{ datos: T; uso: UsoClaude }> {
+  /** Llamada común: sistema estable con caché, mensaje variable, errores en español. */
+  private async llamar(
+    peticion: PeticionBase,
+    formato: Anthropic.JSONOutputFormat | null,
+  ): Promise<{ respuesta: Anthropic.Message; uso: UsoClaude }> {
     const cliente = this.obtenerCliente();
     this.registrarLlamada(peticion.companyId);
     const modelo = peticion.modelo || MODELO_POR_OMISION;
-    const sistema: Anthropic.TextBlockParam[] = peticion.sistema.map((text, i) => ({
-      type: 'text',
-      text,
-      ...(i === peticion.sistema.length - 1
-        ? { cache_control: { type: 'ephemeral' as const } }
-        : {}),
-    }));
+    // Cada bloque estable lleva su marca de caché (la API admite 4; aquí van 3 como máximo):
+    // el prompt fijo se reutiliza aunque cambie la lista de personas de quien pregunta.
+    const sistema: Anthropic.TextBlockParam[] = peticion.sistema
+      .filter((t) => t.trim())
+      .map((text, i, todos) => ({
+        type: 'text',
+        text,
+        ...(i >= todos.length - 3 ? { cache_control: { type: 'ephemeral' as const } } : {}),
+      }));
+    const thinking = configuracionPensamiento(modelo, peticion.pensar);
 
     let respuesta: Anthropic.Message;
     try {
@@ -121,11 +189,12 @@ export class ClaudeService {
         {
           model: modelo,
           max_tokens: peticion.maxTokens ?? 4096,
-          system: sistema,
+          ...(sistema.length ? { system: sistema } : {}),
           messages: [{ role: 'user', content: peticion.usuario }],
+          ...(thinking ? { thinking } : {}),
           output_config: {
             effort: peticion.esfuerzo ?? 'low',
-            format: { type: 'json_schema', schema: peticion.esquema },
+            ...(formato ? { format: formato } : {}),
           },
         },
         { timeout: peticion.timeoutMs ?? 60_000 },
@@ -138,26 +207,32 @@ export class ClaudeService {
         );
       }
       if (error instanceof Anthropic.RateLimitError) {
+        if (tipoDeError(error) === 'budget_exceeded') {
+          this.logger.error(`[${peticion.proceso}] presupuesto mensual de IA agotado en la puerta`);
+          throw new ServiceUnavailableException(
+            'Se acabó el presupuesto de IA de este mes. Avísale al administrador.',
+          );
+        }
         throw new ServiceUnavailableException(
           'La IA está saturada en este momento. Intenta de nuevo en un minuto.',
         );
       }
+      if (error instanceof Anthropic.BadRequestError && /no está permitido/.test(error.message)) {
+        // La puerta solo deja usar los modelos de la política de NEXARA.
+        this.logger.error(`[${peticion.proceso}] la puerta no permite ${modelo}`);
+        throw new ServiceUnavailableException(`El modelo ${modelo} no está permitido para NEXARA en la puerta de IA.`);
+      }
       if (error instanceof Anthropic.APIError) {
-        this.logger.error(`[${peticion.proceso}] Anthropic ${error.status}: ${error.message}`);
+        // Solo el estado y el tipo: el mensaje puede repetir parte de lo enviado.
+        this.logger.error(
+          `[${peticion.proceso}] ${modelo} → ${error.status ?? 'sin estado'} ${tipoDeError(error) ?? ''}`.trim(),
+        );
         throw new ServiceUnavailableException('La IA no respondió. Intenta de nuevo.');
       }
       throw error;
     }
 
-    const uso: UsoClaude = {
-      modelo,
-      tokensEntrada:
-        respuesta.usage.input_tokens + (respuesta.usage.cache_creation_input_tokens ?? 0),
-      tokensSalida: respuesta.usage.output_tokens,
-      tokensCacheLeidos: respuesta.usage.cache_read_input_tokens ?? 0,
-      usdAprox: null,
-    };
-    uso.usdAprox = estimarUsd(modelo, uso.tokensEntrada + uso.tokensCacheLeidos, uso.tokensSalida);
+    const uso = usoDeRespuesta(modelo, respuesta.usage);
     this.logger.log(
       `[${peticion.proceso}] empresa ${peticion.companyId} · ${modelo} · ${uso.tokensEntrada}+${uso.tokensCacheLeidos} caché → ${uso.tokensSalida} tokens · ~$${uso.usdAprox ?? '?'}`,
     );
@@ -169,20 +244,40 @@ export class ClaudeService {
     }
     if (respuesta.stop_reason === 'max_tokens') {
       throw new ServiceUnavailableException(
-        'La instrucción es demasiado larga para procesarla de una vez. Divídela.',
+        'El texto es demasiado largo para procesarlo de una vez. Divídelo.',
       );
     }
-    const texto = respuesta.content
+    return { respuesta, uso };
+  }
+
+  private static texto(respuesta: Anthropic.Message): string {
+    return respuesta.content
       .map((b) => (b.type === 'text' ? b.text : ''))
       .join('')
       .trim();
+  }
+
+  /** Una llamada con salida JSON validada por el esquema. Devuelve el objeto y el uso. */
+  async json<T>(peticion: PeticionJson): Promise<{ datos: T; uso: UsoClaude }> {
+    const { respuesta, uso } = await this.llamar(peticion, {
+      type: 'json_schema',
+      schema: peticion.esquema,
+    });
+    const texto = ClaudeService.texto(respuesta);
     try {
       return { datos: JSON.parse(texto) as T, uso };
     } catch {
-      this.logger.error(`[${peticion.proceso}] respuesta no es JSON: ${texto.slice(0, 200)}`);
+      // Sin el contenido en el log: puede traer nombres o datos de la empresa.
+      this.logger.error(`[${peticion.proceso}] respuesta no es JSON (${texto.length} caracteres)`);
       throw new ServiceUnavailableException(
         'La IA respondió en un formato inesperado. Intenta de nuevo.',
       );
     }
+  }
+
+  /** Una llamada de texto libre (Lab). */
+  async texto(peticion: PeticionTexto): Promise<{ texto: string; uso: UsoClaude }> {
+    const { respuesta, uso } = await this.llamar(peticion, null);
+    return { texto: ClaudeService.texto(respuesta), uso };
   }
 }

@@ -77,7 +77,6 @@ export const ESQUEMA_PLAN: Record<string, unknown> = {
   additionalProperties: false,
   required: ['acciones', 'aclaracion'],
   properties: {
-    aclaracion: textoONulo,
     acciones: {
       type: 'array',
       items: {
@@ -117,33 +116,35 @@ export const ESQUEMA_PLAN: Record<string, unknown> = {
         },
       },
     },
+    aclaracion: textoONulo,
   },
 };
 
 /** Instrucciones fijas (no cambian entre llamadas: así entran en la caché de Claude). */
-export const PROMPT_SISTEMA = `Eres el asistente de asignación de actividades de NEXARA, una empresa mexicana de seguridad electrónica e integración (CCTV, control de acceso, redes, alarmas, servicio de campo).
+export const PROMPT_SISTEMA = `Eres el asistente de asignación de actividades de NEXARA, empresa mexicana de seguridad electrónica e integración (CCTV, control de acceso, redes, alarmas, servicio de campo).
 
-Recibes instrucciones de dirección en lenguaje natural, a veces dictadas por voz y con errores de transcripción. Tu trabajo es convertirlas en actividades. No ejecutas nada: devuelves un plan que una persona revisa antes de crearlo.
+Recibes una instrucción de dirección, a veces dictada por voz y con errores de transcripción, y la conviertes en un plan de actividades que una persona revisa antes de crearlas.
 
-Tipos de actividad (elige uno por actividad):
-- tarea: trabajo del día sin proyecto. Subtipos: Levantamiento (visitar un sitio para revisar o medir antes de cotizar), Recolección, Entrega, Junta (reunión con alguien, también con un cliente si no hay servicio técnico que hacer), Compra de material, Preparación de equipo, Trámite, Capacitación, Reporte / documentación, Otro.
-- servicio: atención técnica a un cliente de servicio en su sitio (falla, mantenimiento, revisión de cámaras, alarma, control de acceso). Requiere cliente. tipoServicio: PREVENTIVO (mantenimiento programado), CORRECTIVO (falla), EMERGENCIA (algo caído o urgente), INSTALACION (equipo nuevo pequeño).
-- obra: instalación grande en sitio ligada a un proyecto (cableado, montaje de cámaras en obra).
-- proyecto: trabajo ligado a un proyecto operativo que no es instalación (ingeniería, planos, pruebas, puesta en marcha).
+Tipos (uno por actividad):
+- tarea: trabajo del día sin proyecto. subtipoTarea: Levantamiento (visitar un sitio para revisar o medir antes de cotizar), Recolección, Entrega, Junta (reunión, también con un cliente si no hay trabajo técnico), Compra de material, Preparación de equipo, Trámite, Capacitación, Reporte / documentación, Otro.
+- servicio: trabajo técnico en el sitio de un cliente (falla, mantenimiento, revisión, instalación pequeña). tipoServicio: PREVENTIVO (mantenimiento programado), CORRECTIVO (falla), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo pequeño).
+- obra: instalación grande ligada a un proyecto (cableado, montaje en obra).
+- proyecto: trabajo de un proyecto que no es instalación (ingeniería, planos, pruebas, puesta en marcha).
 - comercial: cotizar, propuesta, seguimiento de venta, visita para vender.
 
-Reglas:
-- Una instrucción puede traer varias actividades; separa una por persona y por trabajo.
-- responsable: el nombre de la persona tal como aparece en la lista de personas asignables; si dijeron un apodo o solo el nombre de pila, usa el nombre completo de la lista que coincida. Si nadie coincide, copia lo que dijeron. null si no lo dijeron.
-- cliente: la empresa o cliente mencionado ("Tox", "Oxxo", "Banorte"). sitio: sucursal, plaza o dirección si la dijeron.
-- fecha en formato AAAA-MM-DD y hora en HH:MM de 24 horas, en hora de Ciudad de México. "a las 3" en horario laboral es 15:00. "mañana", "el lunes", etc. se calculan desde la fecha actual que se te da. Si no dijeron fecha pero sí hora, es hoy (o mañana si esa hora ya pasó). Sin fecha ni hora: null.
-- duracionMin: solo si la dijeron o es evidente; máximo 720.
+Campos:
+- Una actividad por persona y por trabajo: si piden lo mismo a dos personas, son dos actividades.
+- responsable: el nombre completo de la lista de personas cuando lo que dijeron (nombre de pila, apodo: Beto→Roberto, Paty→Patricia, Toño→Antonio) coincide con una sola persona. Si coincide con varias o con nadie, copia exactamente lo que dijeron («Antonio», «Pedro») sin elegir a otra persona, y crea la actividad igual. null si no dijeron quién.
+- cliente: el nombre de la empresa cliente como lo dijeron. sitio: la sucursal, planta, plaza o dirección («la Torre Médica del San Rafael» → cliente «San Rafael», sitio «Torre Médica»). Si no está claro dónde termina el nombre del cliente, pon todo en sitio y cliente null. null si no lo dijeron.
+- fecha AAAA-MM-DD y hora HH:MM (24 h), hora de Ciudad de México, calculadas desde la fecha y hora actuales que se te dan. «mañana», «el lunes», «el viernes» = el próximo día con ese nombre después de hoy. «a las 3» en horario laboral = 15:00. Hora sin fecha: hoy, o mañana si esa hora ya pasó. «ya» o «de inmediato»: hoy a la hora actual. «hoy» sin hora: hoy con hora null. Sin fecha o plazo vago («la otra semana»): null.
+- duracionMin: solo si la dijeron (máximo 720).
 - prioridad: Alta si dicen urgente, ya, cuanto antes o algo está caído; Baja si dicen sin prisa; si no, Media.
-- encargo: "despacho" si piden que la persona reparta el trabajo a su equipo ("que Antonio mande a alguien"); "ejecucion" si la hace ella; null si no está claro.
-- titulo: corto y en infinitivo, máximo 120 caracteres ("Visitar a Tox con el cliente"). indicaciones: el detalle útil que dieron, sin inventar.
-- razonTipo: una frase corta de por qué elegiste ese tipo.
-- No inventes personas, clientes, fechas ni datos que no estén en la instrucción.
-- Si la instrucción no pide ninguna actividad o es incomprensible, devuelve acciones vacío y en aclaracion una pregunta breve en español. Si se entiende, aclaracion es null.`;
+- encargo: despacho si la persona debe mandar a alguien de su equipo; ejecucion si la hace ella; null si no está claro.
+- titulo: empieza con un verbo en infinitivo, máximo 80 caracteres («Revisar DVR que no graba en Angelópolis»).
+- indicaciones: el detalle útil que dieron para hacer el trabajo (qué falla, cantidades, materiales, con quién), con sus palabras, sin agregar ni interpretar nada y sin explicar tu razonamiento. null si no hay detalle.
+- razonTipo: máximo 12 palabras.
+- No inventes personas, clientes, fechas, cantidades ni datos.
+- Si piden algún trabajo, aunque falten datos, devuelve la actividad con lo que haya. Solo si no piden ningún trabajo o no se entiende: acciones vacío y en aclaracion una pregunta breve (nunca acciones vacío con aclaracion null). Si hay actividades, aclaracion null.`;
 
 export type PersonaAsignable = { id: number; nombre: string; puesto?: string | null; email?: string | null };
 export type ClienteNexara = { id: number; name: string };
@@ -184,6 +185,39 @@ export function mensajeUsuario(texto: string, ahora: Date, autor: string | null)
   return `Fecha actual: ${fecha} (${iso}), ${hora} hora de Ciudad de México.${autor ? `\nQuien escribe: ${autor}.` : ''}\n\nInstrucción:\n${texto.trim()}`;
 }
 
+/**
+ * Modelo y parámetros del asistente, medidos con el eval (`src/ai/eval/`, 23-10-2026): Haiku 5.5
+ * en esfuerzo `low` y sin razonamiento sacó lo mismo que con razonamiento y que Sonnet 5.5
+ * (15/15 en las revisiones de código), con la mitad de tokens de salida y ~2 s por llamada.
+ * El modelo se puede cambiar sin desplegar con `ANTHROPIC_ASSISTANT_MODEL`.
+ */
+export const CONFIG_ASISTENTE = {
+  modelo: 'claude-haiku-5-5',
+  esfuerzo: 'low' as const,
+  pensar: false,
+  // ~250 tokens por actividad; el plan admite hasta 10.
+  maxTokens: 3_000,
+};
+
+/** La petición completa a Claude (el servicio y el eval mandan exactamente lo mismo). */
+export function peticionAsistente(
+  instruccion: string,
+  personas: PersonaAsignable[],
+  ahora: Date,
+  autor: string | null,
+) {
+  return {
+    // Prompt fijo + personas de la empresa: cambian poco, así que se reutilizan de la caché.
+    sistema: [PROMPT_SISTEMA, bloquePersonas(personas)],
+    usuario: mensajeUsuario(instruccion, ahora, autor),
+    esquema: ESQUEMA_PLAN,
+    modelo: CONFIG_ASISTENTE.modelo,
+    esfuerzo: CONFIG_ASISTENTE.esfuerzo,
+    pensar: CONFIG_ASISTENTE.pensar,
+    maxTokens: CONFIG_ASISTENTE.maxTokens,
+  };
+}
+
 /** AAAA-MM-DD en hora de Ciudad de México. */
 export function fechaLocalISO(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(d);
@@ -199,10 +233,20 @@ export function normalizar(s: string | null | undefined): string {
     .trim();
 }
 
+/** Palabras que no distinguen un nombre de otro («CEDIS de Tox», «la Torre Médica»). */
+const PALABRAS_VACIAS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'y', 'a', 'al', 'con', 'para', 'por']);
+
+function palabrasUtiles(s: string): string[] {
+  return normalizar(s)
+    .split(' ')
+    .filter((w) => w.length >= 2 && !PALABRAS_VACIAS.has(w));
+}
+
 /**
  * Qué tan bien coincide `consulta` con `nombre` (0 = nada, 3 = igual).
  * 2: cada palabra de la consulta es (o empieza) una palabra del nombre («antonio» → «José
- *    Antonio Ramírez», «banor» → «Banorte»).
+ *    Antonio Ramírez», «banor» → «Banorte»), o el nombre completo viene dentro de la consulta
+ *    («Bodegas Luna Atlixco» → «Bodegas Luna», «Torre Médica del San Rafael» → «Torre Médica»).
  * 1: solo algunas palabras coinciden así: se propone, no se elige.
  */
 export function puntaje(consulta: string, nombre: string): number {
@@ -211,11 +255,21 @@ export function puntaje(consulta: string, nombre: string): number {
   if (!c || !n) return 0;
   if (c === n) return 3;
   const palabrasN = n.split(' ');
-  const palabrasC = c.split(' ').filter((w) => w.length >= 2);
+  const palabrasC = palabrasUtiles(consulta);
   const esInicio = (w: string) => palabrasN.some((p) => p.startsWith(w));
   if (palabrasC.length && palabrasC.every((w) => palabrasN.includes(w) || (w.length >= 3 && esInicio(w)))) return 2;
+  const utilesN = palabrasUtiles(nombre);
+  if (utilesN.length && utilesN.every((w) => palabrasC.includes(w))) return 2;
   if (palabrasC.some((w) => w.length >= 3 && esInicio(w))) return 1;
   return 0;
+}
+
+/** Quita de `texto` las palabras de `nombre` («CEDIS de Tox» sin «Grupo Tox» → «CEDIS»). */
+function sinPalabrasDe(texto: string | null, nombre: string): string | null {
+  if (!texto) return null;
+  const quitar = new Set(palabrasUtiles(nombre));
+  const resto = palabrasUtiles(texto).filter((w) => !quitar.has(w));
+  return resto.length ? resto.join(' ') : null;
 }
 
 export type Coincidencia<T> = { elegido: T | null; candidatos: T[] };
@@ -299,22 +353,50 @@ function horaLegible(iso: string | null, ahora: Date): string {
   return `${cuando} ${hora}`;
 }
 
+/**
+ * Personas que también encajan con lo que la instrucción dijo de `elegida` (las palabras de su
+ * nombre que aparecen en el texto). null si no hay empate o si se nombró por apodo («Beto»).
+ */
+export function mencionAmbigua(
+  elegida: PersonaAsignable,
+  personas: PersonaAsignable[],
+  instruccion: string,
+): PersonaAsignable[] | null {
+  const dichas = new Set(palabrasUtiles(instruccion));
+  const mencion = palabrasUtiles(elegida.nombre).filter((w) => dichas.has(w));
+  if (!mencion.length) return null;
+  const otras = personas.filter(
+    (p) => p.id !== elegida.id && mencion.every((w) => palabrasUtiles(p.nombre).includes(w)),
+  );
+  return otras.length ? [elegida, ...otras] : null;
+}
+
 /** Convierte una acción del plan en una propuesta lista para confirmar. */
 export function construirPropuesta(
   accion: AccionPlan,
   catalogos: CatalogosNexara,
-  contexto: { creadoPorId: number; ahora: Date },
+  contexto: { creadoPorId: number; ahora: Date; instruccion?: string },
 ): PropuestaActividad {
   const tipo: TipoActividad = (TIPOS_ACTIVIDAD as readonly string[]).includes(accion.tipo) ? accion.tipo : 'tarea';
   const avisos: string[] = [];
   const faltantes: string[] = [];
 
-  // Persona
+  // Persona. Si la IA eligió a alguien que en la instrucción solo se nombró con palabras que
+  // comparte con otra persona («Antonio» con dos Antonio en la lista), no se elige.
   const persona = buscar(accion.responsable, catalogos.personas, (p) => p.nombre);
-  const responsable = persona.elegido ? ref(persona.elegido.id, persona.elegido.nombre) : null;
+  let responsable = persona.elegido ? ref(persona.elegido.id, persona.elegido.nombre) : null;
+  let candidatosPersona = persona.candidatos;
+  if (persona.elegido && contexto.instruccion) {
+    const empatadas = mencionAmbigua(persona.elegido, catalogos.personas, contexto.instruccion);
+    if (empatadas) {
+      responsable = null;
+      candidatosPersona = empatadas;
+      avisos.push(`El nombre que dijeron puede ser ${empatadas.map((p) => p.nombre).join(' o ')}: elige a la persona.`);
+    }
+  }
   if (!responsable) {
     faltantes.push('responsable');
-    if (accion.responsable && !persona.candidatos.length) {
+    if (accion.responsable && !candidatosPersona.length) {
       avisos.push(`No encontré a «${accion.responsable}» entre las personas que puedes asignar.`);
     }
   }
@@ -326,10 +408,20 @@ export function construirPropuesta(
   let clienteCandidatos: Referencia[] = [];
   const porCliente = buscar(accion.cliente, catalogos.clientes, (c) => c.name);
   if (porCliente.elegido) cliente = ref(porCliente.elegido.id, porCliente.elegido.name);
+  // «Bodegas Luna Atlixco» puede llegar solo como sitio: el cliente también se busca ahí.
+  if (!cliente && accion.sitio) {
+    const porSitio = buscar(accion.sitio, catalogos.clientes, (c) => c.name);
+    if (porSitio.elegido) cliente = ref(porSitio.elegido.id, porSitio.elegido.name);
+  }
   const sucursalesDelCliente = cliente
     ? catalogos.sucursales.filter((s) => s.clientId === cliente!.id)
     : catalogos.sucursales;
-  const porSucursal = buscar(accion.sitio || (cliente ? null : accion.cliente), sucursalesDelCliente, (s) => s.name);
+  const consultaSucursal = accion.sitio || (cliente ? null : accion.cliente);
+  const porSucursal = buscar(
+    cliente ? sinPalabrasDe(consultaSucursal, cliente.nombre) : consultaSucursal,
+    sucursalesDelCliente,
+    (s) => s.name,
+  );
   if (porSucursal.elegido) {
     sucursal = porSucursal.elegido;
     if (!cliente) cliente = ref(sucursal.clientId, sucursal.clientName);
@@ -434,7 +526,7 @@ export function construirPropuesta(
     titulo: String(payload.titulo),
     textoResponsable: accion.responsable,
     responsable,
-    responsableCandidatos: responsable ? [] : persona.candidatos.map((p) => ref(p.id, p.nombre)),
+    responsableCandidatos: responsable ? [] : candidatosPersona.map((p) => ref(p.id, p.nombre)),
     textoCliente: textoCliente ?? null,
     cliente,
     clienteCandidatos,

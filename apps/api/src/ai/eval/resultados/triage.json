@@ -1,0 +1,46 @@
+[
+  {
+    "funcion": "triage",
+    "variante": "haiku-low-np",
+    "modelo": "claude-haiku-5-5",
+    "esfuerzo": "low",
+    "pensar": false,
+    "fecha": "2026-10-23T05:04:25.475Z",
+    "casos": 12,
+    "errores": 0,
+    "puntaje": 1,
+    "casosPerfectos": 12,
+    "inventos": 0,
+    "notaJuez": null,
+    "tokensEntradaMedios": 783,
+    "tokensSalidaMedios": 71,
+    "tokensPensamientoMedios": 0,
+    "usdPorLlamada": 8.3e-05,
+    "msMedios": 1970,
+    "fallos": [],
+    "etiqueta": "triage-v1"
+  },
+  {
+    "funcion": "triage",
+    "variante": "haiku-low",
+    "modelo": "claude-haiku-5-5",
+    "esfuerzo": "low",
+    "pensar": true,
+    "fecha": "2026-10-23T05:04:25.475Z",
+    "casos": 12,
+    "errores": 0,
+    "puntaje": 0.9722,
+    "casosPerfectos": 11,
+    "inventos": 0,
+    "notaJuez": null,
+    "tokensEntradaMedios": 784,
+    "tokensSalidaMedios": 71,
+    "tokensPensamientoMedios": 0,
+    "usdPorLlamada": 7.6e-05,
+    "msMedios": 1545,
+    "fallos": [
+      "t08 prioridad (P1)"
+    ],
+    "etiqueta": "triage-v1"
+  }
+]

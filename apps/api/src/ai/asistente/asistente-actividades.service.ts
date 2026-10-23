@@ -4,11 +4,9 @@ import { UsersService } from '../../users/users.service.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { ClaudeService, type UsoClaude } from '../claude/claude.service.js';
 import {
-  ESQUEMA_PLAN,
-  PROMPT_SISTEMA,
-  bloquePersonas,
+  CONFIG_ASISTENTE,
   construirPropuesta,
-  mensajeUsuario,
+  peticionAsistente,
   type CatalogosNexara,
   type PlanAsistente,
   type PropuestaActividad,
@@ -32,7 +30,7 @@ export class AsistenteActividadesService {
   estado() {
     return {
       disponible: this.claude.disponible(),
-      modelo: process.env.ANTHROPIC_ASSISTANT_MODEL || 'claude-haiku-5-5',
+      modelo: process.env.ANTHROPIC_ASSISTANT_MODEL || CONFIG_ASISTENTE.modelo,
     };
   }
 
@@ -42,21 +40,18 @@ export class AsistenteActividadesService {
     if (!instruccion) throw new BadRequestException('Escribe qué necesitas.');
 
     const catalogos = await this.catalogos(user, tenantId);
+    const ahora = new Date();
+    const peticion = peticionAsistente(instruccion, catalogos.personas, ahora, user?.nombre ?? null);
     const { datos, uso } = await this.claude.json<PlanAsistente>({
+      ...peticion,
       proceso: 'asistente-actividades',
       companyId: tenantId,
-      // Prompt fijo + personas de la empresa: cambian poco, así que se reutilizan de la caché.
-      sistema: [PROMPT_SISTEMA, bloquePersonas(catalogos.personas)],
-      usuario: mensajeUsuario(instruccion, new Date(), user?.nombre ?? null),
-      esquema: ESQUEMA_PLAN,
-      modelo: process.env.ANTHROPIC_ASSISTANT_MODEL || undefined,
-      maxTokens: 4096,
+      modelo: process.env.ANTHROPIC_ASSISTANT_MODEL || peticion.modelo,
     });
 
-    const ahora = new Date();
     const acciones = Array.isArray(datos?.acciones) ? datos.acciones.slice(0, 10) : [];
     return {
-      propuestas: acciones.map((a) => construirPropuesta(a, catalogos, { creadoPorId: Number(user.id), ahora })),
+      propuestas: acciones.map((a) => construirPropuesta(a, catalogos, { creadoPorId: Number(user.id), ahora, instruccion })),
       aclaracion: datos?.aclaracion ?? (acciones.length ? null : 'No encontré ninguna actividad en el texto. ¿Qué hay que hacer y quién?'),
       uso,
     };
