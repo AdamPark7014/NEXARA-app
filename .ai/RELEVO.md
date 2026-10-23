@@ -1,5 +1,27 @@
 # RELEVO
 
+- **23-10 ~19:00 UTC (claude-code, R-1) — Transcripción de juntas: modelo grande medido en el servidor y limpieza de whisper.**
+  - Adam: «la transcripción es muy pobre, no tiene sentido» (junta real de 28 min, grabación 5: bucles, «nos vemos en
+    el próximo vídeo», «[Noticias]», una línea en inglés). Sin Claude en este trabajo: WER por código.
+  - Banco en el servidor (`apps/api/scripts/banco-transcriptor`, resultados en `resultados.jsonl`): 22 voces de FLEURS
+    es_419 (dev) en una «junta» de 3.7 min, limpia y «de sala» (paso bajo, -10 dB, eco y ruido), partes como la web,
+    misma imagen y banderas que producción. WER limpio / sala y × tiempo real (servidor con carga 5–8):
+    small 22.3 / 65.5 % (0.30 / 0.23) · medium-q5 24.9 / 62.1 % (1.58 / 1.05) · large-v3-turbo-q8 20.8 / 52.8 %
+    (1.61 / 0.77) · large-v3-turbo-q5 20.8 / 53.8 % (1.89 / 1.17) · **turbo-q5 con audio_ctx 1100: 21.3 / 53.1 %
+    (1.18 / 0.88)** ← elegido. Partes de 30 s: al small le hizo perder frases (32 %) y al turbo no le mejoró la sala;
+    se quedan las de 20 s. Contexto de la parte anterior como prompt: peor (20.5 / 56.7 %) → apagado. Lista de nombres
+    de pila en el prompt: peor (22.3 %, un bucle) → solo clientes.
+  - Producción: `WHISPER_MODEL=large-v3-turbo-q5_0`, `audio_ctx` 1100 en cada parte, `cpu_shares` 512 y tope de 3.5
+    CPU; `update.sh` reconstruye el transcriptor con `--build`. Con el servidor ocupado queda unos minutos detrás de la
+    junta y se pone al día al concluir (partes pendientes ya no se dan por perdidas a los 20 min, sino a las 3 h).
+  - `limpiarTextoWhisper`: quita marcas `[...]`, oraciones de cierre de video/subtítulos, «Gracias.» suelto, oraciones
+    en inglés, bucles (frase repetida 3+ veces, la misma idea con variaciones) y líneas repetidas; probado con las
+    partes reales de la grabación 5 (2882 → 2682 palabras; en las partes revisadas a mano solo se fue lo inventado).
+  - Navegador: sin cancelación de eco ni supresión de ruido, con control de ganancia (voz lejana), opus a 48 kbps.
+    Eso no se pudo medir aquí (es el procesado de Chrome): queda por ver en la próxima junta real.
+  - Ojo del servidor (no es de este trabajo): `dockerd` gasta ~1.3 CPU de forma continua y hay 133 procesos zombi;
+    eso le quita al transcriptor casi un núcleo.
+
 - **23-10 ~18:45 UTC (claude-code) — «Asignar con IA» más barato y más rápido; eval solo por la puerta con Haiku.**
   - Reglas nuevas de costo (Adam vía coordinador): pruebas solo por la puerta con el token `pruebas`, solo Haiku,
     sin juez Opus/Sonnet; objetivo de producción p95 ≤ 3.5 s, ~10 s por intento y un reintento.

@@ -34,12 +34,18 @@ export class TranscriptorService {
     return ok;
   }
 
-  /** Audio (cualquier formato que lea ffmpeg) → texto en español. */
+  /**
+   * Audio (cualquier formato que lea ffmpeg) → texto en español.
+   * - `prompt` reemplaza al vocabulario fijo (ver `promptTranscriptor`: nombres de la empresa).
+   * - `audioCtx`: contexto del codificador en cuadros de 20 ms (1100 = 22 s). Para audio corto de
+   *   largo conocido (partes de una junta) acelera ~40 % sin perder calidad; 0 = los 30 s completos.
+   */
   async transcribir(
     audio: Buffer,
     nombre: string,
     mime: string,
     timeoutMs = 600_000,
+    opciones: { prompt?: string; audioCtx?: number } = {},
   ): Promise<string> {
     const base = this.url();
     if (!base) {
@@ -52,7 +58,8 @@ export class TranscriptorService {
     form.append('response_format', 'json');
     form.append('language', 'es');
     form.append('temperature', '0');
-    form.append('prompt', promptTranscriptor());
+    form.append('prompt', opciones.prompt?.trim() || promptTranscriptor());
+    if (opciones.audioCtx) form.append('audio_ctx', String(opciones.audioCtx));
 
     const t0 = Date.now();
     let respuesta: Response;

@@ -37,8 +37,9 @@ import s from "./reuniones.module.css";
 
 /**
  * Partes de 20 s: el texto bueno (whisper) llega pronto a la pantalla y, si algo falla, se pierde
- * a lo mucho eso. Medido en el servidor (23-10): 20 s de audio se transcriben en ~5 s, o sea ~25 %
- * del transcriptor por reunión en curso.
+ * a lo mucho eso. Medido en el servidor (23-10, banco con FLEURS en español, limpio y «de sala»):
+ * con 20 s y contexto de 22 s, large-v3-turbo trabaja a ~0.8–1.0× tiempo real con el servidor
+ * ocupado; 30 s no mejoró el WER del modelo grande y al pequeño le hacía perder frases.
  */
 const PARTE_MS = 20_000;
 /** Tres horas de junta como máximo; aviso 10 minutos antes. */

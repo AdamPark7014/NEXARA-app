@@ -15,11 +15,12 @@ import { getUploadSubdir } from '../common/upload-paths.js';
 import { JobQueueService } from '../jobs/job-queue.service.js';
 import { EmailService } from '../common/email/email.service.js';
 import { TranscriptorService } from '../ai/voz/transcriptor.service.js';
-import { EXTENSIONES_AUDIO, extensionAudio } from '../ai/voz/transcriptor.js';
+import { EXTENSIONES_AUDIO, extensionAudio, promptTranscriptor } from '../ai/voz/transcriptor.js';
 import { ClaudeService, type UsoClaude } from '../ai/claude/claude.service.js';
 import { MEETING_DEFAULTS, type AgreementKind, type MeetingType } from './meeting-rhythm.js';
 import { MeetingsService } from './meetings.service.js';
 import {
+  AUDIO_CTX_PARTE,
   MAX_PARTES,
   carpetaGrabacion,
   msValidos,
@@ -59,9 +60,18 @@ const MINUTA = 'reunion.minuta';
 const INTENTOS = 3;
 /** Un candado de notas más viejo que esto es de un proceso que murió. */
 const LEASE_MS = 4 * 60_000;
-/** Una parte que no se transcribe en este tiempo se da por perdida al concluir. */
-const PARTE_PERDIDA_MS = 20 * 60_000;
+/**
+ * Una parte que no se transcribe en este tiempo se da por perdida al concluir. Holgado: con el
+ * modelo grande el transcriptor puede ir detrás de la junta y ponerse al día después de concluir.
+ */
+const PARTE_PERDIDA_MS = 3 * 60 * 60_000;
 const MAX_TEXTO_PEGADO = 400_000;
+/**
+ * Pasar a whisper el final de la parte anterior como prompt (continuidad entre partes): medido
+ * en el servidor (23-10, large-v3-turbo, partes de 30 s) empeora el WER (18.8 → 20.5 % limpio,
+ * 54.3 → 56.7 % de sala), así que va apagado. El prompt lleva vocabulario y clientes de la empresa.
+ */
+const CONTINUIDAD_ENTRE_PARTES = false;
 
 type ArchivoSubido = { buffer: Buffer; mimetype: string; size: number };
 
@@ -204,7 +214,8 @@ export class GrabacionService implements OnModuleInit {
     const ext = audio.split('.').pop()!;
     try {
       const buffer = await fs.readFile(path.join(dir, audio));
-      const texto = await this.transcriptor.transcribir(buffer, audio, mimeDe(ext));
+      const prompt = await this.promptParte(companyId, grabacion.id, parte);
+      const texto = await this.transcriptor.transcribir(buffer, audio, mimeDe(ext), 600_000, { prompt, audioCtx: AUDIO_CTX_PARTE });
       await this.marcarParte(fila.id, 'LISTA', texto, null);
       await this.borrarAudio(dir, audio);
     } catch (error) {
@@ -215,6 +226,47 @@ export class GrabacionService implements OnModuleInit {
       await this.borrarAudio(dir, audio);
     }
     await this.despuesDeParte(companyId, meetingId);
+  }
+
+  /**
+   * Clientes de la empresa para el prompt de whisper (así escribe bien «Grupo Tox» y no «Tocs»),
+   * 10 min en memoria. Sin nombres de personas: en el banco (23-10) una lista larga de nombres
+   * de pila subió el WER de 21.3 a 22.3 % y metió un bucle; los nombres comunes los escribe bien.
+   */
+  private readonly nombresPorEmpresa = new Map<number, { nombres: string[]; at: number }>();
+
+  private async nombresEmpresa(companyId: number): Promise<string[]> {
+    const guardado = this.nombresPorEmpresa.get(companyId);
+    if (guardado && Date.now() - guardado.at < 10 * 60_000) return guardado.nombres;
+    const clientes = await this.prisma.serviceClient.findMany({
+      where: { companyId, isActive: true },
+      select: { name: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 12,
+    });
+    const nombres = [...new Set(clientes.map((c) => c.name.trim().slice(0, 40)).filter(Boolean))];
+    this.nombresPorEmpresa.set(companyId, { nombres, at: Date.now() });
+    return nombres;
+  }
+
+  /**
+   * Prompt de cada parte: vocabulario, clientes de la empresa y, si se enciende, el final de la
+   * parte anterior (continuidad; medido con el banco del transcriptor, `scripts/banco-transcriptor`).
+   */
+  private async promptParte(companyId: number, recordingId: number, parte: number): Promise<string> {
+    const [nombres, anterior] = await Promise.all([
+      this.nombresEmpresa(companyId).catch(() => [] as string[]),
+      CONTINUIDAD_ENTRE_PARTES && parte > 1
+        ? this.prisma.meetingRecordingPart.findUnique({
+            where: { recordingId_parte: { recordingId, parte: parte - 1 } },
+            select: { estado: true, texto: true },
+          })
+        : null,
+    ]);
+    return promptTranscriptor(process.env, {
+      nombres,
+      anterior: CONTINUIDAD_ENTRE_PARTES && anterior?.estado === 'LISTA' ? anterior.texto : null,
+    });
   }
 
   private async borrarAudio(dir: string, audio: string) {
