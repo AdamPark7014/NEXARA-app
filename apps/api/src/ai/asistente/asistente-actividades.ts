@@ -47,9 +47,13 @@ const TOPE_MINUTOS = 12 * 60;
 /** Lo que devuelve Claude por cada actividad que entendió. */
 export type AccionPlan = {
   tipo: TipoActividad;
-  razonTipo: string;
-  subtipoTarea: string | null;
-  tipoServicio: (typeof TIPOS_SERVICIO)[number] | null;
+  /** Ya no se pide (ahorra salida); queda por si llega de un plan viejo. */
+  razonTipo?: string;
+  /** Subtipo de la tarea (`SUBTIPOS_TAREA`) o tipo del servicio (`TIPOS_SERVICIO`); null en los demás. */
+  subtipo?: string | null;
+  /** Planes anteriores al 23-10-2026 (dos campos separados). */
+  subtipoTarea?: string | null;
+  tipoServicio?: (typeof TIPOS_SERVICIO)[number] | null;
   titulo: string;
   indicaciones: string | null;
   responsable: string | null;
@@ -72,6 +76,28 @@ export type PlanAsistente = {
   aclaracion: string | null;
 };
 
+/**
+ * Lo que devuelve Claude, en corto: cada clave y cada null se pagan y se esperan (la salida
+ * es lo que más tarda y más cuesta), así que van nombres breves y día con hora en un solo
+ * campo. `planDeSalida` lo pasa a `AccionPlan`.
+ */
+export type AccionIA = {
+  tipo: TipoActividad;
+  sub: string | null;
+  titulo: string;
+  detalle: string | null;
+  quien: string | null;
+  cliente: string | null;
+  lugar: string | null;
+  /** «AAAA-MM-DD» o «AAAA-MM-DD HH:MM». */
+  inicio: string | null;
+  limite: string | null;
+  min: number | null;
+  prio: 'Alta' | 'Media' | 'Baja';
+  encargo: 'ejecucion' | 'despacho' | null;
+};
+export type SalidaIA = { acciones: AccionIA[]; aclaracion: string | null };
+
 const textoONulo = { type: ['string', 'null'] };
 const enumONulo = (valores: readonly string[]) => ({ anyOf: [{ type: 'string', enum: [...valores] }, { type: 'null' }] });
 
@@ -86,40 +112,19 @@ export const ESQUEMA_PLAN: Record<string, unknown> = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: [
-          'tipo',
-          'razonTipo',
-          'subtipoTarea',
-          'tipoServicio',
-          'titulo',
-          'indicaciones',
-          'responsable',
-          'cliente',
-          'sitio',
-          'fecha',
-          'hora',
-          'fechaLimite',
-          'horaLimite',
-          'duracionMin',
-          'prioridad',
-          'encargo',
-        ],
+        required: ['tipo', 'sub', 'titulo', 'detalle', 'quien', 'cliente', 'lugar', 'inicio', 'limite', 'min', 'prio', 'encargo'],
         properties: {
           tipo: { type: 'string', enum: [...TIPOS_ACTIVIDAD] },
-          razonTipo: { type: 'string' },
-          subtipoTarea: enumONulo(SUBTIPOS_TAREA),
-          tipoServicio: enumONulo(TIPOS_SERVICIO),
+          sub: enumONulo([...SUBTIPOS_TAREA, ...TIPOS_SERVICIO]),
           titulo: { type: 'string' },
-          indicaciones: textoONulo,
-          responsable: textoONulo,
+          detalle: textoONulo,
+          quien: textoONulo,
           cliente: textoONulo,
-          sitio: textoONulo,
-          fecha: textoONulo,
-          hora: textoONulo,
-          fechaLimite: textoONulo,
-          horaLimite: textoONulo,
-          duracionMin: { type: ['integer', 'null'] },
-          prioridad: { type: 'string', enum: ['Alta', 'Media', 'Baja'] },
+          lugar: textoONulo,
+          inicio: textoONulo,
+          limite: textoONulo,
+          min: { type: ['integer', 'null'] },
+          prio: { type: 'string', enum: ['Alta', 'Media', 'Baja'] },
           encargo: enumONulo(['ejecucion', 'despacho']),
         },
       },
@@ -128,35 +133,69 @@ export const ESQUEMA_PLAN: Record<string, unknown> = {
   },
 };
 
-/** Instrucciones fijas (no cambian entre llamadas: así entran en la caché de Claude). */
-export const PROMPT_SISTEMA = `Eres el asistente de asignación de actividades de NEXARA, empresa mexicana de seguridad electrónica e integración (CCTV, control de acceso, redes, alarmas, servicio de campo).
+/** «2026-10-23 18:00» → día y hora; «2026-10-23» → día sin hora. */
+function diaYHora(valor: unknown): { dia: string | null; hora: string | null } {
+  const m = /^\s*(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?/.exec(typeof valor === 'string' ? valor : '');
+  return { dia: m?.[1] ?? null, hora: m?.[2] ?? null };
+}
 
-Recibes una instrucción de dirección, escrita o dictada por voz (con errores de transcripción, muletillas y correcciones al vuelo: «que Paty… no, que Carolina» es Carolina), y la conviertes en actividades con todos sus campos llenos con lo que se dijo. Una persona las revisa antes de crearlas.
+/** La salida corta de Claude → el plan con el que trabaja el armado (acepta la forma vieja). */
+export function planDeSalida(salida: unknown): PlanAsistente {
+  const s = (salida ?? {}) as { acciones?: unknown; aclaracion?: unknown };
+  const acciones = (Array.isArray(s.acciones) ? s.acciones : []).map((x): AccionPlan => {
+    const a = (x ?? {}) as Record<string, unknown>;
+    if ('responsable' in a || 'fecha' in a) return a as unknown as AccionPlan;
+    const texto = (k: string) => (typeof a[k] === 'string' && (a[k] as string).trim() ? (a[k] as string) : null);
+    const inicio = diaYHora(a.inicio);
+    const limite = diaYHora(a.limite);
+    return {
+      tipo: a.tipo as TipoActividad,
+      subtipo: texto('sub'),
+      titulo: texto('titulo') ?? '',
+      indicaciones: texto('detalle'),
+      responsable: texto('quien'),
+      cliente: texto('cliente'),
+      sitio: texto('lugar'),
+      fecha: inicio.dia,
+      hora: inicio.hora,
+      fechaLimite: limite.dia,
+      horaLimite: limite.hora,
+      duracionMin: typeof a.min === 'number' ? a.min : null,
+      prioridad: (a.prio as AccionPlan['prioridad']) ?? 'Media',
+      encargo: (a.encargo as AccionPlan['encargo']) ?? null,
+    };
+  });
+  return { acciones, aclaracion: typeof s.aclaracion === 'string' && s.aclaracion.trim() ? s.aclaracion : null };
+}
 
-Tipos (uno por actividad):
-- tarea: trabajo del día sin proyecto. subtipoTarea: Levantamiento (visitar un sitio para revisar o medir antes de cotizar), Recolección, Entrega, Junta (reunión o llamada para revisar o acordar algo, también con un cliente), Compra de material, Preparación de equipo, Trámite (facturas, fianzas, permisos, pagos, papeleo), Capacitación, Reporte / documentación (hacer o mandar un reporte), Otro.
-- servicio: ir al sitio de un cliente a hacer trabajo técnico (falla, mantenimiento, revisión, instalación de pocas horas). tipoServicio: PREVENTIVO (mantenimiento programado), CORRECTIVO (falla), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo pequeño).
-- obra: instalación grande de uno de los proyectos activos (cableado, montaje en obra).
-- proyecto: trabajo de uno de los proyectos activos que no es instalación (ingeniería, planos, pruebas, puesta en marcha).
-- obra y proyecto solo si mencionan el proyecto, la obra o la puesta en marcha: que el cliente tenga un proyecto activo no basta. Una instalación de pocas horas es servicio INSTALACION.
-- comercial: solo para vender: cotizar, mandar una propuesta, dar seguimiento a una venta o visitar para vender. Una junta con un cliente para revisar algo (contrato, avance, entrega) es tarea Junta.
+/**
+ * Instrucciones fijas (no cambian entre llamadas: entran en la caché de Claude). Cortas a
+ * propósito: casi todas las llamadas reales llegan con la caché fría y cada token de aquí se
+ * paga completo. Lo que se puede resolver en código (catálogo, calendario, coincidencias,
+ * fechas en el formato del alta) no se le pide a la IA.
+ */
+export const PROMPT_SISTEMA = `Asistente de asignación de actividades de NEXARA (seguridad electrónica e integración en México: CCTV, control de acceso, redes, alarmas, servicio de campo). Conviertes la instrucción de dirección (escrita o dictada por voz, con errores, muletillas y correcciones: «que Paty… no, que Carolina» es Carolina) en actividades. Una persona las revisa antes de crearlas.
+
+Tipos:
+- tarea: sin proyecto. sub: Levantamiento (revisar o medir un sitio antes de cotizar), Recolección, Entrega, Junta (reunión o llamada para revisar o acordar algo, también con un cliente), Compra de material, Preparación de equipo, Trámite (facturas, fianzas, permisos, pagos), Capacitación, Reporte / documentación (hacer o mandar un reporte, aunque sea de una falla), Otro.
+- servicio: trabajo técnico en el sitio de un cliente. sub: PREVENTIVO (mantenimiento), CORRECTIVO (falla o cambio de una pieza), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo de pocas horas).
+- obra: instalación grande de un proyecto. proyecto: ingeniería, planos, pruebas o puesta en marcha de un proyecto. Solo si mencionan el proyecto, la obra o la puesta en marcha.
+- comercial: solo para vender: cotizar, propuesta, seguimiento de venta, visita de venta. Una junta con un cliente para revisar algo es tarea Junta.
+- obra, proyecto y comercial: sub null.
 
 Campos:
-- Una actividad por persona y por trabajo: si piden lo mismo a dos personas, son dos actividades.
-- responsable: el nombre completo de la lista de personas cuando lo que dijeron (nombre de pila, apodo: Beto→Roberto, Paty→Patricia, Toño→Antonio) coincide con una sola persona. Si coincide con varias o con nadie, copia exactamente lo que dijeron («Antonio», «Pedro») sin elegir a otra persona, y crea la actividad igual. Si piden a alguien que mande a su gente, el responsable es esa persona (encargo despacho). null si no dijeron quién.
-- cliente: si es uno de los clientes registrados (aunque lo digan corto o con otra ortografía: «Tox» → «Grupo Tox»), escríbelo como en la lista; si no está en la lista, como lo dijeron, sin cambiarlo por otro. Proveedores, tiendas y lugares que no son clientes: cliente null y el nombre del lugar en sitio. sitio: la sucursal, planta, área, plaza o dirección, como en la lista si es una sucursal registrada («la Torre Médica del San Rafael» → cliente «Hospital San Rafael», sitio «Torre Médica»). null si no lo dijeron, aunque el cliente tenga una sola sucursal.
-- Fechas AAAA-MM-DD y horas HH:MM (24 h), hora de Ciudad de México, calculadas desde la fecha y hora actuales que se te dan. «mañana», «el lunes», «el viernes» = el próximo día con ese nombre después de hoy. «a las 3» o «para las 3» en horario laboral = 15:00.
-- fecha y hora: cuándo se hace o empieza: cita, visita, junta, «mañana a las 9», «el lunes», «empezando el jueves». Hora sin fecha: hoy, o mañana si esa hora ya pasó. «ya», «de inmediato», «ahorita»: hoy a la hora actual. «hoy» sin hora: hoy con hora null.
-- fechaLimite y horaLimite: para cuándo debe quedar terminado: «para el viernes», «antes del viernes», «a más tardar», «tiene hasta», «que quede listo», «que lo entregue el». «Para» con día y sin hora es plazo; con hora («para las 3») es la hora de la cita. En un rango («del lunes al miércoles») fecha es el primer día y fechaLimite el último. Si solo dieron plazo, fecha null. «Para hoy» es fechaLimite hoy. Un día o plazo que encabeza varias actividades («Para el viernes: …») vale para todas, y una hora dentro de una de ellas es la hora de ese día («que capacite a las 11» → el viernes a las 11).
-- Plazo vago («la otra semana», «luego») o sin fechas: todo null.
-- duracionMin: cuánto tarda, solo si lo dijeron («una hora y media» 90, «como 3 horas» 180, «media hora» 30, «jornadas de 8 horas» o «todo el día» 480). Máximo 720. Si no, null.
-- prioridad: Alta si dicen urgente, ya, cuanto antes o algo está caído; Baja si dicen sin prisa; si no, Media.
-- encargo: despacho si la persona debe mandar a alguien de su equipo; ejecucion si la hace ella; null si no está claro.
-- titulo: verbo en infinitivo + qué + dónde, máximo 80 caracteres, claro y profesional («Revisar DVR que no graba en Angelópolis»).
-- indicaciones: el detalle que dieron y que no cabe en el título (síntoma, cantidades, materiales, equipos, con quién ir o coordinarse, a quién llamar o entregar, para qué), en una o dos frases claras y profesionales, sin muletillas. No repitas el título, no agregues pasos ni objetivos que nadie dijo («revisar la causa», «restablecer el servicio», «tomar medidas»), no menciones proyectos ni sucursales que no dijeron, no expliques tu razonamiento y no pongas fechas, horas ni duración (van en sus campos). null si no queda nada.
-- razonTipo: máximo 12 palabras.
-- No inventes personas, clientes, fechas, cantidades ni datos.
-- Si piden algún trabajo, aunque falten datos, devuelve la actividad con lo que haya. Solo si no piden ningún trabajo o no se entiende: acciones vacío y en aclaracion una pregunta breve (nunca acciones vacío con aclaracion null). Si hay actividades, aclaracion null.`;
+- Una actividad por persona y por trabajo.
+- quien: el nombre completo de las coincidencias si lo dicho (nombre o apodo: Beto→Roberto, Toño→Antonio) corresponde a una sola persona; si a varias o a ninguna, copia lo que dijeron. Si piden a alguien que mande a su gente, es esa persona (encargo despacho). null si no dijeron quién.
+- cliente y lugar como en las coincidencias si son de ahí («Tox» → «Grupo Tox»); si no, como lo dijeron. Proveedores, tiendas y lugares que no son clientes: cliente null y el lugar en lugar. lugar: sucursal, planta, área o dirección; null si no lo dijeron.
+- inicio («AAAA-MM-DD HH:MM», 24 h, o «AAAA-MM-DD» sin hora): cuándo se hace o empieza (cita, visita, «mañana a las 9», «empezando el jueves»). «mañana», «el lunes», «el viernes»: el primero con ese nombre en «Próximos días», nunca hoy. «a las 3» o «para las 3» = 15:00. Hora sin día: hoy, o mañana si ya pasó. «ya», «de inmediato»: hoy a la hora actual. «hoy» sin hora: solo el día. Si no dicen cuándo, null (no supongas hoy ni mañana).
+- limite (mismo formato): para cuándo debe quedar: «para el viernes», «antes del…», «a más tardar», «tiene hasta», «que quede listo». «Para» con día y sin hora es plazo. En un rango («del lunes al miércoles») inicio es el primer día y limite el último. Si solo hay plazo, inicio null. Un día que encabeza varias actividades («Para el viernes: …») vale para todas, y una hora dentro de una es la hora de ese día. Plazo vago («la otra semana») o sin fechas: null.
+- min: duración en minutos, solo si la dijeron («hora y media» 90, «media hora» 30, «jornadas de 8 horas» o «todo el día» 480), máximo 720.
+- prio: Alta si es urgente, ya, cuanto antes o algo está caído; Baja si sin prisa; si no, Media.
+- encargo: despacho si debe mandar a alguien de su equipo; ejecucion si la hace ella; null si no está claro.
+- titulo: infinitivo + qué + dónde, máximo 80 caracteres («Revisar DVR que no graba en Angelópolis»).
+- detalle: las indicaciones para quien la hará: solo lo que no cabe en el título (síntoma, cantidades, materiales, con quién, a quién llamar o entregar), en una o dos frases profesionales. No repitas el título ni agregues pasos u objetivos que nadie dijo («revisar la causa»), no expliques tu razonamiento, sin fechas, horas ni duración. null si no queda nada.
+- No inventes personas, clientes, sucursales, proyectos, fechas ni cantidades.
+- Si piden algún trabajo, devuelve la actividad aunque falten datos. Solo si no piden ningún trabajo: acciones vacío y en aclaracion una pregunta breve. Con actividades, aclaracion null.`;
 
 export type PersonaAsignable = { id: number; nombre: string; puesto?: string | null; email?: string | null };
 export type ClienteNexara = { id: number; name: string };
@@ -172,46 +211,150 @@ export type SucursalNexara = {
 };
 export type ProyectoNexara = { id: number; title: string; clientId: number; clientName: string };
 
-/** Lista de personas para el bloque de sistema (estable por empresa → cacheable). */
-export function bloquePersonas(personas: PersonaAsignable[]): string {
-  const filas = personas.map((p) => `- ${p.nombre}${p.puesto ? ` (${p.puesto})` : ''}`);
-  return `Personas a las que quien escribe puede asignar trabajo:\n${filas.join('\n') || '- (ninguna)'}`;
-}
-
-/** Topes del bloque de clientes: con más, se manda lo primero y el resto se busca en código. */
-const MAX_CLIENTES_PROMPT = 300;
-const MAX_SUCURSALES_POR_CLIENTE = 25;
-const MAX_PROYECTOS_PROMPT = 80;
+/**
+ * Apodos frecuentes → nombres de pila, para encontrar a la persona en código antes de llamar
+ * a la IA («Beto» → Roberto, «Paty» → Patricia, «Toño» → Antonio).
+ */
+const APODOS: Record<string, string[]> = {
+  beto: ['roberto', 'alberto', 'norberto', 'heriberto', 'humberto'],
+  paty: ['patricia'],
+  pati: ['patricia'],
+  tono: ['antonio'],
+  tony: ['antonio'],
+  pepe: ['jose'],
+  chema: ['jose'],
+  lupe: ['guadalupe'],
+  lupita: ['guadalupe'],
+  memo: ['guillermo'],
+  paco: ['francisco'],
+  pancho: ['francisco'],
+  nacho: ['ignacio'],
+  chuy: ['jesus'],
+  chucho: ['jesus'],
+  lalo: ['eduardo'],
+  quique: ['enrique'],
+  rafa: ['rafael'],
+  fer: ['fernando', 'fernanda'],
+  mafer: ['fernanda'],
+  gaby: ['gabriela'],
+  gabi: ['gabriela'],
+  ale: ['alejandra', 'alejandro'],
+  alex: ['alejandro', 'alejandra'],
+  dani: ['daniela', 'daniel'],
+  caro: ['carolina'],
+  charly: ['carlos'],
+  pau: ['paulina'],
+  moni: ['monica'],
+  vero: ['veronica'],
+  lety: ['leticia'],
+  isa: ['isabel'],
+  santi: ['santiago'],
+  tere: ['teresa'],
+  mau: ['mauricio'],
+  richi: ['ricardo'],
+  poncho: ['alfonso'],
+  cris: ['cristian', 'cristina'],
+  mari: ['maria'],
+  maru: ['maria'],
+};
 
 /**
- * Clientes registrados con sus sucursales y los proyectos activos (estable por empresa →
- * cacheable). Con la lista, la IA escribe «Grupo Tox» aunque dicten «Tox».
+ * Cómo suena una palabra (ya normalizada), para que el dictado no impida encontrarla:
+ * «Toks» = «Tox», «Cristian» = «Christian», «Vanesa» = «Banessa».
  */
-export function bloqueClientes(catalogos: Pick<CatalogosNexara, 'clientes' | 'sucursales' | 'proyectos'>): string {
-  const porCliente = new Map<number, string[]>();
-  for (const suc of catalogos.sucursales) {
-    const lista = porCliente.get(suc.clientId) ?? [];
-    if (lista.length < MAX_SUCURSALES_POR_CLIENTE) lista.push(suc.name);
-    porCliente.set(suc.clientId, lista);
-  }
-  const clientes = [...catalogos.clientes]
-    .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-    .slice(0, MAX_CLIENTES_PROMPT)
-    .map((c) => {
-      const suc = porCliente.get(c.id);
-      return `- ${c.name}${suc?.length ? ` · sucursales: ${suc.join('; ')}` : ''}`;
-    });
-  const proyectos = catalogos.proyectos
-    .slice(0, MAX_PROYECTOS_PROMPT)
-    .map((p) => `- ${p.title}${p.clientName ? ` (${p.clientName})` : ''}`);
-  return [
-    `Clientes registrados:\n${clientes.join('\n') || '- (ninguno)'}`,
-    `Proyectos activos:\n${proyectos.join('\n') || '- (ninguno)'}`,
-  ].join('\n\n');
+export function sonido(palabra: string): string {
+  return palabra
+    .replace(/chr/g, 'cr')
+    .replace(/ch/g, '§')
+    .replace(/h/g, '')
+    .replace(/qu/g, 'k')
+    .replace(/c([ei])/g, 's$1')
+    .replace(/c/g, 'k')
+    .replace(/z/g, 's')
+    .replace(/v/g, 'b')
+    .replace(/ll/g, 'y')
+    .replace(/ks/g, 'x')
+    .replace(/w/g, 'u')
+    .replace(/y$/, 'i')
+    .replace(/(.)\1+/g, '$1')
+    .replace(/§/g, 'ch');
 }
 
-/** Mensaje del turno: fecha y hora actuales + la instrucción. */
-export function mensajeUsuario(texto: string, ahora: Date, autor: string | null): string {
+/** Palabras con las que se puede nombrar algo (sin artículos, giros ni relleno). */
+function palabrasNombre(texto: string): string[] {
+  return normalizar(texto)
+    .split(' ')
+    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !PALABRAS_RELLENO.has(w) && !PALABRAS_GIRO.has(w))
+    .map(sonido);
+}
+
+/** Lo dicho, como suena, con los apodos ya traducidos a nombres. */
+function palabrasDichas(instruccion: string): string[] {
+  const salida = new Set<string>();
+  for (const w of normalizar(instruccion).split(' ')) {
+    for (const nombre of APODOS[w] ?? []) salida.add(sonido(nombre));
+    if (w.length >= 3 && !/^\d+$/.test(w) && !PALABRAS_RELLENO.has(w)) salida.add(sonido(w));
+  }
+  return [...salida];
+}
+
+function parecidas(a: string, b: string): boolean {
+  return a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)));
+}
+
+/** Tope de cada lista de coincidencias que se manda a la IA. */
+const MAX_COINCIDENCIAS = 8;
+
+/**
+ * Lo del catálogo que se mencionó (por nombre, apodo o como suena), resuelto en código antes
+ * de llamar a la IA: se le manda solo esto en vez de toda la empresa. Lo que no aparece aquí
+ * lo copia la IA tal cual y el código lo vuelve a buscar en el catálogo completo.
+ */
+export function catalogoRelevante(instruccion: string, catalogos: CatalogosNexara): CatalogosNexara {
+  const dichas = palabrasDichas(instruccion);
+  const coincide = (nombre: string) => palabrasNombre(nombre).some((w) => dichas.some((d) => parecidas(d, w)));
+  const personas = catalogos.personas.filter((p) => coincide(p.nombre)).slice(0, MAX_COINCIDENCIAS);
+  const sucursales = catalogos.sucursales.filter((s) => coincide(s.name)).slice(0, MAX_COINCIDENCIAS);
+  const proyectos = catalogos.proyectos.filter((p) => coincide(p.title)).slice(0, MAX_COINCIDENCIAS);
+  const deOtros = new Set([...sucursales.map((s) => s.clientId), ...proyectos.map((p) => p.clientId)]);
+  const clientes = catalogos.clientes.filter((c) => coincide(c.name) || deOtros.has(c.id)).slice(0, MAX_COINCIDENCIAS);
+  return {
+    personas,
+    clientes,
+    // Solo sucursales de clientes que quedaron (o de los que se nombró la sucursal).
+    sucursales: sucursales.filter((s) => clientes.some((c) => c.id === s.clientId)),
+    proyectos,
+  };
+}
+
+/** Las coincidencias como texto para el mensaje (lo variable va fuera de la caché). */
+export function bloqueCoincidencias(rel: CatalogosNexara): string {
+  const lista = (xs: string[], vacio = 'ninguno') => (xs.length ? xs.join('; ') : vacio);
+  const cliente = (c: ClienteNexara) => {
+    const suc = rel.sucursales.filter((s) => s.clientId === c.id).map((s) => s.name);
+    return suc.length ? `${c.name} (sucursales: ${suc.join(', ')})` : c.name;
+  };
+  return [
+    'Coincidencias en el catálogo (escribe estos nombres tal cual):',
+    `Personas: ${lista(rel.personas.map((p) => p.nombre), 'ninguna')}`,
+    `Clientes: ${lista(rel.clientes.map(cliente))}`,
+    `Proyectos: ${lista(rel.proyectos.map((p) => `${p.title} (${p.clientName})`))}`,
+  ].join('\n');
+}
+
+/** «sáb 2026-10-24, dom 2026-10-25, …»: los próximos días ya calculados en código. */
+export function proximosDias(ahora: Date, dias = 7): string {
+  const [y, m, d] = fechaLocalISO(ahora).split('-').map(Number);
+  const salida: string[] = [];
+  for (let i = 1; i <= dias; i++) {
+    const dia = new Date(Date.UTC(y, m - 1, d + i, 12));
+    salida.push(`${DIAS_SEMANA[dia.getUTCDay()].slice(0, 3)} ${dia.toISOString().slice(0, 10)}`);
+  }
+  return salida.join(', ');
+}
+
+/** Mensaje del turno: hoy, los próximos días, quién escribe, las coincidencias y la instrucción. */
+export function mensajeUsuario(texto: string, ahora: Date, autor: string | null, coincidencias?: string): string {
   const fecha = new Intl.DateTimeFormat('es-MX', {
     timeZone: ZONA_HORARIA,
     weekday: 'long',
@@ -226,7 +369,16 @@ export function mensajeUsuario(texto: string, ahora: Date, autor: string | null)
     minute: '2-digit',
     hour12: false,
   }).format(ahora);
-  return `Fecha actual: ${fecha} (${iso}), ${hora} hora de Ciudad de México.${autor ? `\nQuien escribe: ${autor}.` : ''}\n\nInstrucción:\n${texto.trim()}`;
+  return [
+    `Hoy: ${fecha} (${iso}), ${hora} hora de Ciudad de México.`,
+    `Próximos días: ${proximosDias(ahora)}.`,
+    autor ? `Quien escribe: ${autor}.` : null,
+    coincidencias ?? null,
+    '',
+    `Instrucción:\n${texto.trim()}`,
+  ]
+    .filter((x) => x !== null)
+    .join('\n');
 }
 
 /**
@@ -234,16 +386,22 @@ export function mensajeUsuario(texto: string, ahora: Date, autor: string | null)
  * en esfuerzo `low` y sin razonamiento sacó lo mismo que con razonamiento y que Sonnet 5.5
  * (15/15 en las revisiones de código), con la mitad de tokens de salida y ~2 s por llamada.
  * Con plazos, duración, faltantes y catálogo de clientes (23 casos, 23-10-2026): 0.94 con juez
- * (antes 0.85) y nota 4.3/5 (antes 3.6), ~US$0.0002 por llamada; con razonamiento costó 2.4×
- * sin mejorar.
+ * (antes 0.85) y nota 4.3/5 (antes 3.6); con razonamiento costó 2.4× sin mejorar. Costo real
+ * en producción (caché fría, que es lo normal con uso esporádico): con toda la empresa en el
+ * prompt ~4,800 tokens de entrada y US$0.0007 por llamada; con solo las coincidencias y el
+ * prompt corto, ver `.ai/RELEVO.md`.
  * El modelo se puede cambiar sin desplegar con `ANTHROPIC_ASSISTANT_MODEL`.
  */
 export const CONFIG_ASISTENTE = {
   modelo: 'claude-haiku-5-5',
   esfuerzo: 'low' as const,
   pensar: false,
-  // ~250 tokens por actividad; el plan admite hasta 10.
+  // ~200 tokens por actividad; el plan admite hasta 10.
   maxTokens: 3_000,
+  // Por intento ~10 s y un solo reintento: lo normal son 2–3 s; si no, mensaje claro y el
+  // texto sigue en la caja para reintentar (antes 60 s × 3 intentos).
+  timeoutMs: 10_000,
+  reintentos: 1,
 };
 
 /** La petición completa a Claude (el servicio y el eval mandan exactamente lo mismo). */
@@ -254,15 +412,17 @@ export function peticionAsistente(
   autor: string | null,
 ) {
   return {
-    // Prompt fijo + personas + clientes de la empresa: cambian poco, así que se reutilizan
-    // de la caché (cada bloque lleva su marca).
-    sistema: [PROMPT_SISTEMA, bloquePersonas(catalogos.personas), bloqueClientes(catalogos)],
-    usuario: mensajeUsuario(instruccion, ahora, autor),
+    // Solo el prompt fijo va en la caché; del catálogo va lo que se mencionó (resuelto en
+    // código), no la empresa entera.
+    sistema: [PROMPT_SISTEMA],
+    usuario: mensajeUsuario(instruccion, ahora, autor, bloqueCoincidencias(catalogoRelevante(instruccion, catalogos))),
     esquema: ESQUEMA_PLAN,
     modelo: CONFIG_ASISTENTE.modelo,
     esfuerzo: CONFIG_ASISTENTE.esfuerzo,
     pensar: CONFIG_ASISTENTE.pensar,
     maxTokens: CONFIG_ASISTENTE.maxTokens,
+    timeoutMs: CONFIG_ASISTENTE.timeoutMs,
+    reintentos: CONFIG_ASISTENTE.reintentos,
   };
 }
 
@@ -355,7 +515,10 @@ export function indicacionesSinEco(indicaciones: string | null | undefined, titu
   const vistas = new Set([titulo, ...conocidas].flatMap((t) => (t ? raicesDe(t) : [])));
   const propias = new Set(raicesDe(texto));
   const nuevas = [...propias].filter((w) => !vistas.has(w));
-  if (!nuevas.length || (nuevas.length === 1 && propias.size >= 4)) return null;
+  // «Colocar 12 pantallas» bajo «Instalar 12 pantallas»: lo único nuevo es el verbo.
+  const primera = normalizar(texto).split(' ')[0] ?? '';
+  const soloVerbo = nuevas.length === 1 && /(ar|er|ir)$/.test(primera) && nuevas[0] === primera.slice(0, 5);
+  if (!nuevas.length || soloVerbo || (nuevas.length === 1 && propias.size >= 4)) return null;
   return texto;
 }
 
@@ -446,6 +609,23 @@ export type Agenda = {
   /** false = la hora no se dijo y se puso la de omisión. */
   horaDicha: boolean;
 };
+
+/** ¿La instrucción dice algún día («hoy», «mañana», «el viernes», «3 de noviembre», «24/10»)? */
+export function mencionaDia(instruccion: string): boolean {
+  // `normalizar` deja letras, números y espacios: «24/10» llega como «24 10».
+  return /\b(hoy|manana|lunes|martes|miercoles|jueves|viernes|sabado|domingo|\d{1,2} de [a-z]+|\d{1,2} \d{1,2})\b/.test(normalizar(instruccion));
+}
+
+/**
+ * «Que vaya a las 8» a las 10:30 sin decir día: es mañana a las 8, no hoy en el pasado. La
+ * IA a veces lo pone hoy; en código se corrige cuando la instrucción no dice ningún día.
+ */
+export function corregirHoraPasada<T extends Pick<AccionPlan, 'fecha' | 'hora'>>(accion: T, ahora: Date, instruccion?: string): T {
+  const hora = aHora(accion.hora);
+  if (!instruccion || !hora || accion.fecha !== fechaLocalISO(ahora) || mencionaDia(instruccion)) return accion;
+  if (hora >= horaActualRedondeada(new Date(ahora.getTime() - 15 * 60_000))) return accion;
+  return { ...accion, fecha: fechaLocalISO(new Date(ahora.getTime() + 86_400_000)) };
+}
 
 export function agendaDe(accion: Pick<AccionPlan, 'fecha' | 'hora' | 'fechaLimite'>, ahora: Date): Agenda {
   const hoy = fechaLocalISO(ahora);
@@ -649,7 +829,7 @@ export function construirPropuesta(
 
   // Fechas como el formulario «Asignar»: inicio = entrega = máxima; con plazo de varios días,
   // además el periodo (la API pone la máxima y la entrega al fin de su último día).
-  const agenda = agendaDe(accion, contexto.ahora);
+  const agenda = agendaDe(corregirHoraPasada(accion, contexto.ahora, contexto.instruccion), contexto.ahora);
   const fechaInicio = aFechaISO(agenda.dia, agenda.hora);
   const hoy = fechaLocalISO(contexto.ahora);
   if (agenda.hasta ? agenda.hasta < hoy : fechaInicio && new Date(fechaInicio).getTime() < contexto.ahora.getTime() - 15 * 60_000) {
@@ -678,14 +858,17 @@ export function construirPropuesta(
   const encargo = accion.encargo === 'ejecucion' || accion.encargo === 'despacho' ? accion.encargo : null;
 
   const conProyecto = tipo === 'obra' || tipo === 'proyecto';
+  const subtipo = accion.subtipo ?? null;
+  const subtipoTarea = (SUBTIPOS_TAREA as readonly string[]).includes(subtipo ?? '') ? subtipo : accion.subtipoTarea;
+  const tipoServicio = (TIPOS_SERVICIO as readonly string[]).includes(subtipo ?? '') ? subtipo : accion.tipoServicio;
   const ticketType =
     tipo === 'obra'
       ? 'INSTALACION'
       : tipo === 'tarea' || tipo === 'comercial'
         ? 'OTRO'
-        : accion.tipoServicio || 'PREVENTIVO';
+        : tipoServicio || 'PREVENTIVO';
   const ticketTypeCustom =
-    tipo === 'comercial' ? 'COMERCIAL' : tipo === 'tarea' ? accion.subtipoTarea || 'Otro' : undefined;
+    tipo === 'comercial' ? 'COMERCIAL' : tipo === 'tarea' ? subtipoTarea || 'Otro' : undefined;
 
   const payload: Record<string, unknown> = {
     titulo: tituloFinal,

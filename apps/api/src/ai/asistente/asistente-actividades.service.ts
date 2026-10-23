@@ -7,9 +7,10 @@ import {
   CONFIG_ASISTENTE,
   construirPropuesta,
   peticionAsistente,
+  planDeSalida,
   type CatalogosNexara,
-  type PlanAsistente,
   type PropuestaActividad,
+  type SalidaIA,
 } from './asistente-actividades.js';
 
 export type RespuestaAsistente = {
@@ -42,14 +43,15 @@ export class AsistenteActividadesService {
     const catalogos = await this.catalogos(user, tenantId);
     const ahora = new Date();
     const peticion = peticionAsistente(instruccion, catalogos, ahora, user?.nombre ?? null);
-    const { datos, uso } = await this.claude.json<PlanAsistente>({
+    const { datos: salida, uso } = await this.claude.json<SalidaIA>({
       ...peticion,
       proceso: 'asistente-actividades',
       companyId: tenantId,
       modelo: process.env.ANTHROPIC_ASSISTANT_MODEL || peticion.modelo,
     });
 
-    const acciones = Array.isArray(datos?.acciones) ? datos.acciones.slice(0, 10) : [];
+    const datos = planDeSalida(salida);
+    const acciones = datos.acciones.slice(0, 10);
     return {
       propuestas: acciones.map((a) => construirPropuesta(a, catalogos, { creadoPorId: Number(user.id), ahora, instruccion })),
       aclaracion: datos?.aclaracion ?? (acciones.length ? null : 'No encontré ninguna actividad en el texto. ¿Qué hay que hacer y quién?'),

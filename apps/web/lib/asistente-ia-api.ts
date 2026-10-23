@@ -77,11 +77,26 @@ export function estadoAsistente(token: string) {
   return pedir<{ disponible: boolean; modelo: string }>(token, "ai/asistente/estado");
 }
 
-export function interpretar(token: string, texto: string) {
-  return pedir<RespuestaAsistente>(token, "ai/asistente/interpretar", {
-    method: "POST",
-    body: JSON.stringify({ texto }),
-  });
+/**
+ * El servidor corta cada intento a los ~10 s con un reintento; aquí se espera a lo más 25 s
+ * para que el botón nunca se quede girando.
+ */
+export const ESPERA_INTERPRETAR_MS = 25_000;
+
+export async function interpretar(token: string, texto: string) {
+  const senal = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(ESPERA_INTERPRETAR_MS) : undefined;
+  try {
+    return await pedir<RespuestaAsistente>(token, "ai/asistente/interpretar", {
+      method: "POST",
+      body: JSON.stringify({ texto }),
+      signal: senal,
+    });
+  } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      throw new Error("La IA tardó demasiado en contestar.");
+    }
+    throw e;
+  }
 }
 
 export function personasAsignables(token: string) {

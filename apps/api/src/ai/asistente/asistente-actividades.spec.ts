@@ -1,15 +1,21 @@
 import {
   aFechaISO,
   agendaDe,
-  bloqueClientes,
+  bloqueCoincidencias,
   buscar,
+  catalogoRelevante,
   construirPropuesta,
+  corregirHoraPasada,
   horaActualRedondeada,
   indicacionesSinEco,
   lugarDicho,
+  mencionaDia,
   mensajeUsuario,
   peticionAsistente,
+  planDeSalida,
+  proximosDias,
   puntaje,
+  sonido,
   type AccionPlan,
   type CatalogosNexara,
 } from './asistente-actividades.js';
@@ -255,13 +261,78 @@ describe('asistente de actividades', () => {
       expect(buscar('Tox nave 2', [{ id: 1, name: 'Grupo Tox' }, { id: 2, name: 'Grupo Andes' }], (c) => c.name).elegido?.id).toBe(1);
     });
 
-    it('la IA recibe los clientes con sus sucursales y los proyectos activos (bloque cacheable)', () => {
-      const bloque = bloqueClientes(catalogos);
-      expect(bloque).toContain('- Banorte · sucursales: Plaza Satélite');
-      expect(bloque).toContain('- CCTV nave 2 (TOX Logística)');
-      const pet = peticionAsistente('hola', catalogos, ahora, null);
-      expect(pet.sistema).toHaveLength(3);
-      expect(pet.sistema[2]).toBe(bloque);
+    it('a la IA solo le llega lo del catálogo que se mencionó (resuelto en código)', () => {
+      const rel = catalogoRelevante('que Caro vaya a la plaza satelite de banorte', catalogos);
+      expect(rel.personas.map((p) => p.id)).toEqual([8]);
+      expect(rel.clientes.map((c) => c.id)).toEqual([2]);
+      expect(rel.sucursales.map((s) => s.id)).toEqual([50]);
+      expect(rel.proyectos).toEqual([]);
+      // Como suena: «Toks» es «TOX»; «Beto» no es nadie de este catálogo.
+      expect(catalogoRelevante('Toño mañana en toks', catalogos).clientes.map((c) => c.id)).toEqual([1]);
+      expect(catalogoRelevante('Toño mañana en toks', catalogos).personas.map((p) => p.id)).toEqual([7]);
+      expect(sonido('christian')).toBe(sonido('cristian'));
+      const bloque = bloqueCoincidencias(rel);
+      expect(bloque).toContain('Personas: Carolina Pérez');
+      expect(bloque).toContain('Clientes: Banorte (sucursales: Plaza Satélite)');
+      expect(bloque).toContain('Proyectos: ninguno');
+      // Solo el prompt fijo va en el sistema (caché); lo variable va en el mensaje.
+      const pet = peticionAsistente('que Caro vaya a la plaza satelite de banorte', catalogos, ahora, null);
+      expect(pet.sistema).toHaveLength(1);
+      expect(pet.usuario).toContain(bloque);
+      expect(pet.usuario).not.toContain('Juan González');
+      expect(pet).toMatchObject({ timeoutMs: 10_000, reintentos: 1 });
+    });
+
+    it('los próximos días van calculados para que «el viernes» nunca sea hoy', () => {
+      // 12-10-2026 es lunes.
+      expect(proximosDias(ahora, 5)).toBe('mar 2026-10-13, mié 2026-10-14, jue 2026-10-15, vie 2026-10-16, sáb 2026-10-17');
+      expect(mensajeUsuario('x', ahora, null)).toContain('Próximos días: mar 2026-10-13');
+    });
+
+    it('la salida corta de la IA se pasa al plan (día y hora en un solo campo)', () => {
+      const plan = planDeSalida({
+        acciones: [
+          {
+            tipo: 'servicio',
+            sub: 'CORRECTIVO',
+            titulo: 'Revisar DVR',
+            detalle: 'No graba.',
+            quien: 'Carolina Pérez',
+            cliente: 'Banorte',
+            lugar: null,
+            inicio: '2026-10-13 09:30',
+            limite: '2026-10-16',
+            min: 90,
+            prio: 'Alta',
+            encargo: null,
+          },
+        ],
+        aclaracion: null,
+      });
+      expect(plan.acciones[0]).toMatchObject({
+        subtipo: 'CORRECTIVO',
+        indicaciones: 'No graba.',
+        responsable: 'Carolina Pérez',
+        fecha: '2026-10-13',
+        hora: '09:30',
+        fechaLimite: '2026-10-16',
+        horaLimite: null,
+        duracionMin: 90,
+        prioridad: 'Alta',
+      });
+      const p = construirPropuesta(plan.acciones[0], catalogos, ctx);
+      expect(p.payload).toMatchObject({ ticketType: 'CORRECTIVO', periodoInicio: '2026-10-13', periodoFin: '2026-10-16' });
+      expect(planDeSalida(null)).toEqual({ acciones: [], aclaracion: null });
+    });
+
+    it('«a las 8» ya pasada y sin día es mañana, aunque la IA ponga hoy', () => {
+      const accion = { ...base, fecha: '2026-10-12', hora: '08:00' };
+      expect(corregirHoraPasada(accion, ahora, 'que Juan vaya a las 8').fecha).toBe('2026-10-13');
+      // Si dijeron el día, se respeta (y la tarjeta avisa que quedó en el pasado).
+      expect(corregirHoraPasada(accion, ahora, 'que Juan vaya hoy a las 8').fecha).toBe('2026-10-12');
+      expect(corregirHoraPasada({ ...accion, hora: '15:00' }, ahora, 'que Juan vaya a las 3').fecha).toBe('2026-10-12');
+      expect(mencionaDia('el lunes 2 de noviembre')).toBe(true);
+      expect(mencionaDia('que vaya a las 8')).toBe(false);
     });
   });
 });

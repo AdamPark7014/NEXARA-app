@@ -1,5 +1,24 @@
 # RELEVO
 
+- **23-10 ~18:45 UTC (claude-code) — «Asignar con IA» más barato y más rápido; eval solo por la puerta con Haiku.**
+  - Reglas nuevas de costo (Adam vía coordinador): pruebas solo por la puerta con el token `pruebas`, solo Haiku,
+    sin juez Opus/Sonnet; objetivo de producción p95 ≤ 3.5 s, ~10 s por intento y un reintento.
+  - Asistente (`asistente-actividades.ts`): el catálogo ya no va entero: `catalogoRelevante` busca en código lo
+    mencionado (apodos «Beto»/«Paty»/«Toño», cómo suena «Toks»=«Tox», prefijos) y solo eso va en el mensaje;
+    `proximosDias` manda el calendario calculado («el viernes» dicho en viernes ya no es hoy); `corregirHoraPasada`
+    («a las 8» sin día y ya pasada → mañana); prompt recortado (5.5k → 3.7k caracteres); salida corta (`sub`,
+    `quien`, `lugar`, `inicio`/`limite` con día y hora juntos, `min`, `prio`, `detalle`, sin `razonTipo`) que
+    `planDeSalida` pasa al plan de siempre; `CONFIG_ASISTENTE.timeoutMs` 10 s y `reintentos` 1 (nuevo campo por
+    petición en `ClaudeService`, solo esas dos líneas). Web: espera máxima 25 s y error claro con el texto intacto.
+  - Medido (Haiku, puerta de pruebas, 10 llamadas en serie): antes p50 2.0 s / p95 6.3 s, 4,276 tokens de entrada,
+    342 de salida, US$0.00027; después p50 1.8 s / p95 3.5 s, 3,047 / 229, US$0.00021. En producción con el catálogo
+    real (antes de este cambio): caché fría 4,845 tokens → US$0.00072; con caché 4,723 leídos → US$0.00015.
+    Calidad: 23/23 casos con revisiones de código.
+  - Arnés del eval: `comun.ts` siempre por la puerta con `pruebas.token` (sin llave directa; sin token, error),
+    juez por omisión Haiku (`--juez sonnet|opus` explícito), costo estimado antes de correr con `--max-usd`,
+    `--concurrencia 1` con p50/p95; `generar-transcripciones` con Haiku por omisión (`--modelo`).
+  - Gasto: antes de la regla esta tarea gastó ~US$0.70 en el eval (juez Opus); después, ~US$0.025.
+
 - **23-10 ~18:45 UTC (claude-code) — Cada llamada a Claude dice qué función la hizo (`x-proceso`).**
   - Adam: «ve cómo perfeccionar el modelo… si consume mucho nos da en la torre, pero si es muy lento, no entiende bien
     o se traba… también nos va a generar problemas». La puerta ya registraba latencia, errores y costo por proyecto y

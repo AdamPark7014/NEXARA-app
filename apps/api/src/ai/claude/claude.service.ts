@@ -64,6 +64,8 @@ type PeticionBase = {
   pensar?: boolean;
   /** Tiempo máximo de la llamada (por omisión 60 s). */
   timeoutMs?: number;
+  /** Reintentos si falla o se pasa del tiempo (por omisión 2, los del cliente). */
+  reintentos?: number;
 };
 
 export type PeticionJson = PeticionBase & {
@@ -219,6 +221,7 @@ export class ClaudeService {
         },
         {
           timeout: peticion.timeoutMs ?? 60_000,
+          ...(peticion.reintentos != null ? { maxRetries: peticion.reintentos } : {}),
           // La puerta registra la llamada bajo este proceso (no viaja a Anthropic).
           headers: { 'x-proceso': procesoParaPuerta(peticion.proceso) },
         },

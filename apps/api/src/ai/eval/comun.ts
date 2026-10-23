@@ -1,15 +1,16 @@
 /**
- * Utilidades del eval de IA: llave, presupuesto de pruebas y concurrencia.
+ * Utilidades del eval de IA: llave, presupuesto de pruebas, costo estimado y concurrencia.
  *
- * Llave (nunca en el repo): `ANTHROPIC_API_KEY` del entorno (con `CLAUDE_BASE_URL` si va por
- * la puerta); si no hay, el token del proyecto `pruebas` de la puerta
- * (`C:\dev\secrets\puerta-ia\pruebas.token`) o la llave directa de
- * `C:\dev\secrets\anthropic\ANTHROPIC_API_KEY.txt`.
+ * Todo el eval va SIEMPRE por la puerta (`https://ia.zynoratek.com`) con el token del proyecto
+ * `pruebas` (`C:\dev\secrets\puerta-ia\pruebas.token`): así cada centavo pasa por el tope de
+ * la puerta. No hay camino a la llave directa de Anthropic (se salta el tope) y una
+ * `ANTHROPIC_API_KEY` del entorno se ignora. Regla de Adam (23-10-2026): pruebas solo con
+ * Haiku 5.5; otro modelo solo pidiéndolo explícitamente.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
-import { usoDeRespuesta, type UsoClaude } from '../claude/claude.service.js';
+import { estimarUsd, usoDeRespuesta, type UsoClaude } from '../claude/claude.service.js';
 
 export const DIR_EVAL = resolve(process.cwd(), 'src/ai/eval');
 export const DIR_RESULTADOS = join(DIR_EVAL, 'resultados');
@@ -19,24 +20,61 @@ const ARCHIVO_GASTO = join(DIR_RESULTADOS, 'gasto.json');
 
 const PUERTA_PUBLICA = 'https://ia.zynoratek.com';
 const TOKEN_PRUEBAS = 'C:\\dev\\secrets\\puerta-ia\\pruebas.token';
-const LLAVE_DIRECTA = 'C:\\dev\\secrets\\anthropic\\ANTHROPIC_API_KEY.txt';
 
-/** Deja `ANTHROPIC_API_KEY` y `CLAUDE_BASE_URL` listos para `ClaudeService` y el juez. */
+/**
+ * Deja `ANTHROPIC_API_KEY` (token de pruebas) y `CLAUDE_BASE_URL` (la puerta) listos para
+ * `ClaudeService` y el juez. Sin token, se detiene: nunca cae a la llave directa.
+ */
 export function cargarLlave(): string {
-  if ((process.env.ANTHROPIC_API_KEY || '').trim()) {
-    return `entorno${process.env.CLAUDE_BASE_URL ? ` → ${process.env.CLAUDE_BASE_URL}` : ''}`;
+  if (!existsSync(TOKEN_PRUEBAS)) {
+    throw new Error(
+      `Falta el token de pruebas de la puerta (${TOKEN_PRUEBAS}). El eval solo corre por la puerta; ` +
+        'dalo de alta con «pnpm --dir C:\\dev\\apps\\PUERTA-IA-app alta -- --nombre pruebas --modelos claude-haiku-5-5».',
+    );
   }
-  if (existsSync(TOKEN_PRUEBAS) && !process.env.EVAL_DIRECTO) {
-    process.env.ANTHROPIC_API_KEY = readFileSync(TOKEN_PRUEBAS, 'utf8').trim();
-    process.env.CLAUDE_BASE_URL = PUERTA_PUBLICA;
-    return `puerta (pruebas) → ${PUERTA_PUBLICA}`;
-  }
-  if (existsSync(LLAVE_DIRECTA)) {
-    process.env.ANTHROPIC_API_KEY = readFileSync(LLAVE_DIRECTA, 'utf8').trim();
-    delete process.env.CLAUDE_BASE_URL;
-    return 'Anthropic directo';
-  }
-  throw new Error('Sin llave para el eval: define ANTHROPIC_API_KEY o crea el token de pruebas.');
+  const token = readFileSync(TOKEN_PRUEBAS, 'utf8').trim();
+  if (!token) throw new Error(`El token de pruebas (${TOKEN_PRUEBAS}) está vacío.`);
+  process.env.ANTHROPIC_API_KEY = token;
+  process.env.CLAUDE_BASE_URL = PUERTA_PUBLICA;
+  return `puerta (pruebas) → ${PUERTA_PUBLICA}`;
+}
+
+/** Modelos por nombre corto. Por omisión, Haiku: los demás solo si se piden. */
+export const MODELOS: Record<string, string> = {
+  haiku: 'claude-haiku-5-5',
+  sonnet: 'claude-sonnet-5-5',
+  opus: 'claude-opus-5-5',
+};
+
+export function modeloDe(nombre: string | undefined, porOmision = 'haiku'): string {
+  const clave = (nombre || porOmision).trim().toLowerCase();
+  const modelo = MODELOS[clave];
+  if (!modelo) throw new Error(`Modelo desconocido: ${nombre} (usa ${Object.keys(MODELOS).join(', ')})`);
+  return modelo;
+}
+
+/**
+ * Costo estimado de una llamada: `cacheada` es la parte del prompt que se lee de la caché
+ * (`primera` = la escribe, 1.25×). null si el modelo no está en la tabla de precios.
+ */
+export function costoLlamada(
+  modelo: string,
+  tokens: { entrada: number; cacheada?: number; salida: number },
+  primera = false,
+): number {
+  const cacheada = Math.min(tokens.cacheada ?? 0, tokens.entrada);
+  return (
+    estimarUsd(modelo, {
+      entrada: tokens.entrada - cacheada,
+      salida: tokens.salida,
+      ...(primera ? { cacheEscrita: cacheada } : { cacheLeida: cacheada }),
+    }) ?? 0
+  );
+}
+
+/** Lo que queda del tope del libro de gasto. */
+export function restante(): number {
+  return Math.max(0, topeUsd() - gastado());
 }
 
 let cliente: Anthropic | null = null;

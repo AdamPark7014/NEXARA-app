@@ -44,7 +44,7 @@
     {
       "fecha": "2026-10-23",
       "concepto": "asistente haiku-low-np",
-      "usd": 0.085529
+      "usd": 0.107791
     },
     {
       "fecha": "2026-10-23",
@@ -60,6 +60,11 @@
       "fecha": "2026-10-23",
       "concepto": "triage haiku-low",
       "usd": 0.00091
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "prueba opcionales haiku",
+      "usd": 0.000628
     }
   ]
 }

@@ -3,7 +3,9 @@
  * escenario (`casos-actas.ts`) y revisa que traigan las pistas de cada acuerdo. Se guardan en
  * `transcripciones/<id>.txt` y se versionan: el eval siempre califica sobre el mismo texto.
  *
- *   node -r ts-node/register/transpile-only src/ai/eval/generar-transcripciones.ts [--casos r01,r02] [--forzar]
+ *   node -r ts-node/register/transpile-only src/ai/eval/generar-transcripciones.ts [--casos r01,r02] [--forzar] [--modelo haiku]
+ *
+ * Por la puerta con el token de pruebas y con Haiku 5.5 salvo que se pida otro (`--modelo sonnet`).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,13 +18,15 @@ import {
   cargarLlave,
   clienteEval,
   enParalelo,
+  modeloDe,
   plano,
   registrarGasto,
   textoDe,
   usoDe,
 } from './comun.js';
 
-const MODELO = 'claude-sonnet-5-5';
+/** Haiku 5.5 por omisión; `--modelo` cambia. */
+let MODELO = modeloDe(undefined);
 const PALABRAS_POR_MINUTO = 130;
 export const DIR_TRANSCRIPCIONES = join(DIR_EVAL, 'transcripciones');
 
@@ -86,7 +90,7 @@ async function generar(e: EscenarioActa): Promise<string> {
     output_config: { effort: 'low' },
   });
   const uso = usoDe(MODELO, r);
-  registrarGasto('generar transcripciones (sonnet)', uso.usdAprox);
+  registrarGasto(`generar transcripciones (${MODELO.replace('claude-', '')})`, uso.usdAprox);
   if (r.stop_reason !== 'end_turn') throw new Error(`${e.id}: stop_reason ${r.stop_reason}`);
   const texto = textoDe(r);
   const n = texto.split(/\s+/).length;
@@ -116,7 +120,7 @@ async function alargar(e: EscenarioActa, texto: string): Promise<string> {
       ],
       output_config: { effort: 'low' },
     });
-    registrarGasto('generar transcripciones (sonnet)', usoDe(MODELO, r).usdAprox);
+    registrarGasto(`generar transcripciones (${MODELO.replace('claude-', '')})`, usoDe(MODELO, r).usdAprox);
     if (r.stop_reason !== 'end_turn') break;
     texto = `${texto}\n\n${textoDe(r)}`;
     console.log(`${e.id}: alargada a ${palabrasDe(texto)} palabras (objetivo ${objetivo})`);
@@ -126,7 +130,8 @@ async function alargar(e: EscenarioActa, texto: string): Promise<string> {
 
 async function main() {
   const args = argumentos();
-  console.log(`Llave: ${cargarLlave()}`);
+  MODELO = modeloDe(args.modelo);
+  console.log(`Llave: ${cargarLlave()} · modelo ${MODELO}`);
   mkdirSync(DIR_TRANSCRIPCIONES, { recursive: true });
   const ids = args.casos ? args.casos.split(',') : null;
   const elegidos = ESCENARIOS_ACTA.filter((e) => !ids || ids.includes(e.id));

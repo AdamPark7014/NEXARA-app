@@ -96,7 +96,8 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
       setEstados({});
       setEditandoTexto({});
     } catch (e) {
-      setError(formatApiError(e, "La IA no respondió. Intenta de nuevo."));
+      // Lo escrito o dictado no se borra: basta volver a tocar «Interpretar».
+      setError(`${formatApiError(e, "La IA no respondió.")} Tu instrucción sigue aquí: vuelve a tocar «Interpretar».`);
     } finally {
       setPensando(false);
     }
