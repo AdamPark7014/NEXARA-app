@@ -32,29 +32,18 @@ if (path.resolve(SALIDA).startsWith(path.resolve(__dirname, '..'))) {
 
 const personal = JSON.parse(fs.readFileSync(PERSONAL, 'utf8'));
 
-// Fáciles de recordar y al azar (pedido de Adam, 23-10-2026): «Palabra-Palabra-NN», p. ej. «Mango-Nube-47».
-// Nada que salga del nombre ni del número de empleado (el patrón «Nexara! + número» era adivinable). El login
-// bloquea la cuenta tras varios intentos fallidos, así que ~1.2 millones de combinaciones por persona bastan.
-const PALABRAS = [
-  'Mango', 'Pera', 'Lima', 'Coco', 'Fresa', 'Uva', 'Kiwi', 'Cereza', 'Durazno', 'Papaya', 'Melon', 'Ciruela',
-  'Nube', 'Luna', 'Sol', 'Estrella', 'Cometa', 'Rayo', 'Brisa', 'Lluvia', 'Nieve', 'Trueno', 'Aurora', 'Marea',
-  'Rio', 'Lago', 'Mar', 'Playa', 'Bosque', 'Selva', 'Monte', 'Valle', 'Isla', 'Cascada', 'Pradera', 'Volcan',
-  'Leon', 'Tigre', 'Lobo', 'Oso', 'Zorro', 'Aguila', 'Halcon', 'Delfin', 'Ballena', 'Tortuga', 'Panda', 'Koala',
-  'Jaguar', 'Puma', 'Colibri', 'Buho', 'Ardilla', 'Conejo', 'Venado', 'Pinguino', 'Nutria', 'Caballo', 'Gato', 'Perro',
-  'Rojo', 'Azul', 'Verde', 'Dorado', 'Plata', 'Coral', 'Turquesa', 'Violeta', 'Ambar', 'Marfil', 'Jade', 'Rubi',
-  'Piano', 'Guitarra', 'Tambor', 'Violin', 'Flauta', 'Trompeta', 'Arpa', 'Bongo',
-  'Cafe', 'Cacao', 'Vainilla', 'Canela', 'Miel', 'Pan', 'Taco', 'Elote', 'Tamal', 'Mole', 'Churro', 'Nopal',
-  'Faro', 'Puente', 'Torre', 'Castillo', 'Molino', 'Barco', 'Velero', 'Cohete', 'Globo', 'Tren', 'Bici', 'Kayak',
-  'Roble', 'Pino', 'Cedro', 'Olivo', 'Bambu', 'Cactus', 'Girasol', 'Rosa', 'Tulipan', 'Orquidea', 'Lirio', 'Helecho',
-];
-const al = (lista) => lista[crypto.randomInt(lista.length)];
+// Patrón de marca fácil de recordar (pedido de Adam, 23-10-2026): «Nexara-nx» + 2 dígitos + 3 letras al azar,
+// p. ej. «Nexara-nx34wkp». Lo fijo es la marca; lo que protege es la parte al azar (~780 mil combinaciones por
+// persona, y el login bloquea tras varios intentos). Nunca derivado del nombre ni del número de empleado: el patrón
+// viejo «Nexara! + número de empleado» se adivinaba sabiendo el número.
+const DIGITOS = '23456789';
+const LETRAS = 'abcdefghjkmnpqrstuvwxyz';
+const al = (s) => s[crypto.randomInt(s.length)];
 const usadas = new Set();
 function clave() {
   for (;;) {
-    const a = al(PALABRAS);
-    const b = al(PALABRAS);
-    const c = `${a}-${b}-${crypto.randomInt(10, 100)}`;
-    if (a !== b && !usadas.has(c)) {
+    const c = `Nexara-nx${al(DIGITOS)}${al(DIGITOS)}${al(LETRAS)}${al(LETRAS)}${al(LETRAS)}`;
+    if (!usadas.has(c)) {
       usadas.add(c);
       return c;
     }
