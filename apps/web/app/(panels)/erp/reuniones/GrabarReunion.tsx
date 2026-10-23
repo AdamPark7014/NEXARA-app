@@ -3,8 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
-import { useGrabadora, type MetaParte } from "@/lib/use-grabadora";
+import { mensajeMicrofono, useGrabadora, type MetaParte } from "@/lib/use-grabadora";
 import { duracionLegible } from "@/lib/voz-api";
+import {
+  abrirDispositivo,
+  dispositivoDePista,
+  listarMicrofonos,
+  nombreMicrofono,
+  recordarMicrofono,
+  type Dispositivo,
+} from "@/lib/microfono";
 import {
   concluirGrabacion,
   estadoGrabacion,
@@ -22,6 +30,8 @@ const PARTE_MS = 60_000;
 const MAX_MS = 3 * 60 * 60_000;
 const AVISO_MS = MAX_MS - 10 * 60_000;
 const CONSULTA_MS = 10_000;
+/** Cinco segundos de silencio digital (ni una muestra distinta de cero): micrófono mudo. */
+const SILENCIO_MS = 5_000;
 
 type Pendiente = { parte: number; meta: MetaParte; audio: Blob };
 
@@ -189,6 +199,34 @@ export default function GrabarReunion({
     return () => window.removeEventListener("beforeunload", avisar);
   }, [ocupado]);
 
+  // Micrófonos disponibles (con nombre: el permiso ya se dio) y cambio a mitad de la junta.
+  const [microfonos, setMicrofonos] = useState<Dispositivo[]>([]);
+  const [cambiandoMic, setCambiandoMic] = useState(false);
+  useEffect(() => {
+    if (!grabadora.grabando) return;
+    const cargar = () => void listarMicrofonos().then(setMicrofonos).catch(() => undefined);
+    cargar();
+    navigator.mediaDevices?.addEventListener?.("devicechange", cargar);
+    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", cargar);
+  }, [grabadora.grabando]);
+
+  const cambiarMicrofono = async (deviceId: string) => {
+    if (!deviceId || deviceId === grabadora.microfono?.deviceId) return;
+    setCambiandoMic(true);
+    setError(null);
+    try {
+      const nuevo = await abrirDispositivo(deviceId);
+      grabadora.cambiarMicrofono(nuevo);
+      const pista = nuevo.getAudioTracks()[0];
+      const real = dispositivoDePista(pista?.label ?? "", pista?.getSettings?.().deviceId, microfonos);
+      if (real) recordarMicrofono(real.deviceId);
+    } catch (e) {
+      setError(mensajeMicrofono(e));
+    } finally {
+      setCambiandoMic(false);
+    }
+  };
+
   const descartar = () => {
     if (!window.confirm("¿Detener la grabación sin concluir? Lo grabado se queda guardado y puedes concluirla después desde la reunión.")) return;
     grabadora.detener();
@@ -202,6 +240,10 @@ export default function GrabarReunion({
   const minutos = Math.floor(grabadora.transcurrido / 60_000);
   const enTexto = estado?.listas ?? 0;
   const etiqueta = concluyendo ? "Concluyendo" : grabadora.pausado ? "En pausa" : grabadora.grabando ? "Grabando" : "Detenida";
+  const enVivo = grabadora.grabando && !grabadora.pausado && !concluyendo;
+  const mudo = enVivo && grabadora.silencioMs >= SILENCIO_MS;
+  // Nivel en escala que se note al hablar (la voz rara vez pasa de 0.3 de pico).
+  const barra = grabadora.nivel == null ? null : Math.min(1, Math.sqrt(grabadora.nivel) * 1.6);
 
   return (
     <section className={s.rec} aria-label="Grabación de la reunión en curso">
@@ -214,6 +256,18 @@ export default function GrabarReunion({
           <div style={{ minWidth: 0 }}>
             <p className={s.recLabel} aria-live="polite">
               {etiqueta} · <span className={s.recClock}>{duracionLegible(grabadora.transcurrido)}</span>
+              {enVivo && barra != null ? (
+                <span
+                  className={`${s.nivel} ${mudo ? s.nivelMudo : ""}`}
+                  role="meter"
+                  aria-label="Nivel del micrófono"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(barra * 100)}
+                >
+                  <span style={{ width: `${Math.round(barra * 100)}%` }} />
+                </span>
+              ) : null}
             </p>
             <p className={s.recTitle}>{sesion.titulo}</p>
           </div>
@@ -240,6 +294,34 @@ export default function GrabarReunion({
           : `${minutos} ${minutos === 1 ? "minuto grabado" : "minutos grabados"} · ${enTexto} ya en texto · las notas se toman cada ~4 minutos`}
         {!concluyendo && enCola > 1 ? ` · ${enCola} partes por subir` : ""}
       </p>
+
+      {mudo ? (
+        <InlineAlert
+          variant="warning"
+          message={`No te escucho con «${nombreMicrofono(grabadora.microfono?.label)}». Elige otro micrófono o revisa que no esté silenciado.`}
+        />
+      ) : null}
+      {grabadora.grabando && !concluyendo && microfonos.length ? (
+        <label className={s.micro}>
+          <span className={s.fieldLabel} style={{ margin: 0 }}>Micrófono</span>
+          <select
+            className={s.input}
+            value={grabadora.microfono?.deviceId ?? ""}
+            disabled={cambiandoMic}
+            onChange={(e) => void cambiarMicrofono(e.target.value)}
+            aria-invalid={mudo || undefined}
+          >
+            {!microfonos.some((m) => m.deviceId === grabadora.microfono?.deviceId) ? (
+              <option value={grabadora.microfono?.deviceId ?? ""}>{nombreMicrofono(grabadora.microfono?.label)}</option>
+            ) : null}
+            {microfonos.map((m) => (
+              <option key={m.deviceId} value={m.deviceId}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {sinRed ? (
         <InlineAlert

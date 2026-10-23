@@ -64,6 +64,8 @@ import PersonalCalendar from "@/components/calendar/PersonalCalendar";
 import ActaIA from "./ActaIA";
 import GrabarReunion, { type SesionGrabacion } from "./GrabarReunion";
 import { abrirMicrofono } from "@/lib/use-grabadora";
+import { pedirPermisoMicrofono, usePermisoMicrofono } from "@/lib/use-permiso-microfono";
+import PermisoMicrofono from "./PermisoMicrofono";
 import s from "./reuniones.module.css";
 
 type Tab = "mios" | "reuniones" | "agenda";
@@ -329,19 +331,41 @@ export default function ReunionesPage() {
    */
   const [empezando, setEmpezando] = useState(false);
   const [sesion, setSesion] = useState<SesionGrabacion | null>(null);
-  const comenzarGrabacion = async (existente?: { id: number; titulo: string; baseMs?: number; baseParte?: number }) => {
+  type Existente = { id: number; titulo: string; baseMs?: number; baseParte?: number };
+
+  // Permiso del micrófono como el de notificaciones: tarjeta antes de grabar si falta.
+  const permisoMic = usePermisoMicrofono();
+  const [tarjetaMic, setTarjetaMic] = useState<{ pendiente: Existente | null; grabar: boolean } | null>(null);
+  const [micPospuesto, setMicPospuesto] = useState(false);
+  useEffect(() => {
+    if (!puedeConvocar || micPospuesto || tarjetaMic || sesion) return;
+    if (permisoMic.estado === "prompt" || permisoMic.estado === "denied") setTarjetaMic({ pendiente: null, grabar: false });
+  }, [permisoMic.estado, puedeConvocar, micPospuesto, tarjetaMic, sesion]);
+  useEffect(() => {
+    // Se permitió (desde la tarjeta o desde el candado del navegador): la tarjeta sobra.
+    if (permisoMic.estado === "granted" && tarjetaMic && !tarjetaMic.grabar) setTarjetaMic(null);
+  }, [permisoMic.estado, tarjetaMic]);
+
+  const comenzarGrabacion = async (existente?: Existente, opciones: { desdeTarjeta?: boolean } = {}) => {
     if (!token || empezando) return;
     if (sesion) {
       toast.error("Ya hay una reunión grabándose: concluye esa primero.");
+      return;
+    }
+    if (!opciones.desdeTarjeta && (permisoMic.estado === "prompt" || permisoMic.estado === "denied")) {
+      setTarjetaMic({ pendiente: existente ?? null, grabar: true });
       return;
     }
     setEmpezando(true);
     const { stream, error: errorMic } = await abrirMicrofono();
     if (!stream) {
       setEmpezando(false);
-      toast.error(errorMic ?? "No se pudo abrir el micrófono.");
+      const estado = await permisoMic.reconsultar();
+      if (estado === "denied") setTarjetaMic({ pendiente: existente ?? null, grabar: true });
+      else toast.error(errorMic ?? "No se pudo abrir el micrófono.");
       return;
     }
+    setTarjetaMic(null);
     try {
       const reunion =
         existente ??
@@ -1013,6 +1037,35 @@ export default function ReunionesPage() {
           </div>
         )}
       </Modal>
+
+      {tarjetaMic && (permisoMic.estado === "prompt" || permisoMic.estado === "denied") ? (
+        <PermisoMicrofono
+          estado={permisoMic.estado}
+          onPermitir={async () => {
+            if (tarjetaMic.grabar) {
+              await comenzarGrabacion(tarjetaMic.pendiente ?? undefined, { desdeTarjeta: true });
+            } else {
+              const ok = await pedirPermisoMicrofono();
+              const estado = await permisoMic.reconsultar();
+              if (ok || estado === "granted") setTarjetaMic(null);
+            }
+          }}
+          onReconsultar={async () => {
+            const estado = await permisoMic.reconsultar();
+            if (estado === "granted") {
+              const pendiente = tarjetaMic.grabar ? tarjetaMic : null;
+              setTarjetaMic(null);
+              if (pendiente) await comenzarGrabacion(pendiente.pendiente ?? undefined, { desdeTarjeta: true });
+            } else {
+              toast.error("El navegador sigue bloqueando el micrófono. Revisa el candado junto a la dirección y recarga.");
+            }
+          }}
+          onCerrar={() => {
+            setTarjetaMic(null);
+            setMicPospuesto(true);
+          }}
+        />
+      ) : null}
     </>
   );
 }
