@@ -1505,13 +1505,10 @@ Puente NAS · keystore Play · sitio público (canónica de producción) · `NO 
   en la bóveda) y `gerencia@`, `developer@` y `play.review@` aparte (la herramienta las omite): hash nuevo,
   `passwordChangedAt`, desbloqueo y sesiones revocadas (81 de `gerencia@`, 18 de `play.review@`). Verificado en la base:
   la filtrada no entra en ninguna, la nueva sí, 0 sesiones previas abiertas.
-- Credenciales nuevas SOLO en `C:\dev\secrets
-exara\credenciales-2026-10-23\` (Excel + un .txt por persona);
-  lista del personal en `C:\dev\secrets
-exara\personal.json`; copia de los archivos filtrados en `...\historico\`.
+- Credenciales nuevas SOLO en `C:\dev\secrets\nexara\credenciales-2026-10-23\` (Excel + un .txt por persona);
+  lista del personal en `C:\dev\secrets\nexara\personal.json`; copia de los archivos filtrados en `...\historico\`.
 - Contraseña de la cuenta demo de revisión actualizada en App Store Connect (versión 1.0) y en
-  `C:\dev\secrets
-exara-store\`. **Falta en Play Console** (Contenido de la app › Acceso a la app): la cambia Adam.
+  `C:\dev\secrets\nexara-store\`. **Falta en Play Console** (Contenido de la app › Acceso a la app): la cambia Adam.
 - El script ya no trae datos: lee `personal.json`, genera contraseñas aleatorias y escribe fuera del repo; `.gitignore`
   bloquea Excel/JSON de credenciales. El historial de git sigue teniendo lo filtrado (ya inservible): limpiarlo o hacer
   privado el repo es decisión de Adam.
