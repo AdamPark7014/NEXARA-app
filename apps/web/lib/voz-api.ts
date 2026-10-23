@@ -2,8 +2,7 @@
  * Voz a texto con nuestro propio transcriptor (whisper en el servidor de NEXARA).
  *
  * - Dictar: se graba en el navegador, se sube el audio y vuelve el texto (`ai/voz/*`).
- * - Grabar una junta: se sube una parte cada pocos minutos y el servidor la transcribe en
- *   segundo plano (`grabaciones-reuniones/*`).
+ * - Grabar una junta: `lib/grabacion-api.ts` (partes de ~1 minuto, notas en vivo y minuta).
  *
  * El audio no pasa por Google ni por ningún proveedor.
  */
@@ -58,29 +57,6 @@ export async function transcribirDictado(token: string, audio: Blob): Promise<st
   const r = await pedir<{ texto: string }>(token, "ai/voz/transcribir", { method: "POST", body: formulario(audio) });
   return r?.texto ?? "";
 }
-
-export type EstadoGrabacion = {
-  disponible: boolean;
-  total: number;
-  listas: number;
-  pendientes: number;
-  conError: number;
-  terminada: boolean;
-  partes: Array<{ parte: number; estado: "pendiente" | "lista" | "error"; error?: string }>;
-  texto: string;
-};
-
-export const subirParteGrabacion = (token: string, meetingId: number, parte: number, audio: Blob) =>
-  pedir<EstadoGrabacion>(token, `grabaciones-reuniones/${meetingId}/partes`, {
-    method: "POST",
-    body: formulario(audio, { parte: String(parte) }),
-  });
-
-export const estadoGrabacion = (token: string, meetingId: number) =>
-  pedir<EstadoGrabacion>(token, `grabaciones-reuniones/${meetingId}`);
-
-export const borrarGrabacion = (token: string, meetingId: number) =>
-  pedir<{ ok: boolean }>(token, `grabaciones-reuniones/${meetingId}`, { method: "DELETE" });
 
 /** Formatos en orden de preferencia: opus pesa poco y ffmpeg lo lee sin problema. */
 const FORMATOS = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/webm", "audio/mp4"];

@@ -7137,10 +7137,69 @@ model OperationalMeeting {
   company     CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   asistentes  MeetingAttendee[]
   acuerdos    MeetingAgreement[]
+  grabacion   MeetingRecording?
 
   @@index([companyId, fecha])
   @@index([companyId, tipo, fecha])
   @@map("operational_meetings")
+}
+
+/// Grabación de una reunión con notas en vivo y minuta con IA (Adam, 22-10-2026): un botón graba,
+/// cada parte de ~1 min se transcribe con nuestro whisper (el audio se borra al transcribirse), las
+/// notas se toman por tramos mientras sigue la junta y al concluir se escribe la minuta.
+model MeetingRecording {
+  id          Int       @id @default(autoincrement())
+  meetingId   Int       @unique
+  companyId   Int
+  /// GRABANDO · CONCLUYENDO · LISTA · ERROR
+  estado      String    @default("GRABANDO") @db.VarChar(20)
+  iniciadaAt  DateTime  @default(now())
+  concluidaAt DateTime?
+  /// Notas por tramo (`NotasGuardadas[]` de `minuta-ia.ts`).
+  notas       Json      @default("[]")
+  /// Última parte cubierta por las notas.
+  notasHasta  Int       @default(0)
+  /// Candado de las notas (un tramo a la vez); vence solo si el proceso muere.
+  notasLease  DateTime?
+  /// Minuta final (`Minuta` de `minuta-ia.ts`).
+  minuta      Json?
+  minutaAt    DateTime?
+  error       String?   @db.VarChar(500)
+  /// Gasto de IA acumulado de esta reunión.
+  usdIa       Float     @default(0)
+  tokensIa    Int       @default(0)
+  /// Cuándo se confirmaron los acuerdos propuestos (ya no se vuelven a proponer).
+  acuerdosConfirmadosAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  meeting OperationalMeeting      @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  partes  MeetingRecordingPart[]
+
+  @@index([companyId, estado])
+  @@map("meeting_recordings")
+}
+
+/// Una parte de ~1 minuto de la grabación: su texto y cuándo se dijo.
+model MeetingRecordingPart {
+  id           Int       @id @default(autoincrement())
+  recordingId  Int
+  parte        Int
+  /// PENDIENTE · LISTA · ERROR
+  estado       String    @default("PENDIENTE") @db.VarChar(12)
+  texto        String?   @db.Text
+  palabras     Int       @default(0)
+  /// Desde el inicio de la grabación, sin pausas (null en texto pegado).
+  inicioMs     Int?
+  duracionMs   Int?
+  error        String?   @db.VarChar(300)
+  createdAt    DateTime  @default(now())
+  transcritaAt DateTime?
+
+  recording MeetingRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@unique([recordingId, parte])
+  @@map("meeting_recording_parts")
 }
 
 /// Convocado a una reunión y si asistió.

@@ -115,16 +115,26 @@ export class MeetingsController {
     return this.service.get(id, companyId);
   }
 
-  /** Acta en PDF: datos, asistencia, agenda, minuta, acuerdos y la transcripción si hubo grabación. */
+  /**
+   * PDF de la reunión: la minuta completa si se grabó (resumen, temas, acuerdos, anexo con la
+   * transcripción); si no, el acta con la minuta escrita a mano y los acuerdos.
+   */
   @Get(':id/pdf')
   async actaPdf(
     @Param('id', ParseIntPipe) id: number,
     @CurrentCompanyId() companyId: number | null,
     @Res() res: Response,
   ) {
+    const minuta = await this.grabacion.pdf(id, companyId);
+    if (minuta) {
+      res.header('Content-Type', 'application/pdf');
+      res.header('Content-Disposition', `attachment; filename="${minuta.nombre}"`);
+      res.send(minuta.pdf);
+      return;
+    }
     const reunion = await this.service.get(id, companyId);
-    const grabacion = await this.grabacion.estado(id, companyId).catch(() => null);
-    const pdf = await generarActaPdf({ ...reunion, transcripcion: grabacion?.texto ?? null });
+    const { texto } = await this.grabacion.transcripcion(id, companyId).catch(() => ({ texto: '' }));
+    const pdf = await generarActaPdf({ ...reunion, transcripcion: texto || null });
     res.header('Content-Type', 'application/pdf');
     res.header('Content-Disposition', `attachment; filename="${nombreArchivoActa(reunion)}"`);
     res.send(pdf);

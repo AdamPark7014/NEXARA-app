@@ -267,6 +267,8 @@ export class MeetingsService {
       activityId?: number | null;
       /** Crea también una actividad para el responsable y la deja ligada al acuerdo. */
       crearActividad?: boolean;
+      /** Prioridad de esa actividad (la propone la minuta con IA); Media si no viene. */
+      prioridad?: string;
     },
     companyId?: number | null,
     creadoPorId?: number | null,
@@ -300,7 +302,7 @@ export class MeetingsService {
     });
 
     if (dto.crearActividad && tipo === 'ACUERDO' && creado.responsableId && !creado.activityId && creadoPorId) {
-      const ligado = await this.crearActividadDeAcuerdo(creado, reunion, creadoPorId, tenantId);
+      const ligado = await this.crearActividadDeAcuerdo(creado, reunion, creadoPorId, tenantId, dto.prioridad);
       if (ligado) return this.decorateAgreement(ligado);
       return { ...this.decorateAgreement(creado), avisoActividad: 'El acuerdo se guardó, pero no se pudo crear su actividad.' };
     }
@@ -316,10 +318,11 @@ export class MeetingsService {
     reunion: { titulo: string; fecha: Date },
     creadoPorId: number,
     tenantId: number,
+    prioridad?: string,
   ) {
     if (!this.activities || !acuerdo.responsableId) return null;
     try {
-      const dto = actividadDeAcuerdo(acuerdo, reunion, creadoPorId);
+      const dto = actividadDeAcuerdo(acuerdo, reunion, creadoPorId, prioridad);
       const actividad = await this.activities.create(dto as any, tenantId);
       return await this.prisma.meetingAgreement.update({
         where: { id: acuerdo.id },
