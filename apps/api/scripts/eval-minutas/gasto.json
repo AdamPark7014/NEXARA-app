@@ -1,6 +1,7 @@
 {
-  "tope_usd": 4,
-  "movimientos": [
+  "tope_usd": 1,
+  "movimientos": [],
+  "antes_de_la_puerta": [
     {
       "fecha": "2026-10-23",
       "concepto": "generar transcripciones (sonnet)",

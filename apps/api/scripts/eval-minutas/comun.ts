@@ -1,9 +1,10 @@
 /**
- * Utilidades del eval de minutas: llave, libro de gasto (tope 4 USD) y concurrencia.
+ * Utilidades del eval de minutas: llave, libro de gasto (tope 1 USD al mes) y concurrencia.
  *
- * Llave (nunca en el repo ni en la salida): la directa de `C:\dev\secrets\anthropic\ANTHROPIC_API_KEY.txt`
- * o, con `EVAL_PUERTA=1`, el token del proyecto `pruebas` de la puerta de IA
- * (`C:\dev\secrets\puerta-ia\pruebas.token`, base https://ia.zynoratek.com).
+ * Llave (nunca en el repo ni en la salida): SOLO el token del proyecto `pruebas` de la puerta de IA
+ * (`C:\dev\secrets\puerta-ia\pruebas.token`, base https://ia.zynoratek.com), que tiene su propio tope mensual.
+ * La llave directa de Anthropic ya no se usa aquí (Adam, 23-10-2026: «8 dólares para lo poco que hemos usado en
+ * pruebas me parece muchísimo»; casi todo era este eval con la llave directa y Opus de juez).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -14,7 +15,8 @@ export const DIR_TRANSCRIPCIONES = join(DIR_EVAL, 'transcripciones');
 /** Respuestas completas de cada corrida: fuera de git. */
 export const DIR_DETALLE = resolve(__dirname, '../../../../.ai/eval-minutas');
 const ARCHIVO_GASTO = join(DIR_EVAL, 'gasto.json');
-export const TOPE_USD = 4;
+/** Tope de este eval por mes calendario (además del tope del proyecto `pruebas` en la puerta). */
+export const TOPE_USD = 1;
 
 const PRECIOS: Record<string, { entrada: number; salida: number; cacheLeida: number }> = {
   'claude-haiku-5-5': { entrada: 0.1, salida: 0.5, cacheLeida: 0.01 },
@@ -30,16 +32,14 @@ export function usdDe(modelo: string, u: Anthropic.Usage): number {
   return (u.input_tokens * p.entrada + escrita * p.entrada * 1.25 + leida * p.cacheLeida + u.output_tokens * p.salida) / 1e6;
 }
 
+const TOKEN_PRUEBAS = 'C:\\dev\\secrets\\puerta-ia\\pruebas.token';
+
 export function cargarLlave(): string {
-  // Directo por omisión: el proyecto `pruebas` de la puerta tiene 5 USD al mes y lo comparten otros evals.
-  if (process.env.EVAL_PUERTA && existsSync('C:\\dev\\secrets\\puerta-ia\\pruebas.token')) {
-    process.env.ANTHROPIC_API_KEY = readFileSync('C:\\dev\\secrets\\puerta-ia\\pruebas.token', 'utf8').trim();
-    process.env.CLAUDE_BASE_URL = 'https://ia.zynoratek.com';
-    return 'puerta (pruebas)';
-  }
-  process.env.ANTHROPIC_API_KEY = readFileSync('C:\\dev\\secrets\\anthropic\\ANTHROPIC_API_KEY.txt', 'utf8').trim();
-  delete process.env.CLAUDE_BASE_URL;
-  return 'Anthropic directo';
+  // Siempre por la puerta: así el gasto de los evals queda bajo el tope del proyecto `pruebas`.
+  if (!existsSync(TOKEN_PRUEBAS)) throw new Error(`Falta el token del proyecto pruebas de la puerta (${TOKEN_PRUEBAS}).`);
+  process.env.ANTHROPIC_API_KEY = readFileSync(TOKEN_PRUEBAS, 'utf8').trim();
+  process.env.CLAUDE_BASE_URL = 'https://ia.zynoratek.com';
+  return 'puerta (pruebas)';
 }
 
 let cliente: Anthropic | null = null;
@@ -54,11 +54,17 @@ export function clienteEval(): Anthropic {
   return cliente;
 }
 
-type Libro = { tope_usd: number; movimientos: Array<{ fecha: string; concepto: string; usd: number }> };
+type Movimiento = { fecha: string; concepto: string; usd: number };
+/** `antes_de_la_puerta`: lo gastado con la llave directa hasta el 23-10-2026 (solo registro; no cuenta para el tope). */
+type Libro = { tope_usd: number; movimientos: Movimiento[]; antes_de_la_puerta?: Movimiento[] };
 const leer = (): Libro =>
   existsSync(ARCHIVO_GASTO) ? (JSON.parse(readFileSync(ARCHIVO_GASTO, 'utf8')) as Libro) : { tope_usd: TOPE_USD, movimientos: [] };
 
-export const gastado = () => leer().movimientos.reduce((s, m) => s + m.usd, 0);
+/** Gastado en el mes calendario en curso. */
+export const gastado = () => {
+  const mes = new Date().toISOString().slice(0, 7);
+  return leer().movimientos.filter((m) => m.fecha.startsWith(mes)).reduce((s, m) => s + m.usd, 0);
+};
 
 export function registrarGasto(concepto: string, usd: number) {
   if (!usd) return;

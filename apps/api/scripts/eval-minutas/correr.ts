@@ -1,12 +1,12 @@
 /**
  * Eval de la minuta automática: simula la grabación (partes de 60 s), toma las notas en vivo
  * con las mismas reglas que producción (`siguienteTramo`, `tramoAlConcluir`), escribe la minuta
- * con cada variante y califica con un juez (Opus 5.5, rúbrica) más revisiones de código
- * (acuerdos, responsables, fechas, temas, cifras, seguimiento).
+ * con cada variante y califica con un juez (Haiku 5.5 por omisión, rúbrica) más revisiones de código
+ * (acuerdos, responsables, fechas, temas, cifras, seguimiento). Todo va por la puerta (proyecto `pruebas`).
  *
  *   cd apps/api
  *   node -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only scripts/eval-minutas/correr.ts \
- *     --variantes hh,hs,sC [--juntas m1,m2] [--sin-juez] [--etiqueta texto]
+ *     --variantes hh,hs,sC [--juntas m1,m2] [--sin-juez] [--juez haiku|sonnet|opus] [--etiqueta texto]
  *
  * Variantes: hh = notas Haiku + minuta Haiku; hs = notas Haiku + minuta Sonnet; sC / hC = minuta
  * Sonnet / Haiku sobre la transcripción completa (sin notas; solo juntas largas).
@@ -52,7 +52,9 @@ import {
 } from './comun.js';
 import { PALABRAS_POR_MINUTO } from './generar.js';
 
-const JUEZ = 'claude-opus-5-5';
+/** Juez barato por omisión: Opus cuesta ~40 veces más que Haiku y fue casi la mitad del gasto de pruebas (23-10-2026). */
+const JUECES: Record<string, string> = { haiku: 'claude-haiku-5-5', sonnet: 'claude-sonnet-5-5', opus: 'claude-opus-5-5' };
+const JUEZ = JUECES[argumentos().juez ?? 'haiku'] ?? JUECES.haiku;
 const claude = new ClaudeService();
 
 type Uso = { entrada: number; salida: number; cacheLeida: number; usd: number; llamadas: number; ms: number };
@@ -231,7 +233,7 @@ async function juzgar(j: Junta, transcripcion: string, m: Minuta): Promise<{ v: 
     output_config: { effort: 'low', format: { type: 'json_schema', schema: ESQUEMA_JUEZ } },
   });
   const usd = usdDe(JUEZ, r.usage);
-  registrarGasto('juez (opus)', usd);
+  registrarGasto(`juez (${JUEZ})`, usd);
   return { v: JSON.parse(textoDe(r)) as Veredicto, usd };
 }
 
