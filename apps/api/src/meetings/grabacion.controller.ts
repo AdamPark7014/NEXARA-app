@@ -28,7 +28,7 @@ import { GrabacionService, type AcuerdoConfirmado, type CuerpoParte } from './gr
  * toca quien conduce (`MEETINGS_LEAD_URL_RULES`).
  *
  *   POST :id/partes          una parte de audio (~1 min) con su posición en la grabación
- *   GET  :id?notasDesde=n    estado, notas en vivo (desde la n) y la minuta cuando está
+ *   GET  :id?notasDesde=n&textoDesde=p  estado, notas y texto de whisper nuevos, y la minuta cuando está
  *   POST :id/concluir        «Concluir reunión»: escribe la minuta en segundo plano
  *   POST :id/texto           transcripción o notas pegadas (mismo camino, sin audio)
  *   POST :id/acuerdos        guarda los acuerdos confirmados (y sus actividades)
@@ -55,8 +55,10 @@ export class GrabacionController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentCompanyId() companyId: number | null,
     @Query('notasDesde') notasDesde?: string,
+    @Query('textoDesde') textoDesde?: string,
   ) {
-    return this.grabacion.estado(id, companyId, Number(notasDesde) || 0);
+    const texto = textoDesde === undefined || textoDesde === '' ? null : Number(textoDesde) || 0;
+    return this.grabacion.estado(id, companyId, Number(notasDesde) || 0, texto);
   }
 
   @Get(':id/transcripcion')

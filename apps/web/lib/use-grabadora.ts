@@ -82,6 +82,8 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
   const [silencioMs, setSilencioMs] = useState(0);
   /** Micrófono en uso: nombre y `deviceId` de la pista. */
   const [microfono, setMicrofono] = useState<{ label: string; deviceId: string | null } | null>(null);
+  /** Analizador del micrófono en uso (para la onda en vivo). */
+  const [analizador, setAnalizador] = useState<AnalyserNode | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const grabadora = useRef<MediaRecorder | null>(null);
   const timers = useRef<number[]>([]);
@@ -115,6 +117,7 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
   const desconectarMedidor = useCallback(() => {
     const m = medidor.current;
     medidor.current = null;
+    setAnalizador(null);
     if (!m) return;
     try {
       m.fuente.disconnect();
@@ -139,7 +142,8 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
         const analizador = ctx.createAnalyser();
         analizador.fftSize = 2048;
         fuente.connect(analizador);
-        medidor.current = { ctx, fuente, analizador, datos: new Float32Array(analizador.fftSize) };
+        medidor.current = { ctx, fuente, analizador, datos: new Float32Array(new ArrayBuffer(analizador.fftSize * 4)) };
+        setAnalizador(analizador);
       } catch {
         medidor.current = null;
         setNivel(null);
@@ -334,8 +338,13 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
     [soltarMicrofono],
   );
 
+  /** Pista del micrófono en uso (para el reconocimiento de voz del navegador). */
+  const pista = useCallback(() => stream.current?.getAudioTracks()[0] ?? null, []);
+
   return {
     soportado,
+    analizador,
+    pista,
     grabando,
     pausado,
     transcurrido,

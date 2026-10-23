@@ -567,7 +567,12 @@ export class GrabacionService implements OnModuleInit {
 
   // ── Leer ───────────────────────────────────────────────────────────────
 
-  async estado(meetingId: number, companyId: number | null, notasDesde = 0) {
+  /**
+   * Estado de la grabación. `notasDesde` manda solo las notas nuevas; `textoDesde` (si viene) agrega
+   * el texto de whisper de las partes ya transcritas después de esa: la pantalla de grabación
+   * sustituye con él la vista previa del navegador.
+   */
+  async estado(meetingId: number, companyId: number | null, notasDesde = 0, textoDesde: number | null = null) {
     const tenantId = requireCompanyId(companyId);
     await this.reunion(meetingId, tenantId);
     const disponible = Boolean(this.transcriptor.url());
@@ -579,7 +584,17 @@ export class GrabacionService implements OnModuleInit {
     });
     const notas = (g.notas as unknown as NotasGuardadas[]) ?? [];
     const desde = Math.max(0, Math.min(Number(notasDesde) || 0, notas.length));
+    const textos =
+      textoDesde == null
+        ? undefined
+        : await this.prisma.meetingRecordingPart.findMany({
+            where: { recordingId: g.id, estado: 'LISTA', parte: { gt: Math.max(0, textoDesde) } },
+            select: { parte: true, inicioMs: true, duracionMs: true, texto: true },
+            orderBy: { parte: 'asc' },
+            take: 60,
+          });
     return {
+      ...(textos ? { textos: textos.map((t) => ({ ...t, texto: t.texto ?? '' })) } : {}),
       disponible,
       existe: true as const,
       estado: g.estado,

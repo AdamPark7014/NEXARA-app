@@ -21,15 +21,30 @@ import {
   type GrabacionExistente,
   type NotasGuardadas,
 } from "@/lib/grabacion-api";
+import { useDictado } from "@/lib/use-dictado";
+import {
+  guardarVistaPrevia,
+  juntarTextos,
+  ultimaContigua,
+  vistaPreviaGuardada,
+  type Frase,
+  type TextoParte,
+} from "@/lib/transcripcion-vivo";
 import NotasEnVivo from "./NotasEnVivo";
+import OndaVoz from "./OndaVoz";
+import TranscripcionEnVivo from "./TranscripcionEnVivo";
 import s from "./reuniones.module.css";
 
-/** Un minuto por parte: si algo falla, se pierde a lo mucho eso. */
-const PARTE_MS = 60_000;
+/**
+ * Partes de 20 s: el texto bueno (whisper) llega pronto a la pantalla y, si algo falla, se pierde
+ * a lo mucho eso. Medido en el servidor (23-10): 20 s de audio se transcriben en ~5 s, o sea ~25 %
+ * del transcriptor por reunión en curso.
+ */
+const PARTE_MS = 20_000;
 /** Tres horas de junta como máximo; aviso 10 minutos antes. */
 const MAX_MS = 3 * 60 * 60_000;
 const AVISO_MS = MAX_MS - 10 * 60_000;
-const CONSULTA_MS = 10_000;
+const CONSULTA_MS = 6_000;
 /** Cinco segundos de silencio digital (ni una muestra distinta de cero): micrófono mudo. */
 const SILENCIO_MS = 5_000;
 
@@ -75,6 +90,10 @@ export default function GrabarReunion({
   const despertar = useRef<() => void>(() => undefined);
   const notasRef = useRef<NotasGuardadas[]>([]);
   notasRef.current = notas;
+  const [textos, setTextos] = useState<TextoParte[]>([]);
+  const textosRef = useRef<TextoParte[]>([]);
+  textosRef.current = textos;
+  const baseTexto = sesion.baseParte ?? 0;
 
   /** Sube las partes en orden; si falla la red, reintenta sola (3 s, 6 s… hasta 30 s). */
   const procesarCola = useCallback(async () => {
@@ -171,10 +190,11 @@ export default function GrabarReunion({
     let vivo = true;
     const consultar = async () => {
       try {
-        const r = await estadoGrabacion(token, meetingId, notasRef.current.length);
+        const r = await estadoGrabacion(token, meetingId, notasRef.current.length, ultimaContigua(textosRef.current, baseTexto));
         if (!vivo || !r.existe) return;
         setEstado(r);
         if (r.notas.length) setNotas((prev) => juntarNotas(prev, r.notas, r.notasDesde));
+        if (r.textos?.length) setTextos((prev) => juntarTextos(prev, r.textos!));
       } catch {
         /* sin red: la siguiente consulta lo intenta */
       }
@@ -185,7 +205,27 @@ export default function GrabarReunion({
       vivo = false;
       window.clearInterval(t);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, meetingId]);
+
+  // Vista previa con el reconocimiento de voz del navegador (Chrome, Edge, Safari): instantánea,
+  // aproximada; el texto de whisper la sustituye conforme llega.
+  const [vistaPrevia, setVistaPrevia] = useState(true);
+  useEffect(() => setVistaPrevia(vistaPreviaGuardada()), []);
+  const [frases, setFrases] = useState<Frase[]>([]);
+  const transcurridoRef = useRef(0);
+  transcurridoRef.current = grabadora.transcurrido;
+  const dictado = useDictado((texto) => setFrases((prev) => [...prev.slice(-120), { ms: transcurridoRef.current, texto }]));
+  const escuchar = vistaPrevia && dictado.soportado && grabadora.grabando && !grabadora.pausado && !concluyendo;
+  const micActual = grabadora.microfono?.deviceId ?? null;
+  const micPrevio = useRef<string | null>(null);
+  useEffect(() => {
+    if (escuchar && dictado.escuchando && micPrevio.current !== micActual) dictado.detener(); // otro micrófono: se reinicia con él
+    micPrevio.current = micActual;
+    if (escuchar && !dictado.escuchando && !dictado.error) dictado.iniciar(grabadora.pista());
+    if (!escuchar && dictado.escuchando) dictado.detener();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escuchar, dictado.escuchando, dictado.error, micActual]);
 
   // Mientras se graba o falta subir algo, cerrar la pestaña pide confirmación.
   const ocupado = grabadora.grabando || enCola > 0 || concluyendo;
@@ -242,8 +282,7 @@ export default function GrabarReunion({
   const etiqueta = concluyendo ? "Concluyendo" : grabadora.pausado ? "En pausa" : grabadora.grabando ? "Grabando" : "Detenida";
   const enVivo = grabadora.grabando && !grabadora.pausado && !concluyendo;
   const mudo = enVivo && grabadora.silencioMs >= SILENCIO_MS;
-  // Nivel en escala que se note al hablar (la voz rara vez pasa de 0.3 de pico).
-  const barra = grabadora.nivel == null ? null : Math.min(1, Math.sqrt(grabadora.nivel) * 1.6);
+  const previaActiva = escuchar && dictado.escuchando;
 
   return (
     <section className={s.rec} aria-label="Grabación de la reunión en curso">
@@ -256,21 +295,10 @@ export default function GrabarReunion({
           <div style={{ minWidth: 0 }}>
             <p className={s.recLabel} aria-live="polite">
               {etiqueta} · <span className={s.recClock}>{duracionLegible(grabadora.transcurrido)}</span>
-              {enVivo && barra != null ? (
-                <span
-                  className={`${s.nivel} ${mudo ? s.nivelMudo : ""}`}
-                  role="meter"
-                  aria-label="Nivel del micrófono"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(barra * 100)}
-                >
-                  <span style={{ width: `${Math.round(barra * 100)}%` }} />
-                </span>
-              ) : null}
             </p>
             <p className={s.recTitle}>{sesion.titulo}</p>
           </div>
+          {grabadora.grabando && !concluyendo ? <OndaVoz analizador={grabadora.analizador} activo={enVivo} /> : null}
         </div>
         <div className={s.recActions}>
           {grabadora.grabando && !concluyendo ? (
@@ -334,13 +362,42 @@ export default function GrabarReunion({
       ) : null}
       {error || grabadora.error ? <InlineAlert variant="danger" message={(grabadora.error ?? error) as string} /> : null}
 
+      {grabadora.grabando || textos.length ? (
+        <TranscripcionEnVivo
+          textos={textos}
+          base={baseTexto}
+          frases={frases}
+          parcial={dictado.parcial}
+          vistaPrevia={previaActiva}
+          pendientes={(estado?.pendientes ?? 0) + enCola}
+        />
+      ) : null}
+
       <NotasEnVivo notas={notas} grabando={grabadora.grabando && !concluyendo} />
 
       {!concluyendo ? (
         <div className={s.recFoot}>
-          <p className={s.hint} style={{ margin: 0 }}>
-            Deja esta pantalla abierta cerca de quien habla. La voz se pasa a texto en nuestro servidor y el audio se borra en cuanto se transcribe.
-          </p>
+          <div style={{ display: "grid", gap: 6 }}>
+            <p className={s.hint} style={{ margin: 0 }}>
+              {vistaPrevia && dictado.soportado
+                ? "La vista previa usa el reconocimiento de voz de tu navegador; la minuta se hace con el texto de nuestro servidor y el audio se borra en cuanto se transcribe."
+                : "La voz se pasa a texto en nuestro servidor y el audio se borra en cuanto se transcribe."}
+            </p>
+            {dictado.soportado ? (
+              <label className={s.interruptor}>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={vistaPrevia}
+                  onChange={(e) => {
+                    setVistaPrevia(e.target.checked);
+                    guardarVistaPrevia(e.target.checked);
+                  }}
+                />
+                Vista previa del navegador
+              </label>
+            ) : null}
+          </div>
           <Button size="sm" variant="ghost" onClick={descartar}>
             Detener sin concluir
           </Button>
