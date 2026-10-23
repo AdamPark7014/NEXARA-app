@@ -240,12 +240,18 @@ services:
       context: ..
       dockerfile: deploy/docker/Dockerfile.transcriptor
       args:
-        WHISPER_MODEL: ${WHISPER_MODEL:-small}
+        WHISPER_MODEL: ${WHISPER_MODEL:-large-v3-turbo-q5_0}
     container_name: nexara-transcriptor
     restart: unless-stopped
     mem_limit: ${TRANSCRIPTOR_MEM_LIMIT:-2048m}
+    # Prioridad baja frente a los demás servicios del servidor (comparte 4 vCPU con todo): si hay
+    # pelea por CPU, whisper espera; si no, usa lo que haya. Tope de núcleos por si acaso.
+    cpu_shares: ${TRANSCRIPTOR_CPU_SHARES:-512}
+    cpus: ${TRANSCRIPTOR_CPUS:-3.5}
     environment:
       WHISPER_THREADS: ${WHISPER_THREADS:-4}
+      # Banderas extra de whisper-server (p. ej. --suppress-nst), medidas en el banco del transcriptor.
+      WHISPER_ARGS: ${WHISPER_ARGS:-}
     networks:
       - internal
 

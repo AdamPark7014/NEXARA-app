@@ -1,15 +1,23 @@
 /**
  * Grabación de reuniones con transcripción propia.
  *
- * La web graba la junta en partes de ~1 minuto (cada parte es un archivo de audio completo) y
+ * La web graba la junta en partes de 20 s (cada parte es un archivo de audio completo) y
  * las sube conforme salen, con su posición en la grabación. El API guarda el audio en una
  * carpeta privada solo hasta transcribirlo (whisper propio, en la cola) y lo borra: lo que queda
  * es el texto de cada parte en `meeting_recording_parts`. Las notas por tramo y la minuta viven
  * en `meeting_recordings` (ver `minuta-ia.ts`).
  */
 
-/** Un minuto por parte: 3 horas son 180 partes. */
+/** Partes de 20 s: 3 horas son 540 partes. */
 export const MAX_PARTES = 9_999;
+
+/**
+ * Contexto del codificador de whisper para cada parte (cuadros de 20 ms): 1100 = 22 s, lo que dura
+ * una parte de 20 s con su holgura. Medido en el servidor (23-10, large-v3-turbo-q5_0): 1000 en vez
+ * de los 1500 de siempre bajó el tiempo ~40 % con el mismo WER (21.3 vs 20.8 % limpio, 53.6 vs
+ * 53.8 % de sala).
+ */
+export const AUDIO_CTX_PARTE = 1_100;
 
 /** Texto pegado: se parte en tramos de este tamaño para que se anote igual que una grabación. */
 export const PALABRAS_POR_PARTE_PEGADA = 700;

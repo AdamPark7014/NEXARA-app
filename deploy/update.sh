@@ -169,9 +169,10 @@ echo "Starting services..."
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans db
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans --no-build api web
 if [[ "$TRANSCRIPTOR_ON" == true ]]; then
-  # La primera vez compila whisper y baja el modelo (varios minutos); después no hace nada.
+  # La primera vez compila whisper y baja el modelo (varios minutos). Con --build se reconstruye
+  # si cambió su Dockerfile o WHISPER_MODEL; si no, la caché de Docker lo deja igual en segundos.
   echo "Starting transcriptor..."
-  DOCKER_BUILDKIT=1 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d transcriptor
+  DOCKER_BUILDKIT=1 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build transcriptor
 fi
 
 if [[ "$RUN_MIGRATE" == true ]]; then

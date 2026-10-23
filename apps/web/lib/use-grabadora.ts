@@ -5,7 +5,7 @@
  *
  * Cada `parteMs` se cierra el archivo y se abre otro sobre el mismo micrófono: así cada
  * parte se puede transcribir sola y una junta de horas no queda en un solo archivo que se
- * pierda si se cierra la pestaña. El audio va en opus a 32 kbps (~240 KB por minuto).
+ * pierda si se cierra la pestaña. El audio va en opus a 48 kbps (~360 KB por minuto).
  *
  * Pausar cierra la parte en curso (se entrega) y no abre otra hasta reanudar: el tiempo en
  * pausa no cuenta. Cada parte llega con su posición en la grabación (`inicioMs`) y su duración.
@@ -190,7 +190,8 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
     const formato = elegirFormatoAudio((m) => MediaRecorder.isTypeSupported(m));
     const rec = new MediaRecorder(stream.current, {
       ...(formato ? { mimeType: formato } : {}),
-      audioBitsPerSecond: 32_000,
+      // 48 kbps: opus a 32 ya se oía bien de cerca; de lejos, con ruido, conviene más detalle (~360 KB/min).
+      audioBitsPerSecond: 48_000,
     });
     const parte = ++numero.current;
     const inicioMs = grabadoMs();

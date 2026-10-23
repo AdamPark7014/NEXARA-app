@@ -141,7 +141,13 @@ function soltarRespaldo(r: Eleccion, respaldo: { stream: MediaStream } | null): 
 
 // ── Navegador ───────────────────────────────────────────────────────────
 
-export const AUDIO = { echoCancellation: true, noiseSuppression: true, channelCount: 1 } as const;
+/**
+ * Restricciones para voz lejana de sala (junta con la laptop en la mesa): sin cancelación de eco
+ * ni supresión de ruido del navegador (están hechas para quien habla pegado al micrófono y se comen
+ * a quien habla lejos; whisper aguanta mejor el ruido que los cortes) y con control automático de
+ * ganancia para subir a quien habla bajo.
+ */
+export const AUDIO = { echoCancellation: false, noiseSuppression: false, autoGainControl: true, channelCount: 1 } as const;
 
 export function abrirDispositivo(deviceId: string | null): Promise<MediaStream> {
   return navigator.mediaDevices.getUserMedia({
