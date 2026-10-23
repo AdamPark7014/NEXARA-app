@@ -44,7 +44,10 @@ export type UsoClaude = {
 };
 
 type PeticionBase = {
-  /** Nombre del proceso, para el log y el tope (p. ej. «asistente-actividades»). */
+  /**
+   * Nombre del proceso, para el log, el tope y el encabezado `x-proceso` de la puerta (p. ej.
+   * «asistente-actividades»). Usa minúsculas, dígitos y guiones: así sale igual en el panel de la puerta.
+   */
   proceso: string;
   companyId: number;
   /** Bloques de sistema estables primero: cada uno se marca para caché (máx. 3). */
@@ -110,6 +113,23 @@ export function configuracionPensamiento(
 ): Anthropic.ThinkingConfigParam | undefined {
   if (pensar !== false) return undefined;
   return modelo.startsWith('claude-sonnet-5-5') ? { type: 'between_tools' } : { type: 'disabled' };
+}
+
+/**
+ * Valor del encabezado `x-proceso` que la puerta usa para medir cada función por separado (latencia, errores,
+ * cortes y costo en su panel). La puerta acepta `[a-z0-9-]`, máx. 40, y no lo reenvía a Anthropic.
+ */
+export function procesoParaPuerta(proceso: string): string {
+  const limpio = (proceso || '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '');
+  return limpio || 'sin-proceso';
 }
 
 /** Tipo de error que manda la puerta (o Anthropic) en el cuerpo: `budget_exceeded`, etc. */
@@ -197,7 +217,11 @@ export class ClaudeService {
             ...(formato ? { format: formato } : {}),
           },
         },
-        { timeout: peticion.timeoutMs ?? 60_000 },
+        {
+          timeout: peticion.timeoutMs ?? 60_000,
+          // La puerta registra la llamada bajo este proceso (no viaja a Anthropic).
+          headers: { 'x-proceso': procesoParaPuerta(peticion.proceso) },
+        },
       );
     } catch (error) {
       if (error instanceof Anthropic.AuthenticationError) {
