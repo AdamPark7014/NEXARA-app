@@ -41,7 +41,7 @@ export class AsistenteActividadesService {
 
     const catalogos = await this.catalogos(user, tenantId);
     const ahora = new Date();
-    const peticion = peticionAsistente(instruccion, catalogos.personas, ahora, user?.nombre ?? null);
+    const peticion = peticionAsistente(instruccion, catalogos, ahora, user?.nombre ?? null);
     const { datos, uso } = await this.claude.json<PlanAsistente>({
       ...peticion,
       proceso: 'asistente-actividades',

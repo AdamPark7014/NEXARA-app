@@ -20,9 +20,22 @@
   margin: 0;
 }
 
+/* Lo que leerá quien la hace: se ve antes de confirmar. */
+.indicaciones {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ui-fg-2);
+}
+
+.texto {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
 .ajustes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--ui-s3);
 }
 
