@@ -33,8 +33,16 @@
   - Ajuste tras la prueba: la IA asignó «Diana» a una «Daniela» de la empresa → regla de nombres parecidos en el
     prompt (eval m4/m7 0.81/0.88 → 0.85/0.90); Syscom en el vocabulario de whisper; lecciones y riesgos plegados en
     la lista de acuerdos propuestos; ancho de bloques y contraste de «Pendiente».
+  - `b8d895ee` desplegado y verificado: la #3 regenerada ya deja «Diana», «Mafer», «Jorge» como se dijeron (no los
+    cambia por otra persona); reunión #4 (misma serie, texto pegado por `POST :id/texto`) trae seguimiento de los 10
+    acuerdos de la #3 (cumplido / en proceso / bloqueado / sin mención), US$0.020 con 3.5k tokens del sistema en
+    caché; confirmar acuerdos 200; «Enviar» sin asistentes → 400 con mensaje claro (no se mandó correo real).
+    Las reuniones #3 y #4 quedaron tituladas «[Prueba de grabación] …» para que Adam las reconozca o las cancele.
+  - Detalle de la reunión: «Editar título» (además de asistentes editables).
   - Muestras para Adam (scratchpad de la sesión): `minuta-muestra.pdf`, `minuta-produccion-reunion3.pdf`,
     `captura-grabacion-1536.png`, `captura-minuta-1536.png`. Lo visual espera su visto bueno.
+  - Pendiente: navegar a otra pantalla del panel dentro de la app corta la grabación (lo subido queda; al volver,
+    «Seguir grabando»); solo el cierre de pestaña pide confirmación. App móvil sin cambios.
 
 - **23-10 ~00:10 (claude-code, N-1) — IA de NEXARA por la puerta única, modelo más barato medido con eval.**
   - Adam (22-10): «que llamen bien a la API con el modelo más barato que funcione perfectamente y acomoda

@@ -51,6 +51,7 @@ import {
   suggestedTypeForToday,
   todayInput,
   updateAgreement,
+  updateMeeting,
   updateMyAgreement,
   type Agreement,
   type AgreementKind,
@@ -267,6 +268,7 @@ export default function ReunionesPage() {
 
   const cerrarDetalle = () => {
     setEditandoAsistentes(null);
+    setEditandoTitulo(null);
     setDetalleAbierto(false);
     setDetalle(null);
     setNuevoAcuerdo(acuerdoVacio);
@@ -359,6 +361,18 @@ export default function ReunionesPage() {
   };
 
   // ── Asistentes (se pueden marcar después de empezar) ────────────────────
+
+  const [editandoTitulo, setEditandoTitulo] = useState<string | null>(null);
+  const guardarTitulo = async () => {
+    if (!token || !detalle || !editandoTitulo?.trim()) return;
+    try {
+      await updateMeeting(token, detalle.id, { titulo: editandoTitulo.trim() });
+      setEditandoTitulo(null);
+      await refrescarDetalle();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cambiar el título."));
+    }
+  };
 
   const [editandoAsistentes, setEditandoAsistentes] = useState<number[] | null>(null);
   const [guardandoAsistentes, setGuardandoAsistentes] = useState(false);
@@ -806,7 +820,34 @@ export default function ReunionesPage() {
               {MEETING_TYPE_LABEL[detalle.tipo]} · {formatMeetingDate(detalle.fecha)}
               {detalle.horaInicio ? ` · ${detalle.horaInicio}` : ""}
               {detalle.facilitador ? ` · conduce ${detalle.facilitador.nombre}` : ""}
+              {puedeConvocar && editandoTitulo === null ? (
+                <>
+                  {" · "}
+                  <Button size="xs" variant="link" onClick={() => setEditandoTitulo(detalle.titulo)}>
+                    Editar título
+                  </Button>
+                </>
+              ) : null}
             </p>
+
+            {editandoTitulo !== null ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input
+                  className={s.input}
+                  style={{ flex: "1 1 280px" }}
+                  aria-label="Título de la reunión"
+                  value={editandoTitulo}
+                  maxLength={200}
+                  onChange={(e) => setEditandoTitulo(e.target.value)}
+                />
+                <Button size="sm" variant="primary" onClick={() => void guardarTitulo()} disabled={!editandoTitulo.trim()}>
+                  Guardar
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setEditandoTitulo(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            ) : null}
 
             {detalle.agenda && (
               <div>
