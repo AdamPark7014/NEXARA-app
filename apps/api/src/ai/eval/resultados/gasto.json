@@ -1,0 +1,65 @@
+{
+  "tope_usd": 4,
+  "movimientos": [
+    {
+      "fecha": "2026-10-22",
+      "concepto": "asistente haiku-low",
+      "usd": 0.00104
+    },
+    {
+      "fecha": "2026-10-22",
+      "concepto": "generar transcripciones (sonnet)",
+      "usd": 0.241522
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "generar transcripciones (sonnet)",
+      "usd": 0.41888
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "actas sonnet-low",
+      "usd": 0.34692
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "juez actas (opus)",
+      "usd": 0.784103
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "actas haiku-low",
+      "usd": 0.02507
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "asistente haiku-low",
+      "usd": 0.042448
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "juez asistente (opus)",
+      "usd": 0.497021
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "asistente haiku-low-np",
+      "usd": 0.018747
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "asistente sonnet-low",
+      "usd": 0.06202
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "triage haiku-low-np",
+      "usd": 0.001049
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "triage haiku-low",
+      "usd": 0.00091
+    }
+  ]
+}

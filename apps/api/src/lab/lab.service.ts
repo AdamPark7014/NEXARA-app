@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OPEN_ACTIVITY_WHERE } from '../activities/activity-status.js';
 import { kpiFallback } from '../common/kpi-fallback.js';
+import { ClaudeService } from '../ai/claude/claude.service.js';
 
 /**
  * Feature flags: `companyId = null` = platform/global.
@@ -10,7 +11,10 @@ import { kpiFallback } from '../common/kpi-fallback.js';
  */
 @Injectable()
 export class LabService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly claude: ClaudeService,
+  ) {}
 
   // ── Feature flags ────────────────────────────────────────────────
   listFlags(scope?: string, companyId?: number | null) {
@@ -103,15 +107,12 @@ export class LabService {
     const t0 = Date.now();
     const isAnthropic = input.model.startsWith('claude');
     const provider = isAnthropic ? 'anthropic' : 'openai';
-    const anthropicBaseUrl = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1').replace(/\/+$/, '');
-    const anthropicToken = (process.env.ANTHROPIC_AUTH_TOKEN || '').trim();
-    // El token va con ANTHROPIC_BASE_URL (proxy); ANTHROPIC_API_KEY es la de Anthropic directo.
-    const apiKey = isAnthropic
-      ? (anthropicToken || process.env.ANTHROPIC_API_KEY)
-      : process.env.OPENAI_API_KEY;
+    // Claude va por el mismo cliente que el resto de NEXARA: la puerta de IA (CLAUDE_BASE_URL)
+    // con el token del proyecto (ANTHROPIC_API_KEY); solo los modelos que la puerta permite.
+    const configurado = isAnthropic ? this.claude.disponible() : Boolean(process.env.OPENAI_API_KEY);
     const liveEnabled = await this.isEnabled('lab.ai.live');
 
-    if (!apiKey || !liveEnabled) {
+    if (!configurado || !liveEnabled) {
       return {
         provider,
         model: input.model,
@@ -123,29 +124,19 @@ export class LabService {
 
     try {
       if (isAnthropic) {
-        const res = await fetch(`${anthropicBaseUrl}/messages`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            Authorization: `Bearer ${apiKey}`,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: input.model,
-            max_tokens: 1024,
-            system: input.systemPrompt,
-            messages: [{ role: 'user', content: input.prompt }],
-          }),
+        const { texto } = await this.claude.texto({
+          proceso: 'lab',
+          companyId: 0,
+          sistema: input.systemPrompt ? [input.systemPrompt] : [],
+          usuario: input.prompt,
+          modelo: input.model,
+          maxTokens: 2048,
         });
-        if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
-        const data: any = await res.json();
-        const text = Array.isArray(data.content) ? data.content.map((c: any) => c.text || '').join('\n') : '';
-        return { output: text, model: input.model, provider, elapsedMs: Date.now() - t0 };
+        return { output: texto, model: input.model, provider, elapsedMs: Date.now() - t0 };
       } else {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
           body: JSON.stringify({
             model: input.model,
             messages: [

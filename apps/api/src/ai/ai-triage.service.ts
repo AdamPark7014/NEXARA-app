@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { OPEN_ACTIVITY_WHERE } from '../activities/activity-status.js';
+import { ClaudeService } from './claude/claude.service.js';
+import { limpiarTriage, peticionTriage, type ClasificacionTriage } from './triage-ia.js';
 
 export type TriageResult = {
   priority: 'P0' | 'P1' | 'P2' | 'P3';
@@ -12,22 +14,26 @@ export type TriageResult = {
   suggestedAssigneeRole: string;
   risk: 'low' | 'medium' | 'high';
   rationale: string[];
-  provider: 'rules' | 'openai' | 'anthropic';
+  provider: 'rules' | 'anthropic';
 };
 
 /**
  * Product AI — triage de tickets/actividades (no Lab).
- * Usa reglas deterministas siempre; opcionalmente LLM si hay API key + flag.
+ * Usa reglas deterministas siempre; con la bandera `product.ai.triage` encendida y la IA
+ * configurada, Claude (Haiku 5.5, salida estructurada) afina prioridad, tipo y resumen.
  */
 @Injectable()
 export class AiTriageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly claude: ClaudeService,
+  ) {}
 
   async triageActivityText(
     input: { title: string; description?: string; clientName?: string },
     companyId?: number | null,
   ): Promise<TriageResult> {
-    requireCompanyId(companyId);
+    const tenantId = requireCompanyId(companyId);
     const text = `${input.title} ${input.description || ''}`.toLowerCase();
     const rationale: string[] = [];
     let priority: TriageResult['priority'] = 'P2';
@@ -81,18 +87,25 @@ export class AiTriageService {
     let provider: TriageResult['provider'] = 'rules';
     let summary = `${ticketType} · ${priority}: ${input.title}`.slice(0, 180);
 
-    if (live?.enabled && process.env.OPENAI_API_KEY) {
+    if (live?.enabled && this.claude.disponible()) {
       try {
-        const llm = await this.callOpenAi(input);
-        if (llm) {
-          provider = 'openai';
+        const peticion = peticionTriage(input);
+        const { datos } = await this.claude.json<ClasificacionTriage>({
+          ...peticion,
+          proceso: 'triage',
+          companyId: tenantId,
+          modelo: process.env.ANTHROPIC_TRIAGE_MODEL || peticion.modelo,
+        });
+        const llm = limpiarTriage(datos);
+        if (llm.priority || llm.ticketType) {
+          provider = 'anthropic';
           summary = llm.summary || summary;
           if (llm.priority) priority = llm.priority;
           if (llm.ticketType) ticketType = llm.ticketType;
-          rationale.push('Refinado por modelo LLM');
+          rationale.push('Refinado por Claude');
         }
       } catch {
-        rationale.push('LLM no disponible; se usaron reglas');
+        rationale.push('IA no disponible; se usaron reglas');
       }
     }
 
@@ -140,41 +153,6 @@ export class AiTriageService {
           : []),
         { action: 'Generar resumen diario de NOC para el turno', type: 'summary', impact: 'ops' },
       ],
-    };
-  }
-
-  private async callOpenAi(input: { title: string; description?: string }) {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_TRIAGE_MODEL || 'gpt-4o-mini',
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Clasifica tickets de field service CCTV/IT. Responde JSON: {priority:P0|P1|P2|P3, ticketType:EMERGENCIA|CORRECTIVO|PREVENTIVO|INSTALACION|OTRO, summary:string}',
-          },
-          { role: 'user', content: `Título: ${input.title}\nDescripción: ${input.description || ''}` },
-        ],
-      }),
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) return null;
-    return JSON.parse(content) as {
-      priority?: TriageResult['priority'];
-      ticketType?: TriageResult['ticketType'];
-      summary?: string;
     };
   }
 }

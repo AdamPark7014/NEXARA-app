@@ -1,5 +1,28 @@
 # RELEVO
 
+- **23-10 ~00:10 (claude-code, N-1) — IA de NEXARA por la puerta única, modelo más barato medido con eval.**
+  - Adam (22-10): «que llamen bien a la API con el modelo más barato que funcione perfectamente y acomoda
+    las instrucciones… optimicemos el costo». Guía: `C:\dev\scripts\ai-os\IA-CLAUDE.md`.
+  - Servidor (lo hizo el coordinador): `nexara-api` ya llama a `http://puerta-ia:8080` con el token de NEXARA
+    (`/etc/ai/anthropic.env` → `/etc/ai/nexara-claude.env`). La llave vieja sigue en `/etc/secrets/anthropic.env`.
+  - `ClaudeService`: opción `pensar` (false = `disabled` en Haiku, `between_tools` en Sonnet), caché en cada
+    bloque de sistema, costo con caché leída/escrita, `tokensPensamiento`, mensajes en español para
+    `budget_exceeded` y modelo no permitido por la puerta, sin texto del modelo en los logs, método `texto()`.
+  - «Asignar con IA»: prompt nuevo (apodos, nombres ambiguos, cliente/sitio, fechas, títulos en infinitivo,
+    nunca plan vacío sin pregunta), esquema con `acciones` primero, búsqueda que encuentra «Bodegas Luna
+    Atlixco» y «CEDIS de Tox», y candado en código: si la IA elige a uno de dos «Antonio», no se elige.
+    Config: Haiku 5.5, esfuerzo low, sin razonamiento, max 3000. Eval 15 casos: 0.877 → 0.993 (15/15 en las
+    revisiones de código en 3 corridas), ~$0.0002 por llamada con caché, ~2 s.
+  - Triage: de OpenAI a `ClaudeService` (Haiku 5.5, salida estructurada, `triage-ia.ts`); bandera
+    `product.ai.triage` sigue apagada. Eval 12/12.
+  - Lab: Claude por `ClaudeService` (puerta + token de NEXARA); ya no usa `ANTHROPIC_BASE_URL/AUTH_TOKEN`.
+  - Eval: `apps/api/src/ai/eval/` (`npm run eval:ia -w apps/api -- --funcion asistente|actas|triage --variantes
+    haiku-low-np,sonnet-low`); resúmenes y gasto en `resultados/`, detalle en `.ai/eval-ia/` (ignorado).
+  - **Actas: NO se tocaron (las toma R-1).** Eval de actas hecho con el prompt actual: Sonnet low 0.966
+    (15 inventos) vs Haiku low 0.921 (34 inventos) → Haiku aún no iguala; se queda Sonnet. Mis cambios en
+    `meetings/acta-ia.ts` y `acta-ia.service.ts` (CONFIG_ACTA, `peticionActa`) quedaron sin commitear para R-1.
+  - Pendiente en este turno: desplegar y verificar con HTTP reales (se coordina con R-1).
+
 - **22-10 ~15:40 (claude-code) — «No cumplida» al cierre de jornada (desplegado) + propuesta del evaluador IA.**
   - Adam: «cualquier actividad que no se acabe después de la jornada laboral se toma como incumplida… y que se
     pueda poner que una actividad no se cumplió, pero mucho más profesional».

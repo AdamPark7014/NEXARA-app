@@ -123,6 +123,38 @@ describe('asistente de actividades', () => {
     expect(debil.candidatos[0].id).toBe(8);
   });
 
+  it('el cliente y la sucursal se encuentran aunque vengan juntos o con el nombre del cliente', () => {
+    // «Banorte Plaza Satélite» solo como sitio: cliente por el nombre completo dentro del texto.
+    const juntos = construirPropuesta({ ...base, tipo: 'servicio', cliente: null, sitio: 'Banorte Plaza Satélite' }, catalogos, ctx);
+    expect(juntos.cliente).toEqual({ id: 2, nombre: 'Banorte' });
+    expect(juntos.sucursal).toEqual({ id: 50, nombre: 'Plaza Satélite' });
+    // «la Plaza Satélite de Banorte»: se quitan el cliente y las palabras vacías.
+    const conCliente = construirPropuesta({ ...base, cliente: 'Banorte', sitio: 'la Plaza Satélite de Banorte' }, catalogos, ctx);
+    expect(conCliente.sucursal).toEqual({ id: 50, nombre: 'Plaza Satélite' });
+  });
+
+  it('si el nombre dicho es de dos personas, no se queda con la que eligió la IA', () => {
+    const conDos = {
+      ...catalogos,
+      personas: [...catalogos.personas, { id: 11, nombre: 'Antonio Vázquez' }],
+    };
+    const ambiguo = construirPropuesta({ ...base, responsable: 'Antonio Vázquez' }, conDos, {
+      ...ctx,
+      instruccion: 'que Antonio vaya a Tox a las 3',
+    });
+    expect(ambiguo.responsable).toBeNull();
+    expect(ambiguo.responsableCandidatos.map((p) => p.id).sort((a, b) => a - b)).toEqual([7, 11]);
+    expect(ambiguo.payload.responsableId).toBeUndefined();
+    // Con el nombre completo (o un apodo que no se puede revisar) se respeta la elección.
+    const claro = construirPropuesta({ ...base, responsable: 'José Antonio Ramírez' }, conDos, {
+      ...ctx,
+      instruccion: 'que José Antonio vaya a Tox a las 3',
+    });
+    expect(claro.responsable).toEqual({ id: 7, nombre: 'José Antonio Ramírez' });
+    const apodo = construirPropuesta({ ...base, responsable: 'Antonio Vázquez' }, conDos, { ...ctx, instruccion: 'que Toño vaya' });
+    expect(apodo.responsable).toEqual({ id: 11, nombre: 'Antonio Vázquez' });
+  });
+
   it('fechas en hora de CDMX', () => {
     expect(aFechaISO('2026-10-13', '9:30')).toBe('2026-10-13T15:30:00.000Z');
     expect(aFechaISO('2026-10-13', null)).toBe('2026-10-13T15:00:00.000Z');
