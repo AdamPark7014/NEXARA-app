@@ -4,7 +4,6 @@ import { MEETING_DEFAULTS, type MeetingType } from './meeting-rhythm.js';
 import {
   ESTADO_PREVIO_LABEL,
   PRIORIDAD_LABEL,
-  marcaTiempo,
   type Minuta,
   type Prioridad,
   type SeguimientoMinuta,
@@ -22,9 +21,10 @@ import {
  *   Hoja 2         01 Resumen ejecutivo · 02 Lo más importante · índice con páginas
  *   03…            temas (uno por apartado), decisiones, acuerdos (tabla), pendientes y preguntas,
  *                  riesgos, cifras, lecciones y próximos pasos, seguimiento de la reunión anterior
- *   Anexo          transcripción completa con marcas de tiempo
  *
- * Las secciones vacías no se imprimen y el índice se renumera.
+ * Las secciones vacías no se imprimen y el índice se renumera. La transcripción no va en el PDF
+ * (Adam, 23-10-2026: «que la moldee a un PDF bien estructurado de resumen», no el texto literal):
+ * se consulta en la reunión dentro de la app.
  */
 
 const C = {
@@ -63,7 +63,6 @@ export type MinutaPdfPayload = {
   minuta: Minuta;
   duracionMs: number;
   iniciadaAt?: Date | null;
-  transcripcion?: string | null;
 };
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -570,35 +569,6 @@ export const generarMinutaPdf = (r: MinutaPdfPayload): Promise<Buffer> =>
       });
     }
 
-    // Anexo: la transcripción completa, con la marca de tiempo de cada minuto.
-    const texto = (r.transcripcion ?? '').trim();
-    if (texto) {
-      ctx.seccion = 'Anexo · Transcripción';
-      const p = apertura(ctx, 'ANEXO', 'Transcripción de la junta', { hojaNueva: true });
-      indice.push({ numero: 'Anexo', titulo: 'Transcripción de la junta', pagina: p, nivel: 0 });
-      const nota = 'Texto automático (sin nombres de quién habla); puede tener palabras mal reconocidas. Cada marca es el minuto de la grabación.';
-      parrafo(doc, nota, X, ctx.y, COL, { tamano: 8.5, color: C.tenue, renglon: 12 });
-      ctx.y += alto(doc, nota, COL, F.texto, 8.5, 12) + 12;
-      for (const linea of texto.split('\n')) {
-        const mm = /^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)$/.exec(linea);
-        const marca = mm?.[1] ?? null;
-        const cuerpo = (mm ? mm[2] : linea).trim();
-        if (!cuerpo) continue;
-        const h = alto(doc, cuerpo, COL - 52, F.texto, 8.8, 12.6);
-        if (h > LIMITE - INICIO) {
-          // Párrafo más largo que una hoja (texto pegado sin saltos): se deja fluir.
-          asegurar(ctx, 60);
-          parrafo(doc, cuerpo, X + 52, ctx.y, COL - 52, { tamano: 8.8, renglon: 12.6, color: C.pizarra });
-          ctx.y = doc.y + 8;
-          continue;
-        }
-        asegurar(ctx, h + 6);
-        if (marca) renglon(doc, marca, X, ctx.y + 9, { tamano: 8, fuente: F.semi, color: C.acento });
-        parrafo(doc, cuerpo, X + 52, ctx.y, COL - 52, { tamano: 8.8, renglon: 12.6, color: C.pizarra });
-        ctx.y += h + 6;
-      }
-    }
-
     // Índice con páginas, en el lugar reservado.
     doc.switchToPage(indicePagina);
     let yi = indiceY;
@@ -632,5 +602,3 @@ export const generarMinutaPdf = (r: MinutaPdfPayload): Promise<Buffer> =>
     doc.end();
   });
 
-/** Para las pruebas: marca de tiempo tal como sale en el anexo. */
-export const marcaAnexo = (ms: number) => `[${marcaTiempo(ms)}]`;

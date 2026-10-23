@@ -1,5 +1,19 @@
 # RELEVO
 
+- **23-10 ~17:10 UTC (claude-code) — Minuta de reuniones: PDF solo con el resumen y prompt para audio de sala.**
+  - Adam probó una junta real de 28 min (reunión 7, grabación 5): «la transcripción es muy pobre… el PDF toma audios
+    literalmente; que la moldee a un PDF bien estructurado de resumen».
+  - `minuta-pdf.ts`: fuera el anexo con la transcripción completa (y el campo `transcripcion` del payload y
+    `marcaAnexo`); el texto sigue en la app (`GET :id/transcripcion`). Prueba nueva: el texto literal no cambia el PDF.
+  - `minuta-ia.ts` (notas y minuta): regla para audio de sala (bucles, frases inventadas en silencios, pedazos sin
+    sentido u otro idioma se ignoran; reconstruir solo con contexto claro; nunca armar horas, fechas o cifras con
+    pedazos) y bloque `REGLAS_REDACCION` (con sus palabras, tercera persona, sin citas, sin hablar del audio).
+  - Prueba con la junta real por la puerta (proyecto pruebas, Sonnet 5.5): antes el resumen decía «la transcripción
+    es de muy baja calidad», ahora no; 6 temas, «viernes 30 a las 10» bien (un intento intermedio puso 10:30 y se
+    corrigió con la regla), PDF de 7 hojas sin anexo, ~US$0.044.
+  - La calidad del texto de whisper la está trabajando el agente de reuniones (modelo, partes de 30 s, contexto entre
+    partes, filtro de bucles); sus cambios en `ai/voz/transcriptor*.ts` no van en este commit.
+
 - **23-10 ~00:00 (claude-code, R-1) — Reuniones automáticas: grabar con un botón, notas en vivo y minuta en PDF.**
   - Adam (22-10): «le pulsas comenzar a grabar reunión y tiene que empezar a tomar todas las notas… en cuanto le
     des que concluyó, genera un PDF completo que desglose por apartados… con el menor uso posible de tokens».
