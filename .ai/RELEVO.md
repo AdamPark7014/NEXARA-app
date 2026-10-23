@@ -1496,3 +1496,22 @@ Nueve carriles en paralelo, integrados y fusionados en `main`:
 
 ## No tocar
 Puente NAS · keystore Play · sitio público (canónica de producción) · `NO TOCAR LIBREMENTE`.
+
+## 23-10-2026 · Rotación de credenciales filtradas (claude-code)
+
+- `NEXARA-usuarios-v5.xlsx`, `NEXARA-usuarios-v6.xlsx` y `scripts/generate-credentials-xlsx.js` tenían nombre, correo y
+  contraseña (patrón «Nexara! + número de empleado») de 19 cuentas y estaban en el repo **público** desde el 21-09.
+- Rotadas las 19 (con el OK de Adam): 16 con `prisma/cargar-credenciales-boveda.ts --apply` (cierra sesiones y guarda
+  en la bóveda) y `gerencia@`, `developer@` y `play.review@` aparte (la herramienta las omite): hash nuevo,
+  `passwordChangedAt`, desbloqueo y sesiones revocadas (81 de `gerencia@`, 18 de `play.review@`). Verificado en la base:
+  la filtrada no entra en ninguna, la nueva sí, 0 sesiones previas abiertas.
+- Credenciales nuevas SOLO en `C:\dev\secrets
+exara\credenciales-2026-10-23\` (Excel + un .txt por persona);
+  lista del personal en `C:\dev\secrets
+exara\personal.json`; copia de los archivos filtrados en `...\historico\`.
+- Contraseña de la cuenta demo de revisión actualizada en App Store Connect (versión 1.0) y en
+  `C:\dev\secrets
+exara-store\`. **Falta en Play Console** (Contenido de la app › Acceso a la app): la cambia Adam.
+- El script ya no trae datos: lee `personal.json`, genera contraseñas aleatorias y escribe fuera del repo; `.gitignore`
+  bloquea Excel/JSON de credenciales. El historial de git sigue teniendo lo filtrado (ya inservible): limpiarlo o hacer
+  privado el repo es decisión de Adam.
