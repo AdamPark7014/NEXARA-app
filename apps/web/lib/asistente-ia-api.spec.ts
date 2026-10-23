@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bloqueos, payloadFinal, type PropuestaActividad } from "./asistente-ia-api";
+import { agendaFinal, bloqueos, pasoEquipo, payloadFinal, reglaEncargo, type PropuestaActividad } from "./asistente-ia-api";
 
 const base: PropuestaActividad = {
   tipo: "servicio",
@@ -20,32 +20,119 @@ const base: PropuestaActividad = {
   proyecto: null,
   proyectoCandidatos: [],
   fechaInicio: null,
-  faltantes: ["responsable", "cliente"],
+  agenda: { dia: null, hora: null, hasta: null, horaDicha: false },
+  duracionMin: null,
+  prioridad: "Media",
+  encargo: null,
+  indicaciones: null,
+  faltantes: ["responsable", "cliente", "fecha", "duración"],
   avisos: [],
   payload: { titulo: "Revisar cámaras", coreKind: "servicio", creadoPorId: 1 },
+};
+
+/** Una propuesta completa: «que Carolina revise mañana a las 9 las cámaras de Tox, 2 horas». */
+const lista: PropuestaActividad = {
+  ...base,
+  responsable: { id: 8, nombre: "Carolina Pérez" },
+  responsableCandidatos: [],
+  cliente: { id: 1, nombre: "TOX Logística" },
+  clienteCandidatos: [],
+  agenda: { dia: "2026-10-24", hora: "09:00", hasta: null, horaDicha: true },
+  duracionMin: 120,
+  faltantes: [],
+  payload: {
+    titulo: "Revisar cámaras",
+    coreKind: "servicio",
+    creadoPorId: 1,
+    responsableId: 8,
+    clientId: 1,
+    tiempoEstimadoMin: 120,
+    fechaInicio: "2026-10-24T15:00:00.000Z",
+    fechaEntregaEsperada: "2026-10-24T15:00:00.000Z",
+    fechaMaxima: "2026-10-24T15:00:00.000Z",
+  },
 };
 
 describe("asistente IA en la pizarra", () => {
   it("aplica lo que se eligió en la tarjeta", () => {
     expect(payloadFinal(base, { responsableId: 9, clientId: 1 })).toMatchObject({ responsableId: 9, clientId: 1 });
     expect(payloadFinal({ ...base, payload: { ...base.payload, clientId: 4 } }, { clientId: null }).clientId).toBeUndefined();
+    const texto = payloadFinal(lista, { titulo: "  Revisar DVR  ", indicaciones: " ", prioridad: "Alta", duracionMin: 90 });
+    expect(texto).toMatchObject({ titulo: "Revisar DVR", prioridad: "Alta", tiempoEstimadoMin: 90 });
+    expect(texto.indicaciones).toBeUndefined();
   });
 
-  it("no deja crear sin responsable ni un servicio sin cliente", () => {
+  it("sin cambiar la agenda se manda la de la IA tal cual", () => {
+    const p = payloadFinal(lista, {});
+    expect(p.fechaInicio).toBe("2026-10-24T15:00:00.000Z");
+    expect(p.periodoFin).toBeUndefined();
+  });
+
+  it("día, hora y último día se guardan como el formulario «Asignar» (hora de CDMX)", () => {
+    const varios = payloadFinal(lista, { hora: "10:30", hasta: "2026-10-28" });
+    expect(varios).toMatchObject({
+      fechaInicio: "2026-10-24T16:30:00.000Z",
+      fechaEntregaEsperada: "2026-10-24T16:30:00.000Z",
+      fechaMaxima: "2026-10-24T16:30:00.000Z",
+      periodoInicio: "2026-10-24",
+      periodoFin: "2026-10-28",
+    });
+    // Quitar el día deja la actividad sin fechas.
+    const sinDia = payloadFinal(lista, { dia: "" });
+    expect(sinDia.fechaInicio).toBeUndefined();
+    expect(sinDia.fechaMaxima).toBeUndefined();
+    // Un último día antes del primero no se manda (y la tarjeta lo bloquea).
+    expect(payloadFinal(lista, { hasta: "2026-10-20" }).periodoFin).toBeUndefined();
+    expect(agendaFinal(base, { dia: "2026-10-24" })).toEqual({ dia: "2026-10-24", hora: "09:00", hasta: null, horaDicha: false });
+  });
+
+  it("no deja crear sin responsable, cliente, día del servicio ni tiempo estimado", () => {
     expect(bloqueos(base, base.payload, {})).toEqual([
       "Elige a quién se le asigna.",
       "Un servicio necesita un cliente registrado.",
+      "Indica el día del servicio.",
+      "Indica cuánto tiempo toma.",
+    ]);
+    expect(bloqueos(lista, payloadFinal(lista, {}), {})).toEqual([]);
+    const alReves = { hasta: "2026-10-20" };
+    expect(bloqueos(lista, payloadFinal(lista, alReves), { agenda: agendaFinal(lista, alReves) })).toEqual([
+      "El último día no puede ser antes del primero.",
     ]);
   });
 
   it("respeta los tipos que recibe cada persona", () => {
-    const payload = payloadFinal(base, { responsableId: 9, clientId: 1 });
+    const payload = payloadFinal(lista, { responsableId: 9 });
     // Juan (campo de David) recibe tarea/proyecto/obra, no servicio.
     expect(
-      bloqueos(base, payload, { creadorEmail: "gerencia@nexara.com.mx", destinoEmail: "juan.gonzalez@nexara.com.mx" }),
+      bloqueos(lista, payload, { creadorEmail: "gerencia@nexara.com.mx", destinoEmail: "juan.gonzalez@nexara.com.mx" }),
     ).toEqual(["A esta persona no se le puede asignar servicio."]);
-    expect(
-      bloqueos(base, payload, { creadorEmail: "gerencia@nexara.com.mx", destinoEmail: "soporte@nexara.com.mx" }),
-    ).toEqual([]);
+    expect(bloqueos(lista, payload, { creadorEmail: "gerencia@nexara.com.mx", destinoEmail: "soporte@nexara.com.mx" })).toEqual([]);
+  });
+
+  it("encargo con las reglas de «Asignar»", () => {
+    // Luis + servicio: siempre despacho, aunque la IA dijera ejecución.
+    const luis = "direccion.operaciones@nexara.com.mx";
+    expect(payloadFinal({ ...lista, encargo: "ejecucion" }, {}, { destinoEmail: luis }).assignmentCharge).toBe("despacho");
+    expect(reglaEncargo("tarea", luis, null)).toEqual({ valor: "ejecucion", fijo: true, ofrecer: false });
+    // David elige: sin elegir, no se crea.
+    const david = "operaciones@nexara.com.mx";
+    const obra = { ...lista, tipo: "obra" as const, tipoEtiqueta: "Obra", payload: { ...lista.payload, coreKind: "obra", projectId: 3 } };
+    expect(bloqueos(obra, payloadFinal(obra, {}, { destinoEmail: david }), { destinoEmail: david, creadorEmail: "gerencia@nexara.com.mx" })).toContain(
+      "Elige si la hace en persona o la reparte a su equipo.",
+    );
+    expect(payloadFinal(obra, { encargo: "despacho" }, { destinoEmail: david }).assignmentCharge).toBe("despacho");
+    // A quien no reparte no se le pone encargo.
+    expect(payloadFinal({ ...lista, encargo: "despacho" }, {}, { destinoEmail: "soporte@nexara.com.mx" }).assignmentCharge).toBeUndefined();
+  });
+
+  it("después de crear, el responsable queda con su tiempo estimado (y el cupo en el despacho)", () => {
+    expect(pasoEquipo(lista, payloadFinal(lista, {}), "soporte@nexara.com.mx")).toEqual({ userId: 8, rol: "LEAD", horasPlan: 2 });
+    expect(pasoEquipo(lista, payloadFinal(lista, { duracionMin: 90 }), "jose.ramirez@nexara.com.mx")).toEqual({
+      userId: 8,
+      rol: "LEAD",
+      horasPlan: 1.5,
+      indicaciones: "Cupo: 1 persona.",
+    });
+    expect(pasoEquipo(base, base.payload)).toBeNull();
   });
 });

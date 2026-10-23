@@ -19,6 +19,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { ClaudeService, type UsoClaude } from '../claude/claude.service.js';
 import {
   construirPropuesta,
+  fechaLocalISO,
   peticionAsistente,
   type AccionPlan,
   type PlanAsistente,
@@ -107,12 +108,14 @@ async function juzgar<T>(concepto: string, sistema: string, bloques: Anthropic.T
 
 // ─────────────────────────── Asistente ───────────────────────────
 
-const JUEZ_ASISTENTE = `Calificas la salida de un asistente que convierte instrucciones de dirección (español de México, a veces dictadas por voz) en actividades para el sistema NEXARA. Recibes la instrucción, la fecha actual, las listas de personas y clientes de la empresa, lo que se esperaba y el plan que devolvió el asistente (JSON).
+const JUEZ_ASISTENTE = `Calificas la salida de un asistente que convierte instrucciones de dirección (español de México, a veces dictadas por voz) en actividades para el sistema NEXARA. Recibes la instrucción, la fecha actual, el catálogo de la empresa (personas, clientes con sus sucursales y proyectos activos, el mismo que recibió el asistente), lo que se esperaba y las actividades que se crearían.
+
+Cómo se guardan las fechas: «inicio» es cuándo se hace o empieza; «límite» es el día contra el que se mide si se entregó a tiempo (vence al terminar ese día). Una cita o visita sin plazo vence el mismo día. Con un plazo («para el viernes», «antes del viernes», «a más tardar…») empieza hoy (salvo que digan otro inicio) y el límite es el plazo; «para las 3» o «el viernes a las 11» son la hora o el día de la cita. Sin hora dicha se usa la hora actual (si es hoy) o 09:00: no es invento.
 
 Revisa solo esto:
-- inventos: datos del plan que no salen de la instrucción ni de las listas: personas, clientes, lugares, cantidades, fechas u horas que nadie dijo, o una persona elegida cuando el nombre era ambiguo o no existe. Copiar lo que dijeron no es invento. Una fecha calculada correctamente desde «mañana», «el lunes», etc. no es invento.
-- titulosOk: cada titulo es corto, en infinitivo y describe el trabajo pedido.
-- indicacionesFieles: las indicaciones conservan el detalle útil que dieron (qué falla, cantidades, lugar) sin agregar nada.
+- inventos: datos que no salen de la instrucción ni del catálogo: personas, clientes, sucursales, proyectos, lugares, cantidades, fechas u horas que nadie dijo, o una persona elegida cuando el nombre era ambiguo o no existe. Escribir el nombre registrado del cliente, sucursal o proyecto que corresponde a lo que dijeron no es invento («CEDIS de Tox» → sucursal «CEDIS Puebla» de Grupo Tox); poner una sucursal o un proyecto que no mencionaron sí lo es. La prioridad Media por omisión y las fechas calculadas desde «mañana», «el lunes», etc. no son invento.
+- titulosOk: cada título es corto, en infinitivo y describe el trabajo pedido.
+- indicacionesFieles: el detalle útil que dieron (síntoma, cantidades, materiales, con quién, a quién entregar, hora límite) queda en el título o en las indicaciones, y las indicaciones no repiten el título, no agregan pasos ni objetivos que nadie dijo («revisar la causa»), no explican el razonamiento y están redactadas de forma clara y profesional. Indicaciones vacías son correctas si todo cabe en el título. La frase «Entregar a más tardar el … a las …» con la hora límite que dijeron es correcta.
 - nota: 1 a 5, qué tan lista para usarse está la propuesta (5 = se crea sin tocar nada).
 - comentario: una frase con el problema principal, o «sin problemas».`;
 
@@ -148,11 +151,32 @@ function revisarAccion(e: AccionEsperada, a: AccionPlan, p: PropuestaActividad):
   en('cliente', e.clienteId, p.cliente?.id ?? null);
   en('sucursal', e.sucursalId, p.sucursal?.id ?? null);
   en('proyecto', e.proyectoId, p.proyecto?.id ?? null);
-  en('fecha', e.fecha, a.fecha ?? null);
+  // Agenda: lo que de verdad se guarda (día de inicio y día contra el que se mide «a tiempo»).
+  const diaDe = (iso: unknown) => (typeof iso === 'string' && iso ? fechaLocalISO(new Date(iso)) : null);
+  const cadena = (v: unknown) => (typeof v === 'string' && v ? v : null);
+  en('inicio', e.inicio, diaDe(p.payload.fechaInicio) ?? cadena(p.payload.periodoInicio));
+  en('límite', e.limite, cadena(p.payload.periodoFin) ?? diaDe(p.payload.fechaMaxima));
   en('hora', e.hora, hhmm(a.hora));
+  en('hora límite', e.horaLimite, hhmm((a as AccionPlan & { horaLimite?: string | null }).horaLimite ?? null));
   en('prioridad', e.prioridad, a.prioridad);
   en('encargo', e.encargo, a.encargo ?? null);
   en('duracion', e.duracionMin, a.duracionMin ?? null);
+  if (e.faltan) {
+    const faltantes = p.faltantes ?? [];
+    r.push({ nombre: 'faltantes', ok: e.faltan.every((f) => faltantes.includes(f)), detalle: faltantes.join(',') || '(ninguno)' });
+  }
+  const indicaciones = plano(String(p.payload.indicaciones ?? ''));
+  if (e.detalleCon) {
+    const texto = `${plano(String(p.payload.titulo ?? ''))} ${indicaciones}`;
+    const faltan = e.detalleCon.filter((t) => !texto.includes(plano(t)));
+    r.push({ nombre: 'detalle completo', ok: !faltan.length, detalle: faltan.length ? `sin ${faltan.join(', ')}` : undefined });
+  }
+  if (e.lugarCon) {
+    r.push({ nombre: 'lugar', ok: plano(String(p.payload.branchName ?? '')).includes(plano(e.lugarCon)), detalle: String(p.payload.branchName ?? '') });
+  }
+  if (e.sinIndicaciones) {
+    r.push({ nombre: 'indicaciones sin eco', ok: !indicaciones.trim(), detalle: String(p.payload.indicaciones ?? '') });
+  }
   return r;
 }
 
@@ -182,6 +206,46 @@ function revisarAsistente(caso: CasoAsistente, plan: PlanAsistente, propuestas: 
   return revisiones;
 }
 
+/** Lo que se crearía, como lo ve quien confirma (sirve para el código de antes y el de ahora). */
+function textoPropuestas(propuestas: PropuestaActividad[]): string {
+  if (!propuestas.length) return '(ninguna actividad)';
+  const diaHora = (iso: unknown) => {
+    if (typeof iso !== 'string' || !iso) return 'sin fecha';
+    const d = new Date(iso);
+    const hora = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+    return `${fechaLocalISO(d)} ${hora}`;
+  };
+  return propuestas
+    .map((p, i) => {
+      const x = p.payload;
+      const limite = (typeof x.periodoFin === 'string' && x.periodoFin) || (typeof x.fechaMaxima === 'string' ? fechaLocalISO(new Date(x.fechaMaxima)) : 'sin fecha');
+      return [
+        `${i + 1}. título: ${x.titulo}`,
+        `indicaciones: ${x.indicaciones ?? '(vacías)'}`,
+        `tipo: ${p.tipoEtiqueta}${x.ticketTypeCustom ? ` · ${x.ticketTypeCustom}` : x.ticketType && p.tipo === 'servicio' ? ` · ${x.ticketType}` : ''}`,
+        `responsable: ${p.responsable?.nombre ?? `sin elegir (dijeron «${p.textoResponsable ?? ''}»)`}`,
+        `cliente: ${p.cliente?.nombre ?? 'ninguno'}${p.sucursal ? ` · sucursal ${p.sucursal.nombre}` : x.branchName ? ` · lugar ${x.branchName}` : ''}${p.proyecto ? ` · proyecto ${p.proyecto.nombre}` : ''}`,
+        `inicio: ${diaHora(x.fechaInicio)} · límite: ${limite}`,
+        `duración: ${x.tiempoEstimadoMin ? `${x.tiempoEstimadoMin} min` : 'sin dato'} · prioridad: ${x.prioridad} · encargo: ${x.assignmentCharge ?? 'sin dato'}`,
+        `razón del tipo: ${p.razonTipo}`,
+      ].join('\n   ');
+    })
+    .join('\n');
+}
+
+function textoCatalogo(): string {
+  return [
+    `Personas: ${PERSONAS.map((p) => p.nombre).join('; ')}`,
+    `Clientes y sucursales: ${CATALOGO.clientes
+      .map((c) => {
+        const suc = CATALOGO.sucursales.filter((s) => s.clientId === c.id).map((s) => s.name);
+        return suc.length ? `${c.name} (${suc.join(', ')})` : c.name;
+      })
+      .join('; ')}`,
+    `Proyectos activos: ${CATALOGO.proyectos.map((p) => `${p.title} (${p.clientName})`).join('; ')}`,
+  ].join('\n');
+}
+
 function textoEsperadoAsistente(caso: CasoAsistente): string {
   if (caso.aclaracion) return 'Ninguna actividad: acciones vacías y una pregunta en aclaracion.';
   const nombre = (id: number | null | undefined) => (id == null ? null : PERSONAS.find((p) => p.id === id)?.nombre);
@@ -192,8 +256,10 @@ function textoEsperadoAsistente(caso: CasoAsistente): string {
         `${i + 1}. responsable: ${nombre(e.responsableId) ?? `nadie de la lista (conservar «${e.textoResponsable ?? ''}»)`}`,
         `tipo: ${e.tipos.join('/')}`,
         e.clienteId ? `cliente: ${e.clienteId.map((c) => cliente(c) ?? 'ninguno registrado').join(' o ')}` : null,
-        e.fecha ? `fecha: ${e.fecha.map((f) => f ?? 'sin fecha').join(' o ')}` : null,
+        e.inicio ? `inicio: ${e.inicio.map((f) => f ?? 'sin fecha').join(' o ')}` : null,
+        e.limite ? `límite: ${e.limite.map((f) => f ?? 'sin fecha').join(' o ')}` : null,
         e.hora ? `hora: ${e.hora.map((h) => h ?? 'sin hora').join(' o ')}` : null,
+        e.duracionMin ? `duración: ${e.duracionMin.map((d) => (d == null ? 'no la dijeron' : `${d} min`)).join(' o ')}` : null,
       ]
         .filter(Boolean)
         .join(' · '),
@@ -206,7 +272,7 @@ async function correrAsistente(caso: CasoAsistente, v: Variante, conJuez: boolea
   const base = { caso: caso.id, variante: v.nombre };
   try {
     asegurarPresupuesto(0.02);
-    const pet = peticionAsistente(caso.instruccion, CATALOGO.personas, AHORA, AUTOR);
+    const pet = peticionAsistente(caso.instruccion, CATALOGO, AHORA, AUTOR);
     const { datos, uso } = await claude.json<PlanAsistente>({
       ...pet,
       proceso: 'eval-asistente',
@@ -233,12 +299,12 @@ async function correrAsistente(caso: CasoAsistente, v: Variante, conJuez: boolea
             type: 'text',
             text: [
               `Fecha actual: miércoles 21 de octubre de 2026, 10:30 (Ciudad de México).`,
-              `Personas: ${PERSONAS.map((p) => p.nombre).join('; ')}`,
-              `Clientes registrados: ${CATALOGO.clientes.map((c) => c.name).join('; ')}`,
+              textoCatalogo(),
               `Instrucción: ${caso.instruccion}`,
               `Se esperaba:\n${textoEsperadoAsistente(caso)}`,
               caso.nota ? `Ojo: ${caso.nota}` : null,
-              `Plan del asistente:\n${JSON.stringify(plan, null, 1)}`,
+              plan.aclaracion ? `Pregunta de aclaración del asistente: ${plan.aclaracion}` : null,
+              `Actividades que se crearían:\n${textoPropuestas(propuestas)}`,
             ]
               .filter(Boolean)
               .join('\n\n'),

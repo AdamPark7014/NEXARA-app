@@ -1,8 +1,14 @@
 import {
   aFechaISO,
+  agendaDe,
+  bloqueClientes,
   buscar,
   construirPropuesta,
+  horaActualRedondeada,
+  indicacionesSinEco,
+  lugarDicho,
   mensajeUsuario,
+  peticionAsistente,
   puntaje,
   type AccionPlan,
   type CatalogosNexara,
@@ -37,7 +43,9 @@ const base: AccionPlan = {
   sitio: null,
   fecha: '2026-10-12',
   hora: '15:00',
-  duracionMin: null,
+  fechaLimite: null,
+  horaLimite: null,
+  duracionMin: 60,
   prioridad: 'Media',
   encargo: null,
 };
@@ -61,8 +69,12 @@ describe('asistente de actividades', () => {
       ticketTypeCustom: 'Junta',
       clientId: 1,
       fechaInicio: '2026-10-12T21:00:00.000Z',
+      fechaMaxima: '2026-10-12T21:00:00.000Z',
+      tiempoEstimadoMin: 60,
       estatus: 'Pendiente',
     });
+    expect(p.payload.periodoFin).toBeUndefined();
+    expect(p.agenda).toEqual({ dia: '2026-10-12', hora: '15:00', hasta: null, horaDicha: true });
     expect(p.resumen).toBe('Tarea · Junta para José Antonio Ramírez en TOX Logística hoy 15:00');
   });
 
@@ -160,5 +172,96 @@ describe('asistente de actividades', () => {
     expect(aFechaISO('2026-10-13', null)).toBe('2026-10-13T15:00:00.000Z');
     expect(aFechaISO(null, '15:00')).toBeNull();
     expect(mensajeUsuario('  hola ', ahora, 'Christian')).toContain('(2026-10-12), 10:00 hora de Ciudad de México.');
+  });
+
+  describe('agenda: inicio contra plazo', () => {
+    it('«para el viernes» empieza hoy y vence el viernes (periodo, como «Al» del formulario)', () => {
+      const p = construirPropuesta({ ...base, fecha: null, hora: null, fechaLimite: '2026-10-16' }, catalogos, ctx);
+      expect(p.agenda).toEqual({ dia: '2026-10-12', hora: '10:00', hasta: '2026-10-16', horaDicha: false });
+      expect(p.payload).toMatchObject({
+        periodoInicio: '2026-10-12',
+        periodoFin: '2026-10-16',
+        fechaInicio: '2026-10-12T16:00:00.000Z',
+      });
+      expect(p.resumen).toContain('vence vie 16 oct');
+      expect(p.avisos).toEqual([]);
+    });
+
+    it('«para hoy» es un solo momento: ahora, y vence al terminar el día', () => {
+      const p = construirPropuesta({ ...base, fecha: null, hora: null, fechaLimite: '2026-10-12' }, catalogos, ctx);
+      expect(p.payload.periodoFin).toBeUndefined();
+      expect(p.payload.fechaInicio).toBe('2026-10-12T16:00:00.000Z');
+      expect(p.payload.fechaMaxima).toBe(p.payload.fechaInicio);
+    });
+
+    it('una cita sin hora va a las 9 (la del formulario) y se marca como no dicha', () => {
+      expect(agendaDe({ fecha: '2026-10-13', hora: null, fechaLimite: null }, ahora)).toEqual({
+        dia: '2026-10-13',
+        hora: '09:00',
+        hasta: null,
+        horaDicha: false,
+      });
+      // Inicio después del plazo: se hace el día del plazo.
+      expect(agendaDe({ fecha: '2026-10-20', hora: '11:00', fechaLimite: '2026-10-16' }, ahora).dia).toBe('2026-10-16');
+    });
+
+    it('la hora límite queda escrita en las indicaciones', () => {
+      const p = construirPropuesta(
+        { ...base, fecha: null, hora: null, fechaLimite: '2026-10-12', horaLimite: '18:00', indicaciones: 'Mandarlo por correo al gerente.' },
+        catalogos,
+        ctx,
+      );
+      expect(p.payload.indicaciones).toBe('Mandarlo por correo al gerente. Entregar a más tardar el lunes 12 de octubre a las 18:00.');
+    });
+
+    it('sin fecha ni duración: quedan vacías y como faltantes', () => {
+      const p = construirPropuesta({ ...base, fecha: null, hora: null, duracionMin: null }, catalogos, ctx);
+      expect(p.faltantes).toEqual(['fecha', 'duración']);
+      expect(p.payload.fechaInicio).toBeUndefined();
+      expect(p.payload.tiempoEstimadoMin).toBeUndefined();
+      expect(p.resumen).toContain('sin fecha');
+    });
+
+    it('hora redondeada a 5 minutos, sin pasar de las 23:55', () => {
+      expect(horaActualRedondeada(new Date('2026-10-12T16:02:00Z'))).toBe('10:05');
+      expect(horaActualRedondeada(new Date('2026-10-13T05:58:00Z'))).toBe('23:55');
+    });
+  });
+
+  describe('indicaciones y lugar', () => {
+    it('quita las indicaciones que solo repiten el título y deja las que traen algo nuevo', () => {
+      const titulo = 'Comprar 20 conectores RJ45 y una bobina de cable UTP';
+      expect(indicacionesSinEco('Adquirir 20 conectores RJ45 y una bobina de cable UTP.', titulo)).toBeNull();
+      expect(indicacionesSinEco('Instalar dos cámaras nuevas en el estacionamiento.', 'Instalar dos cámaras nuevas en estacionamiento de Torre Médica')).toBeNull();
+      // El síntoma y las cantidades que el título no tiene se quedan.
+      expect(indicacionesSinEco('La puerta principal no abre.', 'Revisar control de acceso de la puerta principal')).toBe('La puerta principal no abre.');
+      expect(indicacionesSinEco('Son 3 equipos.', 'Entregar NVR en Atlixco')).toBe('Son 3 equipos.');
+      expect(indicacionesSinEco('  ', titulo)).toBeNull();
+    });
+
+    it('la sucursal que no se dijo no se usa, aunque la IA la ponga', () => {
+      const p = construirPropuesta({ ...base, tipo: 'servicio', cliente: 'Banorte', sitio: 'Plaza Satélite' }, catalogos, {
+        ...ctx,
+        instruccion: 'que Carolina revise las cámaras de Banorte',
+      });
+      expect(p.cliente).toEqual({ id: 2, nombre: 'Banorte' });
+      expect(p.sucursal).toBeNull();
+      expect(p.payload.branchName).toBeUndefined();
+      expect(lugarDicho('Sucursal 14 Angelópolis', 'que vaya a la 14')).toBe(true);
+      expect(lugarDicho('Campus Zavaleta', 'al Colegio Andes')).toBe(false);
+    });
+
+    it('«Tox nave 2» encuentra a «Grupo Tox» por su palabra propia', () => {
+      expect(buscar('Tox nave 2', [{ id: 1, name: 'Grupo Tox' }, { id: 2, name: 'Grupo Andes' }], (c) => c.name).elegido?.id).toBe(1);
+    });
+
+    it('la IA recibe los clientes con sus sucursales y los proyectos activos (bloque cacheable)', () => {
+      const bloque = bloqueClientes(catalogos);
+      expect(bloque).toContain('- Banorte · sucursales: Plaza Satélite');
+      expect(bloque).toContain('- CCTV nave 2 (TOX Logística)');
+      const pet = peticionAsistente('hola', catalogos, ahora, null);
+      expect(pet.sistema).toHaveLength(3);
+      expect(pet.sistema[2]).toBe(bloque);
+    });
   });
 });

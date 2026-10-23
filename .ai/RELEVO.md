@@ -1,5 +1,32 @@
 # RELEVO
 
+- **23-10 ~18:10 UTC (claude-code) — «Asignar con IA»: escribir o dictar llena todos los campos como «Asignar».**
+  - Adam: que el CEO pueda escribir o dictar «de forma bastante profesional y rápida, y que llene todos los parámetros
+    de las actividades correctamente».
+  - Evidencia en producción (`audit_logs` + `Activity`): la única actividad creada con IA (AN-0270, 22-10, «Hacer la
+    cotización de Anfora») quedó sin fechaInicio/fechaMaxima/entrega, sin tiempo estimado, con el LEAD sin
+    `horasPlan`, sin encargo e indicaciones que repetían el título. Las de «Asignar» a mano: fecha en ~100 %,
+    encargo en casi todas y el LEAD con `horasPlan` (tiempo estimado obligatorio). «Para el viernes» quedaba como
+    día de inicio (solo aparecía el viernes) y «Tox nave 2» no encontraba a «Grupo Tox».
+  - API `ai/asistente/asistente-actividades.ts`: plan con `fechaLimite`/`horaLimite`; `agendaDe` (cita = un momento;
+    plazo = empieza hoy y vence el día del plazo, como periodo si son días distintos; sin hora: hoy la hora actual,
+    otro día 09:00); hora límite escrita en indicaciones; faltantes `fecha` y `duración`; prompt con catálogo de
+    clientes, sucursales y proyectos (3.er bloque en caché), reglas de tipo (obra/proyecto solo si se menciona),
+    correcciones al dictar y indicaciones sin eco ni pasos inventados; `indicacionesSinEco` y `lugarDicho` en código
+    (quitan eco del título y sucursales que no se dijeron); `puntaje` ignora palabras de giro («Grupo», «Hotel»).
+    La propuesta trae `agenda`, `duracionMin`, `prioridad`, `encargo`, `indicaciones`.
+  - Web `AsistenteIA.tsx` + `lib/asistente-ia-api.ts`: la tarjeta muestra indicaciones y deja corregir responsable,
+    cliente, proyecto, día, hora, «Al» (último día), tiempo, prioridad, encargo (reglas de «Asignar» por persona) y
+    título/indicaciones («Editar texto»); bloquea igual que «Asignar» (día en servicio/obra, tiempo obligatorio,
+    encargo de quien reparte); al crear suma al responsable como LEAD con `horasPlan` (y cupo en despacho);
+    botón «Confirmar las N que están listas».
+  - Eval (23 casos, 8 nuevos con plazos, duración, dictado con autocorrección y el dictado real de Christian con otro
+    cliente; juez Opus con el catálogo y las actividades finales): antes 0.849, 0/23 perfectos, 5 inventos, juez
+    3.57 → después 0.944, 9/23, 3 inventos, juez 4.26; revisiones de código 0.99–1.0 en 4 corridas. Haiku 5.5 low sin
+    razonamiento, ~US$0.0002 por llamada (con razonamiento 2.4× sin mejorar). Gasto del eval 3.14 de 4 USD.
+  - Pendiente: apps nativas sin IA (lo propone el agente principal); periodo por etapa del proyecto (lo que
+    «Asignar» propone en obra/proyecto) no se calcula con IA.
+
 - **23-10 ~17:35 UTC (claude-code) — Minuta profesional: título, descripción, tipo, participantes y cada tema concluido.**
   - Adam: «parámetros para no tener costos elevados y perfección de entendimiento… título y todo profesional… que llene
     participantes (fue yo con ARTA Producciones)… que desglose todos los puntos, no un resumen súper resumido… concluye
