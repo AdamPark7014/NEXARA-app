@@ -32,16 +32,32 @@ if (path.resolve(SALIDA).startsWith(path.resolve(__dirname, '..'))) {
 
 const personal = JSON.parse(fs.readFileSync(PERSONAL, 'utf8'));
 
-// 3 bloques de 4 sin caracteres ambiguos (0/O, 1/l/I), con mayúscula, minúscula y dígito.
-const MAY = 'ABCDEFGHJKMNPQRSTUVWXYZ';
-const MIN = 'abcdefghjkmnpqrstuvwxyz';
-const DIG = '23456789';
-const TODO = MAY + MIN + DIG;
-const al = (s) => s[crypto.randomInt(s.length)];
+// Fáciles de recordar y al azar (pedido de Adam, 23-10-2026): «Palabra-Palabra-NN», p. ej. «Mango-Nube-47».
+// Nada que salga del nombre ni del número de empleado (el patrón «Nexara! + número» era adivinable). El login
+// bloquea la cuenta tras varios intentos fallidos, así que ~1.2 millones de combinaciones por persona bastan.
+const PALABRAS = [
+  'Mango', 'Pera', 'Lima', 'Coco', 'Fresa', 'Uva', 'Kiwi', 'Cereza', 'Durazno', 'Papaya', 'Melon', 'Ciruela',
+  'Nube', 'Luna', 'Sol', 'Estrella', 'Cometa', 'Rayo', 'Brisa', 'Lluvia', 'Nieve', 'Trueno', 'Aurora', 'Marea',
+  'Rio', 'Lago', 'Mar', 'Playa', 'Bosque', 'Selva', 'Monte', 'Valle', 'Isla', 'Cascada', 'Pradera', 'Volcan',
+  'Leon', 'Tigre', 'Lobo', 'Oso', 'Zorro', 'Aguila', 'Halcon', 'Delfin', 'Ballena', 'Tortuga', 'Panda', 'Koala',
+  'Jaguar', 'Puma', 'Colibri', 'Buho', 'Ardilla', 'Conejo', 'Venado', 'Pinguino', 'Nutria', 'Caballo', 'Gato', 'Perro',
+  'Rojo', 'Azul', 'Verde', 'Dorado', 'Plata', 'Coral', 'Turquesa', 'Violeta', 'Ambar', 'Marfil', 'Jade', 'Rubi',
+  'Piano', 'Guitarra', 'Tambor', 'Violin', 'Flauta', 'Trompeta', 'Arpa', 'Bongo',
+  'Cafe', 'Cacao', 'Vainilla', 'Canela', 'Miel', 'Pan', 'Taco', 'Elote', 'Tamal', 'Mole', 'Churro', 'Nopal',
+  'Faro', 'Puente', 'Torre', 'Castillo', 'Molino', 'Barco', 'Velero', 'Cohete', 'Globo', 'Tren', 'Bici', 'Kayak',
+  'Roble', 'Pino', 'Cedro', 'Olivo', 'Bambu', 'Cactus', 'Girasol', 'Rosa', 'Tulipan', 'Orquidea', 'Lirio', 'Helecho',
+];
+const al = (lista) => lista[crypto.randomInt(lista.length)];
+const usadas = new Set();
 function clave() {
   for (;;) {
-    const c = Array.from({ length: 12 }, () => al(TODO)).join('');
-    if (/[A-Z]/.test(c) && /[a-z]/.test(c) && /[2-9]/.test(c)) return `${c.slice(0, 4)}-${c.slice(4, 8)}-${c.slice(8)}`;
+    const a = al(PALABRAS);
+    const b = al(PALABRAS);
+    const c = `${a}-${b}-${crypto.randomInt(10, 100)}`;
+    if (a !== b && !usadas.has(c)) {
+      usadas.add(c);
+      return c;
+    }
   }
 }
 
