@@ -1,5 +1,15 @@
 # RELEVO
 
+- **23-10 ~18:10 UTC (claude-code) — Gasto de IA en pruebas: evals solo por la puerta, sin Opus.**
+  - Adam: «8 dólares para lo poco que hemos usado en pruebas me parece muchísimo… optimiza con código de funciones y
+    parámetros para mantener funciones reduciendo costos». Medido en la puerta (octubre): productos reales ~0.21 USD
+    (NEXARA 0.20, FinanVoz 0.01); evals por la puerta 3.32 (Opus juez 1.76, Sonnet 1.37) y este eval con la llave
+    directa 3.76 (sin tope).
+  - `scripts/eval-minutas`: siempre por la puerta (`pruebas.token`, sin camino de llave directa), juez Haiku por
+    omisión (`--juez sonnet|opus` explícito), tope 1 USD por mes calendario; lo gastado antes queda en
+    `gasto.json › antes_de_la_puerta`. El arnés `src/ai/eval` lo cambia el agente de actividades.
+  - Puerta (`PUERTA-IA-app` 298eba3): proyecto `pruebas` sin Opus y con tope de 4 USD al mes.
+
 - **23-10 ~18:10 UTC (claude-code) — «Asignar con IA»: escribir o dictar llena todos los campos como «Asignar».**
   - Adam: que el CEO pueda escribir o dictar «de forma bastante profesional y rápida, y que llene todos los parámetros
     de las actividades correctamente».
