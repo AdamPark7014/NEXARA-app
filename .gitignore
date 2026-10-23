@@ -128,3 +128,9 @@ apps/web/NUL
 
 # Detalle de las corridas del eval de minutas (respuestas completas): se resume en apps/api/scripts/eval-minutas.
 .ai/eval-minutas/
+
+# Credenciales y datos del personal: nunca en git (filtración del 23-10-2026). Viven en C:\dev\secrets\nexara.
+NEXARA-usuarios-*.xlsx
+*credenciales*.xlsx
+*credenciales*.json
+personal.json
