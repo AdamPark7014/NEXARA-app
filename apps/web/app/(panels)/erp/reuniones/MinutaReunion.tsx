@@ -60,6 +60,7 @@ export default function MinutaReunion({
   const [bajando, setBajando] = useState(false);
   const [transcripcion, setTranscripcion] = useState<string | null>(null);
   const [verNotas, setVerNotas] = useState(false);
+  const [verOtros, setVerOtros] = useState(false);
 
   const refrescar = useCallback(async () => {
     const r = await estadoGrabacion(token, meetingId);
@@ -299,9 +300,18 @@ export default function MinutaReunion({
             <p className={s.hint} style={{ margin: 0 }}>
               Nada se crea solo: revisa responsable y fecha, desmarca lo que no aplique y guarda. Cada acuerdo marcado como actividad le llega a su responsable.
             </p>
-            {propuestas.map((p, i) => (
-              <FilaPropuesta key={i} p={p} personas={personas} onCambio={(c) => cambiar(i, c)} />
-            ))}
+            {propuestas.map((p, i) =>
+              p.tipo === "ACUERDO" || verOtros ? <FilaPropuesta key={i} p={p} personas={personas} onCambio={(c) => cambiar(i, c)} /> : null,
+            )}
+            {propuestas.some((p) => p.tipo !== "ACUERDO") ? (
+              <div>
+                <Button size="sm" variant="ghost" onClick={() => setVerOtros((v) => !v)}>
+                  {verOtros
+                    ? "Ocultar lecciones y riesgos"
+                    : `Registrar también lecciones y riesgos (${propuestas.filter((p) => p.tipo !== "ACUERDO").length})`}
+                </Button>
+              </div>
+            ) : null}
             {sinResponsable ? (
               <p className={s.hint} style={{ margin: 0 }}>
                 {sinResponsable === 1 ? "Un acuerdo no tiene" : `${sinResponsable} acuerdos no tienen`} responsable: elige uno o desmárcalo.

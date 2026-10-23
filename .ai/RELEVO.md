@@ -23,9 +23,18 @@
     riesgos, cifras, lecciones/próximos pasos, seguimiento y anexo con marcas de tiempo.
   - Eval (`apps/api/scripts/eval-minutas`, 8 juntas sintéticas de 11–56 min, juez Opus 5.5): minuta Sonnet sobre
     transcripción completa 0.88 / juez 4.33 vs sobre notas 0.77 / 3.93 (y más cara) vs Haiku completa 0.83 / 4.07.
-    Costo por junta: 30 min ≈ US$0.07, 60 ≈ 0.12, 90 ≈ 0.17. Gasto del eval US$3.47 de 4 (llave directa).
+    Costo por junta: 30 min ≈ US$0.07, 60 ≈ 0.12, 90 ≈ 0.17. Gasto del eval US$3.76 de 4 (llave directa).
   - Tomé los cambios de N-1 en `acta-ia.ts`/`acta-ia.service.ts` (CONFIG_ACTA, `peticionActa`): el endpoint
     `reuniones/:id/acta-ia` queda pero la web ya no lo usa.
+  - Desplegado `b5cddc7a` (`--with-migrate`, web con revisión de tipos) y verificado en api.nexara.com.mx con audio
+    sintético de 4 min (TTS español, 5 partes por `POST :id/partes`): notas en vivo a los 4 min, minuta en 24 s,
+    reunión #3 quedó REALIZADA con título sugerido y minuta en `notas`, PDF 200, audio borrado, 401 sin token,
+    US$0.050 en la puerta. El token de prueba se firmó dentro de `nexara-api` (30 min, sin jti) y no salió del servidor.
+  - Ajuste tras la prueba: la IA asignó «Diana» a una «Daniela» de la empresa → regla de nombres parecidos en el
+    prompt (eval m4/m7 0.81/0.88 → 0.85/0.90); Syscom en el vocabulario de whisper; lecciones y riesgos plegados en
+    la lista de acuerdos propuestos; ancho de bloques y contraste de «Pendiente».
+  - Muestras para Adam (scratchpad de la sesión): `minuta-muestra.pdf`, `minuta-produccion-reunion3.pdf`,
+    `captura-grabacion-1536.png`, `captura-minuta-1536.png`. Lo visual espera su visto bueno.
 
 - **23-10 ~00:10 (claude-code, N-1) — IA de NEXARA por la puerta única, modelo más barato medido con eval.**
   - Adam (22-10): «que llamen bien a la API con el modelo más barato que funcione perfectamente y acomoda

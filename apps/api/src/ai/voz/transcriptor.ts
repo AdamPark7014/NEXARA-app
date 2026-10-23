@@ -32,7 +32,7 @@ export function limpiarTextoWhisper(texto: string): string {
 export const PROMPT_TRANSCRIPTOR =
   'Junta de trabajo de NEXARA, integrador de seguridad en México. Se habla de actividades, ' +
   'cotizaciones, clientes y sucursales: CCTV, cámaras Hikvision, NVR, DVR, control de acceso, ' +
-  'cableado, fibra, Banorte, IPADE, Integra.';
+  'cableado, fibra, Syscom, Banorte, IPADE, Integra.';
 
 export function promptTranscriptor(env: NodeJS.ProcessEnv = process.env): string {
   return (env.TRANSCRIPTOR_PROMPT || '').trim() || PROMPT_TRANSCRIPTOR;
