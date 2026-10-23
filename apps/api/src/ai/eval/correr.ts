@@ -8,9 +8,8 @@
  * inventado, resumen fiel). Todo gasto queda en `resultados/gasto.json` y la corrida se
  * detiene antes de pasar el tope de ese archivo.
  *
- *   cd apps/api
- *   node -r ts-node/register/transpile-only src/ai/eval/correr.ts \
- *     --funcion asistente|actas|triage --variantes haiku-low,haiku-low-np,sonnet-low [--casos a01,a02] [--sin-juez]
+ *   npm run eval:ia -w apps/api -- \
+ *     --funcion asistente|actas|triage --variantes haiku-low,haiku-low-np,sonnet-low [--casos a01,a02] [--sin-juez] [--etiqueta x]
  *
  * Variante = <haiku|sonnet|opus>-<low|medium|high>[-np]; `-np` apaga el razonamiento.
  */
