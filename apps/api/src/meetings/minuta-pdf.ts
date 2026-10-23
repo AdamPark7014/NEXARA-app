@@ -3,7 +3,9 @@ import { PDF_FUENTES, loadNexaraLogo, registrarFuentesCorporativas } from '../co
 import { MEETING_DEFAULTS, type MeetingType } from './meeting-rhythm.js';
 import {
   ESTADO_PREVIO_LABEL,
+  ESTADO_TEMA_LABEL,
   PRIORIDAD_LABEL,
+  type EstadoTema,
   type Minuta,
   type Prioridad,
   type SeguimientoMinuta,
@@ -91,6 +93,13 @@ const COLOR_PRIORIDAD: Record<Prioridad, [string, string]> = {
   alta: ['#B42318', '#FEE4E2'],
   media: ['#B54708', '#FEF0C7'],
   baja: ['#475569', '#EEF2F6'],
+};
+
+const COLOR_TEMA: Record<EstadoTema, [string, string]> = {
+  decidido: ['#067647', '#DCFAE6'],
+  en_seguimiento: ['#175CD3', '#DCEBFE'],
+  abierto: ['#B54708', '#FEF0C7'],
+  informativo: ['#475569', '#EEF2F6'],
 };
 
 const COLOR_ESTADO: Record<SeguimientoMinuta['estado'], [string, string]> = {
@@ -319,17 +328,28 @@ function portada(ctx: Ctx) {
   const tipo = MEETING_DEFAULTS[r.tipo as MeetingType]?.titulo ?? r.tipo;
   renglon(doc, `${tipo} · ${fechaLarga(r.fecha, true)}`, X, y + 12, { tamano: 13, color: C.pizarra, max: COL });
   caja(doc, X, y + 32, 48, 2, C.acento);
+  y += 48;
+
+  // Descripción: con quién y para qué (hasta 4 renglones).
+  if (m.descripcion) {
+    doc.font(F.texto).fontSize(10.5).fillColor(C.pizarra);
+    doc.text(m.descripcion, X, y, { width: 470, height: 15.5 * 4, ellipsis: true, lineGap: 15.5 - doc.currentLineHeight(false) });
+    y += Math.min(alto(doc, m.descripcion, 470, F.texto, 10.5, 15.5), 15.5 * 4);
+  }
 
   // Rejilla de datos.
-  y = Math.max(y + 70, 430);
+  y = Math.max(y + 26, 420);
   filete(doc, X, DER, y);
+  const organizaciones = m.organizaciones ?? [];
   const presentes = r.asistentes.filter((a) => a.asistio).length;
   const celdas: Array<[string, string]> = [
     ['Fecha', fechaLarga(r.fecha)],
     ['Hora de inicio', r.horaInicio || '—'],
     ['Duración grabada', r.duracionMs ? duracionTexto(r.duracionMs) : '—'],
     ['Conduce', r.facilitador?.nombre || '—'],
-    ['Asistentes', r.asistentes.length ? `${r.asistentes.length} convocados${presentes ? ` · ${presentes} con asistencia` : ''}` : '—'],
+    organizaciones.length
+      ? ['Con', organizaciones.join(', ')]
+      : ['Asistentes', r.asistentes.length ? `${r.asistentes.length} convocados${presentes ? ` · ${presentes} presentes` : ''}` : '—'],
     ['Acuerdos propuestos', String(m.acuerdos.length)],
   ];
   const anchoCelda = (COL - 28) / 2;
@@ -343,14 +363,30 @@ function portada(ctx: Ctx) {
     yFila += 42;
   }
 
-  // Asistentes por nombre.
-  const nombres = r.asistentes.map((a) => a.user?.nombre).filter(Boolean) as string[];
-  if (nombres.length) {
+  // Participantes (de la minuta) y, si no hay, los convocados.
+  const participantes = (m.participantes ?? []).map((p) => ({
+    nombre: p.nombre,
+    detalle: [p.rol, p.organizacion].filter(Boolean).join(' · '),
+  }));
+  const lista = participantes.length
+    ? participantes
+    : (r.asistentes.map((a) => a.user?.nombre).filter(Boolean) as string[]).map((nombre) => ({ nombre, detalle: '' }));
+  if (lista.length) {
     filete(doc, X, DER, yFila);
-    renglon(doc, 'CONVOCADOS', X, yFila + 20, { tamano: 7.5, fuente: F.medio, color: C.tenue, espaciado: 1.3 });
-    const texto = nombres.join('  ·  ');
-    doc.font(F.texto).fontSize(9.5).fillColor(C.pizarra);
-    doc.text(texto, X, yFila + 28, { width: COL, height: 60, ellipsis: true, lineGap: 3 });
+    renglon(doc, participantes.length ? 'PARTICIPANTES' : 'CONVOCADOS', X, yFila + 20, { tamano: 7.5, fuente: F.medio, color: C.tenue, espaciado: 1.3 });
+    // Dos columnas en lo que queda de la portada (el pie va en 752); lo que no cabe, «y N más».
+    const yp = yFila + 32;
+    const maxFilas = Math.max(1, Math.floor((738 - yp) / 26));
+    const filas = Math.min(Math.ceil(lista.length / 2), maxFilas);
+    const caben = filas * 2;
+    const visibles = lista.length > caben ? [...lista.slice(0, caben - 1), { nombre: `y ${lista.length - caben + 1} más`, detalle: '' }] : lista;
+    visibles.forEach((p, i) => {
+      const col = i < filas ? 0 : 1;
+      const x = X + col * (anchoCelda + 28);
+      const yy = yp + (i % filas) * 26;
+      renglon(doc, p.nombre, x, yy + 9, { tamano: 9.5, fuente: F.medio, color: C.tinta, max: anchoCelda });
+      if (p.detalle) renglon(doc, p.detalle, x, yy + 21, { tamano: 8, color: C.pizarra, max: anchoCelda });
+    });
   }
 
   renglon(doc, 'Minuta generada a partir de la grabación de la junta. Revisa los acuerdos antes de darlos por oficiales.', X, 752, {
@@ -440,11 +476,17 @@ export const generarMinutaPdf = (r: MinutaPdfPayload): Promise<Buffer> =>
         }
         vinetas(ctx, t.puntos, { sangria: 40 });
         if (t.conclusion) {
-          const texto = `Cómo quedó: ${t.conclusion}`;
-          const h = alto(doc, texto, COL - 64, F.medio, 9.5, 13.5);
+          // Cómo quedó, con su estado (decidido, en seguimiento, abierto, informativo) como etiqueta.
+          const etiqueta = t.estado ? ESTADO_TEMA_LABEL[t.estado] : null;
+          doc.font(F.semi).fontSize(7.5);
+          const wEtiqueta = etiqueta ? doc.widthOfString(etiqueta) + 12 + 10 : 0;
+          const texto = etiqueta ? t.conclusion : `Cómo quedó: ${t.conclusion}`;
+          const ancho = COL - 64 - wEtiqueta;
+          const h = Math.max(alto(doc, texto, ancho, F.medio, 9.5, 13.5), 14);
           asegurar(ctx, h + 18);
           caja(doc, X + 40, ctx.y, COL - 40, h + 14, C.tinte, 4);
-          parrafo(doc, texto, X + 52, ctx.y + 7, COL - 64, { fuente: F.medio, tamano: 9.5, renglon: 13.5, color: C.cabecera });
+          if (etiqueta && t.estado) pastilla(doc, etiqueta, X + 52, ctx.y + 6, COLOR_TEMA[t.estado]);
+          parrafo(doc, texto, X + 52 + wEtiqueta, ctx.y + 7, ancho, { fuente: F.medio, tamano: 9.5, renglon: 13.5, color: C.cabecera });
           ctx.y += h + 22;
         }
       });
@@ -474,7 +516,7 @@ export const generarMinutaPdf = (r: MinutaPdfPayload): Promise<Buffer> =>
           m.acuerdos.map((a, i) => [
             String(i + 1),
             a.descripcion,
-            a.responsable?.nombre ?? (a.textoResponsable ? `${a.textoResponsable} (por confirmar)` : 'Sin responsable'),
+            a.responsable?.nombre ?? (a.textoResponsable ? `${a.textoResponsable} (por confirmar)` : 'Por asignar'),
             fechaCorta(a.fechaCompromiso),
             PRIORIDAD_LABEL[a.prioridad],
           ]),
@@ -501,7 +543,10 @@ export const generarMinutaPdf = (r: MinutaPdfPayload): Promise<Buffer> =>
       });
     }
 
-    if (m.riesgos.length) {
+    if (m.riesgos.length && !m.riesgos.some((x) => x.mitigacion)) {
+      // Sin mitigaciones dichas: lista simple, sin una columna de «No se definió».
+      seccion('Riesgos y bloqueos', () => vinetas(ctx, m.riesgos.map((x) => x.riesgo)));
+    } else if (m.riesgos.length) {
       seccion('Riesgos y bloqueos', () =>
         tabla(
           ctx,
@@ -509,7 +554,7 @@ export const generarMinutaPdf = (r: MinutaPdfPayload): Promise<Buffer> =>
             { titulo: 'Riesgo o bloqueo', ancho: COL * 0.58 },
             { titulo: 'Mitigación', ancho: COL * 0.42 },
           ],
-          m.riesgos.map((x) => [x.riesgo, x.mitigacion ?? 'No se definió']),
+          m.riesgos.map((x) => [x.riesgo, x.mitigacion ?? '—']),
         ),
       );
     }

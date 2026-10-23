@@ -527,6 +527,12 @@
 .ep_sin_avance { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); }
 .ep_bloqueado { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--state-danger-text, var(--danger)); }
 
+/* Estado de cada tema de la minuta (decidido, en seguimiento, abierto, informativo). */
+.et_decidido { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.et_en_seguimiento { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); }
+.et_abierto { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); }
+.conclusion .estadoPrevio { margin-right: 4px; vertical-align: 1px; }
+
 .transcripcion {
   margin: 0;
   max-height: 360px;

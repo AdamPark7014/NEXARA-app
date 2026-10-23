@@ -13,6 +13,7 @@
  * (`grabacion.service.ts`) y el eval (`apps/api/scripts/eval-minutas`) mandan exactamente lo mismo.
  */
 import { aFechaISO, buscar, type Referencia } from '../ai/asistente/asistente-actividades.js';
+import { MEETING_TYPES, type MeetingType } from './meeting-rhythm.js';
 
 // ── Tramos ──────────────────────────────────────────────────────────────
 
@@ -130,6 +131,17 @@ export type Prioridad = (typeof PRIORIDADES)[number];
 export const ESTADOS_PREVIO = ['cumplido', 'en_proceso', 'sin_avance', 'bloqueado', 'cancelado'] as const;
 export type EstadoPrevio = (typeof ESTADOS_PREVIO)[number];
 
+/** Cómo quedó cada tema (Adam, 23-10-2026: «concluye cada uno de los parámetros de la reunión»). */
+export const ESTADOS_TEMA = ['decidido', 'en_seguimiento', 'abierto', 'informativo'] as const;
+export type EstadoTema = (typeof ESTADOS_TEMA)[number];
+export const ESTADO_TEMA_LABEL: Record<EstadoTema, string> = {
+  decidido: 'Decidido',
+  en_seguimiento: 'En seguimiento',
+  abierto: 'Abierto',
+  informativo: 'Informativo',
+};
+
+
 export type NotasTramo = {
   temas: Array<{ titulo: string; puntos: string[] }>;
   decisiones: string[];
@@ -152,11 +164,20 @@ export type NotasGuardadas = {
   notas: NotasTramo;
 };
 
+export type ParticipantePlan = { nombre: string; organizacion: string | null; rol: string | null };
+
 export type MinutaPlan = {
   tituloSugerido: string | null;
+  /** Quiénes se reunieron, para qué y el alcance (1–2 frases): va a la descripción de la reunión. */
+  descripcion: string;
+  tipoSugerido: MeetingType;
+  /** Organizaciones externas con las que fue la junta (clientes, proveedores); vacío si fue interna. */
+  organizaciones: string[];
+  participantes: ParticipantePlan[];
   resumenEjecutivo: string;
   loMasImportante: string[];
-  temas: Array<{ titulo: string; resumen: string; puntos: string[]; conclusion: string | null }>;
+  /** resumen = planteamiento (qué se planteó y por qué); puntos = desarrollo; conclusion = cómo quedó. */
+  temas: Array<{ titulo: string; resumen: string; puntos: string[]; conclusion: string | null; estado: EstadoTema }>;
   decisiones: string[];
   acuerdos: Array<{ descripcion: string; responsable: string | null; fechaCompromiso: string | null; prioridad: Prioridad }>;
   pendientes: string[];
@@ -193,10 +214,16 @@ export const ESQUEMA_NOTAS: Record<string, unknown> = objeto({
 });
 
 export const ESQUEMA_MINUTA: Record<string, unknown> = objeto({
-  tituloSugerido: textoONulo,
+  tituloSugerido: texto,
+  descripcion: texto,
+  tipoSugerido: { type: 'string', enum: [...MEETING_TYPES] },
+  organizaciones: lista(texto),
+  participantes: lista(objeto({ nombre: texto, organizacion: textoONulo, rol: textoONulo })),
   resumenEjecutivo: texto,
   loMasImportante: lista(texto),
-  temas: lista(objeto({ titulo: texto, resumen: texto, puntos: lista(texto), conclusion: textoONulo })),
+  temas: lista(
+    objeto({ titulo: texto, resumen: texto, puntos: lista(texto), conclusion: texto, estado: { type: 'string', enum: [...ESTADOS_TEMA] } }),
+  ),
   decisiones: lista(texto),
   acuerdos: lista(objeto({ descripcion: texto, responsable: textoONulo, fechaCompromiso: textoONulo, prioridad })),
   pendientes: lista(texto),
@@ -211,7 +238,7 @@ export const ESQUEMA_MINUTA: Record<string, unknown> = objeto({
 // ── Prompts (fijos: van en caché) ───────────────────────────────────────
 
 const EMPRESA =
-  'NEXARA es una empresa mexicana de seguridad electrónica e integración (CCTV, control de acceso, redes, alarmas, servicio de campo) con sede en Puebla.';
+  'NEXARA es una empresa mexicana de seguridad electrónica e integración (CCTV, control de acceso, redes, alarmas, servicio de campo) con sede en Puebla; también desarrolla plataformas de software a la medida para clientes (por ejemplo, la plataforma ARTA de ARTA Producciones para eventos y su auditorio).';
 
 const REGLAS_FIDELIDAD = `Fidelidad (lo más importante):
 - Solo lo que se dijo. No supongas responsables, fechas, cifras, causas ni conclusiones. Si no se sabe a quién le toca, el responsable es null.
@@ -253,7 +280,7 @@ Campos:
 
 export const PROMPT_MINUTA = `Redactas la minuta oficial de una junta de trabajo. ${EMPRESA}
 
-Recibes los datos de la reunión y su contenido: las notas que se tomaron por tramos durante la junta más la transcripción del último tramo, o la transcripción completa si la junta fue corta. Quien no estuvo debe entender con la minuta qué se trató, qué se decidió, qué sigue y quién lo hace.
+Recibes los datos de la reunión y su contenido: las notas que se tomaron por tramos durante la junta más la transcripción del último tramo, o la transcripción completa si la junta fue corta. Es el registro oficial de la junta: quien no estuvo debe entender con ella, a detalle, qué se trató, qué se dijo de cada asunto, cómo quedó cada uno, qué sigue y quién lo hace. Profesional y completa, pero sin relleno.
 
 ${REGLAS_FIDELIDAD}
 
@@ -262,17 +289,26 @@ ${REGLAS_REDACCION}
 ${REGLAS_ACUERDOS}
 
 Campos:
-- tituloSugerido: título corto y específico según lo tratado («Junta comercial: cierre de Grupo Tox y metas de noviembre»).
-- resumenEjecutivo: un párrafo de 5 a 8 líneas con lo esencial y cómo quedó.
+- tituloSugerido: título profesional y específico. Si la junta fue con una organización externa, nómbrala y di de qué fue («ARTA Producciones: avance de la plataforma de eventos y permisos por área»); si fue interna, el asunto principal («Junta comercial: cierre de Grupo Tox y metas de noviembre»).
+- descripcion: 1 o 2 frases: quiénes se reunieron (NEXARA y, si aplica, la organización externa), con qué propósito y qué alcance tuvo. Sin fecha ni duración.
+- tipoSugerido: EXTRAORDINARIA si fue con un cliente, proveedor u otras personas de fuera, o sobre un asunto puntual; DIARIA, PLANEACION_SEMANAL, REVISION_AVANCES o CIERRE_SEMANAL solo si fue esa junta interna del equipo de NEXARA. Si no hay forma de saberlo, el tipo actual de la reunión.
+- organizaciones: las organizaciones externas con las que fue la junta (cliente, proveedor), como se llaman. Vacío si fue interna.
+- participantes: las personas que tomaron parte (hablaron, se les habló directamente o se presentaron), no las que solo se mencionaron. nombre: como aparece en la lista de personas si es de la empresa; si es de fuera, como lo dijeron. organizacion: «NEXARA» o la organización externa, o null si no se sabe. rol: su función si se dijo o es evidente (dirección, producción, sistemas…), si no null. No inventes nombres: quien no se identifica no va.
+- resumenEjecutivo: un párrafo de 6 a 10 líneas: con quién y para qué fue la junta, lo esencial de cada tema y cómo quedó cada uno.
 - loMasImportante: hasta 5 puntos, lo que un director debe saber, de lo más a lo menos importante.
-- temas: en el orden en que se trataron. Un asunto que aparece en varios tramos va una sola vez con todo lo que se dijo. resumen: 1 a 3 frases. puntos: todo lo relevante que se dijo, una frase completa y concreta por punto, sin perder nombres, cantidades, fechas ni clientes. conclusion: cómo quedó, o null si quedó abierto.
+- temas: TODOS los asuntos con contenido, en el orden en que se trataron, sin juntar asuntos distintos en uno ni dejar fuera ninguno. Un asunto que aparece en varios tramos va una sola vez con todo lo que se dijo.
+  · titulo: el asunto, específico («Firma de documentos en la plataforma», no «Varios»).
+  · resumen: el planteamiento, en 1 a 3 frases: qué se planteó, por qué y quién lo planteó si se sabe.
+  · puntos: el desarrollo completo, una frase completa y concreta por cada idea, requerimiento, dato, propuesta, objeción y respuesta relevante, sin perder nombres, cantidades, fechas, sistemas ni clientes. Las que haga falta para no perder nada (normalmente de 3 a 8); ninguna de relleno.
+  · conclusion: siempre, en 1 o 2 frases: qué se decidió; o qué quedó en proceso, con quién y para cuándo; o qué quedó abierto y qué falta para cerrarlo; o, si solo se informó, qué quedó claro.
+  · estado: decidido (se resolvió o acordó), en_seguimiento (quedó en proceso con alguien a cargo), abierto (quedó sin definir), informativo (solo se informó, no requería decisión).
 - decisiones; acuerdos (descripcion, responsable, fechaCompromiso, prioridad); pendientes (sin responsable); preguntasAbiertas.
 - riesgos: riesgo o bloqueo y su mitigación si se dijo (si no, null).
-- cifras: cada dato (monto, cantidad, porcentaje, fecha clave) con su contexto.
-- proximosPasos: lo que sigue después de la junta, breve (puede resumir acuerdos y fechas próximas).
+- cifras: montos, cantidades, porcentajes y plazos que aporten, cada uno con su contexto. Las fechas, escritas («viernes 30 de octubre, 10:00»), nunca en AAAA-MM-DD. No repitas aquí lo que ya está en acuerdos o próximos pasos.
+- proximosPasos: lo que sigue después de la junta, breve (puede retomar acuerdos y la próxima reunión si se fijó).
 - lecciones: aprendizajes que el grupo dijo que hay que recordar.
 - seguimiento: por cada acuerdo de la reunión anterior (A1, A2…) del que se habló: ref, estado y detalle. Los que no se mencionaron no van.
-- Sin repetir lo mismo en varias listas, salvo que proximosPasos retome acuerdos.`;
+- Sin repetir lo mismo en varias listas, salvo que proximosPasos retome acuerdos. Listas vacías cuando no haya nada: nunca pongas algo solo por llenar un campo.`;
 
 export type PersonaMinuta = { id: number; nombre: string; puesto?: string | null };
 
@@ -294,6 +330,10 @@ export type ContextoReunion = {
   fecha: string;
   horaInicio?: string | null;
   duracionMs?: number | null;
+  /** Tipo con el que se creó (el botón de grabar usa el del día). */
+  tipo?: MeetingType | null;
+  /** Quien conduce y grabó la junta. */
+  conduce?: string | null;
   asistentes: string[];
   agenda?: string | null;
   personas: Array<{ nombre: string; puesto?: string | null }>;
@@ -332,6 +372,8 @@ function encabezado(ctx: ContextoReunion): string[] {
     `Fecha: ${fechaLarga(ctx.fecha)}${ctx.horaInicio ? ` · inicio ${ctx.horaInicio}` : ''}${
       ctx.duracionMs ? ` · duración ${Math.max(1, Math.round(ctx.duracionMs / 60_000))} min` : ''
     }`,
+    ...(ctx.tipo ? [`Tipo actual: ${ctx.tipo}`] : []),
+    ...(ctx.conduce ? [`Conduce: ${ctx.conduce}`] : []),
     ...(ctx.asistentes.length ? [`Asistentes: ${ctx.asistentes.join(', ')}`] : []),
     ...(ctx.agenda?.trim() ? [`Agenda:\n${ctx.agenda.trim()}`] : []),
   ];
@@ -349,9 +391,11 @@ export const CONFIG_NOTAS = {
   timeoutMs: 90_000,
 };
 
+/** Esfuerzo medio desde el 23-10-2026: con la junta real de ARTA (28 min, audio de sala) entendió mejor quién se reunió
+ * y sacó los pendientes que bajo omitía, por el mismo costo (~US$0.055 contra 0.052). */
 export const CONFIG_MINUTA = {
   modelo: 'claude-sonnet-5-5',
-  esfuerzo: 'low' as const,
+  esfuerzo: 'medium' as const,
   pensar: true,
   maxTokens: 16_000,
   timeoutMs: 300_000,
@@ -482,7 +526,18 @@ export type SeguimientoMinuta = {
   detalle: string | null;
 };
 
-export type Minuta = Omit<MinutaPlan, 'acuerdos' | 'seguimiento'> & {
+/** Participante con su usuario de NEXARA cuando es claramente alguien de la empresa. */
+export type ParticipanteMinuta = ParticipantePlan & { persona: Referencia | null };
+
+export type TemaMinuta = { titulo: string; resumen: string; puntos: string[]; conclusion: string | null; estado?: EstadoTema };
+
+/** Las minutas anteriores al 23-10-2026 no traen descripción, tipo, organizaciones, participantes ni estado por tema. */
+export type Minuta = Omit<MinutaPlan, 'acuerdos' | 'seguimiento' | 'descripcion' | 'tipoSugerido' | 'organizaciones' | 'participantes' | 'temas'> & {
+  descripcion?: string | null;
+  tipoSugerido?: MeetingType | null;
+  organizaciones?: string[];
+  participantes?: ParticipanteMinuta[];
+  temas: TemaMinuta[];
   acuerdos: AcuerdoMinuta[];
   seguimiento: SeguimientoMinuta[];
   reunionAnterior: ReunionAnterior | null;
@@ -506,8 +561,28 @@ export function construirMinuta(
 ): Minuta {
   const p = (plan ?? {}) as Partial<MinutaPlan>;
   const avances = new Map((Array.isArray(p.seguimiento) ? p.seguimiento : []).map((s) => [String(s?.ref ?? '').trim().toUpperCase(), s]));
+  const limpio = (v: unknown, max = 500): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+  const vistos = new Set<string>();
+  const participantes: ParticipanteMinuta[] = [];
+  for (const x of Array.isArray(p.participantes) ? p.participantes : []) {
+    const nombre = limpio(x?.nombre, 160);
+    if (!nombre) continue;
+    const organizacion = limpio(x?.organizacion, 160);
+    // Solo alguien de NEXARA (o sin organización) se busca entre las personas de la empresa.
+    const interno = !organizacion || /nexara/i.test(organizacion);
+    const r = interno ? buscar(nombre, personas, (y) => y.nombre) : { elegido: null };
+    const persona = r.elegido ? { id: r.elegido.id, nombre: r.elegido.nombre } : null;
+    const clave = persona ? `#${persona.id}` : nombre.toLowerCase();
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    participantes.push({ nombre: persona?.nombre ?? nombre, organizacion: persona ? 'NEXARA' : organizacion, rol: limpio(x?.rol, 120), persona });
+  }
   return {
     tituloSugerido: typeof p.tituloSugerido === 'string' && p.tituloSugerido.trim() ? p.tituloSugerido.trim().slice(0, 200) : null,
+    descripcion: limpio(p.descripcion, 1_000),
+    tipoSugerido: (MEETING_TYPES as readonly string[]).includes(String(p.tipoSugerido)) ? (p.tipoSugerido as MeetingType) : null,
+    organizaciones: [...new Set(textos(p.organizaciones).map((o) => o.slice(0, 160)))],
+    participantes,
     resumenEjecutivo: String(p.resumenEjecutivo ?? '').trim(),
     loMasImportante: textos(p.loMasImportante).slice(0, 5),
     temas: (Array.isArray(p.temas) ? p.temas : [])
@@ -517,6 +592,7 @@ export function construirMinuta(
         resumen: String(t.resumen ?? '').trim(),
         puntos: textos(t.puntos),
         conclusion: typeof t.conclusion === 'string' && t.conclusion.trim() ? t.conclusion.trim() : null,
+        estado: (ESTADOS_TEMA as readonly string[]).includes(String(t.estado)) ? t.estado : undefined,
       })),
     decisiones: textos(p.decisiones),
     acuerdos: (Array.isArray(p.acuerdos) ? p.acuerdos : [])
@@ -573,17 +649,30 @@ export const PRIORIDAD_LABEL: Record<Prioridad, string> = { alta: 'Alta', media:
 
 /** Minuta en texto plano: lo que queda en `notas` de la reunión (se lee y se busca por fecha). */
 export function minutaTexto(m: Minuta): string {
-  const bloques: string[] = [`RESUMEN EJECUTIVO\n${m.resumenEjecutivo}`];
+  const bloques: string[] = [];
+  if (m.descripcion) bloques.push(m.descripcion);
+  const participantes = (m.participantes ?? []).map((p) =>
+    [p.nombre, [p.rol, p.organizacion].filter(Boolean).join(', ')].filter(Boolean).join(' — '),
+  );
+  bloques.push(`RESUMEN EJECUTIVO\n${m.resumenEjecutivo}`);
   const vinetas = (titulo: string, items: string[]) => {
     if (items.length) bloques.push(`${titulo}\n${items.map((i) => `- ${i}`).join('\n')}`);
   };
+  vinetas('PARTICIPANTES', participantes);
   vinetas('LO MÁS IMPORTANTE', m.loMasImportante);
   if (m.temas.length) {
     bloques.push(
       `TEMAS\n${m.temas
-        .map((t, i) => [`${i + 1}. ${t.titulo}`, t.resumen ? `   ${t.resumen}` : '', ...t.puntos.map((p) => `   - ${p}`), t.conclusion ? `   Conclusión: ${t.conclusion}` : '']
-          .filter(Boolean)
-          .join('\n'))
+        .map((t, i) =>
+          [
+            `${i + 1}. ${t.titulo}${t.estado ? ` [${ESTADO_TEMA_LABEL[t.estado]}]` : ''}`,
+            t.resumen ? `   ${t.resumen}` : '',
+            ...t.puntos.map((p) => `   - ${p}`),
+            t.conclusion ? `   Conclusión: ${t.conclusion}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        )
         .join('\n')}`,
     );
   }

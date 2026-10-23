@@ -66,6 +66,32 @@ describe('minuta de reunión en PDF', () => {
     expect(paginas(await generarMinutaPdf(conTexto))).toBe(paginas(await generarMinutaPdf(base)));
   });
 
+  it('portada con descripción, organización y participantes; muchos participantes no desbordan', async () => {
+    const con = (n: number): MinutaPdfPayload => ({
+      ...base,
+      minuta: {
+        ...minuta,
+        descripcion: 'Reunión de NEXARA con ARTA Producciones para revisar el avance de su plataforma de eventos. '.repeat(3),
+        organizaciones: ['ARTA Producciones'],
+        participantes: Array.from({ length: n }, (_, i) => ({
+          nombre: `Persona ${i + 1}`,
+          organizacion: i % 2 ? 'ARTA Producciones' : 'NEXARA',
+          rol: i % 3 ? 'Producción' : null,
+          persona: null,
+        })),
+        temas: minuta.temas.map((t, i) => ({ ...t, conclusion: t.conclusion ?? 'Quedó abierto.', estado: (['decidido', 'en_seguimiento', 'abierto', 'informativo'] as const)[i % 4] })),
+      },
+    });
+    const pocos = await generarMinutaPdf(con(2));
+    expect(paginas(pocos)).toBeGreaterThanOrEqual(5);
+    expect(paginas(await generarMinutaPdf(con(40)))).toBe(paginas(pocos));
+  });
+
+  it('riesgos sin mitigación van como lista', async () => {
+    const pdf = await generarMinutaPdf({ ...base, minuta: { ...minuta, riesgos: [{ riesgo: 'El tipo de cambio puede subir', mitigacion: null }] } });
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
   it('sin secciones opcionales sigue saliendo', async () => {
     const vacia: Minuta = {
       ...minuta,

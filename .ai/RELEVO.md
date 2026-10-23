@@ -1,5 +1,25 @@
 # RELEVO
 
+- **23-10 ~17:35 UTC (claude-code) — Minuta profesional: título, descripción, tipo, participantes y cada tema concluido.**
+  - Adam: «parámetros para no tener costos elevados y perfección de entendimiento… título y todo profesional… que llene
+    participantes (fue yo con ARTA Producciones)… que desglose todos los puntos, no un resumen súper resumido… concluye
+    cada uno de los parámetros sin llenar de información basura».
+  - `minuta-ia.ts`: esquema nuevo con `descripcion`, `tipoSugerido` (enum MeetingType), `organizaciones`, `participantes`
+    (nombre, organización, rol; los de NEXARA se ligan a su usuario con `buscar`, los de fuera no) y por tema
+    planteamiento (`resumen`), desarrollo (`puntos`), `conclusion` siempre y `estado` (decidido, en_seguimiento,
+    abierto, informativo). Prompt: todos los temas sin juntarlos, conclusión obligatoria, fechas escritas, nada de
+    relleno; `EMPRESA` menciona el software a la medida (ARTA). Contexto con `Tipo actual` y `Conduce`.
+    `CONFIG_MINUTA.esfuerzo` medium (probado con la junta real: mejor quién se reunió y pendientes, ~US$0.055).
+    Campos nuevos opcionales en `Minuta` para que las minutas viejas abran.
+  - `grabacion.service.ts` `cerrarReunion`: agenda ← descripción si estaba vacía; con título genérico, título y tipo
+    sugeridos (una junta con cliente no entra a la serie del cierre semanal); quien conduce y los participantes de
+    NEXARA quedan como asistentes presentes. Solo commiteé mis hunks: los de transcripción son del agente de reuniones.
+  - PDF: portada con descripción, «Con» (organizaciones) y participantes en dos columnas con «y N más»; cada tema cierra
+    con etiqueta de estado y su conclusión; riesgos sin mitigación como lista (sin «No se definió»); «Por asignar».
+    Web `MinutaReunion.tsx`: bloque «Con …» con descripción y participantes, estado en la conclusión de cada tema.
+  - Pruebas: API reuniones 77/77, tipos API y web, vitest grabacion. Junta real (28 min) con Sonnet medium: 5 temas con
+    estado y conclusión, EXTRAORDINARIA, «ARTA Producciones: …», 7 hojas.
+
 - **23-10 ~17:10 UTC (claude-code) — Minuta de reuniones: PDF solo con el resumen y prompt para audio de sala.**
   - Adam probó una junta real de 28 min (reunión 7, grabación 5): «la transcripción es muy pobre… el PDF toma audios
     literalmente; que la moldee a un PDF bien estructurado de resumen».

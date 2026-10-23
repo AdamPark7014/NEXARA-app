@@ -164,8 +164,9 @@ describe('peticiones a Claude', () => {
     // Mismo sistema en todos los tramos de la reunión: acierta en caché.
     expect(peticionNotas(ctx, partes(8).slice(4), []).sistema).toEqual(n.sistema);
 
-    const m = peticionMinuta(ctx, { fuente: 'transcripcion', texto: 'hola', palabras: 1 });
+    const m = peticionMinuta({ ...ctx, tipo: 'REVISION_AVANCES', conduce: 'Carolina Pérez Lima' }, { fuente: 'transcripcion', texto: 'hola', palabras: 1 });
     expect(m.usuario).toContain('Fecha: miércoles 21 de octubre de 2026 (2026-10-21) · inicio 10:00 · duración 30 min');
+    expect(m.usuario).toContain('Tipo actual: REVISION_AVANCES\nConduce: Carolina Pérez Lima');
     expect(m.usuario).toContain('TRANSCRIPCIÓN COMPLETA\nhola');
     expect(m.esquema).toBe(ESQUEMA_MINUTA);
     expect(m.maxTokens).toBe(CONFIG_MINUTA.maxTokens);
@@ -197,9 +198,18 @@ describe('peticiones a Claude', () => {
 describe('minuta final', () => {
   const plan: MinutaPlan = {
     tituloSugerido: '  Revisión: Colegio Andes y SAT ',
+    descripcion: ' Revisión de NEXARA con ARTA Producciones sobre su plataforma. ',
+    tipoSugerido: 'EXTRAORDINARIA',
+    organizaciones: ['ARTA Producciones', 'ARTA Producciones', ' '],
+    participantes: [
+      { nombre: 'Antonio Vázquez', organizacion: 'NEXARA', rol: null },
+      { nombre: 'Antonio Vázquez Luna', organizacion: null, rol: 'Técnico' },
+      { nombre: 'Carolina', organizacion: 'ARTA Producciones', rol: 'Producción' },
+      { nombre: ' ', organizacion: null, rol: null },
+    ],
     resumenEjecutivo: 'Se revisaron los acuerdos.',
     loMasImportante: ['a', 'b', 'c', 'd', 'e', 'f'],
-    temas: [{ titulo: 'Colegio Andes', resumen: 'Levantamiento', puntos: ['Dos de tres edificios', ' '], conclusion: '' }],
+    temas: [{ titulo: 'Colegio Andes', resumen: 'Levantamiento', puntos: ['Dos de tres edificios', ' '], conclusion: '', estado: 'decidido' }],
     decisiones: ['Usar fibra'],
     acuerdos: [
       { descripcion: 'Contestar el requerimiento del SAT', responsable: 'Antonio Vázquez', fechaCompromiso: '2026-10-28', prioridad: 'alta' },
@@ -219,7 +229,7 @@ describe('minuta final', () => {
     const m = construirMinuta(plan, PERSONAS, ctx.previos, { anterior: ctx.anterior!, fuente: 'notas' });
     expect(m.tituloSugerido).toBe('Revisión: Colegio Andes y SAT');
     expect(m.loMasImportante).toHaveLength(5);
-    expect(m.temas[0]).toEqual({ titulo: 'Colegio Andes', resumen: 'Levantamiento', puntos: ['Dos de tres edificios'], conclusion: null });
+    expect(m.temas[0]).toEqual({ titulo: 'Colegio Andes', resumen: 'Levantamiento', puntos: ['Dos de tres edificios'], conclusion: null, estado: 'decidido' });
     expect(m.acuerdos).toHaveLength(2);
     expect(m.acuerdos[0].responsable).toEqual({ id: 9, nombre: 'Antonio Vázquez Luna' });
     expect(m.acuerdos[0].prioridad).toBe('alta');
@@ -231,9 +241,24 @@ describe('minuta final', () => {
     ]);
   });
 
+  it('participantes: los de NEXARA se ligan a su usuario, los de fuera no, y sin repetidos', () => {
+    const m = construirMinuta(plan, PERSONAS, [], { anterior: null, fuente: 'transcripcion' });
+    expect(m.descripcion).toBe('Revisión de NEXARA con ARTA Producciones sobre su plataforma.');
+    expect(m.tipoSugerido).toBe('EXTRAORDINARIA');
+    expect(m.organizaciones).toEqual(['ARTA Producciones']);
+    expect(m.participantes).toEqual([
+      { nombre: 'Antonio Vázquez Luna', organizacion: 'NEXARA', rol: null, persona: { id: 9, nombre: 'Antonio Vázquez Luna' } },
+      // Una Carolina de ARTA no es la Carolina de NEXARA.
+      { nombre: 'Carolina', organizacion: 'ARTA Producciones', rol: 'Producción', persona: null },
+    ]);
+    expect(construirMinuta({ ...plan, tipoSugerido: 'JUNTA' as never }, PERSONAS, [], { anterior: null, fuente: 'notas' }).tipoSugerido).toBeNull();
+  });
+
   it('la minuta en texto lleva los apartados con contenido', () => {
     const texto = minutaTexto(construirMinuta(plan, PERSONAS, ctx.previos, { anterior: null, fuente: 'notas' }));
-    expect(texto.startsWith('RESUMEN EJECUTIVO\nSe revisaron los acuerdos.')).toBe(true);
+    expect(texto.startsWith('Revisión de NEXARA con ARTA Producciones sobre su plataforma.\n\nRESUMEN EJECUTIVO\nSe revisaron los acuerdos.')).toBe(true);
+    expect(texto).toContain('PARTICIPANTES\n- Antonio Vázquez Luna — NEXARA\n- Carolina — Producción, ARTA Producciones');
+    expect(texto).toContain('1. Colegio Andes [Decidido]');
     expect(texto).toContain('- Contestar el requerimiento del SAT · Antonio Vázquez Luna · 2026-10-28 · prioridad alta');
     expect(texto).toContain('SEGUIMIENTO DE LA REUNIÓN ANTERIOR\n- Entregar el reporte de SLA: Cumplido — Se entregó el viernes');
     expect(texto).not.toContain('PREGUNTAS ABIERTAS');

@@ -36,6 +36,16 @@ async function pedir<T>(token: string, path: string, init: RequestInit = {}): Pr
 
 export type Prioridad = "alta" | "media" | "baja";
 export type EstadoPrevio = "cumplido" | "en_proceso" | "sin_avance" | "bloqueado" | "cancelado" | "sin_mencion";
+
+/** Cómo quedó cada tema de la minuta (desde el 23-10-2026; las minutas anteriores no lo traen). */
+export type EstadoTema = "decidido" | "en_seguimiento" | "abierto" | "informativo";
+
+export type ParticipanteMinuta = {
+  nombre: string;
+  organizacion: string | null;
+  rol: string | null;
+  persona: { id: number; nombre: string } | null;
+};
 export type Referencia = { id: number; nombre: string };
 
 export type NotasTramo = {
@@ -70,9 +80,14 @@ export type AcuerdoMinuta = {
 
 export type Minuta = {
   tituloSugerido: string | null;
+  /** Con quién y para qué fue la junta. Desde el 23-10-2026, como organizaciones, participantes y estado por tema. */
+  descripcion?: string | null;
+  tipoSugerido?: string | null;
+  organizaciones?: string[];
+  participantes?: ParticipanteMinuta[];
   resumenEjecutivo: string;
   loMasImportante: string[];
-  temas: Array<{ titulo: string; resumen: string; puntos: string[]; conclusion: string | null }>;
+  temas: Array<{ titulo: string; resumen: string; puntos: string[]; conclusion: string | null; estado?: EstadoTema }>;
   decisiones: string[];
   acuerdos: AcuerdoMinuta[];
   pendientes: string[];
@@ -234,6 +249,13 @@ export function juntarNotas(previas: NotasGuardadas[], nuevas: NotasGuardadas[],
 }
 
 export const PRIORIDAD_LABEL: Record<Prioridad, string> = { alta: "Alta", media: "Media", baja: "Baja" };
+
+export const ESTADO_TEMA_LABEL: Record<EstadoTema, string> = {
+  decidido: "Decidido",
+  en_seguimiento: "En seguimiento",
+  abierto: "Abierto",
+  informativo: "Informativo",
+};
 
 export const ESTADO_PREVIO_LABEL: Record<EstadoPrevio, string> = {
   cumplido: "Cumplido",
