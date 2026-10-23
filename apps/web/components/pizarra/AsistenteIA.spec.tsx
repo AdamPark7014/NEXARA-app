@@ -155,4 +155,16 @@ describe("AsistenteIA", () => {
     expect(cuerpo).toMatchObject({ titulo: "Cambiar DVR del CEDIS", prioridad: "Alta", fechaInicio: "2026-10-27T15:00:00.000Z" });
     expect(cuerpo.indicaciones).toBeUndefined();
   });
+
+  it("si la IA no contesta, avisa claro y deja el texto para reintentar", async () => {
+    api.interpretar.mockRejectedValueOnce(new Error("La IA tardó demasiado en contestar."));
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    const caja = await screen.findByLabelText("Instrucción para la IA");
+    await usuario.type(caja, "que Carolina revise el DVR");
+    await usuario.click(screen.getByRole("button", { name: "Interpretar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/tardó demasiado.*Tu instrucción sigue aquí/);
+    expect(caja).toHaveValue("que Carolina revise el DVR");
+    expect(screen.getByRole("button", { name: "Interpretar" })).toBeEnabled();
+  });
 });

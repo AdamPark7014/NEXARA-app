@@ -3,13 +3,19 @@
  *
  * Llama exactamente lo mismo que producción (`peticionAsistente` / las piezas de `acta-ia.ts`
  * + `ClaudeService.json`) con cada variante de modelo, esfuerzo y razonamiento; califica con
- * revisiones en código (responsable, fechas, tipo, cliente…) y con un juez
- * (`claude-opus-5-5`) que revisa lo que el código no puede (acuerdos equivalentes, nada
- * inventado, resumen fiel). Todo gasto queda en `resultados/gasto.json` y la corrida se
- * detiene antes de pasar el tope de ese archivo.
+ * revisiones en código (responsable, fechas, tipo, cliente…) y, si se pide, con un juez que
+ * revisa lo que el código no puede (acuerdos equivalentes, nada inventado, resumen fiel).
+ *
+ * Costo (regla de Adam, 23-10-2026): todo va por la puerta con el token de pruebas, el juez
+ * por omisión es Haiku 5.5 (`--juez sonnet|opus` solo pidiéndolo) y antes de llamar se
+ * imprime el costo estimado; si pasa de `--max-usd` (o de lo que queda del tope de
+ * `resultados/gasto.json`) no corre. Lo que se gasta queda en ese archivo.
  *
  *   npm run eval:ia -w apps/api -- \
- *     --funcion asistente|actas|triage --variantes haiku-low,haiku-low-np,sonnet-low [--casos a01,a02] [--sin-juez] [--etiqueta x]
+ *     --funcion asistente|actas|triage [--variantes haiku-low-np] [--casos a01,a02] [--sin-juez] [--juez haiku] [--max-usd 0.05]
+ *     [--concurrencia 1] [--etiqueta x]
+ *
+ * `--concurrencia 1` mide la latencia real (p50/p95 en el resumen); por omisión van 5 a la vez.
  *
  * Variante = <haiku|sonnet|opus>-<low|medium|high>[-np]; `-np` apaga el razonamiento.
  */
@@ -21,6 +27,8 @@ import {
   construirPropuesta,
   fechaLocalISO,
   peticionAsistente,
+  planDeSalida,
+  type SalidaIA,
   type AccionPlan,
   type PlanAsistente,
   type PropuestaActividad,
@@ -43,33 +51,33 @@ import { leerTranscripcion } from './generar-transcripciones.js';
 import {
   DIR_DETALLE,
   DIR_RESULTADOS,
+  MODELOS,
   PresupuestoAgotado,
   argumentos,
   asegurarPresupuesto,
   cargarLlave,
   clienteEval,
+  costoLlamada,
   enParalelo,
   gastado,
+  modeloDe,
   plano,
   registrarGasto,
+  restante,
   textoDe,
   topeUsd,
   usoDe,
 } from './comun.js';
 
-const JUEZ = 'claude-opus-5-5';
-const MODELOS: Record<string, string> = {
-  haiku: 'claude-haiku-5-5',
-  sonnet: 'claude-sonnet-5-5',
-  opus: 'claude-opus-5-5',
-};
+/** Juez: Haiku 5.5 salvo que se pida otro con `--juez`. */
+let JUEZ = MODELOS.haiku;
 
 type Variante = { nombre: string; modelo: string; esfuerzo: 'low' | 'medium' | 'high'; pensar: boolean };
 
 function variante(nombre: string): Variante {
   const [m, esfuerzo, extra] = nombre.split('-');
   if (!MODELOS[m] || !['low', 'medium', 'high'].includes(esfuerzo)) throw new Error(`Variante inválida: ${nombre}`);
-  return { nombre, modelo: MODELOS[m], esfuerzo: esfuerzo as Variante['esfuerzo'], pensar: extra !== 'np' };
+  return { nombre, modelo: modeloDe(m), esfuerzo: esfuerzo as Variante['esfuerzo'], pensar: extra !== 'np' };
 }
 
 type Revision = { nombre: string; ok: boolean; detalle?: string };
@@ -101,7 +109,7 @@ async function juzgar<T>(concepto: string, sistema: string, bloques: Anthropic.T
     messages: [{ role: 'user', content: bloques }],
     output_config: { effort: 'low', format: { type: 'json_schema', schema: esquema } },
   });
-  registrarGasto(`juez ${concepto} (opus)`, usoDe(JUEZ, r).usdAprox);
+  registrarGasto(`juez ${concepto} (${JUEZ.replace('claude-', '')})`, usoDe(JUEZ, r).usdAprox);
   if (r.stop_reason !== 'end_turn') throw new Error(`juez: stop_reason ${r.stop_reason}`);
   return JSON.parse(textoDe(r)) as T;
 }
@@ -227,7 +235,6 @@ function textoPropuestas(propuestas: PropuestaActividad[]): string {
         `cliente: ${p.cliente?.nombre ?? 'ninguno'}${p.sucursal ? ` · sucursal ${p.sucursal.nombre}` : x.branchName ? ` · lugar ${x.branchName}` : ''}${p.proyecto ? ` · proyecto ${p.proyecto.nombre}` : ''}`,
         `inicio: ${diaHora(x.fechaInicio)} · límite: ${limite}`,
         `duración: ${x.tiempoEstimadoMin ? `${x.tiempoEstimadoMin} min` : 'sin dato'} · prioridad: ${x.prioridad} · encargo: ${x.assignmentCharge ?? 'sin dato'}`,
-        `razón del tipo: ${p.razonTipo}`,
       ].join('\n   ');
     })
     .join('\n');
@@ -273,7 +280,7 @@ async function correrAsistente(caso: CasoAsistente, v: Variante, conJuez: boolea
   try {
     asegurarPresupuesto(0.02);
     const pet = peticionAsistente(caso.instruccion, CATALOGO, AHORA, AUTOR);
-    const { datos, uso } = await claude.json<PlanAsistente>({
+    const { datos: salida, uso } = await claude.json<SalidaIA>({
       ...pet,
       proceso: 'eval-asistente',
       companyId: 0,
@@ -283,7 +290,7 @@ async function correrAsistente(caso: CasoAsistente, v: Variante, conJuez: boolea
     });
     const ms = Date.now() - t0;
     registrarGasto(`asistente ${v.nombre}`, uso.usdAprox);
-    const plan: PlanAsistente = { acciones: Array.isArray(datos?.acciones) ? datos.acciones : [], aclaracion: datos?.aclaracion ?? null };
+    const plan: PlanAsistente = planDeSalida(salida);
     const propuestas = plan.acciones.slice(0, 10).map((a) => construirPropuesta(a, CATALOGO, { creadoPorId: 12, ahora: AHORA, instruccion: caso.instruccion }));
     const revisiones = revisarAsistente(caso, plan, propuestas);
 
@@ -564,6 +571,13 @@ async function correrTriage(caso: CasoTriage, v: Variante): Promise<Resultado> {
 
 // ──────────────────────────── Resumen ────────────────────────────
 
+/** Percentil por rango más cercano (p50, p95) de los milisegundos de cada llamada. */
+function percentil(xs: number[], p: number): number {
+  if (!xs.length) return 0;
+  const orden = [...xs].sort((a, b) => a - b);
+  return orden[Math.min(orden.length - 1, Math.max(0, Math.ceil(p * orden.length) - 1))];
+}
+
 function promedio(xs: number[]): number {
   return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0;
 }
@@ -590,26 +604,62 @@ function resumir(funcion: string, v: Variante, rs: Resultado[]) {
     tokensPensamientoMedios: Math.round(promedio(usos.map((u) => u.tokensPensamiento))),
     usdPorLlamada: Number(promedio(usos.map((u) => u.usdAprox ?? 0)).toFixed(6)),
     msMedios: Math.round(promedio(ok.map((r) => r.ms))),
+    // Con `--concurrencia 1` es la latencia que ve quien usa la función (cada llamada sola).
+    msP50: percentil(ok.map((r) => r.ms), 0.5),
+    msP95: percentil(ok.map((r) => r.ms), 0.95),
     fallos: rs
       .flatMap((r) => (r.error ? [`${r.caso}: ERROR ${r.error}`] : r.revisiones.filter((x) => !x.ok).map((x) => `${r.caso} ${x.nombre}${x.detalle ? ` (${x.detalle})` : ''}`)))
       .slice(0, 80),
   };
 }
 
+/**
+ * Tokens típicos por llamada (medidos el 23-10-2026): entrada total, parte en caché y salida.
+ * Sirven para estimar el costo antes de correr.
+ */
+const TOKENS_TIPICOS: Record<string, { entrada: number; cacheada: number; salida: number; juez: { entrada: number; salida: number } }> = {
+  asistente: { entrada: 3_500, cacheada: 2_000, salida: 320, juez: { entrada: 2_500, salida: 350 } },
+  actas: { entrada: 12_000, cacheada: 2_500, salida: 2_500, juez: { entrada: 14_000, salida: 1_500 } },
+  triage: { entrada: 700, cacheada: 500, salida: 80, juez: { entrada: 0, salida: 0 } },
+};
+
+/** Costo estimado de la corrida: cada caso por variante (la primera escribe la caché) + juez. */
+function estimarCorrida(funcion: string, casos: number, variantes: Variante[], conJuez: boolean): number {
+  const t = TOKENS_TIPICOS[funcion];
+  let total = 0;
+  for (const v of variantes) {
+    // Con razonamiento la salida es ~2.4× (medido en el asistente).
+    const salida = Math.round(t.salida * (v.pensar ? 2.4 : 1));
+    total += costoLlamada(v.modelo, { ...t, salida }, true) + (casos - 1) * costoLlamada(v.modelo, { ...t, salida });
+    if (conJuez && t.juez.entrada) total += casos * costoLlamada(JUEZ, { entrada: t.juez.entrada, salida: t.juez.salida });
+  }
+  return Number(total.toFixed(4));
+}
+
 async function main() {
   const args = argumentos();
   const funcion = args.funcion;
   if (funcion !== 'asistente' && funcion !== 'actas' && funcion !== 'triage') throw new Error('--funcion asistente|actas|triage');
-  const variantes = (args.variantes || 'haiku-low').split(',').map(variante);
+  const variantes = (args.variantes || 'haiku-low-np').split(',').map(variante);
   const conJuez = !args['sin-juez'];
+  JUEZ = modeloDe(args.juez);
   const ids = args.casos ? args.casos.split(',') : null;
   console.log(`Llave: ${cargarLlave()} · gastado ${gastado().toFixed(4)} de ${topeUsd()} USD`);
 
   const todos: Array<{ id: string }> = funcion === 'asistente' ? CASOS_ASISTENTE : funcion === 'actas' ? ESCENARIOS_ACTA : CASOS_TRIAGE;
   const casos = todos.filter((c) => !ids || ids.includes(c.id));
+  const estimado = estimarCorrida(funcion, casos.length, variantes, conJuez);
+  const maximo = args['max-usd'] ? Number(args['max-usd']) : null;
+  console.log(
+    `Costo estimado: ~US$${estimado} (${casos.length} casos × ${variantes.map((v) => v.nombre).join(', ')}` +
+      `${conJuez ? ` + juez ${JUEZ}` : ', sin juez'}) · quedan US$${restante().toFixed(4)} del tope`,
+  );
+  if (maximo !== null && estimado > maximo) throw new Error(`El costo estimado (US$${estimado}) pasa de --max-usd ${maximo}: no se corre.`);
+  if (estimado > restante()) throw new Error(`El costo estimado (US$${estimado}) pasa de lo que queda del tope: no se corre.`);
   const porVariante = new Map<string, Resultado[]>(variantes.map((v) => [v.nombre, []]));
   // Caso por caso con todas las variantes seguidas: el juez reutiliza la caché del escenario.
-  await enParalelo(casos, funcion === 'actas' ? 3 : 5, async (caso) => {
+  const concurrencia = args.concurrencia ? Math.max(1, Number(args.concurrencia)) : funcion === 'actas' ? 3 : 5;
+  await enParalelo(casos, concurrencia, async (caso) => {
     for (const v of variantes) {
       const r =
         funcion === 'asistente'
