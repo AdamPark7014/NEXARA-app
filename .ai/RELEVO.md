@@ -48,7 +48,17 @@
   - **Actas: NO se tocaron (las toma R-1).** Eval de actas hecho con el prompt actual: Sonnet low 0.966
     (15 inventos) vs Haiku low 0.921 (34 inventos) → Haiku aún no iguala; se queda Sonnet. Mis cambios en
     `meetings/acta-ia.ts` y `acta-ia.service.ts` (CONFIG_ACTA, `peticionActa`) quedaron sin commitear para R-1.
-  - Pendiente en este turno: desplegar y verificar con HTTP reales (se coordina con R-1).
+  - **Desplegado** con el deploy de R-1 (05:37 UTC, `b5cddc7a`, que trae mi `c84bae4c`); no corrí otro.
+    Entorno: `/etc/ai/nexara-claude.env` + `ANTHROPIC_ASSISTANT_MODEL=claude-haiku-5-5`; en `deploy/.env.nexara`
+    `ANTHROPIC_BASE_URL=http://puerta-ia:8080` y `ANTHROPIC_AUTH_TOKEN` vacío (respaldo `.env.nexara.bak-20261023-ia`;
+    el proxy viejo de terceros ya no se usa).
+  - **Verificado por HTTP real** (dentro de `nexara-api`, CEO de pruebas id 35, token de 10 min sin sesión):
+    `ai/asistente/estado` 200; `interpretar` 201 en 1.4–2.4 s con Haiku sin razonamiento (~US$0.0002–0.0005);
+    el caso «urgente… que X vaya ya, y compren 10 RJ45» que antes devolvía plan vacío ahora da 2 actividades;
+    `ai/triage` 201 (reglas, bandera apagada) y el triage con Claude directo P1/CORRECTIVO; `lab/ai` 201 «OK» por
+    la puerta (bandera `lab.ai.live` encendida); Opus en la puerta → «no está permitido» (esperado);
+    `reuniones/2/acta-ia` 201 con Sonnet (US$0.011). La puerta registró todo en `/uso` (NEXARA: US$0.025 del mes).
+  - Gasto de pruebas de N-1: US$2.44 de 4 (proyecto `pruebas` de la puerta).
 
 - **22-10 ~15:40 (claude-code) — «No cumplida» al cierre de jornada (desplegado) + propuesta del evaluador IA.**
   - Adam: «cualquier actividad que no se acabe después de la jornada laboral se toma como incumplida… y que se
