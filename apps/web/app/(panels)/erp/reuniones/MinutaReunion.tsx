@@ -9,6 +9,7 @@ import { downloadMeetingPdf } from "@/lib/meetings-api";
 import { duracionLegible } from "@/lib/voz-api";
 import {
   ESTADO_PREVIO_LABEL,
+  ESTADO_TEMA_LABEL,
   PRIORIDAD_LABEL,
   borrarGrabacion,
   concluirGrabacion,
@@ -247,6 +248,23 @@ export default function MinutaReunion({
         </div>
       </div>
 
+      {m.descripcion || m.participantes?.length || m.organizaciones?.length ? (
+        <section className={s.bloque}>
+          <h3 className={s.bloqueTitle}>{m.organizaciones?.length ? `Con ${m.organizaciones.join(", ")}` : "La reunión"}</h3>
+          {m.descripcion ? <p className={s.resumen}>{m.descripcion}</p> : null}
+          {m.participantes?.length ? (
+            <div className={s.chips} aria-label="Participantes">
+              {m.participantes.map((p, i) => (
+                <span key={i} className={s.estadoPrevio} title={[p.rol, p.organizacion].filter(Boolean).join(" · ") || undefined}>
+                  {p.nombre}
+                  {p.organizacion && p.organizacion !== "NEXARA" ? ` · ${p.organizacion}` : ""}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className={s.bloque}>
         <h3 className={s.bloqueTitle}>Resumen ejecutivo</h3>
         <p className={s.resumen}>{m.resumenEjecutivo}</p>
@@ -277,7 +295,16 @@ export default function MinutaReunion({
                   <li key={j}>{p}</li>
                 ))}
               </ul>
-              {t.conclusion ? <p className={s.conclusion}>Cómo quedó: {t.conclusion}</p> : null}
+              {t.conclusion ? (
+                <p className={s.conclusion}>
+                  {t.estado ? (
+                    <span className={`${s.estadoPrevio} ${s[`et_${t.estado}` as keyof typeof s] ?? ""}`}>{ESTADO_TEMA_LABEL[t.estado]}</span>
+                  ) : (
+                    "Cómo quedó:"
+                  )}{" "}
+                  {t.conclusion}
+                </p>
+              ) : null}
             </details>
           ))}
         </section>

@@ -340,6 +340,7 @@ export class GrabacionService implements OnModuleInit {
         fecha: true,
         horaInicio: true,
         agenda: true,
+        facilitador: { select: { nombre: true } },
         asistentes: { select: { user: { select: { nombre: true } } } },
       },
     });
@@ -355,6 +356,8 @@ export class GrabacionService implements OnModuleInit {
       titulo: r.titulo,
       fecha: dia(r.fecha),
       horaInicio: r.horaInicio,
+      tipo: r.tipo,
+      conduce: r.facilitador?.nombre ?? null,
       asistentes: r.asistentes.map((a) => a.user?.nombre).filter(Boolean) as string[],
       agenda: r.agenda,
       personas,
@@ -515,25 +518,44 @@ export class GrabacionService implements OnModuleInit {
   }
 
   /**
-   * Con la minuta lista, la reunión queda realizada, con la minuta en `notas` (si no tenía) y el
-   * título que sugiere la IA si seguía con el genérico del tipo («Reunión diaria»). Los acuerdos
-   * no: esos se confirman a mano.
+   * Con la minuta lista, la reunión queda realizada y llena lo que la IA dedujo (Adam, 23-10-2026:
+   * «que se llene como título y como descripción… y todo el tema de los participantes»):
+   * - la minuta en `notas` y la descripción en `agenda`, si estaban vacías;
+   * - si seguía con el título genérico del botón de grabar («Junta de cierre»): el título y el tipo
+   *   que sugiere la IA (una junta con un cliente no es el cierre semanal y no debe entrar a esa serie);
+   * - quien conduce y las personas de NEXARA que tomaron parte quedan como asistentes presentes.
+   * Los acuerdos no: esos se confirman a mano.
    */
   private async cerrarReunion(meetingId: number, r: { tipo: string; titulo: string }, minuta: Minuta) {
     const actual = await this.prisma.operationalMeeting.findUnique({
       where: { id: meetingId },
-      select: { estado: true, notas: true, realizadaAt: true },
+      select: { estado: true, notas: true, agenda: true, realizadaAt: true, facilitadorId: true },
     });
     if (!actual) return;
     const generico = Object.values(MEETING_DEFAULTS).some((d) => d.titulo === r.titulo);
+    const tipo = generico && minuta.tipoSugerido && minuta.tipoSugerido !== r.tipo ? minuta.tipoSugerido : null;
     await this.prisma.operationalMeeting.update({
       where: { id: meetingId },
       data: {
         ...(actual.notas?.trim() ? {} : { notas: minutaTexto(minuta) }),
+        ...(actual.agenda?.trim() || !minuta.descripcion ? {} : { agenda: minuta.descripcion }),
         ...(generico && minuta.tituloSugerido ? { titulo: minuta.tituloSugerido.slice(0, 200) } : {}),
+        ...(tipo ? { tipo } : {}),
         ...(actual.estado === 'PROGRAMADA' ? { estado: 'REALIZADA', realizadaAt: actual.realizadaAt ?? new Date() } : {}),
       },
     });
+    const presentes = [
+      ...new Set(
+        [actual.facilitadorId, ...(minuta.participantes ?? []).map((p) => p.persona?.id)].filter((id): id is number => typeof id === 'number'),
+      ),
+    ];
+    if (presentes.length) {
+      await this.prisma.meetingAttendee.createMany({
+        data: presentes.map((userId) => ({ meetingId, userId, asistio: true })),
+        skipDuplicates: true,
+      });
+      await this.prisma.meetingAttendee.updateMany({ where: { meetingId, userId: { in: presentes } }, data: { asistio: true } });
+    }
   }
 
   // ── Texto pegado ───────────────────────────────────────────────────────
