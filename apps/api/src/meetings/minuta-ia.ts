@@ -215,11 +215,15 @@ const EMPRESA =
 
 const REGLAS_FIDELIDAD = `Fidelidad (lo más importante):
 - Solo lo que se dijo. No supongas responsables, fechas, cifras, causas ni conclusiones. Si no se sabe a quién le toca, el responsable es null.
-- La transcripción es automática: no dice quién habla, la puntuación falla y hay palabras mal oídas. Corrige solo lo obvio por el contexto (marcas, clientes, nombres de la lista de personas). Una persona que habla en primera persona («yo lo mando») solo tiene nombre si alguien la nombró.
+- La transcripción es automática y casi siempre sale de un micrófono en la sala: no dice quién habla, la puntuación falla, hay palabras mal oídas, frases que se repiten en bucle, frases que el reconocedor inventa en los silencios («gracias», «nos vemos en el próximo video», «[Música]», «suscríbete») y pedazos sin sentido o en otro idioma. Ignora todo eso. Reconstruye lo que se quiso decir solo cuando el contexto lo deja claro (marcas, clientes, sistemas, nombres de la lista de personas); lo que no se entiende se omite sin mencionarlo. Nunca armes horas, fechas, cifras o nombres juntando pedazos sueltos («el viernes a las 10… 30» es el viernes 30 a las 10, no las 10:30). Una persona que habla en primera persona («yo lo mando») solo tiene nombre si alguien la nombró.
 - Una propuesta rechazada, descartada o que quedó en el aire no es decisión. Un comentario o una queja no es acuerdo. Lo que alguien dijo que NO hará no es compromiso.
 - Plática social, bromas y asuntos personales (fiestas, comida, ofrendas, futbol, tráfico, cumpleaños) no van en ninguna parte, tampoco como pendiente.
 - Un riesgo es un problema que alguien planteó como tal; si se dijo que algo está bien, alcanza o ya se resolvió, no es riesgo. No lleva responsable salvo que alguien lo haya tomado como tarea (entonces también es acuerdo).
 - Un pendiente es trabajo que alguien dijo que hay que hacer y nadie tomó; un tema que se dejó «para otro día» sin tarea concreta va como pregunta abierta, no como pendiente.`;
+
+const REGLAS_REDACCION = `Redacción:
+- Escribe con tus palabras, en tercera persona y en tono de acta formal. Nunca copies frases de la transcripción ni pongas citas textuales, muletillas o preguntas tal como se dijeron: cuenta qué se trató y cómo quedó.
+- No hables de la grabación, del audio, del micrófono ni de la calidad de la transcripción en ningún campo: el documento trata de la junta.`;
 
 const REGLAS_ACUERDOS = `Acuerdos: compromisos concretos de hacer algo.
 - Descripción en infinitivo y específica («Enviar a Grupo Tox la cotización de 12 cámaras»).
@@ -233,6 +237,8 @@ export const PROMPT_NOTAS = `Tomas las notas de una junta de trabajo mientras oc
 Recibes un tramo de la transcripción automática (unos minutos de junta). Las notas de todos los tramos se juntan al terminar en la minuta oficial, así que anota todo lo de ESTE tramo con detalle concreto (quién, qué, cuánto, cuándo, clientes, equipos, cantidades) y nada de tramos anteriores.
 
 ${REGLAS_FIDELIDAD}
+
+${REGLAS_REDACCION}
 
 ${REGLAS_ACUERDOS}
 
@@ -250,6 +256,8 @@ export const PROMPT_MINUTA = `Redactas la minuta oficial de una junta de trabajo
 Recibes los datos de la reunión y su contenido: las notas que se tomaron por tramos durante la junta más la transcripción del último tramo, o la transcripción completa si la junta fue corta. Quien no estuvo debe entender con la minuta qué se trató, qué se decidió, qué sigue y quién lo hace.
 
 ${REGLAS_FIDELIDAD}
+
+${REGLAS_REDACCION}
 
 ${REGLAS_ACUERDOS}
 

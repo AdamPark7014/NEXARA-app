@@ -689,7 +689,6 @@ export class GrabacionService implements OnModuleInit {
       minuta: g.minuta as unknown as Minuta,
       duracionMs: resumirPartes(partes.map((p) => ({ ...p, palabras: 0 }))).duracionMs,
       iniciadaAt: g.iniciadaAt,
-      transcripcion: transcripcionConMarcas(partes),
     };
   }
 

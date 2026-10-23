@@ -50,19 +50,23 @@ const base: MinutaPdfPayload = {
   ],
   minuta,
   duracionMs: 41 * 60_000,
-  transcripcion: Array.from({ length: 40 }, (_, i) => `[${String(i).padStart(2, '0')}:00] ${'bueno entonces lo de Tox queda así '.repeat(18)}`).join('\n'),
 };
 
 const paginas = (pdf: Buffer) => (pdf.toString('latin1').match(/\/Type \/Page\b/g) ?? []).length;
 
 describe('minuta de reunión en PDF', () => {
-  it('genera portada, resumen con índice, apartados y anexo', async () => {
+  it('genera portada, resumen con índice y apartados', async () => {
     const pdf = await generarMinutaPdf(base);
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
-    expect(paginas(pdf)).toBeGreaterThanOrEqual(6);
+    expect(paginas(pdf)).toBeGreaterThanOrEqual(5);
   });
 
-  it('sin secciones opcionales ni transcripción sigue saliendo', async () => {
+  it('es solo la minuta: el texto literal de la grabación no entra al PDF', async () => {
+    const conTexto = { ...base, transcripcion: '[00:00] bueno entonces lo de Tox queda así\n'.repeat(400) } as MinutaPdfPayload;
+    expect(paginas(await generarMinutaPdf(conTexto))).toBe(paginas(await generarMinutaPdf(base)));
+  });
+
+  it('sin secciones opcionales sigue saliendo', async () => {
     const vacia: Minuta = {
       ...minuta,
       loMasImportante: [],
@@ -78,12 +82,7 @@ describe('minuta de reunión en PDF', () => {
       seguimiento: [],
       reunionAnterior: null,
     };
-    const pdf = await generarMinutaPdf({ ...base, minuta: vacia, asistentes: [], transcripcion: null, facilitador: null });
+    const pdf = await generarMinutaPdf({ ...base, minuta: vacia, asistentes: [], facilitador: null });
     expect(paginas(pdf)).toBe(2);
-  });
-
-  it('un párrafo pegado más largo que una hoja no rompe el anexo', async () => {
-    const pdf = await generarMinutaPdf({ ...base, transcripcion: 'palabra '.repeat(6000) });
-    expect(paginas(pdf)).toBeGreaterThan(6);
   });
 });
