@@ -41,6 +41,15 @@
   - Detalle de la reunión: «Editar título» (además de asistentes editables).
   - Muestras para Adam (scratchpad de la sesión): `minuta-muestra.pdf`, `minuta-produccion-reunion3.pdf`,
     `captura-grabacion-1536.png`, `captura-minuta-1536.png`. Lo visual espera su visto bueno.
+  - **Micrófono (prueba de Adam: «No se escuchó nada»):** su Chrome entregaba «Line 1 (Virtual Audio Cable)»
+    mudo. `lib/microfono.ts` mide ~1 s cada micrófono (AnalyserNode; `muted` o cero exacto = sin señal) y prueba
+    recordado → el del navegador → «default» → «communications» → entradas reales (virtuales/mezcla estéreo solo si
+    no hay otra); recuerda el que sonó en `localStorage` (`nexara.microfono`). Panel: medidor de nivel junto a
+    «Grabando · 12:34», selector «Micrófono» (cambiar a mitad cierra la parte y abre la siguiente sin perder nada)
+    y aviso a los 5 s de silencio digital. Permiso como el de notificaciones (`use-permiso-microfono.ts` +
+    `PermisoMicrofono.tsx`): tarjeta en `prompt`, instrucciones + «Ya lo permití» en `denied`, nada en `granted`;
+    sin `permissions.query` (Safari viejo) va directo a `getUserMedia`. Probado con dispositivos falsos (vitest);
+    el micrófono real de Adam NO se pudo probar desde aquí.
   - Pendiente: navegar a otra pantalla del panel dentro de la app corta la grabación (lo subido queda; al volver,
     «Seguir grabando»); solo el cierre de pestaña pide confirmación. App móvil sin cambios.
 

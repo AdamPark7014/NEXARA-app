@@ -556,3 +556,41 @@
   .recDotLive { animation: none; }
   .progreso span { transition: none; }
 }
+
+/* ── Micrófono: nivel en vivo y selector ─────────────────────────── */
+
+.nivel {
+  display: inline-block;
+  width: 72px;
+  height: 8px;
+  margin-left: 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.nivel span {
+  display: block;
+  height: 100%;
+  background: var(--success);
+  transition: width 120ms linear;
+}
+
+.nivelMudo { border-color: var(--danger); }
+
+.micro {
+  display: grid;
+  grid-template-columns: auto minmax(0, 360px);
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .micro { grid-template-columns: 1fr; gap: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nivel span { transition: none; }
+}
