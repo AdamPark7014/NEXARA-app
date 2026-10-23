@@ -109,6 +109,8 @@ export type EstadoGrabacion =
       error: string | null;
       usdIa: number;
       acuerdosConfirmadosAt: string | null;
+      /** Solo si se pidió `textoDesde`: texto de whisper de las partes nuevas. */
+      textos?: Array<{ parte: number; inicioMs: number | null; duracionMs: number | null; texto: string }>;
     };
 
 export type GrabacionExistente = Extract<EstadoGrabacion, { existe: true }>;
@@ -124,8 +126,13 @@ export function subirParte(token: string, meetingId: number, parte: number, meta
   return pedir<{ ok: boolean; parte: number }>(token, `${base(meetingId)}/partes`, { method: "POST", body: form });
 }
 
-export const estadoGrabacion = (token: string, meetingId: number, notasDesde = 0) =>
-  pedir<EstadoGrabacion>(token, `${base(meetingId)}${notasDesde ? `?notasDesde=${notasDesde}` : ""}`);
+export const estadoGrabacion = (token: string, meetingId: number, notasDesde = 0, textoDesde?: number) => {
+  const q = new URLSearchParams();
+  if (notasDesde) q.set("notasDesde", String(notasDesde));
+  if (textoDesde !== undefined) q.set("textoDesde", String(textoDesde));
+  const qs = q.toString();
+  return pedir<EstadoGrabacion>(token, `${base(meetingId)}${qs ? `?${qs}` : ""}`);
+};
 
 export const concluirGrabacion = (token: string, meetingId: number) =>
   pedir<EstadoGrabacion>(token, `${base(meetingId)}/concluir`, { method: "POST" });

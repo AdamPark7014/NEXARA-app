@@ -50,6 +50,14 @@
     `PermisoMicrofono.tsx`): tarjeta en `prompt`, instrucciones + «Ya lo permití» en `denied`, nada en `granted`;
     sin `permissions.query` (Safari viejo) va directo a `getUserMedia`. Probado con dispositivos falsos (vitest);
     el micrófono real de Adam NO se pudo probar desde aquí.
+  - **Onda y transcripción en vivo (Adam: «barritas como un audio de WhatsApp» y ver el texto al hablar):**
+    `OndaVoz.tsx` (canvas + requestAnimationFrame, 48 barras a ~20 fps con RMS suavizado; puntito bajo el umbral;
+    con «reducir movimiento», indicador fijo) reemplaza al medidor. `TranscripcionEnVivo.tsx`: texto de whisper
+    (`GET :id?textoDesde=p`) y, mientras llega, vista previa del reconocimiento del navegador (`use-dictado`,
+    es-MX, se reinicia solo; usa la pista elegida en Chrome reciente). Partes de 20 s (medido en el servidor:
+    20 s se transcriben en ~5 s → ~25 % del transcriptor por reunión; 60 s en 11.8 s) y consulta cada 6 s.
+    Pie con aviso cierto de privacidad e interruptor «Vista previa del navegador» (encendido, `localStorage`).
+    Sin SpeechRecognition (Firefox): solo whisper con «transcribiendo…».
   - Pendiente: navegar a otra pantalla del panel dentro de la app corta la grabación (lo subido queda; al volver,
     «Seguir grabando»); solo el cierre de pestaña pide confirmación. App móvil sin cambios.
 

@@ -18,7 +18,8 @@ type Reconocedor = {
   onresult: ((e: EventoVoz) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
-  start: () => void;
+  /** Chrome reciente acepta la pista del micrófono elegido; los demás ignoran el argumento. */
+  start: (pista?: MediaStreamTrack) => void;
   stop: () => void;
 };
 type ConstructorReconocedor = new () => Reconocedor;
@@ -77,7 +78,7 @@ export function useDictado(alTerminarFrase: (texto: string) => void) {
     setParcial("");
   }, []);
 
-  const iniciar = useCallback(() => {
+  const iniciar = useCallback((pista?: MediaStreamTrack | null) => {
     const Ctor = constructorDelNavegador();
     if (!Ctor) return;
     setError(null);
@@ -99,10 +100,21 @@ export function useDictado(alTerminarFrase: (texto: string) => void) {
       quiereEscuchar.current = false;
       setError(MENSAJE_ERROR[e.error] ?? "El dictado se detuvo. Vuelve a intentarlo.");
     };
+    const arrancar = () => {
+      if (pista && pista.readyState === "live") {
+        try {
+          r.start(pista);
+          return;
+        } catch {
+          /* sin soporte de pista: el micrófono predeterminado */
+        }
+      }
+      r.start();
+    };
     r.onend = () => {
       if (quiereEscuchar.current) {
         try {
-          r.start();
+          arrancar();
           return;
         } catch {
           /* cae a detener */
@@ -114,7 +126,7 @@ export function useDictado(alTerminarFrase: (texto: string) => void) {
     reconocedor.current = r;
     quiereEscuchar.current = true;
     try {
-      r.start();
+      arrancar();
       setEscuchando(true);
     } catch {
       quiereEscuchar.current = false;
