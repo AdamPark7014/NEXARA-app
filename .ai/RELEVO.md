@@ -1,5 +1,16 @@
 # RELEVO
 
+- **23-10 ~18:45 UTC (claude-code) — Cada llamada a Claude dice qué función la hizo (`x-proceso`).**
+  - Adam: «ve cómo perfeccionar el modelo… si consume mucho nos da en la torre, pero si es muy lento, no entiende bien
+    o se traba… también nos va a generar problemas». La puerta ya registraba latencia, errores y costo por proyecto y
+    modelo; ahora también por función (`PUERTA-IA-app` acfe4cf, v1.1.0, desplegada): `/uso` → `procesos` y panel
+    «Por función» con objetivos de p95 y costo por llamada (`config/proyectos.json` › `nexara.objetivos`).
+  - `ai/claude/claude.service.ts`: manda `x-proceso` = `procesoParaPuerta(peticion.proceso)` (minúsculas, dígitos y
+    guiones, máx. 40) en las opciones de la petición; no va en el cuerpo y la puerta no lo reenvía a Anthropic. Los
+    nombres que ya existen pasan tal cual: `asistente-actividades`, `triage`, `reunion-notas`, `reunion-minuta`,
+    `acta-reunion`, `lab`, `eval-*`. Spec con 2 casos nuevos (6/6) y `tsc` del API limpio.
+  - Falta: desplegar el API (otro paso) para que el panel deje de ver a NEXARA como `sin-proceso`.
+
 - **23-10 ~18:10 UTC (claude-code) — Gasto de IA en pruebas: evals solo por la puerta, sin Opus.**
   - Adam: «8 dólares para lo poco que hemos usado en pruebas me parece muchísimo… optimiza con código de funciones y
     parámetros para mantener funciones reduciendo costos». Medido en la puerta (octubre): productos reales ~0.21 USD

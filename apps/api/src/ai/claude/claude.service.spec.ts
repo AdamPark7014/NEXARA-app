@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ClaudeService, configuracionPensamiento, estimarUsd, usoDeRespuesta } from './claude.service.js';
+import { ClaudeService, configuracionPensamiento, estimarUsd, procesoParaPuerta, usoDeRespuesta } from './claude.service.js';
 
 function respuesta(texto: string, extra: Partial<Anthropic.Message> = {}): Anthropic.Message {
   return {
@@ -75,6 +75,20 @@ describe('ClaudeService', () => {
       output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object' } } },
     });
     expect(cuerpo).not.toHaveProperty('temperature');
+    // La puerta mide cada función por el encabezado x-proceso (no va en el cuerpo).
+    expect(create.mock.calls[0][1]).toMatchObject({ timeout: 60_000, headers: { 'x-proceso': 'prueba' } });
+    expect(cuerpo).not.toHaveProperty('proceso');
+  });
+
+  it('x-proceso queda en [a-z0-9-] y máximo 40 caracteres, como lo acepta la puerta', () => {
+    expect(procesoParaPuerta('asistente-actividades')).toBe('asistente-actividades');
+    expect(procesoParaPuerta('Reunión Minuta')).toBe('reunion-minuta');
+    expect(procesoParaPuerta('eval_acta / v2')).toBe('eval-acta-v2');
+    expect(procesoParaPuerta('')).toBe('sin-proceso');
+    expect(procesoParaPuerta('***')).toBe('sin-proceso');
+    const largo = procesoParaPuerta(`${'a'.repeat(39)}-b`);
+    expect(largo).toBe('a'.repeat(39));
+    expect(procesoParaPuerta('x'.repeat(60))).toHaveLength(40);
   });
 
   it('corta con un mensaje claro si la respuesta se truncó o se negó', async () => {
