@@ -1508,7 +1508,9 @@ Puente NAS · keystore Play · sitio público (canónica de producción) · `NO 
 - Credenciales nuevas SOLO en `C:\dev\secrets\nexara\credenciales-2026-10-23\` (Excel + un .txt por persona);
   lista del personal en `C:\dev\secrets\nexara\personal.json`; copia de los archivos filtrados en `...\historico\`.
 - Contraseña de la cuenta demo de revisión actualizada en App Store Connect (versión 1.0) y en
-  `C:\dev\secrets\nexara-store\`. **Falta en Play Console** (Contenido de la app › Acceso a la app): la cambia Adam.
+  `C:\dev\secrets\nexara-store\`. A pedido de Adam, las contraseñas son fáciles de recordar y al azar
+  («Palabra-Palabra-NN»); copia de la tabla en `C:\dev\secrets\PASSWORDS NEXARA.xlsx` (OneDrive\Documentos\SOFTWARE\
+  SECRETOS). **Falta en Play Console** (Contenido de la app › Acceso a la app): la cambia Adam.
 - El script ya no trae datos: lee `personal.json`, genera contraseñas aleatorias y escribe fuera del repo; `.gitignore`
   bloquea Excel/JSON de credenciales. El historial de git sigue teniendo lo filtrado (ya inservible): limpiarlo o hacer
   privado el repo es decisión de Adam.
