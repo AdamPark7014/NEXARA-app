@@ -1216,5 +1216,96 @@
         "fallos": []
       }
     ]
+  },
+  {
+    "fecha": "2026-10-23T14:30:15.751Z",
+    "etiqueta": "regla-nombres",
+    "config": {
+      "modelo": "claude-sonnet-5-5",
+      "esfuerzo": "low",
+      "pensar": true,
+      "maxTokens": 16000,
+      "timeoutMs": 300000
+    },
+    "resumen": [
+      {
+        "variante": "sC",
+        "casos": 2,
+        "puntaje": 0.875,
+        "juez": 4.165,
+        "acuerdos": 1,
+        "responsables": 0.875,
+        "fechas": 1,
+        "temas": 1,
+        "cifras": 1,
+        "inventos": 6,
+        "errores": 4,
+        "usdMedio": 0.0704
+      }
+    ],
+    "filas": [
+      {
+        "junta": "m4",
+        "minutos": 23,
+        "palabras": 3029,
+        "variante": "sC",
+        "fuente": "transcripcion",
+        "tramos": 0,
+        "notas": null,
+        "minuta": {
+          "entrada": 10850,
+          "salida": 4855,
+          "cacheLeida": 0,
+          "usd": 0.071955,
+          "llamadas": 1,
+          "ms": 29063
+        },
+        "usdTotal": 0.07196,
+        "usdJuez": 0.070074,
+        "puntaje": 0.85,
+        "acuerdos": 1,
+        "responsables": 0.75,
+        "fechas": 1,
+        "temas": 1,
+        "cifras": 1,
+        "seguimiento": null,
+        "inventos": 3,
+        "errores": 2,
+        "juez": 4,
+        "fallos": [
+          "E4 responsable: Alejandra Torres Vega"
+        ]
+      },
+      {
+        "junta": "m7",
+        "minutos": 33,
+        "palabras": 4452,
+        "variante": "sC",
+        "fuente": "transcripcion",
+        "tramos": 0,
+        "notas": null,
+        "minuta": {
+          "entrada": 14028,
+          "salida": 3915,
+          "cacheLeida": 0,
+          "usd": 0.068911,
+          "llamadas": 1,
+          "ms": 24502
+        },
+        "usdTotal": 0.06891,
+        "usdJuez": 0.081425,
+        "puntaje": 0.9,
+        "acuerdos": 1,
+        "responsables": 1,
+        "fechas": 1,
+        "temas": 1,
+        "cifras": 1,
+        "seguimiento": null,
+        "inventos": 3,
+        "errores": 2,
+        "juez": 4.33,
+        "fallos": []
+      }
+    ]
   }
 ]

@@ -223,7 +223,7 @@ const REGLAS_FIDELIDAD = `Fidelidad (lo más importante):
 
 const REGLAS_ACUERDOS = `Acuerdos: compromisos concretos de hacer algo.
 - Descripción en infinitivo y específica («Enviar a Grupo Tox la cotización de 12 cámaras»).
-- Responsable: el nombre tal como aparece en la lista de personas si coincide (también por apodo o nombre de pila: Beto = Roberto, Toño = Antonio); si es alguien de fuera, como lo dijeron; null si nadie lo tomó.
+- Responsable: el nombre tal como aparece en la lista de personas si es claramente la misma persona (mismo nombre de pila o un apodo conocido: Beto = Roberto, Toño = Antonio, Mafer = María Fernanda). Un nombre solo parecido no es la misma persona (Diana no es Daniela, Mario no es Marco): si en la lista no hay nadie con ese nombre, escríbelo como se dijo. null si nadie lo tomó.
 - Fecha en AAAA-MM-DD si se dijo un día o un plazo («el viernes», «en dos semanas», «mañana»), calculada desde la fecha de la reunión; si no, null.
 - Prioridad: alta si se dijo urgente, para hoy o crítico; baja si se dijo que puede esperar; si no, media.
 - Lo que quedó por hacer sin que nadie lo tomara va en pendientes, no en acuerdos (y nunca en los dos).`;

@@ -240,7 +240,10 @@
 .rec {
   display: grid;
   gap: 12px;
-  margin-bottom: 18px;
+  width: 100%;
+  max-width: none;
+  margin: 0 0 18px;
+  box-sizing: border-box;
   padding: 18px 20px;
   border: 1px solid var(--nx-panel-hairline, var(--border));
   border-left: 4px solid var(--danger);
@@ -379,7 +382,7 @@
 
 .marcaAcuerdo { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); }
 .marcaDecision { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
-.marcaPendiente { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--state-warning-text, var(--warning)); }
+.marcaPendiente { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); }
 .marcaRiesgo { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--state-danger-text, var(--danger)); }
 
 /* ── Minuta ───────────────────────────────────────────────────────── */
@@ -415,7 +418,8 @@
   transition: width 400ms ease;
 }
 
-.bloque { display: grid; gap: 8px; }
+/* Ancho explícito: algunos layouts dan reglas propias a `section`. */
+.bloque { display: grid; gap: 8px; width: 100%; max-width: none; margin: 0; justify-self: stretch; }
 
 .bloqueTitle { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
 
@@ -520,7 +524,7 @@
 
 .ep_cumplido { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
 .ep_en_proceso { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); }
-.ep_sin_avance { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--state-warning-text, var(--warning)); }
+.ep_sin_avance { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); }
 .ep_bloqueado { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--state-danger-text, var(--danger)); }
 
 .transcripcion {
