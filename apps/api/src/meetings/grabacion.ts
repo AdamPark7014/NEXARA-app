@@ -1,21 +1,20 @@
 /**
  * Grabación de reuniones con transcripción propia.
  *
- * La web graba la junta en partes de unos minutos (cada parte es un archivo de audio
- * completo) y las sube conforme salen. El API guarda cada parte en disco y la manda a la
- * cola; el trabajo la pasa por nuestro transcriptor (whisper) y deja el texto junto al audio.
- * El estado se lee del propio disco, sin tablas nuevas:
- *
- *   parte-0001.webm → en cola o transcribiéndose
- *   parte-0001.txt  → lista (el audio se borra, salvo GRABACION_CONSERVAR_AUDIO=1)
- *   parte-0001.err  → no se pudo transcribir
+ * La web graba la junta en partes de ~1 minuto (cada parte es un archivo de audio completo) y
+ * las sube conforme salen, con su posición en la grabación. El API guarda el audio en una
+ * carpeta privada solo hasta transcribirlo (whisper propio, en la cola) y lo borra: lo que queda
+ * es el texto de cada parte en `meeting_recording_parts`. Las notas por tramo y la minuta viven
+ * en `meeting_recordings` (ver `minuta-ia.ts`).
  */
-import { EXTENSIONES_AUDIO } from '../ai/voz/transcriptor.js';
 
-/** Cinco minutos por parte dan ~1000 partes antes de llenar 4 dígitos: de sobra. */
+/** Un minuto por parte: 3 horas son 180 partes. */
 export const MAX_PARTES = 9_999;
 
-/** Carpeta privada (nunca se sirve por `/uploads`) de una reunión. */
+/** Texto pegado: se parte en tramos de este tamaño para que se anote igual que una grabación. */
+export const PALABRAS_POR_PARTE_PEGADA = 700;
+
+/** Carpeta privada (nunca se sirve por `/uploads`) con el audio que espera transcripción. */
 export function carpetaGrabacion(companyId: number, meetingId: number): string {
   return `grabaciones-reuniones/${companyId}/${meetingId}`;
 }
@@ -24,52 +23,60 @@ export function nombreParte(parte: number, extension: string): string {
   return `parte-${String(parte).padStart(4, '0')}.${extension}`;
 }
 
-export type EstadoParte = 'pendiente' | 'lista' | 'error';
+/** Milisegundos enviados por la web: entero no negativo o null. */
+export function msValidos(valor: unknown, maximo: number): number | null {
+  if (valor === undefined || valor === null || valor === '') return null;
+  const n = Math.round(Number(valor));
+  return Number.isFinite(n) && n >= 0 && n <= maximo ? n : null;
+}
 
-export type ParteGrabacion = { parte: number; estado: EstadoParte; error?: string };
-
-const PATRON = /^parte-(\d{4})\.([a-z0-9]+)$/;
-
-/**
- * Estado de cada parte según los archivos de la carpeta. Si una parte tiene texto, está
- * lista aunque quede el audio (se conserva con GRABACION_CONSERVAR_AUDIO=1).
- */
-export function partesDesdeArchivos(archivos: string[]): ParteGrabacion[] {
-  const porParte = new Map<number, Set<string>>();
-  for (const nombre of archivos) {
-    const m = PATRON.exec(nombre);
-    if (!m) continue;
-    const ext = m[2];
-    if (ext !== 'txt' && ext !== 'err' && !EXTENSIONES_AUDIO.includes(ext)) continue;
-    const n = Number(m[1]);
-    if (!porParte.has(n)) porParte.set(n, new Set());
-    porParte.get(n)!.add(ext);
+/** Texto pegado → partes de ~700 palabras cortadas en fin de línea o de frase. */
+export function partirTexto(texto: string, porParte = PALABRAS_POR_PARTE_PEGADA): string[] {
+  const lineas = texto
+    .replace(/\r/g, '')
+    .split(/\n+|(?<=[.!?])\s+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const partes: string[] = [];
+  let actual: string[] = [];
+  let palabras = 0;
+  for (const linea of lineas) {
+    const n = linea.split(/\s+/).length;
+    if (palabras && palabras + n > porParte) {
+      partes.push(actual.join(' '));
+      actual = [];
+      palabras = 0;
+    }
+    actual.push(linea);
+    palabras += n;
   }
-  return [...porParte.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([parte, exts]) => ({
-      parte,
-      estado: exts.has('txt') ? 'lista' : exts.has('err') ? 'error' : 'pendiente',
-    }));
+  if (actual.length) partes.push(actual.join(' '));
+  return partes;
 }
 
-/** Texto completo de la junta: las partes en orden, separadas por un salto de línea. */
-export function unirTranscripcion(textos: Array<{ parte: number; texto: string }>): string {
-  return [...textos]
-    .sort((a, b) => a.parte - b.parte)
-    .map((t) => t.texto.trim())
-    .filter(Boolean)
-    .join('\n');
-}
+export type ResumenPartes = {
+  total: number;
+  listas: number;
+  pendientes: number;
+  conError: number;
+  /** Número de la última parte recibida (para seguir la numeración al retomar). */
+  ultima: number;
+  /** Tiempo grabado (suma de las partes). */
+  duracionMs: number;
+  palabras: number;
+};
 
-export function resumenGrabacion(partes: ParteGrabacion[]) {
-  const cuenta = (e: EstadoParte) => partes.filter((p) => p.estado === e).length;
+export function resumirPartes(
+  partes: Array<{ parte: number; estado: string; duracionMs: number | null; palabras: number }>,
+): ResumenPartes {
+  const cuenta = (e: string) => partes.filter((p) => p.estado === e).length;
   return {
     total: partes.length,
-    listas: cuenta('lista'),
-    pendientes: cuenta('pendiente'),
-    conError: cuenta('error'),
-    /** Todo lo subido ya pasó por el transcriptor (bien o con error). */
-    terminada: partes.length > 0 && cuenta('pendiente') === 0,
+    listas: cuenta('LISTA'),
+    pendientes: cuenta('PENDIENTE'),
+    conError: cuenta('ERROR'),
+    ultima: partes.reduce((m, p) => Math.max(m, p.parte), 0),
+    duracionMs: partes.reduce((s, p) => s + (p.duracionMs ?? 0), 0),
+    palabras: partes.reduce((s, p) => s + (p.palabras ?? 0), 0),
   };
 }

@@ -1,5 +1,32 @@
 # RELEVO
 
+- **23-10 ~00:00 (claude-code, R-1) — Reuniones automáticas: grabar con un botón, notas en vivo y minuta en PDF.**
+  - Adam (22-10): «le pulsas comenzar a grabar reunión y tiene que empezar a tomar todas las notas… en cuanto le
+    des que concluyó, genera un PDF completo que desglose por apartados… con el menor uso posible de tokens».
+  - Web `/erp/reuniones`: botón principal «Comenzar a grabar reunión» (pide el micrófono en el mismo toque, crea
+    la junta de hoy y graba). Panel en la página (`GrabarReunion.tsx`): «Grabando · 12:34», Pausar/Reanudar,
+    «Concluir reunión», partes de 1 min que se suben solas con reintento sin fin (3→30 s, `online`), aviso a las
+    2 h 50 y conclusión sola a las 3 h; notas en vivo (`NotasEnVivo.tsx`). En el detalle: asistentes editables,
+    minuta (`MinutaReunion.tsx`) con PDF, «Enviar a asistentes» (EmailService/SMTP), acuerdos propuestos con
+    responsable, fecha y prioridad (nada se crea solo), lecciones y riesgos sin marcar, seguimiento de la reunión
+    anterior, transcripción y notas por tramo; grabación abierta → «Seguir grabando» o «Concluir con lo grabado».
+    Pegar transcripción/notas va por el mismo camino (`POST :id/texto`).
+  - API `grabaciones-reuniones` (solo quien conduce): `POST :id/partes` (audio + inicioMs/duracionMs; el audio se
+    borra al transcribirse), `GET :id?notasDesde=n`, `POST :id/concluir|regenerar|texto|acuerdos|enviar`,
+    `GET :id/pdf|transcripcion`, `DELETE :id`. `GET /reuniones/:id/pdf` da la minuta si existe. Tablas nuevas
+    `meeting_recordings` y `meeting_recording_parts` (migración `20261023120000_grabacion_reuniones_minuta`).
+    Cola (BullMQ): transcribir parte → notas por tramo (candado en BD) → minuta al concluir.
+  - IA (`meetings/minuta-ia.ts`): notas cada ~4 min/250 palabras (o 1,500) con Haiku 5.5 low sin razonamiento y
+    sistema en caché (~US$0.0002/min); minuta con Sonnet 5.5 low sobre la transcripción completa (JSON con esquema;
+    `ANTHROPIC_MINUTA_MODEL` / `ANTHROPIC_NOTAS_MODEL` cambian modelo). PDF `minuta-pdf.ts` (estilo propuesta
+    técnica): portada, resumen, top 5, índice con páginas, temas, decisiones, tabla de acuerdos, pendientes,
+    riesgos, cifras, lecciones/próximos pasos, seguimiento y anexo con marcas de tiempo.
+  - Eval (`apps/api/scripts/eval-minutas`, 8 juntas sintéticas de 11–56 min, juez Opus 5.5): minuta Sonnet sobre
+    transcripción completa 0.88 / juez 4.33 vs sobre notas 0.77 / 3.93 (y más cara) vs Haiku completa 0.83 / 4.07.
+    Costo por junta: 30 min ≈ US$0.07, 60 ≈ 0.12, 90 ≈ 0.17. Gasto del eval US$3.47 de 4 (llave directa).
+  - Tomé los cambios de N-1 en `acta-ia.ts`/`acta-ia.service.ts` (CONFIG_ACTA, `peticionActa`): el endpoint
+    `reuniones/:id/acta-ia` queda pero la web ya no lo usa.
+
 - **23-10 ~00:10 (claude-code, N-1) — IA de NEXARA por la puerta única, modelo más barato medido con eval.**
   - Adam (22-10): «que llamen bien a la API con el modelo más barato que funcione perfectamente y acomoda
     las instrucciones… optimicemos el costo». Guía: `C:\dev\scripts\ai-os\IA-CLAUDE.md`.

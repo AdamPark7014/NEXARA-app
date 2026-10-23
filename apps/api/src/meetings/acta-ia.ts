@@ -77,10 +77,7 @@ export function bloquePersonasActa(personas: Array<{ nombre: string; puesto?: st
   return `Personas de la empresa:\n${personas.map((p) => `- ${p.nombre}${p.puesto ? ` (${p.puesto})` : ''}`).join('\n') || '- (ninguna)'}`;
 }
 
-export function mensajeActa(
-  reunion: { titulo: string; fecha: Date; agenda?: string | null; asistentes: string[] },
-  transcripcion: string,
-): string {
+export function mensajeActa(reunion: DatosReunion, transcripcion: string): string {
   // `fecha` es columna de día (medianoche UTC): se lee tal cual, sin zona.
   const fecha = reunion.fecha.toISOString().slice(0, 10);
   return [
@@ -94,6 +91,39 @@ export function mensajeActa(
   ]
     .filter((l) => l !== null)
     .join('\n');
+}
+
+/**
+ * Modelo y parámetros del acta, medidos con el eval (`src/ai/eval/`). El modelo se puede
+ * cambiar sin desplegar con `ANTHROPIC_ACTAS_MODEL`.
+ */
+export const CONFIG_ACTA = {
+  modelo: 'claude-sonnet-5-5',
+  esfuerzo: 'low' as const,
+  pensar: true,
+  // El API corta toda petición a los 120 s (APP_REQUEST_TIMEOUT_MS): el acta debe caber antes.
+  maxTokens: 8_000,
+  timeoutMs: 110_000,
+};
+
+export type DatosReunion = { titulo: string; fecha: Date; agenda?: string | null; asistentes: string[] };
+
+/** La petición completa a Claude (el servicio y el eval mandan exactamente lo mismo). */
+export function peticionActa(
+  reunion: DatosReunion,
+  personas: Array<{ nombre: string; puesto?: string | null }>,
+  transcripcion: string,
+) {
+  return {
+    sistema: [PROMPT_ACTA, bloquePersonasActa(personas)],
+    usuario: mensajeActa(reunion, transcripcion),
+    esquema: ESQUEMA_ACTA,
+    modelo: CONFIG_ACTA.modelo,
+    esfuerzo: CONFIG_ACTA.esfuerzo,
+    pensar: CONFIG_ACTA.pensar,
+    maxTokens: CONFIG_ACTA.maxTokens,
+    timeoutMs: CONFIG_ACTA.timeoutMs,
+  };
 }
 
 export type AcuerdoPropuesto = {

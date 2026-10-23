@@ -1,0 +1,40 @@
+{
+  "tope_usd": 4,
+  "movimientos": [
+    {
+      "fecha": "2026-10-23",
+      "concepto": "generar transcripciones (sonnet)",
+      "usd": 1.000784
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "notas (haiku)",
+      "usd": 0.033413
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "minuta hhN",
+      "usd": 0.027255
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "juez (opus)",
+      "usd": 1.303984
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "minuta hsN",
+      "usd": 0.517394
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "minuta sC",
+      "usd": 0.53319
+    },
+    {
+      "fecha": "2026-10-23",
+      "concepto": "minuta hC",
+      "usd": 0.055222
+    }
+  ]
+}

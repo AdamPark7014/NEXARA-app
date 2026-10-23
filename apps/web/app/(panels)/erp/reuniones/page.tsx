@@ -8,8 +8,9 @@
  * los acuerdos y las lecciones aprendidas no quedaban ligados a las actividades
  * de las que se hablaba.
  *
- * Quien conduce abre en **Reuniones**, con «Empezar reunión ahora»: un toque crea la junta,
- * graba, y al terminar la IA escribe el acta y cada acuerdo cae como actividad del responsable.
+ * Quien conduce abre en **Reuniones**, con «Comenzar a grabar reunión»: un toque crea la junta y
+ * graba; la IA toma notas mientras hablan y al «Concluir reunión» escribe la minuta completa (PDF)
+ * con los acuerdos listos para caer como actividades de sus responsables.
  * El resto del personal abre en **Mis acuerdos**: lo que le toca, no el archivo de juntas.
  */
 
@@ -46,6 +47,7 @@ import {
   listMeetings,
   listMyAgreements,
   listOverdueAgreements,
+  setAttendance,
   suggestedTypeForToday,
   todayInput,
   updateAgreement,
@@ -59,6 +61,8 @@ import {
 } from "@/lib/meetings-api";
 import PersonalCalendar from "@/components/calendar/PersonalCalendar";
 import ActaIA from "./ActaIA";
+import GrabarReunion, { type SesionGrabacion } from "./GrabarReunion";
+import { abrirMicrofono } from "@/lib/use-grabadora";
 import s from "./reuniones.module.css";
 
 type Tab = "mios" | "reuniones" | "agenda";
@@ -262,7 +266,7 @@ export default function ReunionesPage() {
   };
 
   const cerrarDetalle = () => {
-    setGrabarEn(null);
+    setEditandoAsistentes(null);
     setDetalleAbierto(false);
     setDetalle(null);
     setNuevoAcuerdo(acuerdoVacio);
@@ -316,27 +320,59 @@ export default function ReunionesPage() {
     }
   };
 
-  /** Un toque: crea la junta de hoy con la hora de ahora, la abre y empieza a grabar. */
+  /**
+   * «Comenzar a grabar reunión»: pide el micrófono en el mismo toque (Safari lo exige), crea la
+   * junta de hoy con la hora de ahora (título y asistentes se editan después) y graba. Con
+   * `existente`, graba (o retoma) esa reunión.
+   */
   const [empezando, setEmpezando] = useState(false);
-  const [grabarEn, setGrabarEn] = useState<number | null>(null);
-  const empezarAhora = async () => {
+  const [sesion, setSesion] = useState<SesionGrabacion | null>(null);
+  const comenzarGrabacion = async (existente?: { id: number; titulo: string; baseMs?: number; baseParte?: number }) => {
     if (!token || empezando) return;
+    if (sesion) {
+      toast.error("Ya hay una reunión grabándose: concluye esa primero.");
+      return;
+    }
     setEmpezando(true);
+    const { stream, error: errorMic } = await abrirMicrofono();
+    if (!stream) {
+      setEmpezando(false);
+      toast.error(errorMic ?? "No se pudo abrir el micrófono.");
+      return;
+    }
     try {
-      const creada = await createMeeting(token, {
-        tipo: suggestedTypeForToday(),
-        fecha: todayInput(),
-        horaInicio: horaAhora(),
-      });
-      setGrabarEn(creada.id);
+      const reunion =
+        existente ??
+        (await createMeeting(token, { tipo: suggestedTypeForToday(), fecha: todayInput(), horaInicio: horaAhora() }));
+      setSesion({ meetingId: reunion.id, titulo: reunion.titulo, stream, baseMs: existente?.baseMs, baseParte: existente?.baseParte });
+      cerrarDetalle();
       cambiarTab("reuniones");
       setVerLecciones(false);
-      await abrirDetalle(creada.id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       void cargar();
     } catch (e) {
+      stream.getTracks().forEach((t) => t.stop());
       toast.error(formatApiError(e, "No se pudo empezar la reunión."));
     } finally {
       setEmpezando(false);
+    }
+  };
+
+  // ── Asistentes (se pueden marcar después de empezar) ────────────────────
+
+  const [editandoAsistentes, setEditandoAsistentes] = useState<number[] | null>(null);
+  const [guardandoAsistentes, setGuardandoAsistentes] = useState(false);
+  const guardarAsistentes = async () => {
+    if (!token || !detalle || !editandoAsistentes) return;
+    setGuardandoAsistentes(true);
+    try {
+      await setAttendance(token, detalle.id, editandoAsistentes.map((userId) => ({ userId, asistio: true })));
+      setEditandoAsistentes(null);
+      await refrescarDetalle();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudieron guardar los asistentes."));
+    } finally {
+      setGuardandoAsistentes(false);
     }
   };
 
@@ -439,8 +475,8 @@ export default function ReunionesPage() {
           puedeConvocar ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setConvocando(true)}>Programar</Button>
-              <Button variant="primary" iconLeft="●" onClick={() => void empezarAhora()} loading={empezando}>
-                Empezar reunión ahora
+              <Button variant="primary" iconLeft="●" onClick={() => void comenzarGrabacion()} loading={empezando} disabled={Boolean(sesion)}>
+                Comenzar a grabar reunión
               </Button>
             </div>
           ) : null
@@ -455,6 +491,23 @@ export default function ReunionesPage() {
           action={<Button size="sm" variant="secondary" onClick={() => void cargar()}>Reintentar</Button>}
         />
       )}
+
+      {sesion ? (
+        <GrabarReunion
+          key={sesion.meetingId}
+          token={token}
+          sesion={sesion}
+          onConcluida={(id) => {
+            setSesion(null);
+            void cargar();
+            void abrirDetalle(id);
+          }}
+          onDescartar={() => {
+            setSesion(null);
+            void cargar();
+          }}
+        />
+      ) : null}
 
       {loaded && (
         <div className={s.metrics}>
@@ -590,11 +643,15 @@ export default function ReunionesPage() {
             <EmptyState
               icon="📅"
               title="Todavía no hay reuniones"
-              description={puedeConvocar ? "Toca «Empezar reunión ahora»: se graba y la IA escribe el acta." : "Aquí verás las juntas a las que te convoquen."}
+              description={
+                puedeConvocar
+                  ? "Toca «Comenzar a grabar reunión»: la IA toma notas mientras hablan y al concluir escribe la minuta en PDF."
+                  : "Aquí verás las juntas a las que te convoquen."
+              }
               action={
                 puedeConvocar ? (
-                  <Button variant="primary" onClick={() => void empezarAhora()} loading={empezando}>
-                    Empezar reunión ahora
+                  <Button variant="primary" onClick={() => void comenzarGrabacion()} loading={empezando} disabled={Boolean(sesion)}>
+                    Comenzar a grabar reunión
                   </Button>
                 ) : undefined
               }
@@ -765,15 +822,61 @@ export default function ReunionesPage() {
               </div>
             )}
 
-            {/* Grabar y el acta con IA: solo encargados de área (Adam, 12-10). */}
-            {puedeConvocar && detalle.estado !== "CANCELADA" && (
+            {puedeConvocar && (
+              <div>
+                <span className={s.fieldLabel}>
+                  Asistentes · {detalle.asistentes.length}{" "}
+                  {editandoAsistentes === null && personas.length > 0 ? (
+                    <Button size="xs" variant="link" onClick={() => setEditandoAsistentes(detalle.asistentes.map((a) => a.userId))}>
+                      {detalle.asistentes.length ? "Editar" : "Agregar"}
+                    </Button>
+                  ) : null}
+                </span>
+                {editandoAsistentes === null ? (
+                  <p className={s.hint} style={{ margin: 0 }}>
+                    {detalle.asistentes.length
+                      ? detalle.asistentes.map((a) => a.user?.nombre).filter(Boolean).join(" · ")
+                      : "Sin asistentes registrados. Agrégalos para enviarles la minuta."}
+                  </p>
+                ) : (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <div className={s.people}>
+                      {personas.map((p) => (
+                        <label key={p.id} className={s.person}>
+                          <input
+                            type="checkbox"
+                            checked={editandoAsistentes.includes(p.id)}
+                            onChange={(e) =>
+                              setEditandoAsistentes((prev) =>
+                                prev ? (e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id)) : prev,
+                              )
+                            }
+                          />
+                          {p.nombre}
+                        </label>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <Button size="sm" variant="primary" onClick={() => void guardarAsistentes()} loading={guardandoAsistentes}>
+                        Guardar asistentes
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => setEditandoAsistentes(null)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Grabar y la minuta con IA: solo encargados de área (Adam, 12-10). */}
+            {puedeConvocar && detalle.estado !== "CANCELADA" && sesion?.meetingId !== detalle.id && (
               <ActaIA
                 key={detalle.id}
                 token={token}
                 meetingId={detalle.id}
                 personas={personas}
-                puedeGuardar
-                grabarAlAbrir={grabarEn === detalle.id}
+                onGrabar={(base) => void comenzarGrabacion({ id: detalle.id, titulo: detalle.titulo, ...base })}
                 onGuardada={refrescarDetalle}
               />
             )}

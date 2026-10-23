@@ -7,12 +7,20 @@
 const dia = (d: Date | null | undefined): string | null =>
   d instanceof Date && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : null;
 
+/** Prioridad de la actividad: Alta, Media o Baja (Media si no se dijo). */
+export function prioridadActividad(valor?: string | null): 'Alta' | 'Media' | 'Baja' {
+  const v = String(valor ?? '').trim().toLowerCase();
+  return v === 'alta' ? 'Alta' : v === 'baja' ? 'Baja' : 'Media';
+}
+
 const recortar = (texto: string, max: number) => (texto.length > max ? `${texto.slice(0, max - 1).trimEnd()}…` : texto);
 
 export function actividadDeAcuerdo(
   acuerdo: { descripcion: string; responsableId: number | null; fechaCompromiso: Date | null },
   reunion: { titulo: string; fecha: Date },
   creadoPorId: number,
+  /** «alta» | «media» | «baja» (minuta con IA) o ya en forma de actividad («Alta»…). */
+  prioridad?: string | null,
 ): Record<string, unknown> {
   const descripcion = acuerdo.descripcion.trim();
   const diaReunion = dia(reunion.fecha);
@@ -30,7 +38,7 @@ export function actividadDeAcuerdo(
     responsableId: acuerdo.responsableId,
     creadoPorId,
     estatus: 'Pendiente',
-    prioridad: 'Media',
+    prioridad: prioridadActividad(prioridad),
     coreKind: 'tarea',
     activityType: 'INTERNAL',
     ticketType: 'OTRO',

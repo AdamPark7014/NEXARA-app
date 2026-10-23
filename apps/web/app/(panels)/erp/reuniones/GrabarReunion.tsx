@@ -1,108 +1,184 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
-import { useGrabadora } from "@/lib/use-grabadora";
+import { useGrabadora, type MetaParte } from "@/lib/use-grabadora";
+import { duracionLegible } from "@/lib/voz-api";
 import {
-  borrarGrabacion,
-  duracionLegible,
+  concluirGrabacion,
   estadoGrabacion,
-  subirParteGrabacion,
-  vozPropiaDisponible,
-  type EstadoGrabacion,
-} from "@/lib/voz-api";
+  juntarNotas,
+  subirParte,
+  type GrabacionExistente,
+  type NotasGuardadas,
+} from "@/lib/grabacion-api";
+import NotasEnVivo from "./NotasEnVivo";
 import s from "./reuniones.module.css";
 
-/** Cada parte dura 5 minutos: si algo falla, se pierde a lo mucho eso. */
-const PARTE_MS = 5 * 60_000;
-const CONSULTA_MS = 8_000;
+/** Un minuto por parte: si algo falla, se pierde a lo mucho eso. */
+const PARTE_MS = 60_000;
+/** Tres horas de junta como máximo; aviso 10 minutos antes. */
+const MAX_MS = 3 * 60 * 60_000;
+const AVISO_MS = MAX_MS - 10 * 60_000;
+const CONSULTA_MS = 10_000;
 
-type Pendiente = { parte: number; audio: Blob };
+type Pendiente = { parte: number; meta: MetaParte; audio: Blob };
+
+export type SesionGrabacion = {
+  meetingId: number;
+  titulo: string;
+  /** Micrófono abierto en el mismo toque del botón. */
+  stream?: MediaStream | null;
+  /** Al retomar: lo ya grabado y la última parte subida. */
+  baseMs?: number;
+  baseParte?: number;
+};
 
 /**
- * «Grabar reunión»: el navegador graba la junta y sube una parte cada 5 minutos; nuestro
- * transcriptor la pasa a texto en el servidor mientras la junta sigue. Al terminar, el
- * texto completo se entrega con `onTranscripcion` para generar el acta.
+ * La junta en curso: «Grabando · 12:34», pausa y «Concluir reunión». Cada minuto sube una parte
+ * (con reintento si se cae la red; lo subido no se pierde aunque se cierre la pestaña) y las
+ * notas que la IA toma por tramos van apareciendo. Al concluir, el servidor escribe la minuta.
  */
 export default function GrabarReunion({
   token,
-  meetingId,
-  autoIniciar = false,
-  onTranscripcion,
+  sesion,
+  onConcluida,
+  onDescartar,
 }: {
   token: string;
-  meetingId: number;
-  /** Arranca a grabar en cuanto el transcriptor responde («Empezar reunión ahora»). */
-  autoIniciar?: boolean;
-  onTranscripcion: (texto: string) => void;
+  sesion: SesionGrabacion;
+  /** La minuta se está escribiendo (o ya está): se abre la reunión. */
+  onConcluida: (meetingId: number) => void;
+  /** Se detuvo sin concluir (lo subido queda guardado). */
+  onDescartar: () => void;
 }) {
-  const [disponible, setDisponible] = useState(false);
-  const [estado, setEstado] = useState<EstadoGrabacion | null>(null);
-  const [enviando, setEnviando] = useState(0);
-  const [sinEnviar, setSinEnviar] = useState<Pendiente[]>([]);
+  const { meetingId } = sesion;
+  const [estado, setEstado] = useState<GrabacionExistente | null>(null);
+  const [notas, setNotas] = useState<NotasGuardadas[]>([]);
+  const [enCola, setEnCola] = useState(0);
+  const [sinRed, setSinRed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [entregada, setEntregada] = useState(false);
-  const cola = useRef<Promise<void>>(Promise.resolve());
-  const callback = useRef(onTranscripcion);
-  callback.current = onTranscripcion;
+  const [concluyendo, setConcluyendo] = useState(false);
+  const cola = useRef<Pendiente[]>([]);
+  const trabajando = useRef(false);
+  const despertar = useRef<() => void>(() => undefined);
+  const notasRef = useRef<NotasGuardadas[]>([]);
+  notasRef.current = notas;
 
-  const refrescar = useCallback(async () => {
-    try {
-      setEstado(await estadoGrabacion(token, meetingId));
-    } catch {
-      /* se reintenta en la siguiente consulta */
+  /** Sube las partes en orden; si falla la red, reintenta sola (3 s, 6 s… hasta 30 s). */
+  const procesarCola = useCallback(async () => {
+    if (trabajando.current) return;
+    trabajando.current = true;
+    let espera = 3_000;
+    while (cola.current.length) {
+      const p = cola.current[0];
+      try {
+        await subirParte(token, meetingId, p.parte, p.meta, p.audio);
+        cola.current.shift();
+        setEnCola(cola.current.length);
+        setSinRed(false);
+        espera = 3_000;
+      } catch (e) {
+        const status = (e as { status?: number }).status ?? 0;
+        if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
+          // El servidor rechazó la parte (p. ej. ya concluyó): no tiene caso reintentar.
+          cola.current.shift();
+          setEnCola(cola.current.length);
+          setError(e instanceof Error ? e.message : "El servidor rechazó una parte de la grabación.");
+          continue;
+        }
+        setSinRed(true);
+        await new Promise<void>((resolve) => {
+          const t = window.setTimeout(resolve, espera);
+          despertar.current = () => {
+            window.clearTimeout(t);
+            resolve();
+          };
+        });
+        espera = Math.min(espera * 2, 30_000);
+      }
     }
+    trabajando.current = false;
   }, [token, meetingId]);
 
   useEffect(() => {
-    let vivo = true;
-    vozPropiaDisponible(token).then((ok) => {
-      if (!vivo || !ok) return;
-      setDisponible(true);
-      void refrescar();
-    });
-    return () => {
-      vivo = false;
-    };
-  }, [token, refrescar]);
+    const alVolver = () => despertar.current();
+    window.addEventListener("online", alVolver);
+    return () => window.removeEventListener("online", alVolver);
+  }, []);
 
-  /** Sube una parte; las partes van en fila para no saturar la conexión del celular. */
-  const enviar = useCallback(
-    (p: Pendiente) => {
-      setEnviando((n) => n + 1);
-      cola.current = cola.current.then(async () => {
-        for (let intento = 1; intento <= 3; intento++) {
-          try {
-            setEstado(await subirParteGrabacion(token, meetingId, p.parte, p.audio));
-            setSinEnviar((l) => l.filter((x) => x.parte !== p.parte));
-            setEnviando((n) => n - 1);
-            return;
-          } catch (e) {
-            if (intento === 3) {
-              setSinEnviar((l) => [...l.filter((x) => x.parte !== p.parte), p]);
-              setError(e instanceof Error ? e.message : "No se pudo enviar una parte de la grabación.");
-              setEnviando((n) => n - 1);
-              return;
-            }
-            await new Promise((r) => setTimeout(r, intento * 3_000));
-          }
-        }
-      });
+  const encolar = useCallback(
+    (audio: Blob, parte: number, meta: MetaParte) => {
+      cola.current.push({ parte, meta, audio });
+      setEnCola(cola.current.length);
+      void procesarCola();
     },
-    [token, meetingId],
+    [procesarCola],
   );
 
-  const base = useRef(0);
+  const concluir = useCallback(async () => {
+    setConcluyendo(true);
+    setError(null);
+    grabadora.detener();
+    // La última parte sale al detener (MediaRecorder la entrega en unos milisegundos).
+    await new Promise((r) => window.setTimeout(r, 1_200));
+    while (cola.current.length || trabajando.current) {
+      despertar.current();
+      await new Promise((r) => window.setTimeout(r, 500));
+    }
+    try {
+      await concluirGrabacion(token, meetingId);
+      onConcluida(meetingId);
+    } catch (e) {
+      setConcluyendo(false);
+      setError(e instanceof Error ? e.message : "No se pudo concluir la reunión. Intenta de nuevo.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, meetingId, onConcluida]);
+
+  const concluirRef = useRef(concluir);
+  concluirRef.current = concluir;
+
   const grabadora = useGrabadora({
     parteMs: PARTE_MS,
-    // Si ya había partes (se recargó la página), la numeración sigue después de ellas.
-    onParte: (audio, n) => enviar({ parte: (base.current || 0) + n, audio }),
+    maxMs: MAX_MS,
+    onParte: encolar,
+    onLimite: () => void concluirRef.current(),
   });
 
+  // Arranca en cuanto se monta, con el micrófono que ya se pidió en el toque del botón.
+  const arrancada = useRef(false);
+  useEffect(() => {
+    if (arrancada.current || !grabadora.soportado) return;
+    arrancada.current = true;
+    void grabadora.iniciar({ stream: sesion.stream, baseMs: sesion.baseMs, baseParte: sesion.baseParte });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grabadora.soportado]);
+
+  // Estado y notas nuevas cada 10 s mientras se graba.
+  useEffect(() => {
+    let vivo = true;
+    const consultar = async () => {
+      try {
+        const r = await estadoGrabacion(token, meetingId, notasRef.current.length);
+        if (!vivo || !r.existe) return;
+        setEstado(r);
+        if (r.notas.length) setNotas((prev) => juntarNotas(prev, r.notas, r.notasDesde));
+      } catch {
+        /* sin red: la siguiente consulta lo intenta */
+      }
+    };
+    void consultar();
+    const t = window.setInterval(() => void consultar(), CONSULTA_MS);
+    return () => {
+      vivo = false;
+      window.clearInterval(t);
+    };
+  }, [token, meetingId]);
+
   // Mientras se graba o falta subir algo, cerrar la pestaña pide confirmación.
-  const ocupado = grabadora.grabando || enviando > 0 || sinEnviar.length > 0;
+  const ocupado = grabadora.grabando || enCola > 0 || concluyendo;
   useEffect(() => {
     if (!ocupado) return;
     const avisar = (e: BeforeUnloadEvent) => {
@@ -113,127 +189,81 @@ export default function GrabarReunion({
     return () => window.removeEventListener("beforeunload", avisar);
   }, [ocupado]);
 
-  // Al terminar de grabar, se consulta hasta que todas las partes estén transcritas.
-  const esperando = !grabadora.grabando && Boolean(estado && estado.total > 0 && !estado.terminada);
-  useEffect(() => {
-    if (!esperando && !grabadora.grabando) return;
-    const t = window.setInterval(() => void refrescar(), CONSULTA_MS);
-    return () => window.clearInterval(t);
-  }, [esperando, grabadora.grabando, refrescar]);
-
-  // Transcripción completa y ya nada por subir: pasa sola al acta (una vez por grabación).
-  useEffect(() => {
-    if (entregada || grabadora.grabando || enviando > 0) return;
-    if (estado?.terminada && estado.texto.trim()) {
-      setEntregada(true);
-      callback.current(estado.texto);
-    }
-  }, [estado, entregada, grabadora.grabando, enviando]);
-
-  const iniciar = async () => {
-    setError(null);
-    setEntregada(false);
-    base.current = estado?.partes.length ? Math.max(...estado.partes.map((p) => p.parte)) : 0;
-    await grabadora.iniciar();
+  const descartar = () => {
+    if (!window.confirm("¿Detener la grabación sin concluir? Lo grabado se queda guardado y puedes concluirla después desde la reunión.")) return;
+    grabadora.detener();
+    onDescartar();
   };
 
-  // Una sola vez por montaje: si la persona la detiene, no vuelve a arrancar sola.
-  const autoArrancada = useRef(false);
-  useEffect(() => {
-    if (!autoIniciar || autoArrancada.current || !disponible || !grabadora.soportado || grabadora.grabando) return;
-    autoArrancada.current = true;
-    void iniciar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoIniciar, disponible, grabadora.soportado]);
+  if (!grabadora.soportado) {
+    return <InlineAlert variant="warning" message="Este navegador no puede grabar audio. Usa Chrome, Edge o Safari actualizados." />;
+  }
 
-  if (!disponible || !grabadora.soportado) return null;
-
-  const borrar = async () => {
-    if (!window.confirm("¿Borrar el audio y la transcripción de esta reunión? El acta guardada no se toca.")) return;
-    try {
-      await borrarGrabacion(token, meetingId);
-      setSinEnviar([]);
-      setEntregada(false);
-      await refrescar();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo borrar la grabación.");
-    }
-  };
-
-  const total = estado?.total ?? 0;
+  const minutos = Math.floor(grabadora.transcurrido / 60_000);
+  const enTexto = estado?.listas ?? 0;
+  const etiqueta = concluyendo ? "Concluyendo" : grabadora.pausado ? "En pausa" : grabadora.grabando ? "Grabando" : "Detenida";
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        {grabadora.grabando ? (
-          <>
-            <Button size="sm" variant="danger" onClick={grabadora.detener}>
-              Detener grabación
-            </Button>
-            <span className={s.hint} style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: 4 }} aria-live="polite">
-              <FiberManualRecordIcon fontSize="inherit" style={{ color: "var(--danger)" }} aria-hidden />
-              Grabando {duracionLegible(grabadora.transcurrido)}
-              {total ? ` · ${estado?.listas ?? 0} de ${total} partes ya en texto` : ""}
-            </span>
-          </>
-        ) : (
-          <Button size="sm" variant="secondary" onClick={() => void iniciar()}>
-            {total ? "Seguir grabando" : "Grabar reunión"}
+    <section className={s.rec} aria-label="Grabación de la reunión en curso">
+      <div className={s.recHead}>
+        <div className={s.recStatus}>
+          <span
+            className={`${s.recDot} ${grabadora.grabando && !grabadora.pausado && !concluyendo ? s.recDotLive : ""}`}
+            aria-hidden="true"
+          />
+          <div style={{ minWidth: 0 }}>
+            <p className={s.recLabel} aria-live="polite">
+              {etiqueta} · <span className={s.recClock}>{duracionLegible(grabadora.transcurrido)}</span>
+            </p>
+            <p className={s.recTitle}>{sesion.titulo}</p>
+          </div>
+        </div>
+        <div className={s.recActions}>
+          {grabadora.grabando && !concluyendo ? (
+            grabadora.pausado ? (
+              <Button variant="secondary" onClick={grabadora.reanudar}>Reanudar</Button>
+            ) : (
+              <Button variant="secondary" onClick={grabadora.pausar}>Pausar</Button>
+            )
+          ) : null}
+          <Button variant="danger" size="lg" onClick={() => void concluir()} loading={concluyendo} disabled={concluyendo}>
+            Concluir reunión
           </Button>
-        )}
-        {!grabadora.grabando && total > 0 ? (
-          <Button size="sm" variant="ghost" onClick={() => void borrar()} disabled={enviando > 0}>
-            Borrar grabación
-          </Button>
-        ) : null}
+        </div>
       </div>
 
-      {!grabadora.grabando && total === 0 ? (
-        <p className={s.hint} style={{ margin: 0 }}>
-          Deja esta pantalla abierta cerca de quien habla. La voz se pasa a texto en nuestro servidor, sin servicios externos.
-        </p>
-      ) : null}
-      {enviando > 0 ? <p className={s.hint} style={{ margin: 0 }}>Enviando audio… ({enviando})</p> : null}
-      {esperando ? (
-        <p className={s.hint} style={{ margin: 0 }} aria-live="polite">
-          Pasando a texto: {estado?.listas ?? 0} de {total} partes. Puedes seguir en otra cosa; aquí aparecerá.
-        </p>
-      ) : null}
-      {estado?.terminada && entregada ? (
-        <p className={s.hint} style={{ margin: 0 }}>
-          Transcripción lista ({duracionLegible(total * PARTE_MS)} aprox.). Ya está en el cuadro del acta.
-        </p>
-      ) : null}
-      {estado?.terminada && !entregada && estado.texto.trim() && !grabadora.grabando ? (
-        <div>
-          <Button size="sm" variant="secondary" onClick={() => { setEntregada(true); onTranscripcion(estado.texto); }}>
-            Usar la transcripción en el acta
-          </Button>
-        </div>
-      ) : null}
-      {estado && estado.conError > 0 ? (
+      <p className={s.recMeta}>
+        {concluyendo
+          ? enCola
+            ? `Subiendo lo último de la grabación (${enCola} ${enCola === 1 ? "parte" : "partes"})…`
+            : "Guardando la grabación para escribir la minuta…"
+          : `${minutos} ${minutos === 1 ? "minuto grabado" : "minutos grabados"} · ${enTexto} ya en texto · las notas se toman cada ~4 minutos`}
+        {!concluyendo && enCola > 1 ? ` · ${enCola} partes por subir` : ""}
+      </p>
+
+      {sinRed ? (
         <InlineAlert
           variant="warning"
-          message={`${estado.conError === 1 ? "Una parte no se pudo" : `${estado.conError} partes no se pudieron`} pasar a texto; el resto sí.`}
+          message={`Sin conexión con el servidor: ${enCola} ${enCola === 1 ? "parte espera" : "partes esperan"} y se suben solas al volver la red. No cierres esta pestaña.`}
         />
       ) : null}
-      {sinEnviar.length ? (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <InlineAlert variant="danger" message={error ?? "Hay audio sin enviar."} />
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              setError(null);
-              sinEnviar.forEach(enviar);
-            }}
-          >
-            Reintentar envío ({sinEnviar.length})
+      {grabadora.transcurrido >= AVISO_MS && !concluyendo ? (
+        <InlineAlert variant="warning" message="Faltan menos de 10 minutos para el máximo de 3 horas: al llegar, la reunión se concluye sola." />
+      ) : null}
+      {error || grabadora.error ? <InlineAlert variant="danger" message={(grabadora.error ?? error) as string} /> : null}
+
+      <NotasEnVivo notas={notas} grabando={grabadora.grabando && !concluyendo} />
+
+      {!concluyendo ? (
+        <div className={s.recFoot}>
+          <p className={s.hint} style={{ margin: 0 }}>
+            Deja esta pantalla abierta cerca de quien habla. La voz se pasa a texto en nuestro servidor y el audio se borra en cuanto se transcribe.
+          </p>
+          <Button size="sm" variant="ghost" onClick={descartar}>
+            Detener sin concluir
           </Button>
         </div>
-      ) : error || grabadora.error ? (
-        <InlineAlert variant="danger" message={(grabadora.error ?? error) as string} />
       ) : null}
-    </div>
+    </section>
   );
 }
