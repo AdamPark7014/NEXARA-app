@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
 import { Tag } from "@/components/ui/DataTable";
@@ -70,34 +68,30 @@ export default function VehiculoDetallePage() {
     </Button>
   );
 
+  const viajes = datos?.historial.length ?? 0;
+
   return (
     <div className={styles.wrap}>
-      <PageHeader
-        eyebrow={<Link href={VEHICULOS_PATH} className={styles.migas}>← Flotilla</Link>}
-        title={vehiculo?.nombre || (primeraCarga ? "Cargando…" : "Vehículo")}
-        subtitle={vehiculo?.placas || undefined}
-        density="ops"
-        meta={
-          vehiculo ? (
-            <>
-              <Tag variant={vehiculo.disponible ? "positive" : estado.variante} dot>
-                {vehiculo.disponible ? "Disponible" : estado.texto}
-              </Tag>
-              {vehiculo.conductor && <Tag variant="accent">{vehiculo.conductor.nombre}</Tag>}
-              {vehiculo.tieneRastreador && (
-                <Tag variant="neutral">{vehiculo.gpsProveedor || "Con GPS"}</Tag>
-              )}
-            </>
-          ) : undefined
-        }
-        actions={
-          <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
-            {cargando && datos ? "Actualizando…" : "Actualizar"}
-          </Button>
-        }
-      />
+      <Link href={VEHICULOS_PATH} className={styles.volver}>
+        ‹ Vehículos
+      </Link>
+      <h1 className={styles.titulo}>{vehiculo?.nombre || (primeraCarga ? "Cargando…" : "Vehículo")}</h1>
+      {vehiculo ? (
+        <div className={styles.lineas}>
+          <span className={styles.linea}>{vehiculo.placas || "Sin placas"}</span>
+          <span className={styles.linea}>
+            <Tag variant={vehiculo.disponible ? "positive" : estado.variante} dot>
+              {vehiculo.disponible ? "Disponible" : estado.texto}
+            </Tag>
+          </span>
+          {vehiculo.conductor ? <span className={styles.linea}>{vehiculo.conductor.nombre}</span> : null}
+          {vehiculo.tieneRastreador ? (
+            <span className={styles.linea}>{vehiculo.gpsProveedor || "Con GPS"}</span>
+          ) : null}
+        </div>
+      ) : null}
 
-      {error && datos && <InlineAlert message={error} variant="warning" action={reintentar} />}
+      {error ? <InlineAlert message={error} variant={datos ? "warning" : "danger"} action={reintentar} /> : null}
 
       {primeraCarga && (
         <Section title="Estado" dense>
@@ -117,23 +111,9 @@ export default function VehiculoDetallePage() {
         </Section>
       )}
 
-      <Section title={!datos ? "Historial" : `Historial · ${datos.historial.length} viajes`}>
+      <Section title="Historial">
         {primeraCarga && <SkeletonRows rows={3} label="Cargando historial" />}
-        {!cargando && error && !datos && (
-          <EmptyState
-            title="No se pudo cargar el vehículo"
-            description={error}
-            variant="compact"
-            action={reintentar}
-          />
-        )}
-        {datos && datos.historial.length === 0 && (
-          <EmptyState
-            title="Sin viajes"
-            description="Cuando alguien registre una salida, aquí verás el recorrido y sus fotos."
-            variant="compact"
-          />
-        )}
+        {datos && datos.historial.length === 0 ? <p className={styles.frase}>Todavía no hay viajes registrados.</p> : null}
         {datos && datos.historial.length > 0 && (
           <div style={{ display: "grid", gap: 12 }}>
             {datos.historial.map((viaje) => (
@@ -141,6 +121,11 @@ export default function VehiculoDetallePage() {
             ))}
           </div>
         )}
+        {datos ? (
+          <p className={styles.pie}>
+            {viajes} {viajes === 1 ? "viaje" : "viajes"}
+          </p>
+        ) : null}
       </Section>
 
       <Modal
@@ -185,15 +170,14 @@ function Viaje({
   const estado = etiquetaEstatus(viaje.estatus);
   return (
     <article className={styles.viaje}>
-      <div className={styles.viajeTop}>
-        <div className={styles.filaVehiculo}>
-          <span className={styles.nombre}>{viaje.conductor?.nombre ?? "Sin conductor"}</span>
-          <span className={styles.mini}>
-            {formatoFecha(viaje.inicio)} → {formatoFecha(viaje.fin)}
-            {viaje.actividad ? ` · ${viaje.actividad}` : ""}
-          </span>
-        </div>
-        <Tag variant={estado.variante}>{estado.texto}</Tag>
+      <div className={styles.lineas}>
+        <span className={styles.lineaNombre}>{viaje.conductor?.nombre ?? "Sin conductor"}</span>
+        <span className={styles.linea}>{formatoFecha(viaje.inicio)}</span>
+        {viaje.fin ? <span className={styles.linea}>{formatoFecha(viaje.fin)}</span> : null}
+        {viaje.actividad ? <span className={styles.linea}>{viaje.actividad}</span> : null}
+        <span className={styles.linea}>
+          <Tag variant={estado.variante}>{estado.texto}</Tag>
+        </span>
       </div>
 
       <div className={styles.datos}>

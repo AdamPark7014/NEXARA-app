@@ -76,7 +76,8 @@ describe("ficha del vehículo", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<VehiculoDetallePage />);
 
-    expect(await screen.findByText("Historial · 1 viajes")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "‹ Vehículos" })).toBeInTheDocument();
+    expect(screen.getByText("1 viaje")).toBeInTheDocument();
     expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("vehicles/flotilla/3");
     expect(screen.getByText("120,345 km")).toBeInTheDocument();
     expect(screen.getByText(/AN-2026-014/)).toBeInTheDocument();

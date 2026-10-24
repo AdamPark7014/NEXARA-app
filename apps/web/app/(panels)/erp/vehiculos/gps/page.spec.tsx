@@ -81,8 +81,8 @@ describe("GPS de la flotilla", () => {
     const fetchMock = stubFetch();
     render(<VehiculosGpsPage />);
 
-    expect(screen.getByText("Solo Dirección General")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Volver a Vehículos" })).toBeInTheDocument();
+    expect(screen.getByText("Solo Dirección General puede ver el GPS.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "‹ Vehículos" })).toBeInTheDocument();
     // Ni mapa ni lista lateral.
     expect(screen.queryByLabelText("Día del recorrido")).not.toBeInTheDocument();
 

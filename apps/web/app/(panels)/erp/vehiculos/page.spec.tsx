@@ -100,16 +100,10 @@ describe("flotilla en Core", () => {
     expect(screen.getByText("sin placas")).toBeInTheDocument();
     expect(screen.getByText("Beto Ruiz")).toBeInTheDocument();
     expect(screen.getByText("120,345 km")).toBeInTheDocument();
-
-    // «En uso» sale dos veces: como KPI y como píldora del renglón.
-    const kpi = (etiqueta: string) =>
-      screen
-        .getAllByText(etiqueta)
-        .map((el) => el.closest("article"))
-        .find(Boolean)!;
-    expect(kpi("Vehículos")).toHaveTextContent("2");
-    expect(kpi("Disponibles")).toHaveTextContent("1");
-    expect(kpi("En uso")).toHaveTextContent("1");
+    expect(screen.getByRole("heading", { name: "Vehículos" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Libres/ })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /Ocupados/ })).toHaveTextContent("1");
+    expect(screen.getByText("2 vehículos")).toBeInTheDocument();
   });
 
   it("el renglón lleva a la ficha del vehículo", async () => {

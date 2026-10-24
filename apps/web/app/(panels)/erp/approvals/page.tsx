@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import PageChrome from "@/components/ui/PageChrome";
 import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
-import MetricStrip from "@/components/ui/MetricStrip";
 import Modal from "@/components/ui/Modal";
+import {
+  FilterChip,
+  FilterChips,
+  ListFooter,
+  ModulePage,
+  ModuleToolbar,
+  SearchInput,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
-import { getApprovalsSectionConfig } from "@/lib/section-views";
-import FilterToolbar from "@/components/FilterToolbar";
-import { exportToExcel } from "@/lib/export-excel";
 import { formatApiError } from "@/lib/erp-api";
 import {
   listMyPendingApprovals,
@@ -154,7 +156,6 @@ function ApprovalChain({ pasos }: { pasos: ApprovalChainStep[] }) {
 export default function ApprovalsPage() {
   const { user } = useUser();
   const token = user?.token;
-  const cfg = useMemo(() => getApprovalsSectionConfig(user), [user]);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const highlightRef = useRef<HTMLElement | null>(null);
   const [filter, setFilter] = useState<Filtro>("all");
@@ -291,183 +292,142 @@ export default function ApprovalsPage() {
   const showSkeleton = loading && data === null;
   const hasFilters = filter !== "all" || searchQ.trim() !== "";
 
+  const quitarFiltros = () => {
+    setSearchQ("");
+    setFilter("all");
+  };
+
+  const fraseVacia = !token
+    ? "Inicia sesión para ver tus aprobaciones."
+    : hasFilters
+      ? "Ninguna solicitud coincide con estos filtros."
+      : "No hay solicitudes por aprobar.";
+
   return (
-    <PageChrome
-      eyebrow="Hoy"
-      title={cfg.title}
-      subtitle={cfg.subtitle}
-      secondaryActions={
-        <Button variant="ghost" iconLeft="↻" onClick={() => void fetchPending()} loading={loading && data !== null} disabled={loading}>
-          Actualizar
-        </Button>
+    <>
+    <ModulePage
+      className={s.page}
+      title="Aprobaciones"
+      before={
+        <>
+          {error ? (
+            <InlineAlert
+              variant={data ? "warning" : "danger"}
+              message={error}
+              action={<Button size="sm" variant="secondary" onClick={() => void fetchPending()}>Reintentar</Button>}
+            />
+          ) : null}
+          {decideError && !rejectTarget ? (
+            <InlineAlert variant="danger" message={decideError} onDismiss={() => setDecideError(null)} />
+          ) : null}
+          {notice ? <InlineAlert variant="success" message={notice} onDismiss={() => setNotice(null)} /> : null}
+        </>
       }
-      filters={
-        <FilterToolbar
-          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título, folio o solicitante…" }}
-          onClear={() => {
-            setSearchQ("");
-            setFilter("all");
-          }}
-          resultCount={showSkeleton ? null : list.length}
-          rightActions={
-            list.length > 0 ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                iconLeft="⬇"
-                onClick={() =>
-                  exportToExcel(list, [
-                    { key: "type", label: "Tipo" },
-                    { key: "titulo", label: "Solicitud" },
-                    { key: "folio", label: "Folio" },
-                    { key: "monto", label: "Importe" },
-                    { key: "moneda", label: "Moneda" },
-                    { key: "solicita", label: "Solicita" },
-                    { key: "prioridad", label: "Prioridad" },
-                    { key: "fechaSolicitud", label: "Fecha" },
-                  ], "aprobaciones-pendientes")
-                }
-              >
-                Excel
+      listLabel="Solicitudes por aprobar"
+      toolbar={
+        <ModuleToolbar
+          search={
+            <SearchInput
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Tipo, título, folio o quien solicita"
+              aria-label="Buscar aprobaciones"
+            />
+          }
+          chips={
+            <FilterChips ariaLabel="Filtrar por prioridad">
+              {FILTERS.map((f) => (
+                <FilterChip key={f.key} active={filter === f.key} count={counts[f.key]} onClick={() => setFilter(f.key)}>
+                  {f.label}
+                </FilterChip>
+              ))}
+            </FilterChips>
+          }
+          end={
+            hasFilters ? (
+              <Button size="sm" variant="ghost" onClick={quitarFiltros}>
+                Quitar filtros
               </Button>
-            ) : undefined
+            ) : null
           }
         />
       }
+      loading={showSkeleton}
+      loadingRows={4}
+      empty={!showSkeleton && list.length === 0 && !error}
+      emptyState={{
+        title: fraseVacia,
+        action: hasFilters ? (
+          <Button size="sm" variant="secondary" onClick={quitarFiltros}>
+            Quitar filtros
+          </Button>
+        ) : undefined,
+      }}
+      footer={
+        !showSkeleton && list.length > 0 ? (
+          <ListFooter total={list.length} unit={list.length === 1 ? "solicitud" : "solicitudes"} />
+        ) : undefined
+      }
     >
-      {error && (
-        <InlineAlert
-          variant={data ? "warning" : "danger"}
-          message={data ? `No pudimos actualizar la bandeja; mostramos la última versión. ${error}` : error}
-          action={<Button size="sm" variant="secondary" onClick={() => void fetchPending()}>Reintentar</Button>}
-        />
-      )}
-      {decideError && !rejectTarget && (
-        <InlineAlert variant="danger" message={decideError} onDismiss={() => setDecideError(null)} />
-      )}
-      {notice && <InlineAlert variant="success" message={notice} onDismiss={() => setNotice(null)} />}
-
-      {!showSkeleton && data && (
-        <div style={{ marginBottom: 14 }}>
-          <MetricStrip
-            ariaLabel="Resumen de la bandeja"
-            metrics={[
-              { label: "pendientes", value: counts.all, hint: counts.all === 0 ? "bandeja al día" : "esperan tu decisión", tone: counts.all > 0 ? "warning" : "success" },
-              { label: "importe por aprobar", value: counts.monto > 0 ? formatMonto(counts.monto, "MXN") : "—", hint: counts.sinImporte > 0 ? `${counts.sinImporte} sin importe` : "en pesos" },
-              { label: "prioridad alta", value: counts.Alta, hint: counts.Alta > 0 ? "atiéndelas primero" : "sin urgentes", tone: counts.Alta > 0 ? "danger" : "default", onClick: counts.Alta > 0 ? () => setFilter("Alta") : undefined },
-              { label: "esperando 3 días o más", value: counts.late, tone: counts.late > 0 ? "warning" : "default" },
-              { label: "la más antigua", value: counts.all > 0 ? (counts.oldest === 0 ? "hoy" : `${counts.oldest} ${counts.oldest === 1 ? "día" : "días"}`) : "—" },
-            ]}
-          />
-        </div>
-      )}
-
-      <div className={s.chips} role="group" aria-label="Filtrar por prioridad">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            className={s.chip}
-            aria-pressed={filter === f.key}
-            onClick={() => setFilter(f.key)}
-          >
-            {f.label}
-            <span className={s.chipCount}>{counts[f.key]}</span>
-          </button>
-        ))}
-      </div>
-
-      {showSkeleton ? (
-        <div className={s.list} aria-busy="true" aria-label="Cargando aprobaciones">
-          <div className={s.skeletonCard} />
-          <div className={s.skeletonCard} />
-        </div>
-      ) : !token ? (
-        <EmptyState icon="🔒" title="Inicia sesión" description="Necesitas iniciar sesión para ver tus aprobaciones." />
-      ) : list.length === 0 ? (
-        data === null ? (
-          <EmptyState
-            icon="⚠️"
-            title="No pudimos cargar la bandeja"
-            description="Revisa tu conexión e intenta de nuevo."
-            action={<Button variant="primary" onClick={() => void fetchPending()}>Reintentar</Button>}
-          />
-        ) : hasFilters ? (
-          <EmptyState
-            icon="🔍"
-            title="Sin coincidencias"
-            description="Ninguna solicitud coincide con la búsqueda o el filtro."
-            action={<Button variant="secondary" onClick={() => { setFilter("all"); setSearchQ(""); }}>Ver todas</Button>}
-          />
-        ) : (
-          <EmptyState icon="✅" title="Todo al día" description="No hay solicitudes esperando tu firma. Buen trabajo." />
-        )
-      ) : (
-        <div className={s.list}>
-          {highlightId !== null && rows.some((r) => r.instanceId === highlightId) && (
-            <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: 0 }}>
-              Abriste esta bandeja desde un enlace: la solicitud señalada aparece primero.
-            </p>
-          )}
-          {list.map((a) => {
-            const isHighlighted = highlightId !== null && a.instanceId === highlightId;
-            const days = daysWaiting(a.createdAt);
-            const busy = decidingId === a.approvalId;
-            return (
-              <article
-                key={a.key}
-                ref={isHighlighted ? highlightRef : undefined}
-                className={`${s.card} ${isHighlighted ? s.cardHighlighted : ""}`}
-                aria-labelledby={`${a.key}-title`}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div className={s.cardMeta}>
-                    <span className={s.tag}>{a.type}</span>
-                    <span className={`${s.tag} ${a.prioridad === "Alta" ? s.tagHigh : a.prioridad === "Media" ? s.tagMedium : ""}`}>
-                      Prioridad {a.prioridad.toLowerCase()}
+      <div className={s.list}>
+        {highlightId !== null && rows.some((r) => r.instanceId === highlightId) ? (
+          <p className={s.nota}>La solicitud del enlace aparece primero.</p>
+        ) : null}
+        {list.map((a) => {
+          const isHighlighted = highlightId !== null && a.instanceId === highlightId;
+          const days = daysWaiting(a.createdAt);
+          const busy = decidingId === a.approvalId;
+          return (
+            <article
+              key={a.key}
+              ref={isHighlighted ? highlightRef : undefined}
+              className={`${s.card} ${isHighlighted ? s.cardHighlighted : ""}`}
+              aria-labelledby={`${a.key}-title`}
+            >
+              <div className={s.solicitud}>
+                <div className={s.datos}>
+                  <span className={s.dato}>{a.type}</span>
+                  <span className={`${s.dato} ${a.prioridad === "Alta" ? s.tagHigh : a.prioridad === "Media" ? s.tagMedium : ""}`}>
+                    Prioridad {a.prioridad.toLowerCase()}
+                  </span>
+                  <span className={`${s.dato} ${days >= 3 ? s.waitingVeryLate : days >= 1 ? s.waitingLate : ""}`}>
+                    {a.fechaSolicitud}
+                  </span>
+                  {days >= 1 ? (
+                    <span className={`${s.dato} ${days >= 3 ? s.waitingVeryLate : s.waitingLate}`}>
+                      {days} {days === 1 ? "día" : "días"} esperando
                     </span>
-                    <span className={`${s.waiting} ${days >= 3 ? s.waitingVeryLate : days >= 1 ? s.waitingLate : ""}`}>
-                      {a.fechaSolicitud}
-                      {days >= 1 ? ` · ${days} ${days === 1 ? "día" : "días"} esperando` : ""}
-                    </span>
-                  </div>
-
-                  <h3 id={`${a.key}-title`} className={s.cardTitle}>{a.titulo}</h3>
-                  {a.monto != null && <div className={s.cardAmount}>{formatMonto(a.monto, a.moneda)}</div>}
-                  <p className={s.cardDetail}>{a.detalle}</p>
-
-                  <div>
-                    <div className={s.fieldLabel}>Solicita</div>
-                    <div className={s.fieldValue}>
-                      {a.solicita}
-                      {a.solicitaRol && <span> · {a.solicitaRol}</span>}
-                    </div>
-                  </div>
-
-                  <div className={s.actions}>
-                    <Button variant="primary" iconLeft="✓" onClick={() => void approve(a)} loading={busy} disabled={decidingId !== null}>
-                      {busy ? "Aprobando…" : "Aprobar"}
-                    </Button>
-                    <Button variant="ghost" iconLeft="✕" onClick={() => openReject(a)} disabled={decidingId !== null} style={{ color: "var(--danger)" }}>
-                      Rechazar
-                    </Button>
-                    <Button variant="secondary" iconLeft="💬" onClick={() => { setInfoTarget(a); setInfoMessage(""); }}>
-                      Pedir más info
-                    </Button>
-                    {a.href && (
-                      <Link href={a.href} className={s.entityLink}>
-                        Ver solicitud →
-                      </Link>
-                    )}
-                  </div>
+                  ) : null}
                 </div>
-
-                <ApprovalChain pasos={a.pasos} />
-              </article>
-            );
-          })}
-        </div>
-      )}
+                <h3 id={`${a.key}-title`} className={s.cardTitle}>{a.titulo}</h3>
+                {a.monto != null ? <p className={s.cardAmount}>{formatMonto(a.monto, a.moneda)}</p> : null}
+                <p className={s.cardDetail}>{a.detalle}</p>
+                <p className={s.dato}>Solicita</p>
+                <p className={s.fieldValue}>{a.solicita}</p>
+                {a.solicitaRol ? <p className={s.dato}>{a.solicitaRol}</p> : null}
+                <div className={s.actions}>
+                  <Button variant="primary" onClick={() => void approve(a)} loading={busy} disabled={decidingId !== null}>
+                    {busy ? "Aprobando…" : "Aprobar"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => openReject(a)} disabled={decidingId !== null} style={{ color: "var(--danger)" }}>
+                    Rechazar
+                  </Button>
+                  <Button variant="secondary" onClick={() => { setInfoTarget(a); setInfoMessage(""); }}>
+                    Pedir información
+                  </Button>
+                  {a.href ? (
+                    <Link href={a.href} className={s.entityLink}>
+                      Ver solicitud
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+              <ApprovalChain pasos={a.pasos} />
+            </article>
+          );
+        })}
+      </div>
+    </ModulePage>
 
       <Modal
         open={rejectTarget !== null}
@@ -545,6 +505,6 @@ export default function ApprovalsPage() {
           </>
         )}
       </Modal>
-    </PageChrome>
+    </>
   );
 }

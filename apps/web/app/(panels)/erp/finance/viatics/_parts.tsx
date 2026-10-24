@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties } from "react";
 import Button from "@/components/ui/Button";
+import lista from "./viatics.module.css";
 import StatusDot from "@/components/ui/StatusDot";
 import { Money } from "@/components/ui/DataTable";
 import { financeInputStyle } from "@/components/finance/FinanceModuleShell";
@@ -166,7 +167,7 @@ export function BreakdownTable({
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
       ) : (
         <>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+          <table className={lista.desglose} style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <caption style={srOnlyStyle}>{title}</caption>
             <thead>
               <tr>
@@ -184,10 +185,11 @@ export function BreakdownTable({
             <tbody>
               {shown.map((r, i) => (
                 <tr key={r.name}>
-                  <th scope="row" style={{ textAlign: "left", fontWeight: 400, padding: "6px 8px 6px 0", borderBottom: cellBorder(i) }}>
+                  <th scope="row" data-etiqueta="Concepto" style={{ textAlign: "left", fontWeight: 400, padding: "6px 8px 6px 0", borderBottom: cellBorder(i) }}>
                     {r.name}
                   </th>
                   <td
+                    data-etiqueta="Registros"
                     style={{
                       textAlign: "right",
                       fontSize: 11,
@@ -199,7 +201,7 @@ export function BreakdownTable({
                   >
                     {r.count}
                   </td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", padding: "6px 0", borderBottom: cellBorder(i) }}>
+                  <td data-etiqueta="Total" style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", padding: "6px 0", borderBottom: cellBorder(i) }}>
                     <Money value={r.total} />
                   </td>
                 </tr>
