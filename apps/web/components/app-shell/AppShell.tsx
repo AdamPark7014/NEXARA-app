@@ -1410,13 +1410,16 @@ function Breadcrumbs({
   /** Grupo del menú donde vive la página («Hoy», «Recursos»…): sustituye al nombre del panel. */
   groupTitle: string | null;
 }) {
-  const homeHref =
-    panelHome ??
-    (panel === "lab" || panel === "integra" ? `/${panel}` : `/${panel}/dashboard`);
-  const segments = pathname
-    .split("/")
-    .filter(Boolean)
-    .slice(1); // saltamos el slug del panel
+  void panelHome;
+  void groupTitle;
+  const segments = pathname.split("/").filter(Boolean).slice(1);
+
+  const etiqueta = (path: string, seg: string) => {
+    const moduleHit = MODULES_BY_URL.get(path);
+    if (moduleHit?.label) return moduleHit.label;
+    if (/^\d+$/.test(seg)) return "Detalle";
+    return humanize(seg);
+  };
 
   if (segments.length === 0) {
     return (
@@ -1428,38 +1431,29 @@ function Breadcrumbs({
     );
   }
 
-  const accumulated: string[] = [];
+  if (segments.length === 1) {
+    const aqui = `/${panel}/${segments[0]}`;
+    return (
+      <nav className={styles.breadcrumbs} aria-label="Estás en">
+        <span className={styles.crumbCurrent} aria-current="page">
+          {etiqueta(aqui, segments[0])}
+        </span>
+      </nav>
+    );
+  }
+
+  const padreSegs = segments.slice(0, -1);
+  const padre = `/${panel}/${padreSegs.join("/")}`;
+  const nombrePadre = etiqueta(padre, padreSegs[padreSegs.length - 1] ?? "");
   return (
     <nav className={styles.breadcrumbs} aria-label="Estás en">
-      {groupTitle ? (
-        <span className={styles.crumbHome}>{groupTitle}</span>
-      ) : (
-        <Link href={homeHref} className={styles.crumbHome}>
-          {PANEL_META[panel].name}
-        </Link>
-      )}
-      {segments.map((seg, idx) => {
-        accumulated.push(seg);
-        const isLast = idx === segments.length - 1;
-        const target = `/${panel}/${accumulated.join("/")}`;
-        const moduleHit = MODULES_BY_URL.get(target);
-        // Un id numérico (/indicadores/21, /cotizaciones/7) no dice nada: «Detalle».
-        const label = moduleHit?.label || (/^\d+$/.test(seg) ? "Detalle" : humanize(seg));
-        return (
-          <span key={target} className={styles.crumb} data-last={isLast ? "true" : undefined}>
-            <span className={styles.crumbSep} aria-hidden="true">
-              <ShellIcon name="right" size={14} />
-            </span>
-            {isLast ? (
-              <span className={styles.crumbCurrent} aria-current="page">
-                {label}
-              </span>
-            ) : (
-              <Link href={target}>{label}</Link>
-            )}
-          </span>
-        );
-      })}
+      <Link href={padre} className={styles.crumbBack}>
+        <span className={styles.crumbBackIcon} aria-hidden="true">
+          <ShellIcon name="right" size={16} />
+        </span>
+        <span className={styles.srOnly}>Volver a </span>
+        {nombrePadre}
+      </Link>
     </nav>
   );
 }

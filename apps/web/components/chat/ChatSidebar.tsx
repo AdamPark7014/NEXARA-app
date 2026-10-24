@@ -32,6 +32,8 @@ type Props = {
   onNewChannel: () => void;
   onNewDm: () => void;
   onOpenSwitcher: () => void;
+  /** La lista no llegó: no invites a crear un canal que no se puede guardar. */
+  loadFailed?: boolean;
 };
 
 function unreadOf(c: Channel) {
@@ -128,6 +130,7 @@ export default function ChatSidebar({
   onNewChannel,
   onNewDm,
   onOpenSwitcher,
+  loadFailed = false,
 }: Props) {
   const [collapsed, setCollapsed] = useState<Partial<Record<SectionId, boolean>>>(() =>
     loadJson<Partial<Record<SectionId, boolean>>>(SECTIONS_KEY, {}),
@@ -234,15 +237,17 @@ export default function ChatSidebar({
           >
             <SearchIcon aria-hidden="true" sx={{ fontSize: 18 }} />
           </button>
-          <button
-            type="button"
-            className={`${styles.headIcon} ${styles.headIconStrong} ${styles.tipBelow}`}
-            aria-label="Nuevo mensaje directo"
-            data-tip="Nuevo mensaje directo"
-            onClick={onNewDm}
-          >
-            <EditNoteOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
-          </button>
+          {!loadFailed && (
+            <button
+              type="button"
+              className={`${styles.headIcon} ${styles.headIconStrong} ${styles.tipBelow}`}
+              aria-label="Nuevo mensaje directo"
+              data-tip="Nuevo mensaje directo"
+              onClick={onNewDm}
+            >
+              <EditNoteOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -278,39 +283,45 @@ export default function ChatSidebar({
           title="Canales"
           collapsed={isCollapsed("canales")}
           onToggle={() => toggle("canales")}
-          addLabel="Crear canal"
-          onAdd={onNewChannel}
+          addLabel={loadFailed ? undefined : "Crear canal"}
+          onAdd={loadFailed ? undefined : onNewChannel}
           rows={publics}
           activeId={activeId}
           renderRow={row}
           footer={
-            <>
-              {loading && <div className={styles.loadingLine}>Cargando…</div>}
-              <button type="button" className={styles.rowAdd} onClick={onNewChannel}>
-                <span className={styles.plusBox} aria-hidden="true">
-                  <AddIcon sx={{ fontSize: 14 }} />
-                </span>
-                Crear canal
-              </button>
-            </>
+            loadFailed ? (
+              <div className={styles.loadingLine}>No se pudo cargar</div>
+            ) : (
+              <>
+                {loading && <div className={styles.loadingLine}>Cargando…</div>}
+                <button type="button" className={styles.rowAdd} onClick={onNewChannel}>
+                  <span className={styles.plusBox} aria-hidden="true">
+                    <AddIcon sx={{ fontSize: 14 }} />
+                  </span>
+                  Crear canal
+                </button>
+              </>
+            )
           }
         />
         <Section
           title="Mensajes directos"
           collapsed={isCollapsed("directos")}
           onToggle={() => toggle("directos")}
-          addLabel="Nuevo mensaje directo"
-          onAdd={onNewDm}
+          addLabel={loadFailed ? undefined : "Nuevo mensaje directo"}
+          onAdd={loadFailed ? undefined : onNewDm}
           rows={dms}
           activeId={activeId}
           renderRow={row}
           footer={
-            <button type="button" className={styles.rowAdd} onClick={onNewDm}>
-              <span className={styles.plusBox} aria-hidden="true">
-                <AddIcon sx={{ fontSize: 14 }} />
-              </span>
-              Escribir a alguien
-            </button>
+            loadFailed ? null : (
+              <button type="button" className={styles.rowAdd} onClick={onNewDm}>
+                <span className={styles.plusBox} aria-hidden="true">
+                  <AddIcon sx={{ fontSize: 14 }} />
+                </span>
+                Escribir a alguien
+              </button>
+            )
           }
         />
       </nav>

@@ -59,10 +59,11 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--ui-s3) var(--ui-s4);
   padding: var(--ui-s4) var(--ui-s4) var(--ui-s4) calc(var(--ui-s4) + 4px);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-card-radius, 16px);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   overflow: hidden;
   min-width: 0;
 }
@@ -377,4 +378,47 @@
   .dialogo {
     padding: var(--ui-s4);
   }
+}
+
+.resumen {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--ui-fg-2);
+}
+
+.tituloLink {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.tituloLink:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.linea,
+.nota {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.nota {
+  font-size: 14px;
+  color: var(--ui-fg-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cola {
+  gap: 0;
+}
+
+.tarea[data-primera="true"] {
+  background: transparent;
 }

@@ -9,6 +9,7 @@ import { type MentionTextareaHandle } from "./chat/MentionTextarea";
 import { esCeoChristian } from "@/lib/ceo-user";
 import { formatApiError } from "@/lib/erp-api";
 import InlineAlert from "@/components/ui/InlineAlert";
+import Button from "@/components/ui/Button";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import {
   entityMentionToken,
@@ -538,6 +539,7 @@ export default function WorkspaceChat({
       });
     } catch (e) {
       setError(formatApiError(e, "No se pudo cargar el chat"));
+      setMobilePane("chat");
     } finally {
       setLoadingChannels(false);
     }
@@ -1613,15 +1615,32 @@ export default function WorkspaceChat({
           onNewChannel={openNewChannelDialog}
           onNewDm={openDmDialog}
           onOpenSwitcher={() => setSwitcherOpen(true)}
+          loadFailed={!activeId && Boolean(error) && !loadingChannels}
         />
 
         <section className={styles.main} aria-label="Conversación">
           {!activeId ? (
             <div className={styles.emptyMain}>
               <div>
-                <div className={styles.emptyMark}>N</div>
-                <h3>Chat del equipo</h3>
-                <p>Elige un canal a la izquierda o abre un mensaje directo para empezar.</p>
+                {error && !loadingChannels ? (
+                  <>
+                    <h3>No se pudo cargar el chat</h3>
+                    <p>
+                      {error === "No se pudo cargar el chat"
+                        ? "Revisa la conexión e inténtalo de nuevo."
+                        : error}
+                    </p>
+                    <div className={styles.emptyRetry}>
+                      <Button variant="secondary" onClick={() => void loadChannels()}>
+                        Reintentar
+                      </Button>
+                    </div>
+                  </>
+                ) : loadingChannels ? (
+                  <p>Cargando…</p>
+                ) : (
+                  <p>Elige un canal o abre un mensaje directo.</p>
+                )}
               </div>
             </div>
           ) : (

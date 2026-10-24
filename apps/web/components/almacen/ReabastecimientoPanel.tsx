@@ -1,9 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
-import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
-import HourglassBottomOutlinedIcon from "@mui/icons-material/HourglassBottomOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import {
   Alert,
@@ -13,8 +10,6 @@ import {
   Checkbox,
   DataTable,
   SkeletonRows,
-  Stat,
-  StatRow,
   StatusBadge,
   type Column,
 } from "@/components/base";
@@ -235,40 +230,16 @@ export default function ReabastecimientoPanel() {
 
   return (
     <>
-      {!cargando && filas.length > 0 && (
-        <StatRow ariaLabel="Resumen de reabastecimiento" cols={3}>
-          <Stat
-            label="Por comprar"
-            value={porComprar}
-            hint="llegaron a su mínimo"
-            tone={porComprar > 0 ? "brand" : "default"}
-            icon={<ShoppingCartOutlinedIcon />}
-          />
-          <Stat
-            label="Se acaban ya"
-            value={seAcaba}
-            hint="2 días o menos"
-            tone={seAcaba > 0 ? "danger" : "default"}
-            icon={<ReportProblemOutlinedIcon />}
-            iconTone={seAcaba > 0 ? "danger" : "neutral"}
-            semaforo={seAcaba > 0 ? "rojo" : "verde"}
-          />
-          <Stat
-            label="Aprietan"
-            value={aprietan}
-            hint="menos de una semana"
-            tone={aprietan > 0 ? "warning" : "default"}
-            icon={<HourglassBottomOutlinedIcon />}
-            iconTone={aprietan > 0 ? "warning" : "neutral"}
-            semaforo={aprietan > 0 ? "ambar" : "verde"}
-          />
-        </StatRow>
-      )}
-
       <Card>
         <CardHead
           title="Qué comprar"
-          subtitle={subtitulo}
+          subtitle={
+            !cargando && filas.length > 0
+              ? [`${porComprar} por comprar`, `${seAcaba} se acaban ya`, `${aprietan} aprietan`, subtitulo]
+                  .filter(Boolean)
+                  .join(" · ")
+              : subtitulo
+          }
           actions={
             <>
               <Checkbox

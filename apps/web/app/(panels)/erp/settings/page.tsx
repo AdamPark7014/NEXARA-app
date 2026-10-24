@@ -7,7 +7,6 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
-import MetricStrip from "@/components/ui/MetricStrip";
 import { FormField, FormGrid } from "@/components/ui/FormField";
 import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
@@ -203,9 +202,18 @@ export default function SettingsPage() {
 
   return (
     <PageChrome
-      eyebrow="Gobierno · Configuración"
       title="Configuración"
-      subtitle="Parámetros de la empresa activa, integraciones y facturación de tu cuenta."
+      subtitle={
+        error && !loaded
+          ? undefined
+          : loaded
+            ? [
+                `${stats.total.toLocaleString("es-MX")} ${stats.total === 1 ? "parámetro" : "parámetros"}`,
+                `${stats.categories.toLocaleString("es-MX")} ${stats.categories === 1 ? "categoría" : "categorías"}`,
+                ...(stats.unnamed > 0 ? [`${stats.unnamed.toLocaleString("es-MX")} sin nombre`] : []),
+              ].join(" · ")
+            : "Parámetros de la empresa activa."
+      }
       primaryAction={
         cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo parámetro</Button> : undefined
       }
@@ -214,7 +222,7 @@ export default function SettingsPage() {
       }
       context={<SettingsModuleRail />}
     >
-      <Section title="Integraciones y cuenta" subtitle="Accesos rápidos a la configuración avanzada." dense>
+      <Section title="Integraciones y cuenta" dense>
         <ErpModuleCards
           items={[
             { href: "/erp/settings/billing", title: "Plan y facturación", description: "Plan contratado, usuarios incluidos y pagos", icon: "💳" },
@@ -225,29 +233,13 @@ export default function SettingsPage() {
         />
       </Section>
 
-      {loaded && settings.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <MetricStrip
-            ariaLabel="Resumen de parámetros"
-            metrics={[
-              { label: "Parámetros", value: stats.total },
-              { label: "Categorías", value: stats.categories },
-              {
-                label: "Sin nombre visible",
-                value: stats.unnamed,
-                tone: stats.unnamed > 0 ? "warning" : "success",
-                hint: stats.unnamed > 0 ? "Agrega un nombre para identificarlos" : "Todos tienen nombre",
-              },
-            ]}
-          />
-        </div>
-      )}
-
+      {!(error && !loaded) && (
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, clave o valor…", ariaLabel: "Buscar parámetros" }}
         onClear={() => setSearchQ("")}
         resultCount={initialLoading ? null : filteredCount}
       />
+      )}
 
       {error && loaded && (
         <InlineAlert
@@ -264,7 +256,11 @@ export default function SettingsPage() {
         <EmptyState
           icon="⚠️"
           title="No se pudo cargar la configuración"
-          description={error}
+          description={
+            error === "No se pudo cargar la configuración."
+              ? "Revisa la conexión e inténtalo de nuevo."
+              : error
+          }
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
@@ -290,7 +286,6 @@ export default function SettingsPage() {
         <Section
           key={category}
           title={categoryLabel(category)}
-          subtitle={CATEGORY_META[category.toLowerCase()]?.description}
           actions={<span style={{ fontSize: 12, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{rows.length}</span>}
         >
           <ul style={{ display: "grid", gap: 8, listStyle: "none", margin: 0, padding: 0 }}>

@@ -138,10 +138,10 @@
 .headTitle {
   margin: 0;
   font-family: var(--ui-font);
-  font-size: var(--ui-fs-page, var(--ui-text-title));
-  font-weight: var(--ui-fw-page, 650);
-  line-height: var(--ui-lh-page, 1.2);
-  letter-spacing: var(--ui-tracking-page, -0.02em);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
   color: var(--ui-fg);
   overflow-wrap: anywhere;
   text-wrap: balance;
@@ -157,11 +157,15 @@
 
 .headDesc {
   margin: 0;
-  font-size: var(--ui-text-base);
-  line-height: 1.5;
-  color: var(--ui-fg-2);
-  max-width: 44rem;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ui-fg-3);
+  max-width: 36rem;
   text-wrap: pretty;
+}
+
+:global(.nx-app-shell) .headCrumbs {
+  display: none;
 }
 
 .head[data-density="ops"] .headDesc {

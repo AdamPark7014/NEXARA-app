@@ -131,7 +131,6 @@ export default function KpisEquipoPage() {
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto" }}>
       <PageHead
-        back={{ href: "/erp/asistencias", label: "Asistencias" }}
         title="KPIs del equipo"
         actions={
           <>

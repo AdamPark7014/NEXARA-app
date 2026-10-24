@@ -5,27 +5,18 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
-import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
-import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
-import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
-import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
-import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import EventRepeatIcon from "@mui/icons-material/EventRepeat";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CheckIcon from "@mui/icons-material/Check";
-import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
-import ListAltOutlinedIcon from "@mui/icons-material/ListAltOutlined";
-import PriorityHighIcon from "@mui/icons-material/PriorityHigh";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import {
   Alert,
@@ -36,8 +27,6 @@ import {
   CardHead,
   EmptyState,
   SkeletonRows,
-  Stat,
-  StatRow,
   StatusBadge,
   Textarea,
   type Tone,
@@ -48,7 +37,6 @@ import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
 import IniciarActividad from "@/components/pizarra/IniciarActividad";
 import { SesionPropia } from "@/components/pizarra/SesionActividad";
-import { SemaforoBadge } from "@/components/pizarra/PizarraKpi";
 import { puedeIniciar, textoChipSemaforo, textoPlanVsReal } from "@/lib/actividad-tiempos";
 import {
   estatusUi,
@@ -147,10 +135,6 @@ export default function MisActividadesPage() {
   const seguimiento = data?.seguimiento ?? [];
   const urgentes = open.filter((a) => priorityUi(a.prioridad).label === "Urgente").length;
   const canReorder = Boolean(data?.canReorder) && open.length > 1;
-  const atrasadas = open.filter((a) => a.semaforo === "rojo").length;
-  const porVencer = open.filter((a) => a.semaforo === "amarillo").length;
-  const enTiempo = open.length - atrasadas - porVencer;
-
   const askMove = (from: number, to: number) => {
     const item = open[from];
     if (!item || to < 0 || to >= open.length || to === from) return;
@@ -209,16 +193,15 @@ export default function MisActividadesPage() {
   return (
     <div className={m.vista}>
       <header className={m.saludo}>
-        <div className={m.saludoTexto}>
-          <h2 className={m.hola}>{firstName ? `Hola, ${firstName}` : "Tu día"}</h2>
-          <p className={c.tenue}>
-            {loading
-              ? "Cargando tus actividades…"
-              : open.length === 0
-                ? "No tienes pendientes por ahora."
-                : `Tienes ${open.length} por hacer. Empieza por la #1.`}
-          </p>
-        </div>
+        <p className={m.resumen}>
+          {loading
+            ? "Cargando…"
+            : open.length === 0
+              ? firstName
+                ? `${firstName}, nada pendiente.`
+                : "Nada pendiente."
+              : `${open.length} por hacer${urgentes ? ` · ${urgentes} urgente${urgentes === 1 ? "" : "s"}` : ""}.`}
+        </p>
         <div className={m.saludoAcciones}>
           <Button variant="ghost" className={c.tap} iconStart={<RefreshIcon />} onClick={() => void load()}>
             Actualizar
@@ -230,53 +213,6 @@ export default function MisActividadesPage() {
           ) : null}
         </div>
       </header>
-
-      {data ? (
-        <StatRow cols={seguimiento.length ? 4 : 3} ariaLabel="Resumen de tu día">
-          <Stat
-            label="Por hacer"
-            value={open.length}
-            icon={<ListAltOutlinedIcon />}
-            meter={
-              open.length
-                ? [
-                    { value: enTiempo, tone: "success", label: `${enTiempo} en tiempo` },
-                    { value: porVencer, tone: "warning", label: `${porVencer} por vencer` },
-                    { value: atrasadas, tone: "danger", label: `${atrasadas} atrasadas` },
-                  ]
-                : undefined
-            }
-            meterMax={open.length || undefined}
-            hint={open.length ? undefined : "nada pendiente"}
-          />
-          <Stat
-            label="Urgentes"
-            value={urgentes}
-            tone={urgentes ? "danger" : "default"}
-            hint={atrasadas ? `${atrasadas} ya van tarde` : "ninguna va tarde"}
-            icon={<PriorityHighIcon />}
-            iconTone={urgentes ? "danger" : "neutral"}
-            semaforo={atrasadas ? "rojo" : porVencer ? "ambar" : "verde"}
-          />
-          <Stat
-            label="Hechas hoy"
-            value={done.length}
-            tone={done.length ? "brand" : "default"}
-            hint={done.length ? "bien hecho" : "todavía ninguna"}
-            icon={<TaskAltIcon />}
-            iconTone="success"
-          />
-          {seguimiento.length ? (
-            <Stat
-              label="En seguimiento"
-              value={seguimiento.length}
-              hint="ya las repartiste"
-              icon={<VisibilityOutlinedIcon />}
-              iconTone="info"
-            />
-          ) : null}
-        </StatRow>
-      ) : null}
 
       {error ? (
         <Alert
@@ -292,11 +228,7 @@ export default function MisActividadesPage() {
         </Alert>
       ) : null}
 
-      {canReorder ? (
-        <Alert tone="brand" title="Tú decides el orden.">
-          Usa «Subir» y «Bajar». Cada cambio te pide un motivo corto de por qué la harás en ese lugar.
-        </Alert>
-      ) : !loading && open.length > 1 && !data?.canReorder ? (
+      {!canReorder && !loading && open.length > 1 && !data?.canReorder ? (
         <p className={c.pista}>El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.</p>
       ) : null}
 
@@ -351,111 +283,41 @@ export default function MisActividadesPage() {
                   {i + 1}
                 </div>
                 <div className={m.cuerpo}>
-                  {first ? <span className={m.empieza}>Empieza por aquí</span> : null}
-                  <div className={c.filaEntre}>
-                    <div className={m.cabeza}>
-                      <span className={m.tipo} aria-hidden="true">
-                        <ActivityKindIcon kind={kindIcon(a)} size={18} />
-                      </span>
-                      <div className={m.cabezaTexto}>
-                        <h3 className={c.tituloFila}>{a.titulo}</h3>
-                        <span className={c.folio}>
-                          {a.anNumber} · {kindLabel(a)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className={m.acciones}>
-                      {a.porRepartir && myId ? (
-                        <ButtonLink
-                          href={`/erp/pizarra/${myId}`}
-                          variant="tonal"
-                          size="sm"
-                          className={c.tap}
-                          iconStart={<SendOutlinedIcon />}
-                        >
-                          Repartir
-                        </ButtonLink>
-                      ) : null}
-                      <ButtonLink
-                        href={`/erp/actividades/${a.id}`}
-                        size="sm"
-                        className={c.tap}
-                        iconEnd={<ArrowForwardIcon />}
-                      >
-                        Abrir
-                      </ButtonLink>
-                    </div>
-                  </div>
-
-                  <div className={m.insignias}>
-                    {a.porRepartir ? (
-                      <Badge size="sm" tone="warning" icon={<SendOutlinedIcon />}>
-                        Te toca repartirla
-                      </Badge>
-                    ) : null}
-                    <StatusBadge size="sm" label={est.label} tone={est.tone ?? "neutral"} />
-                    <Badge size="sm" dot tone={pr.tone}>
-                      {pr.label}
-                    </Badge>
-                    {a.semaforo ? (
-                      <SemaforoBadge
-                        semaforo={a.semaforo}
-                        label={textoChipSemaforo(a.semaforo, a.minutosAtraso, a.minutosParaVencer, a.motivoSemaforo)}
-                      />
-                    ) : null}
-                    {puedeIniciar(a) && a.semaforo === "verde" ? (
-                      <Badge size="sm" tone="info">
-                        Sin iniciar
-                      </Badge>
-                    ) : null}
-                    {a.enPausa ? (
-                      <Badge size="sm" tone="warning" icon={<PauseCircleOutlineIcon />}>
-                        En pausa
-                      </Badge>
-                    ) : null}
-                    <Badge size="sm" tone="outline" icon={a.autoAsignada ? <PanToolOutlinedIcon /> : undefined}>
-                      {a.autoAsignada
-                        ? "Auto-asignada"
-                        : a.asignadaPor
-                          ? `De ${shortName(a.asignadaPor.nombre)}`
-                          : "Asignada"}
-                    </Badge>
-                  </div>
-
-                  <div className={c.datos}>
-                    <span className={c.dato}>
-                      <EventOutlinedIcon aria-hidden="true" />
-                      {when ?? "Sin fecha"}
-                    </span>
-                    {plan ? (
-                      <span className={[c.dato, a.excedida ? m.excedida : ""].filter(Boolean).join(" ")}>
-                        <TimerOutlinedIcon aria-hidden="true" />
-                        {plan}
-                        {a.excedida ? " · excedida" : ""}
-                      </span>
-                    ) : estimado ? (
-                      <span className={c.dato}>
-                        <TimerOutlinedIcon aria-hidden="true" />
-                        {estimado}
-                        {max ? ` · tope ${max}` : ""}
-                      </span>
-                    ) : null}
-                    {lugar ? (
-                      <span className={c.dato}>
-                        <PlaceOutlinedIcon aria-hidden="true" />
-                        {lugar}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  {a.indicaciones ? <p className={c.cita}>{a.indicaciones}</p> : null}
-                  {a.ordenJustificacion ? (
-                    <p className={[c.tenue, m.porque].join(" ")}>
-                      <EditNoteOutlinedIcon aria-hidden="true" />
-                      <span>
-                        <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
-                      </span>
+                  <div className={m.cabezaTexto}>
+                    <Link href={`/erp/actividades/${a.id}`} className={m.tituloLink}>
+                      <h3 className={c.tituloFila}>{a.titulo}</h3>
+                    </Link>
+                    <p className={m.linea}>
+                      {[
+                        when,
+                        lugar,
+                        plan ?? (estimado ? (max ? `${estimado} · tope ${max}` : estimado) : null),
+                        a.enPausa
+                          ? "En pausa"
+                          : a.semaforo
+                            ? textoChipSemaforo(a.semaforo, a.minutosAtraso, a.minutosParaVencer, a.motivoSemaforo)
+                            : est.label,
+                        pr.label === "Urgente" ? "Urgente" : null,
+                        a.porRepartir ? "Te toca repartirla" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
+                  </div>
+                  {a.porRepartir && myId ? (
+                    <ButtonLink
+                      href={`/erp/pizarra/${myId}`}
+                      variant="tonal"
+                      size="sm"
+                      className={c.tap}
+                      iconStart={<SendOutlinedIcon />}
+                    >
+                      Repartir
+                    </ButtonLink>
+                  ) : null}
+                  {a.indicaciones ? <p className={m.nota}>{a.indicaciones}</p> : null}
+                  {a.ordenJustificacion ? (
+                    <p className={m.nota}>Por qué va aquí: {a.ordenJustificacion}</p>
                   ) : null}
 
                   {/* Quien la recibe no la acepta ni la rechaza: únicamente la inicia. */}

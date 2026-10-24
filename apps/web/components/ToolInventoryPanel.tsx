@@ -9,9 +9,6 @@ import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import AutorenewOutlined from '@mui/icons-material/AutorenewOutlined';
 import HandymanOutlined from '@mui/icons-material/HandymanOutlined';
-import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline';
-import LocalShippingOutlined from '@mui/icons-material/LocalShippingOutlined';
-import BuildOutlined from '@mui/icons-material/BuildOutlined';
 import AutoFixHighOutlined from '@mui/icons-material/AutoFixHighOutlined';
 import { useUser } from './UserContext';
 import {
@@ -34,8 +31,6 @@ import {
   SearchInput,
   Select,
   SkeletonRows,
-  Stat,
-  StatRow,
   StatusBadge,
   type Column,
 } from '@/components/base';
@@ -199,12 +194,12 @@ const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial
         headers: { Authorization: `Bearer ${user.token}` },
       });
 
-      if (!response.ok) throw new Error('No se pudo cargar inventario');
+      if (!response.ok) throw new Error('No se pudo cargar el inventario');
       const payload = await response.json();
       setItems(Array.isArray(payload) ? payload : []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(formatApiError(err, 'No se pudo cargar el inventario'));
     } finally {
       if (!opts?.background) setLoading(false);
     }
@@ -545,7 +540,7 @@ const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial
   const editandoAlgo = Boolean(editTarget || replacementTarget);
   const buscando = query.trim().length > 0;
   // Sin herramientas no hay nada que esconder: el alta se enseña sola.
-  const mostrarAlta = altaAbierta || (!loading && items.length === 0 && !buscando);
+  const mostrarAlta = altaAbierta || (!loading && !error && items.length === 0 && !buscando);
 
   const columnas: Column<InventoryItem>[] = [
     {
@@ -655,49 +650,6 @@ const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial
 
   return (
     <div className={styles.wrapper}>
-      {!loading && items.length > 0 && (
-        <StatRow ariaLabel="Resumen de inventario" cols={4}>
-          <Stat
-            label="Herramientas"
-            value={counts.total}
-            hint={includeRetired && counts.retired > 0 ? `dadas de alta · ${counts.retired} retiradas` : 'dadas de alta'}
-            icon={<HandymanOutlined />}
-            onClick={() => setEstadoFiltro('todas')}
-            pressed={estadoFiltro === 'todas'}
-          />
-          <Stat
-            label="Disponibles"
-            value={counts.available}
-            hint="se pueden prestar"
-            tone={counts.available > 0 ? 'success' : 'default'}
-            icon={<CheckCircleOutline />}
-            iconTone="success"
-            onClick={() => alternarFiltro('AVAILABLE')}
-            pressed={estadoFiltro === 'AVAILABLE'}
-          />
-          <Stat
-            label="Asignadas"
-            value={counts.assigned}
-            hint={enKit + prestadas > 0 ? `${enKit} en kit · ${prestadas} prestadas` : 'en manos de alguien'}
-            icon={<LocalShippingOutlined />}
-            iconTone="info"
-            onClick={() => alternarFiltro('ASSIGNED')}
-            pressed={estadoFiltro === 'ASSIGNED'}
-          />
-          <Stat
-            label="En reparación"
-            value={counts.inRepair}
-            hint="fuera de servicio"
-            tone={counts.inRepair > 0 ? 'warning' : 'default'}
-            icon={<BuildOutlined />}
-            iconTone={counts.inRepair > 0 ? 'warning' : 'neutral'}
-            semaforo={counts.inRepair > 0 ? 'ambar' : 'verde'}
-            onClick={() => alternarFiltro('IN_REPAIR')}
-            pressed={estadoFiltro === 'IN_REPAIR'}
-          />
-        </StatRow>
-      )}
-
       {mostrarAlta && (
         <form onSubmit={createItem}>
           <FormSection
@@ -990,10 +942,10 @@ const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial
           }
         />
 
-        {error && (
+        {error && items.length > 0 && (
           <div className={styles.aviso}>
             <Alert
-              tone="danger"
+              tone="warning"
               role="alert"
               action={
                 <Button size="sm" variant="secondary" onClick={() => void fetchItems()}>
@@ -1001,7 +953,7 @@ const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial
                 </Button>
               }
             >
-              {error}
+              {error}. Se muestra lo último que cargó.
             </Alert>
           </div>
         )}
@@ -1010,6 +962,18 @@ const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial
           <div className={styles.carga}>
             <SkeletonRows rows={5} label="Cargando herramientas" />
           </div>
+        ) : error && items.length === 0 ? (
+          <EmptyState
+            size="compact"
+            tone="danger"
+            title="No se pudo cargar el inventario"
+            description={error === "No se pudo cargar el inventario" ? "Revisa la conexión e inténtalo de nuevo." : error}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void fetchItems()}>
+                Reintentar
+              </Button>
+            }
+          />
         ) : items.length === 0 ? (
           // «No hay nada» y «el filtro no encuentra nada» no son lo mismo:
           // el primero pide dar de alta, el segundo pide cambiar la búsqueda.

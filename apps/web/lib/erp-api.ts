@@ -9,6 +9,8 @@ const INTERNAL_ROUTE_ERROR = /\bCannot (GET|POST|PUT|PATCH|DELETE) \//;
 export function formatApiError(err: unknown, fallback = "Error desconocido"): string {
   const raw = (err instanceof Error ? err.message : typeof err === "string" ? err : "").trim();
   if (!raw) return fallback;
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(raw)) return fallback;
+  if (/^internal server error$/i.test(raw) || /^http 5\d\d$/i.test(raw)) return fallback;
   try {
     const parsed = JSON.parse(raw) as { message?: unknown; error?: unknown };
     const msg = Array.isArray(parsed.message)

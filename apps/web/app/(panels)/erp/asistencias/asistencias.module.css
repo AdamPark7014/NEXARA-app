@@ -355,3 +355,10 @@
   line-height: 1.5;
   color: var(--ui-fg-2);
 }
+
+.linea {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}

@@ -8,7 +8,6 @@ import QrCodeScannerOutlined from "@mui/icons-material/QrCodeScannerOutlined";
 import ShoppingCartOutlined from "@mui/icons-material/ShoppingCartOutlined";
 import HandymanOutlined from "@mui/icons-material/HandymanOutlined";
 import BackpackOutlined from "@mui/icons-material/BackpackOutlined";
-import WarehouseOutlined from "@mui/icons-material/WarehouseOutlined";
 import { PageHead, Tabs, type TabItem } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig, getOpsTeamSectionConfig } from "@/lib/section-views";
@@ -110,10 +109,8 @@ export default function AlmacenPage() {
   return (
     <>
       <PageHead
-        eyebrow="Core · Almacén"
         title="Almacén"
         description={cfg.subtitle}
-        icon={<WarehouseOutlined />}
         tabs={<Tabs ariaLabel="Secciones de almacén" value={tab} onChange={cambiarTab} items={ITEMS_PESTANAS} />}
       />
 

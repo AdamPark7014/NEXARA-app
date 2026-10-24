@@ -3,13 +3,12 @@ import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useState, useCallback } from 'react';
 import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import { useUser } from './UserContext';
 import styles from './ToolMyKitPanel.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { formatApiError } from '@/lib/erp-api';
 import {
   Alert,
   Badge,
@@ -18,8 +17,6 @@ import {
   CardHead,
   EmptyState,
   SkeletonRows,
-  Stat,
-  StatRow,
   StatusBadge,
   type Tone,
 } from '@/components/base';
@@ -88,7 +85,7 @@ const ToolMyKitPanel: React.FC = () => {
       setItems(Array.isArray(payload) ? payload : []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(formatApiError(err, 'No se pudo cargar tu kit'));
     } finally {
       setLoading(false);
     }
@@ -172,33 +169,33 @@ const ToolMyKitPanel: React.FC = () => {
     <Card>
       <CardHead title={TITLE} subtitle={SUBTITLE} />
       <div className={styles.body}>
-        {error && (
+        {error && items.length > 0 ? (
           <Alert tone="danger" role="alert">
             {error}
           </Alert>
-        )}
+        ) : null}
 
-        {items.length > 0 && (
-          <StatRow ariaLabel="Resumen de mi kit" className={styles.stats}>
-            <Stat label="Herramientas" value={items.length} icon={<HandymanOutlinedIcon fontSize="inherit" />} />
-            <Stat label="Kit base" value={kitCount} icon={<Inventory2OutlinedIcon fontSize="inherit" />} />
-            <Stat
-              label="Préstamos"
-              value={loanCount}
-              icon={<SwapHorizOutlinedIcon fontSize="inherit" />}
-              iconTone="info"
-            />
-            <Stat
-              label="Incidentes"
-              value={incidentCount}
-              tone={incidentCount > 0 ? 'danger' : 'success'}
-              icon={<ReportProblemOutlinedIcon fontSize="inherit" />}
-              hint={incidentCount > 0 ? "Pendientes de resolución" : "Sin incidentes activos"}
-            />
-          </StatRow>
-        )}
+        {items.length > 0 ? (
+          <p className={styles.resumen}>
+            {[
+              `${items.length} ${items.length === 1 ? "herramienta" : "herramientas"}`,
+              kitCount ? `${kitCount} en el kit` : null,
+              loanCount ? `${loanCount} ${loanCount === 1 ? "prestada" : "prestadas"}` : null,
+              incidentCount ? `${incidentCount} ${incidentCount === 1 ? "incidente" : "incidentes"}` : "sin incidentes",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        ) : null}
 
-        {items.length === 0 ? (
+        {error && items.length === 0 ? (
+          <EmptyState
+            tone="danger"
+            title="No se pudo cargar tu kit"
+            description={error === "No se pudo cargar tu kit" ? "Revisa la conexión e inténtalo de nuevo." : error}
+            action={<Button variant="secondary" onClick={() => void fetchKit()}>Reintentar</Button>}
+          />
+        ) : items.length === 0 ? (
           <EmptyState
             icon={<HandymanOutlinedIcon fontSize="inherit" />}
             title="No tienes herramientas de kit asignadas."
