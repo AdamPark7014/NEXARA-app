@@ -48,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -89,11 +88,7 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(Color(0xFFDBEAFE), Color(0xFFF8FAFC)),
-                ),
-            ),
+            .background(Color(0xFFF8FAFC)),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -109,7 +104,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(
                     modifier = Modifier
@@ -136,26 +131,9 @@ fun LoginScreen(
                     Spacer(Modifier.height(12.dp))
 
                     Text(
-                        "NEXARA",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            letterSpacing = 3.sp,
-                            color = NexaraBrand,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                    )
-
-                    Spacer(Modifier.height(6.dp))
-
-                    Text(
                         "Iniciar sesión",
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color(0xFF0F172A),
-                    )
-                    Text(
-                        "Ingresa a tu cuenta de Nexara",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF64748B),
-                        modifier = Modifier.padding(top = 4.dp),
                     )
 
                     if (state.quickProfiles.isNotEmpty()) {
@@ -289,22 +267,12 @@ fun LoginScreen(
                             onCheckedChange = { vm.setRememberMe(it) },
                             colors = CheckboxDefaults.colors(checkedColor = NexaraBrand),
                         )
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "Recordarme",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color(0xFF0F172A),
-                            )
-                            Text(
-                                if (state.rememberMe) {
-                                    "Entrarás directo sin volver a escribir tu contraseña"
-                                } else {
-                                    "Se cerrará la sesión al cerrar la app"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF64748B),
-                            )
-                        }
+                        Text(
+                            "Recordarme en este teléfono",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color(0xFF0F172A),
+                            modifier = Modifier.weight(1f),
+                        )
                     }
 
                     Spacer(Modifier.height(16.dp))

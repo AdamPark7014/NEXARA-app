@@ -20,6 +20,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -488,43 +489,39 @@ fun ConsoleNavHost(
     val showBack = currentRoute != null && currentRoute !in tabRoutes
     /** Inicio trae su propia cabecera (saludo, fecha y campana): sin barra superior. */
     val enInicio = (currentRoute ?: startRoute) == ConsoleRoutes.Inicio
+    /** La conversación de Chat trae su propia barra, con volver a la lista. */
+    var chatEnConversacion by remember { mutableStateOf(false) }
     /** El detalle de actividad lleva su dock con la acción grande: ahí la barra inferior estorba. */
     val conBarraInferior = currentRoute != ConsoleRoutes.ActivityDetail
 
-    // La barra superior es teal con letras blancas: iconos claros en la barra de
-    // estado mientras se ve. En Inicio el fondo es claro y vuelven los oscuros.
-    if (!enInicio) NxLightStatusBarIcons()
+    val tituloGrande = !showBack && currentRoute in setOf(
+        ConsoleRoutes.Activities,
+        ConsoleRoutes.Attendance,
+        ConsoleRoutes.Chat,
+        ConsoleRoutes.More,
+    )
+    val sinBarraDeShell = enInicio || (currentRoute == ConsoleRoutes.Chat && chatEnConversacion)
     Scaffold(
         topBar = {
-            if (!enInicio) TopAppBar(
-                title = {
+            if (!sinBarraDeShell) {
+                val titulo: @Composable () -> Unit = {
                     Text(
                         currentTitle,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White,
+                        style = if (tituloGrande) {
+                            MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                        } else {
+                            MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                        },
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
-                },
-                colors = NxBrandTopAppBarColors(),
-                navigationIcon = {
-                    if (showBack) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Volver",
-                                tint = Color.White,
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    // «Más» ya es la quinta pestaña de abajo (v2): aquí solo queda la campana.
-                    // Sin «Salir» aquí: cerrar sesión vive al final de Mi perfil, con confirmación.
-                    // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
+                }
+                val campana: @Composable () -> Unit = {
                     if (currentRoute != ConsoleRoutes.Notifications) {
                         IconButton(
-                            onClick = { navController.navigate(ConsoleRoutes.Notifications) { launchSingleTop = true } },
+                            onClick = {
+                                navController.navigate(ConsoleRoutes.Notifications) { launchSingleTop = true }
+                            },
                         ) {
                             BadgedBox(
                                 badge = {
@@ -535,14 +532,40 @@ fun ConsoleNavHost(
                             ) {
                                 Icon(
                                     Icons.Default.Notifications,
-                                    contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
-                                    tint = Color.White,
+                                    contentDescription = if (unreadCount > 0) {
+                                        "Notificaciones, $unreadCount sin leer"
+                                    } else {
+                                        "Notificaciones"
+                                    },
                                 )
                             }
                         }
                     }
-                },
-            )
+                }
+                if (tituloGrande) {
+                    LargeTopAppBar(
+                        title = titulo,
+                        colors = NxBrandTopAppBarColors(),
+                        actions = { campana() },
+                    )
+                } else {
+                    TopAppBar(
+                        title = titulo,
+                        colors = NxBrandTopAppBarColors(),
+                        navigationIcon = {
+                            if (showBack) {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Volver",
+                                    )
+                                }
+                            }
+                        },
+                        actions = { campana() },
+                    )
+                }
+            }
         },
         bottomBar = {
             if (conBarraInferior) {
@@ -638,6 +661,7 @@ fun ConsoleNavHost(
                 ChatScreen(
                     initialChannelId = chatChannelId,
                     initialMessageId = chatMessageId,
+                    onConversacionAbierta = { chatEnConversacion = it },
                 )
             }
             // Clientes ya no es pestaña (v2): se abre desde «Más» o por enlace, con flecha de volver.

@@ -461,7 +461,7 @@ private fun JornadaHero(
         jornada == InicioRules.Jornada.EN_JORNADA && state.gpsActivo -> "Compartiendo tu ubicación de jornada"
         jornada == InicioRules.Jornada.EN_JORNADA -> "Tu ubicación de jornada está apagada"
         jornada == InicioRules.Jornada.COMPLETADA -> "Entrada y salida registradas hoy"
-        else -> "Se toma una foto y tu ubicación al checar"
+        else -> null
     }
     // El API contesta 400 a la segunda entrada del día: aquí se apaga antes.
     val siguiente = when {
@@ -513,9 +513,11 @@ private fun JornadaHero(
                 )
                 Text("h trabajadas", fontSize = 16.sp, color = Color.White.copy(alpha = 0.78f), modifier = Modifier.padding(bottom = 6.dp))
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Icons.Outlined.Place, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(15.dp))
-                Text(subTexto, fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subTexto != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Outlined.Place, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(15.dp))
+                    Text(subTexto, fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),

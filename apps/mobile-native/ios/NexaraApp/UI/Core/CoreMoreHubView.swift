@@ -4,7 +4,7 @@ import SwiftUI
 /// #F8FAFC, tu perfil arriba, «CLIENTES Y OBRA» con Clientes si el rol lo ve, y
 /// los módulos de Core agrupados en HOY / RECURSOS / FINANZAS / GOBIERNO,
 /// filtrados por `CoreNavigation.extraModules`. Va dentro del `NavigationStack`
-/// de la pestaña; la barra teal se la pone el shell.
+/// de la pestaña; la barra clara se la pone el shell.
 ///
 /// A dónde va cada módulo lo decide `CoreExtraDestination`. Solo se enseñan los
 /// que ya tienen pantalla nativa (`tienePantallaNativa`): nada de fichas «en la
@@ -47,8 +47,7 @@ struct CoreMoreHubView: View {
                     } label: {
                         CoreMoreHubCard(
                             systemImage: "person.2.fill",
-                            title: "Clientes",
-                            summary: "Padrón por sector: fichas, sucursales y altas."
+                            title: "Clientes"
                         )
                     }
                     .buttonStyle(NxPressableStyle())
@@ -66,8 +65,7 @@ struct CoreMoreHubView: View {
                         } label: {
                             CoreMoreHubCard(
                                 systemImage: module.systemImage,
-                                title: module.title,
-                                summary: module.summary
+                                title: module.title
                             )
                         }
                         .buttonStyle(NxPressableStyle())
@@ -105,37 +103,24 @@ private struct CoreMoreHubGroupHeader: View {
 }
 
 /// Renglón del hub (Android `HubCard`): tarjeta radio 16 con elevación 1, alto
-/// mínimo 64, baldosa de 40 en `brandSoft` (radio 12) con el icono de 22 en
-/// `brandText`, nombre 14 SemiBold, resumen 12,5 gris (2 líneas) y flecha.
+/// mínimo 64, icono y el nombre. La frase de cada módulo no se repite aquí:
+/// el título de la barra, al entrar, ya dice cuál es.
 private struct CoreMoreHubCard: View {
     let systemImage: String
     let title: String
-    let summary: String
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
-                    .fill(NxColors.brandSoft)
-                Image(systemName: systemImage)
-                    .font(.system(size: 19, weight: .regular))
-                    .foregroundStyle(NxColors.brandText)
-                    .frame(width: 22, height: 22)
-            }
-            .frame(width: 40, height: 40)
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(NxType.titleSmall)
-                    .foregroundStyle(NxColors.fg)
-                    .lineLimit(1)
-                Text(summary)
-                    .font(NxType.bodySmall)
-                    .foregroundStyle(NxColors.muted)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(NxColors.muted)
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(NxType.titleSmall)
+                .foregroundStyle(NxColors.fg)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(NxColors.muted)

@@ -575,7 +575,7 @@ fun ConsoleAttendanceScreen(
         TabRow(
             selectedTabIndex = indice,
             containerColor = NxColors.Surface,
-            contentColor = NxColors.Brand,
+            contentColor = NxColors.Slate,
         ) {
             pestanas.forEach { (key, label) ->
                 Tab(
@@ -585,12 +585,12 @@ fun ConsoleAttendanceScreen(
                         Text(
                             label,
                             fontSize = 13.5.sp,
-                            fontWeight = if (tab == key) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (tab == key) FontWeight.SemiBold else FontWeight.Medium,
                             maxLines = 1,
                         )
                     },
-                    selectedContentColor = NxColors.Brand,
-                    unselectedContentColor = NxUi.Fg2,
+                    selectedContentColor = NxColors.Slate,
+                    unselectedContentColor = NxColors.Muted,
                 )
             }
         }
@@ -1086,15 +1086,14 @@ private fun MiJornadaCard(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                Text(
-                    when {
-                        abierta && inicioIso != null -> "Desde las ${fmtHora(inicioIso)}"
-                        !esHoy -> "Solo se puede checar en el día de hoy."
-                        else -> "Se toma una foto y tu ubicación."
-                    },
-                    fontSize = 12.sp,
-                    color = NxColors.Muted,
-                )
+                val apoyo = when {
+                    abierta && inicioIso != null -> "Desde las ${fmtHora(inicioIso)}"
+                    !esHoy -> "Solo se puede checar en el día de hoy."
+                    else -> null
+                }
+                if (apoyo != null) {
+                    Text(apoyo, fontSize = 13.sp, color = NxColors.Muted)
+                }
             }
             if (abierta && inicioIso != null) {
                 // Cifras de ancho fijo: el reloj no baila mientras corre.
@@ -1213,21 +1212,12 @@ private fun GpsJornadaAviso(onDetener: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            NxIconText(
-                text = "Compartiendo ubicación de jornada",
-                icon = Icons.Outlined.GpsFixed,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = NxColors.Slate,
-                iconSize = 16.dp,
-            )
-            Text(
-                "Se apaga sola al registrar tu salida.",
-                fontSize = 11.5.sp,
-                color = NxColors.Muted,
-            )
-        }
+        Text(
+            "Ubicación de jornada activa hasta tu salida.",
+            fontSize = 15.sp,
+            color = NxColors.Slate,
+            modifier = Modifier.weight(1f),
+        )
         TextButton(onClick = onDetener) { Text("Dejar de compartir", fontSize = 12.5.sp) }
     }
 }

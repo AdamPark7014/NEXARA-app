@@ -1,12 +1,11 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Cromo de navegación igual a Android
+// MARK: - Cromo de navegación
 //
-// Barra superior teal (Android `TopAppBar` con `NxBrandTopAppBarColors`) y barra
-// inferior propia (Android `NxBottomTabBar`, Material 3 `NavigationBar`). Las
-// usa `CoreShellView`; las pantallas solo aplican `.nxBrandNavBar(…)` a lo que
-// ellas mismas empujan o presentan.
+// Barra superior clara (título en tinta, fondo del lienzo) y barra inferior
+// propia. Las usa `CoreShellView`; las pantallas aplican `.nxBrandNavBar(…)`
+// a lo que ellas mismas empujan o presentan.
 
 // MARK: - Entorno que pone el shell
 
@@ -51,9 +50,9 @@ final class NxShellChrome: ObservableObject {
     }
 }
 
-// MARK: - Barra superior teal
+// MARK: - Barra superior clara
 
-/// `true` cuando una vista de DENTRO ya puso su propia barra teal: la de fuera
+/// `true` cuando una vista de DENTRO ya puso su propia barra: la de fuera
 /// no repite campana ni título (si el shell y la pantalla la aplican los dos,
 /// se ve una sola campana).
 private struct NxBrandNavBarInteriorKey: PreferenceKey {
@@ -67,23 +66,23 @@ private struct NxBrandNavBarInteriorKey: PreferenceKey {
 private struct NxBrandNavBarModifier: ViewModifier {
     let title: String?
     let showsBell: Bool
+    let large: Bool
     @Environment(\.nxOpenNotifications) private var openNotifications
     @State private var hayOtraDentro = false
 
-    private var muestraTitulo: Bool { title != nil && !hayOtraDentro }
+    private var muestraTitulo: Bool { title != nil && !hayOtraDentro && !large }
     private var muestraCampana: Bool { showsBell && openNotifications != nil && !hayOtraDentro }
 
     func body(content: Content) -> some View {
         conTitulo(
             content.onPreferenceChange(NxBrandNavBarInteriorKey.self) { hayOtraDentro = $0 }
         )
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(NxColors.brand, for: .navigationBar)
+        .navigationBarTitleDisplayMode(large ? .large : .inline)
+        .toolbarBackground(NxColors.surface, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        // Barra «oscura»: título blanco y la hora y la batería en blanco. Los
-        // botones de la barra salen blancos porque `AccentColor` es blanco con
-        // rasgo oscuro (ver `NxBrand`).
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        // Barra clara: título y hora en tinta. El acento de la flecha sale del
+        // rasgo claro (teal), no de una franja de color.
+        .toolbarColorScheme(.light, for: .navigationBar)
         // Volver = solo la flecha, sin el nombre de la pantalla anterior (Android).
         .toolbarRole(.editor)
         .toolbar {
@@ -113,14 +112,14 @@ private struct NxBrandNavBarModifier: ViewModifier {
     }
 }
 
-/// Título de la barra teal: 16 SemiBold blanco en una línea (Android `titleMedium`).
+/// Título de la barra clara: 17 SemiBold en tinta, una línea.
 private struct NxBrandNavTitle: View {
     let text: String
 
     var body: some View {
         Text(text)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(Color.white)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(NxColors.fg)
             .lineLimit(1)
             .truncationMode(.tail)
             .accessibilityAddTraits(.isHeader)
@@ -128,20 +127,17 @@ private struct NxBrandNavTitle: View {
 }
 
 extension View {
-    /// Barra superior teal de Android en esta pantalla: fondo #1F9E84 siempre
-    /// visible, título 16 SemiBold blanco en una línea, flecha de volver blanca
-    /// (solo si la pantalla está apilada), hora y batería en blanco y, a la
-    /// derecha, la campana con su insignia roja.
+    /// Barra superior clara. En la raíz de una pestaña el título es grande;
+    /// al empujar, queda en línea y la flecha de volver es la del sistema.
     ///
-    /// - `title`: si se da, se pinta con la letra exacta de Android y se usa como
-    ///   `navigationTitle`. Con `nil` se respeta el título que ponga la pantalla.
+    /// - `title`: `navigationTitle`. Con `nil` se respeta el de la pantalla.
     /// - `showsBell`: `false` dentro de Notificaciones (abrirla ya da todo por visto).
+    /// - `large`: título grande, solo en la raíz de pestaña.
     ///
-    /// Regla: lo aplica QUIEN ABRE la pantalla (el shell a sus pestañas y
-    /// cubiertas, el hub a sus módulos, cada pantalla a lo que empuja). Si dos lo
-    /// aplican a la misma vista no pasa nada: se ve una sola campana.
-    func nxBrandNavBar(title: String? = nil, showsBell: Bool = true) -> some View {
-        modifier(NxBrandNavBarModifier(title: title, showsBell: showsBell))
+    /// Lo aplica quien abre la pantalla. Si dos lo aplican a la misma vista
+    /// se ve una sola campana.
+    func nxBrandNavBar(title: String? = nil, showsBell: Bool = true, large: Bool = false) -> some View {
+        modifier(NxBrandNavBarModifier(title: title, showsBell: showsBell, large: large))
     }
 
     /// Oculta la barra inferior del shell mientras esta pantalla está a la vista
@@ -172,7 +168,7 @@ struct NxBellButton: View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "bell.fill")
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(NxColors.fg)
                 if badge.unreadCount > 0 {
                     NxCountBadge(count: badge.unreadCount)
                         .fixedSize()
@@ -180,7 +176,7 @@ struct NxBellButton: View {
                 }
             }
         }
-        .tint(Color.white)
+        .tint(NxColors.fg)
         .accessibilityLabel(badge.unreadCount > 0 ? "Notificaciones, \(badge.unreadCount) sin leer" : "Notificaciones")
         .accessibilityIdentifier("bell-button")
     }
@@ -219,18 +215,14 @@ struct NxBottomBarItem: Identifiable {
     var badgeNoun: String = "pendientes"
 }
 
-/// Barra inferior de Android (`NxBottomTabBar` = Material 3 `NavigationBar`):
-/// fondo #F8FAFC sin sombra, 80 de alto más el área segura. La activa lleva una
-/// pastilla de 64 × 32 (radio 16) en #CFECE4 detrás del icono relleno #0F5F4F y
-/// el texto 12 SemiBold #0F172A; las demás, icono de contorno y texto 12 Medium
-/// #6B7889. Insignia roja con «99+» en la esquina del icono. Vibración ligera al
-/// cambiar de pestaña; tocar la activa no hace nada (como Android).
+/// Barra inferior: icono y palabra. La activa va en tinta, las demás en gris.
+/// Sin pastilla. Vibración ligera al cambiar; tocar la activa no hace nada.
 struct NxBottomBar: View {
     let items: [NxBottomBarItem]
     let selectedId: String
     let onSelect: (String) -> Void
 
-    static let height: CGFloat = 80
+    static let height: CGFloat = 56
 
     var body: some View {
         HStack(alignment: .top, spacing: NxSpacing.s) {
@@ -260,33 +252,25 @@ private struct NxBottomBarButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                ZStack {
-                    Capsule()
-                        .fill(NxColors.brandSoft2)
-                        .frame(width: 64, height: 32)
-                        .scaleEffect(x: selected ? 1 : 0.5, y: 1)
-                        .opacity(selected ? 1 : 0)
-                    Image(systemName: selected ? item.selectedSystemImage : item.systemImage)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(selected ? NxColors.brandDeep : NxColors.muted)
-                        .frame(width: 24, height: 24)
-                        .overlay(alignment: .topLeading) {
-                            if item.badge > 0 {
-                                NxCountBadge(count: item.badge)
-                                    .fixedSize()
-                                    .offset(x: 12, y: -4)
-                            }
+            VStack(spacing: 2) {
+                Image(systemName: selected ? item.selectedSystemImage : item.systemImage)
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(selected ? NxColors.fg : NxColors.muted)
+                    .frame(width: 28, height: 24)
+                    .overlay(alignment: .topTrailing) {
+                        if item.badge > 0 {
+                            NxCountBadge(count: item.badge)
+                                .fixedSize()
+                                .offset(x: 8, y: -6)
                         }
-                }
-                .frame(width: 64, height: 32)
+                    }
                 Text(item.title)
-                    .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
                     .foregroundStyle(selected ? NxColors.fg : NxColors.muted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .padding(.top, 12)
+            .padding(.top, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .contentShape(Rectangle())
             .animation(.easeOut(duration: 0.2), value: selected)

@@ -437,7 +437,7 @@ fun ActivityDetailScreen(
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = c.surface,
-                contentColor = c.brand,
+                contentColor = c.fg,
             ) {
                 ACTIVITY_TABS.forEachIndexed { i, label ->
                     Tab(
@@ -450,8 +450,8 @@ fun ActivityDetailScreen(
                                 fontWeight = if (selectedTab == i) FontWeight.Bold else FontWeight.Medium,
                             )
                         },
-                        selectedContentColor = c.brand,
-                        unselectedContentColor = c.fg2,
+                        selectedContentColor = c.fg,
+                        unselectedContentColor = c.muted,
                     )
                 }
             }

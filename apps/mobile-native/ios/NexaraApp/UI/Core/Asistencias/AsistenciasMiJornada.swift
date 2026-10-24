@@ -34,21 +34,23 @@ struct MiJornadaCard: View {
         return nil
     }
 
-    private var subtitulo: String {
+    private var subtitulo: String? {
         if abierta, let inicio = vm.inicioIso { return "Desde las \(AttendanceClock.time(inicio))" }
         if !esHoy { return "Solo se puede checar en el día de hoy." }
-        return "Se toma una foto y tu ubicación."
+        return nil
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    NxStatusDot(text: estadoTexto, color: estadoColor, fontSize: 15, fontWeight: .bold)
-                    Text(subtitulo)
-                        .font(.system(size: 12))
-                        .foregroundStyle(NxColors.muted)
-                        .fixedSize(horizontal: false, vertical: true)
+                    NxStatusDot(text: estadoTexto, color: estadoColor, fontSize: 17, fontWeight: .semibold)
+                    if let subtitulo {
+                        Text(subtitulo)
+                            .font(.system(size: 13))
+                            .foregroundStyle(NxColors.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if abierta, let inicio = vm.inicioIso {
@@ -172,19 +174,9 @@ struct GpsJornadaAviso: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
-                AsisIconText(
-                    text: "Compartiendo ubicación de jornada",
-                    systemImage: AsisIcono.gps,
-                    fontSize: 13,
-                    weight: .semibold,
-                    color: NxColors.fg,
-                    iconSize: 16
-                )
-                Text("Se apaga sola al registrar tu salida.")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(NxColors.muted)
-            }
+            Text("Ubicación de jornada activa hasta tu salida.")
+                .font(.system(size: 15))
+                .foregroundStyle(NxColors.fg)
             .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: onDetener) {
                 Text("Dejar de compartir")

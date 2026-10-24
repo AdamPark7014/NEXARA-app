@@ -243,8 +243,7 @@ private fun LazyListScope.seccionKit(
         item(key = "kit-vacio") {
             NxEmptyState(
                 title = "No traes herramienta asignada",
-                subtitle = "Tu kit está vacío: nadie te ha asignado una herramienta de forma " +
-                    "permanente. Almacén es quien las reparte.",
+                subtitle = "",
                 actionLabel = if (hayPrestamos) "Ver mis préstamos" else null,
                 onAction = if (hayPrestamos) onVerPrestamos else null,
             )
@@ -255,7 +254,6 @@ private fun LazyListScope.seccionKit(
     item(key = "kit-cabecera") {
         MoreCabecera(
             titulo = "Mi kit",
-            subtitulo = "Primero lo que reclama atención",
             trailing = "${kit.size}",
         )
     }
@@ -331,15 +329,14 @@ private fun LazyListScope.seccionPrestamos(
 
                 filtro == HerramientasRules.FiltroPrestamo.ABIERTOS && total > 0 -> NxEmptyState(
                     title = "No debes ninguna",
-                    subtitle = "No tienes préstamos abiertos: todo lo que pediste ya se cerró.",
+                    subtitle = "",
                     actionLabel = "Ver el historial",
                     onAction = { onFiltro(HerramientasRules.FiltroPrestamo.TODOS) },
                 )
 
                 else -> NxEmptyState(
                     title = "Todavía no pides herramienta prestada",
-                    subtitle = "Los préstamos se dan de alta en almacén. Cuando te presten algo, " +
-                        "aparecerá aquí con su fecha de devolución y su código para recogerlo.",
+                    subtitle = "",
                 )
             }
         }
@@ -349,7 +346,6 @@ private fun LazyListScope.seccionPrestamos(
     item(key = "prestamos-cabecera") {
         MoreCabecera(
             titulo = filtro.etiqueta,
-            subtitulo = "Primero lo vencido y lo que vence antes",
             trailing = "${prestamos.size}",
         )
     }

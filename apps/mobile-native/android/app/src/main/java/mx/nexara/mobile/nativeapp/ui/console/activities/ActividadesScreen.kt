@@ -30,7 +30,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Visibility
@@ -42,6 +41,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -251,48 +253,40 @@ fun ActividadesScreen(
 }
 
 /**
- * Pestañas subrayadas, como en la web. Antes era una píldora blanca con borde
- * dentro del área de contenido: una caja dentro de otra caja que se comía
- * 68 dp de alto para decir dos palabras.
+ * Dos vistas del día, en el control segmentado del sistema. Sin iconos ni
+ * subrayado de marca: el segmento elegido ya dice dónde estás.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VistaTabs(vista: String, onChange: (String) -> Unit) {
     val opciones = listOf(
-        Triple(VISTA_MIAS, "Mis actividades", NxGlyph.APPROVED.icon),
-        Triple(VISTA_EQUIPO, "Mi equipo", Icons.Outlined.Groups),
+        VISTA_MIAS to "Mis actividades",
+        VISTA_EQUIPO to "Mi equipo",
     )
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            opciones.forEach { (id, label, icon) ->
-                val on = vista == id
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onChange(id) }
-                        .padding(top = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    NxIconText(
-                        text = label,
-                        icon = icon,
-                        fontSize = 13.5.sp,
-                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                        color = if (on) NxColors.Brand else NxUi.Fg2,
-                        iconSize = 17.dp,
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    // El subrayado es el único adorno: marca dónde estás sin dibujar una caja.
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .background(if (on) NxColors.Brand else Color.Transparent),
-                    )
-                }
+    val colores = SegmentedButtonDefaults.colors(
+        activeContainerColor = NxColors.Card,
+        activeContentColor = NxColors.Slate,
+        activeBorderColor = NxColors.Muted.copy(alpha = 0.35f),
+        inactiveContainerColor = NxColors.Surface,
+        inactiveContentColor = NxColors.Muted,
+        inactiveBorderColor = NxColors.Muted.copy(alpha = 0.25f),
+    )
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        opciones.forEachIndexed { index, (id, label) ->
+            SegmentedButton(
+                selected = vista == id,
+                onClick = { onChange(id) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = opciones.size),
+                colors = colores,
+                icon = {},
+            ) {
+                Text(label, maxLines = 1, fontWeight = FontWeight.Medium)
             }
         }
-        HorizontalDivider(color = NxUi.Border)
     }
 }
 
@@ -773,7 +767,6 @@ private fun MisActividadesContent(
     val urgentes = open.count { CoreActivityRules.isUrgent(it.prioridad) }
     val canReorder = data?.canReorder == true && open.size > 1
     val canSelfAssign = data?.canSelfAssign == true && onSelfAssign != null
-    val firstName = CoreActivityRules.firstName(user?.nombre)
     val hayAlgo = open.isNotEmpty() || done.isNotEmpty() || seguimiento.isNotEmpty()
     val estado = nxEstadoPantalla(cargando = loading && data == null, error = error, hayDatos = hayAlgo)
 
@@ -790,42 +783,30 @@ private fun MisActividadesContent(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Encabezado de dos renglones: saludo y qué hacer ahora. Nada más:
-            // lo primero que se tiene que ver es la actividad, no la bienvenida.
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            // El título grande ya dice «Actividades». Aquí solo el resumen del día.
+            if (estado == NxEstadoPantalla.CONTENIDO) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         Text(
-                            if (firstName.isNotBlank()) "Hola, $firstName" else "Tu día",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NxColors.Slate,
+                            ActividadesUx.resumenDia(open.size, urgentes, done.size, seguimiento.size),
+                            fontSize = 15.sp,
+                            color = NxColors.Muted,
+                            modifier = Modifier.weight(1f),
                         )
-                        Text(
-                            ActividadesUx.instruccionDia(open.size, loading && data == null),
-                            fontSize = 13.sp,
-                            color = NxUi.Fg2,
-                        )
-                    }
-                    // Siempre visible: con cola es secundario (el primario es la #1);
-                    // con la cola vacía también tiene que estar, aunque haya hechas hoy.
-                    if (ActividadesUx.muestraAutoasignar(canSelfAssign)) {
-                        TextButton(
-                            onClick = { onSelfAssign?.invoke() },
-                            modifier = Modifier.heightIn(min = NxUi.TouchH),
-                        ) { Text("Auto-asignarme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = NxUi.Fg2) }
+                        if (ActividadesUx.muestraAutoasignar(canSelfAssign) && open.isNotEmpty()) {
+                            TextButton(
+                                onClick = { onSelfAssign?.invoke() },
+                                modifier = Modifier.heightIn(min = NxUi.TouchH),
+                            ) {
+                                Text("Auto-asignarme", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = NxColors.Brand)
+                            }
+                        }
                     }
                 }
-            }
-
-            // Regla 7: sin nada que contar, la tira no se pinta.
-            val metricas = ActividadesUx.metricas(open.size, urgentes, done.size, seguimiento.size)
-            if (metricas.isNotEmpty()) {
-                item { NxMetricStrip(items = metricas) }
             }
 
             // Cola vacía pero hay hechas hoy o seguimiento: la pantalla no está
@@ -849,31 +830,13 @@ private fun MisActividadesContent(
                 NxEstadoPantalla.ERROR -> item { NxErrorBlock(error.orEmpty()) { reload++ } }
                 NxEstadoPantalla.VACIO -> item {
                     NxEmptyState(
-                        title = "Todo al día",
-                        subtitle = "Cuando te asignen algo aparecerá aquí.",
+                        title = "Nada pendiente hoy",
+                        subtitle = "",
                         actionLabel = if (canSelfAssign) "Auto-asignarme una actividad" else null,
                         onAction = if (canSelfAssign) ({ onSelfAssign?.invoke() }) else null,
                     )
                 }
                 NxEstadoPantalla.CONTENIDO -> {
-                    if (canReorder) {
-                        item {
-                            Text(
-                                "Tú decides el orden: usa «Subir» y «Bajar». Cada cambio pide un motivo corto.",
-                                fontSize = 12.5.sp,
-                                color = NxColors.Muted,
-                            )
-                        }
-                    } else if (open.size > 1) {
-                        item {
-                            Text(
-                                "El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.",
-                                fontSize = 12.5.sp,
-                                color = NxColors.Muted,
-                            )
-                        }
-                    }
-
                     itemsIndexed(open, key = { _, a -> "open-${a.id}" }) { index, a ->
                         OpenActivityCard(
                             a = a,
@@ -914,7 +877,6 @@ private fun MisActividadesContent(
                         item {
                             NxDenseSectionHeader(
                                 title = "En seguimiento (${seguimiento.size})",
-                                hint = "Ya las repartiste: aquí ves a quién y cómo va quien las ejecuta.",
                                 modifier = Modifier.padding(top = 6.dp),
                             )
                         }
@@ -1038,7 +1000,6 @@ private fun OpenActivityCard(
     /** «Iniciar actividad»: guarda la hora real y abre la pestaña indicada. */
     onIniciar: (String?) -> Unit = {},
 ) {
-    val pr = CoreActivityRules.priorityUi(a.prioridad)
     val first = index == 0
     val prColor = ActividadesUx.colorPrioridad(a.prioridad)?.let { Color(it) } ?: NxUi.BorderStrong
     val shape = RoundedCornerShape(14.dp)
@@ -1061,51 +1022,40 @@ private fun OpenActivityCard(
             .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(if (first) NxColors.Brand else NxColors.BrandSoft),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "${index + 1}",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (first) Color.White else NxColors.Brand,
-                )
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                if (first) {
-                    Text(
-                        "EMPIEZA POR AQUÍ",
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NxColors.Brand,
-                        letterSpacing = 1.sp,
-                    )
-                }
+        val cuando = ActivityPeriodo.cuandoTexto(
+            a.periodo,
+            CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima),
+        )
+        val tipo = listOfNotNull(
+            CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom),
+            a.anNumber?.takeIf { it.isNotBlank() }?.let { "Folio $it" },
+        ).joinToString(" · ")
+        val contexto = ActividadesUx.lineaContexto(cuando, a.cliente ?: a.proyecto, tipo)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+            Text(
+                "${index + 1}",
+                fontSize = 15.sp,
+                fontWeight = if (first) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (first) NxColors.Slate else NxColors.Muted,
+                modifier = Modifier.width(18.dp),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     a.titulo.orEmpty(),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = NxColors.Slate,
-                    lineHeight = 20.sp,
+                    lineHeight = 22.sp,
                 )
-                // El tipo, con su ícono: es lo que distingue una obra de un trámite de un vistazo.
-                NxIconText(
-                    text = listOfNotNull(
-                        CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom),
-                        a.anNumber?.takeIf { it.isNotBlank() }?.let { "Folio $it" },
-                    ).joinToString(" · "),
-                    icon = CoreActivityRules.kindGlyph(a.coreKind).icon,
-                    fontSize = 12.sp,
-                    color = NxColors.Muted,
-                    iconSize = 15.dp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (contexto.isNotBlank()) {
+                    Text(
+                        contexto,
+                        fontSize = 13.sp,
+                        color = NxColors.Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
 
@@ -1145,65 +1095,18 @@ private fun OpenActivityCard(
         }
         iniciarError?.let { Text(it, fontSize = 12.5.sp, color = Color(CoreActivityRules.ROJO)) }
 
-        // Estado: punto y palabra. Gris para el flujo normal, color solo si pide acción.
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            if (a.porRepartir == true) {
-                NxStatusDot("Te toca repartirla", color = CoreActivityRules.NARANJA, fontWeight = FontWeight.Bold)
-            }
-            ActivitySemaforo.luz(a.semaforo)?.let { luz ->
-                NxStatusDot(luz.etiqueta, color = ActividadesUx.colorSemaforo(a.semaforo))
-            }
-            NxStatusDot(
-                CoreActivityRules.estatusUi(a.estatus).label,
-                color = ActividadesUx.colorEstatus(a.estatus),
-            )
-            NxStatusDot(pr.label, color = ActividadesUx.colorPrioridad(a.prioridad))
+        Text(
+            ActividadesUx.lineaEstado(a.porRepartir == true, a.semaforo, a.estatus, a.prioridad),
+            fontSize = 13.sp,
+            color = NxColors.Muted,
+        )
+        val tiempoExcedido = if (a.excedida == true) {
+            ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)
+        } else {
+            null
         }
-
-        // Cuándo, cuánto y dónde: tres datos con su ícono, en una sola línea si caben.
-        val meta = buildList {
-            // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
-            add(
-                (
-                    ActivityPeriodo.cuandoTexto(a.periodo, CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima))
-                        ?: "Sin fecha"
-                    ) to NxIcons.Calendar,
-            )
-            val tiempo = ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)
-                ?: a.tiempoEstimadoMin?.takeIf { it > 0 }?.let { est ->
-                    val tope = a.tiempoMaximoMin?.takeIf { it > 0 }
-                        ?.let { " · tope ${CoreActivityRules.formatMinutes(it)}" }.orEmpty()
-                    "${CoreActivityRules.formatMinutes(est)}$tope"
-                }
-            tiempo?.let { add(it to Icons.Outlined.Schedule) }
-            (a.cliente ?: a.proyecto)?.takeIf { it.isNotBlank() }?.let { add(it to Icons.Outlined.LocationOn) }
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            meta.forEach { (text, icon) ->
-                NxIconText(
-                    text = text,
-                    icon = icon,
-                    fontSize = 12.5.sp,
-                    color = if (text.startsWith("Plan") && a.excedida == true) {
-                        Color(CoreActivityRules.ROJO)
-                    } else {
-                        NxColors.Muted
-                    },
-                    iconSize = 15.dp,
-                )
-            }
-        }
-
-        // Quién la mandó: dato de contexto, no otro chip de colores.
-        val quien = when {
-            a.autoAsignada == true -> "Auto-asignada"
-            else -> ActivitySemaforo.asignadaPorTexto(a.quienAsigno?.nombre)
-        }
-        quien?.let {
-            NxIconText(text = it, icon = NxGlyph.PERSON.icon, fontSize = 12.5.sp, color = NxColors.Muted, iconSize = 15.dp)
+        tiempoExcedido?.let {
+            Text(it, fontSize = 13.sp, color = Color(CoreActivityRules.ROJO))
         }
 
         // Nota con una línea de margen en vez de un recuadro relleno: el borde

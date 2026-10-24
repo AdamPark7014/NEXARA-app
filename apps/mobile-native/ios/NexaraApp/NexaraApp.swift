@@ -114,8 +114,8 @@ struct RootView: View {
                 app.route = AppState.landing(for: session.currentUser)
             }
         }
-        // Login y bienvenida son claros (hora en negro); el portal lleva barra teal
-        // (hora en blanco). Dentro del shell manda `CoreShellView`. Ver `NxStatusBar`.
+        // Login, bienvenida, portal y shell llevan barra clara (hora en negro).
+        // Dentro del shell manda `CoreShellView`. Ver `NxStatusBar`.
         .onAppear { barraDeEstado(para: app.route) }
         .onChange(of: app.route) { _, ruta in barraDeEstado(para: ruta) }
         // Sesión leída del llavero tarde (arranque con el teléfono bloqueado):
@@ -127,8 +127,7 @@ struct RootView: View {
 
     private func barraDeEstado(para ruta: AppState.Route) {
         switch ruta {
-        case .login, .onboarding: NxStatusBar.textoBlanco(false)
-        case .portal: NxStatusBar.textoBlanco(true)
+        case .login, .onboarding, .portal: NxStatusBar.textoBlanco(false)
         case .core: break
         }
     }

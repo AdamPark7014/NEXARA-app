@@ -1,10 +1,8 @@
 import LocalAuthentication
 import SwiftUI
 
-/// Inicio de sesión — igual que `LoginScreen` de Android: fondo degradado azul
-/// claro, tarjeta blanca de radio 20 con el logo, «NEXARA», «Iniciar sesión»,
-/// acceso rápido, correo y contraseña, «Recordarme», «Entrar», la huella para
-/// elegir el perfil guardado y el aviso de privacidad; abajo, la versión.
+/// Inicio de sesión: logo, «Iniciar sesión», correo, contraseña, «Recordarme»,
+/// «Entrar» y, si hay perfil guardado, la huella. Abajo, la versión.
 ///
 /// Como Android, no se pregunta «Usuario / Cliente / Sucursal»: se prueba
 /// primero la cuenta de personal y, si el servidor dice que ahí no existe
@@ -73,14 +71,7 @@ struct LoginView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .background(
-            LinearGradient(
-                colors: [NxColors.rgb(0xDBEAFE), NxColors.surface],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-        )
+        .background(NxColors.surface.ignoresSafeArea())
         .onChange(of: email) { _, _ in
             errorMessage = nil
             infoMessage = nil
@@ -104,20 +95,10 @@ struct LoginView: View {
                 .background(Self.azulOscuro, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .accessibilityLabel("Nexara")
 
-            Text("NEXARA")
-                .font(.system(size: 14, weight: .semibold))
-                .tracking(3)
-                .foregroundStyle(Self.azul)
-                .padding(.top, 12)
-
             Text("Iniciar sesión")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(NxColors.fg)
-                .padding(.top, 6)
-            Text("Ingresa a tu cuenta de Nexara")
-                .font(NxType.bodyMedium)
-                .foregroundStyle(Self.sub)
-                .padding(.top, 4)
+                .padding(.top, 16)
 
             if !quickProfiles.isEmpty {
                 accesoRapido
@@ -168,7 +149,7 @@ struct LoginView: View {
         .padding(.horizontal, 28)
         .padding(.vertical, 36)
         .frame(maxWidth: .infinity)
-        .nxCardSurface(radius: NxRadius.xl, elevation: 6, fill: NxColors.card)
+        .nxCardSurface(radius: NxRadius.xl, elevation: 0, fill: NxColors.card)
     }
 
     private func etiquetaCampo(_ texto: String) -> some View {
@@ -194,11 +175,13 @@ struct LoginView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(profile.displayName)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Self.azulOscuro)
-                                Text(profile.email)
-                                    .font(NxType.bodySmall)
-                                    .foregroundStyle(Self.sub)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(NxColors.fg)
+                                if profile.email.caseInsensitiveCompare(profile.displayName) != .orderedSame {
+                                    Text(profile.email)
+                                        .font(NxType.bodySmall)
+                                        .foregroundStyle(Self.sub)
+                                }
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -302,18 +285,10 @@ struct LoginView: View {
                 }
                 .frame(width: 18, height: 18)
                 .frame(width: 48, height: 48)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Recordarme")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(NxColors.fg)
-                    Text(rememberMe
-                         ? "Entrarás directo sin volver a escribir tu contraseña"
-                         : "Se cerrará la sesión al cerrar la app")
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(Self.sub)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Recordarme en este teléfono")
+                    .font(.system(size: 17))
+                    .foregroundStyle(NxColors.fg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
