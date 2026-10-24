@@ -12,8 +12,6 @@ import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
 import EditOutlined from "@mui/icons-material/EditOutlined";
 import CategoryOutlined from "@mui/icons-material/CategoryOutlined";
 import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
-import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
-import TrendingDownOutlined from "@mui/icons-material/TrendingDownOutlined";
 import PaidOutlined from "@mui/icons-material/PaidOutlined";
 import EventBusyOutlined from "@mui/icons-material/EventBusyOutlined";
 import InsightsOutlined from "@mui/icons-material/InsightsOutlined";
@@ -1585,47 +1583,8 @@ export function VistaAlmacen({
       {tab === "inventario" && (
         <ModulePage
           listLabel="Existencias"
-          stats={
-            cargadoUnaVez && items.length > 0 ? (
-              <StatRow ariaLabel="Resumen del inventario" cols={4}>
-                <Stat
-                  label="Agotados"
-                  value={resumen.sinStock}
-                  hint={resumen.sinStock > 0 ? "Hay que reponerlos ya" : "Todo tiene existencia"}
-                  tone={resumen.sinStock > 0 ? "danger" : "default"}
-                  icon={<ReportProblemOutlined />}
-                  iconTone={resumen.sinStock > 0 ? "danger" : "neutral"}
-                  semaforo={resumen.sinStock > 0 ? "rojo" : "verde"}
-                  onClick={() => alternarEstado("sin_stock")}
-                  pressed={filterEstado === "sin_stock"}
-                />
-                <Stat
-                  label="Bajo mínimo"
-                  value={resumen.bajoMinimo}
-                  hint={resumen.bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles sanos"}
-                  tone={resumen.bajoMinimo > 0 ? "warning" : "default"}
-                  icon={<TrendingDownOutlined />}
-                  iconTone={resumen.bajoMinimo > 0 ? "warning" : "neutral"}
-                  semaforo={resumen.bajoMinimo > 0 ? "ambar" : "verde"}
-                  onClick={() => alternarEstado("bajo_minimo")}
-                  pressed={filterEstado === "bajo_minimo"}
-                />
-                {resumen.valorTotal > 0 ? (
-                  <Stat
-                    label="Valor del inventario"
-                    value={<Money value={resumen.valorTotal} compact />}
-                    hint={`${cantidad(items.length)} registros de stock`}
-                    icon={<PaidOutlined />}
-                  />
-                ) : (
-                  <Stat label="Registros de stock" value={cantidad(items.length)} hint="Producto por almacén" icon={<Inventory2Outlined />} />
-                )}
-                <Stat label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon={<WarehouseOutlined />} iconTone="neutral" />
-              </StatRow>
-            ) : undefined
-          }
           before={
-            productFilter || (loadError && cargadoUnaVez) || resumen.categorias.length > 0 ? (
+            productFilter || (loadError && cargadoUnaVez) ? (
               <div className={s.avisos}>
                 {productFilter && (
                   <Alert
@@ -1644,20 +1603,6 @@ export function VistaAlmacen({
                   >
                     {`${loadError}. Se muestra lo último que cargó.`}
                   </Alert>
-                )}
-                {resumen.categorias.length > 0 && (
-                  <Card pad aria-label="Productos por categoría">
-                    <p className={s.rotulo}>Productos por categoría</p>
-                    <ul className={s.categorias}>
-                      {resumen.categorias.map(([cat, count]) => (
-                        <li key={cat} className={s.categoria}>
-                          <span className={s.categoriaNombre} title={cat}>{cat}</span>
-                          <Progress value={count} max={Math.max(1, items.length)} ariaLabel={`${cat}: ${count}`} />
-                          <span className={s.tenueNum}>{count}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
                 )}
               </div>
             ) : undefined
@@ -1716,7 +1661,7 @@ export function VistaAlmacen({
             !cargadoUnaVez
               ? {
                   title: "No se pudo cargar el inventario",
-                  description: loadError,
+                  description: loadError && loadError !== "No se pudo cargar el inventario" ? loadError : "Revisa la conexión e inténtalo de nuevo.",
                   tone: "danger",
                   action: <Button variant="secondary" onClick={() => void load()}>Reintentar</Button>,
                 }
@@ -1750,7 +1695,10 @@ export function VistaAlmacen({
           }
           footer={
             cargadoUnaVez && visibleItems.length > 0 ? (
-              <ListFooter total={visibleItems.length} unit={visibleItems.length === 1 ? "producto" : "productos"} />
+              <ListFooter total={visibleItems.length} unit={visibleItems.length === 1 ? "producto" : "productos"}>
+                {resumen.valorTotal > 0 ? <span> · <Money value={resumen.valorTotal} compact /></span> : null}
+                {warehouses.length > 0 ? <span>{` · ${warehouses.length} ${warehouses.length === 1 ? "almacén" : "almacenes"}`}</span> : null}
+              </ListFooter>
             ) : undefined
           }
         >

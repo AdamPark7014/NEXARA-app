@@ -341,7 +341,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
       )}
 
       <Card aria-label="Solicitudes de herramientas">
-        <CardHead title="Solicitudes de herramientas" subtitle="Quién pidió qué, en qué va cada préstamo y cuándo vuelve." />
+        <CardHead title="Solicitudes de herramientas" />
         {(error || actionError) && (
           <div className={s.avisos}>
             {error && (
@@ -423,7 +423,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
           <div className={s.carga}>
             <SkeletonRows rows={5} label="Obteniendo solicitudes de herramientas" />
           </div>
-        ) : (
+        ) : error && items.length === 0 ? null : (
           <DataTable<ToolRequestRow>
             columns={columns}
             rows={visibleItems}

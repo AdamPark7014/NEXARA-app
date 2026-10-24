@@ -10,11 +10,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import HandymanOutlined from "@mui/icons-material/HandymanOutlined";
 import { Alert, PageHead, Tabs } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
-import { isCoreMount } from "@/lib/recursos-core";
 import ToolInventoryPanel from "@/components/ToolInventoryPanel";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
 import ToolMyKitPanel from "@/components/ToolMyKitPanel";
@@ -32,8 +30,6 @@ type LoanTab = "mykit" | "myrequests";
 export default function ToolsPage() {
   const { user } = useUser();
   const pathname = usePathname();
-  // También se monta en Core (`/erp/almacen/herramientas`).
-  const enCore = isCoreMount(pathname);
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
   // Email helpers (vía section-views): manage ≠ OPS_MANAGER; request ≠ campo genérico.
   const canManage = cfg.viewMode === "manage" || cfg.viewMode === "manage_execute" || cfg.canApprove;
@@ -159,10 +155,8 @@ export default function ToolsPage() {
   return (
     <>
       <PageHead
-        eyebrow={enCore ? "Core · Recursos" : "OPS · Campo"}
         title={cfg.title}
         description={cfg.subtitle}
-        icon={<HandymanOutlined />}
         tabs={
           tabs.length > 0 ? (
             <Tabs
