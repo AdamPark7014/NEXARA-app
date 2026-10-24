@@ -11,7 +11,6 @@ import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
-import MetricStrip from "@/components/ui/MetricStrip";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { FormField, FormGrid } from "@/components/ui/FormField";
 import { SkeletonList } from "@/components/PageState";
@@ -235,9 +234,19 @@ export default function WebhooksSettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Gobierno · Configuración"
-        title="Avisos automáticos (webhooks)"
-        subtitle="Envía eventos firmados a tus otros sistemas en cuanto ocurren: facturas, inventario, tickets, cuentas y más."
+        title="Avisos automáticos"
+        subtitle={
+          error && !loaded
+            ? undefined
+            : loaded
+              ? [
+                  `${activeCount.toLocaleString("es-MX")} ${activeCount === 1 ? "activo" : "activos"}`,
+                  `${hooks.length.toLocaleString("es-MX")} en total`,
+                  ...(failing > 0 ? [`${failing.toLocaleString("es-MX")} con fallos`] : []),
+                  ...(dlq.length > 0 ? [`${dlq.length.toLocaleString("es-MX")} ${dlq.length === 1 ? "entrega fallida" : "entregas fallidas"}`] : []),
+                ].join(" · ")
+              : "Eventos hacia tus otros sistemas."
+        }
         density="ops"
         actions={
           <Button variant="secondary" iconLeft="↻" loading={loading && loaded} onClick={() => void load()}>
@@ -247,30 +256,30 @@ export default function WebhooksSettingsPage() {
       />
       <SettingsModuleRail />
 
-      {error && (
+      {error && loaded && (
         <InlineAlert
-          variant={loaded ? "warning" : "danger"}
-          title={loaded ? "No se pudo actualizar" : "No se pudieron cargar los avisos"}
-          message={loaded ? `${error} Mostramos la última información cargada.` : error}
+          variant="warning"
+          title="No se pudo actualizar"
+          message={`${error} Mostramos la última información cargada.`}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 16 }}
         />
       )}
 
-      {loaded && (
-        <div style={{ marginBottom: 20 }}>
-          <MetricStrip
-            ariaLabel="Resumen de avisos"
-            metrics={[
-              { label: "Destinos activos", value: activeCount, hint: `${hooks.length} en total` },
-              { label: "Con fallos recientes", value: failing, tone: failing ? "warning" : "success" },
-              { label: "Entregas fallidas", value: dlq.length, tone: dlq.length ? "danger" : "success", hint: dlq.length ? "Puedes reenviarlas abajo" : "Sin pendientes" },
-            ]}
-          />
-        </div>
-      )}
-
-      <Section title="Nuevo aviso" subtitle="Indica a dónde enviar los eventos y cuáles te interesan.">
+      {error && !loaded && !loading ? (
+        <EmptyState
+          variant="page"
+          title="No se pudieron cargar los avisos"
+          description={
+            error === "No se pudieron cargar los avisos automáticos."
+              ? "Revisa la conexión e inténtalo de nuevo."
+              : error
+          }
+          action={<Button variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      ) : (
+      <>
+      <Section title="Nuevo aviso">
         <div style={{ display: "grid", gap: 14, maxWidth: 720 }}>
           <FormGrid>
             <FormField label="Nombre" error={nameError} hint="Ej. Contabilidad externa">
@@ -385,7 +394,6 @@ export default function WebhooksSettingsPage() {
 
       <Section
         title={`Entregas fallidas${loaded ? ` (${dlq.length})` : ""}`}
-        subtitle="Eventos que no se pudieron entregar tras varios intentos. Corrige el destino y reenvíalos."
       >
         {loaded && !dlq.length && (
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>No hay entregas pendientes. Todo se entregó correctamente.</p>
@@ -421,6 +429,8 @@ export default function WebhooksSettingsPage() {
           ))}
         </ul>
       </Section>
+      </>
+      )}
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );

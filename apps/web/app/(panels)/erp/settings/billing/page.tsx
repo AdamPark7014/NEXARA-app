@@ -10,7 +10,6 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
-import KpiCard from "@/components/ui/KpiCard";
 import { FormField, FormGrid } from "@/components/ui/FormField";
 import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
@@ -177,9 +176,20 @@ export default function BillingSettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Gobierno · Configuración"
         title="Plan y facturación"
-        subtitle="Plan contratado, usuarios incluidos y consumo de la empresa activa."
+        subtitle={
+          error && !data
+            ? undefined
+            : data
+              ? [
+                  humanize(data.company?.planCode || "sin plan"),
+                  seatLimitSaved > 0
+                    ? `${seatsUsed.toLocaleString("es-MX")} de ${seatLimitSaved.toLocaleString("es-MX")} usuarios`
+                    : `${seatsUsed.toLocaleString("es-MX")} usuarios`,
+                  status.label,
+                ].join(" · ")
+              : "Plan, usuarios y consumo de la empresa."
+        }
         density="ops"
         actions={
           <Button variant="secondary" iconLeft="↻" loading={loading && !!data} onClick={() => void load()}>
@@ -189,11 +199,11 @@ export default function BillingSettingsPage() {
       />
       <SettingsModuleRail />
 
-      {error && (
+      {error && data && (
         <InlineAlert
-          variant={data ? "warning" : "danger"}
-          title={data ? "No se pudo actualizar" : "No se pudo cargar la facturación"}
-          message={data ? `${error} Mostramos la última información cargada.` : error}
+          variant="warning"
+          title="No se pudo actualizar"
+          message={`${error} Mostramos la última información cargada.`}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 16 }}
         />
@@ -201,27 +211,22 @@ export default function BillingSettingsPage() {
 
       {loading && !data && !error && <SkeletonList rows={4} />}
 
+      {!data && !loading && error && (
+        <EmptyState
+          variant="page"
+          title="No se pudo cargar la facturación"
+          description={
+            error === "No se pudo cargar la información de facturación."
+              ? "Revisa la conexión e inténtalo de nuevo."
+              : error
+          }
+          action={<Button variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      )}
+
       {data && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-            <KpiCard label="Plan" value={humanize(data.company?.planCode || "—")} icon="📦" />
-            <KpiCard
-              label="Usuarios"
-              value={<span style={{ fontVariantNumeric: "tabular-nums" }}>{seatsUsed} / {seatLimitSaved}</span>}
-              icon="👥"
-              variant={seatPct >= 90 ? "warning" : "accent"}
-              hint={seatLimitSaved ? `${seatPct}% del límite` : undefined}
-            />
-            <KpiCard label="Estado del pago" value={status.label} icon="💳" variant={status.variant === "default" ? "default" : status.variant} />
-            <KpiCard
-              label="Pagos en línea"
-              value={stripeReady ? (data.stripe?.hasSubscription ? "Suscrito" : "Disponible") : "No configurado"}
-              icon="⚡"
-              variant={stripeReady ? "positive" : "default"}
-            />
-          </div>
-
-          <Section title="Pagos" subtitle="Contrata o administra tu suscripción en el portal seguro del proveedor de pagos.">
+          <Section title="Pagos">
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
               <Button
                 variant="primary"
@@ -247,7 +252,7 @@ export default function BillingSettingsPage() {
             )}
           </Section>
 
-          <Section title="Plan contratado" subtitle="Ajusta el plan y el número máximo de usuarios activos.">
+          <Section title="Plan contratado">
             <div style={{ maxWidth: 560 }}>
               {seatLimitSaved > 0 && (
                 <div style={{ marginBottom: 16 }}>

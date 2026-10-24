@@ -174,9 +174,19 @@ export default function ApiKeysSettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Gobierno · Configuración"
-        title="Claves de acceso (API)"
-        subtitle="Permiten que otros sistemas se conecten a NEXARA en nombre de la empresa activa."
+        title="Claves de acceso"
+        subtitle={
+          error && !loaded
+            ? undefined
+            : loaded
+              ? [
+                  `${active.length.toLocaleString("es-MX")} ${active.length === 1 ? "activa" : "activas"}`,
+                  ...(revokedKeys.length > 0
+                    ? [`${revokedKeys.length.toLocaleString("es-MX")} ${revokedKeys.length === 1 ? "revocada" : "revocadas"}`]
+                    : []),
+                ].join(" · ")
+              : "Conexiones de otros sistemas con la empresa."
+        }
         density="ops"
         actions={
           <Button variant="secondary" iconLeft="↻" loading={loading && loaded} onClick={() => void load()}>
@@ -222,17 +232,30 @@ export default function ApiKeysSettingsPage() {
         />
       )}
 
-      {error && (
+      {error && loaded && (
         <InlineAlert
-          variant={loaded ? "warning" : "danger"}
-          title={loaded ? "No se pudo actualizar" : "No se pudieron cargar las claves"}
-          message={loaded ? `${error} Mostramos la última información cargada.` : error}
+          variant="warning"
+          title="No se pudo actualizar"
+          message={`${error} Mostramos la última información cargada.`}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 16 }}
         />
       )}
 
-      <Section title="Nueva clave" subtitle="Dale un nombre claro y concede solo los permisos que el sistema necesita.">
+      {error && !loaded && !loading ? (
+        <EmptyState
+          variant="page"
+          title="No se pudieron cargar las claves"
+          description={
+            error === "No se pudieron cargar las claves de acceso."
+              ? "Revisa la conexión e inténtalo de nuevo."
+              : error
+          }
+          action={<Button variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      ) : (
+      <>
+      <Section title="Nueva clave">
         <div style={{ display: "grid", gap: 14, maxWidth: 640 }}>
           <FormField label="Nombre" error={nameError} hint="Ej. Integración con Power BI">
             <input
@@ -329,6 +352,8 @@ export default function ApiKeysSettingsPage() {
           ))}
         </ul>
       </Section>
+      </>
+      )}
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
