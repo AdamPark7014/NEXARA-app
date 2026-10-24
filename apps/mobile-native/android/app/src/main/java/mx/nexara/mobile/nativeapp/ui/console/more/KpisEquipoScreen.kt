@@ -122,7 +122,6 @@ fun KpisEquipoScreen(vm: KpisEquipoViewModel = viewModel()) {
                 item(key = "cabecera-personas") {
                     MoreCabecera(
                         titulo = "Persona por persona",
-                        subtitulo = KpisEquipoRules.subtituloLista(datos.personas.orEmpty()),
                         trailing = if (consulta.isBlank()) "$totalPersonas" else "${personas.size} de $totalPersonas",
                     )
                 }
@@ -132,7 +131,7 @@ fun KpisEquipoScreen(vm: KpisEquipoViewModel = viewModel()) {
                         if (consulta.isBlank()) {
                             NxEmptyState(
                                 title = "Nadie en tu alcance",
-                                subtitle = "En este periodo no hay personas de las que puedas ver indicadores.",
+                                subtitle = "",
                             )
                         } else {
                             NxEmptyState(
@@ -149,10 +148,6 @@ fun KpisEquipoScreen(vm: KpisEquipoViewModel = viewModel()) {
                     }
                 }
 
-                val supuestos = datos.supuestos.orEmpty()
-                if (supuestos.isNotEmpty()) {
-                    item(key = "supuestos") { Supuestos(supuestos) }
-                }
             }
 
             item(key = "alcance") { MoreNotaDeAlcance(KpisEquipoRules.LIMITE) }
@@ -312,35 +307,3 @@ private fun DetalleLinea(etiqueta: String, valor: String) {
     }
 }
 
-/** Lo que se dio por supuesto al contar; el API lo manda en español. */
-@Composable
-private fun Supuestos(supuestos: List<String>) {
-    var abierto by rememberSaveable { mutableStateOf(false) }
-    MoreTarjeta(onClick = { abierto = !abierto }) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                "Cómo se calculan estos números",
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = NxColors.Slate,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                if (abierto) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = if (abierto) "Ocultar los supuestos" else "Ver los supuestos",
-                tint = NxColors.Muted,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        AnimatedVisibility(visible = abierto) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                supuestos.forEach { texto ->
-                    Text("· $texto", style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
-                }
-            }
-        }
-    }
-}

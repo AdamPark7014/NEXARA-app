@@ -137,7 +137,7 @@ fun VehiculosScreen() {
                 item {
                     NxEmptyState(
                         title = "Sin vehículos",
-                        subtitle = "No traes asignación ni hay unidades libres.",
+                        subtitle = "",
                     )
                 }
             }

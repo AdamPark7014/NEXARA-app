@@ -174,8 +174,7 @@ struct AprobacionesView: View {
                     // El vacío aquí es una buena noticia y se dice como tal.
                     NxEmptyState(
                         title: "No hay nada esperándote",
-                        subtitle: "Ninguna solicitud está detenida en tu firma. "
-                            + "Cuando alguien te necesite, aparece aquí y te llega el aviso.",
+                        subtitle: "",
                         systemImage: CoreExtraModule.aprobaciones.systemImage,
                         actionLabel: "Volver a revisar",
                         onAction: { Task { await modelo.refrescar() } }
@@ -233,13 +232,13 @@ struct AprobacionesView: View {
         if visibles.isEmpty {
             NxEmptyState(
                 title: "Nada en «\(filtro.etiqueta.lowercased())»",
-                subtitle: Self.subtituloVacio(filtro),
+                subtitle: "",
                 systemImage: CoreExtraModule.aprobaciones.systemImage,
                 actionLabel: "Ver todas",
                 onAction: { modelo.alternarFiltro(.todas) }
             )
         } else {
-            NxDenseSectionHeader(title: filtro.etiqueta, hint: "Lo que lleva más tiempo parado, primero.") {
+            NxDenseSectionHeader(title: filtro.etiqueta) {
                 Text("\(visibles.count)")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(NxColors.fg2)
@@ -253,14 +252,6 @@ struct AprobacionesView: View {
                     onRechazar: { abrirDialogo(fila) }
                 )
             }
-        }
-    }
-
-    private static func subtituloVacio(_ filtro: AprobacionesRules.Filtro) -> String {
-        switch filtro {
-        case .atrasadas: return "Ninguna lleva más de dos días parada. Vas al día."
-        case .cierran: return "Ninguna se cierra con tu firma: todas pasan a otro después de ti."
-        case .todas: return "No hay nada en este filtro."
         }
     }
 
@@ -337,7 +328,7 @@ private struct TarjetaDeAprobacion: View {
 
             if fila.cierraElFlujo {
                 NxStatusDot(
-                    text: "Tu firma cierra el flujo: después de ti no queda nadie.",
+                    text: "Tu firma cierra",
                     color: AprobacionesRules.ambar,
                     maxLines: 2
                 )

@@ -147,8 +147,7 @@ fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
                 NxEstadoPantalla.VACIO -> item(key = "vacio") {
                     NxEmptyState(
                         title = "No hay nada esperándote",
-                        subtitle = "Ninguna solicitud está detenida en tu firma. " +
-                            "Cuando alguien te necesite, aparece aquí y te llega el aviso.",
+                        subtitle = "",
                         actionLabel = "Volver a revisar",
                         onAction = vm::refrescar,
                     )
@@ -186,14 +185,7 @@ fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
                         item(key = "sin-coincidencias") {
                             NxEmptyState(
                                 title = "Nada en «${filtro.etiqueta.lowercase()}»",
-                                subtitle = when (filtro) {
-                                    AprobacionesRules.Filtro.ATRASADAS ->
-                                        "Ninguna lleva más de dos días parada. Vas al día."
-                                    AprobacionesRules.Filtro.CIERRAN ->
-                                        "Ninguna se cierra con tu firma: todas pasan a otro después de ti."
-                                    AprobacionesRules.Filtro.TODAS ->
-                                        "No hay nada en este filtro."
-                                },
+                                subtitle = "",
                                 actionLabel = "Ver todas",
                                 onAction = { vm.alternarFiltro(AprobacionesRules.Filtro.TODAS) },
                             )
@@ -202,7 +194,6 @@ fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
                         item(key = "cabecera") {
                             NxDenseSectionHeader(
                                 title = filtro.etiqueta,
-                                hint = "Lo que lleva más tiempo parado, primero.",
                                 trailing = {
                                     Text(
                                         visibles.size.toString(),
@@ -337,7 +328,7 @@ private fun TarjetaDeAprobacion(
 
         if (fila.cierraElFlujo) {
             NxStatusDot(
-                text = "Tu firma cierra el flujo: después de ti no queda nadie.",
+                text = "Tu firma cierra",
                 color = AprobacionesRules.AMBAR,
                 maxLines = 2,
             )

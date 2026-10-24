@@ -62,7 +62,6 @@ struct ViaticoDetalleView: View {
                         alert: NxAlert(
                             id: "viatico-error",
                             title: error,
-                            subtitle: viatico == nil ? nil : "Abajo sigue lo último que se pudo leer.",
                             tone: .danger
                         ),
                         actionLabel: "Reintentar",

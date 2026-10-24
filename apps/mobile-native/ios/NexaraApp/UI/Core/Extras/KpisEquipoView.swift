@@ -19,7 +19,6 @@ struct KpisEquipoView: View {
         let datos = estado.datos
         let personas = KpisEquipoRules.ordenar(KpisEquipoRules.filtrar(datos?.personas ?? [], consulta))
         let totalPersonas = datos?.personas.count ?? 0
-        let porCumplimiento = KpisEquipoRules.ordenaPorCumplimiento(datos?.personas ?? [])
         ScrollView {
             LazyVStack(alignment: .leading, spacing: NxSpacing.m) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -57,7 +56,6 @@ struct KpisEquipoView: View {
 
                     MoreCabecera(
                         titulo: "Persona por persona",
-                        subtitulo: KpisEquipoRules.ordenTexto(porCumplimiento: porCumplimiento),
                         trailing: consulta.trimmingCharacters(in: .whitespaces).isEmpty
                             ? "\(totalPersonas)"
                             : "\(personas.count) de \(totalPersonas)"
@@ -67,7 +65,7 @@ struct KpisEquipoView: View {
                         if consulta.trimmingCharacters(in: .whitespaces).isEmpty {
                             NxEmptyState(
                                 title: "Nadie en tu alcance",
-                                subtitle: "En este periodo no hay personas de las que puedas ver indicadores."
+                                subtitle: ""
                             )
                         } else {
                             NxEmptyState(
@@ -81,9 +79,6 @@ struct KpisEquipoView: View {
                         ForEach(personas) { TarjetaDePersonaKpi(fila: $0) }
                     }
 
-                    if !datos.supuestos.isEmpty {
-                        SupuestosKpi(supuestos: datos.supuestos)
-                    }
                 }
 
                 MoreNotaDeAlcance(texto: KpisEquipoRules.limite)
@@ -250,39 +245,6 @@ private struct DetalleLineaKpi: View {
     }
 }
 
-/// Lo que se dio por supuesto al contar; el API lo manda en español.
-private struct SupuestosKpi: View {
-    let supuestos: [String]
-    @State private var abierto = false
-
-    var body: some View {
-        MoreTarjeta(onClick: { withAnimation(.easeInOut(duration: 0.2)) { abierto.toggle() } }) {
-            HStack(alignment: .center, spacing: NxSpacing.s) {
-                Text("Cómo se calculan estos números")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(NxColors.fg)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: abierto ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(NxColors.muted)
-                    .frame(width: 20, height: 20)
-                    .accessibilityLabel(abierto ? "Ocultar los supuestos" : "Ver los supuestos")
-            }
-            if abierto {
-                VStack(alignment: .leading, spacing: NxSpacing.xs) {
-                    ForEach(supuestos, id: \.self) { texto in
-                        Text("· \(texto)")
-                            .font(NxType.bodySmall)
-                            .foregroundStyle(NxColors.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .transition(.opacity)
-            }
-        }
-    }
-}
-
 // MARK: - Reglas (Android `KpisEquipoRules`)
 
 /// Los números del equipo ya masticados para pintar. Lo que el API no manda sale
@@ -344,13 +306,6 @@ enum KpisEquipoRules {
         case (_, nil): return true
         case let (x?, y?): return x == y ? nil : x > y
         }
-    }
-
-    /// Lo que se lee bajo «Persona por persona».
-    static func ordenTexto(porCumplimiento: Bool) -> String {
-        porCumplimiento
-            ? "Por cumplimiento, de mayor a menor"
-            : "De peor a mejor, para no tener que buscarlo"
     }
 
     /// Cumplimiento en tiempo y forma (los cortes del semáforo de entregas del API):
