@@ -50,6 +50,6 @@ import {
     ActivityNonComplianceService,
     ActivityLifecycleService,
   ],
-  exports: [ActivitiesService, ActivityLifecycleService, ActivityTeamService],
+  exports: [ActivitiesService, ActivityLifecycleService, ActivityTeamService, ActivityNonComplianceService],
 })
 export class ActivitiesModule {}

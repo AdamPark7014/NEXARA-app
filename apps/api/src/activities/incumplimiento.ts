@@ -4,15 +4,15 @@
  * Regla de Adam (22-10-2026): «cualquier actividad que no se acabe después de la jornada laboral
  * se toma como incumplida», y un superior debe poder registrar que una actividad no se cumplió.
  *
- * - **Cierre de jornada.** Al término de la jornada del día en que vencía su entrega (el mismo
- *   límite del semáforo, `limiteDeEntrega`), lo que siga sin entregarse pasa a «No cumplida» y
- *   queda un registro formal (`activity_non_compliances`). Entregada = todos los que la ejecutan
- *   mandaron su evidencia antes del cierre; por eso «Por Validar» nunca se cierra: ya se entregó y
- *   lo que falta es el visto bueno del jefe.
- * - **La jornada** termina a la hora de salida más tarde de quienes la ejecutan (su horario en
- *   `work_schedules`, 18:00 si no tienen). Un límite explícito más tarde que eso manda; una
- *   actividad citada después de la salida tiene hasta que acabe el día.
- * - **Aviso previo** una hora antes del cierre a quien la tiene, una sola vez.
+ * - **Cierre de jornada.** Lo que siga sin entregarse pasa a «No cumplida» cuando la persona
+ *   toma la foto de salida en asistencia, o a las 23:30 si nadie la tomó (el mismo respaldo con
+ *   el que asistencia cierra la jornada olvidada). El reloj del horario (18:00, u otra
+ *   `horaSalida`) no cambia el estatus: solo sirve para avisar una hora antes. Una salida sin
+ *   foto tampoco cierra. Entregada = todos los que la ejecutan mandaron su evidencia antes de
+ *   ese disparo; por eso «Por Validar» nunca se cierra.
+ * - **Plazo explícito** posterior al horario (o la hora de gracia tras asignar) se respeta: la
+ *   foto anterior a ese instante no incumple. Uno anterior al horario no adelanta el cierre.
+ * - **Aviso previo** una hora antes del horario de quien la ejecuta, una sola vez.
  * - **Registro manual**: los mismos superiores que pueden cancelarla, con causa y observaciones.
  * - **Reprogramar** la reabre con fecha nueva; el incumplimiento no se borra (es lo que miden
  *   los KPI de «en tiempo y forma»).
@@ -159,32 +159,65 @@ export type DecisionCierre =
   | { accion: 'avisar'; pendientes: number[] }
   | { accion: null; pendientes: number[] };
 
+/** Salida de asistencia que puede cerrar la actividad: la foto, o el respaldo de las 23:30. */
+export type SalidaAsistencia = {
+  userId: number;
+  at: Date;
+  conFoto: boolean;
+  cierreAutomatico: boolean;
+};
+
+/** La salida sin foto no dispara. El cierre automático de las 23:30 sí, aunque no traiga foto. */
+export function salidaDisparaCierre(salida: Pick<SalidaAsistencia, 'conFoto' | 'cierreAutomatico'>): boolean {
+  return salida.conFoto || salida.cierreAutomatico;
+}
+
 /**
- * Qué toca hacer con una actividad en este momento: cerrarla como no cumplida, avisar que se
- * acerca el cierre, o nada. `pendientes` = quienes no la entregaron a tiempo.
+ * Qué toca hacer ahora: cerrar, avisar, o nada.
+ *
+ * El estatus no cambia a la hora del horario. Cambia cuando cada quien sigue sin entregar
+ * y ya tomó la foto de salida (o asistencia le puso el cierre automático de las 23:30).
+ * Con varios ejecutores se espera al último. `pendientes` = quienes no entregaron antes de ese disparo.
  */
 export function decidirCierreDeJornada(p: {
   estatus: string | null | undefined;
-  cierre: Date | null;
+  /** Reloj del horario. Solo avisa una hora antes; no cierra. */
+  avisoEn?: Date | null;
+  /** Plazo explícito o gracia posterior al horario. La foto anterior no cierra. */
+  noAntesDe?: Date | null;
   ahora: Date;
   avisadoAt?: Date | null;
   ejecutores: EjecutorEntrega[];
+  salidas?: SalidaAsistencia[];
+  /** 23:30 del día en que vencía. Sin foto, aquí se cierra. */
+  respaldoAt?: Date | null;
   vigenteDesde?: Date;
 }): DecisionCierre {
   const nada = (pendientes: number[] = []): DecisionCierre => ({ accion: null, pendientes });
-  if (!esCandidataAlCierre(p.estatus) || !p.cierre) return nada();
+  if (!esCandidataAlCierre(p.estatus)) return nada();
   const desde = p.vigenteDesde ?? NO_CUMPLIDA_VIGENTE_DESDE;
-  if (p.cierre.getTime() < desde.getTime()) return nada();
+  const ancla = p.avisoEn ?? p.respaldoAt ?? null;
+  if (!ancla || ancla.getTime() < desde.getTime()) return nada();
 
-  const cierre = p.cierre;
+  const salidas = p.salidas ?? [];
+  const disparoDe = (userId: number) => salidas.find((s) => s.userId === userId && salidaDisparaCierre(s)) ?? null;
+  const respaldoLlego = Boolean(p.respaldoAt && p.ahora.getTime() >= p.respaldoAt.getTime());
+
   const pendientes = p.ejecutores
-    .filter((e) => !e.entregadaAt || e.entregadaAt.getTime() > cierre.getTime())
+    .filter((e) => {
+      const corte = disparoDe(e.userId)?.at ?? (respaldoLlego ? p.respaldoAt : null);
+      if (!e.entregadaAt) return true;
+      if (!corte) return false;
+      return e.entregadaAt.getTime() > corte.getTime();
+    })
     .map((e) => e.userId);
-  // Todos entregaron a tiempo: si se la devolvieron después, es tema de revisión, no de plazo.
   if (p.ejecutores.length && !pendientes.length) return nada();
 
-  if (p.ahora.getTime() >= cierre.getTime()) return { accion: 'cerrar', pendientes };
-  if (!p.avisadoAt && p.ahora.getTime() >= cierre.getTime() - AVISO_PREVIO_MIN * 60_000) {
+  const yaEsJusto = !p.noAntesDe || p.ahora.getTime() >= p.noAntesDe.getTime();
+  const puedeCerrar = yaEsJusto && pendientes.length > 0 && (pendientes.every((id) => disparoDe(id)) || respaldoLlego);
+  if (puedeCerrar) return { accion: 'cerrar', pendientes };
+
+  if (!p.avisadoAt && p.avisoEn && p.ahora.getTime() >= p.avisoEn.getTime() - AVISO_PREVIO_MIN * 60_000) {
     return { accion: 'avisar', pendientes };
   }
   return nada(pendientes);
@@ -196,6 +229,24 @@ export function estatusAlReprogramar(estatusPrevio: string | null | undefined, a
   return normalizeActivityStatus(estatusPrevio) === ACTIVITY_STATUS.ASIGNADA
     ? ACTIVITY_STATUS.ASIGNADA
     : ACTIVITY_STATUS.PENDIENTE;
+}
+
+/**
+ * Hora de salida del horario en el día de `ancla` (18:00 si nadie tiene la suya).
+ * Es el reloj del aviso, no el instante en que la actividad pasa a no cumplida.
+ */
+export function finDeHorario(ancla: Date, horasSalida?: Array<string | null | undefined> | null): Date {
+  const salida = salidaMasTarde(horasSalida);
+  return workDayAtClock(ancla, Math.floor(salida / 60), salida % 60);
+}
+
+/**
+ * Instante que hay que esperar además de la foto: un plazo explícito posterior al horario,
+ * o la hora de gracia tras asignar. `null` = la foto (o las 23:30) basta.
+ */
+export function esperaTrasHorario(programado: Date | null, finJornada: Date | null): Date | null {
+  if (!programado || !finJornada) return null;
+  return programado.getTime() > finJornada.getTime() + 1000 ? programado : null;
 }
 
 /** «18:00» en la zona de la jornada. */

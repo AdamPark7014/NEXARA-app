@@ -5,7 +5,8 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import { workDateKey } from '../common/time/workday.js';
+import { workDateColumn, workDateKey, workDayAtClock } from '../common/time/workday.js';
+import { HORA_CIERRE_AUTOMATICO } from '../attendance/asistencia-confiable.js';
 import { ACTIVITY_STATUS, isFinishedStatus, statusVariants } from './activity-status.js';
 import {
   canCancelActivity,
@@ -25,11 +26,14 @@ import {
   decidirCierreDeJornada,
   esCausaValida,
   esNoCumplida,
+  esperaTrasHorario,
   estatusAlReprogramar,
   etiquetaCausa,
+  finDeHorario,
   horaDeCierre,
   type EjecutorEntrega,
   type OrigenIncumplimiento,
+  type SalidaAsistencia,
 } from './incumplimiento.js';
 import { ActivityTeamService } from './activity-team.service.js';
 import { leerIncumplimientos, type IncumplimientoDto } from './incumplimiento-lectura.js';
@@ -135,32 +139,58 @@ export class ActivityNonComplianceService {
     })) as FilaCierre[];
     if (!filas.length) return { cerradas: 0, avisadas: 0 };
 
-    const salidas = await this.horasDeSalida(filas.flatMap((f) => this.ejecutoresDe(f)));
+    const planes = filas.map((fila) => {
+      const ejecutores = this.ejecutoresDe(fila);
+      return { fila, ejecutores };
+    });
+    const horas = await this.horasDeSalida(planes.flatMap((p) => p.ejecutores));
+    const listos = planes.map(({ fila, ejecutores }) => {
+      const horasSalida = ejecutores.map((id) => horas.get(id) ?? null);
+      const programado = cierreDeJornada({ ...fila, horasSalida });
+      const avisoEn = programado ? finDeHorario(programado, horasSalida) : null;
+      return {
+        fila,
+        ejecutores,
+        avisoEn,
+        noAntesDe: esperaTrasHorario(programado, avisoEn),
+        respaldoAt: programado
+          ? workDayAtClock(programado, HORA_CIERRE_AUTOMATICO.hora, HORA_CIERRE_AUTOMATICO.minuto)
+          : null,
+        dia: programado ? workDateKey(programado) : null,
+      };
+    });
+    const salidas = await this.salidasDeAsistencia(
+      listos.flatMap((p) => p.ejecutores),
+      listos.flatMap((p) => (p.dia ? [p.dia] : [])),
+    );
     let cerradas = 0;
     let avisadas = 0;
-    for (const fila of filas) {
-      const ejecutores = this.ejecutoresDe(fila);
-      const cierre = cierreDeJornada({ ...fila, horasSalida: ejecutores.map((id) => salidas.get(id) ?? null) });
+    for (const plan of listos) {
+      const { fila, ejecutores } = plan;
+      const delDia = plan.dia ? (salidas.get(plan.dia) ?? []).filter((s) => ejecutores.includes(s.userId)) : [];
       const decision = decidirCierreDeJornada({
         estatus: fila.estatus,
-        cierre,
+        avisoEn: plan.avisoEn,
+        noAntesDe: plan.noAntesDe,
         ahora,
         avisadoAt: fila.cierreAvisadoAt,
         ejecutores: this.entregas(fila, ejecutores),
+        salidas: delDia,
+        respaldoAt: plan.respaldoAt,
       });
       try {
-        if (decision.accion === 'cerrar' && cierre) {
+        if (decision.accion === 'cerrar') {
           const ok = await this.cerrar(fila, {
             origen: 'CIERRE_JORNADA',
             causa: CAUSA_CIERRE_JORNADA,
             observaciones: null,
-            limite: cierre,
+            limite: ahora,
             pendientesIds: decision.pendientes.length ? decision.pendientes : ejecutores,
             actorId: null,
             ahora,
           });
           if (ok) cerradas += 1;
-        } else if (decision.accion === 'avisar' && cierre) {
+        } else if (decision.accion === 'avisar' && plan.avisoEn) {
           const marcada = await this.prisma.activity.updateMany({
             where: { id: fila.id, companyId: fila.companyId, cierreAvisadoAt: null },
             data: { cierreAvisadoAt: ahora },
@@ -168,7 +198,11 @@ export class ActivityNonComplianceService {
           if (marcada.count) {
             avisadas += 1;
             void this.notificationHierarchy
-              .notifyActivityClosingSoon({ activityId: fila.id, pendientesIds: decision.pendientes, cierre })
+              .notifyActivityClosingSoon({
+                activityId: fila.id,
+                pendientesIds: decision.pendientes,
+                cierre: plan.avisoEn,
+              })
               .catch(() => undefined);
           }
         }
@@ -178,6 +212,19 @@ export class ActivityNonComplianceService {
     }
     if (cerradas || avisadas) this.logger.log(`Cierre de jornada: ${cerradas} no cumplida(s), ${avisadas} aviso(s)`);
     return { cerradas, avisadas };
+  }
+
+  /**
+   * La salida de asistencia ya quedó guardada. La foto (o el cierre automático de las 23:30)
+   * revisa el lote; una salida sin foto no cambia el estatus.
+   */
+  async alSalirDeAsistencia(p: { at: Date; conFoto?: boolean; cierreAutomatico?: boolean }): Promise<void> {
+    if (!p.conFoto && !p.cierreAutomatico) return;
+    try {
+      await this.revisarCierres(p.at);
+    } catch (error) {
+      this.logger.warn(`Cierre al salir: ${error instanceof Error ? error.message : error}`);
+    }
   }
 
   /**
@@ -432,6 +479,40 @@ export class ActivityNonComplianceService {
       const entregadaAt = asig?.finRealAt ?? (ev?.status === 'COMPLETED' ? ev.completedAt : null) ?? null;
       return { userId, entregadaAt };
     });
+  }
+
+  /**
+   * Salidas del día de jornada (`AAAA-MM-DD` de la columna `workDate`, no el calendario UTC
+   * del `timestamp`: una foto a las 00:30 sigue siendo del día de la jornada).
+   * Si la consulta falla, lista vacía: a las 23:30 el respaldo cierra igual.
+   */
+  private async salidasDeAsistencia(userIds: number[], dias: string[]): Promise<Map<string, SalidaAsistencia[]>> {
+    const ids = [...new Set(userIds)].filter((id) => id > 0);
+    const claves = [...new Set(dias)];
+    const out = new Map<string, SalidaAsistencia[]>();
+    if (!ids.length || !claves.length) return out;
+    const columnas = claves.map((dia) => workDateColumn(new Date(`${dia}T12:00:00.000Z`)));
+    try {
+      const filas = await this.prisma.attendance.findMany({
+        where: { type: 'salida', userId: { in: ids }, workDate: { in: columnas } },
+        select: { userId: true, timestamp: true, photoUrl: true, cierreAutomatico: true, workDate: true },
+      });
+      for (const f of filas) {
+        if (!f.workDate) continue;
+        const dia = f.workDate.toISOString().slice(0, 10);
+        const lista = out.get(dia) ?? [];
+        lista.push({
+          userId: f.userId,
+          at: f.timestamp,
+          conFoto: Boolean(f.photoUrl && String(f.photoUrl).trim()),
+          cierreAutomatico: Boolean(f.cierreAutomatico),
+        });
+        out.set(dia, lista);
+      }
+    } catch {
+      return new Map();
+    }
+    return out;
   }
 
   /** `HH:MM` de salida de cada persona con horario propio. */

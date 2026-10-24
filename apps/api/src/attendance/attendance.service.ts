@@ -29,6 +29,7 @@ import { horaAviso } from '../notifications/notification-push-meta.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-sessions.service.js';
+import { ActivityNonComplianceService } from '../activities/activity-non-compliance.service.js';
 import { MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA, diaDeGuardia } from '../guardias/guardias-reglas.js';
 import {
   AttendanceJustificationsService,
@@ -77,6 +78,7 @@ export class AttendanceService {
     private readonly realtimeGateway: RealtimeGateway,
     private readonly notificationHierarchy: NotificationHierarchyService,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly incumplimiento?: ActivityNonComplianceService,
   ) {}
 
   /** Aviso con push (NotificationsService); sin él (pruebas) queda solo en la campana como antes. */
@@ -1167,6 +1169,7 @@ export class AttendanceService {
       avisarPersona: true,
     });
 
+    this.revisarActividadesAlSalir({ at: salidaAt, cierreAutomatico: true });
     return salidaAt;
   }
 
@@ -1776,8 +1779,8 @@ export class AttendanceService {
       },
     });
 
-    // Su salida detiene el reloj de las actividades que tenga en curso. No las termina:
-    // siguen «En Proceso» y mañana las reanuda (si no, los KPI cuentan la noche como trabajo).
+    // Su salida detiene el reloj de las actividades en curso. El estatus no cambia aquí:
+    // la foto (más abajo) o el cierre automático de las 23:30 cierran lo que siga sin entrega.
     await cerrarSesionesDeUsuario(this.prisma, { userId, at: now, companyId: tenantId });
 
     // El `false` de la salida sí se queda. Revocar no es fabricar: apagar el
@@ -1834,11 +1837,23 @@ export class AttendanceService {
 
     await this.avisarSiHayQueRevisar(userId, 'salida', attendance.id, columnasValidacion);
 
+    const fotoSalida = typeof attendance.photoUrl === 'string' ? attendance.photoUrl.trim() : '';
+    if (fotoSalida) this.revisarActividadesAlSalir({ at: now, conFoto: true });
+
     return {
       message: 'Salida registrada exitosamente',
       data: attendance,
       day: updatedDay,
     };
+  }
+
+  /** La foto de salida, o el cierre de las 23:30, revisa actividades. Un fallo no deshace la checada. */
+  private revisarActividadesAlSalir(p: { at: Date; conFoto?: boolean; cierreAutomatico?: boolean }) {
+    void this.incumplimiento?.alSalirDeAsistencia(p).catch((error) => {
+      this.logger.warn(
+        `No se pudo revisar el cierre de actividades: ${error instanceof Error ? error.message : error}`,
+      );
+    });
   }
 
   /**
