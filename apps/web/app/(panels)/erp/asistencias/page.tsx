@@ -34,8 +34,6 @@ import {
   PersonCell,
   SearchInput,
   SkeletonRows,
-  Stat,
-  StatRow,
   StatusBadge,
   Tabs,
   Textarea,
@@ -77,13 +75,9 @@ import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
-import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
-import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import PersonOffOutlinedIcon from "@mui/icons-material/PersonOffOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
-import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import styles from "./asistencias.module.css";
 
 // Pantallas pesadas que solo se ven al abrir su pestaña: se cargan entonces, no en cada visita.
@@ -765,8 +759,6 @@ export default function ErpAsistenciasPage() {
   const tarjetasEquipo = (
     <ul className={styles.tarjetas} aria-label="Asistencia del equipo">
       {filtered.map((m) => {
-        const cEntrada = checadaDelTipo(m.attendances, "entrada");
-        const cSalida = checadaDelTipo(m.attendances, "salida");
         return (
           <li key={m.userId} className={styles.tarjeta} data-estado={m.estado}>
             <div className={styles.tarjetaHead}>
@@ -775,33 +767,22 @@ export default function ErpAsistenciasPage() {
                 <Link href={`/erp/pizarra/${m.userId}`} className={styles.tarjetaNombre} aria-label={`${m.nombre}: ver qué está haciendo`}>
                   {m.nombre}
                 </Link>
-                <span className={styles.tarjetaPuesto}>{puestoDe(m)}</span>
               </div>
               <StatusBadge label={ESTADO_META[m.estado].label} tone={ESTADO_META[m.estado].tone} size="sm" />
             </div>
-            <dl className={styles.horas}>
-              <div>
-                <dt>Entrada</dt>
-                <dd>
-                  <span className={styles.hora}>{horaCorta(m.checkIn)}</span>
-                  <InsigniasChecada checada={cEntrada} />
-                </dd>
-              </div>
-              <div>
-                <dt>Salida</dt>
-                <dd>
-                  <span className={styles.hora}>{horaCorta(m.checkOut)}</span>
-                  <InsigniasChecada checada={cSalida} />
-                </dd>
-              </div>
-              <div className={styles.horasTiempo}>
-                <dt>{m.estado === "PRESENTE" ? "En vivo" : "Tiempo"}</dt>
-                <dd>
-                  <TiempoJornada m={m} />
-                </dd>
-              </div>
-            </dl>
-            {m.falta ? <p className={styles.faltaLinea}>Falta justificada · {m.falta.motivo}</p> : null}
+            <p className={styles.linea}>
+              {[
+                horaCorta(m.checkIn) === "—" ? "Sin entrada" : horaCorta(m.checkIn),
+                horaCorta(m.checkOut) === "—"
+                  ? m.estado === "PRESENTE"
+                    ? "En jornada"
+                    : "Sin salida"
+                  : horaCorta(m.checkOut),
+                m.falta ? "Falta justificada" : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
             <div className={styles.tarjetaAcciones}>
               {accionesDePersona(m)}
               <Button size="sm" variant="tertiary" iconEnd={<ChevronRightIcon fontSize="inherit" aria-hidden="true" />} onClick={() => setDetalleId(m.userId)}>
@@ -862,50 +843,6 @@ export default function ErpAsistenciasPage() {
   let vacioState: ModuleEmpty | undefined;
 
   if (enEquipo) {
-    stats = (
-      <StatRow ariaLabel="Resumen del día">
-        <Stat
-          label="En jornada"
-          value={presentes}
-          suffix={mapped.length ? `/ ${mapped.length}` : undefined}
-          tone={presentes > 0 ? "success" : "default"}
-          icon={<LoginOutlinedIcon aria-hidden="true" />}
-          iconTone="success"
-          hint="Con la jornada abierta"
-          onClick={() => elegirEstado("PRESENTE")}
-          pressed={filterEstado === "PRESENTE"}
-          loading={cargandoEquipo}
-        />
-        <Stat
-          label="Ya salieron"
-          value={completos}
-          icon={<LogoutOutlinedIcon aria-hidden="true" />}
-          iconTone="info"
-          hint="Entrada y salida registradas"
-          onClick={() => elegirEstado("COMPLETO")}
-          pressed={filterEstado === "COMPLETO"}
-          loading={cargandoEquipo}
-        />
-        <Stat
-          label="Sin checada"
-          value={ausentes}
-          tone={ausentes > 0 ? "danger" : "default"}
-          icon={<PersonOffOutlinedIcon aria-hidden="true" />}
-          iconTone={ausentes > 0 ? "danger" : "neutral"}
-          hint={justificadas > 0 ? `${justificadas} con falta justificada` : "Sin entrada registrada"}
-          onClick={() => elegirEstado("AUSENTE")}
-          pressed={filterEstado === "AUSENTE"}
-          loading={cargandoEquipo}
-        />
-        <Stat
-          label="Horas trabajadas"
-          value={<LiveTotal jornadas={jornadas} />}
-          icon={<ScheduleOutlinedIcon aria-hidden="true" />}
-          hint="Todo tu equipo junto, en vivo"
-          loading={cargandoEquipo}
-        />
-      </StatRow>
-    );
     before =
       miJornada || refreshError || (error && mapped.length > 0) ? (
         <div className={styles.pila}>
@@ -951,7 +888,7 @@ export default function ErpAsistenciasPage() {
         chips={
           <FilterChips ariaLabel="Filtrar por estado">
             {chips.map((c) => (
-              <FilterChip key={c.key} active={filterEstado === c.key} count={c.n} dot={c.dot} onClick={() => setFilterEstado(c.key)}>
+              <FilterChip key={c.key} active={filterEstado === c.key} count={c.n} dot={c.dot} onClick={() => elegirEstado(c.key)}>
                 {c.label}
               </FilterChip>
             ))}
@@ -980,7 +917,7 @@ export default function ErpAsistenciasPage() {
     contenido = vistaEfectiva === "lista" ? tablaEquipo : tarjetasEquipo;
     footer = (
       <ListFooter total={filtered.length} unit={filtered.length === 1 ? "persona" : "personas"}>
-        {horaActualizado ? <span className={styles.actualizado}>Actualizado a las {horaActualizado}</span> : null}
+        <span className={styles.actualizado}>{horaActualizado ? `Actualizado a las ${horaActualizado} · ` : null}<LiveTotal jornadas={jornadas} /></span>
       </ListFooter>
     );
     vacio = !cargandoEquipo && filtered.length === 0;

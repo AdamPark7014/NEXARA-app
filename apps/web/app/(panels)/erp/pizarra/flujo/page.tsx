@@ -81,7 +81,6 @@ export default function FlujoActividadesPage() {
   return (
     <div className={s.pagina}>
       <ModulePage
-        back={{ href: "/erp/pizarra", label: "Actividades" }}
         title="Flujo de actividades"
         description="Cómo avanzan las actividades del periodo: de asignadas a cerradas, y cuántas a tiempo."
         tertiaryActions={

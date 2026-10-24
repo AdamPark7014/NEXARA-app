@@ -267,7 +267,7 @@ export default function PizarraPage() {
       <div className={p.pagina}>
         <ModulePage
           title="Actividades"
-          description={DESCRIPCION[vistaActiva]}
+          description={vistaActiva === "mias" ? undefined : DESCRIPCION[vistaActiva]}
           tabs={pestanasNodo(["mias", "solicitudes"])}
           card={false}
         >
@@ -472,7 +472,7 @@ export default function PizarraPage() {
     <div className={p.pagina}>
       <ModulePage
         title="Actividades"
-        description={DESCRIPCION[vistaActiva]}
+        description={vistaActiva === "mias" ? undefined : DESCRIPCION[vistaActiva]}
         tertiaryActions={actualizar}
         secondaryActions={centroOperativo}
         tabs={conPestanas ? pestanasNodo(pestanas) : null}

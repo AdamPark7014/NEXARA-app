@@ -292,7 +292,7 @@ export default function ActivityDetailShell({
 
   // El enlace decía «Actividades» también en Core, donde vuelve a la pizarra:
   // una etiqueta que no nombra su destino hace dudar antes de pulsarla.
-  const backLabel = core ? "Pizarra" : "Actividades";
+  const backLabel = "Actividades";
 
   if (!activity) {
     return (
@@ -476,7 +476,6 @@ export default function ActivityDetailShell({
     <ActivityDetailContext.Provider value={ctx}>
       <div className={s.wrap}>
         <RecordPage
-          breadcrumbs={[{ label: backLabel, href: backHref }, { label: activity.anNumber || `#${activity.id}` }]}
           icon={<ActivityKindIcon kind={kindIcon(activity)} size={24} />}
           kind={kind}
           code={activity.anNumber}

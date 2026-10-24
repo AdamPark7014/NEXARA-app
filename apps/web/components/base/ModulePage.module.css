@@ -21,9 +21,9 @@
   position: relative;
   min-width: 0;
   background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-card-radius, 16px);
-  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  box-shadow: none;
   overflow: clip;
 }
 
