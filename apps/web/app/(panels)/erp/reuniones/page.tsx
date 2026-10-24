@@ -18,7 +18,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import MetricStrip from "@/components/ui/MetricStrip";
 import PanelTabs from "@/components/ui/PanelTabs";
 import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
@@ -486,6 +485,11 @@ export default function ReunionesPage() {
   // ── Derivados ───────────────────────────────────────────────────────────
 
   const proximas = useMemo(() => reuniones.filter((r) => r.estado === "PROGRAMADA").length, [reuniones]);
+  const resumenLinea = [
+    plural(mios.length, "acuerdo abierto", "acuerdos abiertos"),
+    ...(miosVencidos > 0 ? [`${miosVencidos.toLocaleString("es-MX")} tarde`] : []),
+    plural(proximas, "programada", "programadas"),
+  ].join(" · ");
   const miosVisibles = useMemo(() => (filtroMios === "fuera" ? mios.filter((a) => a.vencido) : mios), [mios, filtroMios]);
 
   const buscarLecciones = async () => {
@@ -506,9 +510,14 @@ export default function ReunionesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Hoy"
-        title="Reuniones y acuerdos"
-        subtitle="La diaria de las 10:00, la planeación del lunes, la revisión del miércoles y la junta de cierre del viernes."
+        title="Reuniones"
+        subtitle={
+          error && !loaded
+            ? undefined
+            : loaded
+              ? resumenLinea
+              : "Acuerdos abiertos y las juntas del ritmo."
+        }
         actions={
           puedeConvocar ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -521,9 +530,9 @@ export default function ReunionesPage() {
         }
       />
 
-      {error && (
+      {error && loaded && (
         <InlineAlert
-          variant={loaded ? "warning" : "danger"}
+          variant="warning"
           message={error}
           onDismiss={() => setError(null)}
           action={<Button size="sm" variant="secondary" onClick={() => void cargar()}>Reintentar</Button>}
@@ -547,28 +556,23 @@ export default function ReunionesPage() {
         />
       ) : null}
 
-      {loaded && (
-        <div className={s.metrics}>
-          <MetricStrip
-            ariaLabel="Resumen de reuniones"
-            metrics={[
-              { label: "mis acuerdos abiertos", value: mios.length, onClick: () => cambiarTab("mios") },
-              {
-                label: "míos fuera de fecha",
-                value: miosVencidos,
-                tone: miosVencidos > 0 ? "danger" : "default",
-                onClick: () => {
-                  setFiltroMios("fuera");
-                  cambiarTab("mios");
-                },
-              },
-              { label: "reuniones programadas", value: proximas, onClick: () => cambiarTab("reuniones") },
-              { label: "reuniones registradas", value: reuniones.length, onClick: () => cambiarTab("reuniones") },
-            ]}
-          />
-        </div>
-      )}
-
+      {error && !loaded ? (
+        <EmptyState
+          variant="page"
+          title="No se pudo cargar las reuniones"
+          description={
+            error === "No pudimos cargar tus reuniones y acuerdos."
+              ? "Revisa la conexión e inténtalo de nuevo."
+              : error
+          }
+          action={
+            <Button variant="secondary" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        />
+      ) : (
+      <>
       <PanelTabs
         ariaLabel="Secciones de reuniones"
         value={tab}
@@ -585,11 +589,6 @@ export default function ReunionesPage() {
       ) : tab === "mios" ? (
         <Section
           title={filtroMios === "todos-fuera" ? "Acuerdos fuera de fecha" : "Lo que me toca"}
-          subtitle={
-            filtroMios === "todos-fuera"
-              ? "De todo el equipo: el tablero con el que arranca la junta de cierre."
-              : "Acuerdos a tu nombre que siguen abiertos."
-          }
           actions={
             <div className={s.chips} role="group" aria-label="Filtrar acuerdos">
               {FILTROS_MIOS.map((f) => (
@@ -629,7 +628,6 @@ export default function ReunionesPage() {
       ) : verLecciones ? (
         <Section
           title="Lecciones aprendidas"
-          subtitle="Lo que se dijo el viernes y antes se olvidaba el lunes."
           actions={
             <form
               role="search"
@@ -671,8 +669,6 @@ export default function ReunionesPage() {
         </Section>
       ) : (
         <Section
-          title="Reuniones"
-          subtitle="De la más reciente a la más antigua. Cada una baja su acta en PDF."
           actions={<Button size="sm" variant="ghost" onClick={() => setVerLecciones(true)}>💡 Lecciones aprendidas</Button>}
         >
           {primeraCarga ? (
@@ -729,6 +725,8 @@ export default function ReunionesPage() {
             </ul>
           )}
         </Section>
+      )}
+      </>
       )}
 
       {/* ── Convocar ─────────────────────────────────────────────────── */}
@@ -1038,7 +1036,7 @@ export default function ReunionesPage() {
         )}
       </Modal>
 
-      {tarjetaMic && (permisoMic.estado === "prompt" || permisoMic.estado === "denied") ? (
+      {tarjetaMic && !(error && !loaded) && (permisoMic.estado === "prompt" || permisoMic.estado === "denied") ? (
         <PermisoMicrofono
           estado={permisoMic.estado}
           onPermitir={async () => {
