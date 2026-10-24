@@ -349,29 +349,27 @@ enum NxFriendlyError {
     }
 }
 
-/// Bloque de error dentro de una pantalla con más cosas (Android `NxErrorBlock`):
-/// tarjeta roja suave, «No se pudo cargar», la causa y «Reintentar».
+/// Bloque de error dentro de una pantalla con más cosas: la causa y «Reintentar».
 struct NxErrorBlock: View {
     let message: String?
     var onRetry: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NxSpacing.s) {
-            Text("No se pudo cargar")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(NxColors.danger)
+        VStack(spacing: NxSpacing.s) {
             Text(NxFriendlyError.text(message))
-                .font(NxType.bodySmall)
+                .font(NxType.bodyLarge)
                 .foregroundStyle(NxColors.fg)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if let onRetry {
                 Button("Reintentar", action: onRetry)
-                    .buttonStyle(NxPillButtonStyle(fill: .clear, foreground: NxColors.brand, border: NxColors.borderStrong))
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(minHeight: 44)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(NxColors.dangerSoft, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
+        .padding(.vertical, 28)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
     }
 }
@@ -1009,21 +1007,27 @@ struct NxUnderlineTabs<ID: Hashable>: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if scrollable {
+        if scrollable || tabs.count > 4 {
+            VStack(spacing: 0) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(tabs) { tab in pestana(tab).padding(.horizontal, 12) }
                     }
                     .padding(.horizontal, 4)
                 }
-            } else {
-                HStack(spacing: 0) {
-                    ForEach(tabs) { tab in pestana(tab).frame(maxWidth: .infinity) }
-                }
-                .padding(.horizontal, NxSpacing.screenH)
+                Rectangle().fill(NxColors.border).frame(height: 1)
             }
-            Rectangle().fill(NxColors.border).frame(height: 1)
+        } else {
+            Picker("Sección", selection: $selection) {
+                ForEach(tabs) { tab in
+                    Text(tab.title).tag(tab.id)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, NxSpacing.screenH)
+            .padding(.vertical, 8)
+            .accessibilityElement(children: .contain)
         }
     }
 

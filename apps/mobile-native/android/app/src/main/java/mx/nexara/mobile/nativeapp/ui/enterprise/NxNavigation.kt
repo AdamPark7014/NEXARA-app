@@ -105,9 +105,8 @@ fun NavGraphBuilder.nxComposable(
 }
 
 /**
- * Barra inferior Material 3 del rediseño v2: pastilla teal suave en la activa,
- * icono relleno al seleccionar y una insignia roja con el conteo cuando hay
- * algo pendiente. Lee el tema (no [NxColors]) para que el modo oscuro funcione.
+ * Barra inferior: icono y palabra. La activa va en tinta, sin pastilla.
+ * Insignia roja solo cuando hay un conteo. Lee el tema para el modo oscuro.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,9 +160,9 @@ fun NxBottomTabBar(
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = scheme.onSecondaryContainer,
+                    selectedIconColor = scheme.onSurface,
                     selectedTextColor = scheme.onSurface,
-                    indicatorColor = scheme.secondaryContainer,
+                    indicatorColor = Color.Transparent,
                     unselectedIconColor = scheme.onSurfaceVariant,
                     unselectedTextColor = scheme.onSurfaceVariant,
                 ),

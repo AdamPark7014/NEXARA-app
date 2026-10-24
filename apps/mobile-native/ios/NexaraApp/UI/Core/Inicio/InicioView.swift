@@ -369,7 +369,7 @@ private struct InicioJornadaHero: View {
         let salidaIso = ultima(salidas)
         let trabajado: TimeInterval
         let estadoTexto: String
-        let subTexto: String
+        let subTexto: String?
         switch jornada {
         case .enJornada:
             trabajado = AttendanceClock.elapsed(from: inicioIso, to: nil, now: now)
@@ -382,7 +382,7 @@ private struct InicioJornadaHero: View {
         case .sinEntrada:
             trabajado = 0
             estadoTexto = "Sin entrada registrada"
-            subTexto = "Se toma una foto y tu ubicación al checar"
+            subTexto = nil
         }
         // El API contesta 400 a la segunda entrada del día: aquí se apaga antes.
         let puedeEntrar = !hayEntrada && !abierta
@@ -409,16 +409,18 @@ private struct InicioJornadaHero: View {
                     .lineLimit(1)
             }
             .padding(.top, 6)
-            HStack(alignment: .center, spacing: 6) {
-                Image(systemName: "mappin")
-                    .font(.system(size: 13, weight: .regular))
-                    .frame(width: 15, height: 15)
-                    .accessibilityHidden(true)
-                Text(subTexto)
-                    .font(.system(size: 13))
-                    .lineLimit(1)
+            if let subTexto {
+                HStack(alignment: .center, spacing: 6) {
+                    Image(systemName: "mappin")
+                        .font(.system(size: 13, weight: .regular))
+                        .frame(width: 15, height: 15)
+                        .accessibilityHidden(true)
+                    Text(subTexto)
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(Color.white.opacity(0.85))
             }
-            .foregroundStyle(Color.white.opacity(0.85))
             HStack(spacing: 10) {
                 switch jornada {
                 case .enJornada:

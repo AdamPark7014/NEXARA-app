@@ -113,14 +113,12 @@ fun TicketsNavHost(
 
     val showBack = route != TicketsRoutes.Portal
 
-    NxLightStatusBarIcons()
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         title,
-                        color = Color.White,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

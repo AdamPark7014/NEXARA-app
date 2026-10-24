@@ -36,24 +36,17 @@ struct MisActividadesView: View {
     private var canReorder: Bool { data?.canReorder == true && open.count > 1 }
     private var canSelfAssign: Bool { data?.canSelfAssign == true }
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
-    private var firstName: String { ActividadesTexto.primerNombre(session.currentUser?.nombre) }
     private var hayAlgo: Bool { !open.isEmpty || !done.isEmpty || !seguimiento.isEmpty }
 
     private var estado: ActividadesPantalla {
         .de(cargando: loading && data == nil, error: error, hayDatos: hayAlgo)
     }
 
-    private var metricas: [NxMetric] {
-        ActividadesUx.metricas(porHacer: open.count, urgentes: urgentes, hechasHoy: done.count, seguimiento: seguimiento.count)
-    }
-
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
-                encabezado
-                // Regla 7: sin nada que contar, la tira no se pinta.
-                if !metricas.isEmpty {
-                    NxMetricStrip(items: metricas)
+                if estado == .contenido {
+                    encabezado
                 }
                 // Cola vacía pero hay hechas hoy o seguimiento: la pantalla no está
                 // «vacía», así que el botón del estado vacío no sale. Este sí.
@@ -89,26 +82,18 @@ struct MisActividadesView: View {
 
     // MARK: Encabezado
 
-    /// Dos renglones: saludo y qué hacer ahora. Lo primero que se tiene que ver
-    /// es la actividad, no la bienvenida.
+    /// Una línea con el día. El título grande ya dice «Actividades».
     private var encabezado: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(firstName.isEmpty ? "Tu día" : "Hola, \(firstName)")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(NxColors.fg)
-                Text(ActividadesUx.instruccionDia(porHacer: open.count, cargando: loading && data == nil))
-                    .font(.system(size: 13))
-                    .foregroundStyle(NxColors.fg2)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // Siempre visible: con cola es secundario (el primario es la #1).
-            if ActividadesUx.muestraAutoasignar(canSelfAssign) {
+            Text(ActividadesUx.resumenDia(porHacer: open.count, urgentes: urgentes, hechasHoy: done.count, seguimiento: seguimiento.count))
+                .font(.system(size: 15))
+                .foregroundStyle(NxColors.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if ActividadesUx.muestraAutoasignar(canSelfAssign) && !open.isEmpty {
                 Button { showSelfAssign = true } label: {
                     Text("Auto-asignarme")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(NxColors.fg2)
-                        .padding(.horizontal, 8)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(NxColors.brand)
                         .frame(minHeight: NxMetrics.minTap)
                         .contentShape(Rectangle())
                 }
@@ -128,19 +113,15 @@ struct MisActividadesView: View {
             NxErrorBlock(message: error) { Task { await load() } }
         case .vacio:
             NxEmptyState(
-                title: "Todo al día",
-                subtitle: "Cuando te asignen algo aparecerá aquí.",
+                title: "Nada pendiente hoy",
+                subtitle: "",
                 actionLabel: canSelfAssign ? "Auto-asignarme una actividad" : nil,
                 onAction: accionVacia
             )
         case .contenido:
-            notaDeOrden
             cola
             if !seguimiento.isEmpty {
-                NxDenseSectionHeader(
-                    title: "En seguimiento (\(seguimiento.count))",
-                    hint: "Ya las repartiste: aquí ves a quién y cómo va quien las ejecuta."
-                )
+                NxDenseSectionHeader(title: "En seguimiento (\(seguimiento.count))")
                 .padding(.top, 6)
                 ForEach(seguimiento) { s in
                     SeguimientoCard(
@@ -173,19 +154,6 @@ struct MisActividadesView: View {
     private var accionVacia: (() -> Void)? {
         guard canSelfAssign else { return nil }
         return { showSelfAssign = true }
-    }
-
-    @ViewBuilder
-    private var notaDeOrden: some View {
-        if canReorder {
-            Text("Tú decides el orden: usa «Subir» y «Bajar». Cada cambio pide un motivo corto.")
-                .font(.system(size: 12.5))
-                .foregroundStyle(NxColors.muted)
-        } else if open.count > 1 {
-            Text("El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.")
-                .font(.system(size: 12.5))
-                .foregroundStyle(NxColors.muted)
-        }
     }
 
     private var cola: some View {
@@ -343,12 +311,6 @@ private struct OpenActivityCard: View {
         ActividadesTexto.limpio(a.cliente) ?? ActividadesTexto.limpio(a.proyecto)
     }
 
-    /// Quién la mandó: dato de contexto, no otro chip de colores.
-    private var quien: String? {
-        if a.autoAsignada == true { return "Auto-asignada" }
-        return ActividadesSemaforo.asignadaPorTexto(a.quienAsigno?.nombre)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             cabecera
@@ -358,10 +320,18 @@ private struct OpenActivityCard: View {
                     .font(.system(size: 12.5))
                     .foregroundStyle(NxColors.rojo)
             }
-            estados
-            meta
-            if let quien {
-                ActLineaIcono(systemName: "person", text: quien)
+            Text(ActividadesUx.lineaEstado(
+                porRepartir: a.porRepartir == true,
+                semaforo: a.semaforo,
+                estatus: a.estatus,
+                prioridad: a.prioridad
+            ))
+            .font(.system(size: 13))
+            .foregroundStyle(NxColors.muted)
+            if let tiempo, a.excedida == true {
+                Text(tiempo)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.rojo)
             }
             // Nota con una línea de margen en vez de un recuadro relleno.
             if let indicaciones = ActividadesTexto.limpio(a.indicaciones) {
@@ -389,30 +359,26 @@ private struct OpenActivityCard: View {
         .overlay(forma.strokeBorder(filo, lineWidth: highlighted || first ? 1.5 : 1))
     }
 
+    private var contexto: String {
+        ActividadesUx.lineaContexto(cuando: cuando == "Sin fecha" ? nil : cuando, lugar: lugar, tipo: tipoFolio)
+    }
+
     private var cabecera: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("\(index + 1)")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(first ? Color.white : NxColors.brand)
-                .frame(width: 28, height: 28)
-                .background(first ? NxColors.brand : NxColors.brandSoft, in: Circle())
-            VStack(alignment: .leading, spacing: 1) {
-                if first {
-                    Text("EMPIEZA POR AQUÍ")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(NxColors.brand)
-                }
+                .font(.system(size: 15, weight: first ? .semibold : .regular))
+                .foregroundStyle(first ? NxColors.fg : NxColors.muted)
+                .frame(width: 18, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(a.titulo ?? "")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(NxColors.fg)
-                // El tipo, con su ícono: distingue una obra de un trámite de un vistazo.
-                ActLineaIcono(
-                    systemName: CoreStatusUI.kindSymbol(a.coreKind),
-                    text: tipoFolio,
-                    fontSize: 12,
-                    lineLimit: 1
-                )
+                if !contexto.isEmpty {
+                    Text(contexto)
+                        .font(.system(size: 13))
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -460,37 +426,6 @@ private struct OpenActivityCard: View {
             onIniciar(accion.tab)
         } else {
             onOpen(accion.tab)
-        }
-    }
-
-    /// Estado: punto y palabra. Gris para el flujo normal, color solo si pide acción.
-    private var estados: some View {
-        ActividadesFlow {
-            if a.porRepartir == true {
-                NxStatusDot(text: "Te toca repartirla", color: NxColors.naranja, fontWeight: .bold)
-            }
-            if let luz = ActividadesSemaforo.luz(a.semaforo) {
-                NxStatusDot(text: luz.etiqueta, color: ActividadesUx.colorSemaforo(a.semaforo))
-            }
-            NxStatusDot(text: CoreStatusUI.estatus(a.estatus).label, color: ActividadesUx.colorEstatus(a.estatus))
-            NxStatusDot(text: CoreStatusUI.priority(a.prioridad).label, color: ActividadesUx.colorPrioridad(a.prioridad))
-        }
-    }
-
-    /// Cuándo, cuánto y dónde: tres datos con su ícono, en una sola línea si caben.
-    private var meta: some View {
-        ActividadesFlow {
-            ActLineaIcono(systemName: "calendar", text: cuando)
-            if let tiempo {
-                ActLineaIcono(
-                    systemName: "clock",
-                    text: tiempo,
-                    color: tiempo.hasPrefix("Plan") && a.excedida == true ? NxColors.rojo : NxColors.muted
-                )
-            }
-            if let lugar {
-                ActLineaIcono(systemName: "mappin", text: lugar)
-            }
         }
     }
 

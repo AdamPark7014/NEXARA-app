@@ -203,10 +203,9 @@ struct CoreShellView: View {
         .background(NxColors.surface.ignoresSafeArea(edges: .bottom))
     }
 
-    /// Inicio pinta su propia cabecera clara (hora en negro); todo lo demás del shell
-    /// lleva la barra teal hasta arriba (hora en blanco). Ver `NxStatusBar`.
+    /// La barra es clara en todo el shell: la hora va en negro. Ver `NxStatusBar`.
     private func actualizarBarraDeEstado() {
-        NxStatusBar.textoBlanco(!(selected == .inicio && overlay == nil))
+        NxStatusBar.textoBlanco(false)
     }
 
     private func badgeCount(_ tab: CoreShellTab) -> Int {
@@ -243,12 +242,12 @@ struct CoreShellView: View {
         case .actividades:
             NavigationStack {
                 ActividadesHomeView()
-                    .nxBrandNavBar(title: CoreShellTab.actividades.barTitle)
+                    .nxBrandNavBar(title: CoreShellTab.actividades.barTitle, large: true)
             }
         case .asistencias:
             NavigationStack {
                 AttendanceView()
-                    .nxBrandNavBar(title: CoreShellTab.asistencias.barTitle)
+                    .nxBrandNavBar(title: CoreShellTab.asistencias.barTitle, large: true)
             }
         case .mas:
             NavigationStack {
@@ -256,7 +255,7 @@ struct CoreShellView: View {
                     modules: extraModules,
                     showClientes: modules.contains(.clientes)
                 )
-                .nxBrandNavBar(title: CoreShellTab.mas.barTitle)
+                .nxBrandNavBar(title: CoreShellTab.mas.barTitle, large: true)
             }
         }
     }

@@ -85,8 +85,8 @@ object NxElevation {
 }
 
 /**
- * Las barras superiores de la app son azul marca: los iconos de la barra de
- * estado tienen que ser claros mientras esa barra está en pantalla.
+ * Barras superiores claras: iconos de estado oscuros. Se conserva por si una
+ * pantalla puntual pinta un fondo oscuro bajo la hora.
  */
 @Composable
 fun NxLightStatusBarIcons() {
@@ -188,34 +188,32 @@ fun NxErrorState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .background(NxColors.DangerSoft, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.CloudOff, contentDescription = null, tint = NxColors.Danger, modifier = Modifier.size(26.dp))
+        Icon(
+            Icons.Default.CloudOff,
+            contentDescription = null,
+            tint = NxColors.Muted,
+            modifier = Modifier.size(28.dp),
+        )
+        val causa = nxFriendlyError(message)
+        val titular = title.trim()
+        if (titular.isNotEmpty() && titular != "No se pudo cargar" && !causa.equals(titular, ignoreCase = true)) {
+            Text(
+                titular,
+                style = MaterialTheme.typography.titleMedium,
+                color = NxColors.Slate,
+                textAlign = TextAlign.Center,
+            )
         }
         Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
+            causa,
+            style = MaterialTheme.typography.bodyLarge,
             color = NxColors.Slate,
             textAlign = TextAlign.Center,
         )
-        Text(
-            nxFriendlyError(message),
-            style = MaterialTheme.typography.bodyMedium,
-            color = NxColors.Muted,
-            textAlign = TextAlign.Center,
-        )
         if (onRetry != null) {
-            Spacer(Modifier.size(4.dp))
-            NxPrimaryButton(
-                text = "Reintentar",
-                onClick = onRetry,
-                icon = Icons.Default.Refresh,
-                modifier = Modifier,
-            )
+            TextButton(onClick = onRetry, modifier = Modifier.heightIn(min = NxSpacing.TouchTarget)) {
+                Text("Reintentar", fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }

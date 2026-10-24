@@ -274,9 +274,8 @@ extension NxStatusChip {
     }
 }
 
-/// Estado vacío (Android `NxEmptyState`): círculo de 56 en tinte de marca con el
-/// icono en teal, título 16 SemiBold, texto 14 gris centrado y, si hay acción,
-/// el botón principal del tamaño de su texto.
+/// Estado vacío: un símbolo, una frase y, si hace falta, una acción.
+/// El subtítulo solo se pinta si aporta algo que el título no dice.
 struct NxEmptyState: View {
     let title: String
     let subtitle: String
@@ -286,31 +285,31 @@ struct NxEmptyState: View {
 
     var body: some View {
         VStack(spacing: NxSpacing.s) {
-            ZStack {
-                Circle().fill(NxColors.brandTint)
-                Image(systemName: systemImage ?? "tray.fill")
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(NxColors.brand)
-            }
-            .frame(width: 56, height: 56)
-            .accessibilityHidden(true)
-            .padding(.bottom, NxSpacing.xs)
+            Image(systemName: systemImage ?? "tray")
+                .font(.system(size: 28, weight: .regular))
+                .foregroundStyle(NxColors.muted)
+                .accessibilityHidden(true)
             Text(title)
                 .font(NxType.titleMedium)
                 .foregroundStyle(NxColors.fg)
                 .multilineTextAlignment(.center)
-            Text(subtitle)
-                .font(NxType.bodyMedium)
-                .foregroundStyle(NxColors.muted)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            if !subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(subtitle)
+                    .font(NxType.bodyMedium)
+                    .foregroundStyle(NxColors.muted)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let actionLabel, let onAction {
-                NxPrimaryButton(actionLabel, fullWidth: false, action: onAction)
-                    .padding(.top, 6)
+                Button(actionLabel, action: onAction)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(NxColors.brand)
+                    .frame(minHeight: 44)
             }
         }
-        .padding(.vertical, 36)
-        .padding(.horizontal, 24)
+        .padding(.vertical, 48)
+        .padding(.horizontal, 32)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
     }

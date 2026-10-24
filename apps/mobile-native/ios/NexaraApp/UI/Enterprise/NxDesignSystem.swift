@@ -462,9 +462,8 @@ struct NxSkeletonRows: View {
     }
 }
 
-/// La carga falló y no hay nada que enseñar (Android `NxErrorState`): círculo
-/// rojo suave con la nube tachada, título 16 SemiBold, la causa en palabras de
-/// campo y «Reintentar». Si ya había datos, usar `NxRefreshErrorBanner`.
+/// La carga falló y no hay nada que enseñar: la causa en una frase y «Reintentar».
+/// Si ya había datos, usar `NxRefreshErrorBanner`.
 struct NxErrorState: View {
     var title: String
     let message: String?
@@ -484,31 +483,33 @@ struct NxErrorState: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                Circle().fill(NxColors.dangerSoft)
-                Image(systemName: systemImage)
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(NxColors.danger)
-            }
-            .frame(width: 56, height: 56)
-            .accessibilityHidden(true)
-            Text(title)
-                .font(NxType.titleMedium)
-                .foregroundStyle(NxColors.fg)
-                .multilineTextAlignment(.center)
-            Text(NxFriendlyError.text(message))
-                .font(NxType.bodyMedium)
+        let causa = NxFriendlyError.text(message)
+        let titular = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let muestraTitulo = !titular.isEmpty && titular != "No se pudo cargar" && titular.caseInsensitiveCompare(causa) != .orderedSame
+        return VStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.system(size: 28, weight: .regular))
                 .foregroundStyle(NxColors.muted)
+                .accessibilityHidden(true)
+            if muestraTitulo {
+                Text(titular)
+                    .font(NxType.titleMedium)
+                    .foregroundStyle(NxColors.fg)
+                    .multilineTextAlignment(.center)
+            }
+            Text(causa)
+                .font(NxType.bodyLarge)
+                .foregroundStyle(NxColors.fg)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if let retry {
-                NxPrimaryButton("Reintentar", systemImage: "arrow.clockwise", fullWidth: false, action: retry)
-                    .padding(.top, 4)
+                Button("Reintentar", action: retry)
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(minHeight: 44)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 40)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 48)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
     }

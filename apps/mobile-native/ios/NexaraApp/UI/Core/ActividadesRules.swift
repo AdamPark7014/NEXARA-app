@@ -429,6 +429,48 @@ enum ActividadesUx {
         CoreStatusUI.priority(prioridad).label == "Urgente"
     }
 
+    /// «3 por hacer · 1 urgente · 2 hechas hoy» — el resumen del día, en una línea.
+    static func resumenDia(porHacer: Int, urgentes: Int, hechasHoy: Int, seguimiento: Int) -> String {
+        var partes = [porHacer == 0 ? "Nada por hacer" : "\(porHacer) por hacer"]
+        if urgentes == 1 { partes.append("1 urgente") }
+        else if urgentes > 1 { partes.append("\(urgentes) urgentes") }
+        if hechasHoy == 1 { partes.append("1 hecha hoy") }
+        else if hechasHoy > 1 { partes.append("\(hechasHoy) hechas hoy") }
+        if seguimiento > 0 { partes.append("\(seguimiento) en seguimiento") }
+        return partes.joined(separator: " · ")
+    }
+
+    /// Una línea de la tarjeta: cuándo y dónde. Si no hay fecha, el tipo.
+    /// «Sin fecha» no se enseña: no es un dato.
+    static func lineaContexto(cuando: String?, lugar: String?, tipo: String?) -> String {
+        let fechaCruda = cuando?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fechaUtil: String? = {
+            guard let fechaCruda, !fechaCruda.isEmpty else { return nil }
+            if fechaCruda.caseInsensitiveCompare("Sin fecha") == .orderedSame { return nil }
+            return fechaCruda
+        }()
+        let sitio = lugar?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let clase = tipo?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        if let fechaUtil, let sitio { return "\(fechaUtil) · \(sitio)" }
+        if let fechaUtil { return fechaUtil }
+        if let clase, let sitio { return "\(clase) · \(sitio)" }
+        return sitio ?? clase ?? ""
+    }
+
+    /// Una sola frase de estado: lo que pide atención, o el estatus si todo va normal.
+    static func lineaEstado(porRepartir: Bool, semaforo: String?, estatus: String?, prioridad: String?) -> String {
+        if porRepartir { return "Te toca repartirla" }
+        let etiqueta = CoreStatusUI.estatus(estatus).label
+        let luz = ActividadesSemaforo.luz(semaforo)
+        let pideLuz = colorSemaforo(semaforo) != nil
+        if esUrgente(prioridad), pideLuz, let nombre = luz?.etiqueta, !nombre.isEmpty {
+            return "Urgente · \(nombre)"
+        }
+        if esUrgente(prioridad) { return "Urgente · \(etiqueta)" }
+        if pideLuz, let nombre = luz?.etiqueta, !nombre.isEmpty { return nombre }
+        return etiqueta
+    }
+
     /// Lo que dice el encabezado bajo el saludo: qué hacer ahora.
     static func instruccionDia(porHacer: Int, cargando: Bool) -> String {
         if cargando { return "Cargando tus actividades…" }

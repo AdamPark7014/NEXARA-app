@@ -91,6 +91,42 @@ object ActividadesUx {
         }
     }
 
+    /**
+     * Una línea de la tarjeta: cuándo y dónde. Si no hay fecha, el tipo.
+     * «Sin fecha» no se enseña: no es un dato.
+     */
+    fun lineaContexto(cuando: String?, lugar: String?, tipo: String?): String {
+        val fecha = cuando?.trim()?.takeIf { it.isNotEmpty() && !it.equals("Sin fecha", ignoreCase = true) }
+        val sitio = lugar?.trim()?.takeIf { it.isNotEmpty() }
+        val clase = tipo?.trim()?.takeIf { it.isNotEmpty() }
+        return when {
+            fecha != null && sitio != null -> "$fecha · $sitio"
+            fecha != null -> fecha
+            clase != null && sitio != null -> "$clase · $sitio"
+            sitio != null -> sitio
+            clase != null -> clase
+            else -> ""
+        }
+    }
+
+    /** Una sola frase de estado: lo que pide atención, o el estatus si el flujo es normal. */
+    fun lineaEstado(
+        porRepartir: Boolean,
+        semaforo: String?,
+        estatus: String?,
+        prioridad: String?,
+    ): String {
+        if (porRepartir) return "Te toca repartirla"
+        val etiqueta = CoreActivityRules.estatusUi(estatus).label
+        val luz = ActivitySemaforo.luz(semaforo)
+        val pideLuz = colorSemaforo(semaforo) != null
+        val urgente = colorPrioridad(prioridad) != null
+        if (urgente && pideLuz && luz != null) return "Urgente · ${luz.etiqueta}"
+        if (urgente) return "Urgente · $etiqueta"
+        if (pideLuz && luz != null) return luz.etiqueta
+        return etiqueta
+    }
+
     /** «3 por hacer · 1 urgente · 2 hechas hoy» — el resumen del encabezado. */
     fun resumenDia(porHacer: Int, urgentes: Int, hechasHoy: Int, seguimiento: Int): String =
         buildList {

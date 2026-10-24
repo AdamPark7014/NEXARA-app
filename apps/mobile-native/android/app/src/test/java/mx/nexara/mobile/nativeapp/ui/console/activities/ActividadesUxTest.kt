@@ -129,6 +129,23 @@ class ActividadesUxTest {
     }
 
     @Test
+    fun laTarjetaDiceCuandoYDondeEnUnaLinea() {
+        assertEquals(
+            "Hoy 9:00 · Obra Norte",
+            ActividadesUx.lineaContexto("Hoy 9:00", "Obra Norte", "Obra · Folio 12"),
+        )
+        assertEquals("Obra · Folio 12", ActividadesUx.lineaContexto("Sin fecha", null, "Obra · Folio 12"))
+        assertEquals("", ActividadesUx.lineaContexto(null, "  ", ""))
+    }
+
+    @Test
+    fun elEstadoDeLaTarjetaEsUnaFrase() {
+        assertEquals("Te toca repartirla", ActividadesUx.lineaEstado(true, "verde", "Pendiente", "normal"))
+        assertEquals("Urgente · Atrasada", ActividadesUx.lineaEstado(false, "rojo", "En Proceso", "urgente"))
+        assertEquals("En curso", ActividadesUx.lineaEstado(false, "verde", "En Proceso", "normal"))
+    }
+
+    @Test
     fun resumenDelDiaEnUnaLinea() {
         assertEquals("Nada por hacer", ActividadesUx.resumenDia(0, 0, 0, 0))
         assertEquals("3 por hacer · 1 urgente · 2 hechas hoy", ActividadesUx.resumenDia(3, 1, 2, 0))
