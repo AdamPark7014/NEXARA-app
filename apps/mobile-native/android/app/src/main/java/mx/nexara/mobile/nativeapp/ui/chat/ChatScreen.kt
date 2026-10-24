@@ -1447,6 +1447,8 @@ fun ChatScreen(
     @Suppress("UNUSED_PARAMETER") onBack: (() -> Unit)? = null,
     initialChannelId: Long? = null,
     initialMessageId: Long? = null,
+    /** `true` mientras hay un canal abierto: el shell esconde su barra para no duplicarla. */
+    onConversacionAbierta: (Boolean) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1458,6 +1460,12 @@ fun ChatScreen(
     })
     val state by vm.state.collectAsState()
     var draft by remember { mutableStateOf("") }
+    LaunchedEffect(state.selectedChannel?.id) {
+        onConversacionAbierta(state.selectedChannel != null)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onConversacionAbierta(false) }
+    }
 
     LaunchedEffect(initialChannelId, state.channels) {
         val channelId = initialChannelId ?: return@LaunchedEffect
@@ -1633,9 +1641,15 @@ fun ChatScreen(
             vm.clearJumpTarget()
         }
 
+        val lineaCanal = buildList {
+            channel.topic?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
+            if (state.isMuted) add("Silenciado")
+            if (state.channelDetail?.readOnly == true) add("Solo lectura")
+        }.joinToString(" · ")
         Scaffold(
             topBar = {
                 TopAppBar(
+                    colors = mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors(),
                     title = {
                         Column {
                             NxIconText(
@@ -1645,20 +1659,15 @@ fun ChatScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            Text(
-                                buildString {
-                                    append(channelKindLabel(channel.kind))
-                                    channel.topic?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
-                                    if (channel.memberCount > 0) append(" · ${channel.memberCount} miembros")
-                                    // Un canal silenciado tiene que decirlo:
-                                    // si no, se lee como que el chat no anda.
-                                    if (state.isMuted) append(" · silenciado")
-                                    if (state.channelDetail?.readOnly == true) append(" · solo lectura")
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            if (lineaCanal.isNotEmpty()) {
+                                Text(
+                                    lineaCanal,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NxColors.Muted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     },
                     navigationIcon = {

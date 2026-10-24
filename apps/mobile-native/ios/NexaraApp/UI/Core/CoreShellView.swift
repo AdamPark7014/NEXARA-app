@@ -236,7 +236,7 @@ struct CoreShellView: View {
                 )
             }
         case .chat:
-            // `ChatView` trae su propio NavigationStack y pone su barra teal dentro.
+            // `ChatView` trae su propio NavigationStack y su barra clara.
             ChatView(initialChannelId: chatChannelId, initialMessageId: chatMessageId)
                 .id(chatNonce)
         case .actividades:

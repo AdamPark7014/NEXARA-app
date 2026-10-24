@@ -296,13 +296,13 @@ struct ChatConversationView: View {
     private var title: String { channel.map(ChatChannelKind.title) ?? "" }
     private var isDirect: Bool { channel?.isDirect == true }
 
+    /// Una línea, y solo si aporta: el tema, o que está silenciado o en solo lectura.
     private var subtitle: String {
         guard let channel else { return "" }
-        var parts = [ChatChannelKind.label(channel.kind)]
+        var parts: [String] = []
         if !channel.topic.isEmpty { parts.append(channel.topic) }
-        if channel.memberCount > 0 { parts.append("\(channel.memberCount) miembros") }
-        if store.isMuted { parts.append("silenciado") }
-        if store.channelDetail?.readOnly == true { parts.append("solo lectura") }
+        if store.isMuted { parts.append("Silenciado") }
+        if store.channelDetail?.readOnly == true { parts.append("Solo lectura") }
         return parts.joined(separator: " · ")
     }
 
@@ -425,7 +425,7 @@ struct ChatConversationView: View {
                     .truncationMode(.tail)
             }
         }
-        .foregroundStyle(Color.white)
+        .foregroundStyle(NxColors.fg)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -437,7 +437,7 @@ struct ChatConversationView: View {
                 scrollToTop += 1
             } label: {
                 Image(systemName: "pin.fill")
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(NxColors.fg)
                     .overlay(alignment: .topTrailing) {
                         NxCountBadge(count: store.pinnedMessages.count)
                             .fixedSize()
@@ -450,14 +450,14 @@ struct ChatConversationView: View {
             store.toggleSearch()
         } label: {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color.white)
+                .foregroundStyle(NxColors.fg)
         }
         .accessibilityLabel("Buscar mensajes")
         Button {
             Task { await store.refreshMessages() }
         } label: {
             Image(systemName: "arrow.clockwise")
-                .foregroundStyle(Color.white)
+                .foregroundStyle(NxColors.fg)
         }
         .accessibilityLabel("Actualizar")
         Menu {
@@ -465,7 +465,7 @@ struct ChatConversationView: View {
         } label: {
             Image(systemName: "ellipsis")
                 .rotationEffect(.degrees(90))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(NxColors.fg)
         }
         .accessibilityLabel("Opciones del canal")
     }

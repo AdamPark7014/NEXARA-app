@@ -138,20 +138,18 @@ struct HerramientasView: View {
 
         if kit.isEmpty {
             let titulo = "No traes herramienta asignada"
-            let texto = "Tu kit está vacío: nadie te ha asignado una herramienta de forma "
-                + "permanente. Almacén es quien las reparte."
             if vm.estado.prestamos.isEmpty {
-                NxEmptyState(title: titulo, subtitle: texto)
+                NxEmptyState(title: titulo, subtitle: "")
             } else {
                 NxEmptyState(
                     title: titulo,
-                    subtitle: texto,
+                    subtitle: "",
                     actionLabel: "Ver mis préstamos",
                     onAction: { vm.cambiarVista(.prestamos) }
                 )
             }
         } else {
-            MoreCabecera(titulo: "Mi kit", subtitulo: "Primero lo que reclama atención", trailing: "\(kit.count)")
+            MoreCabecera(titulo: "Mi kit", trailing: "\(kit.count)")
             ForEach(kit) { asignacion in
                 TarjetaKit(asignacion: asignacion, hoy: vm.hoy)
             }
@@ -205,21 +203,19 @@ struct HerramientasView: View {
             } else if vm.filtro == .abiertos && total > 0 {
                 NxEmptyState(
                     title: "No debes ninguna",
-                    subtitle: "No tienes préstamos abiertos: todo lo que pediste ya se cerró.",
+                    subtitle: "",
                     actionLabel: "Ver el historial",
                     onAction: { vm.cambiarFiltro(.todos) }
                 )
             } else {
                 NxEmptyState(
                     title: "Todavía no pides herramienta prestada",
-                    subtitle: "Los préstamos se dan de alta en almacén. Cuando te presten algo, "
-                        + "aparecerá aquí con su fecha de devolución y su código para recogerlo."
+                    subtitle: ""
                 )
             }
         } else {
             MoreCabecera(
                 titulo: vm.filtro.etiqueta,
-                subtitulo: "Primero lo vencido y lo que vence antes",
                 trailing: "\(prestamos.count)"
             )
             ForEach(prestamos) { prestamo in

@@ -489,17 +489,21 @@ fun ConsoleNavHost(
     val showBack = currentRoute != null && currentRoute !in tabRoutes
     /** Inicio trae su propia cabecera (saludo, fecha y campana): sin barra superior. */
     val enInicio = (currentRoute ?: startRoute) == ConsoleRoutes.Inicio
+    /** La conversación de Chat trae su propia barra, con volver a la lista. */
+    var chatEnConversacion by remember { mutableStateOf(false) }
     /** El detalle de actividad lleva su dock con la acción grande: ahí la barra inferior estorba. */
     val conBarraInferior = currentRoute != ConsoleRoutes.ActivityDetail
 
     val tituloGrande = !showBack && currentRoute in setOf(
         ConsoleRoutes.Activities,
         ConsoleRoutes.Attendance,
+        ConsoleRoutes.Chat,
         ConsoleRoutes.More,
     )
+    val sinBarraDeShell = enInicio || (currentRoute == ConsoleRoutes.Chat && chatEnConversacion)
     Scaffold(
         topBar = {
-            if (!enInicio) {
+            if (!sinBarraDeShell) {
                 val titulo: @Composable () -> Unit = {
                     Text(
                         currentTitle,
@@ -657,6 +661,7 @@ fun ConsoleNavHost(
                 ChatScreen(
                     initialChannelId = chatChannelId,
                     initialMessageId = chatMessageId,
+                    onConversacionAbierta = { chatEnConversacion = it },
                 )
             }
             // Clientes ya no es pestaña (v2): se abre desde «Más» o por enlace, con flecha de volver.

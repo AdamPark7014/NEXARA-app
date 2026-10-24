@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Chat nativo iOS — paridad Android `ChatScreen` (`ui/chat/ChatScreen.kt`).
 /// Lista de conversaciones con búsqueda, filtros, menciones y «Nueva
-/// conversación»; al tocar una, la conversación se apila con su barra teal.
+/// conversación»; al tocar una, la conversación se apila con su barra clara.
 /// El estado y las reglas viven en `ChatStore`.
 struct ChatView: View {
     var initialChannelId: Int64? = nil
@@ -35,7 +35,7 @@ struct ChatView: View {
     var body: some View {
         NavigationStack {
             listScreen
-                .nxBrandNavBar(title: "Chat")
+                .nxBrandNavBar(title: "Chat", large: true)
                 .navigationDestination(isPresented: $showConversation) {
                     ChatConversationView(store: store)
                 }

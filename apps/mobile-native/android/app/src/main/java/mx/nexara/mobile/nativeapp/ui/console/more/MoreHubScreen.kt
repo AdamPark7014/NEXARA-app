@@ -123,7 +123,6 @@ fun MoreHubScreen(
                 HubCard(
                     icon = Icons.Default.Handshake,
                     label = "Clientes",
-                    summary = "Padrón por sector: fichas, sucursales y altas.",
                     onClick = onOpenClientes,
                 )
             }
@@ -220,17 +219,15 @@ private fun ExtraCard(module: CoreExtraModule, onOpen: (CoreExtraModule) -> Unit
     HubCard(
         icon = module.icon(),
         label = module.label,
-        summary = module.summary,
         onClick = { onOpen(module) },
     )
 }
 
-/** Renglón del hub: icono en baldosa suave, nombre, una línea y flecha. */
+/** Renglón del hub: el nombre del módulo. La explicación no se repite: al entrar, la barra ya lo dice. */
 @Composable
 private fun HubCard(
     icon: ImageVector,
     label: String,
-    summary: String,
     onClick: () -> Unit,
 ) {
     Card(
@@ -248,35 +245,20 @@ private fun HubCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(NxTheme.colors.brandSoft, RoundedCornerShape(NxDimens.ControlRadius)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = NxTheme.colors.brandText,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = NxTheme.colors.fg,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.muted,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = NxTheme.colors.muted,
+                modifier = Modifier.size(22.dp),
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.titleSmall,
+                color = NxTheme.colors.fg,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
