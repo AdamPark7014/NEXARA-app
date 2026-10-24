@@ -13,7 +13,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { isNonEmployeeEmail } from '../common/platform-accounts.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { workDateKey } from '../common/time/workday.js';
-import { esDeTodaLaEmpresa, puedeAsignarA, type Alcanzador } from '../me/equipo-alcance.js';
+import { esDeTodaLaEmpresa, type Alcanzador } from '../me/equipo-alcance.js';
 import { diaDeLaSemana, esSabadoODomingo, fechaClave, fechaColumna } from './guardias-reglas.js';
 
 export type GuardiaActor = Alcanzador;
@@ -74,13 +74,31 @@ function sumarDias(fecha: string, dias: number): string {
 }
 
 /**
- * ¿`actor` puede programarle (o quitarle) una guardia a `targetId`? Dirección, a cualquiera
- * —también a sí misma—; los demás, a quien pueden asignarle actividades (`puedeAsignarA`:
- * su organigrama hacia abajo y el flujo de despacho, nunca a sí mismos).
+ * Quién programa guardias. El organigrama de Adam manda sobre `managerId`.
+ * Christian (superadmin / CEO) programa a cualquiera. David y José, solo el
+ * equipo de esta lista. Iván no está en ninguno hasta nueva orden.
  */
+export const EQUIPO_GUARDIAS_POR_CORREO: Record<string, readonly string[]> = {
+  'operaciones@nexara.com.mx': [
+    'salvador.hernandez@nexara.com.mx',
+    'israel.ramos@nexara.com.mx',
+    'erick.juarez@nexara.com.mx',
+  ],
+  'jose.ramirez@nexara.com.mx': [
+    'alejandro.gonzalez@nexara.com.mx',
+    'soporte@nexara.com.mx',
+    'roberto.vivanco@nexara.com.mx',
+  ],
+};
+
 export function puedeProgramarA(actor: GuardiaActor, users: Padron, targetId: number): boolean {
-  if (esDeTodaLaEmpresa(actor)) return users.some((u) => u.id === Number(targetId));
-  return puedeAsignarA(actor, users, targetId);
+  const id = Number(targetId);
+  if (!users.some((u) => Number(u.id) === id)) return false;
+  if (esDeTodaLaEmpresa(actor)) return true;
+  const equipo = EQUIPO_GUARDIAS_POR_CORREO[(actor.email || '').trim().toLowerCase()];
+  if (!equipo) return false;
+  const target = users.find((u) => Number(u.id) === id);
+  return Boolean(target && equipo.includes(target.email.trim().toLowerCase()));
 }
 
 /**
