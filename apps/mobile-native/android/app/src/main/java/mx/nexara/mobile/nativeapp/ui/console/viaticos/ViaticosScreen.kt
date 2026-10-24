@@ -127,7 +127,6 @@ fun ViaticosScreen(
                             NxAlert(
                                 id = "viaticos-error",
                                 title = msg,
-                                subtitle = if (state.vacio) null else "Abajo sigue lo último que se pudo leer.",
                                 tone = NxTone.Danger,
                                 actionLabel = "Reintentar",
                                 onAction = { vm.cargar(refresh = true) },
@@ -153,13 +152,12 @@ fun ViaticosScreen(
                         if (hayEquipo && pestana == 1) {
                             NxEmptyState(
                                 title = "Nada por autorizar",
-                                subtitle = "Tu equipo no tiene viáticos esperando decisión.",
+                                subtitle = "",
                             )
                         } else {
                             NxEmptyState(
                                 title = "Todavía no pides viáticos",
-                                subtitle = "Pon la gasolina, toma la foto del ticket y pídelo aquí mismo. " +
-                                    "No hace falta esperar a llegar a una computadora.",
+                                subtitle = "",
                                 actionLabel = "Pedir un viático",
                                 onAction = onNuevoViatico,
                             )

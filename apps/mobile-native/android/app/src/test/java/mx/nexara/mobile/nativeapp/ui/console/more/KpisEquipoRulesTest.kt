@@ -278,7 +278,6 @@ class KpisEquipoRulesTest {
             listOf("Luis", "Daniela", "Beto", "David Morales", "Ana"),
             KpisEquipoRules.ordenar(personas).map { it.persona?.nombre },
         )
-        assertEquals("Por cumplimiento, de mayor a menor", KpisEquipoRules.subtituloLista(personas))
     }
 
     @Test
@@ -300,7 +299,6 @@ class KpisEquipoRulesTest {
         )
         assertFalse(KpisEquipoRules.conCumplimiento(personas.first().totales))
         assertEquals(listOf("Beto", "Ana"), KpisEquipoRules.ordenar(personas).map { it.persona?.nombre })
-        assertEquals("De peor a mejor, para no tener que buscarlo", KpisEquipoRules.subtituloLista(personas))
     }
 
     /** Con la API nueva, `cumplimientoPct: null` es «sin entregas», no una API vieja. */

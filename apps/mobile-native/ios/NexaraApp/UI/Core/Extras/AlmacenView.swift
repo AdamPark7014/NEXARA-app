@@ -131,9 +131,6 @@ struct AlmacenView: View {
                 Text(resumen)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(NxColors.danger)
-                Text("De \(datos.niveles.count) existencias en total")
-                    .font(NxType.labelSmall)
-                    .foregroundStyle(NxColors.muted)
             }
         }
 
@@ -147,7 +144,6 @@ struct AlmacenView: View {
         } else {
             MoreCabecera(
                 titulo: vista.etiqueta,
-                subtitulo: vista == .bajoMinimo ? "Primero lo que ya se acabó" : "En orden alfabético",
                 trailing: "\(filas.count)"
             )
             ForEach(filas) { FilaDeExistencia(nivel: $0) }
@@ -166,14 +162,14 @@ struct AlmacenView: View {
         } else if vista == .bajoMinimo && total > 0 {
             NxEmptyState(
                 title: "Nada bajo mínimo",
-                subtitle: "Ningún producto con punto de reorden está por acabarse.",
+                subtitle: "",
                 actionLabel: "Ver todo el inventario",
                 onAction: { vista = .todo }
             )
         } else {
             NxEmptyState(
                 title: "Sin existencias",
-                subtitle: "Todavía no hay productos con existencia en los almacenes de esta empresa."
+                subtitle: ""
             )
         }
     }
@@ -188,8 +184,8 @@ struct AlmacenView: View {
     }
 }
 
-/// Una existencia: la cantidad grande a la derecha, la barra contra el punto de
-/// reorden y el estado con palabras para quien no ve el color.
+/// Una existencia: el producto, dónde está, la cantidad y una frase de estado.
+/// El mínimo y lo apartado van en una sola línea.
 private struct FilaDeExistencia: View {
     let nivel: StockNivel
 
@@ -206,7 +202,7 @@ private struct FilaDeExistencia: View {
                     Text(nivel.ubicacionTexto)
                         .font(NxType.labelMedium)
                         .foregroundStyle(NxColors.muted)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 0) {
@@ -214,13 +210,17 @@ private struct FilaDeExistencia: View {
                         .font(NxType.headlineSmall.bold())
                         .foregroundStyle(tono.fg)
                         .lineLimit(1)
-                    Text("en existencia")
+                    Text(estadoTexto)
                         .font(NxType.labelSmall)
-                        .foregroundStyle(NxColors.muted)
+                        .foregroundStyle(tono.fg)
+                        .lineLimit(1)
                 }
             }
-            MoreBarra(progreso: nivel.progreso, etiqueta: nivel.detalleTexto, tono: tono)
-            NxStatusChip(text: estadoTexto, tone: tono)
+            Text(nivel.detalleTexto)
+                .font(NxType.labelSmall)
+                .foregroundStyle(NxColors.muted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
     }

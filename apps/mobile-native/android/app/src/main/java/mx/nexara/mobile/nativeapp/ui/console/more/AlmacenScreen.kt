@@ -28,7 +28,6 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.fg
 
@@ -116,11 +115,6 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = NxColors.Danger,
                             )
-                            Text(
-                                "De ${datos.niveles.size} existencias en total",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = NxColors.Muted,
-                            )
                         }
                     }
                 }
@@ -141,10 +135,6 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
                     item(key = "cabecera") {
                         MoreCabecera(
                             titulo = vista.etiqueta,
-                            subtitulo = when (vista) {
-                                AlmacenRules.Vista.BAJO_MINIMO -> "Primero lo que ya se acabó"
-                                AlmacenRules.Vista.TODO -> "En orden alfabético"
-                            },
                             trailing = "${visibles.size}",
                         )
                     }
@@ -175,21 +165,20 @@ private fun VacioDeAlmacen(
         )
         vista == AlmacenRules.Vista.BAJO_MINIMO && totalNiveles > 0 -> NxEmptyState(
             title = "Nada bajo mínimo",
-            subtitle = "Ningún producto con punto de reorden está por acabarse.",
+            subtitle = "",
             actionLabel = "Ver todo el inventario",
             onAction = { vm.cambiarVista(AlmacenRules.Vista.TODO) },
         )
         else -> NxEmptyState(
             title = "Sin existencias",
-            subtitle = "Todavía no hay productos con existencia en los almacenes de esta empresa.",
+            subtitle = "",
         )
     }
 }
 
 /**
- * Una existencia. La cantidad va grande a la derecha porque es lo que se busca
- * con la vista; la barra dice de un golpe si está por encima o por debajo del
- * mínimo, y el texto lo repite con palabras para quien no ve el color.
+ * Una existencia: el producto, dónde está, la cantidad y una frase de estado.
+ * El mínimo y lo apartado van en una sola línea, que es el otro dato.
  */
 @Composable
 private fun FilaDeExistencia(nivel: StockLevelDto) {
@@ -224,7 +213,7 @@ private fun FilaDeExistencia(nivel: StockLevelDto) {
                     AlmacenRules.ubicacionTexto(nivel),
                     style = MaterialTheme.typography.labelMedium,
                     color = NxColors.Muted,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -235,16 +224,20 @@ private fun FilaDeExistencia(nivel: StockLevelDto) {
                     color = tono.fg(),
                     maxLines = 1,
                 )
-                Text("en existencia", style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                Text(
+                    estado,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = tono.fg(),
+                    maxLines = 1,
+                )
             }
         }
-
-        MoreBarra(
-            progreso = AlmacenRules.progreso(nivel),
-            etiqueta = AlmacenRules.detalleTexto(nivel),
-            tono = tono,
+        Text(
+            AlmacenRules.detalleTexto(nivel),
+            style = MaterialTheme.typography.labelSmall,
+            color = NxColors.Muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-
-        NxStatusChip(estado, tono)
     }
 }

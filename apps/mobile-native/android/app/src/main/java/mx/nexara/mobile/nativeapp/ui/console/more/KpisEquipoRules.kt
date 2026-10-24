@@ -105,14 +105,6 @@ object KpisEquipoRules {
         return personas.sortedWith(compareBy<KpiPersonaFilaDto> { peso(semaforo(it.semaforo)) }.then(nombre))
     }
 
-    /** Lo que se lee bajo «Persona por persona»: cómo está ordenada la lista. */
-    fun subtituloLista(personas: List<KpiPersonaFilaDto>): String =
-        if (personas.any { conCumplimiento(it.totales) }) {
-            "Por cumplimiento, de mayor a menor"
-        } else {
-            "De peor a mejor, para no tener que buscarlo"
-        }
-
     /** Filtro por nombre, puesto o correo; sin texto devuelve todo. */
     fun filtrar(personas: List<KpiPersonaFilaDto>, consulta: String): List<KpiPersonaFilaDto> {
         val q = consulta.trim().lowercase()

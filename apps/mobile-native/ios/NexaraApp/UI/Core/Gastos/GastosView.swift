@@ -255,8 +255,7 @@ struct GastosView: View {
                     case .vacio:
                         NxEmptyState(
                             title: "Todavía no hay gastos",
-                            subtitle: "Aquí se juntan la renta, los servicios, las suscripciones y lo que "
-                                + "se paga de la bolsa. El primero se registra con la foto de su ticket.",
+                            subtitle: "",
                             systemImage: CoreExtraModule.gastos.systemImage,
                             actionLabel: "Registrar un gasto",
                             onAction: { altaAbierta = true }
@@ -332,7 +331,7 @@ struct GastosView: View {
         if visibles.isEmpty {
             vacioDeFiltro
         } else {
-            NxDenseSectionHeader(title: modelo.filtro.etiqueta, hint: "Del más reciente al más viejo") {
+            NxDenseSectionHeader(title: modelo.filtro.etiqueta) {
                 Text("\(visibles.count)")
                     .font(.system(size: 12))
                     .foregroundStyle(NxColors.muted)
@@ -367,22 +366,11 @@ struct GastosView: View {
             let filtro = modelo.filtro
             NxEmptyState(
                 title: "Nada en «\(filtro.etiqueta.lowercased())»",
-                subtitle: Self.subtituloVacio(filtro),
+                subtitle: "",
                 systemImage: CoreExtraModule.gastos.systemImage,
                 actionLabel: "Ver todos",
                 onAction: { modelo.cambiarFiltro(.todos) }
             )
-        }
-    }
-
-    private static func subtituloVacio(_ filtro: GastosRules.Filtro) -> String {
-        switch filtro {
-        case .porAutorizar: return "No hay gastos esperando visto bueno. Al día."
-        case .porPagar: return "No queda ningún gasto autorizado sin pagar."
-        case .sinComprobante: return "Todos los gastos tienen su comprobante. Nada bloquea el cierre."
-        case .pagados: return "Todavía no se ha liquidado ningún gasto."
-        case .rechazados: return "No se ha rechazado ninguno. Buena señal."
-        case .todos: return "No hay gastos en este filtro."
         }
     }
 

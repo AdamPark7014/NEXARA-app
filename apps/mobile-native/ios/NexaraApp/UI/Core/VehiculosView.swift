@@ -64,7 +64,7 @@ struct VehiculosView: View {
                 if !cargando && error == nil && vacio {
                     NxEmptyState(
                         title: "Sin vehículos",
-                        subtitle: "No traes asignación ni hay unidades libres."
+                        subtitle: ""
                     )
                 }
                 Spacer(minLength: NxSpacing.l)

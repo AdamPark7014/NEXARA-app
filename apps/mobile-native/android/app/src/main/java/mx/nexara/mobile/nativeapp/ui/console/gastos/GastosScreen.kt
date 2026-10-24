@@ -195,8 +195,7 @@ fun GastosScreen(vm: GastosViewModel = viewModel()) {
                     NxEstadoPantalla.VACIO -> item(key = "vacio") {
                         NxEmptyState(
                             title = "Todavía no hay gastos",
-                            subtitle = "Aquí se juntan la renta, los servicios, las suscripciones y lo que " +
-                                "se paga de la bolsa. El primero se registra con la foto de su ticket.",
+                            subtitle = "",
                             actionLabel = "Registrar un gasto",
                             onAction = { altaAbierta = true },
                         )
@@ -237,7 +236,6 @@ fun GastosScreen(vm: GastosViewModel = viewModel()) {
                             item(key = "cabecera") {
                                 NxDenseSectionHeader(
                                     title = filtro.etiqueta,
-                                    hint = "Del más reciente al más viejo",
                                     trailing = {
                                         Text(
                                             "${visibles.size}",
@@ -345,15 +343,7 @@ private fun VacioDeFiltro(
     }
     NxEmptyState(
         title = "Nada en «${filtro.etiqueta.lowercase()}»",
-        subtitle = when (filtro) {
-            GastosRules.Filtro.POR_AUTORIZAR -> "No hay gastos esperando visto bueno. Al día."
-            GastosRules.Filtro.POR_PAGAR -> "No queda ningún gasto autorizado sin pagar."
-            GastosRules.Filtro.SIN_COMPROBANTE ->
-                "Todos los gastos tienen su comprobante. Nada bloquea el cierre."
-            GastosRules.Filtro.PAGADOS -> "Todavía no se ha liquidado ningún gasto."
-            GastosRules.Filtro.RECHAZADOS -> "No se ha rechazado ninguno. Buena señal."
-            GastosRules.Filtro.TODOS -> "No hay gastos en este filtro."
-        },
+        subtitle = "",
         actionLabel = "Ver todos",
         onAction = { vm.cambiarFiltro(GastosRules.Filtro.TODOS) },
     )

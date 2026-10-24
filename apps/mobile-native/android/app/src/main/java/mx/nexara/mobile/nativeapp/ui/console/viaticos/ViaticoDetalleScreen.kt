@@ -121,7 +121,6 @@ fun ViaticoDetalleScreen(
                         NxAlert(
                             id = "viatico-error",
                             title = msg,
-                            subtitle = if (viatico == null) null else "Abajo sigue lo último que se pudo leer.",
                             tone = NxTone.Danger,
                             actionLabel = "Reintentar",
                             onAction = { vm.cargar(viaticoId, refresh = true) },

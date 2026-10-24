@@ -50,8 +50,7 @@ struct PagosEmpleadosView: View {
                 case .vacio:
                     NxEmptyState(
                         title: "Sin pagos registrados",
-                        subtitle: "Todavía no hay ningún pago al personal en esta empresa. "
-                            + "El primero se captura desde la computadora, con su comprobante."
+                        subtitle: ""
                     )
                 case .contenido:
                     contenido(todos: todos, visibles: visibles)
@@ -109,7 +108,7 @@ struct PagosEmpleadosView: View {
         if visibles.isEmpty {
             sinCoincidencias
         } else {
-            NxDenseSectionHeader(title: PagosRules.tituloLista(filtro), hint: "Del más reciente al más viejo.") {
+            NxDenseSectionHeader(title: PagosRules.tituloLista(filtro)) {
                 Text("\(visibles.count)")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(NxColors.fg2)
@@ -145,19 +144,10 @@ struct PagosEmpleadosView: View {
         } else {
             NxEmptyState(
                 title: "Nada en «\(filtro.etiqueta.lowercased())»",
-                subtitle: Self.subtituloVacio(filtro),
+                subtitle: "",
                 actionLabel: "Ver todos",
                 onAction: { filtro = .todos }
             )
-        }
-    }
-
-    private static func subtituloVacio(_ filtro: PagosRules.Filtro) -> String {
-        switch filtro {
-        case .pagados: return "Todavía no se ha liquidado ningún pago."
-        case .borradores: return "No queda ningún pago esperando autorización."
-        case .anulados: return "No se ha anulado ningún pago. Buena señal."
-        case .todos: return "No hay pagos en este filtro."
         }
     }
 

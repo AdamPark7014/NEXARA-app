@@ -123,8 +123,7 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
                 NxEstadoPantalla.VACIO -> item(key = "vacio") {
                     NxEmptyState(
                         title = "Sin pagos registrados",
-                        subtitle = "Todavía no hay ningún pago al personal en esta empresa. " +
-                            "El primero se captura desde la computadora, con su comprobante.",
+                        subtitle = "",
                     )
                 }
 
@@ -180,7 +179,6 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
                         item(key = "cabecera") {
                             NxDenseSectionHeader(
                                 title = PagosRules.tituloLista(filtro),
-                                hint = "Del más reciente al más viejo.",
                                 trailing = {
                                     Text(
                                         visibles.size.toString(),
@@ -360,12 +358,7 @@ private fun SinCoincidencias(
     } else {
         NxEmptyState(
             title = "Nada en «${filtro.etiqueta.lowercase()}»",
-            subtitle = when (filtro) {
-                PagosRules.Filtro.PAGADOS -> "Todavía no se ha liquidado ningún pago."
-                PagosRules.Filtro.BORRADORES -> "No queda ningún pago esperando autorización."
-                PagosRules.Filtro.ANULADOS -> "No se ha anulado ningún pago. Buena señal."
-                PagosRules.Filtro.TODOS -> "No hay pagos en este filtro."
-            },
+            subtitle = "",
             actionLabel = "Ver todos",
             onAction = { vm.cambiarFiltro(PagosRules.Filtro.TODOS) },
         )
