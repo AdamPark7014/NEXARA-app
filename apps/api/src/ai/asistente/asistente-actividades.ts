@@ -77,9 +77,9 @@ export type PlanAsistente = {
 };
 
 /**
- * Lo que devuelve Claude, en corto: cada clave y cada null se pagan y se esperan (la salida
- * es lo que más tarda y más cuesta), así que van nombres breves y día con hora en un solo
- * campo. `planDeSalida` lo pasa a `AccionPlan`.
+ * Lo que devuelve Claude, en corto: nombres breves, día con hora en un solo campo y sin las
+ * claves que serían null (la salida es lo que más tarda y más cuesta). `planDeSalida` lo pasa
+ * a `AccionPlan` y trata lo omitido como null.
  */
 export type AccionIA = {
   tipo: TipoActividad;
@@ -98,38 +98,40 @@ export type AccionIA = {
 };
 export type SalidaIA = { acciones: AccionIA[]; aclaracion: string | null };
 
-const textoONulo = { type: ['string', 'null'] };
-const enumONulo = (valores: readonly string[]) => ({ anyOf: [{ type: 'string', enum: [...valores] }, { type: 'null' }] });
+const texto = { type: 'string' };
 
-/** JSON Schema de la salida estructurada (todas las claves obligatorias, sin extras). */
+/**
+ * JSON Schema de la salida. Las claves que no aplican no van en `required` y no admiten null:
+ * un null se escribe, se paga y se espera. `planDeSalida` trata la ausencia como null.
+ */
 export const ESQUEMA_PLAN: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['acciones', 'aclaracion'],
+  required: ['acciones'],
   properties: {
     acciones: {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['tipo', 'sub', 'titulo', 'detalle', 'quien', 'cliente', 'lugar', 'inicio', 'limite', 'min', 'prio', 'encargo'],
+        required: ['tipo', 'titulo', 'prio'],
         properties: {
           tipo: { type: 'string', enum: [...TIPOS_ACTIVIDAD] },
-          sub: enumONulo([...SUBTIPOS_TAREA, ...TIPOS_SERVICIO]),
-          titulo: { type: 'string' },
-          detalle: textoONulo,
-          quien: textoONulo,
-          cliente: textoONulo,
-          lugar: textoONulo,
-          inicio: textoONulo,
-          limite: textoONulo,
-          min: { type: ['integer', 'null'] },
+          sub: { type: 'string', enum: [...SUBTIPOS_TAREA, ...TIPOS_SERVICIO] },
+          titulo: texto,
+          detalle: texto,
+          quien: texto,
+          cliente: texto,
+          lugar: texto,
+          inicio: texto,
+          limite: texto,
+          min: { type: 'integer' },
           prio: { type: 'string', enum: ['Alta', 'Media', 'Baja'] },
-          encargo: enumONulo(['ejecucion', 'despacho']),
+          encargo: { type: 'string', enum: ['ejecucion', 'despacho'] },
         },
       },
     },
-    aclaracion: textoONulo,
+    aclaracion: texto,
   },
 };
 
@@ -174,28 +176,27 @@ export function planDeSalida(salida: unknown): PlanAsistente {
  * paga completo. Lo que se puede resolver en código (catálogo, calendario, coincidencias,
  * fechas en el formato del alta) no se le pide a la IA.
  */
-export const PROMPT_SISTEMA = `Asistente de asignación de actividades de NEXARA (seguridad electrónica e integración en México: CCTV, control de acceso, redes, alarmas, servicio de campo). Conviertes la instrucción de dirección (escrita o dictada por voz, con errores, muletillas y correcciones: «que Paty… no, que Carolina» es Carolina) en actividades. Una persona las revisa antes de crearlas.
+export const PROMPT_SISTEMA = `Asistente de NEXARA (CCTV, acceso, redes, alarmas, servicio de campo en México). Convierte la instrucción de dirección, escrita o dictada, con errores y correcciones («que Paty… no, que Carolina» es Carolina), en actividades.
 
 Tipos:
-- tarea: sin proyecto. sub: Levantamiento (revisar o medir un sitio antes de cotizar), Recolección, Entrega, Junta (reunión o llamada para revisar o acordar algo, también con un cliente), Compra de material, Preparación de equipo, Trámite (facturas, fianzas, permisos, pagos), Capacitación, Reporte / documentación (hacer o mandar un reporte, aunque sea de una falla), Otro.
-- servicio: trabajo técnico en el sitio de un cliente. sub: PREVENTIVO (mantenimiento), CORRECTIVO (falla o cambio de una pieza), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo de pocas horas).
-- obra: instalación grande de un proyecto. proyecto: ingeniería, planos, pruebas o puesta en marcha de un proyecto. Solo si mencionan el proyecto, la obra o la puesta en marcha.
-- comercial: solo para vender: cotizar, propuesta, seguimiento de venta, visita de venta. Una junta con un cliente para revisar algo es tarea Junta.
-- obra, proyecto y comercial: sub null.
+- tarea, sin proyecto. sub: Levantamiento (medir o revisar un sitio antes de cotizar), Recolección (recoger un pedido; no es comprarlo), Entrega, Junta (reunión o llamada, también con un cliente), Compra de material, Preparación de equipo, Trámite (facturas, fianzas, permisos, pagos), Capacitación, Reporte / documentación (hacer o mandar un reporte, aunque sea de una falla), Otro.
+- servicio: trabajo técnico en el sitio del cliente, sin proyecto. sub: PREVENTIVO (mantenimiento), CORRECTIVO (falla o cambio de pieza), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo de pocas horas, o poner pantallas).
+- obra: cablear o instalar solo cuando nombran el proyecto. proyecto: ingeniería, planos, pruebas o puesta en marcha, no la instalación. Solo esos dos si mencionan el proyecto, la obra o la puesta en marcha.
+- comercial: solo vender (cotizar, propuesta, seguimiento, visita de venta). Junta con un cliente para revisar algo es tarea Junta.
+- obra, proyecto y comercial: sin sub.
 
-Campos:
-- Una actividad por persona y por trabajo.
-- quien: el nombre completo de las coincidencias si lo dicho (nombre o apodo: Beto→Roberto, Toño→Antonio) corresponde a una sola persona; si a varias o a ninguna, copia lo que dijeron. Si piden a alguien que mande a su gente, es esa persona (encargo despacho). null si no dijeron quién.
-- cliente y lugar como en las coincidencias si son de ahí («Tox» → «Grupo Tox»); si no, como lo dijeron. Proveedores, tiendas y lugares que no son clientes: cliente null y el lugar en lugar. lugar: sucursal, planta, área o dirección; null si no lo dijeron.
-- inicio («AAAA-MM-DD HH:MM», 24 h, o «AAAA-MM-DD» sin hora): cuándo se hace o empieza (cita, visita, «mañana a las 9», «empezando el jueves»). «mañana», «el lunes», «el viernes»: el primero con ese nombre en «Próximos días», nunca hoy. «a las 3» o «para las 3» = 15:00. Hora sin día: hoy, o mañana si ya pasó. «ya», «de inmediato»: hoy a la hora actual. «hoy» sin hora: solo el día. Si no dicen cuándo, null (no supongas hoy ni mañana).
-- limite (mismo formato): para cuándo debe quedar: «para el viernes», «antes del…», «a más tardar», «tiene hasta», «que quede listo». «Para» con día y sin hora es plazo. En un rango («del lunes al miércoles») inicio es el primer día y limite el último. Si solo hay plazo, inicio null. Un día que encabeza varias actividades («Para el viernes: …») vale para todas, y una hora dentro de una es la hora de ese día. Plazo vago («la otra semana») o sin fechas: null.
-- min: duración en minutos, solo si la dijeron («hora y media» 90, «media hora» 30, «jornadas de 8 horas» o «todo el día» 480), máximo 720.
+Una actividad por persona y por trabajo. Si un dato no se dijo, omite la clave (no escribas null). Si sí se dijo, escríbela: el nombre va en quien, no basta con ponerlo en el título.
+- quien: nombre completo de las coincidencias si lo dicho (nombre o apodo: Beto→Roberto, Toño→Antonio) es una sola persona; si son varias o ninguna, copia lo dicho. Si debe mandar a su gente, esa persona y encargo despacho.
+- cliente y lugar: el de las coincidencias si salen de ahí («Tox»→«Grupo Tox»); si no, como lo dijeron. Proveedor, tienda o lugar que no es cliente: omite cliente y pon el sitio en lugar.
+- inicio «AAAA-MM-DD HH:MM» (24 h) o «AAAA-MM-DD»: cuándo se hace o empieza («empezando el jueves» es inicio, no plazo). «mañana», «el lunes», «el viernes»: el primero de «Próximos días», nunca hoy. Si dan el número («jueves 29», «el 29»), es esa fecha y no el primer día de la lista. «a las 3» o «para las 3» = 15:00. «a primera hora» = 09:00. Hora sin día: hoy, o mañana si ya pasó. «ya» o «de inmediato»: hoy a la hora actual. «hoy» sin hora: solo el día. Sin cuándo: omite inicio (no supongas hoy ni mañana).
+- limite, mismo formato: para cuándo debe quedar («para el viernes», «antes del…», «a más tardar», «tiene hasta», «que quede listo»). «Para» con día y sin hora es plazo. Rango («del lunes al miércoles»): inicio el primero, limite el último. Solo plazo («para el lunes», sin decir cuándo empieza): omite inicio, no pongas el día siguiente. Un día que encabeza varias («Para el viernes: …») vale para todas; una hora dentro de una es la hora de ese día. Plazo vago («la otra semana») o sin fecha: omite limite.
+- min: minutos solo si los dijeron («hora y media» 90, «media hora» 30, «todo el día» o jornada de 8 h = 480), máximo 720.
 - prio: Alta si es urgente, ya, cuanto antes o algo está caído; Baja si sin prisa; si no, Media.
-- encargo: despacho si debe mandar a alguien de su equipo; ejecucion si la hace ella; null si no está claro.
-- titulo: infinitivo + qué + dónde, máximo 80 caracteres («Revisar DVR que no graba en Angelópolis»).
-- detalle: las indicaciones para quien la hará: solo lo que no cabe en el título (síntoma, cantidades, materiales, con quién, a quién llamar o entregar), en una o dos frases profesionales. No repitas el título ni agregues pasos u objetivos que nadie dijo («revisar la causa»), no expliques tu razonamiento, sin fechas, horas ni duración. null si no queda nada.
+- encargo: despacho si manda a alguien de su equipo; ejecucion si la hace ella.
+- titulo: infinitivo + qué + dónde, máximo 80 («Revisar DVR que no graba en Angelópolis»).
+- detalle: solo lo que no cabe en el título (síntoma, cantidades, materiales, con quién, a quién llamar o entregar), una o dos frases. No repitas el título, no inventes pasos («revisar la causa»), sin fechas, horas ni duración.
 - No inventes personas, clientes, sucursales, proyectos, fechas ni cantidades.
-- Si piden algún trabajo, devuelve la actividad aunque falten datos. Solo si no piden ningún trabajo: acciones vacío y en aclaracion una pregunta breve. Con actividades, aclaracion null.`;
+- Si piden un trabajo, devuelve la actividad aunque falten datos. Si no piden ninguno: acciones vacío y aclaracion con una pregunta breve. Con actividades, omite aclaracion.`;
 
 export type PersonaAsignable = { id: number; nombre: string; puesto?: string | null; email?: string | null };
 export type ClienteNexara = { id: number; name: string };
@@ -355,14 +356,9 @@ export function proximosDias(ahora: Date, dias = 7): string {
 
 /** Mensaje del turno: hoy, los próximos días, quién escribe, las coincidencias y la instrucción. */
 export function mensajeUsuario(texto: string, ahora: Date, autor: string | null, coincidencias?: string): string {
-  const fecha = new Intl.DateTimeFormat('es-MX', {
-    timeZone: ZONA_HORARIA,
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(ahora);
   const iso = fechaLocalISO(ahora);
+  const [y, m, d] = iso.split('-').map(Number);
+  const wd = DIAS_SEMANA[new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()].slice(0, 3);
   const hora = new Intl.DateTimeFormat('en-GB', {
     timeZone: ZONA_HORARIA,
     hour: '2-digit',
@@ -370,7 +366,7 @@ export function mensajeUsuario(texto: string, ahora: Date, autor: string | null,
     hour12: false,
   }).format(ahora);
   return [
-    `Hoy: ${fecha} (${iso}), ${hora} hora de Ciudad de México.`,
+    `Hoy: ${wd} ${iso}, ${hora}.`,
     `Próximos días: ${proximosDias(ahora)}.`,
     autor ? `Quien escribe: ${autor}.` : null,
     coincidencias ?? null,
@@ -388,8 +384,10 @@ export function mensajeUsuario(texto: string, ahora: Date, autor: string | null,
  * Con plazos, duración, faltantes y catálogo de clientes (23 casos, 23-10-2026): 0.94 con juez
  * (antes 0.85) y nota 4.3/5 (antes 3.6); con razonamiento costó 2.4× sin mejorar. Costo real
  * en producción (caché fría, que es lo normal con uso esporádico): con toda la empresa en el
- * prompt ~4,800 tokens de entrada y US$0.0007 por llamada; con solo las coincidencias y el
- * prompt corto, ver `.ai/RELEVO.md`.
+ * prompt ~4,800 tokens de entrada y US$0.0007 por llamada. El 24-10-2026, 23 casos en serie
+ * por la puerta (Haiku, sin razonamiento, sin juez): antes 3,032 tokens de entrada y 209 de
+ * salida, p50 1.7 s / p95 2.8 s; después 2,729 / 173, p50 1.6 s / p95 2.3 s. Los 23 en 1.0
+ * las dos veces. La parte fija en caché bajó de 2,724 a 2,447 tokens.
  * El modelo se puede cambiar sin desplegar con `ANTHROPIC_ASSISTANT_MODEL`.
  */
 export const CONFIG_ASISTENTE = {

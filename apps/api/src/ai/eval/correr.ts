@@ -614,11 +614,11 @@ function resumir(funcion: string, v: Variante, rs: Resultado[]) {
 }
 
 /**
- * Tokens típicos por llamada (medidos el 23-10-2026): entrada total, parte en caché y salida.
+ * Tokens típicos por llamada (asistente medido el 24-10-2026; el resto, el 23-10).
  * Sirven para estimar el costo antes de correr.
  */
 const TOKENS_TIPICOS: Record<string, { entrada: number; cacheada: number; salida: number; juez: { entrada: number; salida: number } }> = {
-  asistente: { entrada: 3_500, cacheada: 2_000, salida: 320, juez: { entrada: 2_500, salida: 350 } },
+  asistente: { entrada: 2_800, cacheada: 2_450, salida: 180, juez: { entrada: 2_500, salida: 350 } },
   actas: { entrada: 12_000, cacheada: 2_500, salida: 2_500, juez: { entrada: 14_000, salida: 1_500 } },
   triage: { entrada: 700, cacheada: 500, salida: 80, juez: { entrada: 0, salida: 0 } },
 };

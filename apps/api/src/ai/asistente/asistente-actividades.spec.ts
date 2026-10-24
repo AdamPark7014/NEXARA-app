@@ -10,6 +10,7 @@ import {
   indicacionesSinEco,
   lugarDicho,
   mencionaDia,
+  ESQUEMA_PLAN,
   mensajeUsuario,
   peticionAsistente,
   planDeSalida,
@@ -177,7 +178,7 @@ describe('asistente de actividades', () => {
     expect(aFechaISO('2026-10-13', '9:30')).toBe('2026-10-13T15:30:00.000Z');
     expect(aFechaISO('2026-10-13', null)).toBe('2026-10-13T15:00:00.000Z');
     expect(aFechaISO(null, '15:00')).toBeNull();
-    expect(mensajeUsuario('  hola ', ahora, 'Christian')).toContain('(2026-10-12), 10:00 hora de Ciudad de México.');
+    expect(mensajeUsuario('  hola ', ahora, 'Christian')).toContain('Hoy: lun 2026-10-12, 10:00.');
   });
 
   describe('agenda: inicio contra plazo', () => {
@@ -323,6 +324,25 @@ describe('asistente de actividades', () => {
       const p = construirPropuesta(plan.acciones[0], catalogos, ctx);
       expect(p.payload).toMatchObject({ ticketType: 'CORRECTIVO', periodoInicio: '2026-10-13', periodoFin: '2026-10-16' });
       expect(planDeSalida(null)).toEqual({ acciones: [], aclaracion: null });
+      const corta = planDeSalida({ acciones: [{ tipo: 'tarea', titulo: 'Comprar cable', prio: 'Baja' }] });
+      expect(corta.aclaracion).toBeNull();
+      expect(corta.acciones[0]).toMatchObject({
+        tipo: 'tarea',
+        subtipo: null,
+        indicaciones: null,
+        responsable: null,
+        cliente: null,
+        sitio: null,
+        fecha: null,
+        hora: null,
+        duracionMin: null,
+        prioridad: 'Baja',
+        encargo: null,
+      });
+      const item = (ESQUEMA_PLAN.properties as { acciones: { items: { required: string[] } } }).acciones.items;
+      expect(ESQUEMA_PLAN.required).toEqual(['acciones']);
+      expect(item.required).toEqual(['tipo', 'titulo', 'prio']);
+      expect(JSON.stringify(ESQUEMA_PLAN)).not.toContain('null');
     });
 
     it('«a las 8» ya pasada y sin día es mañana, aunque la IA ponga hoy', () => {
