@@ -5,11 +5,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { useRouter } from "next/navigation";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
-import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
-import PauseCircleOutlineRoundedIcon from "@mui/icons-material/PauseCircleOutlineRounded";
-import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import {
   Alert,
@@ -19,12 +15,11 @@ import {
   FilterChip,
   FilterChips,
   LinkButton,
+  ListFooter,
   ModulePage,
   ModuleToolbar,
   PersonCell,
   SearchInput,
-  Stat,
-  StatRow,
   StatusCell,
   Tabs,
   type Column,
@@ -151,14 +146,8 @@ export default function ClientesHubPage() {
       (c.owner?.nombre ?? "").toLowerCase().includes(query);
   }, [qDiferida]);
 
-  const { visible, conteoEstado, cifras } = useMemo(() => {
+  const { visible, conteoEstado } = useMemo(() => {
     const porTexto = items.filter(coincide);
-    let activos = 0;
-    let sinRfc = 0;
-    for (const c of items) {
-      if (!isInactiveClient(c.status)) activos += 1;
-      if (!c.taxId?.trim()) sinRfc += 1;
-    }
     const inactivosVista = porTexto.filter((c) => isInactiveClient(c.status)).length;
     return {
       visible: porTexto.filter((c) => cumpleEstado(c, estado)),
@@ -168,7 +157,6 @@ export default function ClientesHubPage() {
         INACTIVOS: inactivosVista,
         SIN_RFC: porTexto.filter((c) => !c.taxId?.trim()).length,
       },
-      cifras: { total: items.length, activos, inactivos: items.length - activos, sinRfc },
     };
   }, [items, coincide, estado]);
 
@@ -221,8 +209,7 @@ export default function ClientesHubPage() {
         empty
         emptyState={{
           icon: <GroupsOutlinedIcon />,
-          title: "Sin acceso a clientes",
-          description: "Tu puesto no tiene clientes asignados. Si crees que es un error, pide acceso a Dirección.",
+          title: "Sin acceso a clientes.",
           tone: "neutral",
         }}
       />
@@ -254,8 +241,6 @@ export default function ClientesHubPage() {
     <ModulePage
       className={styles.pagina}
       title="Clientes"
-      description={meta.help}
-      icon={<GroupsOutlinedIcon />}
       primaryAction={
         puedeAgregar && !(sinRegistros && !error) ? (
           <ButtonLink variant="primary" href={hrefNuevo} iconStart={<AddRoundedIcon />} kbd="N">
@@ -275,45 +260,6 @@ export default function ClientesHubPage() {
             value={sector}
             onChange={selectSector}
           />
-        ) : null
-      }
-      stats={
-        items.length || primeraCarga ? (
-          <StatRow cols={4} ariaLabel="Resumen del padrón">
-            <Stat
-              label="En el padrón"
-              value={cifras.total}
-              hint={nombreSector(sector).toLowerCase()}
-              icon={<GroupsOutlinedIcon />}
-              loading={primeraCarga}
-            />
-            <Stat
-              label="Activos"
-              value={cifras.activos}
-              hint="con trato vigente"
-              icon={<CheckCircleOutlineRoundedIcon />}
-              tone="success"
-              meter={cifras.total ? [{ value: cifras.activos, tone: "success" }] : undefined}
-              meterMax={cifras.total || undefined}
-              loading={primeraCarga}
-            />
-            <Stat
-              label="Inactivos"
-              value={cifras.inactivos}
-              hint="se conservan con su historial"
-              icon={<PauseCircleOutlineRoundedIcon />}
-              iconTone="neutral"
-              loading={primeraCarga}
-            />
-            <Stat
-              label="Sin RFC"
-              value={cifras.sinRfc}
-              hint="faltan datos para facturar"
-              icon={<ReceiptLongOutlinedIcon />}
-              tone={cifras.sinRfc ? "warning" : "default"}
-              loading={primeraCarga}
-            />
-          </StatRow>
         ) : null
       }
       before={
@@ -344,47 +290,36 @@ export default function ClientesHubPage() {
               {conteoEstado.SIN_RFC || estado === "SIN_RFC" ? chip("SIN_RFC", "Sin RFC", "warning") : null}
             </FilterChips>
           }
-          end={
-            hayFiltros ? (
-              <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton>
-            ) : items.length ? (
-              <span className={styles.conteo}>{visible.length === 1 ? "1 cliente" : `${visible.length} clientes`}</span>
-            ) : null
-          }
+          end={hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}
         />
       }
       loading={primeraCarga}
-      empty={!primeraCarga && visible.length === 0}
+      empty={!primeraCarga && visible.length === 0 && !(sinRegistros && error)}
       emptyState={
-        sinRegistros && error
+        sinRegistros
           ? {
-              icon: <CloudOffOutlinedIcon />,
-              title: "No se pudo cargar el padrón",
-              description: "Revisa tu conexión y vuelve a intentarlo con el aviso de arriba.",
-              tone: "danger",
+              icon: <GroupsOutlinedIcon />,
+              title: `Aún no hay ${meta.title.toLowerCase()}`,
+              action: puedeAgregar ? (
+                <ButtonLink variant="primary" href={hrefNuevo} iconStart={<AddRoundedIcon />}>
+                  Crear el primero
+                </ButtonLink>
+              ) : undefined,
             }
-          : sinRegistros
-            ? {
-                icon: <GroupsOutlinedIcon />,
-                title: `Aún no hay ${meta.title.toLowerCase()}`,
-                description: puedeAgregar
-                  ? "Da de alta el primero con sus datos fiscales; después podrás sumarlo a otros sectores."
-                  : "Cuando alguien de tu equipo dé de alta un cliente en este sector, aparecerá aquí.",
-                action: puedeAgregar ? (
-                  <ButtonLink variant="primary" href={hrefNuevo} iconStart={<AddRoundedIcon />}>
-                    Crear el primero
-                  </ButtonLink>
-                ) : undefined,
-              }
-            : {
-                icon: <FilterAltOffOutlinedIcon />,
-                title: "Ningún cliente coincide",
-                description: "Prueba con otro nombre o RFC, o quita los filtros.",
-                action: <Button onClick={quitarFiltros}>Quitar filtros</Button>,
-                tone: "neutral",
-              }
+          : {
+              icon: <FilterAltOffOutlinedIcon />,
+              title: "Ningún cliente coincide.",
+              action: <Button onClick={quitarFiltros}>Quitar filtros</Button>,
+              tone: "neutral",
+            }
+      }
+      footer={
+        !primeraCarga && visible.length ? (
+          <ListFooter total={visible.length} unit={visible.length === 1 ? "cliente" : "clientes"} />
+        ) : null
       }
     >
+      {sinRegistros && error ? null : (
       <DataTable
         flush
         className={`${styles.tabla} ${showOwner ? styles.tablaConEncargado : ""}`}
@@ -408,6 +343,7 @@ export default function ClientesHubPage() {
           </ButtonLink>
         )}
       />
+      )}
     </ModulePage>
   );
 }

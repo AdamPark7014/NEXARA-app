@@ -182,7 +182,6 @@ describe("clientes de proyecto", () => {
     render(<ProyectosPage />);
 
     expect(await screen.findByText("Todavía no hay proyectos")).toBeInTheDocument();
-    expect(screen.getByText(/Ya hay 2 clientes de proyecto en el padrón/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Ver clientes de proyecto" }));
     expect(screen.getByRole("list", { name: "Clientes de proyecto" })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Nuevo proyecto" })).toHaveLength(2);

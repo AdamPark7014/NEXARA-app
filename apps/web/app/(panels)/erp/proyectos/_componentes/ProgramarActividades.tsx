@@ -158,7 +158,7 @@ export default function ProgramarActividades({ proyecto: p, token, ocupado, pers
   return (
     <RecordSection
       title="Programar actividades del proyecto"
-      subtitle="Una actividad por etapa del cronograma, con su periodo: sale en la pizarra de quien la lleva cada día, del primero al último, sin volver a cargarla. Cada etapa empieza al día siguiente de que termina la anterior."
+      subtitle="Una actividad por etapa, en la pizarra de quien la lleva."
       end={
         !abierto ? (
           <Button variant="tonal" iconStart={<EventRepeatOutlinedIcon />} disabled={ocupado || cerrado || sinEtapas} onClick={() => void abrir()}>

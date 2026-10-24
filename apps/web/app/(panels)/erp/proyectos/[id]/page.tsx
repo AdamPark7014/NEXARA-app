@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
@@ -12,7 +13,6 @@ import {
   Alert,
   Badge,
   Button,
-  ButtonLink,
   DateInput,
   EmptyState,
   Field,
@@ -255,13 +255,10 @@ export default function ProyectoDetallePage() {
   if (!Number.isInteger(id) || id <= 0) {
     return (
       <div className={styles.pagina}>
-        <EmptyState
-          icon={<ErrorOutlineRoundedIcon />}
-          title="Ese proyecto no existe"
-          description="El enlace está incompleto o el proyecto ya no está disponible."
-          action={<ButtonLink href="/erp/proyectos">Volver a proyectos</ButtonLink>}
-          size="page"
-        />
+        <Link href="/erp/proyectos" className={styles.volver}>
+          <span aria-hidden="true">‹</span> Proyectos
+        </Link>
+        <EmptyState icon={<ErrorOutlineRoundedIcon />} title="Ese proyecto no existe." size="page" />
       </div>
     );
   }
@@ -269,6 +266,9 @@ export default function ProyectoDetallePage() {
   if (cargando && !proyecto) {
     return (
       <div className={styles.pagina} aria-busy="true" aria-label="Cargando proyecto">
+        <Link href="/erp/proyectos" className={styles.volver}>
+          <span aria-hidden="true">‹</span> Proyectos
+        </Link>
         <div className={styles.esqueletoCabeza}>
           <Skeleton width={120} height={12} />
           <Skeleton width="45%" height={26} />
@@ -286,14 +286,13 @@ export default function ProyectoDetallePage() {
   if (!proyecto) {
     return (
       <div className={styles.pagina}>
-        <ButtonLink href="/erp/proyectos" variant="tertiary" size="sm">
-          ← Proyectos
-        </ButtonLink>
+        <Link href="/erp/proyectos" className={styles.volver}>
+          <span aria-hidden="true">‹</span> Proyectos
+        </Link>
         <div role="alert">
           <EmptyState
             icon={<ErrorOutlineRoundedIcon />}
-            title="No pudimos abrir el proyecto"
-            description={errorCarga ?? "Revisa tu conexión e inténtalo de nuevo."}
+            title={errorCarga ?? "No pudimos abrir el proyecto."}
             tone="danger"
             size="page"
             action={
@@ -301,7 +300,6 @@ export default function ProyectoDetallePage() {
                 Reintentar
               </Button>
             }
-            secondaryAction={<ButtonLink href="/erp/proyectos">Volver a proyectos</ButtonLink>}
           />
         </div>
       </div>
@@ -412,7 +410,11 @@ export default function ProyectoDetallePage() {
     <>
       <RecordPage
         className={styles.pagina}
-        breadcrumbs={[{ label: "Proyectos", href: "/erp/proyectos" }, { label: p.title }]}
+        breadcrumbs={
+          <Link href="/erp/proyectos" className={styles.volver}>
+            <span aria-hidden="true">‹</span> Proyectos
+          </Link>
+        }
         icon={<AccountTreeOutlinedIcon />}
         kind={p.projectType ? KIND_POR_TIPO[p.projectType] : undefined}
         statusLabel={ESTADO_PROYECTO_LABEL[p.status] ?? "Sin estado"}

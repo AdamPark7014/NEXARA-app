@@ -1,7 +1,69 @@
 /* Proyectos · ficha (RecordPage). Solo tokens --ui-*. */
 
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  min-height: 36px;
+  margin: 0 0 8px -6px;
+  padding: 0 10px 0 4px;
+  border-radius: 10px;
+  color: var(--ui-brand-text, #0f5f4f);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+:global(.headCrumbs) .volver {
+  margin: 0 0 2px -6px;
+  color: var(--ui-brand-text, #0f5f4f);
+  font-size: 15px;
+}
+
+.volver:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--ui-brand-text, #0f5f4f);
+}
+
+.volver:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
 .pagina {
   min-width: 0;
+}
+
+/* La cabecera compartida no parte la fila: en teléfono el título va entero
+   y los botones bajan a su línea. */
+@media (max-width: 767px) {
+  .pagina :global([class*="heroTop"]) {
+    flex-wrap: wrap;
+  }
+  .pagina :global([class*="heroText"]) {
+    flex: 1 1 calc(100% - 64px);
+  }
+  .pagina :global([class*="heroActions"]) {
+    flex: 1 1 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+  .pagina :global([class*="heroTitle"]) {
+    overflow-wrap: normal;
+  }
+  .pagina :global([class*="heroSub"] > *) {
+    min-width: min-content;
+    max-width: 100%;
+  }
+  .pagina :global([class*="heroPerson"]) {
+    flex-wrap: nowrap;
+    overflow-wrap: normal;
+  }
+  .pagina :global([class*="heroPersonName"]) {
+    white-space: nowrap;
+  }
 }
 
 .tenue {

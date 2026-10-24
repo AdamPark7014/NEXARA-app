@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { useUser } from "@/components/UserContext";
 import {
-  ButtonLink,
   Checkbox,
   EmptyState,
   Field,
@@ -14,7 +13,6 @@ import {
   FormSection,
   Input,
   PageHead,
-  RequiredMark,
   Skeleton,
   Textarea,
   fieldClass,
@@ -91,14 +89,8 @@ export default function NuevoClientePage() {
   if (!canAccessClientPadron(user) || puedeAgregar === false) {
     return (
       <div className={styles.pagina}>
-        <PageHead back={{ href: "/erp/clientes", label: "Volver a Clientes" }} title="Nuevo cliente" />
-        <EmptyState
-          icon={<LockOutlinedIcon />}
-          title="No puedes dar de alta clientes"
-          description="Solo coordinación, gerencia y la encargada comercial pueden agregar clientes. Un ingeniero o un operativo no puede."
-          action={<ButtonLink href="/erp/clientes">Volver a clientes</ButtonLink>}
-          tone="neutral"
-        />
+        <PageHead back={{ href: "/erp/clientes", label: "Clientes" }} title="Nuevo cliente" />
+        <EmptyState icon={<LockOutlinedIcon />} title="No puedes dar de alta clientes." tone="neutral" />
       </div>
     );
   }
@@ -196,14 +188,7 @@ export default function NuevoClientePage() {
     <FormPage
       className={styles.pagina}
       title="Nuevo cliente"
-      breadcrumbs={[{ label: "Clientes", href: "/erp/clientes" }, { label: "Nuevo cliente" }]}
-      back={{ href: "/erp/clientes", label: "Volver a Clientes" }}
-      description={
-        <>
-          Los campos con <RequiredMark /> son obligatorios. RFC, razón social, dirección, régimen y CP se pueden completar
-          después.
-        </>
-      }
+      back={{ href: "/erp/clientes", label: "Clientes" }}
       pendingTitle="Antes de crear"
       pending={pendientes}
       error={error}
@@ -212,13 +197,13 @@ export default function NuevoClientePage() {
       submitLabel="Crear cliente"
       loading={saving}
     >
-      <FormSection step={1} done={Boolean(form.name.trim())} title="Identidad" description="Cómo lo ubica tu equipo en listas y buscadores." columns={1}>
-        <Field label="Nombre comercial" required error={errorNombre} hint="Como lo conoce tu equipo, por ejemplo «Plaza Norte».">
+      <FormSection step={1} done={Boolean(form.name.trim())} title="Identidad" columns={1}>
+        <Field label="Nombre comercial" required error={errorNombre}>
           <Input id="name" autoComplete="organization" value={form.name} onChange={set("name")} />
         </Field>
       </FormSection>
 
-      <FormSection step={2} title="Datos fiscales" description="Con el RFC se consulta el SAT y se llenan razón social, régimen y CP.">
+      <FormSection step={2} title="Datos fiscales" description="Con el RFC se llenan razón social, régimen y CP.">
         <FieldGrid>
           <div className={styles.rfcLookup}>
             <FiscalRfcLookup
@@ -252,7 +237,7 @@ export default function NuevoClientePage() {
         </FieldGrid>
       </FormSection>
 
-      <FormSection step={3} title="Contacto" description="A dónde llegan cotizaciones y facturas.">
+      <FormSection step={3} title="Contacto">
         <FieldGrid>
           <Field label="Correo de facturación" hint="Aquí llegan cotizaciones y facturas.">
             <Input id="billingEmail" type="email" autoComplete="email" value={form.billingEmail} onChange={set("billingEmail")} />
@@ -286,7 +271,7 @@ export default function NuevoClientePage() {
         step={4}
         done={sectors.length > 0}
         title="Tipos"
-        description="Elige uno o varios: el mismo cliente puede ser comercial, de proyecto y corporativo a la vez. Si ya existe con ese nombre, no se duplica: se le suman los tipos que elijas."
+        description="Puede ser comercial, de proyecto y corporativo a la vez."
       >
         <div className={styles.tiposElegir} role="group" aria-label="Sectores del cliente">
           {visibles.map((s) => {
