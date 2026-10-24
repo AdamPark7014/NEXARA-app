@@ -1,3 +1,35 @@
+.page {
+  min-width: 0;
+}
+
+.nota {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.solicitud {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.dato {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
 .chips {
   display: flex;
   gap: 8px;
@@ -256,6 +288,10 @@
   color: var(--text-tertiary);
 }
 
+.stepInfo span {
+  display: inline;
+}
+
 .skeletonCard {
   height: 196px;
   border-radius: 16px;
@@ -310,6 +346,30 @@
     grid-template-columns: 1fr;
     padding: 16px;
     gap: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .datos,
+  .stepInfo,
+  .actions,
+  .cardMeta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dato,
+  .stepInfo span,
+  .fieldValue,
+  .cardAmount,
+  .cardDetail,
+  .cardTitle {
+    display: block;
+    width: 100%;
+  }
+
+  .entityLink {
+    margin-left: 0;
   }
 }
 

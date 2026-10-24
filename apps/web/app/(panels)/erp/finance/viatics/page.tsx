@@ -18,7 +18,7 @@ import {
   type ApprovalTrailEntry,
 } from "./_parts";
 import Button from "@/components/ui/Button";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import MetricStrip from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -41,7 +41,9 @@ import {
 } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import { ListFooter } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
+import lista from "./viatics.module.css";
 import {
   centavosViatico as centavos,
   pesosViatico as dinero,
@@ -530,48 +532,6 @@ export default function ViaticosPage() {
   }, [tabRows, deferredFilter, filterEstatus, highlightId, tab]);
 
   /**
-   * Regla 1: lo que la persona viene a saber — cuánto espera autorización,
-   * cuánto está autorizado sin pagar, cuánto ya se liquidó y qué bloquea el
-   * cierre por falta de comprobante.
-   */
-  const metrics = useMemo<Metric[]>(() => {
-    const sum = (rows: Viatico[]) => rows.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
-    const porAutorizar = visibleItems.filter(
-      (v) => v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador",
-    );
-    const autorizados = visibleItems.filter((v) => v.estatus === "Aprobado");
-    const pagados = visibleItems.filter((v) => v.estatus === "Pagado");
-    const sinComprobante = visibleItems.filter(
-      (v) => !(v.comprobante || v.ticketEvidenciaUrl) && v.estatus !== "Rechazado",
-    );
-
-    return [
-      {
-        label: "Por autorizar",
-        value: <Money value={sum(porAutorizar)} />,
-        hint: plural(porAutorizar.length, "solicitud esperando", "solicitudes esperando"),
-        tone: porAutorizar.length > 0 ? "warning" : "default",
-      },
-      {
-        label: "Autorizado sin pagar",
-        value: <Money value={sum(autorizados)} />,
-        hint: plural(autorizados.length, "solicitud lista para pago", "solicitudes listas para pago"),
-      },
-      {
-        label: "Pagado",
-        value: <Money value={sum(pagados)} />,
-        hint: plural(pagados.length, "solicitud liquidada", "solicitudes liquidadas"),
-      },
-      {
-        label: "Sin comprobante",
-        value: sinComprobante.length,
-        hint: sinComprobante.length > 0 ? "bloquean el cierre" : "todo comprobado",
-        tone: sinComprobante.length > 0 ? "danger" : "default",
-      },
-    ];
-  }, [visibleItems]);
-
-  /**
    * El resumen en vivo de la asignación — y la única defensa contra el error
    * que de verdad cuesta dinero: capturar el TOTAL del lote creyendo que el
    * campo es por cabeza. Aquí se ve multiplicado antes de confirmar.
@@ -1041,20 +1001,43 @@ export default function ViaticosPage() {
             `${trailActionLabel(last.action)} ${last.userName ?? "—"} · ${formatFecha(last.at)}`,
           );
         }
+        if (narrow) {
+          return (
+            <div className={lista.apilada}>
+              <span className={lista.lineaFuerte}>{v.concepto ?? "—"}</span>
+              {meta.map((linea) => (
+                <span key={linea} className={lista.linea}>
+                  {linea}
+                </span>
+              ))}
+              <span className={lista.linea}>
+                <Money value={Number(v.montoSolicitado) || 0} />
+              </span>
+              <span className={lista.linea}>
+                <StatusDot label={estatusLabel(v.estatus)} tone={estatusTone(v.estatus)} />
+              </span>
+              {href ? (
+                <a
+                  className={lista.linea}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Ver comprobante de ${folioViatico(v.id)}`}
+                >
+                  Ver comprobante
+                </a>
+              ) : (
+                <span className={lista.linea}>Sin comprobante</span>
+              )}
+            </div>
+          );
+        }
         return (
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>
               {v.concepto ?? "—"}
             </div>
             <div style={rowMetaStyle}>
-              {/* En móvil el estado deja de ser columna y baja aquí: antes
-                  empujaba la tabla más allá del ancho de la pantalla. */}
-              {narrow ? (
-                <StatusDot
-                  label={estatusLabel(v.estatus)}
-                  tone={estatusTone(v.estatus)}
-                />
-              ) : null}
               <span>{meta.join(" · ")}</span>
               {href ? (
                 <span>
@@ -1077,14 +1060,18 @@ export default function ViaticosPage() {
         );
       },
     },
-    {
-      key: "montoSolicitado",
-      label: "Monto",
-      align: "right",
-      numeric: true,
-      render: (v) => <Money value={Number(v.montoSolicitado) || 0} />,
-      width: 120,
-    },
+    ...(narrow
+      ? []
+      : ([
+          {
+            key: "montoSolicitado",
+            label: "Monto",
+            align: "right" as const,
+            numeric: true,
+            render: (v: Viatico) => <Money value={Number(v.montoSolicitado) || 0} />,
+            width: 120,
+          },
+        ] as Column<Viatico>[])),
     ...(narrow
       ? []
       : ([
@@ -1214,13 +1201,6 @@ export default function ViaticosPage() {
 
   const selectedTrail = readTrail(selected?.approvalTrail);
 
-  /**
-   * Regla 7: cuatro celdas en `$0` encima de un «Sin viáticos» no informan de
-   * nada y le quitan el sitio a lo único que ayuda ahí —de dónde sale el
-   * primer viático y el botón que lo pide—. La condición es el conteo de
-   * filas, no que el importe sea cero.
-   */
-  const showMetrics = tab !== "analytics" && visibleItems.length > 0;
   /** Sin un solo viático en la pestaña y sin filtros no hay nada que buscar. */
   const showToolbar = tabRows.length > 0 || hasFilters;
   /** La primera carga sí tapa la pantalla; un refresco posterior, no. */
@@ -1271,9 +1251,13 @@ export default function ViaticosPage() {
   return (
     <FinanceModuleShell
       variant="flat"
-      title={cfg.title}
-      subtitle={cfg.subtitle}
-      kpis={showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de viáticos" /> : undefined}
+      title="Viáticos"
+      actions={
+        <>
+          {primaryAction}
+          {assignAction}
+        </>
+      }
       tabs={[
         { id: "contabilidad", label: "Contabilidad" },
         { id: "todos", label: "Todos" },
@@ -1296,6 +1280,7 @@ export default function ViaticosPage() {
             }}
             style={{ marginBottom: 0 }}
             rightActions={
+              narrow ? undefined : (
               <>
                 <Button
                   size="sm"
@@ -1310,8 +1295,25 @@ export default function ViaticosPage() {
                 {primaryAction}
                 {assignAction}
               </>
+              )
             }
           />
+          {narrow && (
+            <div className={lista.herramientas}>
+              <Button
+                size="sm"
+                variant="secondary"
+                style={toolbarButtonStyle}
+                onClick={() => void loadAnalytics()}
+                disabled={analyticsLoading}
+              >
+                {analyticsLoading ? "Calculando…" : "Aplicar"}
+              </Button>
+              <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
+              {primaryAction}
+              {assignAction}
+            </div>
+          )}
           {analyticsError && (
             <InlineAlert
               message={analyticsError}
@@ -1332,7 +1334,7 @@ export default function ViaticosPage() {
           )}
           {!analyticsLoading && !analytics && !analyticsError && (
             <div style={statusPanelStyle}>
-              Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
+              Pulsa Aplicar para calcular el resumen.
             </div>
           )}
           {/* Regla 7 en el periodo: si no hubo ni un viático, la tira de ceros
@@ -1345,6 +1347,21 @@ export default function ViaticosPage() {
           )}
           {!analyticsLoading && analytics && analytics.totals.count > 0 && (
             <>
+              {narrow ? (
+                <div className={lista.apilada}>
+                  <span className={lista.linea}>{analytics.totals.count} registros</span>
+                  <span className={lista.linea}>{analytics.totals.pendientes} por autorizar</span>
+                  <span className={lista.linea}>
+                    Solicitado <Money value={analytics.totals.totalSolicitado} />
+                  </span>
+                  <span className={lista.linea}>
+                    Autorizado <Money value={analytics.totals.totalAprobado} />
+                  </span>
+                  <span className={lista.linea}>
+                    Pagado <Money value={analytics.totals.totalPagado} />
+                  </span>
+                </div>
+              ) : (
               <MetricStrip
                 ariaLabel="Resumen del periodo"
                 metrics={[
@@ -1360,6 +1377,7 @@ export default function ViaticosPage() {
                   { label: "Pagado", value: <Money value={analytics.totals.totalPagado} />, hint: "liquidado en el periodo" },
                 ]}
               />
+              )}
               <BreakdownTable title="Por proyecto" rows={analytics.byProject} />
               <BreakdownTable title="Por persona" rows={analytics.byPerson} />
               <BreakdownTable title="Por categoría" rows={analytics.byCategory} />
@@ -1387,8 +1405,8 @@ export default function ViaticosPage() {
               }]}
               onClear={clearFilters}
               style={{ marginBottom: 0 }}
-              resultCount={firstLoad ? null : filtered.length}
               rightActions={
+                narrow ? undefined : (
                 <>
                   {refreshAction}
                   <ListExportActions
@@ -1397,11 +1415,21 @@ export default function ViaticosPage() {
                     onPdf={() => void downloadPdf()}
                     pdfBusy={pdfBusy}
                   />
-                  {primaryAction}
-                  {assignAction}
                 </>
+                )
               }
             />
+          )}
+          {showToolbar && narrow && (
+            <div className={lista.herramientas}>
+              {refreshAction}
+              <ListExportActions
+                onExcel={exportExcel}
+                excelDisabled={filtered.length === 0}
+                onPdf={() => void downloadPdf()}
+                pdfBusy={pdfBusy}
+              />
+            </div>
           )}
 
           {actionError && (
@@ -1418,7 +1446,7 @@ export default function ViaticosPage() {
           )}
           {catalogErr && (
             <InlineAlert
-              message={`${catalogErr}. El desplegable de proyectos saldrá vacío; puedes ligar la solicitud con el ID de actividad.`}
+              message={catalogErr}
               variant="warning"
               onDismiss={() => setCatalogErr(null)}
             />
@@ -1426,7 +1454,7 @@ export default function ViaticosPage() {
           {truncated && !error && (
             <InlineAlert
               variant="warning"
-              message={`La API devuelve como máximo ${API_LIST_CAP} solicitudes por consulta y llegaron ${API_LIST_CAP}: puede haber más sin mostrar, y los totales de arriba solo cubren lo que ves. Usa Analytics con un rango de fechas para cifras del periodo completo.`}
+              message={`La lista muestra ${API_LIST_CAP} viáticos; puede haber más.`}
             />
           )}
           {error && (
@@ -1445,6 +1473,8 @@ export default function ViaticosPage() {
               Cargando viáticos…
             </div>
           ) : error && items.length === 0 ? null : (
+            <>
+            <div className={narrow ? lista.tablaMovil : undefined}>
             <DataTable
               columns={columns}
               rows={filtered}
@@ -1453,20 +1483,12 @@ export default function ViaticosPage() {
               ariaLabel="Solicitudes de viáticos"
               emptyTitle={
                 hasFilters
-                  ? "Ningún viático coincide"
+                  ? "Ningún viático coincide con estos filtros."
                   : tab === "contabilidad"
-                    ? "Todavía no hay viáticos autorizados"
-                    : "Todavía no hay viáticos"
+                    ? "Todavía no hay viáticos autorizados."
+                    : "Todavía no hay viáticos."
               }
-              emptyDescription={
-                hasFilters
-                  ? "Ninguna solicitud coincide con los filtros aplicados."
-                  : tab === "contabilidad"
-                    ? "Un viático llega aquí cuando alguien lo autoriza. Los que siguen esperando resolución están en «Todos»."
-                    : cfg.canCreate
-                      ? "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos— ligado a una actividad o a un proyecto. Pide el primero y queda aquí para autorizar."
-                      : "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos—. Los pide el equipo desde su panel y aquí llegan para que los autorices."
-              }
+              emptyDescription=""
               emptyAction={
                 hasFilters ? (
                   <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
@@ -1490,6 +1512,11 @@ export default function ViaticosPage() {
                 )
               }
             />
+            </div>
+            {filtered.length > 0 ? (
+              <ListFooter total={filtered.length} unit={filtered.length === 1 ? "viático" : "viáticos"} />
+            ) : null}
+            </>
           )}
         </>
       )}

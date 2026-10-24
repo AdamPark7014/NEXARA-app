@@ -2,19 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import EmptyState from "@/components/ui/EmptyState";
-import Button from "@/components/ui/Button";
-import ContextRail from "@/components/ui/ContextRail";
-import { Tag } from "@/components/ui/DataTable";
 import VehiculosFlotaMapa from "@/components/VehiculosFlotaMapa";
 import { useUser } from "@/components/UserContext";
-import {
-  MIS_VEHICULOS_PATH,
-  VEHICULOS_GPS_PATH,
-  VEHICULOS_PATH,
-  puedeVerGpsDireccion,
-} from "@/lib/recursos-core";
+import { VEHICULOS_PATH, puedeVerGpsDireccion } from "@/lib/recursos-core";
 import { estadoGps, type EstadoGps } from "@/lib/vehiculos-api";
 import styles from "../vehiculos-core.module.css";
 
@@ -47,47 +37,24 @@ export default function VehiculosGpsPage() {
   }, [permitido, token]);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Core · Vehículos"
-        title="GPS de la flotilla"
-        subtitle="Posición y recorrido de cada unidad."
-        density="ops"
-        meta={
-          permitido && estado ? (
-            <>
-              {estado.proveedor && <Tag variant="neutral">{estado.proveedor}</Tag>}
-              <Tag variant={estado.configurado ? "positive" : "warning"}>
-                {estado.vehiculosConRastreador} con rastreador
-              </Tag>
-            </>
-          ) : undefined
-        }
-      />
-      {permitido ? (
-        <div className={styles.wrap}>
-          <ContextRail
-            ariaLabel="Vehículos"
-            items={[
-              { id: "flotilla", label: "Flotilla", href: VEHICULOS_PATH },
-              { id: "mios", label: "Mis vehículos", href: MIS_VEHICULOS_PATH },
-              { id: "gps", label: "GPS", href: VEHICULOS_GPS_PATH, active: true },
-            ]}
-          />
-          <VehiculosFlotaMapa token={token} />
+    <div className={styles.wrap}>
+      <Link href={VEHICULOS_PATH} className={styles.volver}>
+        ‹ Vehículos
+      </Link>
+      <h1 className={styles.titulo}>GPS</h1>
+      {permitido && estado ? (
+        <div className={styles.lineas}>
+          {estado.proveedor ? <span className={styles.linea}>{estado.proveedor}</span> : null}
+          <span className={styles.linea}>{estado.vehiculosConRastreador} con rastreador</span>
         </div>
+      ) : null}
+      {permitido ? (
+        <VehiculosFlotaMapa token={token} />
       ) : (
-        <EmptyState
-          icon="🔒"
-          title="Solo Dirección General"
-          description="El GPS de los vehículos es solo para Dirección General."
-          action={
-            <Link href={VEHICULOS_PATH} style={{ textDecoration: "none" }}>
-              <Button size="sm" variant="secondary">Volver a Vehículos</Button>
-            </Link>
-          }
-        />
+        <p className={styles.frase} role="status">
+          Solo Dirección General puede ver el GPS.
+        </p>
       )}
-    </>
+    </div>
   );
 }

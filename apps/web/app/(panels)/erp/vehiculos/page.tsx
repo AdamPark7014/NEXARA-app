@@ -1,16 +1,20 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
-import ContextRail from "@/components/ui/ContextRail";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
-import { SkeletonRows } from "@/components/base";
+import {
+  FilterChip,
+  FilterChips,
+  ListFooter,
+  ModulePage,
+  ModuleToolbar,
+  SearchInput,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { usePantallaChica } from "@/lib/recursos-ui";
@@ -42,18 +46,30 @@ function grupoDe(v: VehiculoFlota): Exclude<Filtro, "todos"> | null {
   return null;
 }
 
-function EstadoVehiculo({ v }: { v: VehiculoFlota }) {
+function EstadoVehiculo({ v, apilado = false }: { v: VehiculoFlota; apilado?: boolean }) {
   const est = etiquetaEstatus(v.estatus);
+  const estado = (
+    <Tag variant={v.disponible ? "positive" : est.variante} dot>
+      {v.disponible ? "Disponible" : est.texto}
+    </Tag>
+  );
+  const gps = v.tieneRastreador ? (
+    <span title={`Rastreador GPS: ${v.gpsProveedor || "instalado"}`}>
+      <Tag variant="neutral" size="sm">GPS</Tag>
+    </span>
+  ) : null;
+  if (apilado) {
+    return (
+      <>
+        <span className={styles.linea}>{estado}</span>
+        {gps ? <span className={styles.linea}>{gps}</span> : null}
+      </>
+    );
+  }
   return (
     <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-      <Tag variant={v.disponible ? "positive" : est.variante} dot>
-        {v.disponible ? "Disponible" : est.texto}
-      </Tag>
-      {v.tieneRastreador && (
-        <span title={`Rastreador GPS: ${v.gpsProveedor || "instalado"}`}>
-          <Tag variant="neutral" size="sm">GPS</Tag>
-        </span>
-      )}
+      {estado}
+      {gps}
     </span>
   );
 }
@@ -210,231 +226,195 @@ export default function VehiculosPage() {
   const primeraCarga = cargando && !cargadoUnaVez;
   const hayFiltro = filtro !== "todos" || busqueda.trim() !== "";
 
+  const quitarFiltros = () => {
+    setBusqueda("");
+    setFiltro("todos");
+  };
+
+  const sinFlotilla = !primeraCarga && !error && vehiculos.length === 0;
+  const sinCoincidencias = !primeraCarga && vehiculos.length > 0 && visibles.length === 0;
+  const fraseVacia = sinCoincidencias
+    ? "Ningún vehículo coincide con estos filtros."
+    : "Todavía no hay vehículos en la flotilla.";
+
   return (
-    <div className={styles.wrap}>
-      <PageHeader
-        eyebrow="Core · Vehículos"
-        title="Flotilla"
-        density="ops"
-        actions={
-          <>
-            {puedeAlta && (
-              <Button
-                variant="primary"
-                aria-expanded={showAlta}
-                onClick={() => {
-                  setShowAlta((v) => !v);
-                  setAltaError(null);
-                  setAltaOk(null);
-                }}
-              >
-                {showAlta ? "Cerrar" : "Agregar"}
-              </Button>
-            )}
-            <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
-              {cargando && cargadoUnaVez ? "Actualizando…" : "Actualizar"}
+    <ModulePage
+      className={styles.wrap}
+      title="Vehículos"
+      primaryAction={
+        puedeAlta ? (
+          <Button
+            variant="primary"
+            aria-expanded={showAlta}
+            onClick={() => {
+              setShowAlta((v) => !v);
+              setAltaError(null);
+              setAltaOk(null);
+            }}
+          >
+            {showAlta ? "Cerrar" : "Agregar"}
+          </Button>
+        ) : undefined
+      }
+      secondaryActions={
+        <>
+          <Link href={MIS_VEHICULOS_PATH} className={styles.enlace}>
+            Mis vehículos
+          </Link>
+          {verGps ? (
+            <Button variant="secondary" onClick={() => router.push(VEHICULOS_GPS_PATH)}>
+              GPS
             </Button>
-            {verGps && (
-              <Button variant="secondary" onClick={() => router.push(VEHICULOS_GPS_PATH)}>
-                GPS
-              </Button>
-            )}
-          </>
-        }
-      />
-
-      <ContextRail
-        ariaLabel="Vehículos"
-        items={[
-          { id: "flotilla", label: "Flotilla", href: VEHICULOS_PATH, active: true },
-          { id: "mios", label: "Mis vehículos", href: MIS_VEHICULOS_PATH },
-          ...(verGps ? [{ id: "gps", label: "GPS", href: VEHICULOS_GPS_PATH }] : []),
-        ]}
-      />
-
-      {error && cargadoUnaVez && (
-        <InlineAlert
-          message={error}
-          variant="warning"
-          action={
-            <Button size="sm" variant="ghost" onClick={() => void cargar()}>
-              Reintentar
-            </Button>
-          }
-        />
-      )}
-
-      {showAlta && puedeAlta && (
-        <Section title="Nuevo vehículo">
-          <form className={styles.altaForm} onSubmit={(e) => void guardarAlta(e)}>
-            {altaError && <InlineAlert message={altaError} variant="danger" />}
-            {altaOk && <InlineAlert message={altaOk} variant="success" />}
-            <div className={styles.altaGrid}>
-              <div className={styles.altaCampo}>
-                <label htmlFor="vehiculo-nombre">Nombre</label>
-                <input
-                  id="vehiculo-nombre"
-                  className={styles.input}
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Nissan Frontier 2026"
-                  required
-                  autoFocus
-                  autoComplete="off"
-                />
-              </div>
-              <div className={styles.altaCampo}>
-                <label htmlFor="vehiculo-placas">Placas</label>
-                <input
-                  id="vehiculo-placas"
-                  className={styles.input}
-                  value={placas}
-                  onChange={(e) => setPlacas(e.target.value)}
-                  placeholder="SR-36-051"
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                />
-              </div>
-              <div className={styles.altaCampoFull}>
-                <label htmlFor="vehiculo-notas">Notas (opcional)</label>
-                <textarea
-                  id="vehiculo-notas"
-                  className={styles.input}
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  rows={2}
-                  placeholder="Color, número económico, detalles…"
-                />
-              </div>
-            </div>
-            <div className={styles.altaAcciones}>
-              <Button type="submit" variant="primary" disabled={!nombre.trim() || guardando}>
-                {guardando ? "Guardando…" : "Guardar en flotilla"}
-              </Button>
-            </div>
-          </form>
-        </Section>
-      )}
-
-      <div className={styles.kpis}>
-        <KpiCard label="Vehículos" value={kpis.total} />
-        <KpiCard label="Disponibles" value={kpis.disponibles} variant="positive" />
-        <KpiCard label="En uso" value={kpis.uso} variant="accent" />
-        {kpis.fuera > 0 && <KpiCard label="Fuera de servicio" value={kpis.fuera} variant="warning" />}
-      </div>
-
-      <Section
-        title={primeraCarga ? "Cargando flotilla…" : `${visibles.length} de ${vehiculos.length} vehículos`}
-        flush
-      >
-        {vehiculos.length > 0 && (
-          <div className={styles.filtros}>
-            <input
-              type="search"
-              className={styles.busqueda}
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por nombre, placas o conductor…"
-              aria-label="Buscar vehículo"
-            />
-            <div className={styles.chips} role="group" aria-label="Filtrar por estado">
-              {chips.map((c) => (
-                <button
-                  key={c.key}
-                  type="button"
-                  className={`${styles.chip} ${filtro === c.key ? styles.chipActivo : ""}`}
-                  aria-pressed={filtro === c.key}
-                  onClick={() => setFiltro(c.key)}
-                >
-                  {c.label}
-                  <span className={styles.chipCuenta}>{c.cuenta}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {primeraCarga ? (
-          <div className={styles.cuerpoLista}>
-            <SkeletonRows rows={5} label="Cargando flotilla" />
-          </div>
-        ) : error && vehiculos.length === 0 ? (
-          <div style={{ padding: 20 }}>
-            <EmptyState
-              title="No se pudo cargar la flotilla"
-              description={error}
-              variant="compact"
+          ) : null}
+        </>
+      }
+      before={
+        <>
+          {error ? (
+            <InlineAlert
+              message={error}
+              variant={vehiculos.length ? "warning" : "danger"}
               action={
-                <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+                <Button size="sm" variant="ghost" onClick={() => void cargar()}>
                   Reintentar
                 </Button>
               }
             />
-          </div>
-        ) : visibles.length === 0 && hayFiltro ? (
-          <div style={{ padding: 20 }}>
-            <EmptyState
-              title="Ningún vehículo coincide"
-              description="Prueba con otro nombre o quita el filtro de estado."
-              variant="compact"
-              action={
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setBusqueda("");
-                    setFiltro("todos");
-                  }}
-                >
+          ) : null}
+          {showAlta && puedeAlta ? (
+            <Section title="Nuevo vehículo">
+              <form className={styles.altaForm} onSubmit={(e) => void guardarAlta(e)}>
+                {altaError ? <InlineAlert message={altaError} variant="danger" /> : null}
+                {altaOk ? <InlineAlert message={altaOk} variant="success" /> : null}
+                <div className={styles.altaGrid}>
+                  <div className={styles.altaCampo}>
+                    <label htmlFor="vehiculo-nombre">Nombre</label>
+                    <input
+                      id="vehiculo-nombre"
+                      className={styles.input}
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      placeholder="Nissan Frontier 2026"
+                      required
+                      autoFocus
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className={styles.altaCampo}>
+                    <label htmlFor="vehiculo-placas">Placas</label>
+                    <input
+                      id="vehiculo-placas"
+                      className={styles.input}
+                      value={placas}
+                      onChange={(e) => setPlacas(e.target.value)}
+                      placeholder="SR-36-051"
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className={styles.altaCampoFull}>
+                    <label htmlFor="vehiculo-notas">Notas</label>
+                    <textarea
+                      id="vehiculo-notas"
+                      className={styles.input}
+                      value={notas}
+                      onChange={(e) => setNotas(e.target.value)}
+                      rows={2}
+                      placeholder="Color, número económico, detalles…"
+                    />
+                  </div>
+                </div>
+                <div className={styles.altaAcciones}>
+                  <Button type="submit" variant="primary" disabled={!nombre.trim() || guardando}>
+                    {guardando ? "Guardando…" : "Guardar en flotilla"}
+                  </Button>
+                </div>
+              </form>
+            </Section>
+          ) : null}
+        </>
+      }
+      listLabel="Flotilla"
+      toolbar={
+        vehiculos.length > 0 ? (
+          <ModuleToolbar
+            search={
+              <SearchInput
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Nombre, placas o conductor"
+                aria-label="Buscar vehículo"
+              />
+            }
+            chips={
+              <FilterChips ariaLabel="Filtrar por estado">
+                {chips.map((c) => (
+                  <FilterChip key={c.key} active={filtro === c.key} count={c.cuenta} onClick={() => setFiltro(c.key)}>
+                    {c.label}
+                  </FilterChip>
+                ))}
+              </FilterChips>
+            }
+            end={
+              hayFiltro ? (
+                <Button size="sm" variant="ghost" onClick={quitarFiltros}>
                   Quitar filtros
                 </Button>
-              }
-            />
-          </div>
-        ) : pantallaChica && visibles.length > 0 ? (
-          <div className={styles.cuerpoLista}>
-            <ul className={styles.tarjetas} aria-label="Vehículos">
-              {visibles.map((v) => (
-                <li key={v.id}>
-                  <button type="button" className={styles.tarjeta} onClick={() => abrirFicha(v)}>
-                    <span className={styles.viajeTop} style={{ width: "100%" }}>
-                      <span className={styles.filaVehiculo}>
-                        <span className={styles.nombre}>{v.nombre}</span>
-                        <span className={styles.placas}>{v.placas || "sin placas"}</span>
-                      </span>
-                      <EstadoVehiculo v={v} />
-                    </span>
-                    <span className={styles.tarjetaPie}>
-                      <span>{v.conductor ? `Lo trae ${v.conductor.nombre}` : "Sin conductor"}</span>
-                      <span>{formatoKm(v.odometroUltimo)}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <DataTable
-            columns={columnas}
-            rows={visibles}
-            rowKey={(v) => v.id}
-            density="compact"
-            ariaLabel="Flotilla"
-            onRowClick={abrirFicha}
-            emptyTitle="Sin vehículos"
-            emptyDescription={
-              puedeAlta ? "Agrega la primera unidad con el botón Agregar." : "La flotilla está vacía."
-            }
-            emptyAction={
-              puedeAlta ? (
-                <Button size="sm" variant="primary" onClick={() => setShowAlta(true)}>
-                  Agregar vehículo
-                </Button>
-              ) : undefined
+              ) : null
             }
           />
-        )}
-      </Section>
-    </div>
+        ) : undefined
+      }
+      loading={primeraCarga}
+      loadingRows={5}
+      empty={sinFlotilla || sinCoincidencias}
+      emptyState={{
+        title: fraseVacia,
+        action: sinCoincidencias ? (
+          <Button size="sm" variant="secondary" onClick={quitarFiltros}>
+            Quitar filtros
+          </Button>
+        ) : puedeAlta ? (
+          <Button size="sm" variant="primary" onClick={() => setShowAlta(true)}>
+            Agregar
+          </Button>
+        ) : undefined,
+      }}
+      footer={
+        !primeraCarga && visibles.length > 0 ? (
+          <ListFooter total={visibles.length} unit={visibles.length === 1 ? "vehículo" : "vehículos"} />
+        ) : undefined
+      }
+    >
+      {visibles.length === 0 ? null : pantallaChica ? (
+        <ul className={styles.tarjetas} aria-label="Vehículos">
+          {visibles.map((v) => (
+            <li key={v.id}>
+              <button type="button" className={styles.tarjeta} onClick={() => abrirFicha(v)}>
+                <span className={styles.lineaNombre}>{v.nombre}</span>
+                <span className={styles.linea}>{v.placas || "sin placas"}</span>
+                <EstadoVehiculo v={v} apilado />
+                <span className={styles.linea}>{v.conductor ? v.conductor.nombre : "Sin conductor"}</span>
+                {v.proximaDevolucion ? (
+                  <span className={styles.linea}>Devuelve {formatoFecha(v.proximaDevolucion)}</span>
+                ) : null}
+                <span className={styles.linea}>{formatoKm(v.odometroUltimo)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <DataTable
+          columns={columnas}
+          rows={visibles}
+          rowKey={(v) => v.id}
+          density="compact"
+          flush
+          ariaLabel="Flotilla"
+          onRowClick={abrirFicha}
+          stickyHeader={false}
+        />
+      )}
+    </ModulePage>
   );
 }

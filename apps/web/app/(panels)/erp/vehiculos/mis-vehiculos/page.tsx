@@ -1,25 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import PageHeader from "@/components/ui/PageHeader";
+import Link from "next/link";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
-import ContextRail from "@/components/ui/ContextRail";
 import { Tag } from "@/components/ui/DataTable";
 import { SkeletonRows } from "@/components/base";
 import { toast } from "@/components/Toast";
 import VehicleCheckoutForm, { type ChecklistFormPayload } from "@/components/VehicleCheckoutForm";
 import { useUser } from "@/components/UserContext";
 import { asList, erpFetch, formatApiError } from "@/lib/erp-api";
-import {
-  MIS_VEHICULOS_PATH,
-  VEHICULOS_GPS_PATH,
-  VEHICULOS_PATH,
-  puedeVerGpsDireccion,
-} from "@/lib/recursos-core";
+import { VEHICULOS_PATH } from "@/lib/recursos-core";
 import {
   enviarChecklist,
   etiquetaEstatus,
@@ -51,7 +44,6 @@ const ENTREGA_LEGIBLE: Record<string, string> = {
 export default function MisVehiculosPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
-  const verGps = puedeVerGpsDireccion(user);
 
   const [datos, setDatos] = useState<MisVehiculos>({ activa: null, solicitudes: [], disponibles: [] });
   const [cargando, setCargando] = useState(true);
@@ -111,32 +103,17 @@ export default function MisVehiculosPage() {
 
   return (
     <div className={styles.wrap}>
-      <PageHeader
-        eyebrow="Core · Vehículos"
-        title="Mis vehículos"
-        density="ops"
-        actions={
-          <>
-            <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
-              {cargando && cargadoUnaVez ? "Actualizando…" : "Actualizar"}
-            </Button>
-            <Button variant={activa ? "secondary" : "primary"} onClick={() => setPidiendo(true)}>
-              Solicitar
-            </Button>
-          </>
-        }
-      />
+      <Link href={VEHICULOS_PATH} className={styles.volver}>
+        ‹ Vehículos
+      </Link>
+      <div className={styles.viajeTop}>
+        <h1 className={styles.titulo}>Mis vehículos</h1>
+        <Button variant="primary" onClick={() => setPidiendo(true)}>
+          Solicitar
+        </Button>
+      </div>
 
-      <ContextRail
-        ariaLabel="Vehículos"
-        items={[
-          { id: "flotilla", label: "Flotilla", href: VEHICULOS_PATH },
-          { id: "mios", label: "Mis vehículos", href: MIS_VEHICULOS_PATH, active: true },
-          ...(verGps ? [{ id: "gps", label: "GPS", href: VEHICULOS_GPS_PATH }] : []),
-        ]}
-      />
-
-      {error && (
+      {error ? (
         <InlineAlert
           message={error}
           variant={cargadoUnaVez ? "warning" : "danger"}
@@ -146,42 +123,23 @@ export default function MisVehiculosPage() {
             </Button>
           }
         />
-      )}
+      ) : null}
 
       <Section title="En uso" dense>
         {primeraCarga && <SkeletonRows rows={2} label="Cargando tu vehículo" />}
-        {!primeraCarga && !activa && (
-          <EmptyState
-            title="Sin vehículo asignado"
-            description={
-              datos.disponibles.length > 0
-                ? "Toma uno de los disponibles de abajo o solicita uno para una actividad."
-                : "Solicita uno para tu próxima actividad."
-            }
-            variant="compact"
-            action={
-              <Button size="sm" variant="secondary" onClick={() => setPidiendo(true)}>
-                Solicitar vehículo
-              </Button>
-            }
-          />
-        )}
+        {!primeraCarga && !activa ? <p className={styles.frase}>No tienes un vehículo asignado.</p> : null}
         {!primeraCarga && activa && (
           <div style={{ display: "grid", gap: 12 }}>
-            <div className={styles.viajeTop}>
-              <div className={styles.filaVehiculo}>
-                <span className={styles.nombre}>{activa.vehiculo.nombre}</span>
-                <span className={styles.placas}>{activa.vehiculo.placas || "sin placas"}</span>
-              </div>
-              <Tag variant={activa.requiereSalida ? "warning" : "accent"} dot>
-                {activa.requiereSalida ? "Falta salida" : "En uso"}
-              </Tag>
+            <div className={styles.lineas}>
+              <span className={styles.lineaNombre}>{activa.vehiculo.nombre}</span>
+              <span className={styles.linea}>{activa.vehiculo.placas || "sin placas"}</span>
+              <span className={styles.linea}>
+                <Tag variant={activa.requiereSalida ? "warning" : "accent"} dot>
+                  {activa.requiereSalida ? "Falta salida" : "En uso"}
+                </Tag>
+              </span>
             </div>
-            {activa.requiereSalida && (
-              <p className={styles.mini} style={{ margin: 0 }}>
-                Antes de manejarlo, registra la salida con las fotos del vehículo y del tablero.
-              </p>
-            )}
+            {activa.requiereSalida ? <p className={styles.frase}>Falta registrar la salida.</p> : null}
             <div className={styles.datos}>
               <Dato label="Desde" valor={formatoFecha(activa.inicio)} />
               <Dato label="Hasta" valor={formatoFecha(activa.fin)} />
@@ -227,7 +185,7 @@ export default function MisVehiculosPage() {
       </Section>
 
       {!activa && !primeraCarga && datos.disponibles.length > 0 && (
-        <Section title={`Disponibles · ${datos.disponibles.length}`} dense>
+        <Section title="Disponibles" dense>
           <ul className={styles.tarjetas} aria-label="Vehículos disponibles">
             {datos.disponibles.map((v) => (
               <li key={v.id}>
@@ -245,34 +203,32 @@ export default function MisVehiculosPage() {
               </li>
             ))}
           </ul>
+          <p className={styles.pie}>
+            {datos.disponibles.length} {datos.disponibles.length === 1 ? "vehículo" : "vehículos"}
+          </p>
         </Section>
       )}
 
       <Section title="Solicitudes" dense>
         {primeraCarga && <SkeletonRows rows={2} label="Cargando solicitudes" />}
-        {!primeraCarga && datos.solicitudes.length === 0 && (
-          <EmptyState
-            title="Sin solicitudes"
-            description="Cuando pidas un vehículo verás aquí si ya lo aprobaron."
-            variant="compact"
-          />
-        )}
+        {!primeraCarga && datos.solicitudes.length === 0 ? (
+          <p className={styles.frase}>No tienes solicitudes de vehículo.</p>
+        ) : null}
         {!primeraCarga && datos.solicitudes.length > 0 && (
           <ul className={styles.tarjetas} aria-label="Mis solicitudes">
             {datos.solicitudes.map((s) => {
               const est = etiquetaEstatus(s.estatusAprobacion);
               return (
-                <li key={s.id} className={styles.viajeTop}>
-                  <div className={styles.filaVehiculo}>
-                    <span className={styles.nombre}>{s.nombreVehiculo || "Vehículo"}</span>
-                    <span className={`${styles.mini} ${styles.num}`}>
-                      {formatoFecha(s.fechaInicioSolicitada)} → {formatoFecha(s.fechaFinSolicitada)}
-                    </span>
-                  </div>
-                  <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                    {s.entregaEstatus && (
+                <li key={s.id} className={styles.lineas}>
+                  <span className={styles.lineaNombre}>{s.nombreVehiculo || "Vehículo"}</span>
+                  <span className={styles.linea}>{formatoFecha(s.fechaInicioSolicitada)}</span>
+                  <span className={styles.linea}>{formatoFecha(s.fechaFinSolicitada)}</span>
+                  {s.entregaEstatus ? (
+                    <span className={styles.linea}>
                       <Tag variant="neutral">{ENTREGA_LEGIBLE[s.entregaEstatus] ?? s.entregaEstatus}</Tag>
-                    )}
+                    </span>
+                  ) : null}
+                  <span className={styles.linea}>
                     <Tag variant={est.variante}>{est.texto}</Tag>
                   </span>
                 </li>
@@ -280,6 +236,11 @@ export default function MisVehiculosPage() {
             })}
           </ul>
         )}
+        {!primeraCarga ? (
+          <p className={styles.pie}>
+            {datos.solicitudes.length} {datos.solicitudes.length === 1 ? "solicitud" : "solicitudes"}
+          </p>
+        ) : null}
       </Section>
 
       <Modal
@@ -314,11 +275,9 @@ export default function MisVehiculosPage() {
 
 function Disponible({ vehiculo, onTomar }: { vehiculo: VehiculoFlota; onTomar: () => void }) {
   return (
-    <div className={styles.viajeTop} style={{ alignItems: "center" }}>
-      <div className={styles.filaVehiculo}>
-        <span className={styles.nombre}>{vehiculo.nombre}</span>
-        <span className={styles.placas}>{vehiculo.placas || "sin placas"}</span>
-      </div>
+    <div className={styles.lineas}>
+      <span className={styles.lineaNombre}>{vehiculo.nombre}</span>
+      <span className={styles.linea}>{vehiculo.placas || "sin placas"}</span>
       <Button variant="secondary" onClick={onTomar} aria-label={`Tomar ${vehiculo.nombre}`}>
         Tomar
       </Button>

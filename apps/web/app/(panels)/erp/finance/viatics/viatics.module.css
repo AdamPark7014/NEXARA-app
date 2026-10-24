@@ -1,0 +1,108 @@
+.apilada {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.linea,
+.lineaFuerte {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.lineaFuerte {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+@media (max-width: 720px) {
+  .tablaMovil table,
+  .tablaMovil tbody,
+  .tablaMovil tr,
+  .tablaMovil td,
+  .tablaMovil th {
+    display: block;
+    width: 100%;
+    text-align: left !important;
+  }
+
+  .tablaMovil thead {
+    display: none;
+  }
+
+  .tablaMovil tr {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tablaMovil td > div {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+  }
+}
+
+.herramientas {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 0 0 12px;
+}
+
+.herramientas > div {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+}
+
+.pie {
+  margin: 0;
+  padding: 12px 2px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .desglose thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .desglose,
+  .desglose tbody,
+  .desglose tr,
+  .desglose th,
+  .desglose td {
+    display: block;
+    width: 100%;
+    text-align: left !important;
+  }
+
+  .desglose tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .desglose th::before,
+  .desglose td::before {
+    content: attr(data-etiqueta);
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+}

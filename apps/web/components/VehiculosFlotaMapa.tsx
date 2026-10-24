@@ -318,14 +318,12 @@ function ItemVehiculo({
       onClick={onClick}
     >
       <span className={styles.nombre}>{posicion.nombre}</span>
+      <span className={styles.mini}>{posicion.conductor?.nombre ?? "Sin conductor"}</span>
+      {posicion.placas ? <span className={styles.mini}>{posicion.placas}</span> : null}
       <span className={styles.mini}>
-        {posicion.conductor?.nombre ?? "Sin conductor"}
-        {posicion.placas ? ` · ${posicion.placas}` : ""}
+        {posicion.velocidadKmh !== null ? `${Math.round(posicion.velocidadKmh)} km/h` : "—"}
       </span>
-      <span className={styles.mini}>
-        {posicion.velocidadKmh !== null ? `${Math.round(posicion.velocidadKmh)} km/h` : "—"} ·{" "}
-        {formatoHora(posicion.at)}
-      </span>
+      <span className={styles.mini}>{formatoHora(posicion.at)}</span>
     </button>
   );
 }
