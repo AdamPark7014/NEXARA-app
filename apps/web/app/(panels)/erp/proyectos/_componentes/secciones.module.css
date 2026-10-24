@@ -299,6 +299,14 @@ a.tituloFila:hover {
   color: var(--ui-fg);
 }
 
+@media (max-width: 640px) {
+  .tablaFechas th,
+  .tablaFechas td {
+    padding: 8px 10px;
+    white-space: normal;
+  }
+}
+
 .datos {
   margin: 0;
   display: grid;

@@ -1,9 +1,9 @@
 "use client";
 
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Alert, Button, ButtonLink, SkeletonRows } from "@/components/base";
+import { Alert, Button, SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { obtenerCotizacion, type CotizacionDetalle } from "@/lib/cotizaciones-api";
 import { formatApiError } from "@/lib/erp-api";
@@ -40,9 +40,10 @@ export default function CotizacionDetallePage() {
 
   return (
     <div className={styles.carga}>
-      <ButtonLink className={styles.cargaVolver} variant="ghost" size="sm" href="/erp/cotizaciones" iconStart={<ArrowBackRoundedIcon />}>
+      <Link href="/erp/cotizaciones" className={styles.volver}>
+        <span aria-hidden="true">‹</span>
         Cotizaciones
-      </ButtonLink>
+      </Link>
       {cargando ? (
         <div className={styles.cargaTarjeta}>
           <SkeletonRows rows={4} label="Cargando la cotización" />

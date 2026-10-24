@@ -32,7 +32,6 @@ export default function SeccionActividades(props: SeccionProps) {
             Actividades del proyecto<span className={styles.conteo}>{p.activities.length}</span>
           </>
         }
-        subtitle="El avance del proyecto sale de aquí: cuenta las actividades cerradas contra el total. Se programan arriba por etapa o se asignan desde la pizarra ligadas al proyecto."
         end={
           avance.total ? (
             <span className={styles.tenue}>
@@ -42,10 +41,7 @@ export default function SeccionActividades(props: SeccionProps) {
         }
       >
         {p.activities.length === 0 ? (
-          <p className={styles.vacio}>
-            Todavía no hay actividades ligadas a este proyecto. Mientras no las haya, el avance se mide con las etapas cumplidas
-            del cronograma.
-          </p>
+          <p className={styles.vacio}>Todavía no hay actividades ligadas a este proyecto.</p>
         ) : (
           <ul className={styles.lista}>
             {p.activities.map((a) => {

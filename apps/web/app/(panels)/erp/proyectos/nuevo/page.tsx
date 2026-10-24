@@ -1043,9 +1043,7 @@ export default function NuevoProyectoPage() {
     <FormPage
       className={styles.pagina}
       title="Nuevo proyecto"
-      breadcrumbs={[{ label: "Proyectos", href: "/erp/proyectos" }, { label: "Nuevo proyecto" }]}
-      back={{ href: "/erp/proyectos", label: "Volver a Proyectos" }}
-      description="Todo en un solo paso al final: datos, fechas, cronograma, alcance, requerimientos y equipo. Lo que no tengas ahora lo puedes agregar después."
+      back={{ href: "/erp/proyectos", label: "Proyectos" }}
       pendingTitle="Pasos"
       pending={pasos}
       onSubmit={(e) => {

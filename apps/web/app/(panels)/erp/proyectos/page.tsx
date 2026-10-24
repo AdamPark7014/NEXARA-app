@@ -7,12 +7,7 @@ import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
-import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
-import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
-import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
 import {
   Alert,
@@ -23,17 +18,15 @@ import {
   FilterChip,
   FilterChips,
   LinkButton,
+  ListFooter,
   ModulePage,
   ModuleToolbar,
   PersonCell,
   ProgressCell,
   SearchInput,
   Select,
-  Stat,
-  StatRow,
   StatusBadge,
   Tabs,
-  WhenCell,
   type Column,
   type Tone,
 } from "@/components/base";
@@ -274,23 +267,6 @@ export default function ProyectosPage() {
     return { porEstado, porSalud };
   }, [porTexto, estado]);
 
-  /** Cartera completa (sin filtros): lo que se trabaja, lo que falta arrancar, lo atrasado y lo cerrado. */
-  const cifras = useMemo(() => {
-    let enCurso = 0;
-    let porIniciar = 0;
-    let atrasados = 0;
-    let cerrados = 0;
-    let enRiesgo = 0;
-    for (const p of items) {
-      if (p.status === "ACTIVE") enCurso += 1;
-      if (p.status === "PLANNED") porIniciar += 1;
-      if (p.status === "COMPLETED") cerrados += 1;
-      if (p.resumen.salud === "RETRASADO") atrasados += 1;
-      if (p.resumen.enRiesgo && p.resumen.salud !== "RETRASADO") enRiesgo += 1;
-    }
-    return { enCurso, porIniciar, atrasados, cerrados, enRiesgo };
-  }, [items]);
-
   const hayFiltros = Boolean(q.trim() || estado || salud || responsable || cliente);
   const quitarFiltros = () => {
     setQ("");
@@ -320,13 +296,6 @@ export default function ProyectosPage() {
     router.replace(`/erp/proyectos?cliente=${serviceClientId}`, { scroll: false });
   };
 
-  /** Una cifra de la franja también filtra: se vuelve a pulsar para soltarla. */
-  const filtrarEstado = (e: EstadoProyecto) => {
-    setVista("proyectos");
-    setSalud("");
-    setEstado(estado === e ? "" : e);
-  };
-
   const columnas: Column<ProyectoFila>[] = [
     {
       key: "proyecto",
@@ -336,8 +305,10 @@ export default function ProyectosPage() {
           <Link href={`/erp/proyectos/${p.id}`} className={styles.titulo} onClick={(e) => e.stopPropagation()}>
             {p.title}
           </Link>
-          <span className={`${styles.sub} ${styles.soloTelefono}`}>{p.client?.name ?? "Sin cliente"}</span>
-          <span className={styles.sub}>{getServiceProjectTypeLabel(p.projectType)}</span>
+          <span className={styles.sub}>
+            <span className={styles.soloTelefono}>{p.client?.name ?? "Sin cliente"}</span>
+            {getServiceProjectTypeLabel(p.projectType)}
+          </span>
         </span>
       ),
     },
@@ -347,7 +318,7 @@ export default function ProyectosPage() {
       render: (p) => (
         <span className={styles.cliente}>
           <span className={styles.clienteNombre}>{p.client?.name ?? "Sin cliente"}</span>
-          {p.cotizacion?.quoteNumber ? <span className={styles.sub}>Cotización {p.cotizacion.quoteNumber}</span> : null}
+          {p.cotizacion?.quoteNumber ? <span className={styles.sub}>· {p.cotizacion.quoteNumber}</span> : null}
         </span>
       ),
     },
@@ -356,7 +327,7 @@ export default function ProyectosPage() {
       label: "Responsable",
       render: (p) =>
         p.responsable?.nombre ? (
-          <PersonCell name={p.responsable.nombre} size={26} subtitle={`${p.equipoCount} en equipo`} />
+          <PersonCell name={p.responsable.nombre} size={26} />
         ) : (
           <span className={styles.tenue}>Sin asignar</span>
         ),
@@ -383,12 +354,14 @@ export default function ProyectosPage() {
       label: "Fechas",
       render: (p) => {
         const textoPlazo = plazo(p);
+        const tarde = tonoPlazo(p) === "danger" || tonoPlazo(p) === "warning";
         return (
-          <WhenCell
-            time={`${formatoFecha(p.startDate)} → ${p.endDate ? formatoFecha(p.endDate) : "sin fin"}`}
-            hint={textoPlazo || undefined}
-            tone={tonoPlazo(p)}
-          />
+          <span className={styles.fechas}>
+            <span>
+              {formatoFecha(p.startDate)} → {p.endDate ? formatoFecha(p.endDate) : "sin fin"}
+            </span>
+            {textoPlazo ? <span className={tarde ? styles.vencido : undefined}>{textoPlazo}</span> : null}
+          </span>
         );
       },
     },
@@ -441,9 +414,6 @@ export default function ProyectosPage() {
   const encabezado = {
     className: styles.pagina,
     title: "Proyectos",
-    description:
-      "Fechas planeadas y reales, cronograma por etapas, alcance, equipo y documentos. El avance y el semáforo se calculan solos con las actividades y las fechas.",
-    icon: <AccountTreeOutlinedIcon />,
     primaryAction:
       sinRegistros && !error ? null : (
         <ButtonLink variant="primary" href="/erp/proyectos/nuevo" iconStart={<AddRoundedIcon />} kbd="N">
@@ -475,11 +445,6 @@ export default function ProyectosPage() {
                 shortcut="/"
               />
             }
-            end={
-              <span className={styles.tenue}>
-                {clientesVisibles.length === 1 ? "1 cliente" : `${clientesVisibles.length} clientes`}
-              </span>
-            }
           />
         }
         empty={clientesVisibles.length === 0}
@@ -487,16 +452,19 @@ export default function ProyectosPage() {
           clientes.length === 0
             ? {
                 icon: <GroupsOutlinedIcon />,
-                title: "Aún no hay clientes de proyecto",
-                description:
-                  "Aparecen aquí los que se dan de alta en Clientes como «Proyecto», los del alta rápida de una actividad y cualquier cliente al que se le abra un proyecto.",
+                title: "Aún no hay clientes de proyecto.",
               }
             : {
                 icon: <FilterAltOffOutlinedIcon />,
-                title: "Ningún cliente coincide",
+                title: "Ningún cliente coincide.",
                 action: <Button onClick={() => setQ("")}>Quitar búsqueda</Button>,
                 tone: "neutral",
               }
+        }
+        footer={
+          clientesVisibles.length ? (
+            <ListFooter total={clientesVisibles.length} unit={clientesVisibles.length === 1 ? "cliente" : "clientes"} />
+          ) : null
         }
       >
         <ul aria-label="Clientes de proyecto" className={styles.clientes}>
@@ -536,8 +504,7 @@ export default function ProyectosPage() {
                   )}
                 </div>
                 {reciente ? (
-                  <div className={styles.reciente}>
-                    <span className={styles.recienteEtiqueta}>Lo más reciente</span>
+                  <p className={styles.recienteLinea}>
                     <Link href={`/erp/proyectos/${reciente.id}`} className={styles.recienteEnlace}>
                       {reciente.title}
                     </Link>
@@ -545,7 +512,7 @@ export default function ProyectosPage() {
                       {ESTADO_PROYECTO_LABEL[reciente.status] ?? "Sin estado"}
                       {reciente.endDate ? ` · fin ${formatoFecha(reciente.endDate)}` : ""}
                     </span>
-                  </div>
+                  </p>
                 ) : (
                   <span>
                     <Badge tone="outline">Por arrancar</Badge>
@@ -577,55 +544,6 @@ export default function ProyectosPage() {
   return (
     <ModulePage
       {...encabezado}
-      stats={
-        items.length || primeraCarga ? (
-          <StatRow cols={4} ariaLabel="Cartera de proyectos">
-            <Stat
-              label="En curso"
-              value={cifras.enCurso}
-              hint={cifras.enRiesgo ? `${cifras.enRiesgo} en riesgo` : "trabajándose hoy"}
-              icon={<PlayCircleOutlineRoundedIcon />}
-              tone="brand"
-              onClick={() => filtrarEstado("ACTIVE")}
-              pressed={estado === "ACTIVE"}
-              loading={primeraCarga}
-            />
-            <Stat
-              label="Por iniciar"
-              value={cifras.porIniciar}
-              hint="planeados, sin arrancar"
-              icon={<EventOutlinedIcon />}
-              iconTone="info"
-              onClick={() => filtrarEstado("PLANNED")}
-              pressed={estado === "PLANNED"}
-              loading={primeraCarga}
-            />
-            <Stat
-              label="Atrasados"
-              value={cifras.atrasados}
-              hint="pasaron su fecha de fin"
-              icon={<ReportProblemOutlinedIcon />}
-              tone={cifras.atrasados ? "danger" : "default"}
-              onClick={() => {
-                setEstado("");
-                setSalud(salud === "RETRASADO" ? "" : "RETRASADO");
-              }}
-              pressed={salud === "RETRASADO"}
-              loading={primeraCarga}
-            />
-            <Stat
-              label="Cerrados"
-              value={cifras.cerrados}
-              hint="entregados"
-              icon={<TaskAltRoundedIcon />}
-              tone="success"
-              onClick={() => filtrarEstado("COMPLETED")}
-              pressed={estado === "COMPLETED"}
-              loading={primeraCarga}
-            />
-          </StatRow>
-        ) : null
-      }
       listLabel="Proyectos"
       toolbar={
         <>
@@ -661,9 +579,6 @@ export default function ProyectosPage() {
             end={hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}
           />
           <div className={styles.subbarra}>
-            <span className={styles.subbarraEtiqueta} aria-hidden="true">
-              Semáforo
-            </span>
             <FilterChips ariaLabel="Filtrar por semáforo">
               {FILTROS_SALUD.map((f) => (
                 <FilterChip
@@ -717,41 +632,35 @@ export default function ProyectosPage() {
         </>
       }
       loading={primeraCarga}
-      empty={!primeraCarga && visibles.length === 0}
+      empty={!primeraCarga && visibles.length === 0 && !(sinRegistros && error)}
       emptyState={
-        sinRegistros && error
+        sinRegistros
           ? {
-              icon: <CloudOffOutlinedIcon />,
-              title: "No se pudieron cargar los proyectos",
-              description: "Revisa el aviso de arriba y vuelve a intentarlo.",
-              tone: "danger",
+              icon: <AccountTreeOutlinedIcon />,
+              title: "Todavía no hay proyectos",
+              action: (
+                <ButtonLink variant="primary" href="/erp/proyectos/nuevo" iconStart={<AddRoundedIcon />}>
+                  Crear el primero
+                </ButtonLink>
+              ),
+              secondaryAction: clientes?.length ? (
+                <Button onClick={() => cambiarVista("clientes")}>Ver clientes de proyecto</Button>
+              ) : undefined,
             }
-          : sinRegistros
-            ? {
-                icon: <AccountTreeOutlinedIcon />,
-                title: "Todavía no hay proyectos",
-                description: clientes?.length
-                  ? `Ya hay ${clientes.length === 1 ? "1 cliente de proyecto" : `${clientes.length} clientes de proyecto`} en el padrón. Elige uno para arrancar su primer proyecto, o créalo desde cero.`
-                  : "Un proyecto junta cliente, fechas, etapas, equipo y documentos. Puedes crearlo desde cero o a partir de una cotización aprobada.",
-                action: (
-                  <ButtonLink variant="primary" href="/erp/proyectos/nuevo" iconStart={<AddRoundedIcon />}>
-                    Crear el primero
-                  </ButtonLink>
-                ),
-                secondaryAction: clientes?.length ? (
-                  <Button onClick={() => cambiarVista("clientes")}>Ver clientes de proyecto</Button>
-                ) : undefined,
-              }
-            : {
-                icon: <FilterAltOffOutlinedIcon />,
-                title: "Ningún proyecto coincide",
-                description:
-                  estado === "" ? "«Vigentes» esconde los cancelados; prueba con otro estado o quita los filtros." : undefined,
-                action: <Button onClick={quitarFiltros}>Quitar filtros</Button>,
-                tone: "neutral",
-              }
+          : {
+              icon: <FilterAltOffOutlinedIcon />,
+              title: "Ningún proyecto coincide.",
+              action: <Button onClick={quitarFiltros}>Quitar filtros</Button>,
+              tone: "neutral",
+            }
+      }
+      footer={
+        !primeraCarga && visibles.length ? (
+          <ListFooter total={visibles.length} unit={visibles.length === 1 ? "proyecto" : "proyectos"} />
+        ) : null
       }
     >
+      {sinRegistros && error ? null : (
       <DataTable
         flush
         className={styles.tabla}
@@ -775,6 +684,7 @@ export default function ProyectosPage() {
           </ButtonLink>
         )}
       />
+      )}
     </ModulePage>
   );
 }

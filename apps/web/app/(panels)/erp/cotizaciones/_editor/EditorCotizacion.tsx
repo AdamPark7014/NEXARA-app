@@ -4,15 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } fr
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
-import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
-import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
-import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import {
   Alert,
-  Avatar,
-  Badge,
   Button,
   ButtonLink,
   StatusBadge,
@@ -571,12 +566,13 @@ export default function EditorCotizacion({
         <div className={styles.barraIzq}>
           <ButtonLink
             href="/erp/cotizaciones"
-            icon
+            variant="ghost"
+            size="sm"
             className={styles.volver}
+            iconStart={<ArrowBackRoundedIcon aria-hidden="true" />}
             aria-label="Volver a cotizaciones"
-            title="Cotizaciones"
           >
-            <ArrowBackRoundedIcon aria-hidden="true" />
+            Cotizaciones
           </ButtonLink>
           <div className={styles.barraFolio}>
             <div className={styles.barraFolioLinea}>
@@ -638,36 +634,19 @@ export default function EditorCotizacion({
       {detalle ? (
         <section className={styles.ficha} aria-label="Resumen de la cotización">
           <div className={styles.fichaTop}>
-            <span className={styles.fichaIco} aria-hidden="true">
-              <RequestQuoteOutlinedIcon />
-            </span>
             <div className={styles.fichaTexto}>
               <h1 className={styles.fichaTitulo}>{doc.projectName.trim() || "Sin título de proyecto"}</h1>
-              <div className={styles.fichaDatos}>
-                <span className={styles.fichaDato}>
-                  <ApartmentOutlinedIcon aria-hidden="true" />
-                  {doc.clientName.trim() || "Sin cliente"}
-                </span>
-                {detalle.elaboro?.nombre ? (
-                  <span className={styles.fichaDato}>
-                    <Avatar name={detalle.elaboro.nombre} size={22} />
-                    {detalle.elaboro.nombre}
-                    <span className={styles.fichaTenue}>· elaboró</span>
-                  </span>
-                ) : null}
-                {doc.validUntil ? (
-                  <span className={styles.fichaDato}>
-                    <EventOutlinedIcon aria-hidden="true" />
-                    Vigencia {formatoFecha(doc.validUntil)}
-                  </span>
-                ) : null}
-                <Badge tone="outline" size="sm">
-                  {SEGMENTO_LABEL[doc.segmento]}
-                </Badge>
-                <Badge tone="outline" size="sm">
-                  Versión {version}
-                </Badge>
-              </div>
+              <p className={styles.fichaLinea}>
+                {[
+                  doc.clientName.trim() || "Sin cliente",
+                  detalle.elaboro?.nombre,
+                  doc.validUntil ? `Vigencia ${formatoFecha(doc.validUntil)}` : null,
+                  SEGMENTO_LABEL[doc.segmento],
+                  `Versión ${version}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
               {pendientes.length ? (
                 <div className={styles.fichaPendientes} aria-label="Para enviarla">
                   <span className={styles.fichaPendientesTitulo}>Para enviarla</span>

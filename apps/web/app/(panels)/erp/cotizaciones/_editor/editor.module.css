@@ -197,6 +197,13 @@
   overflow-wrap: anywhere;
 }
 
+.fichaLinea {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
 .fichaDatos {
   display: flex;
   flex-wrap: wrap;

@@ -65,7 +65,7 @@ export default function SeccionEquipo({ proyecto: p, token, ocupado, personas, m
             Equipo del proyecto<span className={styles.conteo}>{p.members.length}</span>
           </>
         }
-        subtitle="Para quitar al responsable, primero haz responsable a otra persona. Solo puedes sumar a gente de tu equipo."
+        subtitle="Solo puedes sumar a gente de tu equipo."
       >
         {miembros.length === 0 ? (
           <p className={styles.vacio}>Nadie en el equipo todavía.</p>

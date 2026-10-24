@@ -1,7 +1,69 @@
 /* Clientes: lista (ModulePage), ficha (RecordPage) y alta (FormPage). Solo tokens --ui-*. */
 
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  min-height: 36px;
+  margin: 0 0 8px -6px;
+  padding: 0 10px 0 4px;
+  border-radius: 10px;
+  color: var(--ui-brand-text, #0f5f4f);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+:global(.headCrumbs) .volver {
+  margin: 0 0 2px -6px;
+  font-size: 15px;
+  color: var(--ui-brand-text, #0f5f4f);
+}
+
+.volver:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--ui-brand-text, #0f5f4f);
+}
+
+.volver:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
 .pagina {
   min-width: 0;
+}
+
+/* La cabecera compartida no parte la fila: en teléfono el título va entero
+   y los botones bajan a su línea. */
+@media (max-width: 767px) {
+  .pagina :global([class*="heroTop"]) {
+    flex-wrap: wrap;
+  }
+  .pagina :global([class*="heroText"]) {
+    flex: 1 1 calc(100% - 64px);
+  }
+  .pagina :global([class*="heroActions"]) {
+    flex: 1 1 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+  .pagina :global([class*="heroTitle"]) {
+    overflow-wrap: normal;
+  }
+  .pagina :global([class*="heroSub"] > *) {
+    min-width: min-content;
+    max-width: 100%;
+  }
+  .pagina :global([class*="heroPerson"]) {
+    flex-wrap: nowrap;
+    overflow-wrap: normal;
+  }
+  .pagina :global([class*="heroPersonName"]) {
+    white-space: nowrap;
+  }
 }
 
 .tenue {
@@ -70,7 +132,7 @@
   font-weight: var(--ui-fw-semibold);
   color: var(--ui-fg);
   text-decoration: none;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .nombre:hover {
@@ -118,18 +180,59 @@
   color: var(--ui-fg-4);
 }
 
-/* Teléfono: sin encargado ni acciones (la fila completa abre la ficha). */
+/* Teléfono: nombre en su renglón; tipo y estado debajo, sin recortar la insignia. */
 @media (max-width: 640px) {
-  .tabla th:last-child,
-  .tabla td:last-child {
+  .tabla table thead {
     display: none;
   }
+  .tabla table,
+  .tabla table tbody {
+    display: block;
+    width: 100%;
+  }
+  .tabla table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "cliente cliente"
+      "tipos estado";
+    gap: 8px 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ui-border-subtle);
+  }
+  .tabla table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .tabla table tbody td:nth-child(1),
+  .tabla table tbody td:nth-child(2),
+  .tabla:not(.tablaConEncargado) table tbody td:nth-child(3),
+  .tablaConEncargado table tbody td:nth-child(4) {
+    display: block;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    text-align: left !important;
+  }
+  .tabla table tbody td:nth-child(1) {
+    grid-area: cliente;
+  }
+  .tabla table tbody td:nth-child(2) {
+    grid-area: tipos;
+  }
+  .tabla:not(.tablaConEncargado) table tbody td:nth-child(3),
+  .tablaConEncargado table tbody td:nth-child(4) {
+    grid-area: estado;
+    justify-self: end;
+    align-self: center;
+  }
+  .tabla th:last-child,
+  .tabla td:last-child,
   .tablaConEncargado th:nth-child(3),
   .tablaConEncargado td:nth-child(3) {
     display: none;
   }
   .razon {
-    max-width: 12rem;
+    max-width: none;
   }
 }
 
@@ -275,7 +378,7 @@
   font-size: var(--ui-fs-body);
   color: var(--ui-fg);
   text-decoration: none;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .proyectoNombre:hover {

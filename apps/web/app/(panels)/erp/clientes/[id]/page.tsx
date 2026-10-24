@@ -412,29 +412,28 @@ export default function ClienteDetallePage() {
   if (!Number.isFinite(id)) {
     return (
       <div className={styles.pagina}>
-        <EmptyState
-          icon={<ErrorOutlineRoundedIcon />}
-          title="Este cliente no existe"
-          description="El enlace está incompleto o el cliente ya no está en el padrón."
-          action={<ButtonLink href="/erp/clientes">Volver a clientes</ButtonLink>}
-        />
+        <Link href="/erp/clientes" className={styles.volver}>
+          <span aria-hidden="true">‹</span> Clientes
+        </Link>
+        <EmptyState icon={<ErrorOutlineRoundedIcon />} title="Este cliente no existe." tone="neutral" />
       </div>
     );
   }
   if (!client && loadError) {
     return (
       <div className={styles.pagina}>
+        <Link href="/erp/clientes" className={styles.volver}>
+          <span aria-hidden="true">‹</span> Clientes
+        </Link>
         <EmptyState
           icon={<ErrorOutlineRoundedIcon />}
-          title="No pudimos abrir el cliente"
-          description={loadError}
+          title={loadError}
           tone="danger"
           action={
             <Button variant="primary" onClick={() => void load()}>
               Reintentar
             </Button>
           }
-          secondaryAction={<ButtonLink href="/erp/clientes">Volver a clientes</ButtonLink>}
         />
       </div>
     );
@@ -455,11 +454,7 @@ export default function ClienteDetallePage() {
   const proyectos = (
     <RecordSection
       title={projects.length ? `Proyectos · ${projects.length}` : "Proyectos"}
-      subtitle={
-        projects.length
-          ? `${vigentes === 1 ? "1 vigente" : `${vigentes} vigentes`}. Cada uno abre su cronograma, alcance, equipo y documentos.`
-          : "Los proyectos que se le llevan a este cliente."
-      }
+      subtitle={projects.length ? (vigentes === 1 ? "1 vigente." : `${vigentes} vigentes.`) : undefined}
       end={
         puedeCrearProyecto && puedeAbrirProyectos ? (
           <ButtonLink href={`/erp/proyectos/nuevo?clienteId=${client.id}`} iconStart={<AddRoundedIcon />}>
@@ -474,13 +469,7 @@ export default function ClienteDetallePage() {
         </Alert>
       ) : null}
       {projects.length === 0 ? (
-        <EmptyState
-          icon={<FolderOffOutlinedIcon />}
-          title="Sin proyectos todavía"
-          description={puedeCrearProyecto ? "Crea el primero con el formulario de abajo." : undefined}
-          size="compact"
-          tone="neutral"
-        />
+        <EmptyState icon={<FolderOffOutlinedIcon />} title="Sin proyectos todavía" size="compact" tone="neutral" />
       ) : (
         <ul className={styles.proyectos}>
           {projects.map((p) => {
@@ -580,14 +569,14 @@ export default function ClienteDetallePage() {
 
   const datosFiscales = editando ? (
     <form className={styles.edicion} onSubmit={(e) => void onGuardarEdicion(e)} noValidate aria-label="Editar datos del cliente">
-      <RecordSection title="Identidad" subtitle="Cómo lo ubica tu equipo en listas y buscadores.">
+      <RecordSection title="Identidad">
         <FieldGrid>
           <Field label="Nombre comercial" required error={errorNombre} fullWidth>
             <Input id="edit-name" autoComplete="organization" value={edit.name} onChange={setCampo("name")} />
           </Field>
         </FieldGrid>
       </RecordSection>
-      <RecordSection title="Datos fiscales" subtitle="Lo que captures aquí se usa en cotizaciones y facturas.">
+      <RecordSection title="Datos fiscales">
         <FieldGrid>
           <Field label="Razón social" hint="Como aparece en la constancia fiscal">
             <Input id="edit-legalName" value={edit.legalName} onChange={setCampo("legalName")} />
@@ -623,7 +612,7 @@ export default function ClienteDetallePage() {
           </Field>
         </FieldGrid>
       </RecordSection>
-      <RecordSection title="Contacto" subtitle="A dónde llegan cotizaciones y facturas.">
+      <RecordSection title="Contacto">
         <FieldGrid>
           <Field label="Correo de facturación" hint={aviso(avisos.billingEmail) ?? "Aquí llegan cotizaciones y facturas"}>
             <Input
@@ -653,7 +642,7 @@ export default function ClienteDetallePage() {
       </div>
     </form>
   ) : (
-    <RecordSection title="Datos fiscales" subtitle="Se usan en cotizaciones y facturas.">
+    <RecordSection title="Datos fiscales">
       <dl className={styles.datos}>
         <Dato label="Razón social" full>
           {client.legalName}
@@ -682,7 +671,11 @@ export default function ClienteDetallePage() {
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
       <RecordPage
         className={styles.pagina}
-        breadcrumbs={[{ label: "Clientes", href: "/erp/clientes" }, { label: client.name }]}
+        breadcrumbs={
+          <Link href="/erp/clientes" className={styles.volver}>
+            <span aria-hidden="true">‹</span> Clientes
+          </Link>
+        }
         icon={<IconoTipo />}
         code={client.taxId ? <span className={styles.mono}>{client.taxId}</span> : undefined}
         statusLabel={inactivo ? "Inactivo" : "Activo"}

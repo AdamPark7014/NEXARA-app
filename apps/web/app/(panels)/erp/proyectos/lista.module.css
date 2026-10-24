@@ -70,7 +70,7 @@
   font-weight: var(--ui-fw-semibold);
   color: var(--ui-fg);
   text-decoration: none;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .titulo:hover {
@@ -86,38 +86,50 @@
 .sub {
   font-size: var(--ui-fs-meta);
   color: var(--ui-fg-3);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .soloTelefono {
   display: none;
 }
 
+.fechas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
 .cliente {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
   min-width: 0;
-  max-width: 16rem;
+  max-width: 18rem;
 }
 
 .clienteNombre {
   color: var(--ui-fg);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .avance {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
   min-width: 7.5rem;
 }
 
 .estado {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--ui-s1);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
   min-width: 0;
 }
 
@@ -127,10 +139,53 @@
   gap: var(--ui-s1);
 }
 
-/* Teléfono: proyecto (con su cliente), avance y estado; la fila abre la ficha. */
+/* Teléfono: una tarjeta por proyecto. El nombre usa el renglón completo. */
 @media (max-width: 640px) {
   .soloTelefono {
+    display: inline;
+  }
+  .soloTelefono::after {
+    content: " · ";
+  }
+  .tabla table thead {
+    display: none;
+  }
+  .tabla table,
+  .tabla table tbody {
     display: block;
+    width: 100%;
+  }
+  .tabla table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "proyecto"
+      "avance"
+      "estado";
+    gap: 6px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ui-border-subtle);
+  }
+  .tabla table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .tabla table tbody td:nth-child(1),
+  .tabla table tbody td:nth-child(4),
+  .tabla table tbody td:nth-child(6) {
+    display: block;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    text-align: left !important;
+  }
+  .tabla table tbody td:nth-child(1) {
+    grid-area: proyecto;
+  }
+  .tabla table tbody td:nth-child(4) {
+    grid-area: avance;
+  }
+  .tabla table tbody td:nth-child(6) {
+    grid-area: estado;
   }
   .tabla th:nth-child(2),
   .tabla td:nth-child(2),
@@ -143,7 +198,7 @@
     display: none;
   }
   .celdaProyecto {
-    max-width: 14rem;
+    max-width: none;
   }
 }
 
@@ -205,7 +260,7 @@
   font-size: var(--ui-fs-body);
   font-weight: var(--ui-fw-semibold);
   color: var(--ui-fg);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .alerta {
@@ -227,22 +282,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.reciente {
+.recienteLinea {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--ui-s2) var(--ui-s3);
-  border-radius: var(--ui-radius-md);
-  background: var(--ui-surface-2);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin: 0;
   min-width: 0;
-}
-
-.recienteEtiqueta {
-  font-size: var(--ui-fs-caption);
-  font-weight: var(--ui-fw-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ui-fg-3);
 }
 
 .recienteEnlace {

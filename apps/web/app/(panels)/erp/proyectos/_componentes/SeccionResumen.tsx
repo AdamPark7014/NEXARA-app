@@ -3,10 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
-import TrafficOutlinedIcon from "@mui/icons-material/TrafficOutlined";
-import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
-import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import {
   Alert,
   Badge,
@@ -17,14 +13,10 @@ import {
   Input,
   RecordSection,
   Select,
-  Stat,
-  StatRow,
   Textarea,
-  type Semaforo,
 } from "@/components/base";
 import { listarCotizaciones, type CotizacionRow } from "@/lib/cotizaciones-api";
 import {
-  SALUD_TONO,
   formatoFecha,
   formatoMoneda,
   type ActualizarProyecto,
@@ -35,7 +27,6 @@ import { leerImporte } from "@/lib/proyecto-alta";
 import { SERVICE_PROJECT_TYPE_OPTIONS, getServiceProjectTypeLabel } from "@/lib/service-project-types";
 import { guardarCabecera } from "./acciones";
 import { PersonaSelect } from "./personas";
-import { toneDe } from "./tono";
 import type { SeccionProps } from "./tipos";
 import styles from "./secciones.module.css";
 
@@ -118,14 +109,6 @@ function cambiosDe(p: ProyectoDetalle, f: FormCabecera): { cambios: ActualizarPr
   return { cambios, errores };
 }
 
-/** El tono del semáforo del proyecto en el foquito de la cifra. */
-function semaforoDe(tono: ReturnType<typeof toneDe>): Semaforo {
-  if (tono === "success") return "verde";
-  if (tono === "warning") return "ambar";
-  if (tono === "danger") return "rojo";
-  return "gris";
-}
-
 function diferencia(plan?: string | null, real?: string | null, verbo = "llegó"): string {
   const d = diasEntre(plan, real);
   if (d === null) return "";
@@ -155,15 +138,6 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
   }, [editando, cotizaciones, token]);
 
   const r = p.resumen;
-  const avance = r.avance;
-  const etapasVivas = p.milestones.filter((m) => m.status !== "CANCELADO");
-  const etapasCumplidas = etapasVivas.filter((m) => m.status === "CUMPLIDO").length;
-  const textoAvance =
-    avance.origen === "actividades"
-      ? `${avance.cerradas} de ${avance.total} actividades cerradas`
-      : avance.origen === "hitos"
-        ? `${etapasCumplidas} de ${etapasVivas.length} etapas cumplidas (aún no hay actividades ligadas)`
-        : "Sin actividades ni etapas todavía: el avance aparecerá cuando las haya.";
 
   const cambiar = <K extends keyof FormCabecera>(campo: K, valor: FormCabecera[K]) =>
     setF((prev) => ({ ...prev, [campo]: valor }));
@@ -194,62 +168,8 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
         ? `Faltan ${r.diasRestantes} día${r.diasRestantes === 1 ? "" : "s"}`
         : "";
 
-  const tonoSalud = toneDe(SALUD_TONO[r.salud]);
-
   return (
     <div className={styles.pila}>
-      <StatRow cols={4} variant="strip" ariaLabel="Cómo va el proyecto">
-        <Stat
-          label="Avance"
-          value={avance.porcentaje === null ? "—" : avance.porcentaje}
-          suffix={avance.porcentaje === null ? undefined : "%"}
-          hint={textoAvance}
-          icon={<TrendingUpRoundedIcon />}
-          meter={avance.porcentaje === null ? undefined : [{ value: avance.porcentaje, tone: avance.porcentaje >= 100 ? "success" : "brand" }]}
-          meterMax={100}
-        />
-        <Stat
-          label="Semáforo"
-          value={r.etiqueta}
-          hint={r.hitosVencidos > 0 ? `${r.hitosVencidos} etapa${r.hitosVencidos === 1 ? "" : "s"} con la fecha vencida` : r.motivo}
-          icon={<TrafficOutlinedIcon />}
-          iconTone={tonoSalud}
-          semaforo={semaforoDe(tonoSalud)}
-          title={r.motivo}
-        />
-        <Stat
-          label="Requerimientos"
-          value={r.requerimientos.total ? `${r.requerimientos.cumplidos} / ${r.requerimientos.total}` : "—"}
-          hint={
-            r.requerimientos.total
-              ? r.requerimientos.pendientes
-                ? `Faltan ${r.requerimientos.pendientes} para poder entregar sin pendientes`
-                : "Todo listo"
-              : "Sin requerimientos capturados"
-          }
-          icon={<ChecklistRoundedIcon />}
-          tone={r.requerimientos.pendientes ? "warning" : "default"}
-        />
-        <Stat
-          label="Presupuesto"
-          value={p.budgetAmount == null ? "Sin capturar" : formatoMoneda(p.budgetAmount, p.currency ?? "MXN")}
-          hint={
-            p.cotizacion ? (
-              <>
-                Cotización{" "}
-                <Link className={styles.enlace} href={`/erp/cotizaciones/${p.cotizacion.id}`}>
-                  {p.cotizacion.folioEnviado || p.cotizacion.quoteNumber}
-                </Link>
-                {p.cotizacion.total != null ? ` · ${formatoMoneda(p.cotizacion.total, p.cotizacion.currency ?? "MXN")}` : ""}
-              </>
-            ) : (
-              "Sin cotización ligada"
-            )
-          }
-          icon={<PaymentsOutlinedIcon />}
-        />
-      </StatRow>
-
       <RecordSection title="Fechas: plan contra realidad">
         <div className={styles.tablaMarco}>
           <table className={styles.tablaFechas}>
@@ -330,6 +250,19 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
                 <div className={styles.dato}>
                   <dt>Proyecto comercial</dt>
                   <dd>{p.salesProject.name}</dd>
+                </div>
+              ) : null}
+              {p.cotizacion ? (
+                <div className={styles.dato}>
+                  <dt>Cotización</dt>
+                  <dd>
+                    <Link className={styles.enlace} href={`/erp/cotizaciones/${p.cotizacion.id}`}>
+                      {p.cotizacion.folioEnviado || p.cotizacion.quoteNumber}
+                    </Link>
+                    {p.cotizacion.total != null
+                      ? ` · ${formatoMoneda(p.cotizacion.total, p.cotizacion.currency ?? "MXN")}`
+                      : ""}
+                  </dd>
                 </div>
               ) : null}
             </dl>

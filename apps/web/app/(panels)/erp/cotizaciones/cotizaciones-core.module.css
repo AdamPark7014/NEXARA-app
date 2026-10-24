@@ -222,8 +222,29 @@
   margin: 0;
 }
 
-.cargaVolver {
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   justify-self: start;
+  min-height: 36px;
+  margin-left: -6px;
+  padding: 0 10px 0 4px;
+  border-radius: 10px;
+  color: var(--ui-brand-text, #0f5f4f);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.volver:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.volver:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
 }
 
 .cargaTarjeta {

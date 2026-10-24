@@ -7,9 +7,6 @@ import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
-import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
-import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import {
   Alert,
   Badge,
@@ -21,13 +18,12 @@ import {
   FilterChips,
   InfoPopover,
   LinkButton,
+  ListFooter,
   ModulePage,
   ModuleToolbar,
   PersonCell,
   SearchInput,
   Segmented,
-  Stat,
-  StatRow,
   StatusCell,
   WhenCell,
   statusTone,
@@ -122,7 +118,6 @@ function Intervinieron({ row }: { row: CotizacionRow }) {
 
 /** Vigencia: la fecha límite, cuándo salió y un punto que avisa si ya venció o está por vencer. */
 function Vigencia({ row }: { row: CotizacionRow }) {
-  const salio = row.sentAt ? `enviada ${formatoFecha(row.sentAt)}` : `emitida ${formatoFecha(row.issueDate)}`;
   let tono: Tone = "neutral";
   if (row.estado === "VENCIDA") tono = "danger";
   else if (row.estado === "APROBADA") tono = "success";
@@ -130,7 +125,7 @@ function Vigencia({ row }: { row: CotizacionRow }) {
     const limite = row.validUntil ? new Date(row.validUntil).getTime() : NaN;
     tono = Number.isFinite(limite) && limite - Date.now() <= 3 * DIA ? "warning" : "info";
   }
-  return <WhenCell time={row.validUntil ? formatoFecha(row.validUntil) : "Sin vigencia"} hint={salio} tone={tono} />;
+  return <WhenCell time={row.validUntil ? formatoFecha(row.validUntil) : "Sin vigencia"} tone={tono} />;
 }
 
 export default function CotizacionesPage() {
@@ -218,19 +213,6 @@ export default function CotizacionesPage() {
     return c;
   }, [items, segmento, coincideTexto]);
 
-  const cifras = useMemo(() => {
-    const sumar = (filtro: (r: CotizacionRow) => boolean) =>
-      visibles.filter(filtro).reduce((acc, r) => acc + Number(r.total || 0), 0);
-    return {
-      total: sumar(() => true),
-      enviadas: visibles.filter((r) => r.estado === "ENVIADA").length,
-      porCerrar: sumar((r) => r.estado === "ENVIADA"),
-      aprobadas: sumar((r) => r.estado === "APROBADA"),
-      nAprobadas: visibles.filter((r) => r.estado === "APROBADA").length,
-      borradores: visibles.filter((r) => r.estado === "BORRADOR").length,
-    };
-  }, [visibles]);
-
   const viejos = useMemo(() => items.filter((r) => r.necesitaRefolio).length, [items]);
 
   // El ejemplo de la explicación es una cotización real con nomenclatura, si la hay.
@@ -279,9 +261,7 @@ export default function CotizacionesPage() {
       render: (row) => (
         <span className={styles.celda}>
           <span className={styles.fuerte}>{row.clienteNombre || row.clienteEmpresa || "Sin cliente"}</span>
-          <span className={styles.tenue}>
-            {row.projectName || (row.clienteEmpresa !== row.clienteNombre ? row.clienteEmpresa : "") || "—"}
-          </span>
+          {row.projectName ? <span className={styles.tenue}>{row.projectName}</span> : null}
         </span>
       ),
     },
@@ -367,7 +347,6 @@ export default function CotizacionesPage() {
     <ModulePage
       className={styles.wrap}
       title="Cotizaciones"
-      icon={<RequestQuoteOutlinedIcon />}
       tertiaryActions={
         <InfoPopover label="¿Cómo se lee un folio?" title="Cómo se lee un folio">
           <FolioExplicado
@@ -377,44 +356,13 @@ export default function CotizacionesPage() {
             revision={ejemplo?.revision}
           />
           <p className={styles.ayudaNota}>
-            El folio lo emite el servidor al crear la cotización, con la nomenclatura de RH de quien la hace y su
-            propio consecutivo. Al enviarla se agregan las siglas de quienes intervinieron (revisó, aprobó, envió)
-            y, desde el segundo envío, la revisión. El segmento no va en el folio: es un filtro.
+            El servidor arma el folio con la nomenclatura de quien la hace, su consecutivo y las siglas de quienes intervinieron.
           </p>
         </InfoPopover>
       }
       /* Sin registros el primario vive en el vacío, que además explica de
          dónde sale la primera: dos botones iguales no son dos caminos. */
       primaryAction={sinRegistros && !error ? undefined : nueva}
-      stats={
-        /* Regla 7: la tira solo existe si hay registros. Cuatro celdas en cero
-           encima de un «no hay nada» ocupan el sitio de lo único que ayuda. */
-        items.length ? (
-          <StatRow ariaLabel="Resumen de cotizaciones">
-            <Stat
-              label="En la vista"
-              icon={<RequestQuoteOutlinedIcon />}
-              value={formatoMoneda(cifras.total)}
-              hint={hayFiltros ? `${visibles.length} de ${items.length} cotizaciones` : `${items.length} cotizaciones`}
-            />
-            <Stat label="Borradores" icon={<EditNoteOutlinedIcon />} iconTone="neutral" value={cifras.borradores} hint="por terminar" />
-            <Stat
-              label="Enviadas por cerrar"
-              icon={<SendOutlinedIcon />}
-              value={formatoMoneda(cifras.porCerrar)}
-              hint={cifras.enviadas === 1 ? "1 enviada" : `${cifras.enviadas} enviadas`}
-              tone="brand"
-            />
-            <Stat
-              label="Aprobadas"
-              icon={<TaskAltOutlinedIcon />}
-              iconTone="success"
-              value={formatoMoneda(cifras.aprobadas)}
-              hint={cifras.nAprobadas === 1 ? "1 aprobada" : `${cifras.nAprobadas} aprobadas`}
-            />
-          </StatRow>
-        ) : null
-      }
       before={
         viejos || error ? (
           <div className={styles.avisos}>
@@ -510,14 +458,17 @@ export default function CotizacionesPage() {
       emptyState={{
         icon: <RequestQuoteOutlinedIcon />,
         title: "Todavía no hay cotizaciones",
-        description:
-          "Una cotización nace del editor: eliges cliente y proyecto, capturas las partidas y el servidor emite el folio con tu nomenclatura. Desde ahí se envía por correo.",
         action: (
           <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
             Crear la primera
           </ButtonLink>
         ),
       }}
+      footer={
+        !primeraCarga && visibles.length ? (
+          <ListFooter total={visibles.length} unit={visibles.length === 1 ? "cotización" : "cotizaciones"} />
+        ) : null
+      }
     >
       {contenido}
     </ModulePage>
