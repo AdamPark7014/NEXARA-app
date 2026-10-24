@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import styles from "./PublicPageHero.module.css";
 
 type PublicPageHeroProps = {
+  /** Vuelta al nivel anterior. Solo en rutas anidadas. */
+  back?: { href: string; label: string };
   eyebrow: string;
   title: ReactNode;
   lead: string;
@@ -28,6 +31,7 @@ export default function PublicPageHero({
   imageSrcMobile,
   imageAlt,
   actions,
+  back,
   compact = true,
 }: PublicPageHeroProps) {
   const mobileSrc = imageSrcMobile || imageSrc;
@@ -71,6 +75,11 @@ export default function PublicPageHero({
       />
       <div className={styles.overlay} aria-hidden />
       <div className={styles.content}>
+        {back ? (
+          <Link href={back.href} className={styles.back}>
+            {back.label}
+          </Link>
+        ) : null}
         <p className={styles.eyebrow}>{eyebrow}</p>
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.lead}>{lead}</p>

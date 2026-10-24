@@ -13,32 +13,32 @@
 
   /* Sistema tonal continuo: hero, cuerpo y footer en la misma familia navy.
      La jerarquía se hace con capas de superficie, no con saltos claro/oscuro. */
-  --ds-bg: #070f1e;
-  --ds-bg-alt: #0a1628;
-  --ds-surface: #0e1a30;
-  --ds-surface-2: #132340;
-  --ds-navy: #0b1a33;
-  --ds-navy-deep: #050a14;
-  --ds-panel: #0e1a30;
-  --ds-ink: #eef4ff;
-  --ds-title: #f3f6fb;
-  --ds-body: #c3cfe0;
-  --ds-muted: #9fb0c8;
-  --ds-faint: #7688a3;
-  --ds-line: rgba(140, 180, 230, 0.12);
-  --ds-line-strong: rgba(140, 180, 230, 0.22);
-  --ds-cyan: #2dd8f2;
-  --ds-cyan-soft: #7fe6f7;
-  --ds-cyan-strong: #12b6d4;
-  --ds-cyan-bright: #2dd8f2;
-  --ds-cyan-tint: rgba(45, 216, 242, 0.12);
-  --ds-cyan-line: rgba(45, 216, 242, 0.45);
-  --ds-orange: #ff9d3c; /* solo estados de error */
-  --ds-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
-  --ds-shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.28);
-  --ds-font-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  --ds-font-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
-  --ds-font-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  --ds-bg: #f5f5f7;
+  --ds-bg-alt: #ffffff;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f5f5f7;
+  --ds-navy: #1d1d1f;
+  --ds-navy-deep: #1d1d1f;
+  --ds-panel: #ffffff;
+  --ds-ink: #1d1d1f;
+  --ds-title: #1d1d1f;
+  --ds-body: #6e6e73;
+  --ds-muted: #6e6e73;
+  --ds-faint: #86868b;
+  --ds-line: rgba(0, 0, 0, 0.08);
+  --ds-line-strong: rgba(0, 0, 0, 0.16);
+  --ds-cyan: #1d1d1f;
+  --ds-cyan-soft: #1d1d1f;
+  --ds-cyan-strong: #1d1d1f;
+  --ds-cyan-bright: #1d1d1f;
+  --ds-cyan-tint: rgba(0, 0, 0, 0.04);
+  --ds-cyan-line: rgba(0, 0, 0, 0.16);
+  --ds-orange: #b42318;
+  --ds-shadow: none;
+  --ds-shadow-sm: none;
+  --ds-font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --ds-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --ds-font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --ds-radius-sm: 8px;
   --ds-radius: 12px;
   --ds-radius-lg: 16px;
@@ -120,13 +120,13 @@
 
 .eyebrow {
   display: block;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   font-family: var(--ds-font-ui);
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ds-cyan);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ds-muted);
 }
 
 .sectionTitle {
@@ -179,15 +179,16 @@
 
 /* Un solo color de acción en todo el sitio: el cian de marca (igual que hero y header) */
 .btnPrimary {
-  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
-  color: #04131a;
-  box-shadow: 0 10px 24px rgba(18, 182, 212, 0.22);
+  background: #1d1d1f;
+  color: #f5f5f7;
+  box-shadow: none;
+  border-radius: 980px;
 }
 
 .btnPrimary:hover {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, #4fe0f5, #1cc3e0);
-  box-shadow: 0 14px 30px rgba(18, 182, 212, 0.28);
+  transform: none;
+  background: #000;
+  box-shadow: none;
 }
 
 /* Secundario dirigido por tokens: contorno del color de título de la capa donde vive */
@@ -1824,18 +1825,16 @@ a.iconCard:hover .iconCardLink {
    Vive DENTRO del tema: en oscuro es una superficie navy elevada; en claro,
    un bloque blanco sobre el gris-azul de la página. Nunca se invierte. ── */
 .sectionLight {
-  --ds-bg: #122140;
-  --ds-bg-alt: #0f1c36;
-  --ds-surface: #192d4f;
-  --ds-surface-2: #21385f;
-  --ds-panel: #192d4f;
-  --ds-line: rgba(140, 180, 230, 0.16);
-  --ds-line-strong: rgba(140, 180, 230, 0.28);
-  --ds-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
-  --ds-shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.24);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 32%),
-    var(--ds-bg);
+  --ds-bg: #ffffff;
+  --ds-bg-alt: #f5f5f7;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f5f5f7;
+  --ds-panel: #ffffff;
+  --ds-line: rgba(0, 0, 0, 0.08);
+  --ds-line-strong: rgba(0, 0, 0, 0.16);
+  --ds-shadow: none;
+  --ds-shadow-sm: none;
+  background: #ffffff;
   color: var(--ds-body);
   border-top: 1px solid var(--ds-line-strong);
   border-bottom: 1px solid var(--ds-line-strong);

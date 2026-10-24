@@ -213,7 +213,25 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
 
       <PublicPageHero
-        eyebrow={`${industry.name} · ${service.name}`}
+        back={{
+          href: `/soluciones/${params.industry}`,
+          label:
+            (
+              {
+                manufactura: "Manufactura",
+                "seguridad-electronica": "Seguridad electrónica",
+                "pymes-y-startups": "PyMEs y startups",
+                logistica: "Logística y distribución",
+                retail: "Retail",
+                salud: "Salud",
+                gobierno: "Gobierno",
+                servicios: "Empresas de servicios",
+                hospitalidad: "Hospitalidad",
+                educacion: "Educación",
+              } as Record<string, string>
+            )[params.industry] ?? "Servicios",
+        }}
+        eyebrow={`${service.name}`}
         title={
           <>
             {service.name} para{" "}

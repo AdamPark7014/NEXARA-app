@@ -447,11 +447,6 @@ export function middleware(request: NextRequest) {
       url.pathname = '/servicios';
       return applySecurityHeaders(NextResponse.redirect(url, 308));
     }
-    if (normalized === '/cobertura') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/proyectos';
-      return applySecurityHeaders(NextResponse.redirect(url, 308));
-    }
   }
 
   // Si detectamos un subdominio conocido, reescribir a la ruta interna del

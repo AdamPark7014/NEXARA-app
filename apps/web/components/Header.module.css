@@ -314,7 +314,7 @@
 }
 
 .mobileMenuButton {
-	display: none;
+	display: inline-flex;
 	width: 42px;
 	height: 42px;
 	border: 1px solid color-mix(in srgb, var(--header-text) 30%, transparent);
@@ -456,6 +456,18 @@
 	}
 }
 
+@media (min-width: 1081px) {
+	.mobileMenuButton {
+		display: none !important;
+	}
+}
+
+@media (min-width: 1081px) {
+	.headerPublic .mobileMenuButton {
+		display: none !important;
+	}
+}
+
 @media (max-width: 640px) {
 	.headerInner {
 		min-height: 66px;
@@ -572,6 +584,143 @@
 }
 
 :global(html[data-public-theme="light"]) .mobileLinkActive {
-	color: #0b7f99;
-	background: rgba(14, 154, 184, 0.1);
+	color: #1d1d1f;
+	background: transparent;
+}
+
+.headerPublic {
+	background: rgba(245, 245, 247, 0.88) !important;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+	backdrop-filter: saturate(180%) blur(20px) !important;
+	-webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+	box-shadow: none !important;
+}
+
+.headerPublic .headerInner {
+	min-height: 52px;
+	max-width: 980px;
+}
+
+.headerPublic .navLinks {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	padding: 0 !important;
+	gap: 1.35rem !important;
+	border-radius: 0 !important;
+}
+
+.headerPublic .link,
+.headerPublic .logoLink,
+.headerPublic .logoWordmark {
+	color: #1d1d1f !important;
+	text-shadow: none !important;
+}
+
+.headerPublic .link {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	padding: 0 !important;
+	min-height: 44px;
+	font-weight: 400 !important;
+	font-size: 14px !important;
+	letter-spacing: -0.01em !important;
+	border-radius: 0 !important;
+}
+
+.headerPublic .link:hover,
+.headerPublic .linkActive {
+	background: transparent !important;
+	box-shadow: none !important;
+	transform: none !important;
+}
+
+.headerPublic .linkActive {
+	font-weight: 600 !important;
+}
+
+.headerPublic .linkActive::after,
+.headerPublic::before {
+	display: none !important;
+}
+
+.headerPublic .logoWordmark {
+	font-weight: 600 !important;
+	letter-spacing: -0.03em !important;
+}
+
+.headerPublic .hamburgerLine {
+	background: #1d1d1f !important;
+}
+
+.headerPublic .mobileMenuButton {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+}
+
+.menuLabel {
+	color: #1d1d1f;
+	font-size: 14px;
+	font-weight: 500;
+	letter-spacing: -0.01em;
+	line-height: 1;
+}
+
+@media (max-width: 1080px) {
+	.headerPublic .headerInner {
+		display: flex !important;
+		justify-content: space-between !important;
+		width: 100% !important;
+	}
+
+	.headerPublic .logoSection {
+		display: flex !important;
+		align-items: center !important;
+		justify-content: space-between !important;
+		flex: 1 1 auto !important;
+		width: 100% !important;
+	}
+
+	.headerPublic .mobileMenuButton {
+		display: inline-flex !important;
+		width: auto !important;
+		height: 44px !important;
+		min-width: 44px;
+		margin-left: auto !important;
+		padding: 0 2px !important;
+		background: transparent !important;
+		position: static !important;
+		color: #1d1d1f !important;
+		visibility: visible !important;
+		opacity: 1 !important;
+	}
+
+	.headerPublic .hamburgerLine {
+		display: none !important;
+	}
+}
+
+.headerPublic .mobileMenu {
+	background: #fff !important;
+	color: #1d1d1f !important;
+	border: 1px solid rgba(0, 0, 0, 0.08) !important;
+	box-shadow: none !important;
+}
+
+.headerPublic .mobileLink {
+	color: #1d1d1f !important;
+	font-weight: 400 !important;
+	background: transparent !important;
+	border: 0 !important;
+}
+
+.back {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	color: #6e6e73;
+	font-size: 14px;
+	text-decoration: none;
 }

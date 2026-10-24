@@ -6,9 +6,7 @@ import Header from "../../components/Header";
 import Footer from "../components/Footer";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
 
-const FloatingContactForm = dynamic(() => import("../components/FloatingContactForm"), { ssr: false });
 const PublicTrafficTracker = dynamic(() => import("../../components/PublicTrafficTracker"), { ssr: false });
-const PublicScrollReveal = dynamic(() => import("../../components/PublicScrollReveal"), { ssr: false });
 
 /** Páginas con hero full-bleed bajo el header transparente. */
 const isFlushHeroPath = (pathname: string | null) => {
@@ -45,10 +43,8 @@ export default function PublicLayout({
     <div className="public-layout-wrapper public-friendly">
       <PublicSiteThemeLock />
       <PublicTrafficTracker />
-      <PublicScrollReveal />
       <Header />
       <div className={contentClass}>{children}</div>
-      <FloatingContactForm />
       <Footer />
       <CookieConsentBanner />
     </div>

@@ -3,19 +3,16 @@
 import { useLayoutEffect } from "react";
 
 /**
- * Sitio público (marketing): siempre tema oscuro en <body>.
- * useLayoutEffect evita un frame con variables de tema claro antes de hidratar.
- * Al salir de estas rutas se restaura claro para el resto de la app.
+ * Sitio público: un solo tema claro. La app interna no hereda esta clase.
  */
 export default function PublicSiteThemeLock() {
   useLayoutEffect(() => {
-    document.documentElement.classList.add("dark");
-    document.body.classList.add("dark");
-    document.body.classList.remove("light");
+    document.documentElement.setAttribute("data-public-theme", "light");
+    document.documentElement.classList.remove("dark");
+    document.body.classList.remove("dark");
+    document.body.classList.add("light");
     return () => {
-      document.documentElement.classList.remove("dark");
-      document.body.classList.remove("dark");
-      document.body.classList.add("light");
+      document.body.classList.remove("light");
     };
   }, []);
   return null;

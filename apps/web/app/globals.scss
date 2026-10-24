@@ -549,9 +549,10 @@ body::before {
 }
 
 .public-layout-wrapper {
+  --public-header-height: 52px;
   min-height: 100vh;
-  background: #050a14;
-  color: #eef4ff;
+  background: #f5f5f7;
+  color: #1d1d1f;
   /* No crear segundo scrollport: clip no genera scrollbar (a diferencia de hidden). */
   overflow-x: clip;
   overflow-y: visible;
@@ -913,13 +914,11 @@ textarea:disabled {
   }
 }
 
-/* Sitio público: fondo abismo + sin orbe decorativo del body,
-   aunque aún no haya clase .dark (PublicSiteThemeLock hidrata después). */
-/* Sitio público: un solo scrollbar, acento cian */
+/* Sitio público: fondo claro, sin orbe del body. */
 html:has(.public-friendly),
 html:has(.public-layout-wrapper) {
   scrollbar-width: thin;
-  scrollbar-color: rgba(45, 216, 242, 0.45) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.28) transparent;
 }
 
 html:has(.public-friendly)::-webkit-scrollbar,
@@ -937,7 +936,7 @@ html:has(.public-layout-wrapper)::-webkit-scrollbar-thumb {
 
 body:has(.public-layout-wrapper),
 body.dark:has(.public-layout-wrapper) {
-  background: #050a14 !important;
+  background: #f5f5f7 !important;
   overflow-x: clip;
   overflow-y: visible;
 }
@@ -992,52 +991,52 @@ body.dark:has(.public-layout-wrapper)::before {
   --nx-magenta: var(--nx-neon-purple);
   --nx-magenta-strong: var(--nx-neon-purple-strong);
   --nx-magenta-soft: var(--nx-neon-purple-soft);
-  --nx-paper: #050a14;
-  --nx-ink: #eef4ff;
+  --nx-paper: #f5f5f7;
+  --nx-ink: #1d1d1f;
 
-  --primary: #2dd8f2;
-  --primary-strong: #12b6d4;
-  --secondary: #ff9d3c;
-  --accent: #2dd8f2;
-  --accent-strong: #9fecfa;
-  --support: #b06bff;
-  --highlight: #ff9d3c;
-  --deep: #0a1424;
+  --primary: #1d1d1f;
+  --primary-strong: #000000;
+  --secondary: #6e6e73;
+  --accent: #1d1d1f;
+  --accent-strong: #1d1d1f;
+  --support: #6e6e73;
+  --highlight: #1d1d1f;
+  --deep: #1d1d1f;
 
-  --background:          #050a14;
-  --background-elevated: #0a1424;
-  --surface:             rgba(140, 190, 255, 0.05);
-  --surface-2:           rgba(140, 190, 255, 0.08);
-  --surface-3:           rgba(140, 190, 255, 0.12);
+  --background:          #f5f5f7;
+  --background-elevated: #ffffff;
+  --surface:             #ffffff;
+  --surface-2:           #f5f5f7;
+  --surface-3:           #e8e8ed;
 
-  --foreground:      #eef4ff;
-  --text-primary:    #eef4ff;
-  --text-secondary:  #9bb0cc;
-  --text-tertiary:   #6f85a5;
+  --foreground:      #1d1d1f;
+  --text-primary:    #1d1d1f;
+  --text-secondary:  #6e6e73;
+  --text-tertiary:   #86868b;
 
-  --border:        rgba(140, 190, 255, 0.14);
-  --border-strong: rgba(140, 190, 255, 0.28);
-  --shadow:        0 20px 48px rgba(0, 0, 0, 0.4);
-  --focus:         rgba(45, 216, 242, 0.55);
-  --surface-clean:      #0a1424;
-  --surface-clean-soft: #0d1a2e;
-  --stroke-clean:       rgba(140, 190, 255, 0.18);
-  --surface-light:      #0d1a2e;
-  --bg-secondary:       #050a14;
+  --border:        rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --shadow:        none;
+  --focus:         rgba(0, 0, 0, 0.4);
+  --surface-clean:      #ffffff;
+  --surface-clean-soft: #f5f5f7;
+  --stroke-clean:       rgba(0, 0, 0, 0.08);
+  --surface-light:      #ffffff;
+  --bg-secondary:       #f5f5f7;
 
-  --header-bg: rgba(5, 10, 20, 0.78);
-  --header-border: rgba(140, 190, 255, 0.12);
-  --header-text: #eef4ff;
-  --header-link: rgba(238, 244, 255, 0.72);
-  --header-link-hover-bg: rgba(45, 216, 242, 0.08);
-  --header-link-active-bg: rgba(45, 216, 242, 0.12);
+  --header-bg: rgba(245, 245, 247, 0.88);
+  --header-border: rgba(0, 0, 0, 0.08);
+  --header-text: #1d1d1f;
+  --header-link: #1d1d1f;
+  --header-link-hover-bg: rgba(0, 0, 0, 0.04);
+  --header-link-active-bg: transparent;
 
-  --menu-bg: rgba(5, 10, 20, 0.96);
-  --menu-text: #eef4ff;
-  --menu-muted: rgba(155, 176, 204, 0.95);
-  --menu-item-bg: rgba(140, 190, 255, 0.05);
-  --menu-item-hover-bg: rgba(45, 216, 242, 0.1);
-  --menu-item-active-bg: rgba(45, 216, 242, 0.14);
+  --menu-bg: #ffffff;
+  --menu-text: #1d1d1f;
+  --menu-muted: #6e6e73;
+  --menu-item-bg: transparent;
+  --menu-item-hover-bg: rgba(0, 0, 0, 0.04);
+  --menu-item-active-bg: transparent;
 
   --font-base: var(--nx-font-body, "Manrope", system-ui, sans-serif);
   --font-heading: var(--nx-font-display, "Space Grotesk", "Manrope", system-ui, sans-serif);
@@ -1074,8 +1073,8 @@ body.dark:has(.public-layout-wrapper)::before {
   --nx-line-strong: rgba(140, 190, 255, 0.22);
 
   isolation: isolate;
-  background: #050a14;
-  color: #eef4ff;
+  background: #f5f5f7;
+  color: #1d1d1f;
   -webkit-font-smoothing: antialiased;
 }
 

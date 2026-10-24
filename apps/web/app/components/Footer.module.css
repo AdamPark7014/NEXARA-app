@@ -1,13 +1,13 @@
 /* NEXARA · Footer — composición editorial equilibrada */
 
 .footer {
-  --f-bg: #050a14;
-  --f-acento: #2dd8f2;
-  --f-papel: #eef4ff;
-  --f-linea: rgba(140, 190, 255, 0.12);
-  --f-text: rgba(238, 244, 255, 0.88);
-  --f-dim: #9bb0cc;
-  --f-niebla: #6f85a5;
+  --f-bg: #f5f5f7;
+  --f-acento: #1d1d1f;
+  --f-papel: #1d1d1f;
+  --f-linea: rgba(0, 0, 0, 0.08);
+  --f-text: #1d1d1f;
+  --f-dim: #6e6e73;
+  --f-niebla: #86868b;
   --f-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   --f-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
   --f-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
@@ -550,4 +550,23 @@
   color: #0b1a33;
   border-color: #06708a;
   background: rgba(6, 112, 138, 0.08);
+}
+
+:global(html[data-public-theme="light"]) .footer {
+  --f-bg: #f5f5f7;
+  --f-acento: #1d1d1f;
+  --f-papel: #1d1d1f;
+  --f-linea: rgba(0, 0, 0, 0.08);
+  --f-text: #1d1d1f;
+  --f-dim: #6e6e73;
+  --f-niebla: #6e6e73;
+  background: #f5f5f7;
+}
+
+.infoGrid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.linkCols {
+  grid-template-columns: minmax(0, 240px);
 }

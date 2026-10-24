@@ -120,8 +120,6 @@ export default async function BlogPostPage({ params }: { params: Params }) {
         <div className={`${shared.inner} ${styles.articleInner}`}>
           <p className={styles.articleBreadcrumb}>
             <Link href="/blog">Blog</Link>
-            <span aria-hidden> / </span>
-            <span>{post.title}</span>
           </p>
 
           <header className={styles.articleHeader}>

@@ -105,16 +105,14 @@ function BackupRestorePanel() {
 import Link from 'next/link';
 import Image from 'next/image';
 import styles from './Header.module.css';
-import PublicThemeToggle from './PublicThemeToggle';
-
 import { usePathname } from 'next/navigation';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const navLinks = [
-  { name: 'Inicio', href: '/' },
   { name: 'Servicios', href: '/servicios' },
+  { name: 'Cobertura', href: '/cobertura' },
   { name: 'Proyectos', href: '/proyectos' },
-  { name: 'Nosotros', href: '/nosotros' },
+  { name: 'Contacto', href: '/contacto' },
 ];
 
 const isHomeRoute = (pathname: string | null) =>
@@ -224,6 +222,16 @@ export default function Header() {
             />
             <span className={styles.logoWordmark}>NEXARA</span>
           </Link>
+          <button
+            type="button"
+            className={`${styles.mobileMenuButton} ${mobileMenuOpen ? styles.active : ''}`}
+            onClick={toggleMobileMenu}
+            aria-label="Menú"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-main-menu"
+          >
+            <span className={styles.menuLabel}>Menú</span>
+          </button>
         </div>
 
         {/* Desktop Navigation */}
@@ -242,29 +250,6 @@ export default function Header() {
 
         <div className={styles.rightSection}>
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
-
-          <PublicThemeToggle />
-
-          {!isActiveLink('/contacto') && (
-            <Link href="/contacto" className={styles.contactCta} onClick={closeMobileMenu}>
-              Cotiza tu proyecto
-              <span aria-hidden className={styles.contactArrow}>→</span>
-            </Link>
-          )}
-
-          {/* Mobile Menu Button */}
-          <button
-            type="button"
-            className={`${styles.mobileMenuButton} ${mobileMenuOpen ? styles.active : ''}`}
-            onClick={toggleMobileMenu}
-            aria-label="Menú"
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-main-menu"
-          >
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
-          </button>
         </div>
       </div>
 

@@ -143,6 +143,7 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
 
       <PublicPageHero
+        back={{ href: "/cobertura", label: "Cobertura" }}
         eyebrow={`Cobertura · ${city.region}`}
         title={
           <>

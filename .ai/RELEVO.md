@@ -1,5 +1,7 @@
 # RELEVO
 
+- **24-10 (cursor) — Web pública, rama `cursor/redisenio-web-publica-c222`.** Sitio claro y corto: home, servicios, pie y menú. Rutas anidadas con vuelta al nivel anterior. No se tocó la app interna ni se desplegó. El checkout principal de `main` sigue con el trabajo sin commitear del otro agente.
+
 - **23-10 ~19:00 UTC (claude-code, R-1) — Transcripción de juntas: modelo grande medido en el servidor y limpieza de whisper.**
   - Adam: «la transcripción es muy pobre, no tiene sentido» (junta real de 28 min, grabación 5: bucles, «nos vemos en
     el próximo vídeo», «[Noticias]», una línea en inglés). Sin Claude en este trabajo: WER por código.

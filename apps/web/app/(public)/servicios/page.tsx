@@ -5,10 +5,8 @@ import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import PublicIcon, { type PublicIconName } from "../../components/PublicIcon";
-import LogoStrip from "../../components/LogoStrip";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
-import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 
@@ -17,13 +15,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const dynamic = "force-dynamic";
-
-const PROBLEMAS: { icon: PublicIconName; title: string; text: string }[] = [
-  { icon: "camera", title: "CCTV sin evidencia útil", text: "Cámaras mal ubicadas, grabación que falla justo cuando se necesita." },
-  { icon: "wifi", title: "Wi‑Fi inestable en horas pico", text: "Cobertura por “mejor esfuerzo”, sin diseño RF ni segmentación." },
-  { icon: "server", title: "Racks y cableado sin estándar", text: "Nadie sabe qué va a dónde; cada cambio es una apuesta." },
-  { icon: "headset", title: "Tickets sin SLA ni seguimiento", text: "Soporte reactivo, sin tiempos comprometidos ni historial." },
-];
 
 type Servicio = {
   id: string;
@@ -124,48 +115,10 @@ const servicios: Servicio[] = [
   },
 ];
 
-const PASOS: { icon: PublicIconName; num: string; title: string; text: string }[] = [
-  { icon: "search", num: "01", title: "Diagnóstico", text: "Recorremos el sitio, levantamos riesgos y priorizamos lo que mueve la operación." },
-  { icon: "hardhat", num: "02", title: "Implementación", text: "Alcance cerrado, calendario visible e instalación con evidencia fotográfica." },
-  { icon: "refresh", num: "03", title: "Operación", text: "Soporte, monitoreo y mejoras. Seguimos cuando el proyecto ya está en producción." },
-];
-
-const CERTIFICACIONES = [
-  { src: "/certificaciones/certificaciones-06.png", alt: "HikVision" },
-  { src: "/certificaciones/certificaciones-09.png.jpeg", alt: "Dell Technologies Authorized Partner" },
-  { src: "/certificaciones/certificaciones-04.png", alt: "Lenovo SEG Silver Partner" },
-  { src: "/certificaciones/certificaciones-07.png", alt: "Sophos" },
-  { src: "/certificaciones/certificaciones-01.png", alt: "Linksys" },
-  { src: "/certificaciones/certificaciones-02.png", alt: "Belden" },
-  { src: "/certificaciones/certificaciones-03.png", alt: "Intellinet" },
-  { src: "/certificaciones/certificaciones-05.png.jpeg", alt: "Grandstream" },
-  { src: "/certificaciones/certificaciones-08.png", alt: "Mimosa" },
-  { src: "/certificaciones/certificaciones-04.1.png.webp", alt: "Lenovo SEG Authorized Solutions" },
-];
-
-const INDUSTRIAS: { slug: string; name: string; icon: PublicIconName }[] = [
-  { slug: "retail", name: "Retail", icon: "store" },
-  { slug: "manufactura", name: "Manufactura", icon: "factory" },
-  { slug: "hospitalidad", name: "Hospitalidad", icon: "hotel" },
-  { slug: "salud", name: "Salud", icon: "hospital" },
-  { slug: "educacion", name: "Educación", icon: "school" },
-  { slug: "gobierno", name: "Gobierno", icon: "landmark" },
-];
-
 export default async function ServiciosPage() {
   const visuals = await fetchPageVisuals("page_servicios");
-  const mid = visuals.slots[0];
   const heroDesktop = resolvePageMediaUrl(visuals.heroDesktopUrl);
   const heroMobile = resolvePageMediaUrl(visuals.heroMobileUrl || visuals.heroDesktopUrl);
-  const midPhoto = mid?.desktopUrl
-    ? { src: resolvePageMediaUrl(mid.desktopUrl), alt: mid.alt || "Instalación NEXARA" }
-    : {
-        src: "/fotos/equipo-taller-ensamble-pc-nexara-1920.webp",
-        srcSet:
-          "/fotos/equipo-taller-ensamble-pc-nexara-1200.webp 1200w, /fotos/equipo-taller-ensamble-pc-nexara-1920.webp 1920w",
-        sizes: "(max-width: 1100px) 100vw, 520px",
-        alt: "Equipo técnico de NEXARA ensamblando una computadora en el taller",
-      };
 
   return (
     <main className={`${shared.page} home-main-flush`}>
@@ -220,27 +173,6 @@ export default async function ServiciosPage() {
           </>
         }
       />
-
-      {/* Problemas típicos: tarjeta que monta sobre el hero */}
-      <section aria-label="Lo que suele fallar" className={shared.statsBand}>
-        <div className={shared.inner}>
-          <div className={shared.statsCard}>
-            <div className={shared.tileRow}>
-              {PROBLEMAS.map((p) => (
-                <div key={p.title} className={shared.tile}>
-                  <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
-                    <PublicIcon name={p.icon} />
-                  </span>
-                  <div>
-                    <h3 className={shared.tileTitle}>{p.title}</h3>
-                    <p className={shared.tileText}>{p.text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Detalle de servicios */}
       <section className={shared.section} aria-label="Servicios" data-reveal="up">
@@ -316,135 +248,6 @@ export default async function ServiciosPage() {
         </div>
       </section>
 
-      {/* Método con foto del CMS (banda navy) */}
-      <section className={`${shared.section} ${shared.sectionNavy}`} aria-label="Del diagnóstico a la operación" data-reveal="up">
-        <div className={shared.inner}>
-          <div className={`${shared.split} ${shared.splitReverse}`}>
-            <div className={shared.splitCopy}>
-              <header className={shared.sectionHead}>
-                <p className={shared.eyebrow}>Método</p>
-                <h2 className={shared.sectionTitle}>
-                  Del diagnóstico a la <span className={shared.sectionTitleAccent}>operación</span>
-                </h2>
-                <p className={shared.sectionLead}>
-                  {mid?.caption || "Instalación documentada y operable — evidencia, no promesas."}
-                </p>
-              </header>
-              <div style={{ display: "grid", gap: 14, width: "100%" }}>
-                {PASOS.map((p) => (
-                  <div key={p.num} className={shared.stepItemOpen}>
-                    <span className={shared.stepNumOpen}>{p.num}</span>
-                    <h3 className={shared.stepTitleOpen}>{p.title}</h3>
-                    <p className={shared.stepTextOpen}>{p.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <figure className={`${shared.photoFrame} ${shared.ar45} ${shared.splitMedia}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={midPhoto.src}
-                {...((midPhoto as any).srcSet ? { srcSet: (midPhoto as any).srcSet } : {})}
-                {...((midPhoto as any).sizes ? { sizes: (midPhoto as any).sizes } : {})}
-                alt={midPhoto.alt}
-                loading="lazy"
-                decoding="async"
-              />
-              <span className={shared.photoBadge}>Proyecto real</span>
-            </figure>
-          </div>
-        </div>
-      </section>
-
-      {/* Certificaciones y fabricantes */}
-      <section className={`${shared.sectionSpacious} ${shared.sectionLight}`} aria-label="Certificaciones" data-reveal="soft">
-        <div className={shared.inner}>
-          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-            <p className={shared.eyebrow}>Respaldo técnico</p>
-            <h2 className={shared.sectionTitle}>
-              Certificaciones y <span className={shared.sectionTitleAccent}>alianzas</span>
-            </h2>
-          </header>
-          <LogoStrip label="Certificaciones y alianzas técnicas" items={CERTIFICACIONES} display="grid" />
-        </div>
-      </section>
-
-      {/* Industrias */}
-      <section className={shared.section} aria-label="Industrias" data-reveal="up">
-        <div className={shared.inner}>
-          <header className={`${shared.sectionHead} ${shared.sectionHeadCenter}`}>
-            <p className={shared.eyebrow}>Industrias</p>
-            <h2 className={shared.sectionTitle}>
-              El mismo estándar, <span className={shared.sectionTitleAccent}>tu vertical</span>
-            </h2>
-            <p className={shared.sectionLead}>Soluciones armadas por industria, con su riesgo típico resuelto.</p>
-          </header>
-          <div className={shared.industryRow} data-reveal-stagger>
-            {INDUSTRIAS.map((i) => (
-              <Link key={i.slug} href={`/soluciones/${i.slug}`} className={shared.industryPill} data-reveal="up">
-                <span className={`${shared.iconTile} ${shared.iconTileSm}`}>
-                  <PublicIcon name={i.icon} />
-                </span>
-                {i.name}
-              </Link>
-            ))}
-          </div>
-          <div style={{ marginTop: "clamp(28px, 4vw, 48px)" }}>
-            <SeoInterlinkHub
-              title="Soluciones que más cotizan"
-              subtitle="CCTV, redes y soporte por industria — listo para Google y para convertir."
-              currentPath="/servicios"
-              maxIndustries={4}
-              maxServicesPerIndustry={3}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className={shared.sectionTight} data-reveal="up">
-        <div className={shared.inner}>
-          <div className={shared.ctaBand}>
-            <div className={shared.ctaBandGrid}>
-              <div>
-                <p className={shared.ctaEyebrow}>Siguiente paso</p>
-                <h2 className={shared.ctaTitle}>Cotiza CCTV, redes o soporte</h2>
-                <p className={shared.ctaLead}>
-                  Diagnóstico corto en Puebla o CDMX. Te decimos qué instalar, qué posponer y qué presupuesto tiene sentido.
-                </p>
-                <div className={shared.ctaActions}>
-                  <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`} data-track-conversion="servicios_footer_cta">
-                    Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
-                  </Link>
-                  <a
-                    href={buildWhatsAppLeadUrl({
-                      industryName: "mi empresa",
-                      serviceName: "CCTV, redes o soporte",
-                      path: "/servicios",
-                    })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${shared.btn} ${shared.btnSecondary}`}
-                    data-track-conversion="servicios_wa"
-                  >
-                    WhatsApp
-                  </a>
-                </div>
-              </div>
-              <ul className={shared.ctaFacts}>
-                <li>
-                  <PublicIcon name="clock" /> Primera respuesta típica en menos de 24 horas hábiles.
-                </li>
-                <li>
-                  <PublicIcon name="fileCheck" /> Propuesta con alcance cerrado, sin costos escondidos.
-                </li>
-                <li>
-                  <PublicIcon name="shield" /> Garantía de instalación y soporte con SLA.
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   );
 }

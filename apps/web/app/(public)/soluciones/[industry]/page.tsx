@@ -223,6 +223,7 @@ export default function IndustryHubPage({ params }: { params: Params }) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJson) }}
       />
       <PublicPageHero
+        back={{ href: "/servicios", label: "Servicios" }}
         eyebrow={`Soluciones · ${hub.name}`}
         title={
           <>

@@ -247,7 +247,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var k='nexara:public-theme';var s=localStorage.getItem(k);var t=(s==='light'||s==='dark')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-public-theme',t);}catch(e){document.documentElement.setAttribute('data-public-theme','dark');}})();",
+              "document.documentElement.setAttribute('data-public-theme','light');",
           }}
         />
         {/* Organization structured data */}
