@@ -468,15 +468,14 @@
     font-size: 16px;
   }
 
-  /* En teléfono la descripción ocupa todo el renglón y debajo van cantidad y precio. */
-  .partida {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
+  .partida,
+  .rfcFila {
+    grid-template-columns: 1fr;
+    display: grid;
   }
 
   .partida > :first-child {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 
   .quitar {

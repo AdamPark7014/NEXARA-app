@@ -4,12 +4,14 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import PageHeader from "@/components/ui/PageHeader";
+import { ListFooter } from "@/components/base/ModulePage";
+import VolverSeccion from "@/components/erp/VolverSeccion";
+import q from "@/components/erp/lista-quieta.module.css";
 import MetricStrip from "@/components/ui/MetricStrip";
 import InlineAlert from "@/components/ui/InlineAlert";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
 import FilterToolbar from "@/components/FilterToolbar";
-import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -23,13 +25,15 @@ import {
 } from "@/lib/finance-api";
 
 export type PrenominaPanelProps = {
-  eyebrow: string;
+  eyebrow?: string;
   title?: string;
   subtitle?: string;
   paymentsHref: string;
   rail?: ReactNode;
   /** When false, OT table is read-only (no Aprobar/Rechazar). */
   canDecideOt?: boolean;
+  backHref?: string;
+  backLabel?: string;
 };
 
 type OtRow = {
@@ -118,12 +122,12 @@ const num: React.CSSProperties = { fontVariantNumeric: "tabular-nums", whiteSpac
  * No CFDI. OT×2 lives in API `prenomina-amount.ts` only.
  */
 export default function PrenominaPanel({
-  eyebrow,
   title = "Prenómina",
-  subtitle = "Asistencia y horas extra aprobadas del periodo → monto sugerido por persona. No genera CFDI.",
   paymentsHref,
   rail,
   canDecideOt = true,
+  backHref = "/erp/contabilidad",
+  backLabel = "Contabilidad",
 }: PrenominaPanelProps) {
   const { token } = useUser();
   const [from, setFrom] = useState(isoDaysAgo(6));
@@ -381,12 +385,12 @@ export default function PrenominaPanel({
   const firstLoad = loading && !calculated;
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className={q.zona} style={{ display: "grid", gap: 16 }}>
       {rail}
+      <VolverSeccion href={backHref}>{backLabel}</VolverSeccion>
       <PageHeader
-        eyebrow={eyebrow}
         title={title}
-        subtitle={subtitle}
+        density="ops"
         actions={
           <>
             <Link href={paymentsHref} style={{ textDecoration: "none" }}>
@@ -460,8 +464,7 @@ export default function PrenominaPanel({
       {error && (
         <InlineAlert
           variant={calculated ? "warning" : "danger"}
-          title="No se pudo calcular la prenómina"
-          message={calculated ? `${error} Mostramos el último cálculo.` : error}
+          message={calculated ? "No se pudo recalcular; se muestra el último cálculo." : "No se pudo calcular la prenómina."}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
@@ -504,39 +507,40 @@ export default function PrenominaPanel({
       )}
 
       <section aria-labelledby="prenomina-team">
-        <h2 id="prenomina-team" style={{ fontSize: 16, margin: "0 0 8px", fontFamily: "var(--nx-font-display)" }}>Equipo del periodo</h2>
+        <h2 id="prenomina-team" style={{ fontSize: 16, margin: "0 0 8px", fontFamily: "var(--nx-font-display)" }}>Equipo</h2>
         {firstLoad ? (
-          <SkeletonList rows={6} tableLike />
+          <p className={q.frase} role="status">Cargando la prenómina.</p>
+        ) : rows.length === 0 ? (
+          <p className={q.frase} role="status">{calculated ? "Nadie registró asistencia en el periodo." : "Elige el periodo y calcula."}</p>
         ) : (
-          <DataTable
-            columns={teamColumns}
-            rows={rows}
-            rowKey={(r) => r.userId}
-            ariaLabel="Prenómina por persona"
-            emptyTitle={calculated ? "Nadie registró asistencia en el periodo" : "Aún no hay cálculo"}
-            emptyDescription={calculated ? "Prueba con otro periodo." : "Elige el periodo y pulsa «Calcular periodo»."}
-            emptyAction={!calculated ? <Button size="sm" variant="primary" onClick={() => void load()} disabled={!token || !!rangeError}>Calcular periodo</Button> : undefined}
-          />
+          <>
+            <DataTable
+              columns={teamColumns}
+              rows={rows}
+              rowKey={(r) => r.userId}
+              ariaLabel="Prenómina por persona"
+            />
+            <ListFooter total={rows.length} unit={rows.length === 1 ? "persona" : "personas"} />
+          </>
         )}
       </section>
 
       <section aria-labelledby="prenomina-ot">
-        <h2 id="prenomina-ot" style={{ fontSize: 16, margin: "0 0 4px", fontFamily: "var(--nx-font-display)" }}>Horas extra</h2>
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 10px", maxWidth: "70ch" }}>
-          Solo las horas extra aprobadas suman al monto sugerido.
-          {!canDecideOt ? " Puedes consultarlas, pero no tienes permiso para aprobarlas o rechazarlas." : null}
-        </p>
+        <h2 id="prenomina-ot" style={{ fontSize: 16, margin: "0 0 8px", fontFamily: "var(--nx-font-display)" }}>Horas extra</h2>
         {firstLoad ? (
-          <SkeletonList rows={3} tableLike />
+          <p className={q.frase} role="status">Cargando horas extra.</p>
+        ) : otRows.length === 0 ? (
+          <p className={q.frase} role="status">{calculated ? "No hay horas extra en el periodo." : "Calcula un periodo para ver las horas extra."}</p>
         ) : (
-          <DataTable
-            columns={otColumns}
-            rows={otRows}
-            rowKey={(r) => r.id}
-            ariaLabel="Horas extra del periodo"
-            emptyTitle="Sin horas extra"
-            emptyDescription={calculated ? "Nadie registró horas extra en el periodo." : "Calcula un periodo para ver las horas extra."}
-          />
+          <>
+            <DataTable
+              columns={otColumns}
+              rows={otRows}
+              rowKey={(r) => r.id}
+              ariaLabel="Horas extra del periodo"
+            />
+            <ListFooter total={otRows.length} unit={otRows.length === 1 ? "hora extra" : "horas extra"} />
+          </>
         )}
       </section>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} danger={false} />

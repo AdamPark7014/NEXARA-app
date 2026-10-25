@@ -15,8 +15,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Section from "@/components/ui/Section";
+import { ListFooter } from "@/components/base/ModulePage";
+import q from "@/components/erp/lista-quieta.module.css";
 import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { toast } from "@/components/Toast";
@@ -240,31 +241,27 @@ export default function WholesalePanel({
   // ── Render ──────────────────────────────────────────────────────────────
 
   if (cargando) {
-    return (
-      <Section title="Cargando mayoristas…">
-        <p style={{ fontSize: 13, color: "var(--muted-foreground)" }}>Un momento.</p>
-      </Section>
-    );
+    return <p className={q.frase} role="status">Cargando mayoristas.</p>;
   }
 
   return (
-    <>
-      {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
+    <div className={q.zona}>
+      {error && <InlineAlert message="No se pudieron cargar los mayoristas." onDismiss={() => setError(null)} />}
 
       <Section
-        title={`${mayoristas.length} mayoristas`}
-        subtitle={
-          mayoristas.length > 0
-            ? `Saldo total por pagar: ${money(totalCredito)}`
-            : undefined
+        title="Mayoristas"
+        footer={
+          mayoristas.length > 0 ? (
+            <ListFooter
+              total={mayoristas.length}
+              unit={mayoristas.length === 1 ? "mayorista" : "mayoristas"}
+              end={<span>Saldo {money(totalCredito)}</span>}
+            />
+          ) : null
         }
       >
         {mayoristas.length === 0 ? (
-          <EmptyState
-            icon="🏭"
-            title="Ningún proveedor marcado como mayorista"
-            description="Da de alta un proveedor con «Nuevo proveedor» y marca la casilla de convenio, o abre uno que ya sea mayorista para ajustar crédito, descuento, tiempo de entrega y pedido mínimo."
-          />
+          <p className={q.frase}>No hay proveedores marcados como mayorista.</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
@@ -697,14 +694,14 @@ export default function WholesalePanel({
           </div>
         )}
       </Modal>
-    </>
+    </div>
   );
 }
 
 function Fila({ etiqueta, valor, fuerte }: { etiqueta: string; valor: string; fuerte?: boolean }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-      <span style={{ color: "var(--muted-foreground)" }}>{etiqueta}</span>
+    <div className={q.fila}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>{etiqueta}</span>
       <span style={{ fontWeight: fuerte ? 700 : 500 }}>{valor}</span>
     </div>
   );

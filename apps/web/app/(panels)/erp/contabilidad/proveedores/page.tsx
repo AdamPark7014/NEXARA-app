@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
@@ -443,10 +444,9 @@ export default function ProveedoresPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
         title="Proveedores"
-        subtitle="Cada proveedor dado de alta, con lo que le debes y lo que ya venció. Abre uno para ver su expediente completo."
         density="ops"
         actions={
           <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
@@ -411,10 +412,9 @@ export default function MovimientosPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
-        title="Libro de movimientos"
-        subtitle="Cobros, pagos, gastos, nómina, líneas de banco sin conciliar y facturas, en una sola línea de tiempo."
+        title="Movimientos"
         density="ops"
         actions={
           <>

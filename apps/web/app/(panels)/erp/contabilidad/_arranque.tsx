@@ -162,7 +162,7 @@ export function VacioConPrimerPaso({
   variant = "page",
 }: {
   title: ReactNode;
-  description: ReactNode;
+  description?: ReactNode;
   /** Sin destino, el vacío informa y no ofrece botón (no se inventa una acción). */
   destino?: Destino;
   /** Una segunda salida discreta: ampliar el periodo, volver a calcular… */

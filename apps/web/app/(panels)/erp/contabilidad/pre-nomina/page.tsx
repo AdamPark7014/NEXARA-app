@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -367,10 +368,9 @@ export default function ContabilidadPrenominaPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
         title="Pre-nómina"
-        subtitle="Lo que se va a pagar este periodo, según checadas y extras ya aprobados."
         density="ops"
         actions={
           <Link

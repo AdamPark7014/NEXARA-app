@@ -341,15 +341,6 @@ export default function ContabilidadDashboardPage() {
    */
   const periodoVigente = data?.period ?? range;
 
-  const monthLabel = useMemo(() => {
-    const { from, to } = periodoVigente;
-    const d = new Date(`${from}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return `${from} → ${to}`;
-    const mismoMes = from.slice(0, 7) === to.slice(0, 7);
-    if (!mismoMes) return `${from} → ${to}`;
-    return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
-  }, [periodoVigente]);
-
   /**
    * La tira responde, de izquierda a derecha, las preguntas de la mañana: cuánto
    * hay, cuánto deben, cuánto se debe, cómo va el periodo y qué está mal. El
@@ -406,17 +397,7 @@ export default function ContabilidadDashboardPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Dinero"
-        title="¿Qué hay que hacer hoy?"
-        subtitle={
-          sinSesion
-            ? "Entra con tu cuenta para ver cobros, pagos y banco."
-            : loading && !data
-              ? "Cargando…"
-              : modoArranque
-                ? "Todavía falta preparar lo básico. Empieza por el primer paso."
-                : `Resumen de ${monthLabel} — toca una cifra para entrar.`
-        }
+        title="Contabilidad"
         density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -487,7 +468,7 @@ export default function ContabilidadDashboardPage() {
       {sinSesion && (
         <InlineAlert
           variant="warning"
-          message="No hay sesión activa, así que no se puede consultar el resumen. Vuelve a entrar con tu cuenta y la pantalla se llenará sola."
+          message="No hay sesión activa."
           action={
             <Link href="/login" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>
               Ir a entrar
@@ -499,7 +480,7 @@ export default function ContabilidadDashboardPage() {
       {error && (
         <InlineAlert
           variant="danger"
-          message={`No se pudo cargar el resumen del ${periodoVigente.from} al ${periodoVigente.to}. ${error} Reintenta; si vuelve a fallar, prueba con un rango más corto.`}
+          message="No se pudo cargar el resumen."
           onDismiss={() => setError(null)}
           action={
             <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
@@ -522,37 +503,10 @@ export default function ContabilidadDashboardPage() {
               Revisando qué falta para empezar…
             </p>
           ) : modoArranque ? (
-            <>
-              <p
-                style={{
-                  margin: "0 0 12px",
-                  fontSize: 13,
-                  color: "var(--text-secondary)",
-                  lineHeight: 1.5,
-                  maxWidth: 640,
-                }}
-              >
-                En {monthLabel} todavía no hay dinero registrado. Antes de ver cifras hay que
-                dejar listo lo básico — en este orden:
-              </p>
-              <PuestaEnMarcha pasos={pasos} />
-              <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)" }}>
-                En cuanto exista el primer movimiento, esta pantalla vuelve sola a las cifras del
-                periodo.
-              </p>
-            </>
+            <PuestaEnMarcha pasos={pasos} />
           ) : (
             <VacioConPrimerPaso
-              title={
-                configVerificada
-                  ? "Todo está listo y todavía no pasa nada"
-                  : "Sin nada registrado en este periodo"
-              }
-              description={
-                configVerificada
-                  ? `La contabilidad ya está configurada, pero del ${periodoVigente.from} al ${periodoVigente.to} no hay facturas, cobros, pagos ni saldo en bancos. Emite la primera factura: aparecerá aquí, en Por cobrar y en el libro de movimientos.`
-                  : `Del ${periodoVigente.from} al ${periodoVigente.to} no hay facturas, cobros, pagos ni saldo en bancos. Si falta configurar algo no se pudo comprobar desde tu cuenta, así que empieza por lo que sí es tuyo: la primera factura.`
-              }
+              title="No hay movimiento en este periodo."
               destino={DESTINOS.factura}
               extra={
                 <Button size="sm" variant="ghost" onClick={abrirPeriodo}>
@@ -605,7 +559,7 @@ export default function ContabilidadDashboardPage() {
                   background: "var(--surface)",
                 }}
               >
-                Nada urgente. Puedes cobrar, pagar o cuadrar el banco cuando quieras.
+                Nada urgente.
               </p>
             ) : (
               <ul
@@ -810,6 +764,15 @@ export default function ContabilidadDashboardPage() {
       <style>{`
         @media (max-width: 1024px) {
           .nx-contab-dash-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 720px) {
+          .nx-attention-row,
+          .nx-contab-quiet {
+            grid-template-columns: 1fr !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+          .nx-contab-quiet dd { text-align: left !important; }
         }
         .nx-attention-row:hover {
           background: color-mix(in srgb, var(--primary) 5%, transparent);

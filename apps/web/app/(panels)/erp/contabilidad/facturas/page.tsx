@@ -7,7 +7,6 @@ export default function ContabilidadFacturasPage() {
     <ContabilidadInvoicesView
       mode="all"
       title="Facturas"
-      subtitle="Lo que emitiste y lo que te facturaron, con su saldo y su vencimiento."
     />
   );
 }

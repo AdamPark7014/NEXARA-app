@@ -13,6 +13,9 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import ListExportActions from "@/components/ui/ListExportActions";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
+import { ListFooter } from "@/components/base/ModulePage";
+import VolverSeccion from "@/components/erp/VolverSeccion";
+import q from "@/components/erp/lista-quieta.module.css";
 import SugerenciaNomina from "@/components/finance/SugerenciaNomina";
 import {
   FinanceField,
@@ -935,11 +938,11 @@ function EmployeePaymentsContent() {
   );
 
   return (
-    <>
+    <div className={q.zona}>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <FinanceModuleShell
         variant="flat"
-        title={cfg.title || "Pagos a empleados"}
-        subtitle={cfg.subtitle}
+        title="Pagos"
         kpis={
           showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de pagos a empleados" /> : undefined
         }
@@ -1067,7 +1070,7 @@ function EmployeePaymentsContent() {
                 ]}
                 onClear={clearFilters}
                 style={{ marginBottom: 0 }}
-                resultCount={firstLoad ? null : visibleItems.length}
+                resultCount={null}
                 rightActions={
                   <>
                     {refreshAction}
@@ -1091,7 +1094,7 @@ function EmployeePaymentsContent() {
             )}
             {usersErr && (
               <InlineAlert
-                message={`${usersErr}. El filtro por empleado saldrá vacío y no podrás registrar un pago nuevo hasta que cargue.`}
+                message="No se pudo cargar el personal."
                 variant="warning"
                 onDismiss={() => setUsersErr(null)}
                 action={
@@ -1103,7 +1106,7 @@ function EmployeePaymentsContent() {
             )}
             {error && (
               <InlineAlert
-                message={error}
+                message={items.length > 0 ? "No se pudo actualizar; se muestra lo último cargado." : "No se pudieron cargar los pagos."}
                 variant="danger"
                 action={
                   <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
@@ -1113,37 +1116,20 @@ function EmployeePaymentsContent() {
               />
             )}
             {firstLoad ? (
-              <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
-                Cargando pagos…
-              </div>
-            ) : error && items.length === 0 ? null : (
+              <p className={q.frase} role="status">Cargando pagos.</p>
+            ) : error && items.length === 0 ? null : visibleItems.length === 0 ? (
+              <p className={q.frase} role="status">{hasFilters ? "Nada coincide con estos filtros." : "No hay pagos."}</p>
+            ) : (
+              <>
               <DataTable
                 columns={columns}
                 rows={visibleItems}
                 rowKey={(p) => p.id}
                 density="compact"
                 ariaLabel="Pagos a empleados"
-                emptyTitle={hasFilters ? "Ningún pago coincide" : "Todavía no hay pagos"}
-                emptyDescription={
-                  hasFilters
-                    ? "Ningún pago coincide con los filtros aplicados."
-                    : cfg.canCreate
-                      ? "Un pago nace de un periodo trabajado: eliges a la persona, el rango de fechas y el neto que se deposita. Queda en borrador hasta que alguien lo aprueba."
-                      : "Aquí aparecen los pagos por periodo trabajado que captura el equipo administrativo."
-                }
-                emptyAction={
-                  hasFilters ? (
-                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
-                      Limpiar filtros
-                    </Button>
-                  ) : (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                      {primaryAction}
-                      {refreshAction}
-                    </div>
-                  )
-                }
               />
+              <ListFooter total={visibleItems.length} unit={visibleItems.length === 1 ? "pago" : "pagos"} />
+              </>
             )}
           </>
         )}
@@ -1414,6 +1400,6 @@ function EmployeePaymentsContent() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }

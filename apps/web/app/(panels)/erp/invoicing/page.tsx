@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
 import { todayStamp } from "@/components/finance/download";
 import PageHeader from "@/components/ui/PageHeader";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot from "@/components/ui/StatusDot";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
+import { ListFooter } from "@/components/base/ModulePage";
+import q from "@/components/erp/lista-quieta.module.css";
 import InlineAlert from "@/components/ui/InlineAlert";
 import {
   FinanceField,
@@ -23,24 +23,15 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
 import { toast } from "@/components/Toast";
-import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 import { formatApiError } from "@/lib/erp-api";
 import {
-  AlertIcon,
-  BlockHeading,
-  CfdiIcon,
   COMMERCIAL_LABEL,
   CopyableRef,
   Dot,
   DownloadIcon,
-  FilterIcon,
   fiscalState,
   FootNote,
   InlineAction,
-  LoadingIcon,
-  MetricFrame,
-  MetricHint,
-  MetricValue,
   NoticeStack,
   PlusIcon,
   RefreshIcon,
@@ -293,7 +284,7 @@ export default function InvoicingPage() {
   };
 
   /** Un solo recorrido del libro para todas las cifras de la tira. */
-  const { facturadoMes, porTimbrar, canceladas, vencidas, incomeCount, cobrado, pendiente } = useMemo(() => {
+  const { canceladas } = useMemo(() => {
     let facturado = 0;
     let cobradoSum = 0;
     let pendienteSum = 0;
@@ -692,47 +683,6 @@ export default function InvoicingPage() {
   ];
 
   /* ---------------------------------------------------------------- *
-   * Estado financiero: tres montos y el único conteo que pide acción.
-   *
-   * Eran seis celdas del mismo peso —tres montos y tres conteos—, y la vista
-   * no decía cuál mirar primero. «Vencidas» pasa a ser la pista de «Por
-   * cobrar», que es donde duele, y conserva su clic; «Canceladas» baja a
-   * metadato de pie, que es su rango.
-   * ---------------------------------------------------------------- */
-  const cobranzaPct = facturadoMes > 0 ? Math.round((cobrado / facturadoMes) * 100) : 0;
-
-  const metrics: Metric[] = [
-    {
-      label: "Facturado",
-      value: <MetricValue><Money value={facturadoMes} compact bold={false} /></MetricValue>,
-      hint: <MetricHint>{incomeCount} CFDI de ingreso</MetricHint>,
-    },
-    {
-      label: "Cobrado",
-      value: <MetricValue><Money value={cobrado} compact bold={false} /></MetricValue>,
-      hint: <MetricHint tone={cobranzaPct === 100 && facturadoMes > 0 ? "success" : "default"}>{cobranzaPct}% del facturado</MetricHint>,
-    },
-    {
-      label: "Por cobrar",
-      value: <MetricValue><Money value={pendiente} compact bold={false} /></MetricValue>,
-      hint: (
-        <MetricHint tone={vencidas > 0 ? "danger" : "default"}>
-          {vencidas > 0 ? `${vencidas} vencida${vencidas === 1 ? "" : "s"}` : "sin vencidas"}
-        </MetricHint>
-      ),
-      tone: vencidas > 0 ? "danger" : pendiente > 0 ? "warning" : "default",
-      onClick: vencidas > 0 ? () => setFilterStatus(filterStatus === "OVERDUE" ? "" : "OVERDUE") : undefined,
-    },
-    {
-      label: "Por timbrar",
-      value: <MetricValue>{porTimbrar}</MetricValue>,
-      hint: <MetricHint tone={porTimbrar > 0 ? "warning" : "default"}>borradores sin UUID</MetricHint>,
-      tone: porTimbrar > 0 ? "warning" : "default",
-      onClick: () => setFilterStatus(filterStatus === "DRAFT" ? "" : porTimbrar > 0 ? "DRAFT" : ""),
-    },
-  ];
-
-  /* ---------------------------------------------------------------- *
    * Avisos: un bloque, un renglón cada uno, ordenados por gravedad.
    * ---------------------------------------------------------------- */
   const notices: Notice[] = [];
@@ -777,33 +727,10 @@ export default function InvoicingPage() {
   ], "facturas");
 
   return (
-    <>
-      {/* 1 · Dónde estoy. 2 · La acción principal, el único botón sólido de marca. */}
+    <div className={q.zona}>
       <PageHeader
-        eyebrow="ERP · Finanzas"
-        title={cfg.title}
+        title="Facturación"
         density="ops"
-        actions={
-          cfg.canCreate ? (
-            <Button size="sm" variant="primary" iconLeft={<PlusIcon />} onClick={openNew}>
-              Nueva factura
-            </Button>
-          ) : undefined
-        }
-      />
-      <FinanceModuleRail />
-
-      {/* 3 · Cómo va el dinero. */}
-      <MetricFrame>
-        <MetricStrip metrics={metrics} ariaLabel="Resumen de facturación" />
-      </MetricFrame>
-
-      <NoticeStack notices={notices} />
-
-      {/* 4 · Las facturas. El título se dice con tipografía, no con tarjeta. */}
-      <BlockHeading
-        title="Facturas"
-        meta={loading ? "cargando…" : `${visibleItems.length}${hasFilters && visibleItems.length !== items.length ? ` de ${items.length}` : ""}`}
         actions={
           <>
             <Button
@@ -811,7 +738,6 @@ export default function InvoicingPage() {
               variant="ghost"
               iconLeft={<RefreshIcon />}
               onClick={() => void load()}
-              title="Actualizar"
               aria-label="Actualizar la lista"
             />
             {items.length > 0 && (
@@ -819,11 +745,18 @@ export default function InvoicingPage() {
                 Excel
               </Button>
             )}
+            {cfg.canCreate ? (
+              <Button size="sm" variant="primary" iconLeft={<PlusIcon />} onClick={openNew}>
+                Nueva factura
+              </Button>
+            ) : null}
           </>
         }
       />
 
-      {/* 5 · Los filtros: herramienta de trabajo, no formulario. */}
+      <NoticeStack notices={notices} />
+
+      {/* Filtros. */}
       <WorkToolbar
         note={
           hasFilters || highlightId ? (
@@ -871,62 +804,44 @@ export default function InvoicingPage() {
         </select>
       </WorkToolbar>
 
-      {loading && items.length === 0 && (
-        <EmptyState icon={<LoadingIcon />} title="Cargando facturas…" description="Consultando el libro de CFDI." />
-      )}
+      {loading && items.length === 0 && <p className={q.frase} role="status">Cargando facturas.</p>}
       {!loading && error && items.length === 0 && (
-        <EmptyState
-          icon={<AlertIcon />}
-          title="No se pudo cargar la facturación"
-          description={error}
+        <InlineAlert
+          variant="danger"
+          message="No se pudo cargar la facturación."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
       {error && items.length > 0 && (
         <InlineAlert
           variant="warning"
-          message={`No se pudo actualizar la lista; se muestran los datos anteriores. ${error}`}
+          message="No se pudo actualizar; se muestra lo último cargado."
           onDismiss={() => setError(null)}
           action={
             <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
-              {loading ? "Reintentando…" : "Reintentar"}
+              Reintentar
             </Button>
           }
         />
       )}
-      {!loading && !error && visibleItems.length === 0 && hasFilters && (
-        <EmptyState
-          icon={<FilterIcon />}
-          title="Ningún CFDI con estos filtros"
-          description="Hay facturas en el libro, pero ninguna coincide con la búsqueda actual."
-          action={<Button size="sm" variant="secondary" onClick={clearFilters}>Limpiar filtros</Button>}
-        />
-      )}
-      {!loading && !error && visibleItems.length === 0 && !hasFilters && (
-        <EmptyState
-          icon={<CfdiIcon />}
-          title="Todavía no hay facturas"
-          description={
-            cfg.canCreate
-              ? "Crea el borrador y tímbralo ante el PAC cuando el cliente esté confirmado."
-              : "Las facturas se generan desde un proyecto de ventas cerrado."
-          }
-          action={
-            cfg.canCreate ? (
-              <Button size="sm" variant="primary" iconLeft={<PlusIcon />} onClick={openNew}>
-                Nueva factura
-              </Button>
-            ) : undefined
-          }
-        />
+      {!loading && !error && visibleItems.length === 0 && (
+        <p className={q.frase} role="status">
+          {hasFilters ? "Nada coincide con estos filtros." : "No hay facturas."}
+        </p>
       )}
       {visibleItems.length > 0 && (!loading || items.length > 0) && (
-        <DataTable
-          columns={columns}
-          rows={visibleItems}
-          rowKey={(f) => f.id}
-          ariaLabel="Facturas CFDI"
-        />
+        <>
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(f) => f.id}
+            ariaLabel="Facturas CFDI"
+          />
+          <ListFooter
+            total={visibleItems.length}
+            unit={visibleItems.length === 1 ? "factura" : "facturas"}
+          />
+        </>
       )}
 
       {/* 6 y 7 · Configuración y metadatos, al final y en gris. */}
@@ -1183,6 +1098,6 @@ export default function InvoicingPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }
