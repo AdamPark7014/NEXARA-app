@@ -19,7 +19,7 @@ class AuthErrorMapperTest {
     fun loginMessage_http401_returnsInvalidCredentials() {
         val msg = AuthErrorMapper.loginMessage(httpError(401))
         assertEquals(
-            "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.",
+            "Correo o contraseña incorrectos, verifica tus datos e intenta de nuevo.",
             msg,
         )
     }
@@ -33,37 +33,37 @@ class AuthErrorMapperTest {
     @Test
     fun loginMessage_http429_returnsRateLimited() {
         val msg = AuthErrorMapper.loginMessage(httpError(429))
-        assertEquals("Demasiados intentos. Espera un momento e intenta de nuevo.", msg)
+        assertEquals("Demasiados intentos, espera un momento e intenta de nuevo.", msg)
     }
 
     @Test
     fun loginMessage_http500_returnsServerUnavailable() {
         val msg = AuthErrorMapper.loginMessage(httpError(503))
-        assertEquals("El servidor no está disponible en este momento. Intenta más tarde.", msg)
+        assertEquals("El servidor no está disponible en este momento, intenta más tarde.", msg)
     }
 
     @Test
     fun loginMessage_unknownHost_returnsNoConnection() {
         val msg = AuthErrorMapper.loginMessage(UnknownHostException("offline"))
-        assertEquals("Sin conexión a internet. Revisa tu red e intenta de nuevo.", msg)
+        assertEquals("Sin conexión a internet, revisa tu red e intenta de nuevo.", msg)
     }
 
     @Test
     fun loginMessage_sslException_returnsNoConnection() {
         val msg = AuthErrorMapper.loginMessage(SSLException("cert"))
-        assertEquals("Sin conexión a internet. Revisa tu red e intenta de nuevo.", msg)
+        assertEquals("Sin conexión a internet, revisa tu red e intenta de nuevo.", msg)
     }
 
     @Test
     fun loginMessage_socketTimeout_returnsTimeoutMessage() {
         val msg = AuthErrorMapper.loginMessage(SocketTimeoutException("timeout"))
-        assertEquals("La conexión tardó demasiado. Comprueba tu internet e intenta de nuevo.", msg)
+        assertEquals("La conexión tardó demasiado, comprueba tu internet e intenta de nuevo.", msg)
     }
 
     @Test
     fun loginMessage_ioException_returnsConnectionProblem() {
         val msg = AuthErrorMapper.loginMessage(IOException("broken pipe"))
-        assertEquals("Problema de conexión. Revisa tu internet e intenta de nuevo.", msg)
+        assertEquals("Problema de conexión, revisa tu internet e intenta de nuevo.", msg)
     }
 
     @Test
@@ -98,7 +98,7 @@ class AuthErrorMapperTest {
             httpErrorConCuerpo(401, """{"message":"Credenciales inválidas"}"""),
         )
         assertEquals(
-            "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.",
+            "Correo o contraseña incorrectos, verifica tus datos e intenta de nuevo.",
             msg,
         )
     }
@@ -108,7 +108,7 @@ class AuthErrorMapperTest {
         val msg = AuthErrorMapper.loginMessage(
             httpErrorConCuerpo(429, """{"message":"Too many requests"}""", retryAfter = "619"),
         )
-        assertEquals("Demasiados intentos. Espera 11 minutos e intenta de nuevo.", msg)
+        assertEquals("Demasiados intentos, espera 11 minutos e intenta de nuevo.", msg)
     }
 
     private fun httpErrorConCuerpo(
