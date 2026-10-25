@@ -71,6 +71,20 @@ describe("crearUsuarioDelegado", () => {
     await expect(crearUsuarioDelegado("tok", alta)).rejects.toThrow("correo inválido nombre muy corto");
 
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, json: async () => { throw new Error("no json"); } })));
-    await expect(crearUsuarioDelegado("tok", alta)).rejects.toThrow(/No se pudo dar de alta/);
+    await expect(crearUsuarioDelegado("tok", alta)).rejects.toThrow("No se pudo dar de alta al usuario: intenta de nuevo.");
+  });
+
+  it("cuando el servidor rechaza y no manda frase, una sola oración (ya no «No se pudo dar de alta al usuario. Intenta de nuevo.»)", async () => {
+    const fraseVieja = "No se pudo dar de alta al usuario. Intenta de nuevo.";
+    const frase = "No se pudo dar de alta al usuario: intenta de nuevo.";
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 422, json: async () => ({}) })));
+    try {
+      await crearUsuarioDelegado("tok", alta);
+      throw new Error("el alta debió rechazarse");
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "";
+      expect(mensaje).toBe(frase);
+      expect(mensaje).not.toBe(fraseVieja);
+    }
   });
 });
