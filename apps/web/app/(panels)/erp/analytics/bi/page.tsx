@@ -9,13 +9,10 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import InlineAlert from "@/components/ui/InlineAlert";
 import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
-import { getBiSectionConfig } from "@/lib/section-views";
 import { apiRequest } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import { biRecommendationHref, buildBiQuickLinks } from "@/lib/bi-drill-links";
@@ -96,7 +93,6 @@ function ExportButton({ onClick }: { onClick: () => void }) {
 
 export default function BiPage() {
   const { user } = useUser();
-  const cfg = useMemo(() => getBiSectionConfig(user), [user]);
   const router = useRouter();
   const token = user?.token ?? "";
 
@@ -134,8 +130,8 @@ export default function BiPage() {
       setClientsRoi(Array.isArray(c) ? c : []);
       setIntel(i && typeof i === "object" ? i : null);
       setLoaded(true);
-    } catch (e) {
-      setError(formatApiError(e, "No pudimos cargar la analítica."));
+    } catch {
+      setError("No se pudo cargar la analítica.");
     } finally {
       setLoading(false);
     }
@@ -229,11 +225,11 @@ export default function BiPage() {
   const anchorClass = (id: SectionId) => `${s.anchor} ${focusSection === id ? s.anchorFocus : ""}`;
 
   return (
-    <>
+    <div className={s.zona}>
+      <Link href="/erp/executive" className={s.volver}>‹ Vista ejecutiva</Link>
       <PageHeader
-        eyebrow="Hoy"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title="Analítica"
+        density="ops"
         actions={
           <div className={s.toolbar}>
             <select aria-label="Periodo" className={s.select} value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
@@ -251,7 +247,7 @@ export default function BiPage() {
       {error && loaded && (
         <InlineAlert
           variant="warning"
-          message={`No pudimos actualizar; mostramos los últimos datos. ${error}`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
@@ -266,11 +262,10 @@ export default function BiPage() {
       )}
 
       {!loaded && !loading && error && (
-        <EmptyState
-          icon="⚠️"
-          title="No pudimos cargar la analítica"
-          description={error}
-          action={<Button variant="primary" onClick={() => void load()}>Reintentar</Button>}
+        <InlineAlert
+          variant="danger"
+          message="No se pudo cargar la analítica."
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
 
@@ -311,8 +306,7 @@ export default function BiPage() {
           {intel && (
             <div id="bi-intelligence" className={anchorClass("intelligence")}>
               <Section
-                eyebrow="Hallazgos"
-                title="Qué está pasando y qué hacer"
+                title="Hallazgos"
                 subtitle={[
                   riskLabel ? `Riesgo ${riskLabel}` : null,
                   forecast != null ? `Ventas estimadas el próximo mes: ${mxnCompact.format(Number(forecast))}` : null,
@@ -407,7 +401,7 @@ export default function BiPage() {
                   </div>
                 </div>
               )}
-              <DataTable columns={marginCols} rows={margin} rowKey={(r) => r.projectType} emptyTitle="Sin datos en el periodo" emptyDescription="No hay proyectos con presupuesto registrado." />
+              <DataTable columns={marginCols} rows={margin} rowKey={(r) => r.projectType} emptyTitle="No hay márgenes en este periodo." emptyDescription="" />
             </Section>
           </div>
 
@@ -445,7 +439,7 @@ export default function BiPage() {
                   />
                 ) : undefined}
               />
-              <DataTable columns={engCols} rows={visibleEngineers} rowKey={(r) => r.engineerId} emptyTitle="Sin datos" emptyDescription="No hay órdenes cerradas en los últimos 90 días." />
+              <DataTable columns={engCols} rows={visibleEngineers} rowKey={(r) => r.engineerId} emptyTitle={engSearch.trim() ? "Nada coincide con la búsqueda." : "No hay órdenes en los últimos 90 días."} emptyDescription="" />
             </Section>
           </div>
 
@@ -467,11 +461,11 @@ export default function BiPage() {
                   />
                 ) : undefined}
               />
-              <DataTable columns={clientCols} rows={visibleClients} rowKey={(r) => r.clientId} emptyTitle="Sin datos" emptyDescription="No hay proyectos facturados en el periodo seleccionado." />
+              <DataTable columns={clientCols} rows={visibleClients} rowKey={(r) => r.clientId} emptyTitle={clientSearch.trim() ? "Nada coincide con la búsqueda." : "No hay clientes en este periodo."} emptyDescription="" />
             </Section>
           </div>
         </>
       )}
-    </>
+    </div>
   );
 }

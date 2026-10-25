@@ -86,3 +86,58 @@
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
 }
+
+.zona {
+  min-width: 0;
+}
+
+.volver {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0 8px;
+  padding: 4px 8px 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ui-brand-text, var(--primary));
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.volver:hover {
+  color: var(--text-primary);
+}
+
+.volver:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.frase {
+  margin: 28px 16px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+@media (max-width: 720px) {
+  .zona :global(.nx-ft) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .zona :global(.nx-ft select),
+  .zona :global(.nx-ft-search) {
+    width: 100%;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+}
