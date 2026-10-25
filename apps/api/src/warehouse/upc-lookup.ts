@@ -60,10 +60,10 @@ export type FetchLike = (
 
 const MENSAJES: Record<MotivoSinResultado, string> = {
   CODIGO_NO_CONSULTABLE: 'Este código no es un UPC/EAN: captura los datos a mano.',
-  NO_ENCONTRADO: 'El catálogo internacional no conoce este código. Captura los datos a mano.',
-  LIMITE: 'El catálogo internacional llegó a su límite por hoy. Captura los datos a mano.',
-  SIN_SERVICIO: 'No se pudo consultar el catálogo internacional. Captura los datos a mano.',
-  DESACTIVADO: 'La consulta internacional está apagada. Captura los datos a mano.',
+  NO_ENCONTRADO: 'El catálogo internacional no conoce este código: captura los datos a mano.',
+  LIMITE: 'El catálogo internacional llegó a su límite por hoy: captura los datos a mano.',
+  SIN_SERVICIO: 'No se pudo consultar el catálogo internacional: captura los datos a mano.',
+  DESACTIVADO: 'La consulta internacional está apagada: captura los datos a mano.',
 };
 
 export function sinResultado(codigo: string, motivo: MotivoSinResultado): ResultadoUpc {
