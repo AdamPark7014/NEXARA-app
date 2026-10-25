@@ -254,12 +254,12 @@ export function ClienteTipoPicker({
         <div className={styles.bloque}>
           <p className={styles.nota}>
             {altaCorporativa
-              ? "Solo el nombre es obligatorio. Correo, teléfono y RFC se pueden dejar vacíos."
+              ? "Solo el nombre es obligatorio; correo, teléfono y RFC se pueden dejar vacíos."
               : altaSoloNombre
-                ? "Si no está en la lista, créalo con el nombre. Lo demás se completa después en Proyectos."
+                ? "Si no está en la lista, créalo con el nombre; lo demás se completa después en Proyectos."
                 : soloContacto
-                  ? "Puedes dar de alta aquí el nombre y el contacto. El RFC lo completa después coordinación."
-                  : "Si no está en la lista, créalo con el nombre. Los datos fiscales se completan después."}
+                  ? "Puedes dar de alta aquí el nombre y el contacto; el RFC lo completa después coordinación."
+                  : "Si no está en la lista, créalo con el nombre; los datos fiscales se completan después."}
           </p>
           {altaCorporativa || soloContacto ? (
             <div className={styles.fila}>
