@@ -187,10 +187,13 @@ struct MyProfileView: View {
             fila("Rol", profile?.roleName.nonEmptyOr("—") ?? "—")
             fila("Nº de empleado", numeroDeEmpleado)
             fila("Control de acceso", estadoIntegra)
+            if let nombre = nombreVinculado {
+                fila("Nombre", nombre)
+            }
             divisor
             titulo("Acceso y asistencia (hoy)")
-            fila("Checador de la app", lineaChecador)
-            fila("Pases en puertas", lineaPuertas)
+            filasChecador
+            filasPuertas
             nota("El checador de la app es el que cuenta para tu nómina.")
             if identity?.status != "linked" {
                 // El texto de la API es para administradores (Integra, employeeNo); aquí va el del empleado.
@@ -208,28 +211,47 @@ struct MyProfileView: View {
 
     private var estadoIntegra: String {
         switch identity?.status {
-        case "linked":
-            let name = identity?.personName ?? ""
-            return "Vinculado · \(name.isEmpty ? (identity?.personId ?? "") : name)"
+        case "linked": return "Vinculado"
         case "erp_only": return "Tu número aún no está en control de acceso"
         case "unlinked": return "Sin número de empleado"
         default: return "—"
         }
     }
 
-    private var lineaChecador: String {
-        guard let hybrid, !hybrid.erpCheckIn.isEmpty else { return "Sin entrada" }
-        var line = "Entrada \(NxHoraMexico.hhmm(hybrid.erpCheckIn) ?? "—")"
-        if let salida = NxHoraMexico.hhmm(hybrid.erpCheckOut) { line += " · Salida \(salida)" }
-        return line
+    /// El mismo nombre o id que antes iba después de «Vinculado · ».
+    /// Un nombre vacío sí cae al id, como el renglón anterior.
+    private var nombreVinculado: String? {
+        guard identity?.status == "linked" else { return nil }
+        let name = identity?.personName ?? ""
+        let shown = name.isEmpty ? (identity?.personId ?? "") : name
+        return shown.isEmpty ? nil : shown
     }
 
-    private var lineaPuertas: String {
-        if let hybrid, !hybrid.acsFirstAt.isEmpty {
-            let door = hybrid.acsFirstDoor.isEmpty ? "puerta" : hybrid.acsFirstDoor
-            return "\(hybrid.acsPasses) pases · \(door) · desde \(NxHoraMexico.hhmm(hybrid.acsFirstAt) ?? "—")"
+    /// Entrada y salida en renglones distintos. Sin entrada, el mismo texto de antes.
+    @ViewBuilder
+    private var filasChecador: some View {
+        if let hybrid, !hybrid.erpCheckIn.isEmpty {
+            fila("Entrada", NxHoraMexico.hhmm(hybrid.erpCheckIn) ?? "—")
+            if let salida = NxHoraMexico.hhmm(hybrid.erpCheckOut) {
+                fila("Salida", salida)
+            }
+        } else {
+            fila("Checador de la app", "Sin entrada")
         }
-        return identity?.status == "linked" ? "Sin pases hoy" : "Sin vincular"
+    }
+
+    /// Cuenta, puerta y hora en renglones distintos. Sin primer pase, el mismo texto de antes.
+    @ViewBuilder
+    private var filasPuertas: some View {
+        if let hybrid, !hybrid.acsFirstAt.isEmpty {
+            fila("Pases en puertas", "\(hybrid.acsPasses) pases")
+            fila("Puerta", hybrid.acsFirstDoor.isEmpty ? "puerta" : hybrid.acsFirstDoor)
+            fila("Hora", NxHoraMexico.hhmm(hybrid.acsFirstAt) ?? "—")
+        } else if identity?.status == "linked" {
+            fila("Pases en puertas", "Sin pases hoy")
+        } else {
+            fila("Pases en puertas", "Sin vincular")
+        }
     }
 
     // MARK: Datos personales
