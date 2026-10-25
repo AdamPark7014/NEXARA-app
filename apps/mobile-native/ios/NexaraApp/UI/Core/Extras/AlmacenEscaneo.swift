@@ -74,13 +74,28 @@ private func botonLleno(alto: CGFloat, llenaAncho: Bool = false) -> BotonMateria
     )
 }
 
+// MARK: - Textos
+
+/// Espejo de `AlmacenEscaneoTexto` en Android. Una frase, con el mismo hecho.
+private enum AlmacenEscaneoTexto {
+    /// No hay producto con ese código y, si es nuevo, se puede dar de alta con él.
+    static func vacio(_ codigo: String) -> String {
+        "No hay producto con el código «\(codigo)»: si es un producto nuevo, puedes darlo de alta con este código."
+    }
+
+    /// Los datos vienen del catálogo y hay que revisarlos antes de guardar.
+    static let avisoCatalogo = "Datos sugeridos del catálogo internacional: revísalos antes de guardar."
+}
+
 // MARK: - Producto
 
-/// Android `ProductoEscaneado`: nombre, clave y tipo de código, aviso de caja, la
-/// existencia total y un renglón por almacén con lo apartado.
+/// Android `ProductoEscaneado`: nombre, la clave y el tipo de código en renglones
+/// distintos, aviso de caja, la existencia total y, por almacén, el nombre y la
+/// cantidad en renglones distintos.
 struct ProductoEscaneadoVista: View {
     let r: ProductoPorCodigo
 
+    /// «Clave ABC» y, debajo, «EAN-13 750…». Vacío si no hay ninguno.
     private var detalle: String {
         let tipo = CodigoBarras.clasificar(r.codigoBarras).tipo.etiqueta
         return [
@@ -88,7 +103,7 @@ struct ProductoEscaneadoVista: View {
             r.codigoBarras.map { "\(tipo) \($0)" },
         ]
         .compactMap { $0 }
-        .joined(separator: " · ")
+        .joined(separator: "\n")
     }
 
     var body: some View {
@@ -102,6 +117,7 @@ struct ProductoEscaneadoVista: View {
                 Text(detalle)
                     .font(NxType.labelMedium)
                     .foregroundStyle(NxColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if r.esCaja {
                 Text("Leíste una caja: las cantidades cuentan \(EscaneoReglas.unidad(r)).")
@@ -118,17 +134,16 @@ struct ProductoEscaneadoVista: View {
                     .foregroundStyle(NxColors.muted)
             }
             ForEach(Array(existencias.enumerated()), id: \.offset) { _, e in
-                HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(e.almacen?.nilSiVacio ?? "Almacén")
                         .font(NxType.bodyMedium)
                         .foregroundStyle(NxColors.fg)
-                    Spacer(minLength: 8)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(cantidadTexto(e))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(NxColors.fg)
-                        .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .accessibilityElement(children: .combine)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -316,14 +331,10 @@ struct AltaPorCodigoVista: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("No hay producto con el código «\(codigo)».")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(NxColors.fg)
-                .fixedSize(horizontal: false, vertical: true)
             if !abierto {
-                Text("Si es un producto nuevo, puedes darlo de alta con este código.")
-                    .font(NxType.labelMedium)
-                    .foregroundStyle(NxColors.muted)
+                Text(AlmacenEscaneoTexto.vacio(codigo))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .top, spacing: 8) {
                     Button("Dar de alta") { abrir() }
@@ -332,6 +343,10 @@ struct AltaPorCodigoVista: View {
                         .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.brand)))
                 }
             } else {
+                Text("No hay producto con el código «\(codigo)».")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
+                    .fixedSize(horizontal: false, vertical: true)
                 formulario
             }
         }
@@ -405,7 +420,7 @@ struct AltaPorCodigoVista: View {
                 if descripcion.nilSiVacio == nil { descripcion = p.descripcion ?? "" }
                 imagenUrl = p.imagenUrl
                 categoria = p.categoria
-                fuente = "Datos sugeridos del catálogo internacional. Revísalos antes de guardar."
+                fuente = AlmacenEscaneoTexto.avisoCatalogo
             } else {
                 fuente = r.mensaje?.nilSiVacio
                     ?? "El catálogo internacional no conoce este código: escribe los datos."
