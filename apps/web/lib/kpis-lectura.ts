@@ -112,11 +112,12 @@ export function entregasDelEquipo(e: EntregasKpi | undefined): string {
 }
 
 /**
- * El texto bajo la barra del ranking: «17/18 a tiempo · 18/18 a la primera · 3 h 10 min en
- * actividades de 24 h». Con `tiempo` (orden «Tiempo en actividades») o con una API que aún
- * no manda entregas, solo las horas.
+ * Las cifras bajo la barra del ranking, una por renglón: «17/18 a tiempo», «18/18 a la
+ * primera», «3 h 10 min en actividades de 24 h». Con `tiempo` (orden «Tiempo en
+ * actividades») o con una API que aún no manda entregas, solo las horas.
+ * No recalcula: arma las mismas partes que antes iban juntas con « · ».
  */
-export function detalleDeFila(t: TotalesKpi, opciones: { tiempo?: boolean } = {}): string {
+export function partesDeFila(t: TotalesKpi, opciones: { tiempo?: boolean } = {}): string[] {
   const partes: string[] = [];
   const e = t.entregas;
   if (!opciones.tiempo && e) {
@@ -135,7 +136,12 @@ export function detalleDeFila(t: TotalesKpi, opciones: { tiempo?: boolean } = {}
       ? `${horasEnPalabras(t.minutosProductivos)} en actividades de ${horasEnPalabras(t.minutosLaborados)}`
       : "Sin jornada",
   );
-  return partes.join(" · ");
+  return partes;
+}
+
+/** La misma lectura, densa, en una sola línea. El ranking pinta `partesDeFila`. */
+export function detalleDeFila(t: TotalesKpi, opciones: { tiempo?: boolean } = {}): string {
+  return partesDeFila(t, opciones).join(" · ");
 }
 
 /** Atraso de una entrega: «45 min», «1 h 20 min»; de un día para arriba, «2 días 3 h». */

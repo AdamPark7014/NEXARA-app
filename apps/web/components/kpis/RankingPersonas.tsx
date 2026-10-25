@@ -5,8 +5,8 @@ import { Avatar, Badge } from "@/components/base";
 import { formatPctKpi, type KpiPersonaFila } from "@/lib/kpis-equipo";
 import {
   avisosDePersona,
-  detalleDeFila,
   horasEnPalabras,
+  partesDeFila,
   tonoCumplimiento,
   tonoProductividad,
   type OrdenRanking,
@@ -95,13 +95,27 @@ export default function RankingPersonas({
               )}
               <span className={s.detalle}>
                 <span
+                  className={s.detalleCifras}
                   title={
                     porTiempo
                       ? "Horas con una actividad corriendo de sus horas en jornada"
                       : "Entregas a tiempo de las que se miden · aprobadas a la primera de las revisadas · horas con una actividad corriendo de sus horas en jornada"
                   }
                 >
-                  {detalleDeFila(t, { tiempo: porTiempo })}
+                  {partesDeFila(t, { tiempo: porTiempo }).flatMap((parte, i) => {
+                    const cifra = (
+                      <span key={`c-${i}`} className={s.detalleCifra}>
+                        {parte}
+                      </span>
+                    );
+                    if (i === 0) return [cifra];
+                    return [
+                      <span key={`s-${i}`} className={s.detalleSep} aria-hidden="true">
+                        {" · "}
+                      </span>,
+                      cifra,
+                    ];
+                  })}
                 </span>
                 {avisos.map((a) => (
                   <Badge key={a.clave} tone={a.tono === "neutral" ? "neutral" : a.tono} title={a.titulo}>
