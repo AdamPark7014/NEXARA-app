@@ -113,15 +113,9 @@ struct PortalProfileView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PortalScreenTitle(
-                title: "Perfil del portal",
-                subtitle: vm.editable ? "Actualiza datos de contacto y dirección" : "Perfil de sucursal (solo lectura)"
-            )
-            PortalGap(12)
-
             if let error = vm.error {
                 if vm.profile == nil {
-                    NxErrorBlock(message: error, onRetry: { Task { await vm.refresh(initial: true) } })
+                    PortalFrase(text: error, retry: { Task { await vm.refresh(initial: true) } })
                 } else {
                     NxRefreshErrorBanner(message: error, onRetry: { Task { await vm.refresh(initial: false) } })
                 }
@@ -260,17 +254,13 @@ struct PortalBranchesView: View {
 
     @ViewBuilder
     private var list: some View {
-        PortalScreenTitle(title: "Mis sucursales", subtitle: "Administra ubicaciones y accesos del portal")
-        if let error = vm.error {
-            NxErrorBlock(message: error, onRetry: { Task { await vm.refresh(.initial) } })
+        if let error = vm.error, vm.branches.isEmpty {
+            PortalFrase(text: error, retry: { Task { await vm.refresh(.initial) } })
+        } else if let error = vm.error {
+            PortalFrase(text: error, retry: { Task { await vm.refresh(.visible) } })
         }
         if vm.branches.isEmpty && vm.error == nil {
-            NxEmptyState(
-                title: "Sin sucursales",
-                subtitle: "Registra tu primera sucursal para habilitar el portal por ubicación.",
-                actionLabel: "+ Nueva sucursal",
-                onAction: onCreate
-            )
+            PortalFrase(text: "No hay sucursales.", actionLabel: "Nueva sucursal", onAction: onCreate)
         } else {
             ForEach(vm.branches) { branch in
                 branchCard(branch)
@@ -518,11 +508,6 @@ struct PortalBranchEditView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PortalScreenTitle(
-                title: vm.isNew ? "Nueva sucursal" : "Editar sucursal",
-                subtitle: "Datos de acceso, ubicación y logo del portal"
-            )
-            PortalGap(12)
 
             if let message = vm.message {
                 PortalNoticePanel(message: message, closeLabel: "Cerrar") { vm.message = nil }
@@ -530,7 +515,7 @@ struct PortalBranchEditView: View {
             }
 
             if let error = vm.error {
-                NxErrorBlock(message: error, onRetry: { Task { await vm.load(initial: true) } })
+                PortalFrase(text: error, retry: { Task { await vm.load(initial: true) } })
                 PortalGap(10)
             }
 

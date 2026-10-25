@@ -24,28 +24,76 @@ extension EnvironmentValues {
     }
 }
 
-/// Barra teal de Android `TicketsNavHost`: título 16 SemiBold blanco, flecha de
-/// volver (la pone la pila) y, a la derecha, el icono de cerrar sesión en TODAS
-/// las pantallas del portal. Sin campana: el portal no tiene notificaciones.
+/// Barra clara del portal: fondo blanco, título oscuro, «Volver» en la siguiente
+/// pantalla y cerrar sesión a la derecha. Sin campana.
 private struct PortalChromeModifier: ViewModifier {
     let title: String
     @Environment(\.portalLogout) private var logout
 
     func body(content: Content) -> some View {
         content
-            .nxBrandNavBar(title: title, showsBell: false)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.white, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .background(PortalBackTitle())
             .toolbar {
                 if let logout {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(action: logout) {
                             Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .foregroundStyle(Color.white)
+                                .foregroundStyle(NxColors.fg)
                         }
-                        .tint(Color.white)
                         .accessibilityLabel("Cerrar sesión")
                     }
                 }
             }
+    }
+}
+
+/// El botón de atrás de la pantalla siguiente dice «Volver», no el título anterior.
+private struct PortalBackTitle: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.isHidden = true
+        controller.view.isUserInteractionEnabled = false
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        var current: UIViewController? = controller
+        while let next = current {
+            next.navigationItem.backButtonTitle = "Volver"
+            if next.navigationController != nil { break }
+            current = next.parent
+        }
+    }
+}
+
+/// Vacío o error del portal: una frase, y «Reintentar» o una acción si hace falta.
+struct PortalFrase: View {
+    let text: String
+    var retry: (() -> Void)? = nil
+    var actionLabel: String? = nil
+    var onAction: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(text)
+                .font(NxType.bodyMedium)
+                .foregroundStyle(NxColors.muted)
+                .multilineTextAlignment(.center)
+            if let retry {
+                Button("Reintentar", action: retry)
+            }
+            if let actionLabel, let onAction {
+                Button(actionLabel, action: onAction)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal, 24)
     }
 }
 
@@ -520,9 +568,13 @@ struct PortalNavCard: View {
                     Text(title)
                         .font(NxType.titleMedium)
                         .foregroundStyle(NxColors.fg)
-                    Text(subtitle)
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(1)
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(NxType.bodySmall)
+                            .foregroundStyle(NxColors.muted)
+                            .lineLimit(1)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if let badge {

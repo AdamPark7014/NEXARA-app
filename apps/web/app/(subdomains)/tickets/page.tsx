@@ -960,11 +960,11 @@ export default function ClientTicketsPage() {
 
   return (
     <div className={styles.mainStack}>
+          <header className={styles.quietBar}>
+            <h1 className={styles.quietTitle}>Tickets</h1>
+          </header>
+          <p className={styles.quietLine}>{session.client.name}</p>
           <div className={`card ${styles.panelHero}`}>
-            <p className={styles.panelHeroTitle}>Panel de tickets corporativo</p>
-            <p className={styles.panelHeroMeta}>
-              Cliente: {session.client.name} · Administra solicitudes, inventarios y seguimiento en un solo flujo.
-            </p>
             <div className={styles.panelKpis}>
               <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.total}</span><span className={styles.panelKpiLabel}>Tickets</span></div>
               <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
@@ -988,10 +988,7 @@ export default function ClientTicketsPage() {
                 className={`card ${styles.cardSoft}`}
                 style={{ textDecoration: "none", color: "inherit", display: "block" }}
               >
-                <p className={styles.sectionTitle} style={{ marginBottom: 4 }}>Mi seguridad</p>
-                <p className={styles.mutedText} style={{ margin: 0 }}>
-                  Cámaras, accesos y estado del sitio en Integra →
-                </p>
+                <p className={styles.sectionTitle} style={{ marginBottom: 0 }}>Seguridad</p>
               </a>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <a
@@ -999,23 +996,20 @@ export default function ClientTicketsPage() {
                   className={`card ${styles.cardSoft}`}
                   style={{ textDecoration: "none", color: "inherit", display: "block" }}
                 >
-                  <p className={styles.sectionTitle} style={{ marginBottom: 4 }}>Video</p>
-                  <p className={styles.mutedText} style={{ margin: 0 }}>Cámaras en vivo</p>
+                  <p className={styles.sectionTitle} style={{ marginBottom: 0 }}>Video</p>
                 </a>
                 <a
                   href={getIntegraUrl("/access")}
                   className={`card ${styles.cardSoft}`}
                   style={{ textDecoration: "none", color: "inherit", display: "block" }}
                 >
-                  <p className={styles.sectionTitle} style={{ marginBottom: 4 }}>Accesos</p>
-                  <p className={styles.mutedText} style={{ margin: 0 }}>Puertas y control</p>
+                  <p className={styles.sectionTitle} style={{ marginBottom: 0 }}>Accesos</p>
                 </a>
               </div>
               {pendingFeedback.length > 0 && (
                 <div className={`card ${styles.cardPanel}`}>
                   <div>
-                    <p className={styles.sectionTitle}>Confirmación de servicio</p>
-                    <p className={styles.sectionSubtitle}>Ayúdanos a validar la calidad del servicio recibido.</p>
+                    <p className={styles.sectionTitle}>Confirmación</p>
                   </div>
                   <div className={styles.listStack}>
                     {pendingFeedback.map((activity) => (
@@ -1089,8 +1083,7 @@ export default function ClientTicketsPage() {
               )}
               {clientProjects.length > 0 && (
                 <div className={`card ${styles.cardPanel}`}>
-                  <p className={styles.sectionTitle}>Proyectos en curso</p>
-                  <p className={styles.sectionSubtitle}>Instalaciones y servicios activos en sus sucursales.</p>
+                  <p className={styles.sectionTitle}>Proyectos</p>
                   <div className={styles.listStack}>
                     {clientProjects.map((p) => (
                       <div key={p.id} className={styles.itemCard}>
@@ -1098,10 +1091,8 @@ export default function ClientTicketsPage() {
                           <strong>{p.title}</strong>
                           <span className="badge">{p.progressPercent}%</span>
                         </div>
-                        <div className={styles.mutedText}>
-                          {p.completedActivities}/{p.activityCount} OT completadas
-                          {p.siteCount ? ` · ${p.siteCount} sitio(s)` : ""}
-                        </div>
+                        <div className={styles.quietLine}>{p.completedActivities}/{p.activityCount} órdenes</div>
+                        {p.siteCount ? <div className={styles.quietLine}>{p.siteCount} sitios</div> : null}
                         {p.scopeSummary && <div className={styles.mutedText}>{p.scopeSummary}</div>}
                       </div>
                     ))}
@@ -1111,10 +1102,9 @@ export default function ClientTicketsPage() {
               <div className={`card ${styles.cardSoft}`}>
                 <div className={styles.itemHeader}>
                   <div>
-                    <p className={styles.sectionTitle}>Tickets activos</p>
-                    <p className={styles.sectionSubtitle}>Seguimiento en tiempo real de avances y evidencias.</p>
+                    <p className={styles.sectionTitle}>Tickets</p>
                   </div>
-                  <div className={styles.mutedText}>{loading ? "Sincronizando..." : "Actualizado"}</div>
+                  <div className={styles.quietLine}>{loading ? "Cargando…" : "Al día"}</div>
                 </div>
                 <div className={styles.grid200}>
                   <div>
@@ -1419,9 +1409,7 @@ export default function ClientTicketsPage() {
             <div className={styles.sectionStack}>
               <div className={`card ${styles.cardSoft} ${styles.requestFormCard}`}>
                 <div className={styles.requestFormHeader}>
-                  <p className={styles.requestEyebrow}>Centro de solicitud</p>
                   <p className={styles.sectionTitle}>Nueva solicitud</p>
-                  <p className={styles.sectionSubtitle}>Captura el servicio requerido con datos claros de sucursal, prioridad y ubicación para agilizar la asignación.</p>
                   <div className={styles.requestBadgeRow}>
                     <span className={styles.requestBadge}>Flujo: {requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Mantenimiento e inventario" : "Ticket por problema"}</span>
                     <span className={styles.requestBadge}>Urgencia: {requestDraft.urgency}</span>
@@ -1430,8 +1418,7 @@ export default function ClientTicketsPage() {
 
                 <div className={styles.formSection}>
                   <div className={styles.formSectionHeader}>
-                    <p className={styles.formSectionTitle}>Definición del servicio</p>
-                    <p className={styles.formSectionText}>Selecciona el flujo correcto y, si aplica, establece un compromiso de atención.</p>
+                    <p className={styles.formSectionTitle}>Servicio</p>
                   </div>
                   <div className={styles.grid200}>
                     <div className={styles.fieldStack}>
@@ -1472,7 +1459,6 @@ export default function ClientTicketsPage() {
                 <div className={styles.formSection}>
                   <div className={styles.formSectionHeader}>
                     <p className={styles.formSectionTitle}>Datos de sucursal</p>
-                    <p className={styles.formSectionText}>Puedes usar una sucursal existente o completar manualmente la información del sitio.</p>
                   </div>
                   <div className={styles.grid200}>
                     <div className={`${styles.fieldStack} ${styles.fullSpan}`}>
@@ -1539,7 +1525,6 @@ export default function ClientTicketsPage() {
                 <div className={styles.formSection}>
                   <div className={styles.formSectionHeader}>
                     <p className={styles.formSectionTitle}>Descripción y ubicación</p>
-                    <p className={styles.formSectionText}>Describe el requerimiento con el mayor contexto posible y valida la ubicación en mapa si aplica.</p>
                   </div>
                   <div className={styles.fieldStack}>
                     <label className={styles.fieldLabel}>Descripción del servicio</label>
@@ -1553,7 +1538,6 @@ export default function ClientTicketsPage() {
                   </div>
                   <div className={styles.infoBanner}>
                     <p className={styles.formSectionTitle}>Ubicación del ticket</p>
-                    <p className={styles.formSectionText}>Usa el selector para dejar coordenadas y dirección precisas para el equipo de atención.</p>
                   </div>
                   <ClientLocationPicker
                     label="Ubicación del ticket"
@@ -1727,10 +1711,9 @@ export default function ClientTicketsPage() {
                 </div>
                 <div>
                   <h3 style={{ margin: 0 }}>{session.client.name}</h3>
-                  <p className={styles.mutedText} style={{ margin: 0 }}>Acceso para consulta de tickets, reportes y seguimiento de sucursales.</p>
                   <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, cursor: logoUploading ? "default" : "pointer", opacity: logoUploading ? 0.6 : 1 }}>
                     <span className="button-secondary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}>
-                      {logoUploading ? "Subiendo..." : "📷 Cambiar logo"}
+                      {logoUploading ? "Subiendo…" : "Cambiar logo"}
                     </span>
                     <input
                       type="file"
@@ -1771,10 +1754,7 @@ export default function ClientTicketsPage() {
           {activeTab === "sucursales" && (
             <div className={styles.sectionStack}>
               <div className={`card ${styles.cardSoft}`}>
-                <p className={styles.sectionTitle}>Gestión de sucursales</p>
-                <p className={styles.mutedText} style={{ margin: 0 }}>
-                  Administra aquí mismo tus sucursales, logos y credenciales de acceso.
-                </p>
+                <p className={styles.sectionTitle}>Sucursales</p>
                 {token && (
                   <BranchesForm
                     token={token}

@@ -61,14 +61,14 @@ export default function HelpCenterPage() {
 
   return (
     <div style={{ padding: "24px max(16px, 4vw)", maxWidth: 1000, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <h1 style={{ margin: 0, fontSize: 32 }}>🆘 Centro de ayuda</h1>
-        <p style={{ color: "var(--text-secondary)", marginTop: 8 }}>
-          Encuentra respuestas a las preguntas más frecuentes sobre nuestros servicios.
-        </p>
+      <header style={{ display: "flex", alignItems: "center", gap: 16, minHeight: 52, marginBottom: 16, borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+        <a href="/tickets" style={{ color: "#1d1d1f", textDecoration: "none", fontSize: 15 }}>Volver</a>
+        <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Ayuda</h1>
+      </header>
+      <div style={{ marginBottom: 16 }}>
         <input
           type="text"
-          placeholder="🔍 Buscar artículos..."
+          placeholder="Buscar artículos"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
@@ -87,7 +87,7 @@ export default function HelpCenterPage() {
       {selected ? (
         <div>
           <button type="button" onClick={() => setSelected(null)} style={{ background: "transparent", border: "none", color: "var(--primary)", cursor: "pointer", marginBottom: 12 }}>
-            ← Volver al listado
+            Volver
           </button>
           <article style={{ padding: 24, background: "var(--bg-primary)", border: "1px solid var(--border)", borderRadius: 12 }}>
             {selected.category && <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{selected.category.icon} {selected.category.name}</div>}
@@ -111,8 +111,8 @@ export default function HelpCenterPage() {
           {loading ? (
             <p style={{ textAlign: "center" }}>Cargando…</p>
           ) : filtered.length === 0 ? (
-            <p style={{ color: "var(--text-secondary)", textAlign: "center" }}>
-              No se encontraron artículos {search && `para "${search}"`}.
+            <p style={{ color: "#6e6e73", textAlign: "center" }}>
+              {search ? "Ningún artículo coincide con la búsqueda." : "No hay artículos."}
             </p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>

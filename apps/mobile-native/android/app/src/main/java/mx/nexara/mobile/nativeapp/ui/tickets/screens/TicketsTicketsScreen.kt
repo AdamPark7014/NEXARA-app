@@ -12,8 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.ConfirmationNumber
-import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -52,17 +50,15 @@ import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterPill
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSegmented
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
@@ -179,7 +175,7 @@ fun TicketsTicketsScreen(
         listOf(
             NxKpi("Abiertos", "$open", tone = if (open > 0) NxTone.Warning else NxTone.Success),
             NxKpi("Alta prioridad", "$high", tone = if (high > 0) NxTone.Danger else NxTone.Neutral),
-            NxKpi("Más de 48 h", "$aging", hint = "Sin cierre", tone = if (aging > 0) NxTone.Danger else NxTone.Info),
+            NxKpi("Más de 48 h", "$aging", tone = if (aging > 0) NxTone.Danger else NxTone.Info),
             NxKpi("Total", "${tickets.size}", tone = NxTone.Brand),
         )
     }
@@ -214,8 +210,8 @@ fun TicketsTicketsScreen(
                 itemHeight = 92.dp,
                 modifier = Modifier.fillMaxWidth().padding(NxSpacing.ListPadding),
             )
-            tickets.isEmpty() && !state.error.isNullOrBlank() -> NxErrorState(
-                message = state.error,
+            tickets.isEmpty() && !state.error.isNullOrBlank() -> PortalFrase(
+                text = state.error!!,
                 onRetry = { vm.refresh(initial = true) },
             )
             else -> LazyColumn(
@@ -231,13 +227,6 @@ fun TicketsTicketsScreen(
                             onDismiss = vm::dismissError,
                         )
                     }
-                }
-
-                item(key = "header") {
-                    NxSectionHeader(
-                        title = "Tickets",
-                        subtitle = "Prioridad, antigüedad y estado de cada servicio.",
-                    )
                 }
 
                 item(key = "kpis") { NxKpiGrid(items = kpis) }
@@ -317,14 +306,9 @@ fun TicketsTicketsScreen(
 
                 if (filtered.isEmpty()) {
                     item(key = "empty") {
-                        NxEmptyState(
-                            title = if (tickets.isEmpty()) "Sin tickets" else "Sin resultados",
-                            subtitle = if (tickets.isEmpty()) {
-                                "No hay tickets en este periodo."
-                            } else {
-                                "Ningún ticket coincide con el filtro o la búsqueda."
-                            },
-                            icon = Icons.Outlined.ConfirmationNumber,
+                        PortalFrase(
+                            if (tickets.isEmpty()) "No hay tickets en este periodo."
+                            else "Ningún ticket coincide con la búsqueda.",
                         )
                     }
                 } else {
@@ -359,39 +343,26 @@ private fun TicketRow(ticket: ClientPortalTicketDto, onOpen: () -> Unit) {
             modifier = Modifier.padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Top,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         t.titulo?.takeIf { it.isNotBlank() } ?: "Ticket #${t.id}",
                         style = MaterialTheme.typography.titleSmall,
                         color = NxColors.Slate,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
                     NxStatusChip(NxStatusLabels.label(t.estatus), tone)
                 }
-                val meta = buildList {
-                    t.anNumber?.takeIf { it.isNotBlank() }?.let { add(it) }
-                    NxStatusLabels.priority(t.displayPriority())?.let { add("Prioridad $it") }
-                    t.branchName?.takeIf { it.isNotBlank() }?.let { add(it) }
-                    if (open) add(ticketAgeText(ageH))
-                }.joinToString(" · ")
-                if (meta.isNotBlank()) {
-                    Text(meta, color = NxColors.Muted, style = MaterialTheme.typography.bodySmall)
-                }
-                if (open && ageH >= 48) {
-                    NxIconText(
-                        text = "Fuera de ventana operativa (más de 48 h)",
-                        icon = Icons.Outlined.WarningAmber,
-                        color = NxColors.Danger,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
+                t.anNumber?.takeIf { it.isNotBlank() }?.let { PortalLinea(it) }
+                NxStatusLabels.priority(t.displayPriority())?.let { PortalLinea("Prioridad $it") }
+                t.branchName?.takeIf { it.isNotBlank() }?.let { PortalLinea(it) }
+                if (open) PortalLinea(ticketAgeText(ageH))
             }
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,

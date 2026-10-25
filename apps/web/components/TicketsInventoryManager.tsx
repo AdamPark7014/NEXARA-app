@@ -818,23 +818,28 @@ export default function TicketsInventoryManager({ token, mode, fixedBranch, bran
         {!loading && filteredInventories.map((inventory) => (
           <div key={inventory.id} className="record-card">
             <div className="inventory-record-top">
-              <strong>INV-{inventory.id} · {inventory.branch?.name || "Sucursal"}</strong>
+              <strong>INV-{inventory.id}</strong>
+              <div className="inventory-record-meta">{inventory.branch?.name || "Sucursal"}</div>
               <span className="badge">{getStatusLabel(inventory.status)}</span>
             </div>
-            <div className="inventory-record-meta">Origen: {getOriginLabel(inventory)}</div>
+            <div className="inventory-record-meta">{getOriginLabel(inventory)}</div>
             {inventory.activity && (
-              <div className="inventory-record-meta">
-                Actividad: {inventory.activity.anNumber || `ACT-${inventory.activity.id}`} · {inventory.activity.titulo || '-'} · {getFlowLabel(inventory.activity.workType)}
-              </div>
+              <>
+                <div className="inventory-record-meta">{inventory.activity.anNumber || `ACT-${inventory.activity.id}`}</div>
+                <div className="inventory-record-meta">{inventory.activity.titulo || "Sin título"}</div>
+                <div className="inventory-record-meta">{getFlowLabel(inventory.activity.workType)}</div>
+              </>
             )}
             {inventory.request && (
-              <div className="inventory-record-meta">
-                Solicitud: #{inventory.request.id} · {getFlowLabel(inventory.request.requestType)} · {inventory.request.status || '-'}
-              </div>
+              <>
+                <div className="inventory-record-meta">Solicitud #{inventory.request.id}</div>
+                <div className="inventory-record-meta">{getFlowLabel(inventory.request.requestType)}</div>
+                <div className="inventory-record-meta">{inventory.request.status || "Sin estatus"}</div>
+              </>
             )}
-            <div className="inventory-record-meta">
-              {inventory.previousCount ?? 0} previos · {inventory.currentCount ?? 0} actuales · Δ {inventory.deltaCount ?? 0}
-            </div>
+            <div className="inventory-record-meta">{inventory.previousCount ?? 0} previos</div>
+            <div className="inventory-record-meta">{inventory.currentCount ?? 0} actuales</div>
+            <div className="inventory-record-meta">Δ {inventory.deltaCount ?? 0}</div>
             {toSource(inventory) === 'OWN' && (() => {
               const branchId = Number(inventory.branch?.id || 0);
               const providerBaseline = branchId ? providerBaselineByBranch.get(branchId) : null;

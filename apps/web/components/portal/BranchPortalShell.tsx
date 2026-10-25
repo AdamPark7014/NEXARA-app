@@ -142,8 +142,8 @@ export default function BranchPortalShell({ children }: { children: React.ReactN
             writeBranchSession({ token: data.access_token, branch: data.branch });
             refresh();
           }}
-          title="Portal de sucursal"
-          subtitle="Acceso operativo para reportar solicitudes de servicio"
+          title="Sucursal"
+          subtitle="Ingresa con tu cuenta."
         />
       </div>
     );
@@ -227,7 +227,7 @@ export default function BranchPortalShell({ children }: { children: React.ReactN
                     className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    🏢 Portal corporativo
+                    Portal
                   </Link>
                 </li>
                 <li className={consoleStyles.sidebarMenuItem}>
@@ -236,7 +236,7 @@ export default function BranchPortalShell({ children }: { children: React.ReactN
                     className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    🆘 Centro de ayuda
+                    Ayuda
                   </Link>
                 </li>
               </ul>
@@ -280,7 +280,7 @@ export default function BranchPortalShell({ children }: { children: React.ReactN
                     className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
                     onClick={toggleDarkMode}
                   >
-                    {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
+                    {darkMode ? "Vista clara" : "Vista oscura"}
                   </button>
                 </li>
                 <li className={consoleStyles.sidebarMenuItem}>
@@ -289,7 +289,7 @@ export default function BranchPortalShell({ children }: { children: React.ReactN
                     className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
                     onClick={ctx.logout}
                   >
-                    ⎋ Cerrar sesión
+                    Cerrar sesión
                   </button>
                 </li>
               </ul>

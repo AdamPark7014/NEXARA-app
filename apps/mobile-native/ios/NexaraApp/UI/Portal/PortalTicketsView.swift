@@ -122,7 +122,7 @@ struct PortalTicketsView: View {
             PortalSkeletonScreen(itemCount: 6, itemHeight: 92)
         } else if vm.tickets.isEmpty, let error = vm.error {
             ScrollView {
-                NxErrorState(message: error) { Task { await vm.refresh(.initial) } }
+                PortalFrase(text: error, retry: { Task { await vm.refresh(.initial) } })
             }
             .refreshable { await vm.refresh(.pull) }
         } else {
@@ -147,7 +147,6 @@ struct PortalTicketsView: View {
                 onDismiss: { vm.error = nil }
             )
         }
-        NxSectionHeader(title: "Tickets", subtitle: "Prioridad, antigüedad y estado de cada servicio.")
         NxKpiGrid(items: kpis)
         NxSegmented(
             options: Self.ranges.map(\.label),
@@ -175,12 +174,10 @@ struct PortalTicketsView: View {
         }
         let rows = filtered
         if rows.isEmpty {
-            NxEmptyState(
-                title: vm.tickets.isEmpty ? "Sin tickets" : "Sin resultados",
-                subtitle: vm.tickets.isEmpty
+            PortalFrase(
+                text: vm.tickets.isEmpty
                     ? "No hay tickets en este periodo."
-                    : "Ningún ticket coincide con el filtro o la búsqueda.",
-                systemImage: "ticket"
+                    : "Ningún ticket coincide con la búsqueda."
             )
         } else {
             ForEach(rows) { ticket in
@@ -196,7 +193,7 @@ struct PortalTicketsView: View {
         return [
             NxKpi(label: "Abiertos", value: "\(open.count)", tone: open.isEmpty ? .success : .warning),
             NxKpi(label: "Alta prioridad", value: "\(high)", tone: high > 0 ? .danger : .neutral),
-            NxKpi(label: "Más de 48 h", value: "\(aging)", hint: "Sin cierre", tone: aging > 0 ? .danger : .info),
+            NxKpi(label: "Más de 48 h", value: "\(aging)", tone: aging > 0 ? .danger : .info),
             NxKpi(label: "Total", value: "\(vm.tickets.count)", tone: .brand),
         ]
     }
@@ -439,9 +436,9 @@ struct PortalTicketDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let error = vm.error {
-                        NxErrorBlock(message: error, onRetry: { Task { await vm.load(.initial) } })
+                        PortalFrase(text: error, retry: { Task { await vm.load(.initial) } })
                     } else {
-                        NxEmptyState(title: "Ticket no encontrado", subtitle: "No hay datos para este ticket.")
+                        PortalFrase(text: "No hay datos de este ticket.")
                     }
                 }
                 .padding(NxSpacing.l)
@@ -453,7 +450,7 @@ struct PortalTicketDetailView: View {
     @ViewBuilder
     private func detail(_ t: PortalTicket) -> some View {
         if let error = vm.error {
-            NxErrorBlock(message: error, onRetry: { Task { await vm.load(.initial) } })
+            PortalFrase(text: error, retry: { Task { await vm.load(.initial) } })
         }
         header(t)
         slaPanel(t)

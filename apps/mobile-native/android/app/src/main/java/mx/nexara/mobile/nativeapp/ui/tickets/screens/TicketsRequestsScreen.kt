@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -48,8 +47,8 @@ import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterPill
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
@@ -61,7 +60,6 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSecondaryButton
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
@@ -264,8 +262,8 @@ fun TicketsRequestsScreen(
                 itemHeight = 120.dp,
                 modifier = Modifier.fillMaxWidth().padding(NxSpacing.ListPadding),
             )
-            requests.isEmpty() && !state.error.isNullOrBlank() -> NxErrorState(
-                message = state.error,
+            requests.isEmpty() && !state.error.isNullOrBlank() -> PortalFrase(
+                text = state.error!!,
                 onRetry = { vm.refresh(initial = true) },
             )
             else -> LazyColumn(
@@ -296,13 +294,6 @@ fun TicketsRequestsScreen(
                     }
                 }
 
-                item(key = "header") {
-                    NxSectionHeader(
-                        title = "Solicitudes",
-                        subtitle = "Levanta tickets y revisa el estatus de cada solicitud.",
-                    )
-                }
-
                 item(key = "kpis") { NxKpiGrid(items = kpis, columns = 3) }
 
                 item(key = "search") {
@@ -328,14 +319,9 @@ fun TicketsRequestsScreen(
 
                 if (filtered.isEmpty()) {
                     item(key = "empty") {
-                        NxEmptyState(
-                            title = if (requests.isEmpty()) "Sin solicitudes" else "Sin resultados",
-                            subtitle = if (requests.isEmpty()) {
-                                "Cuando levantes una solicitud aparecerá aquí."
-                            } else {
-                                "Ninguna solicitud coincide con el filtro o la búsqueda."
-                            },
-                            icon = Icons.Outlined.Inbox,
+                        PortalFrase(
+                            if (requests.isEmpty()) "No hay solicitudes."
+                            else "Ninguna solicitud coincide con la búsqueda.",
                         )
                     }
                 } else {
@@ -418,7 +404,7 @@ private fun RequestCard(
                 r.branchName?.takeIf { it.isNotBlank() } ?: "Solicitud #${r.id}",
                 style = MaterialTheme.typography.titleSmall,
                 color = NxColors.Slate,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
@@ -430,18 +416,10 @@ private fun RequestCard(
             color = NxColors.Slate,
             modifier = Modifier.padding(top = 6.dp),
         )
-        val meta = buildList {
-            add(requestTypeLabel(r.requestType))
-            NxStatusLabels.priority(r.urgency)?.let { add("Urgencia $it") }
-            r.dueAt?.takeIf { it.isNotBlank() }?.let { add("Límite ${NxFormat.dateTime(it)}") }
-            r.branchNumber?.takeIf { it.isNotBlank() }?.let { add("Sucursal $it") }
-        }.joinToString(" · ")
-        Text(
-            meta,
-            color = NxColors.Muted,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        PortalLinea(requestTypeLabel(r.requestType), modifier = Modifier.padding(top = 4.dp))
+        NxStatusLabels.priority(r.urgency)?.let { PortalLinea("Urgencia $it") }
+        r.dueAt?.takeIf { it.isNotBlank() }?.let { PortalLinea("Límite ${NxFormat.dateTime(it)}") }
+        r.branchNumber?.takeIf { it.isNotBlank() }?.let { PortalLinea("Sucursal $it") }
         if (canManage && status != "CLOSED") {
             Column(
                 modifier = Modifier.padding(top = NxSpacing.M),

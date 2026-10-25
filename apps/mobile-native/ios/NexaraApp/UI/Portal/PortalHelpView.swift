@@ -83,7 +83,7 @@ final class PortalHelpVM: ObservableObject {
 
 /// Centro de ayuda del portal (Android `PortalHelpScreen`): título, buscador,
 /// tarjetas de artículos y el detalle con «¿Te fue útil este artículo?». El
-/// volver lo da la barra teal de la pila del portal.
+/// volver lo da la barra clara de la pila del portal.
 struct PortalHelpView: View {
     @StateObject private var vm = PortalHelpVM()
 
@@ -119,7 +119,7 @@ struct PortalHelpView: View {
         if vm.isLoading {
             NxLoadingState(text: "Cargando artículos…")
         } else if let err = vm.error, !err.isEmpty {
-            NxErrorBlock(message: err, onRetry: { vm.refresh(initial: true) })
+            PortalFrase(text: err, retry: { vm.refresh(initial: true) })
         } else if let article = vm.selected {
             PortalHelpArticleDetail(
                 article: article,
@@ -128,11 +128,10 @@ struct PortalHelpView: View {
                 onMarkHelpful: { vm.markHelpful(id: article.id) }
             )
         } else if vm.articles.isEmpty {
-            NxEmptyState(
-                title: "Sin artículos",
-                subtitle: vm.search.trimmingCharacters(in: .whitespaces).isEmpty
-                    ? "No hay artículos publicados por ahora."
-                    : "No se encontraron artículos para \"\(vm.search)\"."
+            PortalFrase(
+                text: vm.search.trimmingCharacters(in: .whitespaces).isEmpty
+                    ? "No hay artículos."
+                    : "Ningún artículo coincide con la búsqueda."
             )
         } else {
             LazyVStack(spacing: NxSpacing.listGap) {

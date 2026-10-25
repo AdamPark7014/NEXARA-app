@@ -48,8 +48,7 @@ import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.KbPublicArticleDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
@@ -200,20 +199,16 @@ fun PortalHelpScreen(
 
             when {
                 state.isLoading -> NxLoadingBlock("Cargando artículos…")
-                !state.error.isNullOrBlank() -> NxErrorBlock(state.error!!, onRetry = { vm.refresh(initial = true) })
+                !state.error.isNullOrBlank() -> PortalFrase(state.error!!, onRetry = { vm.refresh(initial = true) })
                 state.selected != null -> PortalHelpArticleDetail(
                     article = state.selected!!,
                     isMarkingHelpful = state.isMarkingHelpful,
                     onBack = { vm.selectArticle(null) },
                     onMarkHelpful = { vm.markHelpful(state.selected!!.id) },
                 )
-                state.articles.isEmpty() -> NxEmptyState(
-                    title = "Sin artículos",
-                    subtitle = if (state.search.isNotBlank()) {
-                        "No se encontraron artículos para \"${state.search}\"."
-                    } else {
-                        "No hay artículos publicados por ahora."
-                    },
+                state.articles.isEmpty() -> PortalFrase(
+                    if (state.search.isNotBlank()) "Ningún artículo coincide con la búsqueda."
+                    else "No hay artículos.",
                 )
                 else -> LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -296,7 +291,7 @@ private fun PortalHelpArticleDetail(
         contentPadding = PaddingValues(bottom = 16.dp),
     ) {
         item {
-            OutlinedButton(onClick = onBack) { Text("← Volver al listado") }
+            OutlinedButton(onClick = onBack) { Text("Volver") }
         }
         item {
             NxPanelShell(contentPadding = PaddingValues(16.dp)) {

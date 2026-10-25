@@ -109,7 +109,7 @@ import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
@@ -657,30 +657,6 @@ fun TicketsBranchEditScreen(
 
             ) {
 
-                Text(
-
-                    if (isNew) "Nueva sucursal" else "Editar sucursal",
-
-                    style = MaterialTheme.typography.titleLarge,
-
-                    fontWeight = FontWeight.Bold,
-
-                )
-
-                Text(
-
-                    "Datos de acceso, ubicación y logo del portal",
-
-                    style = MaterialTheme.typography.bodySmall,
-
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-
-
                 if (!state.message.isNullOrBlank()) {
 
                     NxPanelShell(contentPadding = PaddingValues(12.dp)) {
@@ -699,7 +675,7 @@ fun TicketsBranchEditScreen(
 
                 if (!state.error.isNullOrBlank()) {
 
-                    NxErrorBlock(state.error!!) { vm.load(branchId, initial = true) }
+                    PortalFrase(state.error!!, onRetry = { vm.load(branchId, initial = true) })
 
                     Spacer(Modifier.height(10.dp))
 

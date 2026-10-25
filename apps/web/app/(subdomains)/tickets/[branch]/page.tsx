@@ -1,6 +1,7 @@
 ﻿"use client";
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useBranchPortalSession } from "@/components/portal/BranchPortalShell";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
@@ -463,11 +464,11 @@ export default function BranchTicketsPage() {
 
   return (
     <div className={styles.mainStack}>
+          <header className={styles.quietBar}>
+            <Link className={styles.quietBack} href="/tickets">Volver</Link>
+            <h1 className={styles.quietTitle}>{profile?.name || displayName}</h1>
+          </header>
           <div className={`card ${styles.panelHero}`}>
-            <p className={styles.panelHeroTitle}>Portal de tickets de sucursal</p>
-            <p className={styles.panelHeroMeta}>
-              Sucursal: {profile?.name || displayName} · Registra solicitudes y da seguimiento al inventario de mantenimiento.
-            </p>
             <div className={styles.panelKpis}>
               <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.total}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
               <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
@@ -705,9 +706,7 @@ export default function BranchTicketsPage() {
           <>
           <div className={`card ${styles.cardSoft} ${styles.requestFormCard}`}>
             <div className={styles.requestFormHeader}>
-              <p className={styles.requestEyebrow}>Portal operativo</p>
-              <p className={styles.sectionTitle}>Registrar solicitud</p>
-              <p className={styles.sectionSubtitle}>Genera tickets o mantenimientos desde tu sucursal con información suficiente para acelerar el despacho.</p>
+              <p className={styles.sectionTitle}>Nueva solicitud</p>
               <div className={styles.requestBadgeRow}>
                 <span className={styles.requestBadge}>Sucursal: {profile?.name || displayName}</span>
                 <span className={styles.requestBadge}>Urgencia: {draft.urgency}</span>
@@ -715,14 +714,13 @@ export default function BranchTicketsPage() {
             </div>
 
             <div className={styles.infoBanner}>
-              <p className={styles.formSectionTitle}>Punto de origen</p>
-              <p className={styles.formSectionText}>Sucursal: {profile?.name || displayName} {profile?.branchNumber ? `(${profile.branchNumber})` : ""}</p>
+              <p className={styles.quietLine}>{profile?.name || displayName}</p>
+              {profile?.branchNumber ? <p className={styles.quietLine}>{profile.branchNumber}</p> : null}
             </div>
 
             <div className={styles.formSection}>
               <div className={styles.formSectionHeader}>
                 <p className={styles.formSectionTitle}>Contexto de la solicitud</p>
-                <p className={styles.formSectionText}>Define el tipo de requerimiento y el nivel de prioridad antes de enviarlo al equipo.</p>
               </div>
               <div className={styles.fieldStack}>
                 <label className={styles.fieldLabel}>Descripción del requerimiento</label>
@@ -760,7 +758,6 @@ export default function BranchTicketsPage() {
             <div className={styles.formSection}>
               <div className={styles.formSectionHeader}>
                 <p className={styles.formSectionTitle}>Ubicación y evidencia inicial</p>
-                <p className={styles.formSectionText}>Adjunta archivos y confirma ubicación para evitar aclaraciones posteriores.</p>
               </div>
               <ClientLocationPicker
                 label="Ubicación de la solicitud"
@@ -783,7 +780,6 @@ export default function BranchTicketsPage() {
               <div className={styles.uploadPanel}>
                 <div className={styles.formSectionHeader}>
                   <p className={styles.formSectionTitle}>Archivos de apoyo</p>
-                  <p className={styles.formSectionText}>Puedes adjuntar imágenes o PDF con referencias del problema o del inventario a revisar.</p>
                 </div>
                 <div
                   onDragOver={(event) => {

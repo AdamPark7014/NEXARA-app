@@ -114,7 +114,7 @@ struct PortalFeedbackView: View {
             PortalSkeletonScreen(itemCount: 3, itemHeight: 220)
         } else if vm.items.isEmpty, let error = vm.error {
             ScrollView {
-                NxErrorState(message: error) { Task { await vm.refresh(.initial) } }
+                PortalFrase(text: error, retry: { Task { await vm.refresh(.initial) } })
             }
             .refreshable { await vm.refresh(.pull) }
         } else {
@@ -132,10 +132,6 @@ struct PortalFeedbackView: View {
 
     @ViewBuilder
     private var list: some View {
-        NxSectionHeader(
-            title: "Confirmación de servicio",
-            subtitle: "Ayúdanos a validar la calidad del servicio recibido."
-        )
         if let message = vm.message {
             PortalSuccessBanner(message: message) { vm.message = nil }
         }
@@ -147,11 +143,7 @@ struct PortalFeedbackView: View {
             )
         }
         if vm.items.isEmpty {
-            NxEmptyState(
-                title: "Todo al día",
-                subtitle: "No tienes servicios pendientes de evaluar.",
-                systemImage: "hand.thumbsup"
-            )
+            PortalFrase(text: "No hay servicios por confirmar.")
         } else {
             ForEach(vm.items) { item in
                 card(item)

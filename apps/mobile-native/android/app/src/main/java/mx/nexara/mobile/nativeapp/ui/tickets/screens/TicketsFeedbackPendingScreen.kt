@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,14 +46,13 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSegmented
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
@@ -228,8 +226,8 @@ fun TicketsFeedbackPendingScreen(
                 itemHeight = 220.dp,
                 modifier = Modifier.fillMaxWidth().padding(NxSpacing.ListPadding),
             )
-            state.items.isEmpty() && !state.error.isNullOrBlank() -> NxErrorState(
-                message = state.error,
+            state.items.isEmpty() && !state.error.isNullOrBlank() -> PortalFrase(
+                state.error!!,
                 onRetry = { vm.refresh(initial = true) },
             )
             else -> LazyColumn(
@@ -237,12 +235,6 @@ fun TicketsFeedbackPendingScreen(
                 contentPadding = NxSpacing.ListPadding,
                 verticalArrangement = Arrangement.spacedBy(NxSpacing.ListGap),
             ) {
-                item(key = "header") {
-                    NxSectionHeader(
-                        title = "Confirmación de servicio",
-                        subtitle = "Ayúdanos a validar la calidad del servicio recibido.",
-                    )
-                }
                 state.message?.takeIf { it.isNotBlank() }?.let { msg ->
                     item(key = "message") {
                         NxAlertBanner(
@@ -262,11 +254,7 @@ fun TicketsFeedbackPendingScreen(
 
                 if (state.items.isEmpty()) {
                     item(key = "empty") {
-                        NxEmptyState(
-                            title = "Todo al día",
-                            subtitle = "No tienes servicios pendientes de evaluar.",
-                            icon = Icons.Outlined.ThumbUp,
-                        )
+                        PortalFrase("No hay servicios por confirmar.")
                     }
                 } else {
                     items(state.items, key = { it.id }, contentType = { "feedback" }) { item ->
@@ -305,23 +293,15 @@ private fun FeedbackCard(
                     item.anNumber?.takeIf { it.isNotBlank() } ?: "Ticket",
                     style = MaterialTheme.typography.titleSmall,
                     color = NxColors.Slate,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
                 NxStatusChip("Por evaluar", NxTone.Warning)
             }
-            Text(
-                item.titulo?.takeIf { it.isNotBlank() } ?: "Servicio finalizado",
-                style = MaterialTheme.typography.bodyMedium,
-                color = NxColors.Slate,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+            PortalLinea(item.titulo?.takeIf { it.isNotBlank() } ?: "Servicio finalizado", emphasis = true)
             item.fechaFinalizacion?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    "Finalizado el ${NxFormat.dateTime(it)}",
-                    color = NxColors.Muted,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                PortalLinea("Finalizado el ${NxFormat.dateTime(it)}")
             }
 
             Text(

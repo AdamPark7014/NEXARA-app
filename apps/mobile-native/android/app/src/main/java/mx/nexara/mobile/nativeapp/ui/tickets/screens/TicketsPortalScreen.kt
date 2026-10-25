@@ -18,7 +18,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -27,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -50,13 +50,13 @@ import mx.nexara.mobile.nativeapp.data.tickets.PortalProfile
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.util.openFile
 import java.io.File
@@ -222,25 +222,27 @@ fun TicketsPortalScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val profile = state.profile
+            if (profile == null || profile.name.isBlank()) {
+                item {
+                    PortalFrase(
+                        state.error?.takeIf { it.isNotBlank() } ?: "No hay perfil del portal.",
+                        onRetry = { vm.refresh(initial = true) },
+                        actionLabel = "Cerrar sesión",
+                        onAction = onLogout,
+                    )
+                }
+                return@LazyColumn
+            }
             if (!state.error.isNullOrBlank()) {
                 item {
-                    NxErrorBlock(state.error!!, onRetry = { vm.refresh(initial = true) })
+                    PortalFrase(state.error!!, onRetry = { vm.refresh(initial = false) })
                 }
             }
             if (!state.message.isNullOrBlank()) {
                 item {
-                    Text(state.message!!, color = MaterialTheme.colorScheme.primary)
-                    OutlinedButton(onClick = vm::dismissMessage) { Text("Cerrar aviso") }
+                    PortalLinea(state.message!!)
                 }
-            }
-
-            val profile = state.profile
-            if (profile == null || profile.name.isBlank()) {
-                item {
-                    Text("No se encontró perfil del portal.", color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = onLogout) { Text("Cerrar sesión") }
-                }
-                return@LazyColumn
             }
 
             item {
@@ -256,19 +258,17 @@ fun TicketsPortalScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                     }
-                    Text(profile.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = NxColors.Slate)
-                    if (profile.kind == PortalProfile.Kind.BRANCH && !profile.branchNumber.isNullOrBlank()) {
-                        Text(
-                            text = "Sucursal: ${profile.branchNumber}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = NxColors.Muted,
-                        )
-                    }
                     Text(
-                        "Seguimiento de servicio y soporte",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = NxColors.Muted,
+                        profile.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NxColors.Slate,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    if (profile.kind == PortalProfile.Kind.BRANCH && !profile.branchNumber.isNullOrBlank()) {
+                        PortalLinea(profile.branchNumber!!)
+                    }
                 }
             }
 
@@ -284,20 +284,16 @@ fun TicketsPortalScreen(
             }
 
             item {
-                NxSectionHeader("Módulos", "Acceso rápido al portal")
-            }
-
-            item {
                 PortalNavCard(
-                    title = "Estado de tickets",
-                    subtitle = "${state.stats.pendingTickets} en proceso · ${state.stats.closedTickets} cerrados",
+                    title = "Tickets",
+                    subtitle = "${state.stats.pendingTickets} en proceso",
                     onClick = onOpenTickets,
                 )
             }
             item {
                 PortalNavCard(
                     title = "Solicitudes",
-                    subtitle = if (state.stats.openRequests > 0) "${state.stats.openRequests} activas" else "Levantar o revisar solicitudes",
+                    subtitle = if (state.stats.openRequests > 0) "${state.stats.openRequests} activas" else null,
                     badge = if (state.stats.openRequests > 0) "${state.stats.openRequests}" else null,
                     onClick = onOpenRequests,
                 )
@@ -305,8 +301,8 @@ fun TicketsPortalScreen(
             if (profile.kind == PortalProfile.Kind.CLIENT && state.stats.pendingFeedback > 0) {
                 item {
                     PortalNavCard(
-                        title = "Confirmación de servicio",
-                        subtitle = "Evalúa servicios finalizados",
+                        title = "Confirmación",
+                        subtitle = "${state.stats.pendingFeedback} por confirmar",
                         badge = "${state.stats.pendingFeedback}",
                         tone = NxTone.Warning,
                         onClick = onOpenFeedbackPending,
@@ -315,48 +311,33 @@ fun TicketsPortalScreen(
             }
             if (profile.kind == PortalProfile.Kind.CLIENT) {
                 item {
-                    PortalNavCard(
-                        title = "Mis servicios",
-                        subtitle = "Contratos, facturas y cotizaciones",
-                        onClick = onOpenServices,
-                    )
+                    PortalNavCard(title = "Servicios", onClick = onOpenServices)
                 }
             }
             item {
-                PortalNavCard(title = "Inventarios", subtitle = "Snapshots y mantenimiento", onClick = onOpenInventories)
+                PortalNavCard(title = "Inventarios", onClick = onOpenInventories)
             }
             item {
-                PortalNavCard(
-                    title = "Centro de ayuda",
-                    subtitle = "Preguntas frecuentes y guías",
-                    onClick = onOpenHelp,
-                )
+                PortalNavCard(title = "Ayuda", onClick = onOpenHelp)
             }
             item {
-                PortalNavCard(title = "Mi perfil", subtitle = "Datos corporativos", onClick = onOpenProfile)
+                PortalNavCard(title = "Perfil", onClick = onOpenProfile)
             }
             if (profile.kind == PortalProfile.Kind.CLIENT) {
                 item {
-                    PortalNavCard(title = "Sucursales", subtitle = "Gestión de sitios", onClick = onOpenBranches)
+                    PortalNavCard(title = "Sucursales", onClick = onOpenBranches)
                 }
                 if (state.stats.pendingFeedback == 0) {
                     item {
-                        PortalNavCard(title = "Feedback", subtitle = "Sin pendientes", onClick = onOpenFeedbackPending)
+                        PortalNavCard(title = "Confirmación", subtitle = "Sin pendientes", onClick = onOpenFeedbackPending)
                     }
                 }
                 item {
                     PortalNavCard(
-                        title = "Reporte del portal",
-                        subtitle = if (state.downloadingPortalReport) "Descargando…" else "PDF de actividad y tickets",
+                        title = "Reporte",
+                        subtitle = if (state.downloadingPortalReport) "Descargando…" else null,
                         onClick = { if (!state.downloadingPortalReport) vm.downloadPortalReportPdf() },
                     )
-                }
-            }
-            item {
-            }
-            item {
-                OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {
-                    Text("Cerrar sesión")
                 }
             }
         }
@@ -367,8 +348,8 @@ fun TicketsPortalScreen(
 @Composable
 private fun PortalNavCard(
     title: String,
-    subtitle: String,
     onClick: () -> Unit,
+    subtitle: String? = null,
     badge: String? = null,
     tone: NxTone = NxTone.Brand,
 ) {
@@ -378,11 +359,8 @@ private fun PortalNavCard(
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .semantics {
-                contentDescription = if (badge != null) {
-                    "$title, $subtitle, $badge pendientes"
-                } else {
-                    "$title, $subtitle"
-                }
+                contentDescription = listOfNotNull(title, subtitle?.takeIf { it.isNotBlank() }, badge?.let { "$it pendientes" })
+                    .joinToString(", ")
                 role = Role.Button
             },
         shape = RoundedCornerShape(NxDimens.PanelRadius),
@@ -397,8 +375,23 @@ private fun PortalNavCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = NxColors.Slate,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (badge != null) {
                 NxStatusChip(badge, tone)

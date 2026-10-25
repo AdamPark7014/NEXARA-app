@@ -65,16 +65,16 @@ type NavItem = {
 };
 
 const NAV_ACCOUNT: NavItem[] = [
-  { href: "/tickets?tab=profile", label: "🪪 Mi perfil corporativo", match: (p) => p.includes("tab=profile") || p === "/tickets" },
-  { href: "/tickets/mis-sucursales", label: "🏬 Gestión de sucursales", match: (p) => p.endsWith("/mis-sucursales") },
+  { href: "/tickets?tab=profile", label: "Perfil", match: (p) => p.includes("tab=profile") || p === "/tickets" },
+  { href: "/tickets/mis-sucursales", label: "Sucursales", match: (p) => p.endsWith("/mis-sucursales") },
 ];
 
 const NAV_SERVICE: NavItem[] = [
-  { href: "/tickets?tab=tickets", label: "🎫 Estado de tickets", match: (p) => p.includes("tab=tickets") },
-  { href: "/tickets?tab=new-ticket", label: "➕ Nueva solicitud", match: (p) => p.includes("tab=new-ticket") },
-  { href: "/tickets/mis-servicios", label: "🛎️ Mis servicios", match: (p) => p.endsWith("/mis-servicios") },
-  { href: "/tickets?tab=inventories", label: "🧰 Inventarios", match: (p) => p.includes("tab=inventories") },
-  { href: "/tickets/ayuda", label: "🆘 Centro de ayuda", match: (p) => p.endsWith("/ayuda") },
+  { href: "/tickets?tab=tickets", label: "Tickets", match: (p) => p.includes("tab=tickets") },
+  { href: "/tickets?tab=new-ticket", label: "Nueva solicitud", match: (p) => p.includes("tab=new-ticket") },
+  { href: "/tickets/mis-servicios", label: "Servicios", match: (p) => p.endsWith("/mis-servicios") },
+  { href: "/tickets?tab=inventories", label: "Inventarios", match: (p) => p.includes("tab=inventories") },
+  { href: "/tickets/ayuda", label: "Ayuda", match: (p) => p.endsWith("/ayuda") },
 ];
 
 export default function PortalShell({ children }: { children: React.ReactNode }) {
@@ -186,8 +186,8 @@ export default function PortalShell({ children }: { children: React.ReactNode })
             const slug = data.branch.branchNumber || `branch-${data.branch.id}`;
             window.location.replace(`/tickets/${slug}`);
           }}
-          title="Iniciar sesión"
-          subtitle="Ingresa a tu cuenta de NEXARA"
+          title="Portal"
+          subtitle="Ingresa con tu cuenta."
         />
       </div>
     );
@@ -268,16 +268,15 @@ export default function PortalShell({ children }: { children: React.ReactNode })
                   )}
                 </div>
                 <div className={consoleStyles.sidebarName}>{displayName}</div>
-                <div className={consoleStyles.sidebarEmail}>Seguimiento de servicio y soporte</div>
                 <div className={consoleStyles.sidebarMeta}>
                   <span className={consoleStyles.rolePill}>{roleLabel}</span>
                 </div>
               </div>
 
-              <div className={consoleStyles.menuTitle}>Cuenta corporativa</div>
+              <div className={consoleStyles.menuTitle}>Cuenta</div>
               <ul className={consoleStyles.sidebarMenu}>{NAV_ACCOUNT.map(navLink)}</ul>
 
-              <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
+              <div className={consoleStyles.menuTitle}>Servicio</div>
               <ul className={consoleStyles.sidebarMenu}>{NAV_SERVICE.map(navLink)}</ul>
 
               <div className={consoleStyles.menuTitle}>Sesión</div>
@@ -319,7 +318,7 @@ export default function PortalShell({ children }: { children: React.ReactNode })
                     className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
                     onClick={toggleDarkMode}
                   >
-                    {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
+                    {darkMode ? "Vista clara" : "Vista oscura"}
                   </button>
                 </li>
                 <li className={consoleStyles.sidebarMenuItem}>
@@ -328,7 +327,7 @@ export default function PortalShell({ children }: { children: React.ReactNode })
                     className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
                     onClick={sessionValue.logout}
                   >
-                    ⎋ Cerrar sesión
+                    Cerrar sesión
                   </button>
                 </li>
               </ul>

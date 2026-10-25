@@ -90,7 +90,7 @@ struct PortalInventoriesView: View {
             PortalSkeletonScreen(itemCount: 5)
         } else if !vm.loaded, let error = vm.error {
             ScrollView {
-                NxErrorState(message: error) { Task { await vm.refresh(.initial) } }
+                PortalFrase(text: error, retry: { Task { await vm.refresh(.initial) } })
             }
             .refreshable { await vm.refresh(.pull) }
         } else {
@@ -118,7 +118,6 @@ struct PortalInventoriesView: View {
                 onDismiss: { vm.error = nil }
             )
         }
-        NxSectionHeader(title: "Inventarios", subtitle: "Equipos registrados en tus sucursales.")
         NxSecondaryButton(
             vm.downloading ? "Descargando reporte…" : "Descargar reporte PDF",
             systemImage: "doc.richtext",
@@ -130,17 +129,9 @@ struct PortalInventoriesView: View {
         }
         let rows = filtered
         if vm.inventories.isEmpty {
-            NxEmptyState(
-                title: "Sin inventarios",
-                subtitle: "Todavía no hay inventarios disponibles para tu empresa.",
-                systemImage: "shippingbox"
-            )
+            PortalFrase(text: "No hay inventarios.")
         } else if rows.isEmpty {
-            NxEmptyState(
-                title: "Sin resultados",
-                subtitle: "Ningún inventario coincide con la búsqueda.",
-                systemImage: "shippingbox"
-            )
+            PortalFrase(text: "Ningún inventario coincide con la búsqueda.")
         } else {
             ForEach(rows) { inventory in
                 row(inventory)
@@ -410,15 +401,11 @@ struct PortalInventoryDetailView: View {
 
     @ViewBuilder
     private var list: some View {
-        PortalScreenTitle(
-            title: "Detalle inventario",
-            subtitle: "Revisa items, sincroniza cambios y aprueba el conteo"
-        )
         if let message = vm.message {
             PortalNoticePanel(message: message, closeLabel: "Cerrar aviso") { vm.message = nil }
         }
         if let error = vm.error {
-            NxErrorBlock(message: error, onRetry: { Task { await vm.load(.initial) } })
+            PortalFrase(text: error, retry: { Task { await vm.load(.initial) } })
         }
         if let snap = vm.snapshot {
             headerPanel(snap)
@@ -430,7 +417,7 @@ struct PortalInventoryDetailView: View {
                 .font(NxType.titleMedium)
                 .foregroundStyle(NxColors.brand)
             if snap.items.isEmpty {
-                NxEmptyState(title: "Sin items", subtitle: "Este inventario no tiene equipos registrados.")
+                PortalFrase(text: "Este inventario no tiene equipos.")
             } else {
                 ForEach(Array(snap.items.enumerated()), id: \.offset) { _, item in
                     itemCard(item)
@@ -438,7 +425,7 @@ struct PortalInventoryDetailView: View {
             }
             PortalGap(8)
         } else {
-            NxEmptyState(title: "Inventario no encontrado", subtitle: "No hay datos para este inventario.")
+            PortalFrase(text: "No hay datos de este inventario.")
         }
     }
 

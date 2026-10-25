@@ -434,3 +434,97 @@
     height: 220px;
   }
 }
+
+/* Portal quieto: superficie plana y barra clara. */
+.ticketsConsole {
+  background: #f5f5f7 !important;
+}
+
+.ticketsConsole :global(.sidebar) {
+  background: #ffffff !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.ticketsConsole :global(.card),
+.panelHero,
+.cardPanel,
+.cardSoft,
+.itemCard,
+.panelTabs,
+.panelKpi,
+.companyBox,
+.gradientHeader,
+.requestFormCard,
+.formSection,
+.dropzone,
+.mediaTile {
+  background: #ffffff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.quietBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  margin: 0 0 16px;
+  padding: 0 2px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.quietTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #1d1d1f;
+}
+
+.quietBack {
+  color: #1d1d1f;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.quietLine {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #6e6e73;
+}
+
+.requestEyebrow {
+  display: none;
+}
+
+.authHeader {
+  background: #ffffff !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 0 !important;
+}
+
+.authEyebrow {
+  display: none;
+}
+
+.authTitle,
+:global(body.light) .authTitle,
+:global(body.dark) .authTitle {
+  color: #1d1d1f !important;
+}
+
+.authLead,
+:global(body.light) .authLead,
+:global(body.dark) .authLead {
+  color: #6e6e73 !important;
+}
