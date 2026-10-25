@@ -28,10 +28,16 @@ class CodigoBarrasRulesTest {
         val c = CodigoBarrasRules.clasificar("7501055363026")
         assertEquals(Tipo.INTERNO, c.tipo)
         assertTrue(c.sospechoso)
+        val aviso = CodigoBarrasRules.motivoInvalido("7501055363026")
+        val textoViejo =
+            "Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo."
         assertEquals(
-            "Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo.",
-            CodigoBarrasRules.motivoInvalido("7501055363026"),
+            "Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo.",
+            aviso,
         )
+        assertTrue(aviso != textoViejo)
+        assertEquals(1, aviso!!.count { it == '.' })
+        assertTrue(aviso.contains("escanear"))
     }
 
     @Test
