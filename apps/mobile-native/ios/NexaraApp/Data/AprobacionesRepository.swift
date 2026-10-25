@@ -318,7 +318,7 @@ final class AprobacionesRepository {
         )
         let data = try await api.postJSON("workflow/approvals/\(aprobacionId)/decide", body: body)
         if CoreRepository.isQueuedOffline(data) {
-            throw CoreError.message("Sin conexión: la decisión no se registró. Inténtalo cuando regrese la señal.")
+            throw CoreError.message("Sin conexión: la decisión no se registró.")
         }
         do {
             return try JSONDecoder().decode(DecisionRespuesta.self, from: data)
