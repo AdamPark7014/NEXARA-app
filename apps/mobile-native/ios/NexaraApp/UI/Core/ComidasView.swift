@@ -107,6 +107,7 @@ struct ComidasView: View {
     @State private var photo: CorePhotoItem?
     /// `mi-dia.ahora` menos el reloj del teléfono.
     @State private var clockOffset: TimeInterval = 0
+    @Environment(\.dismiss) private var dismiss
 
     init(fecha: Date? = nil) {
         externalFecha = fecha
@@ -122,38 +123,85 @@ struct ComidasView: View {
     /// comida a tiempo acababa pidiendo justificación por esos minutos.
     private func serverNow() -> Date { Date().addingTimeInterval(clockOffset) }
 
+    private var hayTarjeta: Bool { !isCeo && isToday && myDay?.debeRegistrar == true }
+    private var hayEquipo: Bool { team?.hasTeam == true }
+    private var hayFallo: Bool { myDayError != nil || teamError != nil }
+    /// Sin tarjeta ni lista: la pantalla es una sola frase (carga, error o vacío).
+    private var pantallaEnBlanco: Bool { !hayTarjeta && !hayEquipo }
+
+    /// Dentro de Asistencias vuelve a la pestaña del equipo. Suelta, cierra la cubierta.
+    private func volver() {
+        if externalFecha != nil {
+            AsistenciasPestanaPedida.shared.pedir(.equipo)
+        } else {
+            dismiss()
+        }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let notice {
-                    Text(notice)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(CorePalette.green)
-                }
+        VStack(spacing: 0) {
+            ComidasBarraClara(onVolver: volver)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let notice {
+                        Text(notice)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(CorePalette.green)
+                    }
 
-                if isCeo {
-                    Text("Dirección supervisa las comidas: no registra la suya.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } else if !isToday {
-                    Text("Tu comida de ese día no se puede cambiar.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } else if let myDay, myDay.debeRegistrar {
-                    myDayCard(myDay)
-                } else if let myDayError {
-                    NxStaleBanner(message: myDayError) { Task { await load() } }
-                } else if loading {
-                    NxLoadingState(text: "Cargando tu comida…")
-                }
+                    if pantallaEnBlanco {
+                        if loading {
+                            NxLoadingState(text: "Cargando comidas…")
+                        } else if hayFallo {
+                            ComidasFrase(texto: "No se pudieron cargar las comidas.") {
+                                Task { await load() }
+                            }
+                        } else if isCeo {
+                            Text("Dirección supervisa las comidas: no registra la suya.")
+                                .font(.subheadline)
+                                .foregroundStyle(NxColors.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else if !isToday {
+                            Text("Tu comida de ese día no se puede cambiar.")
+                                .font(.subheadline)
+                                .foregroundStyle(NxColors.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            ComidasFrase(texto: "No hay comidas en este día.")
+                        }
+                    } else {
+                        if isCeo {
+                            Text("Dirección supervisa las comidas: no registra la suya.")
+                                .font(.footnote)
+                                .foregroundStyle(NxColors.muted)
+                        } else if !isToday {
+                            Text("Tu comida de ese día no se puede cambiar.")
+                                .font(.footnote)
+                                .foregroundStyle(NxColors.muted)
+                        } else if let myDay, myDay.debeRegistrar {
+                            if myDayError != nil {
+                                ComidasFrase(texto: "No se pudo cargar tu comida.") {
+                                    Task { await load() }
+                                }
+                            }
+                            myDayCard(myDay)
+                        } else if myDayError != nil {
+                            ComidasFrase(texto: "No se pudo cargar tu comida.") {
+                                Task { await load() }
+                            }
+                        }
 
-                if let team, team.hasTeam {
-                    teamSection(team)
-                } else if let teamError, isCeo {
-                    NxErrorState(message: teamError) { Task { await loadTeam() } }
+                        if let team, team.hasTeam {
+                            teamSection(team)
+                        } else if teamError != nil {
+                            ComidasFrase(texto: "No se pudieron cargar las comidas.") {
+                                Task { await load() }
+                            }
+                        }
+                    }
                 }
+                .padding()
             }
-            .padding()
         }
         .background(NxColors.surface)
         .navigationTitle("Comidas")
@@ -447,15 +495,13 @@ struct ComidasView: View {
                     }
                 }
             }
-            if let teamError {
-                NxStaleBanner(message: teamError) { Task { await loadTeam() } }
+            if teamError != nil {
+                ComidasFrase(texto: "No se pudieron cargar las comidas.") {
+                    Task { await loadTeam() }
+                }
             }
-            if rows.isEmpty {
-                Text("Nadie en este filtro.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, NxSpacing.l)
+            if rows.isEmpty && teamError == nil {
+                ComidasFrase(texto: "Nadie en este filtro.")
             }
             ForEach(rows) { row in
                 LunchTeamRowCard(
@@ -516,6 +562,70 @@ struct ComidasView: View {
 }
 
 // MARK: - Piezas
+
+/// Barra clara: fondo del lienzo, título en tinta y la flecha de volver.
+private struct ComidasBarraClara: View {
+    let onVolver: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onVolver) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(NxColors.fg)
+            .accessibilityLabel("Volver")
+            Text("Comidas")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(NxColors.fg)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.trailing, 16)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 52)
+        .background(NxColors.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(NxColors.borderSubtle).frame(height: 1)
+        }
+    }
+}
+
+/// Vacío o error en una sola frase. «Reintentar» es el botón, no otra frase.
+private struct ComidasFrase: View {
+    let texto: String
+    var reintentar: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(texto)
+                .font(.subheadline)
+                .foregroundStyle(NxColors.fg)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+            if let reintentar {
+                Button("Reintentar", action: reintentar)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(NxColors.brand)
+            }
+        }
+        .padding(.vertical, 28)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private extension View {
+    /// Barra clara de una hoja: fondo del lienzo y tinta, sin franja teal.
+    func comidasBarraClara() -> some View {
+        navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(NxColors.surface, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+    }
+}
 
 private struct LunchPhotoThumb: View {
     let url: String?
@@ -670,7 +780,7 @@ private struct LunchReasonSheet: View {
                 }
             }
             .navigationTitle(pending.checkIn ? "Salir a comer" : "Ya regresé")
-            .navigationBarTitleDisplayMode(.inline)
+            .comidasBarraClara()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { dismiss() }
@@ -759,7 +869,7 @@ private struct LunchReviewSheet: View {
                 }
             }
             .navigationTitle("Comida de \(short)")
-            .navigationBarTitleDisplayMode(.inline)
+            .comidasBarraClara()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { dismiss() }
@@ -798,7 +908,7 @@ private struct LunchReviewSheet: View {
                 : "Rechazaste la comida a destiempo de \(short).")
             dismiss()
         } catch {
-            self.error = error.toUserMessage(fallback: "No se pudo guardar la revisión")
+            self.error = "No se pudo guardar la revisión."
         }
     }
 }
