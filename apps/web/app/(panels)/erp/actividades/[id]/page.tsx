@@ -164,7 +164,7 @@ export default function ActivityDetailPage() {
     const folio = activity.anNumber?.trim() || "esta actividad";
     setConfirmDelete({
       title: "Eliminar actividad",
-      message: `¿Eliminar ${folio}? Deja de verse en la pizarra, en Mi equipo, en las listas y en las búsquedas.`,
+      message: `¿Eliminar ${folio}?`,
       confirmLabel: "Eliminar actividad",
       danger: true,
       fn: async () => {
@@ -200,10 +200,10 @@ export default function ActivityDetailPage() {
       const missing = getMissingEvidence(e);
       if (missing) {
         setMissingEvidence(missing);
-        setSaveErr("No se puede terminar todavía: faltan evidencias.");
+        setSaveErr("Faltan evidencias.");
         return;
       }
-      setSaveErr(formatApiError(e, "No se pudieron guardar los cambios. Intenta de nuevo."));
+      setSaveErr(formatApiError(e, "No se pudieron guardar los cambios."));
     } finally {
       setSaving(false);
     }
@@ -249,7 +249,6 @@ export default function ActivityDetailPage() {
     EXIT_PHOTO: Boolean(ev?.exitPhotoUrl),
   };
   const pasosHechos = pasos.filter((p) => hecho[p]).length;
-  const faltan = pasos.length - pasosHechos;
   const bandera = (paso: string) =>
     devueltos.has(paso) ? (
       <Badge tone="danger" size="sm">
@@ -361,7 +360,7 @@ export default function ActivityDetailPage() {
             </Button>
           }
         >
-          No se pudo actualizar: {error}
+          {error}
         </Alert>
       ) : null}
       {saveErr && !editing ? (
@@ -369,11 +368,7 @@ export default function ActivityDetailPage() {
           {saveErr}
         </Alert>
       ) : null}
-      {mostrarIniciar ? (
-        <Alert tone="brand" title="Te asignaron esta actividad">
-          Pulsa «Iniciar actividad» en la cabecera: queda registrada tu hora real de inicio.
-        </Alert>
-      ) : null}
+      {mostrarIniciar ? <Alert tone="brand">Te asignaron esta actividad.</Alert> : null}
       {/* Ya la inicié: mi reloj corre (Pausar) o está detenido (En pausa · Reanudar). */}
       {token && miFila && !mostrarIniciar ? (
         <SesionPropia
@@ -399,7 +394,7 @@ export default function ActivityDetailPage() {
       {missingEvidence && missingEvidence.length > 0 ? (
         <Alert
           tone="warning"
-          title="Faltan evidencias para marcar la actividad como terminada"
+          title="Faltan evidencias."
           onDismiss={() => setMissingEvidence(null)}
           action={
             <ButtonLink href={hrefs.evidences} size="sm" variant="primary" iconStart={<IcoCamara />}>
@@ -420,9 +415,7 @@ export default function ActivityDetailPage() {
         subtitle={
           pasos.length === 0
             ? "Esta actividad no pide evidencia por pasos."
-            : faltan === 0
-              ? `${pasosHechos} de ${pasos.length} pasos · completas`
-              : `${pasosHechos} de ${pasos.length} pasos · faltan ${faltan} obligatorio${faltan === 1 ? "" : "s"} para mandar a revisión`
+            : `${pasosHechos} de ${pasos.length} pasos.`
         }
         end={
           pasos.length ? (
@@ -476,12 +469,12 @@ export default function ActivityDetailPage() {
                 placeholder="Descripción de la actividad…"
               />
             </Field>
-            <Field label="Indicaciones / Notas internas" fullWidth>
+            <Field label="Indicaciones" fullWidth>
               <Textarea
                 value={form.indicaciones}
                 onChange={(e) => setForm((f) => ({ ...f, indicaciones: e.target.value }))}
                 rows={3}
-                placeholder="Instrucciones para el ingeniero, accesos, contactos…"
+                placeholder="Indicaciones"
               />
             </Field>
             {saveErr ? (
@@ -536,7 +529,7 @@ export default function ActivityDetailPage() {
       {/* El checklist va antes de la evidencia: se revisa lo que se lleva y luego se trabaja. */}
       <HerramientasChecklist activityId={activity.id} />
 
-      <RecordSection title="Evidencias del equipo" subtitle="Lo que subió cada persona y su revisión.">
+      <RecordSection title="Evidencias del equipo">
         <EquipoEvidencias activityId={activity.id} compact verMasHref={hrefs.evidences} />
       </RecordSection>
 

@@ -8,7 +8,7 @@
  * la propuesta sin volver a subirla, así que no hay que adjuntar nada dos veces.
  */
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useUser } from "@/components/UserContext";
 import {
   ESTADO_LABEL,
@@ -64,7 +64,7 @@ export default function CotizacionDeActividad({
     let vivo = true;
     listarCotizaciones(token)
       .then((rows) => vivo && setOpciones(rows))
-      .catch((e) => vivo && setError(e instanceof Error ? e.message : "No se pudieron cargar"));
+      .catch((e) => vivo && setError(e instanceof Error ? e.message : "No se pudieron cargar las cotizaciones."));
     return () => {
       vivo = false;
     };
@@ -78,19 +78,50 @@ export default function CotizacionDeActividad({
   if (!esComercial) return null;
 
   if (cotizacion?.id) {
+    const filas: { etiqueta: string; valor: ReactNode }[] = [
+      {
+        etiqueta: "Folio",
+        valor: (
+          <Link href={`/erp/cotizaciones/${cotizacion.id}`} style={{ fontWeight: 650 }}>
+            {cotizacion.quoteNumber}
+          </Link>
+        ),
+      },
+      { etiqueta: "Estado", valor: estadoEnEspanol(cotizacion.status) },
+    ];
+    if (cotizacion.total != null) {
+      filas.push({ etiqueta: "Total", valor: formatoMoneda(Number(cotizacion.total)) });
+    }
     return (
-      <p style={{ margin: 0, fontSize: 13 }}>
-        Cotización{" "}
-        <Link href={`/erp/cotizaciones/${cotizacion.id}`} style={{ fontWeight: 700 }}>
-          {cotizacion.quoteNumber}
-        </Link>{" "}
-        · {estadoEnEspanol(cotizacion.status)}
-        {cotizacion.total != null ? ` · ${formatoMoneda(Number(cotizacion.total))}` : ""}
-        <br />
-        <span style={{ color: "var(--text-secondary)" }}>
-          Las fotos del levantamiento de esta actividad salen como anexos (03 Planos) de la propuesta.
-        </span>
-      </p>
+      <>
+        <dl className="cotiz-datos">
+          {filas.map((fila) => (
+            <div key={fila.etiqueta}>
+              <dt>{fila.etiqueta}</dt>
+              <dd>{fila.valor}</dd>
+            </div>
+          ))}
+        </dl>
+        <style>{`
+          .cotiz-datos {
+            display: grid;
+            grid-template-columns: repeat(3, max-content);
+            gap: 4px 28px;
+            margin: 0;
+          }
+          .cotiz-datos > div { display: grid; gap: 2px; min-width: 0; }
+          .cotiz-datos dt {
+            margin: 0;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary, var(--ui-fg-3));
+          }
+          .cotiz-datos dd { margin: 0; font-size: 15px; font-weight: 650; }
+          @media (max-width: 480px) {
+            .cotiz-datos { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+          }
+        `}</style>
+      </>
     );
   }
 
@@ -103,7 +134,7 @@ export default function CotizacionDeActividad({
       setEligiendo(false);
       onLigada?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo ligar");
+      setError(e instanceof Error ? e.message : "No se pudo ligar la cotización.");
     } finally {
       setLigando(false);
     }
@@ -111,9 +142,7 @@ export default function CotizacionDeActividad({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-        Esta actividad es comercial: su entregable es una cotización, no una hoja de servicio.
-      </p>
+      <p style={{ margin: 0, fontSize: 13 }}>Sin cotización.</p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Link
           href={`/erp/cotizaciones/nueva?activityId=${activityId}`}
@@ -160,7 +189,10 @@ export default function CotizacionDeActividad({
               background: "var(--bg)",
               color: "inherit",
               fontSize: 13,
-              minWidth: 260,
+              flex: "1 1 220px",
+              width: "100%",
+              maxWidth: 420,
+              minWidth: 0,
             }}
           >
             <option value="">Elige una cotización…</option>

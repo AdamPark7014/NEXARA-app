@@ -133,8 +133,6 @@ export default function ActivityHistoryPage() {
   // La ficha (shell) ya pinta la carga y el error cuando la actividad no llegó.
   if (!activity) return null;
 
-  const isCompleted = !!activity.fechaFinalizacion;
-
   return (
     <>
       {error ? (
@@ -147,24 +145,19 @@ export default function ActivityHistoryPage() {
             </Button>
           }
         >
-          No se pudo actualizar: {error}
+          {error}
         </Alert>
       ) : null}
       <RecordSection
-        title="Línea de tiempo unificada"
-        subtitle={
-          loading
-            ? "Cargando historial…"
-            : `${events.length} evento${events.length === 1 ? "" : "s"} · ${isCompleted ? "Finalizada" : activity.estatus}`
-        }
+        title="Historial"
+        subtitle={loading ? "Cargando historial…" : `${events.length} evento${events.length === 1 ? "" : "s"}.`}
       >
         {loading ? <SkeletonRows rows={4} label="Cargando historial" /> : null}
         {!loading && timelineError ? (
           <EmptyState
             tone="danger"
             icon={<ErrorOutlineIcon fontSize="inherit" />}
-            title="Historial limitado"
-            description={timelineError}
+            title={timelineError.endsWith(".") ? timelineError : `${timelineError}.`}
             action={
               <Button size="sm" variant="secondary" onClick={() => void loadTimeline()}>
                 Reintentar
@@ -174,12 +167,7 @@ export default function ActivityHistoryPage() {
         ) : null}
 
         {!loading && !timelineError && events.length === 0 ? (
-          <EmptyState
-            tone="neutral"
-            icon={<ScheduleOutlinedIcon fontSize="inherit" />}
-            title="Sin eventos"
-            description="Aún no hay movimientos registrados en esta actividad."
-          />
+          <EmptyState tone="neutral" icon={<ScheduleOutlinedIcon fontSize="inherit" />} title="Aún no hay movimientos." />
         ) : null}
 
         {!loading && events.length > 0 ? (
@@ -192,9 +180,14 @@ export default function ActivityHistoryPage() {
                   state={timelineState(ev, idx)}
                   icon={<EvIcon fontSize="inherit" />}
                   title={ev.title}
-                  meta={`${relativeTime(ev.at)} · ${formatDateTime(ev.at)}`}
+                  meta={
+                    <span className="historial-cuando">
+                      <span>{relativeTime(ev.at)}</span>
+                      <span>{formatDateTime(ev.at)}</span>
+                    </span>
+                  }
                 >
-                  <div className={s.sub}>
+                  <div className={`${s.sub} historial-sub`}>
                     <Badge tone="neutral" size="sm">
                       {ev.kind}
                     </Badge>
@@ -206,6 +199,14 @@ export default function ActivityHistoryPage() {
           </Timeline>
         ) : null}
       </RecordSection>
+      <style>{`
+        .historial-cuando > span + span::before { content: " · "; }
+        @media (max-width: 480px) {
+          .historial-cuando { display: grid; gap: 2px; }
+          .historial-cuando > span + span::before { content: none; }
+          .historial-sub { flex-direction: column; align-items: flex-start; }
+        }
+      `}</style>
     </>
   );
 }

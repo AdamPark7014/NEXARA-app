@@ -114,6 +114,16 @@ function corto(nombre?: string | null): string {
   return (nombre || "").split(/\s+/).slice(0, 2).join(" ");
 }
 
+function QuienCuando({ nombre, cuando }: { nombre: string; cuando: string | null }) {
+  if (!nombre && !cuando) return <span>Tomada</span>;
+  return (
+    <>
+      {nombre ? <span>{cuando ? `${nombre} ·` : nombre}</span> : null}
+      {cuando ? <span>{cuando}</span> : null}
+    </>
+  );
+}
+
 function listaNombres(nombres: string[]): string {
   const q = nombres.map((n) => `«${n}»`);
   if (q.length <= 1) return q.join("");
@@ -208,8 +218,8 @@ function Hueco({
           Pendiente
         </div>
       )}
-      <span className={s.huecoM}>
-        {foto ? [corto(foto.por?.nombre), fmt(foto.capturedAt)].filter(Boolean).join(" · ") || "Tomada" : "Sin foto aún"}
+      <span className={`${s.huecoM} punto-quien`}>
+        {foto ? <QuienCuando nombre={corto(foto.por?.nombre)} cuando={fmt(foto.capturedAt)} /> : "Sin foto aún"}
       </span>
       {ofrecer ? (
         <div className={s.huecoAcciones}>
@@ -280,7 +290,7 @@ export default function EvidenciaPorCampos({
       setSinPermiso(false);
     } catch (e) {
       if (esErrorDePermiso(e)) setSinPermiso(true);
-      else setError(formatApiError(e, "No se pudo cargar la evidencia por campos"));
+      else setError(formatApiError(e, "No se pudo cargar la evidencia por campos."));
     } finally {
       setCargando(false);
     }
@@ -325,7 +335,7 @@ export default function EvidenciaPorCampos({
         setCampos(nuevos);
         setAviso(`${MOMENTO_LABEL[destino.momento]} guardada.`);
       } catch (e) {
-        setErrorFoto(formatApiError(e, "No se pudo guardar la foto"));
+        setErrorFoto(formatApiError(e, "No se pudo guardar la foto."));
       } finally {
         setSubiendo(null);
       }
@@ -347,7 +357,7 @@ export default function EvidenciaPorCampos({
       if (!file) return;
       const destino = elegirDestino(target?.closest?.("[data-campo-slot]") ?? null);
       if (!destino) {
-        setErrorFoto("Elige el punto (Antes, En progreso o Después) y pega de nuevo, o suelta la imagen sobre ese hueco.");
+        setErrorFoto("Suelta la imagen sobre el punto.");
         return;
       }
       event.preventDefault();
@@ -432,16 +442,9 @@ export default function EvidenciaPorCampos({
       setCampos(nuevos);
       setEditando(false);
       setPorBorrar(null);
-      const p = progresoDeCampos(nuevos);
-      setAviso(
-        nuevos.length === 0
-          ? "Se quitaron los puntos: el equipo vuelve a subir fotos libres."
-          : `Guardado: ${nuevos.length} punto${nuevos.length === 1 ? "" : "s"}, ${p.requeridas} foto${
-              p.requeridas === 1 ? "" : "s"
-            } por documentar.`,
-      );
+      setAviso(nuevos.length === 0 ? "Se quitaron los puntos." : "Puntos guardados.");
     } catch (e) {
-      setErrorGuardar(formatApiError(e, "No se pudieron guardar los puntos"));
+      setErrorGuardar(formatApiError(e, "No se pudieron guardar los puntos."));
     } finally {
       setGuardando(false);
     }
@@ -453,6 +456,12 @@ export default function EvidenciaPorCampos({
 
   return (
     <section aria-labelledby={tituloId} className={s.caja} style={style}>
+      <style>{`
+        @media (max-width: 480px) {
+          .punto-quien { display: grid; gap: 2px; }
+          .punto-quien .punto { display: none; }
+        }
+      `}</style>
       <div className={s.cabeza}>
         <div className={s.cabezaTexto}>
           <h2 id={tituloId} className={s.titulo}>
@@ -465,8 +474,8 @@ export default function EvidenciaPorCampos({
             {cargando && !campos
               ? "Cargando…"
               : lista.length === 0
-                ? "Esta actividad no pide fotos por punto: el equipo sube fotos libres."
-                : "Qué hay que fotografiar y en qué momento. El responsable y los asignados toman la foto aquí o adjuntan un archivo, una captura, con Ctrl+V o arrastrándola."}
+                ? "Sin fotos por punto."
+                : "El responsable y los asignados toman la foto de cada punto."}
           </p>
         </div>
         <div className={s.cabezaAcciones}>
@@ -542,10 +551,7 @@ export default function EvidenciaPorCampos({
 
       {editando ? (
         <div className={s.editor}>
-          <p className={s.sub}>
-            Una fila por cosa que hay que documentar y, en cada una, los momentos en que se pide foto. Renombrar un
-            punto conserva sus fotos; <strong>quitarlo borra las fotos que ya tenga</strong>.
-          </p>
+          <p className={s.sub}>Quitar un punto borra sus fotos.</p>
           <EvidenciaCamposEditor
             value={borrador}
             onChange={(next) => {
@@ -556,7 +562,7 @@ export default function EvidenciaPorCampos({
             disabled={guardando}
           />
           {borrador.length === 0 && lista.length > 0 ? (
-            <p className={s.nota}>Sin puntos, la actividad vuelve a pedir fotos libres.</p>
+            <p className={s.nota}>Sin puntos.</p>
           ) : null}
 
           {porBorrar && porBorrar.length > 0 ? (
@@ -614,7 +620,7 @@ export default function EvidenciaPorCampos({
                   if (!file) return;
                   const destino = elegirDestino((event.target as HTMLElement).closest?.("[data-campo-slot]") ?? null);
                   if (!destino) {
-                    setErrorFoto("Suelta la imagen sobre el punto, o usa Adjuntar en ese hueco.");
+                    setErrorFoto("Suelta la imagen sobre el punto.");
                     return;
                   }
                   void subirFoto(file, destino);

@@ -9,7 +9,6 @@ import { buildApiUrl } from "@/lib/api-base";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
 import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
-import { esActividadComercial } from "@/lib/evidence-flow-helpers";
 import { quienMira, useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { Alert, Button, EmptyState, RecordSection, SkeletonRows, Stat, StatRow, buttonClass } from "@/components/base";
@@ -67,36 +66,31 @@ export default function ActivityEvidencesPage() {
             </Button>
           }
         >
-          No se pudo actualizar: {error}
+          {error}
         </Alert>
       ) : null}
       {!core && (
-        <StatRow cols={2} ariaLabel="Resumen de evidencias">
-          <Stat label="Archivos" value={files.length} icon={<AttachFileOutlinedIcon fontSize="inherit" />} />
-          <Stat
-            label="Puede cargar"
-            value={canUpload ? "Sí" : "No"}
-            tone={canUpload ? "success" : "default"}
-            icon={<UploadOutlinedIcon fontSize="inherit" />}
-          />
-        </StatRow>
+        <div className="evidencias-cifras">
+          <StatRow cols={2} ariaLabel="Resumen de evidencias">
+            <Stat label="Archivos" value={files.length} icon={<AttachFileOutlinedIcon fontSize="inherit" />} />
+            <Stat
+              label="Puede cargar"
+              value={canUpload ? "Sí" : "No"}
+              tone={canUpload ? "success" : "default"}
+              icon={<UploadOutlinedIcon fontSize="inherit" />}
+            />
+          </StatRow>
+          <style>{`
+            @media (max-width: 480px) {
+              .evidencias-cifras > div { grid-template-columns: minmax(0, 1fr) !important; }
+            }
+          `}</style>
+        </div>
       )}
-      {reparte && (
-        <Alert tone="info" title="Tú repartes esta actividad">
-          En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias. El registro de a quién se la
-          pasaste está en la pestaña Historial.
-        </Alert>
-      )}
+      {reparte && <Alert tone="info">Tú repartes esta actividad.</Alert>}
       {canUpload && (
         <div id="captura" className={s.ancla}>
-          <RecordSection
-            title="Captura de evidencias"
-            subtitle={
-              esActividadComercial(activity.coreKind)
-                ? "Inicio de actividad, evidencias, cotización y conclusión de actividad."
-                : "Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida."
-            }
-          >
+          <RecordSection title="Captura de evidencias">
             <ActivityEvidenceFlow />
           </RecordSection>
         </div>
@@ -114,14 +108,13 @@ export default function ActivityEvidencesPage() {
       </div>
 
       {(files.length > 0 || !core) && (
-        <RecordSection title="Otros archivos" subtitle={`${files.length} archivo${files.length === 1 ? "" : "s"} suelto${files.length === 1 ? "" : "s"}`}>
+        <RecordSection title="Otros archivos" subtitle={`${files.length} archivo${files.length === 1 ? "" : "s"}.`}>
           {files.length === 0 ? (
             <EmptyState
               tone="neutral"
               size="compact"
               icon={<AttachFileOutlinedIcon fontSize="inherit" />}
-              title="Sin otros archivos"
-              description="Aquí aparecen archivos sueltos adjuntos a la actividad."
+              title="Sin otros archivos."
             />
           ) : (
             <ul className={s.archivos}>
