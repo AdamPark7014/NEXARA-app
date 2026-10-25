@@ -171,23 +171,35 @@ fun GeocercaActividadCard(
         }
         Text(
             if (e.exigeMismaUbicacion == true) {
-                "Iniciaste a las ${ActivityGeofence.horaDe(e.origen.at)}. Mantente a menos de $radio m de ese punto: " +
-                    "la foto de salida solo se acepta ahí."
+                "La foto de salida solo se acepta a menos de $radio m del punto de inicio."
             } else {
-                "Iniciaste a las ${ActivityGeofence.horaDe(e.origen.at)}. La foto de salida lleva tu ubicación; " +
-                    "en este tipo de actividad no hace falta que coincida con el inicio."
+                "La foto de salida lleva tu ubicación y no tiene que coincidir con el inicio."
             },
             fontSize = 12.sp,
             color = NxColors.Muted,
         )
+        DatoLinea("Inicio", ActivityGeofence.horaDe(e.origen.at))
         e.ultimo?.let { u ->
-            NxIconText(
-                text = "Última ubicación ${ActivityGeofence.horaDe(u.at)} · a ${u.distanciaM ?: "—"} m del inicio",
-                icon = Icons.Outlined.MyLocation,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = NxColors.Slate,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                NxIconText(
+                    text = "Última ubicación",
+                    icon = Icons.Outlined.MyLocation,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NxColors.Slate,
+                )
+                Text(
+                    ActivityGeofence.horaDe(u.at),
+                    fontSize = 12.sp,
+                    color = NxColors.Slate,
+                )
+                Text(
+                    "${u.distanciaM ?: "—"} m",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NxColors.Slate,
+                )
+            }
         }
         val puntos = e.puntos.orEmpty()
         if (puntos.isNotEmpty()) {
@@ -199,7 +211,7 @@ fun GeocercaActividadCard(
             )
             puntos.take(6).forEach { p ->
                 val fuera = (p.distanciaM ?: 0) > radio
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(ActivityGeofence.horaDe(p.at), fontSize = 12.sp, color = NxColors.Slate)
                     Text(
                         "${p.distanciaM ?: "—"} m",
@@ -229,6 +241,15 @@ fun GeocercaActividadCard(
     }
 }
 
+/** Etiqueta y valor, cada uno en su renglón. */
+@Composable
+private fun DatoLinea(etiqueta: String, valor: String, valorColor: Color = NxColors.Slate) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(etiqueta, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NxColors.Muted)
+        Text(valor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = valorColor)
+    }
+}
+
 @Composable
 fun AlertaZonaFila(a: GeocercaAlertaDto, onJustificar: (() -> Unit)? = null) {
     Column(
@@ -240,14 +261,22 @@ fun AlertaZonaFila(a: GeocercaAlertaDto, onJustificar: (() -> Unit)? = null) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            NxIconText(
-                text = "Salió de zona ${ActivityGeofence.horaDe(a.detectedAt)} · hasta ${a.maxDistanciaM ?: a.distanciaM ?: "—"} m",
-                icon = Icons.Outlined.LocationOff,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFB91C1C),
-                modifier = Modifier.weight(1f),
-            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                NxIconText(
+                    text = "Salió de zona",
+                    icon = Icons.Outlined.LocationOff,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFB91C1C),
+                )
+                Text(ActivityGeofence.horaDe(a.detectedAt), fontSize = 12.sp, color = NxColors.Slate)
+                Text(
+                    "${a.maxDistanciaM ?: a.distanciaM ?: "—"} m",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFB91C1C),
+                )
+            }
             if (a.status == "JUSTIFICADA") {
                 NxStatusChip("Justificada", NxTone.Info)
             } else {
@@ -302,11 +331,12 @@ private fun JustificarZonaDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "Te alejaste ${alerta.maxDistanciaM ?: alerta.distanciaM ?: "—"} m del punto de inicio a las " +
-                        "${ActivityGeofence.horaDe(alerta.detectedAt)}. Tu encargado y dirección verán tu explicación.",
+                    "Tu encargado y dirección verán tu explicación.",
                     fontSize = 13.sp,
                     color = NxColors.Muted,
                 )
+                DatoLinea("Salida", ActivityGeofence.horaDe(alerta.detectedAt))
+                DatoLinea("Distancia", "${alerta.maxDistanciaM ?: alerta.distanciaM ?: "—"} m")
                 OutlinedTextField(
                     value = motivo,
                     onValueChange = { motivo = it },

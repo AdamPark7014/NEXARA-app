@@ -156,6 +156,10 @@
 }
 
 .justificada {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em 0.5em;
   padding: 8px 12px;
   border-radius: var(--ui-radius);
   background: var(--ui-surface-2);
@@ -181,6 +185,9 @@
 }
 
 .lectura {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
   padding: 6px 10px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
@@ -245,6 +252,13 @@
   color: var(--ui-fg-2);
 }
 
+.dialogoDatos {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ui-s2);
+  margin: 0;
+}
+
 .campo {
   display: grid;
   gap: var(--ui-s2);
@@ -305,5 +319,30 @@
 @media (max-width: 640px) {
   .dialogoPie > * {
     flex: 1 1 auto;
+  }
+}
+
+/* A 390 px, un dato y una lectura por renglón: la hora no comparte línea con los metros. */
+@media (max-width: 390px) {
+  .datos,
+  .lecturas {
+    grid-template-columns: 1fr;
+  }
+
+  .lectura {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    white-space: normal;
+  }
+
+  .lecturaSep {
+    display: none;
+  }
+
+  .justificada {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
 }

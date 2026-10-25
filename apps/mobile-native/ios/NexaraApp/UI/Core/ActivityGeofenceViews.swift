@@ -147,8 +147,9 @@ private struct GeoTextButtonBody: View {
 
 // MARK: - Fila de una salida de zona
 
-/// Una salida de zona (Android `AlertaZonaFila`): «Salió de zona 14:05 · hasta 620 m»
-/// con su chip, si regresó, el motivo, la foto y «Justificar con motivo y foto».
+/// Una salida de zona (Android `AlertaZonaFila`): «Salió de zona», la hora y los metros
+/// cada uno en su renglón, con su chip, si regresó, el motivo, la foto y
+/// «Justificar con motivo y foto».
 struct ActivityGeofenceAlertRow: View {
     let alert: ActivityGeofenceAlert
     /// Se conserva por compatibilidad: Android dice «Salió de zona» en la captura y
@@ -165,13 +166,21 @@ struct ActivityGeofenceAlertRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center, spacing: 6) {
-                GeoIconText(
-                    systemName: "location.slash",
-                    text: "Salió de zona \(ActivityGeofence.horaDe(alert.detectedAt)) · hasta \(hasta) m",
-                    size: 12.5,
-                    weight: .semibold,
-                    color: ActivityGeofenceUI.rojoTexto
-                )
+                VStack(alignment: .leading, spacing: 2) {
+                    GeoIconText(
+                        systemName: "location.slash",
+                        text: "Salió de zona",
+                        size: 12.5,
+                        weight: .semibold,
+                        color: ActivityGeofenceUI.rojoTexto
+                    )
+                    Text(ActivityGeofence.horaDe(alert.detectedAt))
+                        .font(.system(size: 12))
+                        .foregroundStyle(NxColors.fg)
+                    Text(ActivityGeofenceUI.distance(hasta))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(ActivityGeofenceUI.rojoTexto)
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 NxStatusChip(
                     text: alert.isJustified ? "Justificada" : "Sin justificar",
@@ -303,10 +312,9 @@ struct ActivityGeofenceCard: View {
     private func tarjeta(_ e: ActivityGeofenceState) -> some View {
         let radio = e.radioM
         let chip = ActivityGeofenceUI.zoneChip(e)
-        let iniciaste = "Iniciaste a las \(ActivityGeofence.horaDe(e.origen?.at))."
         let parrafo = e.exigeMismaUbicacion
-            ? "\(iniciaste) Mantente a menos de \(radio) m de ese punto: la foto de salida solo se acepta ahí."
-            : "\(iniciaste) La foto de salida lleva tu ubicación; en este tipo de actividad no hace falta que coincida con el inicio."
+            ? "La foto de salida solo se acepta a menos de \(radio) m del punto de inicio."
+            : "La foto de salida lleva tu ubicación y no tiene que coincidir con el inicio."
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
                 GeoIconText(
@@ -324,14 +332,30 @@ struct ActivityGeofenceCard: View {
                 .foregroundStyle(NxColors.muted)
                 .geoLinea(12)
                 .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Inicio")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(NxColors.muted)
+                Text(ActivityGeofence.horaDe(e.origen?.at))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
+            }
             if let ultimo = e.ultimo {
-                GeoIconText(
-                    systemName: "location",
-                    text: "Última ubicación \(ActivityGeofence.horaDe(ultimo.at)) · a \(ultimo.distanciaM.map { String($0) } ?? "—") m del inicio",
-                    size: 12.5,
-                    weight: .semibold,
-                    color: NxColors.fg
-                )
+                VStack(alignment: .leading, spacing: 2) {
+                    GeoIconText(
+                        systemName: "location",
+                        text: "Última ubicación",
+                        size: 12.5,
+                        weight: .semibold,
+                        color: NxColors.fg
+                    )
+                    Text(ActivityGeofence.horaDe(ultimo.at))
+                        .font(.system(size: 12))
+                        .foregroundStyle(NxColors.fg)
+                    Text(ActivityGeofenceUI.distance(ultimo.distanciaM))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(NxColors.fg)
+                }
             }
             if !e.puntos.isEmpty {
                 Text(e.seguimientoActivo ? "Seguimiento cada ~10 min" : "Recorrido registrado")
@@ -366,11 +390,10 @@ struct ActivityGeofenceCard: View {
 
     private func filaPunto(_ punto: ActivityGeofencePoint, radio: Int) -> some View {
         let fuera = (punto.distanciaM ?? 0) > radio
-        return HStack(alignment: .center, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 2) {
             Text(ActivityGeofence.horaDe(punto.at))
                 .font(.system(size: 12))
                 .foregroundStyle(NxColors.fg)
-            Spacer(minLength: 8)
             Text(ActivityGeofenceUI.distance(punto.distanciaM))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(fuera ? ActivityGeofenceUI.rojoTexto : NxColors.verde)
@@ -481,14 +504,13 @@ struct ActivityGeofenceJustifySheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 16)
             VStack(alignment: .leading, spacing: 10) {
-                Text(
-                    "Te alejaste \(alert.maxDistanciaM) m del punto de inicio a las "
-                        + "\(ActivityGeofence.horaDe(alert.detectedAt)). Tu encargado y dirección verán tu explicación."
-                )
-                .font(.system(size: 13))
-                .foregroundStyle(NxColors.muted)
-                .geoLinea(13, alto: 20)
-                .fixedSize(horizontal: false, vertical: true)
+                Text("Tu encargado y dirección verán tu explicación.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.muted)
+                    .geoLinea(13, alto: 20)
+                    .fixedSize(horizontal: false, vertical: true)
+                datoDialogo("Salida", ActivityGeofence.horaDe(alert.detectedAt))
+                datoDialogo("Distancia", ActivityGeofenceUI.distance(alert.maxDistanciaM))
                 campoMotivo
                 if let photo {
                     Image(uiImage: photo.image)
@@ -539,6 +561,17 @@ struct ActivityGeofenceJustifySheet: View {
         .padding(24)
         .frame(maxWidth: 560, alignment: .leading)
         .background(ActivityGeofenceJustifySheet.fondo, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func datoDialogo(_ etiqueta: String, _ valor: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(etiqueta)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(NxColors.muted)
+            Text(valor)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(NxColors.fg)
+        }
     }
 
     /// `OutlinedTextField` de Material 3: contorno #CBD5E1 (2 de marca con foco),
