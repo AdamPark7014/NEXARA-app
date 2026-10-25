@@ -400,7 +400,7 @@ export async function consultarUpcInternacional(token: string, codigo: string): 
       encontrado: false,
       codigo,
       motivo: "SIN_SERVICIO",
-      mensaje: "No se pudo consultar el catálogo internacional. Captura los datos a mano.",
+      mensaje: "No se pudo consultar el catálogo internacional: captura los datos a mano.",
     };
   }
 }
