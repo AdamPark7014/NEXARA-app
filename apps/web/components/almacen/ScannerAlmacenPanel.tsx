@@ -97,6 +97,8 @@ export default function ScannerAlmacenPanel() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Código de la búsqueda que falló: el botón Reintentar lo vuelve a pedir. */
+  const [codigoReintento, setCodigoReintento] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [hit, setHit] = useState<HallazgoDeCodigo | null>(null);
   const [warehouses, setWarehouses] = useState<Array<{ id: number; name: string }>>([]);
@@ -114,6 +116,11 @@ export default function ScannerAlmacenPanel() {
   const [busqueda, setBusqueda] = useState("");
   const [candidatos, setCandidatos] = useState<CatalogProduct[]>([]);
   const [buscandoProducto, setBuscandoProducto] = useState(false);
+
+  const mostrarError = useCallback((mensaje: string | null, reintentarCodigo?: string) => {
+    setError(mensaje);
+    setCodigoReintento(mensaje && reintentarCodigo ? reintentarCodigo : null);
+  }, []);
 
   useEffect(() => {
     busyRef.current = loading || saving;
@@ -156,11 +163,11 @@ export default function ScannerAlmacenPanel() {
       const { codigo: q, tipo } = clasificarCodigo(raw);
       if (!q || !token || busyRef.current) return;
       if (q.length < MIN_SCAN_LEN) {
-        setError(`Código demasiado corto (mín. ${MIN_SCAN_LEN})`);
+        mostrarError(`Código demasiado corto (mín. ${MIN_SCAN_LEN})`);
         return;
       }
       setLoading(true);
-      setError(null);
+      mostrarError(null);
       setOkMsg(null);
       setHit(null);
       cerrarDesconocido();
@@ -173,13 +180,13 @@ export default function ScannerAlmacenPanel() {
         else setDesconocido({ codigo: q, tipo });
         setCode("");
       } catch (e) {
-        setError(formatApiError(e, "No se pudo buscar el código. Intenta de nuevo."));
+        mostrarError(formatApiError(e, "No se pudo buscar el código."), q);
       } finally {
         setLoading(false);
         inputRef.current?.focus();
       }
     },
-    [token, cerrarDesconocido],
+    [token, cerrarDesconocido, mostrarError],
   );
 
   // El lector dispara aunque nadie haya hecho clic en el campo. Siempre encendido: así
@@ -190,7 +197,7 @@ export default function ScannerAlmacenPanel() {
         // A medio capturar un alta, otro escaneo borraría lo tecleado. Volver a
         // disparar sobre el mismo código no es un error: simplemente no hace nada.
         if (clasificarCodigo(codigo).codigo !== desconocido.codigo) {
-          setError("Termina o cancela lo que estás capturando antes de escanear otro código.");
+          mostrarError("Termina o cancela lo que estás capturando antes de escanear otro código.");
         }
         return;
       }
@@ -202,24 +209,24 @@ export default function ScannerAlmacenPanel() {
     if (!hit || !token) return;
     const quantity = Number(qty);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setError("Indica una cantidad válida");
+      mostrarError("Indica una cantidad válida");
       return;
     }
     if (needsFrom && fromWarehouseId === "") {
-      setError("Indica el almacén de origen");
+      mostrarError("Indica el almacén de origen");
       return;
     }
     if (needsTo && toWarehouseId === "") {
-      setError("Indica el almacén de destino");
+      mostrarError("Indica el almacén de destino");
       return;
     }
     if (opType === "TRANSFER" && fromWarehouseId === toWarehouseId) {
-      setError("Origen y destino deben ser distintos");
+      mostrarError("Origen y destino deben ser distintos");
       return;
     }
 
     setSaving(true);
-    setError(null);
+    mostrarError(null);
     setOkMsg(null);
     try {
       const apiType = opType === "ADJUSTMENT_OUT" ? "ADJUSTMENT" : opType;
@@ -241,7 +248,7 @@ export default function ScannerAlmacenPanel() {
       setHit(null);
       setQty("1");
     } catch (e) {
-      setError(formatApiError(e, "No se pudo registrar el movimiento"));
+      mostrarError(formatApiError(e, "No se pudo registrar el movimiento"));
     } finally {
       setSaving(false);
       inputRef.current?.focus();
@@ -278,11 +285,11 @@ export default function ScannerAlmacenPanel() {
   const guardarAlta = async () => {
     if (!desconocido || !token) return;
     if (!alta.name.trim()) {
-      setError("Escribe el nombre del producto");
+      mostrarError("Escribe el nombre del producto");
       return;
     }
     setSaving(true);
-    setError(null);
+    mostrarError(null);
     try {
       const producto = await altaProductoPorCodigo(token, {
         codigo: desconocido.codigo,
@@ -299,7 +306,7 @@ export default function ScannerAlmacenPanel() {
       setOkMsg(`Producto dado de alta con la clave ${producto.sku}. Registra cuántas piezas entran.`);
       cerrarDesconocido();
     } catch (e) {
-      setError(formatApiError(e, "No se pudo dar de alta el producto"));
+      mostrarError(formatApiError(e, "No se pudo dar de alta el producto"));
     } finally {
       setSaving(false);
     }
@@ -337,7 +344,7 @@ export default function ScannerAlmacenPanel() {
   const ligar = async (producto: CatalogProduct) => {
     if (!desconocido || !token) return;
     setSaving(true);
-    setError(null);
+    mostrarError(null);
     try {
       const actualizado = await asignarCodigoAProducto(token, producto.id, {
         codigo: desconocido.codigo,
@@ -351,7 +358,7 @@ export default function ScannerAlmacenPanel() {
       setOkMsg(`Código ligado a ${actualizado.name}. Desde ahora el lector lo reconoce.`);
       cerrarDesconocido();
     } catch (e) {
-      setError(formatApiError(e, "No se pudo ligar el código al producto"));
+      mostrarError(formatApiError(e, "No se pudo ligar el código al producto"));
     } finally {
       setSaving(false);
     }
@@ -370,7 +377,7 @@ export default function ScannerAlmacenPanel() {
     <Card aria-label="Escanear">
       <CardHead
         title="Escanear"
-        subtitle="Dispara el lector sobre el código, sin hacer clic en ningún campo. El producto aparece abajo y ahí decides qué pasó con él."
+        subtitle="Dispara el lector sobre el código, sin hacer clic en ningún campo, y decide abajo qué pasó con el producto."
       />
       <div className={s.cuerpo}>
         <CampoEscaneo
@@ -397,7 +404,24 @@ export default function ScannerAlmacenPanel() {
 
         {error && (
           <div id={ERROR_ID}>
-            <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
+            <Alert
+              tone="danger"
+              role="alert"
+              onDismiss={() => mostrarError(null)}
+              action={
+                codigoReintento ? (
+                  <Button
+                    variant="secondary"
+                    size={TACTIL}
+                    loading={loading}
+                    disabled={saving}
+                    onClick={() => void buscarCodigo(codigoReintento)}
+                  >
+                    Reintentar
+                  </Button>
+                ) : undefined
+              }
+            >
               {error}
             </Alert>
           </div>
