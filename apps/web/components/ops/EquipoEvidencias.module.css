@@ -743,6 +743,13 @@
 }
 
 @media (max-width: 767px) {
+  /* A 390 el mínimo de 130 px cabe dos veces: los pasos iban de dos en dos. */
+  .pasos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .paso {
+    min-width: 0;
+  }
   .tarjeta {
     padding: var(--ui-s3);
     border-radius: var(--ui-radius-lg);
