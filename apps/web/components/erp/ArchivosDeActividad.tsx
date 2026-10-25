@@ -27,6 +27,7 @@ import { triggerBlobDownload } from "@/lib/file-download";
 import {
   ACEPTA_ADJUNTOS,
   bajarArchivo,
+  datosDeAdjunto,
   iconoYColor,
   listarAdjuntos,
   metaDeAdjunto,
@@ -54,6 +55,26 @@ const ICONOS: Record<IconoAdjunto, typeof PictureAsPdfOutlinedIcon> = {
 };
 
 const mensaje = (e: unknown, porOmision: string) => (e instanceof Error && e.message.trim() ? e.message : porOmision);
+
+/** Tamaño, quién lo subió y la hora. En ancho van juntos; a 390 px, uno por renglón. */
+function MetaDelRenglon({ adjunto }: { adjunto: AdjuntoActividad }) {
+  const datos = datosDeAdjunto(adjunto);
+  if (!datos.length) return null;
+  return (
+    <span className={s.meta}>
+      {datos.map((dato, i) => (
+        <span key={`${adjunto.id}-${i}`} className={s.dato}>
+          {i > 0 ? (
+            <span className={s.sep} aria-hidden="true">
+              {" · "}
+            </span>
+          ) : null}
+          {dato}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 function IconoTipo({ tipo, grande = false }: { tipo: AdjuntoActividad["tipo"]; grande?: boolean }) {
   const { icono, color, etiqueta } = iconoYColor(tipo);
@@ -254,10 +275,7 @@ export default function ArchivosDeActividad({ activityId }: { activityId: number
         ) : lista == null ? (
           <SkeletonRows rows={2} label="Cargando archivos" />
         ) : lista.length === 0 ? (
-          <div className={s.vacio}>
-            <strong>Aún no hay archivos</strong>
-            <span>Arrastra aquí Excel, Word, PDF o imágenes, o usa «Adjuntar archivo». Hasta 25 MB cada uno.</span>
-          </div>
+          <p className={s.vacio}>Aún no hay archivos</p>
         ) : (
           <>
             <ul className={s.lista}>
@@ -275,7 +293,7 @@ export default function ArchivosDeActividad({ activityId }: { activityId: number
                     <IconoTipo tipo={a.tipo} />
                     <span className={s.textos}>
                       <span className={s.nombre}>{a.nombre}</span>
-                      <span className={s.meta}>{metaDeAdjunto(a)}</span>
+                      <MetaDelRenglon adjunto={a} />
                     </span>
                   </button>
                   {a.puedeQuitar ? (

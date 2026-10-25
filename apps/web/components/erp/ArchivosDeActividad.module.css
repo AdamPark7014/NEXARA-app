@@ -37,18 +37,11 @@
 }
 
 .vacio {
-  display: grid;
-  gap: var(--ui-s1);
-  justify-items: center;
+  margin: 0;
   padding: var(--ui-s5) var(--ui-s4);
   border: 1.5px dashed var(--ui-border);
   border-radius: var(--ui-radius-lg);
   text-align: center;
-  font-size: var(--ui-fs-label);
-  color: var(--ui-fg-3);
-}
-
-.vacio strong {
   font-size: var(--ui-fs-body);
   font-weight: var(--ui-fw-semibold);
   color: var(--ui-fg-2);
@@ -143,6 +136,23 @@
   font-size: var(--ui-fs-meta);
   line-height: 1.35;
   color: var(--ui-fg-3);
+}
+
+.dato {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* En teléfono, tamaño, quién lo subió y la hora van uno por renglón. */
+@media (max-width: 480px) {
+  .meta {
+    display: grid;
+    gap: 2px;
+  }
+
+  .sep {
+    display: none;
+  }
 }
 
 .pista {

@@ -57,7 +57,9 @@ describe("ArchivosDeActividad", () => {
       },
     ]);
     render(<ArchivosDeActividad activityId={7} />);
-    expect(await screen.findByText(/2\.3 MB · Luis Joel · hoy \d{2}:\d{2}/)).toBeTruthy();
+    expect(await screen.findByText("2.3 MB")).toBeTruthy();
+    expect(screen.getByText("Luis Joel")).toBeTruthy();
+    expect(screen.getByText(/hoy \d{2}:\d{2}/)).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Abrir Propuesta Toks.xlsx" }));
     const visor = await screen.findByRole("dialog");
