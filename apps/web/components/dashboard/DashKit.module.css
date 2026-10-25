@@ -354,9 +354,8 @@ a.statCard:hover {
   font-size: 11.5px;
   color: var(--text-tertiary);
   margin-top: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.4;
+  white-space: normal;
 }
 
 .rowTrail {
@@ -522,6 +521,13 @@ a.row { min-height: 44px; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 10px;
+}
+
+/* A 390 px (y en el resto del teléfono) cada mini-stat ocupa su renglón. */
+@media (max-width: 520px) {
+  .miniGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .miniCell {

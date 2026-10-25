@@ -8,6 +8,7 @@
  * sigue como siempre.
  */
 import { useCallback, useEffect, useState } from "react";
+import Button from "@/components/ui/Button";
 import { DashPanel, ListRow, DashPill, DashEmpty, DashSkeleton } from "@/components/dashboard/DashKit";
 import { buildApiUrl } from "@/lib/api-base";
 
@@ -76,6 +77,7 @@ export default function TuDiaPanel({ token }: { token: string | null | undefined
   const [failed, setFailed] = useState(false);
   const [soloResumen, setSoloResumen] = useState<boolean | null>(null);
   const [errorPref, setErrorPref] = useState(false);
+  const [prefPendiente, setPrefPendiente] = useState<boolean | null>(null);
 
   const load = useCallback(() => {
     if (!token) return;
@@ -114,6 +116,7 @@ export default function TuDiaPanel({ token }: { token: string | null | undefined
     const anterior = soloResumen;
     setSoloResumen(activo); // se ve al instante; si no se guarda, vuelve a como estaba
     setErrorPref(false);
+    setPrefPendiente(activo);
     guardarSoloResumen(token, activo).catch(() => {
       setSoloResumen(anterior);
       setErrorPref(true);
@@ -125,14 +128,14 @@ export default function TuDiaPanel({ token }: { token: string | null | undefined
   return (
     <DashPanel
       title="Tu día"
-      subtitle={data ? (data.vacio ? "Nada requiere tu atención ahora" : "Lo que hoy espera algo de ti") : "Revisando pendientes…"}
+      subtitle={data ? (data.vacio ? undefined : "Lo que hoy espera algo de ti") : "Revisando pendientes…"}
       action="Aprobaciones"
       actionHref="/erp/approvals"
     >
       {loading && !data ? (
         <DashSkeleton rows={3} height={16} />
       ) : !data || data.vacio ? (
-        <DashEmpty title="Todo al día" description="Sin aprobaciones, cobranza vencida ni compras atrasadas." />
+        <DashEmpty title="Todo al día" />
       ) : (
         data.items.map((item) => {
           const tono = TONO[item.tono] ?? TONO.atencion;
@@ -149,24 +152,28 @@ export default function TuDiaPanel({ token }: { token: string | null | undefined
       )}
       {soloResumen !== null && (
         <label
-          style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "12px 12px 4px", fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}
+          style={{ display: "flex", gap: 8, alignItems: "center", alignSelf: "flex-start", margin: "12px 12px 4px", fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}
         >
           <input
             type="checkbox"
             checked={soloResumen}
             onChange={(e) => cambiarSoloResumen(e.target.checked)}
-            style={{ marginTop: 3 }}
+            style={{ width: 18, height: 18, minWidth: 18, minHeight: 18, flex: "0 0 auto", margin: 0, padding: 0 }}
           />
-          <span>
-            <strong style={{ color: "var(--text-primary)" }}>Solo el resumen y lo urgente.</strong> No recibir avisos
-            informativos (asistencias, evidencias enviadas, «se creó…»); sí lo que necesita tu decisión o es urgente.
-            {errorPref && (
-              <span role="alert" style={{ display: "block", color: "var(--danger)" }}>
-                No se pudo guardar. Intenta de nuevo.
-              </span>
-            )}
-          </span>
+          <span>Solo el resumen y lo urgente.</span>
         </label>
+      )}
+      {failed && data && (
+        <p role="alert" style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 12px 4px", fontSize: 13, color: "var(--danger)" }}>
+          No pudimos actualizar.
+          <Button size="sm" variant="secondary" onClick={load} loading={loading}>Reintentar</Button>
+        </p>
+      )}
+      {errorPref && prefPendiente !== null && (
+        <p role="alert" style={{ display: "flex", gap: 8, alignItems: "center", margin: "4px 12px", fontSize: 13, color: "var(--danger)" }}>
+          No se pudo guardar.
+          <Button size="sm" variant="secondary" onClick={() => cambiarSoloResumen(prefPendiente)}>Reintentar</Button>
+        </p>
       )}
     </DashPanel>
   );

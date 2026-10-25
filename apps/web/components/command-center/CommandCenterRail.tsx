@@ -91,22 +91,31 @@ export function CommandCenterRail({
   panel = "all",
   extraWidgets = [],
   ariaLabel = "Accesos directos",
+  omitHrefs = [],
+  includeRoleWidgets = true,
 }: {
   panel?: PanelFilter;
   extraWidgets?: CommandWidget[];
   ariaLabel?: string;
+  /** Destinos que la pantalla ya muestra (accesos rápidos, hero). No se repiten aquí. */
+  omitHrefs?: string[];
+  /** La vista ejecutiva ya tiene su lista de accesos; el carril solo añade pendientes. */
+  includeRoleWidgets?: boolean;
 }) {
   const { user } = useUser();
   const pathname = usePathname();
   const widgets = useMemo(() => {
-    const base = filterForPanel(getCommandWidgetsForUser(user), panel);
-    const seen = new Set<string>();
+    const base = includeRoleWidgets ? filterForPanel(getCommandWidgetsForUser(user), panel) : [];
+    const omit = new Set(omitHrefs);
+    const seenId = new Set<string>();
+    const seenHref = new Set<string>();
     return [...extraWidgets, ...base].filter((w) => {
-      if (seen.has(w.id) || w.href === pathname) return false;
-      seen.add(w.id);
+      if (seenId.has(w.id) || seenHref.has(w.href) || w.href === pathname || omit.has(w.href)) return false;
+      seenId.add(w.id);
+      seenHref.add(w.href);
       return true;
     });
-  }, [user, panel, extraWidgets, pathname]);
+  }, [user, panel, extraWidgets, pathname, omitHrefs, includeRoleWidgets]);
 
   if (!widgets.length) return null;
 

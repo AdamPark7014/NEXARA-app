@@ -14,11 +14,9 @@ export function ExecutiveBiDrillPanel({ links }: { links: ExecutiveBiDrillLink[]
       actionHref="/erp/analytics/bi"
       flush
     >
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 4 }}>
-        {links.map((link) => (
-          <ListRow key={link.id} href={link.href} title={link.label} sub={link.desc} trail={<span aria-hidden="true">→</span>} />
-        ))}
-      </div>
+      {links.map((link) => (
+        <ListRow key={link.id} href={link.href} title={link.label} sub={link.desc} trail={<span aria-hidden="true">→</span>} />
+      ))}
     </DashPanel>
   );
 }
