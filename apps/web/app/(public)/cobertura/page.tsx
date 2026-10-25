@@ -1,13 +1,9 @@
-import React from "react";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
-import PublicPageHero from "../../components/PublicPageHero";
-import heroStyles from "../../components/PublicPageHero.module.css";
+import quiet from "../nexara/home-quiet.module.css";
 import styles from "./page.module.css";
-import SeoInterlinkHub from "@/components/SeoInterlinkHub";
-import { GEO_CITIES } from "@/lib/seo/geo-cities";
+import { GEO_CITIES, type GeoCity } from "@/lib/seo/geo-cities";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
-import CoverageMap from "../../components/CoverageMap";
 
 export const revalidate = 1800;
 
@@ -67,12 +63,34 @@ const modalidades = [
   },
 ];
 
-const modeLabel = (mode: string) =>
+const MODES = ["base", "campo", "extendida"] as const;
+
+const modeLabel = (mode: GeoCity["mode"]) =>
   mode === "base" ? "Base" : mode === "campo" ? "Campo" : "Extendida";
+
+const MAP_ALT =
+  "Mapa de cobertura NEXARA — 32 estados y más de 200 puntos de presencia en México; base en Puebla y CDMX";
+
+function CityLine({ mode }: { mode: GeoCity["mode"] }) {
+  const cities = GEO_CITIES.filter((city) => city.mode === mode);
+
+  return (
+    <p className={quiet.cities}>
+      {cities.map((city, index) => (
+        <span key={city.slug}>
+          {index > 0 ? <span aria-hidden="true"> · </span> : null}
+          <Link href={`/cobertura/${city.slug}`} className={styles.inkLink}>
+            {city.name}
+          </Link>
+        </span>
+      ))}
+    </p>
+  );
+}
 
 export default function CoberturaPage() {
   return (
-    <main className={`${shared.page} home-main-flush`}>
+    <main className={`${shared.page} home-main-flush`} aria-label="Cobertura NEXARA">
       <JsonLd
         data={{
           "@context": "https://schema.org",
@@ -82,7 +100,7 @@ export default function CoberturaPage() {
           description: "Cobertura nacional con base en Puebla y CDMX.",
           mainEntity: {
             "@type": "ItemList",
-            itemListElement: GEO_CITIES.slice(0, 20).map((c, i) => ({
+            itemListElement: GEO_CITIES.map((c, i) => ({
               "@type": "ListItem",
               position: i + 1,
               name: c.name,
@@ -91,162 +109,107 @@ export default function CoberturaPage() {
           },
         }}
       />
-      <PublicPageHero
-        eyebrow="Cobertura"
-        title={
-          <>
-            Base en el centro,{" "}
-            <span className={heroStyles.titleAccent}>alcance nacional</span>
-          </>
-        }
-        lead="Puebla y CDMX como ancla operativa. El resto del país con campo propio, partners y modelo remoto o híbrido."
-        imageSrc="/fotos/campo-enlace-antena-ciudad.jpg"
-        imageAlt="Cobertura nacional Nexara"
-        actions={
-          <div className={styles.heroActions}>
-            <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-              Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
-            </Link>
-            <Link href="/cobertura/puebla" className={`${shared.btn} ${shared.btnSecondary}`}>
-              Ver Puebla
-            </Link>
-          </div>
-        }
-      />
 
-      <section className={shared.section} data-reveal="up">
-        <div className={shared.inner}>
-          <header className={shared.sectionHead}>
-            <p className={shared.eyebrow}>Ciudades</p>
-            <h2 className={shared.sectionTitle}>
-              Cotiza por <span className={shared.sectionTitleAccent}>ciudad</span>
-            </h2>
-            <p className={shared.sectionLead}>
-              Páginas locales de CCTV, redes y soporte — listas para Google y para WhatsApp.
-            </p>
-          </header>
-          <div className={styles.cityGrid}>
-            {GEO_CITIES.map((c) => (
-              <Link key={c.slug} href={`/cobertura/${c.slug}`} className={styles.cityCard}>
-                <p className={styles.cityMeta}>
-                  {modeLabel(c.mode)} · {c.region}
-                </p>
-                <h3 className={styles.cityName}>{c.name}</h3>
-                <p className={styles.cityHint}>{c.keywords[0]}</p>
-              </Link>
-            ))}
+      <header className={quiet.opening}>
+        <h1>Base en el centro, alcance nacional.</h1>
+        <p>
+          Puebla y CDMX como ancla operativa. El resto del país con campo propio, partners y modelo
+          remoto o híbrido.
+        </p>
+        <Link href="/contacto" className={styles.inkLink}>
+          Contacto
+        </Link>
+      </header>
+
+      <figure className={styles.map}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/fotos/mapa-cobertura-nexara-claro-2000.webp"
+          srcSet="/fotos/mapa-cobertura-nexara-claro-1200.webp 1200w, /fotos/mapa-cobertura-nexara-claro-1600.webp 1600w, /fotos/mapa-cobertura-nexara-claro-2000.webp 2000w"
+          sizes="100vw"
+          width={2000}
+          height={1000}
+          alt={MAP_ALT}
+        />
+      </figure>
+
+      <section className={quiet.block} aria-label="Ciudades">
+        <h2>Ciudades</h2>
+        {MODES.map((mode) => (
+          <div key={mode} className={styles.cityGroup}>
+            <p className={styles.modeLabel}>{modeLabel(mode)}</p>
+            <CityLine mode={mode} />
           </div>
-        </div>
+        ))}
       </section>
 
-      {/* Mapa de cobertura completo (versión clara u oscura según el tema) */}
-      <section className={shared.sectionTight} data-reveal="up" aria-label="Mapa de operaciones">
-        <div className={shared.inner}>
-          <CoverageMap
-            sizes="(max-width: 1280px) 100vw, 1240px"
-            caption={
+      <section className={quiet.block} aria-label="Regiones">
+        <h2>Regiones</h2>
+        <ul className={quiet.services}>
+          {regiones.map((region) => {
+            const href =
+              region.citySlug && regionCitySlugs.has(region.citySlug)
+                ? `/cobertura/${region.citySlug}`
+                : null;
+            const body = (
               <>
-                <span>Operamos donde importa · 32 estados y más de 200 puntos de presencia</span>
-                <span>Base en Puebla y CDMX</span>
+                <strong>{region.name}</strong>
+                <span>
+                  {region.role}. {region.desc}
+                </span>
               </>
-            }
-          />
-        </div>
-      </section>
-      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
-        <div className={shared.inner}>
-          <header className={shared.sectionHead}>
-            <p className={shared.eyebrow}>Regiones</p>
-            <h2 className={shared.sectionTitle}>
-              Dónde llegamos — y <span className={shared.sectionTitleAccent}>cómo</span>
-            </h2>
-            <p className={shared.sectionLead}>
-              Seis regiones. La base centra el personal; el resto se arma según urgencia, sitio y SLA.
-            </p>
-          </header>
-          <div className={shared.industryBoard} data-reveal-stagger>
-            {regiones.map((r) => {
-              const href =
-                r.citySlug && regionCitySlugs.has(r.citySlug) ? `/cobertura/${r.citySlug}` : null;
-              if (href) {
-                return (
-                  <Link
-                    key={r.name}
-                    href={href}
-                    className={shared.industryCell}
-                    data-reveal="up"
-                  >
-                    <span className={shared.industryRisk}>{r.role}</span>
-                    <h3 className={shared.industryCellTitle}>{r.name}</h3>
-                    <p className={shared.industryCellText}>{r.desc}</p>
-                    <span className={shared.industryCellLink}>Ver región →</span>
+            );
+            return (
+              <li key={region.name}>
+                {href ? (
+                  <Link href={href} className={styles.inkLink}>
+                    {body}
                   </Link>
-                );
-              }
-              return (
-                <div key={r.name} className={shared.industryCell} data-reveal="up">
-                  <span className={shared.industryRisk}>{r.role}</span>
-                  <h3 className={shared.industryCellTitle}>{r.name}</h3>
-                  <p className={shared.industryCellText}>{r.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                ) : (
+                  <div className={styles.staticRow}>{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
-      <section className={shared.section} data-reveal="up">
-        <div className={shared.inner}>
-          <header className={shared.sectionHead}>
-            <p className={shared.eyebrow}>Modalidades</p>
-            <h2 className={shared.sectionTitle}>
-              Cómo <span className={shared.sectionTitleAccent}>intervenimos</span>
-            </h2>
-            <p className={shared.sectionLead}>
-              El modelo se adapta al riesgo y a la ventana de trabajo — no al contrario.
-            </p>
-          </header>
-          <div className={shared.principleGrid} data-reveal-stagger>
-            {modalidades.map((m) => (
-              <div key={m.title} className={shared.principleItem} data-reveal="up">
-                <h3 className={shared.principleTitle}>{m.title}</h3>
-                <p className={shared.principleText}>{m.text}</p>
+      <section className={quiet.block} aria-label="Modalidades">
+        <h2>Modalidades</h2>
+        <ul className={quiet.services}>
+          {modalidades.map((mode) => (
+            <li key={mode.title}>
+              <div className={styles.staticRow}>
+                <strong>{mode.title}</strong>
+                <span>{mode.text}</span>
               </div>
-            ))}
-          </div>
-        </div>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <section className={shared.section} data-reveal="up">
-        <div className={shared.inner}>
-          <SeoInterlinkHub
-            title="Cotiza por ciudad e industria"
-            subtitle="CCTV, redes y soporte — rutas locales listas para Google y para WhatsApp."
-            currentPath="/cobertura"
-            maxIndustries={4}
-            maxServicesPerIndustry={3}
-          />
-        </div>
-      </section>
-
-      <section className={shared.sectionTight} data-reveal="up">
-        <div className={shared.inner}>
-          <div className={shared.ctaBand}>
-            <p className={shared.ctaEyebrow}>Tu zona</p>
-            <h2 className={shared.ctaTitle}>¿Operas fuera del centro?</h2>
-            <p className={shared.ctaLead}>
-              Indica ciudad, tipo de intervención y urgencia. Te confirmamos tiempo de respuesta y modelo de servicio.
-            </p>
-            <div className={shared.ctaActions}>
-              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
-              </Link>
-              <Link href="/cobertura/cdmx" className={`${shared.btn} ${shared.btnSecondary}`}>
-                Ver CDMX
-              </Link>
-            </div>
-          </div>
-        </div>
+      <section className={`${quiet.block} ${quiet.contact}`} aria-label="Contacto">
+        <h2>Contacto</h2>
+        <p>
+          <a href="tel:+522226960350" className={styles.inkLink}>
+            +52 222 696 0350
+          </a>
+          <span aria-hidden="true"> · </span>
+          <a
+            href="https://wa.me/522226960350"
+            className={styles.inkLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            WhatsApp
+          </a>
+        </p>
+        <p>
+          <a href="mailto:gerencia@nexara.com.mx" className={styles.inkLink}>
+            gerencia@nexara.com.mx
+          </a>
+        </p>
+        <p>Ignacio Allende 512, Santiago Momoxpan, San Pedro Cholula, Puebla.</p>
       </section>
     </main>
   );

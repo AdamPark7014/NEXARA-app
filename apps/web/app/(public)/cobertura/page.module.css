@@ -155,3 +155,47 @@
   border-color: var(--ds-cyan-line);
   color: var(--ds-cyan-strong);
 }
+
+/* Índice /cobertura — misma voz que el home (home-quiet). */
+
+.map {
+  margin: 8px 0 0;
+}
+
+.map img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cityGroup:first-child .modeLabel {
+  margin-top: 4px;
+}
+
+.modeLabel {
+  margin: 18px 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+.staticRow {
+  display: grid;
+  gap: 2px;
+  padding: 18px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+
+/* La regla global `a:not([class])` pinta los enlaces en cian.
+   Estas clases dejan la tinta del home (#1d1d1f). */
+.inkLink {
+  color: #1d1d1f;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.inkLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
