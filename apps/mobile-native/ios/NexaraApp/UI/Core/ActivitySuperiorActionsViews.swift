@@ -143,8 +143,7 @@ struct ActivityCancelSheet: View {
 
     var body: some View {
         ActivityDialogSheet(title: "Cancelar actividad", titleWeight: .bold) {
-            Text("La actividad quedará como «Cancelada» con tu motivo en el historial. Se avisa a quienes "
-                + "la ejecutan, al responsable, a sus jefes y a Christian.")
+            Text("La actividad quedará como «Cancelada» con tu motivo en el historial.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -188,7 +187,7 @@ struct ActivityCancelSheet: View {
         defer { saving = false }
         do {
             try await CoreRepository.shared.cancelActivity(activityId: target.id, motivo: limpio)
-            onDone("La actividad quedó cancelada. Se avisó al equipo, a sus jefes y a Christian.")
+            onDone("La actividad quedó cancelada.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo cancelar la actividad")
@@ -219,9 +218,7 @@ struct ActivityNoCumplidaSheet: View {
 
     var body: some View {
         ActivityDialogSheet(title: "Registrar incumplimiento", titleWeight: .bold) {
-            Text("La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar. "
-                + "La causa y tus observaciones quedan en el historial y cuentan en los KPI. "
-                + "Después puedes reprogramarla.")
+            Text("La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -307,7 +304,7 @@ struct ActivityNoCumplidaSheet: View {
         defer { saving = false }
         do {
             try await CoreRepository.shared.registrarNoCumplida(activityId: target.id, causa: elegida, observaciones: limpio)
-            onDone("La actividad quedó como no cumplida. Puedes reprogramarla cuando haya fecha.")
+            onDone("La actividad quedó como no cumplida.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo registrar el incumplimiento")
@@ -344,8 +341,7 @@ struct ActivityReprogramarSheet: View {
 
     var body: some View {
         ActivityDialogSheet(title: "Reprogramar", titleWeight: .bold) {
-            Text("La actividad se reabre con la nueva fecha. El incumplimiento no se borra: "
-                + "queda en el historial y en los KPI.")
+            Text("La actividad se reabre con la nueva fecha.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -403,7 +399,7 @@ struct ActivityReprogramarSheet: View {
         do {
             try await CoreRepository.shared.reprogramarNoCumplida(activityId: target.id, fecha: fecha, motivo: limpio)
             let cuando = ActivityDetailFormat.when(ActivityDetailFormat.isoString(fecha)).map { " para \($0)" } ?? ""
-            onDone("Actividad reprogramada\(cuando). Vuelve a estar abierta; el incumplimiento queda en el historial.")
+            onDone("Actividad reprogramada\(cuando).")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo reprogramar la actividad")

@@ -135,7 +135,7 @@ internal fun ActivitySuperiorActions(
             onConfirm = { motivo ->
                 withContext(Dispatchers.IO) { repo.cancelActivity(activityId, motivo) }
                 dialogo = null
-                onDone("La actividad quedó cancelada. Se avisó al equipo, a sus jefes y a Christian.")
+                onDone("La actividad quedó cancelada.")
             },
         )
         ActivitySuperiorRules.Accion.PASAR -> PasarActividadDialog(
@@ -157,7 +157,7 @@ internal fun ActivitySuperiorActions(
             onConfirm = { causa, observaciones ->
                 withContext(Dispatchers.IO) { repo.registrarNoCumplida(activityId, causa, observaciones) }
                 dialogo = null
-                onDone("La actividad quedó como no cumplida. Puedes reprogramarla cuando haya fecha.")
+                onDone("La actividad quedó como no cumplida.")
             },
         )
         ActivitySuperiorRules.Accion.REPROGRAMAR -> ReprogramarDialog(
@@ -167,7 +167,7 @@ internal fun ActivitySuperiorActions(
                 withContext(Dispatchers.IO) { repo.reprogramarNoCumplida(activityId, fechaIso, motivo) }
                 dialogo = null
                 val cuando = CoreActivityRules.formatWhen(fechaIso)?.let { " para $it" }.orEmpty()
-                onDone("Actividad reprogramada$cuando. Vuelve a estar abierta; el incumplimiento queda en el historial.")
+                onDone("Actividad reprogramada$cuando.")
             },
         )
         null -> Unit
@@ -221,8 +221,7 @@ private fun CancelarActividadDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "La actividad quedará como «Cancelada» con tu motivo en el historial. Se avisa a quienes " +
-                        "la ejecutan, al responsable, a sus jefes y a Christian.",
+                    "La actividad quedará como «Cancelada» con tu motivo en el historial.",
                     fontSize = 13.sp,
                     color = NxColors.Muted,
                 )
@@ -402,9 +401,7 @@ private fun NoCumplidaDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar. " +
-                        "La causa y tus observaciones quedan en el historial y cuentan en los KPI. " +
-                        "Después puedes reprogramarla.",
+                    "La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar.",
                     fontSize = 13.sp,
                     color = NxColors.Muted,
                 )
@@ -493,8 +490,7 @@ private fun ReprogramarDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "La actividad se reabre con la nueva fecha. El incumplimiento no se borra: " +
-                        "queda en el historial y en los KPI.",
+                    "La actividad se reabre con la nueva fecha.",
                     fontSize = 13.sp,
                     color = NxColors.Muted,
                 )
