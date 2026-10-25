@@ -24,7 +24,7 @@ function PanelHead({
   return (
     <div className={styles.panelHead}>
       <button type="button" className={styles.mobileBack} aria-label="Volver al canal" onClick={onClose}>
-        ← Chat
+        ‹ Chat
       </button>
       <div className={styles.panelTitleBlock}>
         <h3 className={styles.panelTitle}>{title}</h3>
@@ -71,7 +71,9 @@ export function MembersPanel({
           detail ? (
             <>
               {channelPrefixNode(detail.kind)}
-              {detail.name} · {detail.memberCount}
+              {detail.name}
+              <br />
+              {detail.memberCount}
             </>
           ) : null
         }
