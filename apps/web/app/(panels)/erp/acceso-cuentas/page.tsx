@@ -7,7 +7,7 @@
  * (cifrada en la bóveda del servidor; se oculta sola a los 30 s) o ponerle una nueva a cualquiera. La ficha
  * vive solo en la memoria de esta pantalla: al recargar o pasar los 5 minutos se vuelve a pedir la contraseña.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -58,6 +58,13 @@ export default function AccesoCuentasPage() {
   const [mostrada, setMostrada] = useState<Mostrada | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [ahora, setAhora] = useState(() => Date.now());
+  const claveRef = useRef<HTMLInputElement>(null);
+  const reintentoRef = useRef<
+    | { tipo: "clave" }
+    | { tipo: "lista" }
+    | { tipo: "ver"; id: number }
+    | { tipo: "restablecer"; id: number }
+  >({ tipo: "clave" });
 
   useEffect(() => {
     if (!token) return;
@@ -91,6 +98,7 @@ export default function AccesoCuentasPage() {
     if (ficha && ahora >= ficha.venceEn) {
       bloquear();
       setError("Pasaron 5 minutos: vuelve a escribir tu contraseña.");
+      reintentoRef.current = { tipo: "clave" };
     }
   }, [ahora, ficha, bloquear]);
 
@@ -106,15 +114,18 @@ export default function AccesoCuentasPage() {
     if (!token || !password || trabajando) return;
     setTrabajando(true);
     setError(null);
+    let entro = false;
     try {
       const r = await desbloquearCuentas(token, password);
+      entro = true;
       setPassword("");
       setFicha({ valor: r.ficha, venceEn: new Date(r.venceEn).getTime() });
       setAhora(Date.now());
       setCuentas(await listarCuentas(token, r.ficha));
     } catch (err) {
       setPassword("");
-      setError(err instanceof Error ? err.message : "No se pudo entrar.");
+      setError(err instanceof Error ? err.message : entro ? "No se pudieron cargar las cuentas." : "No se pudo entrar.");
+      reintentoRef.current = entro ? { tipo: "lista" } : { tipo: "clave" };
     } finally {
       setTrabajando(false);
     }
@@ -129,6 +140,7 @@ export default function AccesoCuentasPage() {
       setCopiado(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo mostrar la contraseña.");
+      reintentoRef.current = { tipo: "ver", id };
     } finally {
       setTrabajando(false);
     }
@@ -146,9 +158,42 @@ export default function AccesoCuentasPage() {
       setCuentas(await listarCuentas(token, ficha.valor));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo restablecer la contraseña.");
+      reintentoRef.current = { tipo: "restablecer", id };
     } finally {
       setTrabajando(false);
     }
+  };
+
+  const cargarLista = async () => {
+    if (!token || !ficha || trabajando) return;
+    setTrabajando(true);
+    setError(null);
+    try {
+      setCuentas(await listarCuentas(token, ficha.valor));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron cargar las cuentas.");
+      reintentoRef.current = { tipo: "lista" };
+    } finally {
+      setTrabajando(false);
+    }
+  };
+
+  const reintentar = () => {
+    const accion = reintentoRef.current;
+    if (accion.tipo === "ver") {
+      void ver(accion.id);
+      return;
+    }
+    if (accion.tipo === "restablecer") {
+      void restablecer(accion.id);
+      return;
+    }
+    if (accion.tipo === "lista") {
+      void cargarLista();
+      return;
+    }
+    setError(null);
+    claveRef.current?.focus();
   };
 
   const filtradas = useMemo(() => {
@@ -160,7 +205,7 @@ export default function AccesoCuentasPage() {
 
   if (permitido === false) {
     return (
-      <EmptyState icon="🔒" title="Solo para el dueño" description="Esta pantalla es de uso exclusivo de dirección general." />
+      <EmptyState icon="🔒" title="Solo para el dueño" />
     );
   }
 
@@ -179,7 +224,17 @@ export default function AccesoCuentasPage() {
         }
       />
 
-      {error && <InlineAlert variant="danger" message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          variant="danger"
+          message={error}
+          action={
+            <Button size="sm" variant="secondary" onClick={reintentar} disabled={trabajando}>
+              {trabajando ? "Reintentando…" : "Reintentar"}
+            </Button>
+          }
+        />
+      )}
       {permitido && !bovedaLista && (
         <InlineAlert
           variant="warning"
@@ -192,6 +247,7 @@ export default function AccesoCuentasPage() {
           <label style={{ display: "grid", gap: 4, fontSize: 13, color: "var(--text-secondary)" }}>
             Tu contraseña
             <input
+              ref={claveRef}
               style={entrada}
               type="password"
               value={password}
@@ -204,11 +260,6 @@ export default function AccesoCuentasPage() {
           <Button type="submit" variant="primary" loading={trabajando} disabled={!password || trabajando || permitido !== true}>
             Entrar
           </Button>
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-            El acceso dura 5 minutos. Cada entrada, cada vez que ves una contraseña y cada restablecimiento quedan en la
-            auditoría. Las contraseñas se guardan cifradas; solo se pueden ver las que se pusieron desde el sistema. De las
-            anteriores no hay nada que mostrar: para esas, ponle una nueva.
-          </p>
         </form>
       ) : (
         <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
@@ -251,34 +302,40 @@ export default function AccesoCuentasPage() {
           />
 
           {cuentas === null ? (
-            <p style={{ margin: 0, color: "var(--text-secondary)" }}>Cargando cuentas…</p>
+            error ? null : <p style={{ margin: 0, color: "var(--text-secondary)" }}>Cargando cuentas…</p>
           ) : filtradas.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--text-secondary)" }}>No hay cuentas que coincidan.</p>
+            <p style={{ margin: 0, color: "var(--text-secondary)" }}>
+              {busqueda.trim() ? "Ninguna cuenta coincide." : "No hay cuentas."}
+            </p>
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
               {filtradas.map((c) => (
                 <li
                   key={c.id}
-                  style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", padding: "10px 14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)" }}
+                  style={{ display: "grid", gap: 8, minWidth: 0, padding: "12px 14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)" }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700 }}>
+                  <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, overflowWrap: "anywhere" }}>
                       {c.nombre} {!c.isActive && <span style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>(inactiva)</span>}
                     </div>
-                    <div style={{ fontSize: 12.5, color: "var(--text-secondary)", overflowWrap: "anywhere" }}>
-                      {c.email} · {c.roleKey ?? "sin tipo"} · contraseña {dias(c.passwordChangedAt)} ·{" "}
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", overflowWrap: "anywhere" }}>{c.email}</div>
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", overflowWrap: "anywhere" }}>{c.roleKey ?? "sin tipo"}</div>
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", overflowWrap: "anywhere" }}>contraseña {dias(c.passwordChangedAt)}</div>
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", overflowWrap: "anywhere" }}>
                       {c.guardada ? "guardada" : "sin contraseña guardada"}
                     </div>
                   </div>
                   {confirmar === c.id ? (
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 12.5 }}>¿Poner una contraseña nueva y cerrar sus sesiones?</span>
-                      <Button variant="primary" loading={trabajando} onClick={() => void restablecer(c.id)}>
-                        Sí, restablecer
-                      </Button>
-                      <Button variant="ghost" onClick={() => setConfirmar(null)}>
-                        Cancelar
-                      </Button>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <span style={{ fontSize: 13, lineHeight: 1.4 }}>¿Poner una contraseña nueva y cerrar sus sesiones?</span>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <Button variant="primary" loading={trabajando} onClick={() => void restablecer(c.id)}>
+                          Sí, restablecer
+                        </Button>
+                        <Button variant="ghost" onClick={() => setConfirmar(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
