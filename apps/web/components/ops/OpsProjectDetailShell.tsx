@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -41,6 +42,20 @@ type Ctx = {
   permisos: ClientPermissions;
 };
 
+/** Una frase, el mismo hecho: queda inactivo, se conservan actividades e historial y se puede reactivar. */
+export function avisoAlDesactivarProyecto(titulo: string): string {
+  return `«${titulo}» quedará inactivo: sus actividades y su historial se conservan y podrás reactivarlo después.`;
+}
+
+/** Una frase, el mismo hecho: no se deshace, el historial de actividades queda y, si solo está detenido, conviene desactivarlo. */
+export function avisoAlEliminarProyecto(titulo: string): string {
+  return `¿Eliminar el proyecto «${titulo}» sin poder deshacerlo, conservando el historial de sus actividades y, si solo está detenido, mejor desactivándolo?`;
+}
+
+export const VUELTA_PROYECTOS_OPERATIVOS = '‹ Proyectos operativos';
+export const FALLO_ESTATUS_PROYECTO = 'No se pudo cambiar el estatus del proyecto';
+export const FALLO_ELIMINAR_PROYECTO = 'No se pudo eliminar el proyecto';
+
 const OpsProjectDetailContext = createContext<Ctx | null>(null);
 
 export function useOpsProjectDetail() {
@@ -66,6 +81,7 @@ export default function OpsProjectDetailShell({
   const [permisos, setPermisos] = useState<ClientPermissions>(NO_CLIENT_PERMISSIONS);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const repetirAccion = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -113,26 +129,34 @@ export default function OpsProjectDetailShell({
 
   const inactivo = isInactiveOperationalProject(project?.status);
 
+  const ejecutar = async (trabajo: () => Promise<void>, fallback: string) => {
+    setActionError(null);
+    try {
+      await trabajo();
+      repetirAccion.current = null;
+    } catch (e) {
+      repetirAccion.current = () => ejecutar(trabajo, fallback);
+      setActionError(e instanceof Error ? e.message : fallback);
+    }
+  };
+
   const pedirCambioEstatus = (activar: boolean) => {
     if (!project) return;
     setConfirm({
       title: activar ? 'Reactivar proyecto' : 'Desactivar proyecto',
       message: activar
         ? `«${project.title}» volverá a estar activo.`
-        : `«${project.title}» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después.`,
+        : avisoAlDesactivarProyecto(project.title),
       confirmLabel: activar ? 'Reactivar' : 'Desactivar',
       danger: !activar,
       fn: async () => {
         if (!token) return;
-        setActionError(null);
-        try {
+        await ejecutar(async () => {
           await (activar
             ? reactivateOperationalProject(token, numericId)
             : deactivateOperationalProject(token, numericId));
           await load();
-        } catch (e) {
-          setActionError(e instanceof Error ? e.message : 'No se pudo cambiar el estatus del proyecto');
-        }
+        }, FALLO_ESTATUS_PROYECTO);
       },
     });
   };
@@ -141,18 +165,15 @@ export default function OpsProjectDetailShell({
     if (!project) return;
     setConfirm({
       title: 'Eliminar proyecto',
-      message: `¿Eliminar el proyecto «${project.title}»? Esta acción no se puede deshacer. Sus actividades conservan su historial. Si solo está detenido, mejor desactívalo.`,
+      message: avisoAlEliminarProyecto(project.title),
       confirmLabel: 'Eliminar',
       danger: true,
       fn: async () => {
         if (!token) return;
-        setActionError(null);
-        try {
+        await ejecutar(async () => {
           await deleteOperationalProject(token, numericId);
           router.push('/ops/projects');
-        } catch (e) {
-          setActionError(e instanceof Error ? e.message : 'No se pudo eliminar el proyecto');
-        }
+        }, FALLO_ELIMINAR_PROYECTO);
       },
     });
   };
@@ -165,7 +186,7 @@ export default function OpsProjectDetailShell({
             href="/ops/projects"
             style={{ fontSize: 13, color: 'var(--text-secondary)', textDecoration: 'none' }}
           >
-            ← Proyectos operativos
+            {VUELTA_PROYECTOS_OPERATIVOS}
           </Link>
           <div
             style={{
@@ -231,7 +252,23 @@ export default function OpsProjectDetailShell({
             </div>
           </div>
           {actionError ? (
-            <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--danger)' }}>{actionError}</p>
+            <p
+              role="alert"
+              style={{
+                margin: '8px 0 0',
+                fontSize: 13,
+                color: 'var(--danger)',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span>{actionError}</span>
+              <Button variant="ghost" onClick={() => void repetirAccion.current?.()}>
+                Reintentar
+              </Button>
+            </p>
           ) : null}
         </header>
         <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
