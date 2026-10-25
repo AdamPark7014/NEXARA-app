@@ -98,7 +98,11 @@ export default function OfflineNetworkBanner() {
     lineas.push("reconecta para sincronizar");
   }
   if (queued > 0) {
-    lineas.push(`${queued} ${queued === 1 ? "operación" : "operaciones"} pendiente(s) de envío`);
+    lineas.push(
+      queued === 1
+        ? `${queued} operación pendiente de envío`
+        : `${queued} operaciones pendientes de envío`,
+    );
   }
   if (queued === 0 && showOffline && !offlineDegraded) lineas.push("Modo sin conexión");
 

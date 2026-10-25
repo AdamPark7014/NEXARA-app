@@ -58,7 +58,10 @@ class OfflineBannerTextoTest {
         assertTrue(fuentes[2].contains("Sin conexión"))
         assertTrue(fuentes[2].contains("Sesión sin validar"))
         assertTrue(fuentes[2].contains("reconecta para sincronizar"))
-        assertTrue(fuentes[2].contains("pendiente(s) de envío"))
+        assertFalse(junto.contains("pendiente(s)"))
+        assertFalse(junto.contains("(s)"))
+        assertTrue(fuentes[2].contains("operación pendiente de envío"))
+        assertTrue(fuentes[2].contains("operaciones pendientes de envío"))
         assertTrue(fuentes[2].contains(">Reintentar<") || fuentes[2].contains("Reintentar"))
     }
 
