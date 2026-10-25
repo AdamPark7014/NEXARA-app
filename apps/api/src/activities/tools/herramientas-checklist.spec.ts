@@ -127,4 +127,31 @@ describe('mensajeChecklistPendiente', () => {
   it('sin pendientes no hay mensaje', () => {
     expect(mensajeChecklistPendiente([])).toBe('');
   });
+
+  it('deja los dos errores del checklist en una frase y cita el texto viejo', () => {
+    // El texto viejo eran dos frases. La lista ya lleva dos puntos; el punto y coma es a propósito.
+    const viejo = {
+      uno: 'Falta palomear el checklist de herramientas antes de iniciar: Escalera. Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.',
+      varios:
+        'Faltan palomear el checklist de herramientas antes de iniciar: A, B, C, D y 2 más. Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.',
+    };
+    const nuevo = {
+      uno: 'Falta palomear el checklist de herramientas antes de iniciar: Escalera; si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.',
+      varios:
+        'Faltan palomear el checklist de herramientas antes de iniciar: A, B, C, D y 2 más; si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.',
+    };
+    const mensajes = {
+      uno: mensajeChecklistPendiente(['Escalera']),
+      varios: mensajeChecklistPendiente(['A', 'B', 'C', 'D', 'E', 'F']),
+    };
+
+    for (const clave of ['uno', 'varios'] as const) {
+      expect(viejo[clave]).toMatch(/\.\s+[A-ZÁÉÍÓÚÑ]/);
+      expect(mensajes[clave]).toBe(nuevo[clave]);
+      expect(mensajes[clave]).not.toBe(viejo[clave]);
+      expect(mensajes[clave].split('. ')).toEqual([nuevo[clave]]);
+    }
+    expect(mensajes.uno).toContain('Falta palomear el checklist de herramientas antes de iniciar:');
+    expect(mensajes.varios).toContain('A, B, C, D y 2 más');
+  });
 });

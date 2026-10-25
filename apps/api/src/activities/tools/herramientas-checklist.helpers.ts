@@ -171,5 +171,5 @@ export function mensajeChecklistPendiente(pendientes: readonly string[]): string
       ? ` y ${pendientes.length - MAX_NOMBRES_EN_MENSAJE} más`
       : '';
   const falta = pendientes.length === 1 ? 'Falta' : 'Faltan';
-  return `${falta} palomear el checklist de herramientas antes de iniciar: ${muestra}${resto}. Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.`;
+  return `${falta} palomear el checklist de herramientas antes de iniciar: ${muestra}${resto}; si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.`;
 }
