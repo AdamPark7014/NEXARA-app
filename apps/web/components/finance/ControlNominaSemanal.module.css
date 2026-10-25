@@ -995,6 +995,29 @@ button.chip[aria-disabled="true"] {
   }
 }
 
+@media (max-width: 720px) {
+  .table,
+  .table tbody,
+  .table tr,
+  .table td,
+  .table th {
+    display: block;
+    width: 100%;
+    position: static;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table td,
+  .table th {
+    text-align: left;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
 @media (max-width: 480px) {
   .addForm {
     grid-template-columns: 1fr;

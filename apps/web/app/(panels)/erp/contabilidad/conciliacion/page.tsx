@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -500,10 +501,9 @@ export default function ConciliacionPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
-        title="Conciliación bancaria"
-        subtitle="El banco a la izquierda, lo que NEXARA cree que es a la derecha. Tú confirmas."
+        title="Conciliación"
         density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

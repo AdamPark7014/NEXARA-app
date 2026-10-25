@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
 import { saveBlob, todayStamp } from "@/components/finance/download";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
+import { ListFooter } from "@/components/base/ModulePage";
+import q from "@/components/erp/lista-quieta.module.css";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
@@ -1255,11 +1258,10 @@ export default function AccountingPage() {
   const totalActual = useMemo(() => budgetVsActual.reduce((s, b) => s + b.actualAmount, 0), [budgetVsActual]);
 
   return (
-    <>
+    <div className={q.zona}>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="ERP · Finanzas"
-        title="Pólizas y libros"
-        subtitle="Asientos, catálogo, balanza y presupuesto."
+        title="Pólizas"
         density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1535,7 +1537,8 @@ export default function AccountingPage() {
               <div aria-busy="true" style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando pólizas…</div>
             ) : !error || items.length > 0 ? (
               <>
-                <DataTable columns={journalColumns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin pólizas" emptyDescription="Registra la primera póliza contable." />
+                <DataTable columns={journalColumns} rows={visibleItems} rowKey={e => e.id} emptyTitle="No hay pólizas." emptyDescription="" />
+                {visibleItems.length > 0 ? <ListFooter total={visibleItems.length} unit={visibleItems.length === 1 ? "póliza" : "pólizas"} /> : null}
                 {visibleItems.length > 0 && (
                   <TableTotals
                     entries={[
@@ -1625,7 +1628,7 @@ export default function AccountingPage() {
             {accountsLoading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
             ) : (
-              <DataTable columns={accountColumns} rows={visibleAccounts} rowKey={a => a.id} emptyTitle="Sin cuentas" emptyDescription="Da de alta la primera cuenta contable." />
+              <DataTable columns={accountColumns} rows={visibleAccounts} rowKey={a => a.id} emptyTitle="No hay cuentas." emptyDescription="" />
             )}
           </Section>
 
@@ -1673,7 +1676,7 @@ export default function AccountingPage() {
             {periodsLoading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
             ) : (
-              <DataTable columns={periodColumns} rows={periods} rowKey={p => p.id} emptyTitle="Sin periodos" emptyDescription="Crea el primer periodo fiscal para poder cerrarlo al final del mes." />
+              <DataTable columns={periodColumns} rows={periods} rowKey={p => p.id} emptyTitle="No hay periodos." emptyDescription="" />
             )}
           </Section>
         </>
@@ -1717,7 +1720,7 @@ export default function AccountingPage() {
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
           ) : (
             <>
-              <DataTable columns={trialColumns} rows={trialBalance} rowKey={r => r.code} emptyTitle="Sin movimientos" emptyDescription="Contabiliza pólizas para generar la balanza." />
+              <DataTable columns={trialColumns} rows={trialBalance} rowKey={r => r.code} emptyTitle="No hay movimientos." emptyDescription="" />
               {trialBalance.length > 0 && (
                 <TableTotals
                   entries={[
@@ -1785,8 +1788,8 @@ export default function AccountingPage() {
                     ]}
                     rows={incomeStatement.revenue}
                     rowKey={(r) => r.code}
-                    emptyTitle="Sin ingresos"
-                    emptyDescription="No hay cuentas de ingreso en el rango."
+                    emptyTitle="No hay ingresos."
+                    emptyDescription=""
                   />
                   {incomeStatement.revenue.length > 0 && (
                     <TableTotals entries={[{ label: "Total ingresos", value: <Money value={incomeStatement.totalRevenue} bold={false} /> }]} />
@@ -1803,8 +1806,8 @@ export default function AccountingPage() {
                     ]}
                     rows={incomeStatement.expenses}
                     rowKey={(r) => r.code}
-                    emptyTitle="Sin gastos"
-                    emptyDescription="No hay cuentas de gasto en el rango."
+                    emptyTitle="No hay gastos."
+                    emptyDescription=""
                   />
                   {incomeStatement.expenses.length > 0 && (
                     <TableTotals entries={[{ label: "Total gastos", value: <Money value={incomeStatement.totalExpenses} bold={false} /> }]} />
@@ -1870,8 +1873,8 @@ export default function AccountingPage() {
                       ]}
                       rows={rows}
                       rowKey={(r) => r.code}
-                      emptyTitle="Sin cuentas"
-                      emptyDescription={`No hay cuentas de ${l.toLowerCase()} con movimientos.`}
+                      emptyTitle="No hay cuentas con movimientos."
+                      emptyDescription=""
                     />
                     {rows.length > 0 && (
                       <TableTotals entries={[{ label: `Total ${l.toLowerCase()}`, value: <Money value={total} bold={false} /> }]} />
@@ -1931,7 +1934,7 @@ export default function AccountingPage() {
             {costCentersLoading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
             ) : (
-              <DataTable columns={costCenterColumns} rows={costCenters} rowKey={c => c.id} emptyTitle="Sin centros de costo" emptyDescription="Crea el primer centro de costo para presupuestar por área." />
+              <DataTable columns={costCenterColumns} rows={costCenters} rowKey={c => c.id} emptyTitle="No hay centros de costo." emptyDescription="" />
             )}
           </Section>
 
@@ -2014,8 +2017,8 @@ export default function AccountingPage() {
                   ]}
                   rows={budgetVsActual}
                   rowKey={(b) => b.id}
-                  emptyTitle="Sin presupuestos"
-                  emptyDescription="Sin presupuestos para este centro de costo y año."
+                  emptyTitle="No hay presupuestos."
+                  emptyDescription=""
                 />
                 <TableTotals
                   entries={[
@@ -2087,7 +2090,7 @@ export default function AccountingPage() {
             {budgetsLoading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
             ) : (
-              <DataTable columns={budgetColumns} rows={budgets} rowKey={b => b.id} emptyTitle="Sin presupuestos" emptyDescription="Crea el primer presupuesto por centro de costo." />
+              <DataTable columns={budgetColumns} rows={budgets} rowKey={b => b.id} emptyTitle="No hay presupuestos." emptyDescription="" />
             )}
           </Section>
         </>
@@ -2220,8 +2223,8 @@ export default function AccountingPage() {
                   ]}
                   rows={diotReport.rows}
                   rowKey={(r) => r.supplierId}
-                  emptyTitle="Sin operaciones"
-                  emptyDescription="No hay facturas de proveedor en el periodo."
+                  emptyTitle="No hay operaciones."
+                  emptyDescription=""
                 />
                 <TableTotals
                   entries={[
@@ -2241,6 +2244,6 @@ export default function AccountingPage() {
       )}
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }

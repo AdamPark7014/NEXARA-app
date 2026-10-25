@@ -1,0 +1,148 @@
+/* Presentación quieta de compras, facturación y nómina/contabilidad.
+   Solo la capa visual: título, volver, frase de vacío o error, pie y teléfono. */
+
+.zona {
+  min-width: 0;
+}
+
+.volver {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0 8px;
+  padding: 4px 8px 4px 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ui-brand-text, var(--primary));
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.volver:hover {
+  color: var(--text-primary);
+}
+
+.volver:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.frase {
+  margin: 28px 16px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+/* Teléfono: un dato por renglón. Las tablas de estos módulos se apilan. */
+@media (max-width: 720px) {
+  .zona :global(table),
+  .zona :global(tbody),
+  .zona :global(tr) {
+    display: block;
+    width: 100%;
+  }
+
+  .zona :global(thead) {
+    display: none;
+  }
+
+  .zona :global(tr) {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .zona :global(td),
+  .zona :global(th) {
+    display: block;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 3px 0 !important;
+    border: 0 !important;
+    text-align: left !important;
+    white-space: normal !important;
+  }
+
+  .zona :global([class*="statsStrip"]),
+  .zona :global([class*="poMetaGrid"]) {
+    grid-template-columns: 1fr !important;
+  }
+
+  .zona :global(.nx-ft) {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .zona :global(.nx-ft > *) {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    margin-left: 0 !important;
+  }
+
+  .concepto,
+  .conceptoHead {
+    grid-template-columns: 1fr !important;
+  }
+
+  .conceptoHead {
+    display: none;
+  }
+
+  .concepto > * {
+    text-align: left !important;
+  }
+
+  .concepto > [data-dato]::before {
+    content: attr(data-dato);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+}
+
+.concepto {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 70px 110px 120px;
+  gap: 10px;
+  padding: 11px 12px;
+  align-items: center;
+}
+
+.conceptoHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 70px 110px 120px;
+  gap: 10px;
+  padding: 0 12px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.apilar {
+  min-width: 0;
+}
+
+.fila {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}

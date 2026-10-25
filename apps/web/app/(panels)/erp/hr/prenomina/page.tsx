@@ -15,9 +15,9 @@ export default function HrPrenominaPage() {
   return (
     <PrenominaPanel
       rail={<HrModuleRail />}
-      eyebrow="RR. HH. · Prenómina"
-      subtitle="Asistencia, horas extra aprobadas y sueldo semanal de cada persona → borradores de pago. No genera CFDI."
       paymentsHref="/erp/finance/employee-payments"
+      backHref="/erp/hr"
+      backLabel="Plantilla"
       canDecideOt={canDecideOt}
     />
   );

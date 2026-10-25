@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable from "@/components/ui/DataTable";
@@ -204,10 +205,9 @@ export default function ReportesPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
         title="Reportes"
-        subtitle="Elige un reporte, fija el periodo y revisa los números. Abre una línea para ver de dónde salen."
         density="ops"
         actions={
           <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>

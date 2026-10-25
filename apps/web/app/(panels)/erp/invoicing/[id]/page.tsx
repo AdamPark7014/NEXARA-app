@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
+import { ListFooter } from "@/components/base/ModulePage";
+import q from "@/components/erp/lista-quieta.module.css";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
@@ -23,14 +24,12 @@ import {
   financeInputStyle,
 } from "@/components/finance/FinanceModuleShell";
 import {
-  AlertIcon,
   BlockHeading,
   COMMERCIAL_LABEL,
   CopyableRef,
   Dot,
   fiscalState,
   FootNote,
-  LoadingIcon,
   MetricFrame,
   MetricHint,
   MetricValue,
@@ -383,8 +382,26 @@ export default function InvoiceDetailPage() {
     return Math.min(100, Math.round(((invoice.paidAmount ?? 0) / invoice.totalAmount) * 100));
   }, [invoice]);
 
-  if (loading && !invoice) return <EmptyState icon={<LoadingIcon />} title="Cargando factura…" description="Consultando el CFDI." />;
-  if (error && !invoice) return <EmptyState icon={<AlertIcon />} title="No se pudo cargar la factura" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />;
+  if (loading && !invoice) {
+    return (
+      <div className={q.zona}>
+        <VolverSeccion href="/erp/invoicing">Facturación</VolverSeccion>
+        <p className={q.frase} role="status">Cargando la factura.</p>
+      </div>
+    );
+  }
+  if (error && !invoice) {
+    return (
+      <div className={q.zona}>
+        <VolverSeccion href="/erp/invoicing">Facturación</VolverSeccion>
+        <InlineAlert
+          variant="danger"
+          message="No se pudo cargar la factura."
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      </div>
+    );
+  }
   if (!invoice) return null;
 
   const isIncome = invoice.type === "ACCOUNTS_RECEIVABLE" || invoice.type === "INCOME";
@@ -494,20 +511,12 @@ export default function InvoiceDetailPage() {
   const lines = invoice.items ?? [];
 
   return (
-    <>
+    <div className={q.zona}>
       {/* 1 · Dónde estoy: folio, contraparte y los dos estados que importan. */}
-      <div style={{ marginBottom: 6 }}>
-        <Link
-          href="/erp/invoicing"
-          style={{ fontSize: 12, color: "var(--text-tertiary)", textDecoration: "none" }}
-        >
-          ← Facturación CFDI
-        </Link>
-      </div>
+      <VolverSeccion href="/erp/invoicing">Facturación</VolverSeccion>
       <PageHeader
-        eyebrow={`ERP · ${isIncome ? "Cuentas por cobrar" : "Cuentas por pagar"}`}
         title={invoice.invoiceNumber}
-        subtitle={counterparty ?? "—"}
+        subtitle={counterparty ?? undefined}
         density="ops"
         meta={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
@@ -546,75 +555,58 @@ export default function InvoiceDetailPage() {
       />
 
       {/* 3 · Cómo va el dinero de esta factura. */}
-      <MetricFrame>
-        <MetricStrip metrics={metrics} ariaLabel="Resumen de la factura" />
-      </MetricFrame>
+      <div className={q.apilar}>
+        <MetricFrame>
+          <MetricStrip metrics={metrics} ariaLabel="Resumen de la factura" />
+        </MetricFrame>
+      </div>
 
       <NoticeStack notices={notices} />
 
-      {/* 4 · Lo facturado. */}
-      <BlockHeading title="Conceptos" meta={lines.length > 0 ? `${lines.length} partida${lines.length === 1 ? "" : "s"}` : undefined} />
+      <BlockHeading title="Conceptos" />
       {lines.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 110px 120px", gap: 10, padding: "0 12px 6px", fontSize: 10.5, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            <span>Descripción</span><span style={{ textAlign: "right" }}>Cant.</span><span style={{ textAlign: "right" }}>P. unit.</span><span style={{ textAlign: "right" }}>Subtotal</span>
+        <div style={{ display: "flex", flexDirection: "column", marginBottom: 8 }}>
+          <div className={q.conceptoHead}>
+            <span>Descripción</span><span>Cant.</span><span>P. unit.</span><span>Subtotal</span>
           </div>
           <div style={{ border: "1px solid var(--nx-panel-hairline)", borderRadius: 10, background: "var(--surface)", overflow: "hidden" }}>
             {lines.map((line, i) => (
               <div
                 key={line.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 70px 110px 120px",
-                  gap: 10,
-                  padding: "11px 12px",
-                  alignItems: "center",
-                  borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))",
-                }}
+                className={q.concepto}
+                style={{ borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))" }}
               >
-                <span style={{ fontSize: 13 }}>{line.description}</span>
-                <span style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{line.quantity}</span>
-                <span style={{ textAlign: "right", fontSize: 13 }}><Money value={line.unitPrice} bold={false} /></span>
-                <span style={{ textAlign: "right", fontSize: 13 }}><Money value={line.subtotal ?? (line.quantity * line.unitPrice)} /></span>
+                <span data-dato="Descripción" style={{ fontSize: 13 }}>{line.description}</span>
+                <span data-dato="Cantidad" style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{line.quantity}</span>
+                <span data-dato="Precio"><Money value={line.unitPrice} bold={false} /></span>
+                <span data-dato="Subtotal"><Money value={line.subtotal ?? (line.quantity * line.unitPrice)} /></span>
               </div>
             ))}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10, padding: "10px 12px 0", alignItems: "baseline" }}>
-            <span style={{ textAlign: "right", fontSize: 11.5, color: "var(--text-tertiary)" }}>Total</span>
-            <span style={{ textAlign: "right", fontSize: 15 }}><Money value={invoice.totalAmount} /></span>
+          <ListFooter total={lines.length} unit={lines.length === 1 ? "partida" : "partidas"} />
+          <div className={q.concepto}>
+            <span data-dato="Total" style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>Total</span>
+            <span data-dato="Importe" style={{ fontSize: 15 }}><Money value={invoice.totalAmount} /></span>
           </div>
         </div>
       ) : (
         <div style={{ marginBottom: 22 }}>
-          <EmptyState
-            variant="compact"
-            title="Sin partidas capturadas"
-            description={invoice.description ?? "Esta factura no tiene conceptos desglosados."}
-          />
+          <p className={q.frase}>No hay partidas.</p>
         </div>
       )}
 
       {/* Pagos: solo aparece cuando hay historial que leer. */}
       {payments.length > 0 && (
         <>
-          <BlockHeading
-            title="Pagos"
-            meta={`${payments.length} registrado${payments.length === 1 ? "" : "s"}${invoice.satPaymentMethod === "PPD" ? " · cada uno exige complemento" : ""}`}
-          />
+          <BlockHeading title="Pagos" />
           <div style={{ border: "1px solid var(--nx-panel-hairline)", borderRadius: 10, background: "var(--surface)", overflow: "hidden", marginBottom: 22 }}>
             {payments.map((p, i) => (
               <div
                 key={p.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto auto auto",
-                  gap: 12,
-                  alignItems: "center",
-                  padding: "11px 12px",
-                  borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))",
-                }}
+                className={q.concepto}
+                style={{ borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))" }}
               >
-                <div style={{ minWidth: 0 }}>
+                <div data-dato="Pago" style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13 }}>{p.method ?? "Transferencia"}{p.reference ? ` · Ref: ${p.reference}` : ""}</div>
                   {p.notes && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.notes}</div>}
                   {p.cfdiPaymentUuid && (
@@ -623,8 +615,8 @@ export default function InvoiceDetailPage() {
                     </div>
                   )}
                 </div>
-                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
-                <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" }}><Money value={p.amount} /></span>
+                <span data-dato="Fecha" style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+                <span data-dato="Importe" style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}><Money value={p.amount} /></span>
                 {canEdit && invoice.satPaymentMethod === "PPD" && invoice.cfdiUuid && !p.cfdiPaymentUuid ? (
                   <Button size="sm" variant="secondary" onClick={() => void stampComplement(p.id)}>Timbrar comp.</Button>
                 ) : (
@@ -633,6 +625,7 @@ export default function InvoiceDetailPage() {
               </div>
             ))}
           </div>
+          <ListFooter total={payments.length} unit={payments.length === 1 ? "pago" : "pagos"} />
         </>
       )}
 
@@ -816,6 +809,6 @@ export default function InvoiceDetailPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }

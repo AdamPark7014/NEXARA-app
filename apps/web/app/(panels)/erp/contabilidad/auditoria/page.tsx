@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { type Column } from "@/components/ui/DataTable";
@@ -399,10 +400,9 @@ export default function AuditoriaPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
         title="Auditoría"
-        subtitle="Quién cambió qué y cuándo. Abre un evento para ver el antes y el después."
         density="ops"
         actions={
           <Button

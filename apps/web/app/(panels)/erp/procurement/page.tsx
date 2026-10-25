@@ -6,10 +6,11 @@ import { usePathname, useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import { ListFooter } from "@/components/base/ModulePage";
+import VolverSeccion from "@/components/erp/VolverSeccion";
+import q from "@/components/erp/lista-quieta.module.css";
 import PanelTabs from "@/components/ui/PanelTabs";
-import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -25,7 +26,6 @@ import chrome from "@/components/erp/erp-chrome.module.css";
 import ComparacionCotizaciones from "./ComparacionCotizaciones";
 import {
   PO_STATUS,
-  PO_STATUS_COLOR,
   PRIORITIES,
   PRIORITY_LABEL,
   REQ_STATUS,
@@ -81,13 +81,6 @@ const emptySupplierForm = {
   creditoDias: "",
   limiteCredito: "",
 };
-
-const ETAPAS: ReadonlyArray<{ tab: ProcTab; label: string }> = [
-  { tab: "requisitions", label: "Requisición" },
-  { tab: "rfq", label: "Cotización" },
-  { tab: "orders", label: "Orden de compra" },
-  { tab: "receipts", label: "Recepción" },
-];
 
 const COSTOS_EXTRA: ReadonlyArray<{ key: keyof typeof emptyLanded; label: string }> = [
   { key: "freightCost", label: "Flete" },
@@ -353,67 +346,6 @@ export default function ProcurementPage() {
   }, [rfqs, busqueda]);
 
   const ordenesAbiertas = useMemo(() => orders.filter((o) => ocAbierta(o.status)), [orders]);
-
-  // ── Cifras de la pestaña activa (solo con lo que esa pestaña cargó) ─────
-  const cifras = useMemo(() => {
-    if (tab === "orders") {
-      let porAprobar = 0;
-      let abiertas = 0;
-      let atrasadas = 0;
-      let montoAbierto = 0;
-      const porEstado: Record<string, number> = {};
-      for (const o of orders) {
-        porEstado[o.status] = (porEstado[o.status] ?? 0) + 1;
-        if (o.status === "DRAFT") porAprobar += 1;
-        if (ocAbierta(o.status)) {
-          abiertas += 1;
-          montoAbierto += Number(o.totalAmount || 0);
-          const dias = diasHasta(o.expectedDate);
-          if (dias != null && dias < 0) atrasadas += 1;
-        }
-      }
-      return { porAprobar, abiertas, atrasadas, montoAbierto, porEstado };
-    }
-    return null;
-  }, [tab, orders]);
-
-  const cifrasReq = useMemo(() => {
-    let pendientes = 0;
-    let urgentes = 0;
-    let aprobadas = 0;
-    for (const r of requisitions) {
-      if (r.status === "PENDING") {
-        pendientes += 1;
-        if (r.priority === "URGENT" || r.priority === "CRITICAL" || r.priority === "HIGH") urgentes += 1;
-      }
-      if (r.status === "APPROVED") aprobadas += 1;
-    }
-    return { pendientes, urgentes, aprobadas };
-  }, [requisitions]);
-
-  const cifrasRecepciones = useMemo(() => {
-    const ahora = new Date();
-    let esteMes = 0;
-    let extra = 0;
-    for (const r of receipts) {
-      const f = r.receiptDate ? new Date(r.receiptDate) : null;
-      if (f && f.getMonth() === ahora.getMonth() && f.getFullYear() === ahora.getFullYear()) esteMes += 1;
-      extra += costosExtra(r);
-    }
-    return { esteMes, extra };
-  }, [receipts]);
-
-  const cifrasRfq = useMemo(() => {
-    let esperando = 0;
-    let conPrecios = 0;
-    let adjudicadas = 0;
-    for (const r of rfqs) {
-      if (r.status === "SENT" || r.status === "DRAFT") esperando += 1;
-      else if (r.status === "QUOTED") conPrecios += 1;
-      else if (r.status === "AWARDED") adjudicadas += 1;
-    }
-    return { esperando, conPrecios, adjudicadas };
-  }, [rfqs]);
 
   // ── Requisiciones ───────────────────────────────────────────────────────
   const abrirReqForm = () => {
@@ -1233,22 +1165,31 @@ export default function ProcurementPage() {
   const ordenRecepcionFuera = receiptPoId && !ordenesAbiertas.some((o) => String(o.id) === receiptPoId);
   const poNumberFiltro = poId ? receipts.find((r) => String(r.purchaseOrderId) === poId)?.purchaseOrder?.poNumber : null;
 
-  const tituloSeccion = primeraCarga
-    ? "Cargando…"
-    : tab === "orders"
-      ? `${visibleOrders.length} ${visibleOrders.length === 1 ? "orden" : "órdenes"}`
-      : tab === "requisitions"
-        ? `${visibleReqs.length} ${visibleReqs.length === 1 ? "requisición" : "requisiciones"}`
-        : tab === "rfq"
-          ? `${visibleRfqs.length} ${visibleRfqs.length === 1 ? "cotización" : "cotizaciones"}`
-          : `${visibleReceipts.length} ${visibleReceipts.length === 1 ? "recepción" : "recepciones"}`;
+  const conteoLista =
+    tab === "orders" ? visibleOrders.length
+    : tab === "requisitions" ? visibleReqs.length
+    : tab === "rfq" ? visibleRfqs.length
+    : visibleReceipts.length;
+  const unidadLista =
+    tab === "orders" ? (conteoLista === 1 ? "orden" : "órdenes")
+    : tab === "requisitions" ? (conteoLista === 1 ? "requisición" : "requisiciones")
+    : tab === "rfq" ? (conteoLista === 1 ? "cotización" : "cotizaciones")
+    : conteoLista === 1 ? "recepción" : "recepciones";
+  const hayFiltroLista = Boolean(busqueda)
+    || (tab === "orders" && Boolean(filterPoStatus))
+    || (tab === "requisitions" && Boolean(filterReqStatus));
+  const fraseVacia = hayFiltroLista
+    ? "Nada coincide con estos filtros."
+    : tab === "orders" ? "No hay órdenes de compra."
+    : tab === "requisitions" ? "No hay requisiciones."
+    : tab === "rfq" ? "No hay cotizaciones de proveedores."
+    : "No hay recepciones.";
 
   return (
-    <>
+    <div className={q.zona}>
       <PageHeader
-        eyebrow="ERP · Compras"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title="Compras"
+        density="ops"
         actions={
           <>
             {tab !== "mayoristas" && (
@@ -1275,19 +1216,6 @@ export default function ProcurementPage() {
         }
       />
 
-      <ol className={s.flujo} aria-label="Así avanza una compra">
-        {ETAPAS.map((e) => (
-          <li key={e.tab} className={s.flujoPaso}>
-            <span
-              className={`${s.flujoEtapa} ${tab === e.tab ? s.flujoActivo : ""}`}
-              aria-current={tab === e.tab ? "step" : undefined}
-            >
-              {e.label}
-            </span>
-          </li>
-        ))}
-      </ol>
-
       <PanelTabs
         ariaLabel="Secciones de compras"
         value={tab}
@@ -1304,82 +1232,14 @@ export default function ProcurementPage() {
             <div style={{ marginBottom: 12 }}>
               <InlineAlert
                 variant={cargado[tab] ? "warning" : "danger"}
-                message={cargado[tab] ? `${errorCarga}. Se muestra lo último que cargó.` : errorCarga}
+                message={cargado[tab] ? "No se pudo actualizar; se muestra lo último cargado." : "No se pudo cargar compras."}
                 action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
               />
             </div>
           )}
 
-          {cargado[tab] && (
-            <div className={s.kpis}>
-              {tab === "orders" && cifras && (
-                <>
-                  <KpiCard label="Por aprobar" value={cifras.porAprobar} variant={cifras.porAprobar > 0 ? "warning" : "neutral"} />
-                  <KpiCard label="Abiertas" value={cifras.abiertas} hint="sin recibir completas" variant="accent" />
-                  <KpiCard label="Atrasadas" value={cifras.atrasadas} hint="pasó su fecha de entrega" variant={cifras.atrasadas > 0 ? "danger" : "positive"} />
-                  <KpiCard label="Monto abierto" value={<span className={s.num}>{pesos(cifras.montoAbierto, { enteros: true })}</span>} />
-                </>
-              )}
-              {tab === "requisitions" && (
-                <>
-                  <KpiCard label="Por aprobar" value={cifrasReq.pendientes} variant={cifrasReq.pendientes > 0 ? "warning" : "positive"} />
-                  <KpiCard label="Urgentes por aprobar" value={cifrasReq.urgentes} variant={cifrasReq.urgentes > 0 ? "danger" : "neutral"} />
-                  <KpiCard label="Aprobadas" value={cifrasReq.aprobadas} hint="listas para cotizar o comprar" variant="accent" />
-                </>
-              )}
-              {tab === "rfq" && (
-                <>
-                  <KpiCard label="Esperando precios" value={cifrasRfq.esperando} variant={cifrasRfq.esperando > 0 ? "warning" : "neutral"} />
-                  <KpiCard label="Con precios" value={cifrasRfq.conPrecios} hint="listas para adjudicar" variant="accent" />
-                  <KpiCard label="Adjudicadas" value={cifrasRfq.adjudicadas} variant="positive" />
-                </>
-              )}
-              {tab === "receipts" && (
-                <>
-                  <KpiCard label="Recepciones" value={receipts.length} />
-                  <KpiCard label="Este mes" value={cifrasRecepciones.esteMes} variant="accent" />
-                  <KpiCard
-                    label="Costos de importación"
-                    value={<span className={s.num}>{pesos(cifrasRecepciones.extra, { enteros: true })}</span>}
-                    hint="flete, seguro, aranceles y otros"
-                  />
-                </>
-              )}
-            </div>
-          )}
-
-          {tab === "orders" && cifras && orders.length > 0 && (
-            <div className={s.reparto}>
-              <p className={s.repartoTitulo}>Órdenes por estado</p>
-              <div className={s.repartoBarra} aria-hidden>
-                {Object.keys(PO_STATUS)
-                  .filter((k) => cifras.porEstado[k])
-                  .map((k) => (
-                    <div
-                      key={k}
-                      className={s.repartoTramo}
-                      style={{ width: `${(cifras.porEstado[k] / orders.length) * 100}%`, background: PO_STATUS_COLOR[k] }}
-                    />
-                  ))}
-              </div>
-              <ul className={s.repartoLeyenda}>
-                {Object.keys(PO_STATUS)
-                  .filter((k) => cifras.porEstado[k])
-                  .map((k) => (
-                    <li key={k}>
-                      <span className={s.repartoPunto} style={{ background: PO_STATUS_COLOR[k] }} aria-hidden />
-                      {PO_STATUS[k]} <strong className={s.num}>{cifras.porEstado[k]}</strong>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          )}
-
           {tab === "rfq" && suppliers.length > 0 && (
-            <Section
-              title="RFC de proveedores"
-              subtitle="Se usa en la DIOT (Contabilidad → Cumplimiento SAT). Se guarda al salir del campo."
-            >
+            <Section title="RFC">
               <div className={s.rfcs}>
                 {suppliers.map((sp) => (
                   <div key={sp.id} className={s.rfcFila}>
@@ -1448,17 +1308,6 @@ export default function ProcurementPage() {
                   : []
             }
             onClear={() => { setSearchQ(""); setFilterPoStatus(""); setFilterReqStatus(""); }}
-            resultCount={
-              primeraCarga
-                ? null
-                : tab === "orders"
-                  ? visibleOrders.length
-                  : tab === "requisitions"
-                    ? visibleReqs.length
-                    : tab === "rfq"
-                      ? visibleRfqs.length
-                      : visibleReceipts.length
-            }
             rightActions={
               tab === "orders" && orders.length > 0 ? (
                 <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => void exportar("orders")}>Descargar Excel</Button>
@@ -1486,15 +1335,16 @@ export default function ProcurementPage() {
           )}
 
           {detailKind && (
+            <>
+            <VolverSeccion onClick={cerrarDetalle}>Compras</VolverSeccion>
             <section className={chrome.poDetail} aria-labelledby="detalle-compra-titulo">
               <div className={chrome.poDetailHead}>
                 <h2 id="detalle-compra-titulo" className={chrome.poDetailTitle}>
                   {detailKind === "order" ? `Orden de compra ${poDetail?.poNumber ?? ""}` : `Requisición ${reqDetail?.reqNumber ?? ""}`}
                 </h2>
-                <Button variant="ghost" size="sm" onClick={cerrarDetalle}>Cerrar</Button>
               </div>
               {detailLoading && <SkeletonRows rows={4} label="Cargando detalle" />}
-              {detailErr && !detailLoading && <InlineAlert variant="danger" message={detailErr} />}
+              {detailErr && !detailLoading && <InlineAlert variant="danger" message="No se pudo cargar el detalle." />}
               {!detailLoading && detailKind === "order" && poDetail && (
                 <>
                   <div className={chrome.poMetaGrid}>
@@ -1545,7 +1395,7 @@ export default function ProcurementPage() {
                       </table>
                     </div>
                   ) : (
-                    <EmptyState variant="compact" title="Sin artículos" description="Esta orden no tiene artículos registrados." />
+                    <p className={q.frase}>Esta orden no tiene artículos.</p>
                   )}
                   <div className={s.accionesFila} style={{ marginTop: 12 }}>
                     <Button variant="secondary" onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}>
@@ -1607,7 +1457,7 @@ export default function ProcurementPage() {
                       </table>
                     </div>
                   ) : (
-                    <EmptyState variant="compact" title="Sin artículos" description="Esta requisición no tiene artículos." />
+                    <p className={q.frase}>Esta requisición no tiene artículos.</p>
                   )}
                   {reqDetail.status === "PENDING" && cfg.canApprove && (
                     <div className={s.accionesFila} style={{ marginTop: 12 }}>
@@ -1624,41 +1474,29 @@ export default function ProcurementPage() {
                 </>
               )}
             </section>
+            </>
           )}
 
-          <Section title={tituloSeccion}>
+          <Section
+            footer={
+              !primeraCarga && !(errorCarga && !cargado[tab]) && conteoLista > 0 ? (
+                <ListFooter total={conteoLista} unit={unidadLista} />
+              ) : null
+            }
+          >
             {primeraCarga ? (
-              <SkeletonRows rows={6} label="Cargando compras" />
-            ) : errorCarga && !cargado[tab] ? null : tab === "rfq" ? (
-              <DataTable
-                columns={rfqColumns}
-                rows={visibleRfqs}
-                rowKey={(r) => r.id}
-                emptyTitle={busqueda ? "Ninguna cotización coincide" : "Aún no hay cotizaciones"}
-                emptyDescription="Pide precios a varios proveedores a partir de una requisición y compáralos antes de crear la orden de compra."
-                emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={abrirRfqForm}>Pedir cotización</Button> : undefined}
-              />
+              <p className={q.frase} role="status">Cargando compras.</p>
+            ) : errorCarga && !cargado[tab] ? null : conteoLista === 0 ? (
+              <p className={q.frase} role="status">{fraseVacia}</p>
+            ) : tab === "rfq" ? (
+              <DataTable columns={rfqColumns} rows={visibleRfqs} rowKey={(r) => r.id} ariaLabel="Cotizaciones de proveedores" />
             ) : tab === "orders" ? (
               <DataTable
                 columns={orderColumns}
                 rows={visibleOrders}
                 rowKey={(o) => o.id}
                 onRowClick={(o) => void loadOrderDetail(o.id)}
-                emptyTitle={busqueda || filterPoStatus ? "Ninguna orden coincide" : "Aún no hay órdenes de compra"}
-                emptyDescription={
-                  busqueda || filterPoStatus
-                    ? "Prueba con otra búsqueda o quita el filtro de estado."
-                    : "Crea una orden directa o aprueba una requisición para generar la primera."
-                }
-                emptyAction={
-                  busqueda || filterPoStatus ? (
-                    <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterPoStatus(""); }}>Quitar filtros</Button>
-                  ) : cfg.canCreate ? (
-                    <Button size="sm" variant="primary" onClick={abrirPoForm}>Nueva orden de compra</Button>
-                  ) : (
-                    <Button size="sm" variant="secondary" onClick={() => setTab("requisitions")}>Ver requisiciones</Button>
-                  )
-                }
+                ariaLabel="Órdenes de compra"
               />
             ) : tab === "requisitions" ? (
               <DataTable
@@ -1666,35 +1504,10 @@ export default function ProcurementPage() {
                 rows={visibleReqs}
                 rowKey={(r) => r.id}
                 onRowClick={(r) => void loadReqDetail(r.id)}
-                emptyTitle={busqueda || filterReqStatus ? "Ninguna requisición coincide" : "Aún no hay requisiciones"}
-                emptyDescription={
-                  busqueda || filterReqStatus
-                    ? "Prueba con otra búsqueda o quita el filtro de estado."
-                    : "Pide aquí materiales o servicios; compras los cotiza y genera la orden."
-                }
-                emptyAction={
-                  busqueda || filterReqStatus ? (
-                    <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterReqStatus(""); }}>Quitar filtros</Button>
-                  ) : cfg.canCreate ? (
-                    <Button size="sm" variant="primary" onClick={abrirReqForm}>Nueva requisición</Button>
-                  ) : undefined
-                }
+                ariaLabel="Requisiciones"
               />
             ) : (
-              <DataTable
-                columns={receiptColumns}
-                rows={visibleReceipts}
-                rowKey={(r) => r.id}
-                emptyTitle={busqueda ? "Ninguna recepción coincide" : "Aún no hay recepciones"}
-                emptyDescription="Cuando llegue mercancía, regístrala contra su orden de compra: entra al almacén y genera la cuenta por pagar."
-                emptyAction={
-                  cfg.canCreate ? (
-                    <Button size="sm" variant="primary" onClick={abrirRecepcion}>Registrar recepción</Button>
-                  ) : (
-                    <Button size="sm" variant="secondary" onClick={() => setTab("orders")}>Ver órdenes</Button>
-                  )
-                }
-              />
+              <DataTable columns={receiptColumns} rows={visibleReceipts} rowKey={(r) => r.id} ariaLabel="Recepciones" />
             )}
           </Section>
         </>
@@ -2204,6 +2017,6 @@ export default function ProcurementPage() {
       </Modal>
 
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
-    </>
+    </div>
   );
 }

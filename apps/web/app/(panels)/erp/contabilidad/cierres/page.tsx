@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { type Column } from "@/components/ui/DataTable";
@@ -258,10 +259,9 @@ export default function CierresPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
         title="Cierres"
-        subtitle="Revisa la lista de verificación antes de cerrar. Al cerrar se bloquean las pólizas del periodo."
         density="ops"
         actions={
           <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>

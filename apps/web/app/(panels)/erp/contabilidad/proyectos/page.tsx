@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import VolverSeccion from "@/components/erp/VolverSeccion";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
@@ -454,10 +455,9 @@ export default function ContabilidadProyectosPage() {
 
   return (
     <>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
         title="Proyectos"
-        subtitle="Qué se facturó, qué costó y qué quedó. Abre un proyecto para ver de dónde sale cada peso de costo."
         density="ops"
         actions={
           <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>

@@ -15,8 +15,6 @@ export default function FinancePrenominaPage() {
   return (
     <PrenominaPanel
       rail={<FinanceModuleRail />}
-      eyebrow="Finanzas · RH"
-      subtitle="Periodo → minutos y extras APROBADOS → monto sugerido. Sin CFDI."
       paymentsHref="/erp/finance/employee-payments"
       canDecideOt={canDecideOt}
     />

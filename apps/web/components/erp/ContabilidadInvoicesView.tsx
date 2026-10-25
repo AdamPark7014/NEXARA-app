@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import { ListFooter } from "@/components/base/ModulePage";
+import VolverSeccion from "@/components/erp/VolverSeccion";
+import quiet from "@/components/erp/lista-quieta.module.css";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
@@ -435,38 +437,20 @@ export default function ContabilidadInvoicesView({
     title ??
     (mode === "cxc" ? "Por cobrar" : mode === "cxp" ? "Por pagar" : "Facturas");
 
-  const pageSubtitle =
-    subtitle ??
-    (mode === "cxc"
-      ? "Quién te debe y qué urge cobrar."
-      : mode === "cxp"
-        ? "Qué debes pagar y cuándo."
-        : "Documentos emitidos y recibidos.");
-
-  /**
-   * Tres vacíos distintos, como en el resto del escritorio: el que el filtro
-   * esconde, el que todavía no tiene movimiento y el que ya está liquidado.
-   */
   const hayBusqueda = q.trim() !== "" || aging !== "";
   const emptyTitle = hayBusqueda
-    ? "Sin resultados con estos filtros"
+    ? "Nada coincide con estos filtros."
     : mode === "cxc"
-      ? "Nada por cobrar"
+      ? "Nada por cobrar."
       : mode === "cxp"
-        ? "Nada por pagar"
-        : "Todavía no hay facturas";
-  const emptyDesc = hayBusqueda
-    ? "Ninguna factura coincide. Borra la búsqueda o elige otro tramo de vencimiento."
-    : mode === "all"
-      ? "En cuanto emitas o registres una factura, aparecerá aquí con su saldo y su fecha de vencimiento."
-      : "Todas las facturas están liquidadas: no queda saldo abierto.";
+        ? "Nada por pagar."
+        : "No hay facturas.";
 
   return (
-    <>
+    <div className={quiet.zona}>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
         title={pageTitle}
-        subtitle={pageSubtitle}
         density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -512,7 +496,7 @@ export default function ContabilidadInvoicesView({
             onChange: setQ,
             placeholder: `Buscar ${partySearchLabel}, folio o folio fiscal…`,
           }}
-          resultCount={filtered.length}
+          resultCount={null}
         />
       </div>
 
@@ -527,8 +511,7 @@ export default function ContabilidadInvoicesView({
           }}
         >
           <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
-            Se cargaron las {parcial.cargadas} facturas más recientes de {parcial.total}. La
-            búsqueda y los filtros solo miran las cargadas.
+            Se cargaron {parcial.cargadas} de {parcial.total} facturas.
           </p>
           <Button size="sm" variant="secondary" onClick={() => setTandas((n) => n + 1)} disabled={loading}>
             Cargar más
@@ -537,54 +520,29 @@ export default function ContabilidadInvoicesView({
       )}
 
       {error && (
-        <>
-          {/* Qué pasó, por qué, y qué hacer — junto a la tabla que quedó vacía. */}
-          <InlineAlert
-            variant="danger"
-            message={`No se pudieron cargar las facturas. Vuelve a intentarlo; si sigue igual, avisa a soporte con este dato: «${error.replace(/\s*\.?\s*$/, "")}».`}
-          />
-          <div style={{ margin: "-4px 0 12px" }}>
-            <Button size="sm" variant="secondary" onClick={() => void load()}>
-              Reintentar
-            </Button>
-          </div>
-        </>
+        <InlineAlert
+          variant="danger"
+          message="No se pudieron cargar las facturas."
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
       )}
 
       {loading ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
+        <p className={quiet.frase} role="status">Cargando facturas.</p>
       ) : error ? null : filtered.length === 0 ? (
-        <EmptyState
-          title={emptyTitle}
-          description={emptyDesc}
-          action={
-            hayBusqueda ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  setQ("");
-                  setAging("");
-                }}
-              >
-                Limpiar filtros
-              </Button>
-            ) : mode === "all" ? (
-              <Link href="/erp/invoicing" style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
-                Ir a facturación
-              </Link>
-            ) : undefined
-          }
-        />
+        <p className={quiet.frase} role="status">{emptyTitle}</p>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={filtered}
-          rowKey={(r) => r.id}
-          density="compact"
-          ariaLabel="Facturas de contabilidad"
-          onRowClick={(r) => setSelected(r)}
-        />
+        <>
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            rowKey={(r) => r.id}
+            density="compact"
+            ariaLabel="Facturas de contabilidad"
+            onRowClick={(r) => setSelected(r)}
+          />
+          <ListFooter total={filtered.length} unit={filtered.length === 1 ? "factura" : "facturas"} />
+        </>
       )}
 
       <Modal
@@ -750,7 +708,7 @@ export default function ContabilidadInvoicesView({
           </div>
         )}
       </Modal>
-    </>
+    </div>
   );
 }
 

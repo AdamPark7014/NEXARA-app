@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import { ListFooter } from "@/components/base/ModulePage";
+import VolverSeccion from "@/components/erp/VolverSeccion";
+import quiet from "@/components/erp/lista-quieta.module.css";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
-import EmptyState from "@/components/ui/EmptyState";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
@@ -729,11 +731,10 @@ export default function CarteraView({
   ];
 
   return (
-    <>
+    <div className={quiet.zona}>
+      <VolverSeccion href="/erp/contabilidad">Contabilidad</VolverSeccion>
       <PageHeader
-        eyebrow="Contabilidad"
         title={title}
-        subtitle={subtitle}
         density="ops"
         actions={
           <Button size="sm" variant="ghost" onClick={() => void cargar()} disabled={cargando}>
@@ -837,62 +838,45 @@ export default function CarteraView({
             },
           ]}
           onClear={hayFiltros ? limpiar : undefined}
-          resultCount={data?.rows.length ?? null}
         />
       </div>
 
       {error && (
         <InlineAlert
           variant="danger"
-          message={`No se pudo cargar la cartera. ${error} Reintenta; si sigue igual, avisa a soporte.`}
+          message="No se pudo cargar la cartera."
+          action={<Button size="sm" variant="secondary" onClick={() => void cargar()}>Reintentar</Button>}
         />
-      )}
-      {error && (
-        <div style={{ marginBottom: 12 }}>
-          <Button size="sm" variant="secondary" onClick={() => void cargar()}>
-            Reintentar
-          </Button>
-        </div>
       )}
 
       {data?.meta.truncado && (
         <InlineAlert
           variant="warning"
-          message={`Se muestran ${data.rows.length} de ${data.meta.total} facturas: no caben todas de una vez, así que los totales de arriba solo cubren lo que se ve. Acota el periodo o filtra para que cuadren.`}
+          message={`Se muestran ${data.rows.length} de ${data.meta.total} facturas.`}
         />
       )}
 
       {cargando ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
-          {token ? "Cargando la cartera…" : "Esperando la sesión para pedir la cartera…"}
+        <p className={quiet.frase} role="status">Cargando la cartera.</p>
+      ) : error && !data ? null : !data || data.rows.length === 0 ? (
+        <p className={quiet.frase} role="status">
+          {hayFiltros ? "Nada coincide con estos filtros." : emptyTitle}
         </p>
-      ) : !data || data.rows.length === 0 ? (
-        <EmptyState
-          title={hayFiltros ? "Sin resultados con estos filtros" : emptyTitle}
-          description={
-            hayFiltros
-              ? "Prueba a quitar el tramo de antigüedad, ampliar el periodo o limpiar la búsqueda."
-              : emptyDescription
-          }
-          action={
-            hayFiltros ? (
-              <Button size="sm" variant="secondary" onClick={limpiar}>
-                Limpiar filtros
-              </Button>
-            ) : (
-              emptyAction
-            )
-          }
-        />
       ) : (
-        <DataTable
-          columns={columnas}
-          rows={data.rows}
-          rowKey={(r) => r.id}
-          density="compact"
-          ariaLabel="Cartera por cobrar y pagar"
-          onRowClick={(r) => void abrirDetalle(r)}
-        />
+        <>
+          <DataTable
+            columns={columnas}
+            rows={data.rows}
+            rowKey={(r) => r.id}
+            density="compact"
+            ariaLabel="Cartera por cobrar y pagar"
+            onRowClick={(r) => void abrirDetalle(r)}
+          />
+          <ListFooter
+            total={data.rows.length}
+            unit={data.rows.length === 1 ? "documento" : "documentos"}
+          />
+        </>
       )}
 
       {/* Detalle */}
@@ -1112,7 +1096,7 @@ export default function CarteraView({
           </div>
         )}
       </Modal>
-    </>
+    </div>
   );
 }
 
@@ -1192,7 +1176,7 @@ function CalendarioCxP({
   if (error) {
     return (
       <Section title="Calendario de vencimientos" dense>
-        <InlineAlert variant="warning" message={`No se pudo cargar el calendario. ${error}`} />
+        <InlineAlert variant="warning" message="No se pudo cargar el calendario." />
         <Button size="sm" variant="secondary" onClick={onReintentar}>
           Reintentar
         </Button>
