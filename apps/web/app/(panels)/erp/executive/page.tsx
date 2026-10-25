@@ -134,11 +134,12 @@ export default function ExecutivePage() {
 
   const shortcuts =
     v2Role === ROLES.DIR_OPERACIONES ? SHORTCUTS.ops : v2Role === ROLES.DIR_ADMIN ? SHORTCUTS.admin : SHORTCUTS.ceo;
+  const omitHrefs = useMemo(() => shortcuts.map((s) => s.href), [shortcuts]);
 
   if (!user || !token) {
     return (
       <DashPage>
-        <DashEmpty title="Verificando tu sesión…" description="En un momento te mostramos los indicadores." />
+        <DashEmpty title="Verificando tu sesión…" />
       </DashPage>
     );
   }
@@ -163,8 +164,10 @@ export default function ExecutivePage() {
         title={`${greetingFor(new Date().getHours())}, ${firstName}`}
         subtitle={
           data
-            ? `Así va la empresa · actualizado a las ${new Date(data.generatedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
-            : "Reuniendo los indicadores de la empresa…"
+            ? `Actualizado a las ${new Date(data.generatedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+            : error
+              ? undefined
+              : "Reuniendo los indicadores de la empresa…"
         }
         actions={
           <>
@@ -181,12 +184,18 @@ export default function ExecutivePage() {
 
       <TuDiaPanel token={token} />
 
-      <CommandCenterRail panel="erp" extraWidgets={dynamicWidgets} ariaLabel="Atajos y pendientes" />
+      <CommandCenterRail
+        panel="erp"
+        extraWidgets={dynamicWidgets}
+        omitHrefs={omitHrefs}
+        includeRoleWidgets={false}
+        ariaLabel="Atajos y pendientes"
+      />
 
       {error && !loading && (
         <InlineAlert
           variant={ready ? "warning" : "danger"}
-          message={ready ? `No pudimos actualizar; mostramos los últimos datos. ${error}` : `No pudimos cargar la vista ejecutiva. ${error}`}
+          message={ready ? "Mostramos los últimos datos disponibles." : error}
           action={<Button size="sm" variant="secondary" onClick={load}>Reintentar</Button>}
         />
       )}
@@ -197,9 +206,12 @@ export default function ExecutivePage() {
             label: "Ingresos del mes",
             value: ready ? <Money value={kpis?.revenueMtd ?? 0} compact /> : sk,
             delta: ready && momChange !== 0 ? { direction: momDir, value: `${momChange > 0 ? "+" : ""}${momChange}%` } : undefined,
-            sub: ready
-              ? `vs ${fmtCompact(kpis?.revenuePrevMonth ?? 0)} el mes anterior · ${fmtCompact(kpis?.revenueYtd ?? 0)} en el año`
-              : undefined,
+            sub: ready ? (
+              <>
+                <span style={{ display: "block" }}>{`vs ${fmtCompact(kpis?.revenuePrevMonth ?? 0)} el mes anterior`}</span>
+                <span style={{ display: "block" }}>{`${fmtCompact(kpis?.revenueYtd ?? 0)} en el año`}</span>
+              </>
+            ) : undefined,
             big: true,
           },
           {
@@ -257,9 +269,9 @@ export default function ExecutivePage() {
         <DashCol span={4}>
           <DashPanel title="Requiere tu atención" subtitle="Lo que afecta la operación o las finanzas">
             {!ready ? (
-              loading ? <DashSkeleton rows={4} height={34} gap={8} /> : <DashEmpty title="Sin datos por ahora" />
+              loading ? <DashSkeleton rows={4} height={34} gap={8} /> : <DashEmpty title="Sin datos por ahora." />
             ) : alerts.length === 0 ? (
-              <DashEmpty title="Sin alertas" description="Todo funciona con normalidad." />
+              <DashEmpty title="Sin alertas." />
             ) : (
               alerts.slice(0, 6).map((a, i) => <AlertRow key={`${a.title}-${i}`} level={a.level} title={a.title} message={a.message} />)
             )}
@@ -269,16 +281,21 @@ export default function ExecutivePage() {
         <DashCol span={6}>
           <DashPanel title="Clientes clave" subtitle="Margen por cliente con proyectos" action="Ver rentabilidad" actionHref="/erp/analytics/bi?section=clients">
             {!ready ? (
-              loading ? <DashSkeleton rows={4} height={14} gap={18} /> : <DashEmpty title="Sin datos por ahora" />
+              loading ? <DashSkeleton rows={4} height={14} gap={18} /> : <DashEmpty title="Sin datos por ahora." />
             ) : !data.topAccounts || data.topAccounts.length === 0 ? (
-              <DashEmpty title="Aún no hay clientes con proyectos" description="Aparecerán aquí en cuanto tengan proyectos activos." />
+              <DashEmpty title="Aún no hay clientes con proyectos." />
             ) : (
               data.topAccounts.map((c) => (
                 <ListRow
                   key={c.clientId}
                   href={`/erp/clientes/${c.clientId}`}
                   title={c.clientName}
-                  sub={`${plural(c.projects, "proyecto", "proyectos")} · margen ${c.marginPercent}%`}
+                  sub={
+                    <>
+                      <span style={{ display: "block" }}>{plural(c.projects, "proyecto", "proyectos")}</span>
+                      <span style={{ display: "block" }}>{`Margen ${c.marginPercent}%`}</span>
+                    </>
+                  }
                   trail={<Money value={c.margin} compact bold />}
                 />
               ))
@@ -289,9 +306,9 @@ export default function ExecutivePage() {
         <DashCol span={6}>
           <DashPanel title="Mejores vendedores del mes" subtitle="Ingresos por oportunidades ganadas" action="Ver analítica" actionHref="/erp/analytics/bi">
             {!ready ? (
-              loading ? <DashSkeleton rows={4} height={14} gap={18} /> : <DashEmpty title="Sin datos por ahora" />
+              loading ? <DashSkeleton rows={4} height={14} gap={18} /> : <DashEmpty title="Sin datos por ahora." />
             ) : data.topSellers.length === 0 ? (
-              <DashEmpty title="Sin cierres este mes" description="Aún no hay oportunidades ganadas en el periodo." />
+              <DashEmpty title="Sin cierres este mes." />
             ) : (
               data.topSellers.map((s, i) => (
                 <ListRow
@@ -323,7 +340,7 @@ export default function ExecutivePage() {
 
         <DashCol span={6}>
           <DashPanel title="Accesos rápidos" subtitle="Lo que más usas, a un clic" flush>
-            <nav aria-label="Accesos rápidos" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 4 }}>
+            <nav aria-label="Accesos rápidos" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {shortcuts.map((s) => (
                 <ListRow key={s.href} href={s.href} title={s.label} sub={s.desc} trail={<span aria-hidden="true">→</span>} />
               ))}

@@ -31,7 +31,7 @@ type Urgencia = "alta" | "media" | "baja";
 type Approval = {
   key: string;
   titulo: string;
-  sub: string;
+  lineas: string[];
   urgencia: Urgencia;
 };
 
@@ -48,20 +48,20 @@ function pendingToApproval(p: PendingApproval): Approval {
   const stepNum = p.step?.stepNumber ?? 1;
   const urgencia: Urgencia = stepNum >= 3 ? "alta" : stepNum >= 2 ? "media" : "baja";
   const aprobador = p.step?.approverUser?.nombre ?? p.step?.approverRole?.nombre;
-  // Con el resumen del API se lee «Orden de compra OC-0012 · $48,250.00»; sin él, como siempre.
   const r = p.resumen;
   const importe =
     r?.monto != null
       ? new Intl.NumberFormat("es-MX", { style: "currency", currency: r.moneda === "USD" ? "USD" : "MXN" }).format(r.monto)
       : null;
+  const lineas = (
+    r?.titulo
+      ? [importe, tipo, r.detalle, aprobador ? `Firma: ${aprobador}` : null]
+      : [p.step?.name ? tipo : null, `Folio ${folio}`, aprobador ? `Firma: ${aprobador}` : null]
+  ).filter((linea): linea is string => Boolean(linea));
   return {
     key: String(p.id),
-    titulo: r?.titulo ? (importe ? `${r.titulo} · ${importe}` : r.titulo) : p.step?.name ? `${p.step.name} · ${tipo}` : tipo,
-    sub: r?.titulo
-      ? [tipo, r.detalle, aprobador ? `Firma: ${aprobador}` : null].filter(Boolean).join(" · ")
-      : aprobador
-        ? `Folio ${folio} · Firma: ${aprobador}`
-        : `Folio ${folio}`,
+    titulo: r?.titulo ?? p.step?.name ?? tipo,
+    lineas,
     urgencia,
   };
 }
@@ -135,7 +135,7 @@ const clampScore = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("es-MX")} ${n === 1 ? one : many}`;
 const compactMxn = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" });
 
-type HealthDomain = { name: string; health: number; note: string; variant: "positive" | "warning" | "danger" };
+type HealthDomain = { name: string; health: number; notes: string[]; variant: "positive" | "warning" | "danger" };
 
 /** Índices estimados de salud por área, derivados del resumen ejecutivo. */
 function buildHealthDomains(exec: ExecutiveDashboard): HealthDomain[] {
@@ -168,38 +168,53 @@ function buildHealthDomains(exec: ExecutiveDashboard): HealthDomain[] {
     {
       name: "Ventas",
       health: clampScore(sales),
-      note: headlineKpis.pipelineCount > 0
-        ? `${plural(headlineKpis.pipelineCount, "oportunidad activa", "oportunidades activas")} · ${change >= 0 ? "+" : ""}${change}% vs mes anterior`
-        : "Sin oportunidades activas",
+      notes: headlineKpis.pipelineCount > 0
+        ? [
+            plural(headlineKpis.pipelineCount, "oportunidad activa", "oportunidades activas"),
+            `${change >= 0 ? "+" : ""}${change}% vs mes anterior`,
+          ]
+        : ["Sin oportunidades activas."],
     },
     {
       name: "Operación",
       health: clampScore(ops),
-      note: operations.otOverdue > 0
-        ? `${plural(operations.otOverdue, "orden de trabajo vencida", "órdenes de trabajo vencidas")} · ${plural(operations.activeProjects, "proyecto activo", "proyectos activos")}`
-        : `${plural(operations.otOpen, "orden de trabajo abierta", "órdenes de trabajo abiertas")} · ${plural(operations.activeProjects, "proyecto activo", "proyectos activos")}`,
+      notes: operations.otOverdue > 0
+        ? [
+            plural(operations.otOverdue, "orden de trabajo vencida", "órdenes de trabajo vencidas"),
+            plural(operations.activeProjects, "proyecto activo", "proyectos activos"),
+          ]
+        : [
+            plural(operations.otOpen, "orden de trabajo abierta", "órdenes de trabajo abiertas"),
+            plural(operations.activeProjects, "proyecto activo", "proyectos activos"),
+          ],
     },
     {
       name: "Finanzas",
       health: clampScore(fin),
-      note: [
-        headlineKpis.arOutstanding > 0 ? `${compactMxn.format(headlineKpis.arOutstanding)} por cobrar` : "Cobranza al día",
+      notes: [
+        headlineKpis.arOutstanding > 0 ? `${compactMxn.format(headlineKpis.arOutstanding)} por cobrar` : "Cobranza al día.",
         finance.overdueInvoices > 0 ? plural(finance.overdueInvoices, "factura vencida", "facturas vencidas") : null,
-      ].filter(Boolean).join(" · "),
+      ].filter((linea): linea is string => Boolean(linea)),
     },
     {
       name: "Almacén y compras",
       health: clampScore(proc),
-      note: procurement.lowStockItems > 0
-        ? `${plural(procurement.lowStockItems, "producto bajo mínimo", "productos bajo mínimo")} · ${plural(procurement.pendingPOs, "orden de compra pendiente", "órdenes de compra pendientes")}`
-        : `${plural(procurement.pendingPOs, "orden de compra pendiente", "órdenes de compra pendientes")} de aprobar`,
+      notes: procurement.lowStockItems > 0
+        ? [
+            plural(procurement.lowStockItems, "producto bajo mínimo", "productos bajo mínimo"),
+            plural(procurement.pendingPOs, "orden de compra pendiente", "órdenes de compra pendientes"),
+          ]
+        : [`${plural(procurement.pendingPOs, "orden de compra pendiente", "órdenes de compra pendientes")} de aprobar`],
     },
     {
       name: "Soporte",
       health: clampScore(support),
-      note: `${plural(operations.ticketsOpen, "ticket abierto", "tickets abiertos")} · ${plural(maintenance.activeContracts, "contrato de mantenimiento", "contratos de mantenimiento")}`,
+      notes: [
+        plural(operations.ticketsOpen, "ticket abierto", "tickets abiertos"),
+        plural(maintenance.activeContracts, "contrato de mantenimiento", "contratos de mantenimiento"),
+      ],
     },
-    { name: "Personas", health: 90, note: plural(exec.teamSize, "colaborador", "colaboradores") },
+    { name: "Personas", health: 90, notes: [plural(exec.teamSize, "colaborador", "colaboradores")] },
   ];
 
   return domains.map((d) => ({
@@ -318,11 +333,7 @@ export default function ErpDashboardPage() {
       {loadError && (
         <InlineAlert
           variant={exec || pendings ? "warning" : "danger"}
-          message={
-            exec || pendings
-              ? `Parte del resumen no se pudo actualizar. Mostramos los últimos datos disponibles. (${loadError})`
-              : `No pudimos cargar el resumen. ${loadError}`
-          }
+          message={exec || pendings ? "Mostramos los últimos datos disponibles." : "No pudimos cargar el resumen."}
           action={
             <Button size="sm" variant="secondary" onClick={retry} loading={loading}>
               Reintentar
@@ -359,17 +370,23 @@ export default function ErpDashboardPage() {
           {
             label: "Proyectos en campo",
             value: exec ? exec.operations.activeProjects.toLocaleString("es-MX") : statSkeleton,
-            sub: exec
-              ? `${plural(exec.operations.otOpen, "orden abierta", "órdenes abiertas")} · ${exec.operations.otOverdue.toLocaleString("es-MX")} vencidas`
-              : undefined,
+            sub: exec ? (
+              <>
+                <span style={{ display: "block" }}>{plural(exec.operations.otOpen, "orden abierta", "órdenes abiertas")}</span>
+                <span style={{ display: "block" }}>{plural(exec.operations.otOverdue, "vencida", "vencidas")}</span>
+              </>
+            ) : undefined,
             tone: exec && exec.operations.otOverdue > 0 ? "warning" : "default",
           },
           {
             label: "Alertas críticas",
             value: exec ? alertCounts.critical.toLocaleString("es-MX") : statSkeleton,
-            sub: exec
-              ? `${plural(alertCounts.warning, "aviso", "avisos")} · ${plural(exec.procurement.lowStockItems, "producto bajo mínimo", "productos bajo mínimo")}`
-              : undefined,
+            sub: exec ? (
+              <>
+                <span style={{ display: "block" }}>{plural(alertCounts.warning, "aviso", "avisos")}</span>
+                <span style={{ display: "block" }}>{plural(exec.procurement.lowStockItems, "producto bajo mínimo", "productos bajo mínimo")}</span>
+              </>
+            ) : undefined,
             tone: exec ? (alertCounts.critical > 0 ? "danger" : "positive") : "default",
           },
         ]}
@@ -390,12 +407,7 @@ export default function ErpDashboardPage() {
                 </div>
               ) : approvals.length === 0 ? (
                 <DashEmpty
-                  title={pendings === null ? "No pudimos revisar tu bandeja" : "Todo al día"}
-                  description={
-                    pendings === null
-                      ? "Intenta de nuevo en unos segundos."
-                      : "No tienes solicitudes esperando tu firma."
-                  }
+                  title={pendings === null ? "No pudimos revisar tu bandeja." : "No tienes solicitudes por firmar."}
                 />
               ) : (
                 approvals.map((a) => {
@@ -406,7 +418,15 @@ export default function ErpDashboardPage() {
                       href="/erp/approvals"
                       accent={meta.accent}
                       title={a.titulo}
-                      sub={a.sub}
+                      sub={
+                        a.lineas.length > 0 ? (
+                          <>
+                            {a.lineas.map((linea, i) => (
+                              <span key={`${a.key}-${i}`} style={{ display: "block" }}>{linea}</span>
+                            ))}
+                          </>
+                        ) : undefined
+                      }
                       trail={<DashPill tone={meta.tone}>Prioridad {meta.label.toLowerCase()}</DashPill>}
                     />
                   );
@@ -431,7 +451,7 @@ export default function ErpDashboardPage() {
                 loading ? (
                   <DashSkeleton rows={6} height={10} gap={16} />
                 ) : (
-                  <DashEmpty title="Sin datos por ahora" description="No pudimos calcular los indicadores por área." />
+                  <DashEmpty title="No pudimos calcular la salud por área." />
                 )
               ) : (
                 <>
@@ -451,7 +471,10 @@ export default function ErpDashboardPage() {
                           <strong style={{ color: HEALTH_COLOR[d.variant], fontWeight: 650 }}>
                             {d.variant === "danger" ? "Atender" : "Vigilar"}
                           </strong>{" "}
-                          {d.name}: {d.note}
+                          {d.name}
+                          {d.notes.map((note, i) => (
+                            <span key={`${d.name}-${i}`} style={{ display: "block" }}>{note}</span>
+                          ))}
                         </li>
                       ))}
                     </ul>
