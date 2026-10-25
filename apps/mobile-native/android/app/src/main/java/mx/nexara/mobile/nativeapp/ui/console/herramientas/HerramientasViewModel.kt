@@ -46,6 +46,14 @@ data class HerramientasUiState(
 )
 
 /**
+ * Aviso cuando la prórroga salió, en una frase.
+ *
+ * Sigue siendo lo mismo: ya se pidió y queda pendiente de que la autoricen.
+ */
+internal fun avisoProrrogaSolicitada(): String =
+    "Prórroga solicitada: queda pendiente de que la autoricen."
+
+/**
  * «Mi kit» y «Mis préstamos» del personal de campo.
  *
  * El día de hoy se guarda en el estado del ViewModel ([hoy]) en vez de leerse en
@@ -171,7 +179,7 @@ class HerramientasViewModel(app: Application) : AndroidViewModel(app) {
                         mensaje = if (encolado) {
                             "Sin conexión: la prórroga quedó en la cola y sale sola al volver la señal."
                         } else {
-                            "Prórroga solicitada. Queda pendiente de que la autoricen."
+                            avisoProrrogaSolicitada()
                         },
                     )
                 }
