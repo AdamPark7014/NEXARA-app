@@ -45,7 +45,7 @@ export type FichaDelPadron =
 
 export const CLIENT_VIEW_FORBIDDEN = 'No tienes acceso a este cliente';
 export const CLIENT_REUSE_FORBIDDEN =
-  'Ya existe un cliente con ese nombre en el padrón y no tienes acceso a él. Pide a coordinación que le sume el tipo que necesitas.';
+  'Ya existe un cliente con ese nombre en el padrón y no tienes acceso a él: pide a coordinación que le sume el tipo que necesitas.';
 
 /** v2: coord_ventas y cualquier rol de tier >= 70 (coordinadores, directores, CEO). */
 const V2_MANAGER_ROLES = new Set([
