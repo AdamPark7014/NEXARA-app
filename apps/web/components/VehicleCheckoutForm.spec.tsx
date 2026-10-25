@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import VehicleCheckoutForm from "./VehicleCheckoutForm";
-import { ETIQUETA_SLOT, SLOTS_VUELTA, SLOT_TABLERO, type SlotChecklist } from "@/lib/vehiculos-api";
+import styles from "@/app/(panels)/erp/vehiculos/vehiculos-core.module.css";
+import { ETIQUETA_SLOT, formatoKm, SLOTS_VUELTA, SLOT_TABLERO, type SlotChecklist } from "@/lib/vehiculos-api";
 
 /**
  * El checklist por pasos. Lo que no puede pasar: salir sin las fotos, o
@@ -70,6 +71,10 @@ describe("VehicleCheckoutForm", () => {
     expect(fotos).toHaveTextContent("Frente");
     expect(fotos).toHaveTextContent("Tablero");
     expect(fotos?.compareDocumentPosition(aviso) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+
+    const resumen = screen.getByText("7 de 7").closest(`.${styles.resumenConfirmacion}`);
+    const cifras = [...(resumen?.querySelectorAll(`.${styles.datoValor}`) ?? [])].map((n) => n.textContent);
+    expect(cifras).toEqual(["7 de 7", formatoKm(120345), "1/2"]);
   });
 
   it("con la vuelta completa pasa al tablero, y sin tablero no avanza", async () => {

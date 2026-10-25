@@ -309,7 +309,7 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
 
       {paso === 4 && (
         <section aria-label="Confirmar">
-          <div className={styles.resumen}>
+          <div className={`${styles.resumen} ${styles.resumenConfirmacion}`}>
             <Dato label="Fotos" valor={`${Object.keys(files).length} de ${totalFotos}`} />
             <Dato label="Kilometraje" valor={formatoKm(kmNumero)} />
             <Dato label="Combustible" valor={combustible || "—"} />
