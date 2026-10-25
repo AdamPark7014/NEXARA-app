@@ -170,7 +170,7 @@ export default async function BlogPage() {
           ) : (
             <div className={styles.emptyState}>
               <p>
-                Aún no hay noticias publicadas. Explora{" "}
+                Aún no hay noticias publicadas, así que explora{" "}
                 <Link href="/servicios">servicios</Link> o{" "}
                 <Link href="/contacto">contáctanos</Link>.
               </p>
