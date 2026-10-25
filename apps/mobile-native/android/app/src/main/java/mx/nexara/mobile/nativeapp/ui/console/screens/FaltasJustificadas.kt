@@ -19,10 +19,13 @@ object FaltasJustificadas {
     fun delDia(lista: List<AttendanceJustificacionDto>?, fecha: String): AttendanceJustificacionDto? =
         lista.orEmpty().firstOrNull { it.fecha?.trim()?.take(10) == fecha }
 
-    /** «Falta justificada · Incapacidad del IMSS». */
+    /**
+     * La etiqueta y, si hay motivo, el motivo en el renglón de abajo.
+     * Antes iban juntos: «Falta justificada · Incapacidad del IMSS».
+     */
     fun texto(j: AttendanceJustificacionDto): String {
         val motivo = j.motivo?.trim().orEmpty()
-        return if (motivo.isBlank()) ETIQUETA else "$ETIQUETA · $motivo"
+        return if (motivo.isBlank()) ETIQUETA else "$ETIQUETA\n$motivo"
     }
 
     /** «Justificó Christian Ruiz» para la línea de abajo. */
