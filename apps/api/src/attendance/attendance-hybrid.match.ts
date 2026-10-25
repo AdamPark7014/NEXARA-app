@@ -91,7 +91,7 @@ export const RETARDO_GRACE_MINUTES = 15;
 /**
  * Jornada normal de NEXARA (Adam, 05-10-2026): entrada 10:00 y salida 18:00, para oficina y
  * contratistas. Hay quien entra antes o sale después; el retardo se mide contra la entrada
- * (más la gracia) y quien tenga horario propio en el editor conserva el suyo.
+ * (más la gracia). Si el editor guardó `work_schedules.horaEntrada`, manda esa hora.
  */
 export const JORNADA_ENTRADA_HM = '10:00';
 export const JORNADA_SALIDA_HM = '18:00';
@@ -102,8 +102,28 @@ function plantillaConHorario(scheduleKey?: ScheduleLateKey): boolean {
   return key === 'office_hours' || key === 'contractor';
 }
 
-/** Hora de entrada esperada (HH:MM) según plantilla ACS ERP; null = sin horario. */
-export function expectedStartHm(scheduleKey?: ScheduleLateKey): string | null {
+/**
+ * `HH:MM` que el editor guardó en `work_schedules.horaEntrada`.
+ * Otra cosa (vacío, texto, hora sin cero) no es una hora: no se inventa otra.
+ */
+export function horaEntradaGuardada(valor?: string | null): string | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec((valor ?? '').trim());
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
+/**
+ * Hora de entrada contra la que se mide el retardo, en America/Mexico_City.
+ *
+ * Si la persona tiene `horaEntrada` guardada, manda esa. Si no (o no es `HH:MM`),
+ * sigue la plantilla: 10:00 para oficina y contratista; null para 24/7 y visitante,
+ * que no marcan retardo.
+ */
+export function expectedStartHm(
+  scheduleKey?: ScheduleLateKey,
+  horaEntrada?: string | null,
+): string | null {
+  const propia = horaEntradaGuardada(horaEntrada);
+  if (propia) return propia;
   return plantillaConHorario(scheduleKey) ? JORNADA_ENTRADA_HM : null;
 }
 
@@ -112,14 +132,17 @@ export function expectedEndHm(scheduleKey?: ScheduleLateKey): string | null {
   return plantillaConHorario(scheduleKey) ? JORNADA_SALIDA_HM : null;
 }
 
-/** ¿El instante cae después de expectedHm + gracia, en la zona de jornada? */
+/**
+ * ¿El instante cae después de la entrada esperada + gracia, en America/Mexico_City?
+ * `opts.horaEntrada` es la de `work_schedules`; si falta, manda la plantilla.
+ */
 export function isLateVsSchedule(
   atIso: string | null | undefined,
   scheduleKey?: ScheduleLateKey,
-  opts?: { graceMinutes?: number; tz?: string },
+  opts?: { graceMinutes?: number; tz?: string; horaEntrada?: string | null },
 ): boolean {
   if (!atIso) return false;
-  const hm = expectedStartHm(scheduleKey);
+  const hm = expectedStartHm(scheduleKey, opts?.horaEntrada);
   if (!hm) return false;
   const at = new Date(atIso);
   if (Number.isNaN(at.getTime())) return false;
@@ -194,6 +217,8 @@ export function hybridTimeFlags(opts: {
   acsMinutes?: number | null;
   acsPasses?: number;
   scheduleKey?: ScheduleLateKey;
+  /** `work_schedules.horaEntrada`. Vacía o inválida: manda la plantilla. */
+  horaEntrada?: string | null;
 }): HybridFlag[] {
   const flags: HybridFlag[] = [];
   const hasErp = Boolean(opts.erpCheckIn);
@@ -220,9 +245,15 @@ export function hybridTimeFlags(opts: {
     if (delta > HYBRID_SKEW_MS) flags.push('desfase_salida');
   }
 
-  // Retardo: primera señal del día (checador o puerta) vs horario de plantilla.
+  // Retardo: primera señal del día (checador o puerta) vs su hora de entrada.
+  // Sin horaEntrada guardada, la plantilla (10:00 oficina/contratista).
   const arrival = opts.erpCheckIn || opts.acsFirstAt || null;
-  if (isLateVsSchedule(arrival, opts.scheduleKey)) {
+  if (
+    isLateVsSchedule(arrival, opts.scheduleKey, {
+      horaEntrada: opts.horaEntrada,
+      tz: WORKDAY_TIMEZONE,
+    })
+  ) {
     flags.push('retardo');
   }
 

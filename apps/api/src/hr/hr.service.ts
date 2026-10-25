@@ -4,6 +4,7 @@ import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagina
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
 import { expectedStartHm, isLateVsSchedule } from '../attendance/attendance-hybrid.match.js';
+import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
 
 @Injectable()
@@ -317,6 +318,7 @@ export class HrService {
       lunchLate30,
       leavesPendingList,
       recentReviews,
+      horariosPropios,
     ] = await Promise.all([
       this.prisma.leaveRequest.count({ where: { status: 'PENDING', ...scope } }),
       this.prisma.leaveRequest.count({
@@ -336,7 +338,6 @@ export class HrService {
           estadoRRHH: true,
           fechaIngreso: true,
           fechaCreacion: true,
-          // Para la puntualidad: cada quien tiene su horario (plantilla 10:00–18:00 o el propio).
           employeeNumber: true,
           roleKey: true,
           tipoContrato: true,
@@ -383,6 +384,10 @@ export class HrService {
           reviewer: { select: { id: true, nombre: true } },
         },
       }),
+      this.prisma.workSchedule.findMany({
+        where: { companyId: tenantId },
+        select: { userId: true, horaEntrada: true },
+      }),
     ]);
 
     const active = staff.filter((u) => u.isActive !== false && u.estadoRRHH !== 'Baja');
@@ -392,13 +397,14 @@ export class HrService {
       return d && d >= since12m;
     });
 
-    // Puntualidad, en hora de México y contra el horario de cada quien.
+    // Puntualidad en America/Mexico_City, contra la horaEntrada de cada quien.
     //
     // Antes era `timestamp.getHours()` contra un 09:15 fijo. `getHours()` es la
     // hora local del proceso, que en el contenedor es UTC: una entrada a las
     // 08:30 de México se leía como las 14:30 y contaba retardo. Con eso, la
-    // plantilla entera salía impuntual. Ahora se usa la misma regla que los
-    // avisos: entrada 10:00 (oficina y contratista), 15 min de gracia.
+    // plantilla entera salía impuntual. La gracia sigue en 15 min. Si el editor
+    // no guardó horaEntrada (o no es HH:MM), manda la plantilla: 10:00 para
+    // oficina y contratista; 24/7 y visitante no marcan retardo.
     const horarioPorUsuario = new Map<number, ReturnType<typeof buildAccessScheduleAssignment>>();
     for (const u of staff) {
       horarioPorUsuario.set(
@@ -412,14 +418,26 @@ export class HrService {
         }),
       );
     }
+    const horaEntradaPorUsuario = new Map<number, string | null>();
+    for (const h of horariosPropios) {
+      horaEntradaPorUsuario.set(h.userId, h.horaEntrada);
+    }
     const lateByUser = new Map<number, number>();
     const presentDaysByUser = new Map<number, number>();
     let entradasConHorario = 0;
     for (const e of entries30) {
       const plantilla = horarioPorUsuario.get(e.userId);
-      if (!plantilla || !expectedStartHm(plantilla.key)) continue; // 24/7 y visitantes no marcan retardo
+      if (!plantilla) continue;
+      const horaEntrada = horaEntradaPorUsuario.get(e.userId) ?? null;
+      // Sin hora propia y sin plantilla con horario (24/7, visitante): no hay retardo.
+      if (!expectedStartHm(plantilla.key, horaEntrada)) continue;
       entradasConHorario += 1;
-      if (isLateVsSchedule(e.timestamp.toISOString(), plantilla.key)) {
+      if (
+        isLateVsSchedule(e.timestamp.toISOString(), plantilla.key, {
+          horaEntrada,
+          tz: WORKDAY_TIMEZONE,
+        })
+      ) {
         lateByUser.set(e.userId, (lateByUser.get(e.userId) ?? 0) + 1);
       }
     }
