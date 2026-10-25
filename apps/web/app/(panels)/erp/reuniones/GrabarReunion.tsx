@@ -162,7 +162,7 @@ export default function GrabarReunion({
       onConcluida(meetingId);
     } catch (e) {
       setConcluyendo(false);
-      setError(e instanceof Error ? e.message : "No se pudo concluir la reunión. Intenta de nuevo.");
+      setError(e instanceof Error ? e.message : "No se pudo concluir la reunión: intenta de nuevo.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, meetingId, onConcluida]);
@@ -275,7 +275,7 @@ export default function GrabarReunion({
   };
 
   if (!grabadora.soportado) {
-    return <InlineAlert variant="warning" message="Este navegador no puede grabar audio. Usa Chrome, Edge o Safari actualizados." />;
+    return <InlineAlert variant="warning" message="Este navegador no puede grabar: usa Chrome, Edge o Safari." />;
   }
 
   const minutos = Math.floor(grabadora.transcurrido / 60_000);
@@ -315,19 +315,26 @@ export default function GrabarReunion({
         </div>
       </div>
 
-      <p className={s.recMeta}>
-        {concluyendo
-          ? enCola
-            ? `Subiendo lo último de la grabación (${enCola} ${enCola === 1 ? "parte" : "partes"})…`
-            : "Guardando la grabación para escribir la minuta…"
-          : `${minutos} ${minutos === 1 ? "minuto grabado" : "minutos grabados"} · ${enTexto} ya en texto · las notas se toman cada ~4 minutos`}
-        {!concluyendo && enCola > 1 ? ` · ${enCola} partes por subir` : ""}
+      <p className={s.recMeta} style={{ display: "grid", gap: 2 }}>
+        {concluyendo ? (
+          <span>
+            {enCola
+              ? `Subiendo lo último (${enCola} ${enCola === 1 ? "parte" : "partes"}).`
+              : "Guardando la grabación."}
+          </span>
+        ) : (
+          <>
+            <span>{minutos} {minutos === 1 ? "minuto grabado" : "minutos grabados"}</span>
+            <span>{enTexto} ya en texto</span>
+            {enCola > 1 ? <span>{enCola} partes por subir</span> : null}
+          </>
+        )}
       </p>
 
       {mudo ? (
         <InlineAlert
           variant="warning"
-          message={`No te escucho con «${nombreMicrofono(grabadora.microfono?.label)}». Elige otro micrófono o revisa que no esté silenciado.`}
+          message={`No te escucho con «${nombreMicrofono(grabadora.microfono?.label)}»: elige otro o revisa que no esté silenciado.`}
         />
       ) : null}
       {grabadora.grabando && !concluyendo && microfonos.length ? (
@@ -355,7 +362,7 @@ export default function GrabarReunion({
       {sinRed ? (
         <InlineAlert
           variant="warning"
-          message={`Sin conexión con el servidor: ${enCola} ${enCola === 1 ? "parte espera" : "partes esperan"} y se suben solas al volver la red. No cierres esta pestaña.`}
+          message={`Sin conexión: ${enCola} ${enCola === 1 ? "parte espera" : "partes esperan"} a que vuelva la red.`}
         />
       ) : null}
       {grabadora.transcurrido >= AVISO_MS && !concluyendo ? (
@@ -381,8 +388,8 @@ export default function GrabarReunion({
           <div style={{ display: "grid", gap: 6 }}>
             <p className={s.hint} style={{ margin: 0 }}>
               {vistaPrevia && dictado.soportado
-                ? "La vista previa usa el reconocimiento de voz de tu navegador; la minuta se hace con el texto de nuestro servidor y el audio se borra en cuanto se transcribe."
-                : "La voz se pasa a texto en nuestro servidor y el audio se borra en cuanto se transcribe."}
+                ? "La vista previa es del navegador y el servidor borra el audio al transcribir."
+                : "El servidor transcribe el audio y lo borra al terminar."}
             </p>
             {dictado.soportado ? (
               <label className={s.interruptor}>

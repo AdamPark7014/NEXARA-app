@@ -166,7 +166,7 @@ export default function MinutaReunion({
       <div className={s.minuta}>
         <p className={s.minutaTitle}>Grabación abierta</p>
         <p className={s.hint} style={{ margin: 0 }}>
-          Hay {duracionLegible(g.duracionMs)} grabados ({g.listas} de {g.total} minutos ya en texto). Puedes seguir grabando donde se quedó o concluir y escribir la minuta con lo que hay.
+          Hay {duracionLegible(g.duracionMs)} grabados y {g.listas} de {g.total} minutos ya en texto.
         </p>
         <div className={s.minutaActions}>
           <Button variant="primary" onClick={() => onSeguirGrabando({ baseMs: g.duracionMs, baseParte: g.ultima })}>
@@ -199,7 +199,7 @@ export default function MinutaReunion({
         <p className={s.hint} style={{ margin: 0 }} aria-live="polite">
           {g.pendientes
             ? `Pasando a texto lo último de la grabación (${g.pendientes} ${g.pendientes === 1 ? "minuto" : "minutos"}).`
-            : "La IA está redactando el resumen, los temas y los acuerdos. Suele tardar uno o dos minutos; puedes cerrar esta ventana y volver."}
+            : "La minuta se está redactando."}
         </p>
         <div className={s.progreso}>
           <span style={{ width: `${g.total ? Math.round((g.listas / g.total) * 100) : 100}%` }} />
@@ -234,8 +234,10 @@ export default function MinutaReunion({
       <div className={s.minutaHead}>
         <div>
           <p className={s.minutaTitle}>Minuta con IA</p>
-          <p className={s.hint} style={{ margin: 0 }}>
-            {duracionLegible(g.duracionMs)} grabados · {g.palabras.toLocaleString("es-MX")} palabras · costo de IA US${g.usdIa.toFixed(3)}
+          <p className={s.hint} style={{ margin: 0, display: "grid", gap: 2 }}>
+            <span>{duracionLegible(g.duracionMs)} grabados</span>
+            <span>{g.palabras.toLocaleString("es-MX")} palabras</span>
+            <span>Costo de IA US${g.usdIa.toFixed(3)}</span>
           </p>
         </div>
         <div className={s.minutaActions}>
@@ -318,14 +320,14 @@ export default function MinutaReunion({
         </h3>
         {confirmados ? (
           <p className={s.hint} style={{ margin: 0 }}>
-            Se guardaron el {new Date(g.acuerdosConfirmadosAt!).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}. Abajo están con su estado.
+            Se guardaron el {new Date(g.acuerdosConfirmadosAt!).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}.
           </p>
         ) : propuestas.length === 0 ? (
           <p className={s.hint} style={{ margin: 0 }}>La IA no encontró compromisos en la junta.</p>
         ) : (
           <>
             <p className={s.hint} style={{ margin: 0 }}>
-              Nada se crea solo: revisa responsable y fecha, desmarca lo que no aplique y guarda. Cada acuerdo marcado como actividad le llega a su responsable.
+              Revisa responsable y fecha, y guarda los que apliquen.
             </p>
             {propuestas.map((p, i) =>
               p.tipo === "ACUERDO" || verOtros ? <FilaPropuesta key={i} p={p} personas={personas} onCambio={(c) => cambiar(i, c)} /> : null,

@@ -58,16 +58,19 @@ export default function NotasEnVivo({ notas, grabando }: { notas: NotasGuardadas
                       <span className={`${s.marca} ${s.marcaDecision}`}>Decisión</span> {d}
                     </p>
                   ))}
-                  {n.acuerdos.map((a, i) => (
-                    <p key={`a${i}`} className={s.tramoMarca}>
-                      <span className={`${s.marca} ${s.marcaAcuerdo}`}>Acuerdo</span> {a.que}
-                      <span className={s.tramoDato}>
-                        {[a.responsable ?? "sin responsable", fechaCorta(a.fecha), a.prioridad === "alta" ? `prioridad ${PRIORIDAD_LABEL.alta.toLowerCase()}` : null]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </p>
-                  ))}
+                  {n.acuerdos.map((a, i) => {
+                    const fecha = fechaCorta(a.fecha);
+                    return (
+                      <p key={`a${i}`} className={s.tramoMarca}>
+                        <span className={`${s.marca} ${s.marcaAcuerdo}`}>Acuerdo</span> {a.que}
+                        <span className={s.tramoDato}>{a.responsable ?? "sin responsable"}</span>
+                        {fecha ? <span className={s.tramoDato}>{fecha}</span> : null}
+                        {a.prioridad === "alta" ? (
+                          <span className={s.tramoDato}>prioridad {PRIORIDAD_LABEL.alta.toLowerCase()}</span>
+                        ) : null}
+                      </p>
+                    );
+                  })}
                   {n.pendientes.map((p, i) => (
                     <p key={`p${i}`} className={s.tramoMarca}>
                       <span className={`${s.marca} ${s.marcaPendiente}`}>Pendiente</span> {p}

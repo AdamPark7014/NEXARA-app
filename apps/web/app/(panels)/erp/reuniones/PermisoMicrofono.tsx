@@ -67,10 +67,7 @@ export default function PermisoMicrofono({
             </ol>
           </>
         ) : (
-          <p style={{ margin: 0 }}>
-            El audio se pasa a texto en nuestro servidor y se borra en cuanto se transcribe. El siguiente paso es el permiso
-            oficial de tu navegador: solo se pide una vez.
-          </p>
+          <p style={{ margin: 0 }}>El audio se transcribe en el servidor y se borra al terminar.</p>
         )}
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

@@ -6,7 +6,6 @@ import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
 import {
   Alert,
   Button,
-  DataTable,
   ListFooter,
   ModulePage,
   ModuleToolbar,
@@ -14,7 +13,6 @@ import {
   SearchInput,
   StatusBadge,
   WhenCell,
-  type Column,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
@@ -113,58 +111,25 @@ export default function FlujoBucketPage() {
     );
   }
 
-  const columnas: Column<WorkflowBucketItem>[] = [
-    {
-      key: "actividad",
-      label: "Actividad",
-      render: (i) => (
-        <span className={s.actividad}>
-          <span className={s.titulo}>{i.titulo}</span>
-          {i.anNumber || i.detalle ? (
-            <span className={s.detalle}>
-              {i.anNumber ? <span className={c.folio}>{i.anNumber}</span> : null}
-              {i.anNumber && i.detalle ? " · " : null}
-              {i.detalle}
-            </span>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      key: "persona",
-      label: "Persona",
-      width: 220,
-      render: (i) =>
-        i.persona ? (
-          <PersonCell name={i.persona.nombre} avatarUrl={i.persona.avatarUrl} subtitle={i.persona.puesto ?? undefined} />
-        ) : (
-          <span className={c.pista}>—</span>
-        ),
-    },
-    {
-      key: "estado",
-      label: "Estado",
-      width: 160,
-      render: (i) => (i.estatus ? <StatusBadge size="sm" status={i.estatus} /> : <span className={c.pista}>—</span>),
-    },
-    {
-      key: "fecha",
-      label: "Fecha",
-      width: 130,
-      render: (i) => <WhenCell time={fecha(i.fecha)} hint={hora(i.fecha)} />,
-    },
-  ];
+  const fila = {
+    width: "100%",
+    display: "grid",
+    gap: 4,
+    padding: "12px 16px",
+    border: 0,
+    borderBottom: "1px solid var(--ui-border-subtle)",
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+    textAlign: "left" as const,
+    cursor: "pointer",
+  };
 
   return (
     <div className={s.pagina}>
       <ModulePage
         back={{ href: "/erp/pizarra/flujo", label: "Flujo de actividades" }}
         title={WORKFLOW_BUCKET_LABELS[bucket]}
-        description={
-          bucket === "peerRejected"
-            ? "Solicitudes entre compañeros que no se aceptaron."
-            : "Las actividades que componen este número."
-        }
         before={
           error ? (
             <Alert
@@ -176,7 +141,7 @@ export default function FlujoBucketPage() {
                 </Button>
               }
             >
-              {data ? `${error}. Se muestra lo último que cargó.` : error}
+              {data ? "No se pudo actualizar." : error}
             </Alert>
           ) : null
         }
@@ -207,8 +172,7 @@ export default function FlujoBucketPage() {
         empty={!cargando && Boolean(data) && items.length === 0}
         emptyState={{
           icon: <InboxOutlinedIcon />,
-          title: "Nada en este número para el periodo elegido",
-          description: "Prueba con otro rango de fechas.",
+          title: "Nada en este número para el periodo elegido.",
           tone: "neutral",
         }}
         footer={
@@ -221,17 +185,43 @@ export default function FlujoBucketPage() {
         listLabel={WORKFLOW_BUCKET_LABELS[bucket]}
       >
         {items.length > 0 ? (
-          <DataTable
-            columns={columnas}
-            rows={visibles}
-            rowKey={(i) => i.id}
-            onRowClick={(i) => {
-              if (i.activityId) router.push(`/erp/actividades/${i.activityId}`);
-            }}
-            flush
-            ariaLabel={WORKFLOW_BUCKET_LABELS[bucket]}
-            emptyTitle="Nadie coincide con la búsqueda"
-          />
+          visibles.length === 0 ? (
+            <p className={c.tenue} style={{ padding: "16px" }}>
+              Nadie coincide con la búsqueda.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {visibles.map((i) => {
+                const cuerpo = (
+                  <>
+                    <span className={s.titulo}>{i.titulo}</span>
+                    {i.anNumber ? <span className={c.folio}>{i.anNumber}</span> : null}
+                    {i.detalle ? <span className={s.detalle}>{i.detalle}</span> : null}
+                    {i.persona ? (
+                      <PersonCell name={i.persona.nombre} avatarUrl={i.persona.avatarUrl} subtitle={i.persona.puesto ?? undefined} />
+                    ) : (
+                      <span className={c.pista}>Sin persona</span>
+                    )}
+                    {i.estatus ? <StatusBadge size="sm" status={i.estatus} /> : <span className={c.pista}>Sin estado</span>}
+                    <WhenCell time={fecha(i.fecha)} hint={hora(i.fecha)} />
+                  </>
+                );
+                return (
+                  <li key={i.id}>
+                    {i.activityId ? (
+                      <button type="button" className={s.actividad} style={fila} onClick={() => router.push(`/erp/actividades/${i.activityId}`)}>
+                        {cuerpo}
+                      </button>
+                    ) : (
+                      <div className={s.actividad} style={{ ...fila, cursor: "default" }}>
+                        {cuerpo}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )
         ) : null}
       </ModulePage>
     </div>
