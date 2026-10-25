@@ -7,17 +7,32 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  /* El lienzo llega casi al borde de la ventana: se come parte del relleno
-     inferior del panel para no dejar una franja vacía ni sacar barra de página. */
-  margin-bottom: -32px;
-}
-
-.pagina[data-modo="lista"] {
-  margin-bottom: 0;
 }
 
 .pagina > nav {
   margin-bottom: 0 !important;
+}
+
+.herramientas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.herramientas > :first-child {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 360px;
+}
+
+.pie {
+  margin: 0;
+  padding: 10px 4px 0;
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Lienzo ─────────────────────────────────────────────────────────────── */
@@ -514,7 +529,9 @@
   overflow-wrap: anywhere;
 }
 
-.filaPuesto {
+.filaPuesto,
+.filaArea {
+  display: block;
   font-size: 12.5px;
   line-height: 1.35;
   color: var(--ui-fg-2);
@@ -541,6 +558,37 @@
 }
 
 @media (max-width: 719px) {
+  .herramientas {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* En columna, flex-grow estiraba el buscador y la lupa (absoluta, al 50%)
+     quedaba suelta entre el campo y los filtros. */
+  .herramientas > :first-child {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  /* Un dato por renglón: nombre, puesto, área y nota, cada uno en su línea. */
+  .fila {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-height: 0;
+  }
+
+  .fila .texto,
+  .filaNombre,
+  .filaPuesto,
+  .filaArea,
+  .filaNota {
+    display: block;
+    width: 100%;
+    white-space: normal;
+  }
+
   .editor {
     position: fixed;
     top: auto;

@@ -197,17 +197,16 @@ function rotuloDeTrazo(texto: string) {
 }
 
 describe("OrgChartView · solo el organigrama, con el director al centro", () => {
-  it("no hay encabezado, cifras, barra por departamento ni filtros: solo la telaraña", async () => {
+  it("título, filtros y conteo al pie, y la telaraña sigue siendo el organigrama", async () => {
     render(<OrgChartView canEditOrg={false} />);
     await screen.findByText("Christian Pozo");
 
-    expect(screen.queryByText("Por departamento")).not.toBeInTheDocument();
-    expect(screen.queryByText("Personas")).not.toBeInTheDocument();
-    expect(screen.queryByText(/personas$/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Todas" })).not.toBeInTheDocument();
-    // El título sigue existiendo para el lector de pantalla, no a la vista.
-    expect(screen.getByRole("heading", { name: "Organigrama" })).toHaveClass("ui-sr-only");
+    const titulo = screen.getByRole("heading", { name: "Organigrama" });
+    expect(titulo).toBeVisible();
+    expect(titulo).not.toHaveClass("ui-sr-only");
+    expect(screen.getByRole("searchbox", { name: "Buscar persona" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Todos/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("17 personas")).toBeInTheDocument();
   });
 
   it("dibuja a las 17 personas una sola vez y pone al director en el centro del lienzo", async () => {
@@ -409,10 +408,29 @@ describe("OrgChartView · estados", () => {
     expect(screen.getByText(/Sin acceso/)).toBeInTheDocument();
   });
 
-  it("sin nadie dado de alta, lo dice", async () => {
+  it("sin nadie dado de alta, lo dice en una frase", async () => {
     respuesta = () => [];
     render(<OrgChartView canEditOrg={false} />);
-    await screen.findByText("Aún no hay nadie en el organigrama");
+    await screen.findByText("Todavía no hay nadie en el organigrama.");
+  });
+
+  it("el filtro deja solo el área y el conteo del pie", async () => {
+    const user = userEvent.setup();
+    render(<OrgChartView canEditOrg={false} />);
+    await screen.findByText("Christian Pozo");
+
+    await user.click(screen.getByRole("button", { name: /^Dirección/ }));
+    expect(screen.getByText("1 persona")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Organigrama" })).not.toBeInTheDocument();
+    const lista = screen.getByRole("list", { name: "Personas filtradas" });
+    expect(within(lista).getByText("Christian Pozo")).toBeInTheDocument();
+    expect(within(lista).queryByText("Mando 2")).not.toBeInTheDocument();
+  });
+
+  it("dentro de RH el regreso va a Plantilla", async () => {
+    render(<OrgChartView canEditOrg showHrRail />);
+    await screen.findByText("Christian Pozo");
+    expect(screen.getByRole("link", { name: "Plantilla" })).toHaveAttribute("href", "/erp/hr");
   });
 
   it("dentro de RH conserva el carril de secciones", async () => {

@@ -3,10 +3,10 @@
 /**
  * Organigrama: una telaraña con el director al centro (`GET users/orgchart`).
  *
- * Montado en `/erp/organigrama` (Core) y `/erp/hr/orgchart` (RH). La página es
- * **solo el organigrama**: sin encabezado, sin cifras, sin barra por departamento
- * ni filtros. El director va al centro, sus reportes directos en el primer anillo
- * y cada equipo se abre en abanico detrás de su jefe (`radial-layout.ts`).
+ * Montado en `/erp/organigrama` (Core) y `/erp/hr/orgchart` (RH). El director va
+ * al centro, sus reportes directos en el primer anillo y cada equipo se abre en
+ * abanico detrás de su jefe (`radial-layout.ts`). El filtro solo esconde tarjetas:
+ * no recalcula quién reporta a quién.
  *
  * - Se mueve arrastrando y se acerca con la rueda, con dos dedos o con los botones.
  * - Reasignar jefe o colocar a alguien «al lado de» otro: tocar su tarjeta. Solo con
@@ -16,6 +16,7 @@
  */
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -24,10 +25,16 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import Button from "@/components/ui/Button";
-import InlineAlert from "@/components/ui/InlineAlert";
-import EmptyState from "@/components/ui/EmptyState";
-import { SkeletonRows } from "@/components/base";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  FilterChip,
+  FilterChips,
+  PageHead,
+  SearchInput,
+  SkeletonRows,
+} from "@/components/base";
 import HrModuleRail from "@/components/hr/HrModuleRail";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -378,6 +385,7 @@ function FilaLista({
   esCentro?: boolean;
 }) {
   const puesto = orgNodeSubtitle(persona);
+  const area = persona.department?.nombre ?? SIN_AREA;
   const ancla = persona.lateralDeId != null ? porId.get(persona.lateralDeId) : undefined;
   const hijos = persona.children ?? [];
   const contenido = (
@@ -386,6 +394,7 @@ function FilaLista({
       <span className={s.texto}>
         <span className={s.filaNombre}>{persona.nombre}</span>
         {puesto ? <span className={s.filaPuesto}>{puesto}</span> : null}
+        <span className={s.filaArea}>{area}</span>
         {ancla ? <span className={s.filaNota}>Al lado de {ancla.nombre}</span> : null}
       </span>
     </>
@@ -450,6 +459,9 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
   const [reintentando, setReintentando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const busquedaDiferida = useDeferredValue(busqueda);
+  const [areaFiltro, setAreaFiltro] = useState<string | null>(null);
 
   const lienzoRef = useRef<HTMLDivElement>(null);
   const [tamano, setTamano] = useState<Medida>({ ancho: 0, alto: 0 });
@@ -515,6 +527,34 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
     [areas],
   );
 
+  const texto = busquedaDiferida.trim().toLowerCase();
+  const hayFiltro = texto.length > 0 || areaFiltro != null;
+  const visibles = useMemo(() => {
+    if (!hayFiltro) return todos;
+    return todos.filter((p) => {
+      const areaNombre = p.department?.nombre ?? SIN_AREA;
+      if (areaFiltro && areaNombre !== areaFiltro) return false;
+      if (!texto) return true;
+      return (
+        p.nombre.toLowerCase().includes(texto) ||
+        orgNodeSubtitle(p).toLowerCase().includes(texto) ||
+        areaNombre.toLowerCase().includes(texto)
+      );
+    });
+  }, [todos, hayFiltro, areaFiltro, texto]);
+  const cuentaArea = useMemo(() => {
+    const cuenta = new Map<string, number>();
+    for (const p of todos) {
+      const nombre = p.department?.nombre ?? SIN_AREA;
+      cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
+    }
+    return cuenta;
+  }, [todos]);
+  const quitarFiltros = () => {
+    setBusqueda("");
+    setAreaFiltro(null);
+  };
+
   // ── Medidas ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -535,7 +575,8 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
     const el = lienzoRef.current;
     if (!el) return;
     const arriba = el.getBoundingClientRect().top + window.scrollY;
-    const alto = Math.max(ALTO_MINIMO, Math.floor(window.innerHeight - arriba - 16));
+    // Deja sitio al conteo del pie para que la página no gane una barra de más.
+    const alto = Math.max(ALTO_MINIMO, Math.floor(window.innerHeight - arriba - 56));
     setAltoLienzo((prev) => (prev === alto ? prev : alto));
     const ancho = el.clientWidth;
     const altoReal = el.clientHeight;
@@ -713,34 +754,64 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
   // ── Pintado ────────────────────────────────────────────────────────────────
 
   const hayGente = roots.length > 0;
-  const radial = hayGente && !estrecho;
+  const radial = hayGente && !estrecho && !hayFiltro;
   const colorDeId = (id: number) => {
     const p = porId.get(id);
     return p ? colorDe(p) : COLOR_SIN_AREA;
   };
 
+  const conteo = visibles.length === 1 ? "1 persona" : `${visibles.length} personas`;
+
   return (
-    <div className={s.pagina} data-modo={estrecho ? "lista" : "radial"}>
-      <h1 className="ui-sr-only">Organigrama</h1>
+    <div className={s.pagina} data-modo={radial ? "radial" : "lista"}>
+      <PageHead title="Organigrama" back={showHrRail ? { href: "/erp/hr", label: "Plantilla" } : undefined} />
 
       {showHrRail && <HrModuleRail />}
 
-      {error && (
-        <InlineAlert
-          variant={hayGente ? "warning" : "danger"}
-          message={hayGente ? `${error}. Se muestra lo último que cargó.` : error}
+      {hayGente && !loading ? (
+        <div className={s.herramientas}>
+          <SearchInput
+            aria-label="Buscar persona"
+            placeholder="Nombre, puesto o área"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+          <FilterChips ariaLabel="Filtrar por área">
+            <FilterChip active={areaFiltro == null} count={todos.length} onClick={() => setAreaFiltro(null)}>
+              Todos
+            </FilterChip>
+            {areas.map((a) => (
+              <FilterChip
+                key={a.nombre}
+                active={areaFiltro === a.nombre}
+                count={cuentaArea.get(a.nombre) ?? 0}
+                onClick={() => setAreaFiltro((actual) => (actual === a.nombre ? null : a.nombre))}
+              >
+                {a.nombre}
+              </FilterChip>
+            ))}
+          </FilterChips>
+        </div>
+      ) : null}
+
+      {error ? (
+        <Alert
+          tone={hayGente ? "warning" : "danger"}
+          role="alert"
           action={
             <Button size="sm" variant="secondary" onClick={() => void reintentar()} loading={reintentando}>
               Reintentar
             </Button>
           }
-        />
-      )}
+        >
+          {error}
+        </Alert>
+      ) : null}
 
       <div
         ref={lienzoRef}
         className={`${s.lienzo} ${radial ? s.lienzoRadial : ""} ${arrastrando ? s.lienzoArrastrando : ""}`}
-        style={estrecho ? undefined : { height: altoLienzo ?? undefined }}
+        style={radial ? { height: altoLienzo ?? undefined } : undefined}
         onPointerDown={radial ? alBajar : undefined}
         onPointerMove={radial ? alMover : undefined}
         onPointerUp={radial ? alSoltar : undefined}
@@ -753,11 +824,28 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
         ) : !hayGente ? (
           error ? null : (
             <div className={s.estado}>
-              <EmptyState
-                title="Aún no hay nadie en el organigrama"
-                description="Cuando RH dé de alta al personal y le asigne jefe, aparece aquí."
-              />
+              <EmptyState title="Todavía no hay nadie en el organigrama." tone="neutral" />
             </div>
+          )
+        ) : hayFiltro ? (
+          visibles.length === 0 ? (
+            <div className={s.estado}>
+              <EmptyState title="Nadie coincide con la búsqueda." tone="neutral" />
+            </div>
+          ) : (
+            <ul className={s.lista} aria-label="Personas filtradas">
+              {visibles.map((p) => (
+                <FilaLista
+                  key={p.id}
+                  persona={{ ...p, children: [] }}
+                  porId={porId}
+                  colorDe={colorDe}
+                  editable={canEditOrg}
+                  editandoId={editandoId}
+                  onEditar={alEditar}
+                />
+              ))}
+            </ul>
           )
         ) : estrecho ? (
           <ul className={s.lista} aria-label="Organigrama">
@@ -907,6 +995,8 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
           />
         ) : null}
       </div>
+
+      {!loading && hayGente ? <p className={s.pie}>{conteo}</p> : null}
     </div>
   );
 }
