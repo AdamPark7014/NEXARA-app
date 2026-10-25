@@ -118,8 +118,8 @@ export default function SeccionCotizacion({
       id="cotizacion"
       numero="04"
       titulo="Cotización"
-      descripcion="Datos del cliente, partidas con sus totales y condiciones comerciales."
-      ayuda="La hoja de cotización del PDF: datos del cliente, tabla de partidas con subtotal, IVA y total, términos y firma. El folio y la moneda salen de la portada y de Personalizar."
+      descripcion="Cliente, partidas y condiciones."
+      ayuda="El folio y la moneda salen en la portada."
       acciones={
         editable ? (
           <Button
@@ -301,17 +301,10 @@ export default function SeccionCotizacion({
           cambiar((d) => ({ ...d, conIva }));
         }}
         label="Requiere factura (lleva IVA)"
-        description={
-          doc.conIva !== false
-            ? "Se suma el IVA de cada partida. Apágalo si el cliente no pide factura."
-            : "Sin factura: la cotización sale sin IVA y así se imprime en el PDF."
-        }
+        description={doc.conIva !== false ? "Se suma el IVA de cada partida." : "Sale sin IVA."}
       />
       {doc.marginPercent != null && doc.marginPercent !== 0 && doc.partidas.some((p) => p.marginPercent != null) ? (
-        <p className={styles.pista}>
-          Ojo: este margen se suma al de las partidas que ya traen el suyo (abajo, en «Detalle»). Si solo quieres
-          controlar el margen partida por partida, deja este campo en 0.
-        </p>
+        <p className={styles.pista}>Se suma al margen de cada partida.</p>
       ) : null}
 
       <div className={styles.bloque}>
@@ -319,21 +312,11 @@ export default function SeccionCotizacion({
           <span className={styles.etiquetaConAyuda}>
             <span className={styles.subtitulo}>Partidas</span>
             {editable ? (
-              <Ayuda titulo="la tabla de partidas">
-                Enter agrega una fila (Mayús+Enter, un salto en el título) · Tab cambia de celda · ↑↓ cambian de fila ·
-                Retroceso en un título vacío quita la fila. Debajo del título están Marca, Modelo, Costo y Margen %
-                de esa partida: con costo y margen puestos ahí, el precio de esa fila sale solo (costo × margen) —
-                aparte del margen general de arriba, que sigue yendo sobre el total. La descripción del PDF es el
-                recuadro de abajo: crece con el texto y conserva saltos de línea y viñetas. La última fila, mientras
-                escribes, te ofrece primero las partidas que ya cotizaste («Usadas antes») y luego el catálogo: una
-                usada antes entra con su descripción, marca, modelo, unidad, costo y precio de la última vez, y con
-                el margen vacío para que pongas el de esta cotización. El menú ⋯ de cada renglón tiene el grupo
-                (equipos, materiales o mano de obra), subir, bajar y quitar.
-              </Ayuda>
+              <Ayuda titulo="la tabla de partidas">Enter agrega una fila.</Ayuda>
             ) : null}
           </span>
           {editable && !doc.partidas.length ? (
-            <span className={styles.pista}>Escribe la primera partida y presiona Enter</span>
+            <span className={styles.pista}>Escribe la primera partida.</span>
           ) : null}
         </div>
         <TablaPartidas

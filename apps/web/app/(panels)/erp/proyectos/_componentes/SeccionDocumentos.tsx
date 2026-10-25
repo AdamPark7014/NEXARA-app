@@ -94,7 +94,7 @@ export default function SeccionDocumentos({ proyecto: p, token, ocupado, mutar, 
             Documentos<span className={styles.conteo}>{p.documents.length}</span>
           </>
         }
-        subtitle="Planos, actas, contratos y minutas del proyecto."
+        subtitle="Planos, actas, contratos y minutas."
       >
         {p.documents.length ? (
           <FilterChips ariaLabel="Filtrar por tipo">
@@ -114,23 +114,33 @@ export default function SeccionDocumentos({ proyecto: p, token, ocupado, mutar, 
           </Alert>
         ) : null}
         {visibles.length === 0 ? (
-          <p className={styles.vacio}>Todavía no hay documentos. Sube planos, actas, contratos o minutas.</p>
+          <p className={styles.vacio}>Todavía no hay documentos.</p>
         ) : (
           <ul className={styles.lista}>
             {visibles.map((d) => (
               <li key={d.id} className={styles.fila}>
                 <div className={styles.principal}>
                   <span className={styles.tituloFila}>
-                    <DescriptionOutlinedIcon fontSize="small" aria-hidden="true" />
-                    {d.nombre}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flex: "1 0 100%", minWidth: 0, overflowWrap: "normal" }}>
+                      <DescriptionOutlinedIcon fontSize="small" aria-hidden="true" />
+                      {d.nombre}
+                    </span>
                     <Badge tone="outline" size="sm">
                       {TIPO_DOCUMENTO_LABEL[d.kind] ?? "Otro documento"}
                     </Badge>
                   </span>
-                  <span className={styles.meta}>
-                    {[formatoTamano(d.fileSizeBytes), d.uploadedBy ? `Subió ${d.uploadedBy.nombre}` : null, formatoFechaHora(d.createdAt)]
-                      .filter(Boolean)
-                      .join(" · ")}
+                  {formatoTamano(d.fileSizeBytes) ? (
+                    <span className={styles.meta} style={{ overflowWrap: "normal" }}>
+                      {formatoTamano(d.fileSizeBytes)}
+                    </span>
+                  ) : null}
+                  {d.uploadedBy ? (
+                    <span className={styles.meta} style={{ overflowWrap: "normal" }}>
+                      Subió {d.uploadedBy.nombre}
+                    </span>
+                  ) : null}
+                  <span className={styles.meta} style={{ overflowWrap: "normal" }}>
+                    {formatoFechaHora(d.createdAt)}
                   </span>
                 </div>
                 <div className={styles.acciones}>
@@ -179,7 +189,7 @@ export default function SeccionDocumentos({ proyecto: p, token, ocupado, mutar, 
               ))}
             </Select>
           </Field>
-          <Field label={`Archivos (hasta ${MAX_ARCHIVOS_POR_SUBIDA}, 25 MB cada uno)`}>
+          <Field label="Archivos" hint={`Hasta ${MAX_ARCHIVOS_POR_SUBIDA} archivos de 25 MB.`}>
             {/* El sistema no trae control de archivo: el nativo con la caja punteada del sistema. */}
             <input id="doc-archivos" ref={input} className={styles.archivo} type="file" multiple onChange={(e) => elegir(e.target.files)} />
           </Field>
@@ -190,14 +200,15 @@ export default function SeccionDocumentos({ proyecto: p, token, ocupado, mutar, 
               maxLength={220}
               disabled={archivos.length > 1}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder={archivos.length > 1 ? "Con varios archivos se usa el nombre de cada uno" : "Ej. Plano de canalización v2"}
+              placeholder={archivos.length > 1 ? "Se usa el nombre de cada archivo." : "Ej. Plano de canalización v2"}
             />
           </Field>
         </div>
         {archivos.length ? (
-          <p className={styles.ayuda}>
-            {archivos.length === 1 ? archivos[0].name : `${archivos.length} archivos`} · {formatoTamano(archivos.reduce((t, f) => t + f.size, 0))}
-          </p>
+          <>
+            <p className={styles.ayuda}>{archivos.length === 1 ? archivos[0].name : `${archivos.length} archivos`}</p>
+            <p className={styles.ayuda}>{formatoTamano(archivos.reduce((t, f) => t + f.size, 0))}</p>
+          </>
         ) : null}
         {errorSubida ? (
           <Alert tone="danger" role="alert" dense>

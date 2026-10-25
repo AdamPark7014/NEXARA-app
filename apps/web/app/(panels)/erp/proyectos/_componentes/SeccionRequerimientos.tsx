@@ -81,21 +81,15 @@ export default function SeccionRequerimientos({ proyecto: p, token, hoy, ocupado
     <div className={styles.pila}>
       <RecordSection
         title="Lo que hace falta para entregar"
-        subtitle={r.total ? `${r.cumplidos} de ${r.total} listos` : "Sin requerimientos"}
-        end={
-          r.total ? (
-            <Progress
-              value={r.porcentaje ?? 0}
-              max={100}
-              tone="success"
-              label={`${r.porcentaje ?? 0} %`}
-              ariaLabel="Requerimientos listos"
-            />
-          ) : null
-        }
+        subtitle={r.total ? `${r.cumplidos} de ${r.total} listos` : undefined}
       >
+        {r.total ? (
+          <div style={{ marginBottom: 14 }}>
+            <Progress value={r.porcentaje ?? 0} max={100} tone="success" label={`${r.porcentaje ?? 0} %`} ariaLabel="Requerimientos listos" />
+          </div>
+        ) : null}
         {p.requirements.length === 0 ? (
-          <p className={styles.vacio}>Sin requerimientos todavía. Agrega los papeles, permisos o datos que hacen falta.</p>
+          <p className={styles.vacio}>Todavía no hay requerimientos.</p>
         ) : (
           <ul className={styles.lista}>
             {p.requirements.map((req) => {
@@ -149,10 +143,24 @@ export default function SeccionRequerimientos({ proyecto: p, token, hoy, ocupado
                       label={<span className={listo || noAplica ? styles.hecho : undefined}>{req.titulo}</span>}
                       description={
                         <>
-                          {req.responsable ? req.responsable.nombre : "Sin responsable"}
-                          {req.dueDate ? ` · Límite: ${formatoFecha(req.dueDate)}` : ""}
-                          {listo && req.completedAt ? ` · Listo el ${formatoFecha(req.completedAt)}` : ""}
-                          {vencido ? <span className={`${styles.vencido} ${styles.datoSub}`}>{textoPlazo(req.dueDate, hoy)}</span> : null}
+                          <span className={styles.datoSub} style={{ overflowWrap: "normal" }}>
+                            {req.responsable ? req.responsable.nombre : "Sin responsable"}
+                          </span>
+                          {req.dueDate ? (
+                            <span className={styles.datoSub} style={{ overflowWrap: "normal" }}>
+                              Límite: {formatoFecha(req.dueDate)}
+                            </span>
+                          ) : null}
+                          {listo && req.completedAt ? (
+                            <span className={styles.datoSub} style={{ overflowWrap: "normal" }}>
+                              Listo el {formatoFecha(req.completedAt)}
+                            </span>
+                          ) : null}
+                          {vencido ? (
+                            <span className={`${styles.vencido} ${styles.datoSub}`} style={{ overflowWrap: "normal" }}>
+                              {textoPlazo(req.dueDate, hoy)}
+                            </span>
+                          ) : null}
                         </>
                       }
                     />
