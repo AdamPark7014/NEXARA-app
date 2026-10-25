@@ -9,9 +9,9 @@ private struct AttendanceJustifyTarget: Identifiable {
 }
 
 /// Pestaña «Equipo del día» / «Mi jornada» (Android `EquipoTab`): mi jornada si
-/// checo, y si administro gente la tira de cifras, una sola barra de filtros y la
-/// lista densa del equipo —una fila por persona, separadas por una línea— cuyo
-/// detalle se abre al tocarla.
+/// checo, y si administro gente una sola lista de conteos —un estado por
+/// renglón— y la lista del equipo, una persona por fila. El detalle se abre al
+/// tocarla.
 struct AsistenciasEquipoTab: View {
     @ObservedObject var vm: AttendanceVM
     @ObservedObject private var tracker = ShiftGpsTracker.shared
@@ -81,30 +81,9 @@ struct AsistenciasEquipoTab: View {
     @ViewBuilder
     private func contenido(_ rows: [AttendanceDayRow]) -> some View {
         let visibles = vm.filter.map { f in rows.filter { $0.estado == f } } ?? rows
-        // La tira solo aparece cuando hay gente que contar; cada celda filtra.
-        NxMetricStrip(
-            items: AttendanceUx.metricas(rows),
-            seleccion: AttendanceUx.metricaDeEstado(vm.filter),
-            onSelect: { clave in
-                let estado = AttendanceUx.estadoDeMetrica(clave)
-                vm.filter = (estado == nil || vm.filter == estado) ? nil : estado
-            }
-        )
-        // Una sola fila de filtros, sin caja y sin fondo.
-        NxFilterBar(horizontalPadding: 0) {
-            ForEach(AttendanceUx.filtros(rows)) { f in
-                NxFilterPill(
-                    label: f.etiqueta,
-                    count: f.conteo,
-                    selected: vm.filter == f.estado,
-                    color: f.color,
-                    onClick: { vm.filter = vm.filter == f.estado ? nil : f.estado }
-                )
-            }
-        }
+        conteos(rows)
         NxDenseSectionHeader(
-            title: AttendanceUx.tituloLista(vm.filter, visibles: visibles.count),
-            hint: "Toca una fila para ver fotos, mapa y avisos."
+            title: AttendanceUx.tituloLista(vm.filter, visibles: visibles.count)
         )
         if visibles.isEmpty {
             NxEmptyState(
@@ -140,6 +119,53 @@ struct AsistenciasEquipoTab: View {
         }
     }
 
+    /// Un conteo por renglón. Tocar el mismo estado lo suelta y vuelve a «Todos».
+    private func conteos(_ rows: [AttendanceDayRow]) -> some View {
+        let opciones = AttendanceUx.filtros(rows)
+        return VStack(spacing: 0) {
+            ForEach(Array(opciones.enumerated()), id: \.element.id) { index, opcion in
+                if index > 0 { NxRowDivider() }
+                conteoFila(opcion)
+            }
+        }
+        .background(NxColors.card)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(NxColors.border, lineWidth: 1)
+        )
+    }
+
+    private func conteoFila(_ opcion: AttendanceUx.Filtro) -> some View {
+        let activo = vm.filter == opcion.estado
+        return Button {
+            vm.filter = activo ? nil : opcion.estado
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(opcion.color ?? Color.clear)
+                    .frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+                Text(opcion.etiqueta)
+                    .font(.system(size: 15, weight: activo ? .semibold : .regular))
+                    .foregroundStyle(NxColors.fg)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("\(opcion.conteo)")
+                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(opcion.conteo > 0 ? NxColors.fg : NxColors.muted)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(activo ? NxColors.brandSoft.opacity(0.55) : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(activo ? AccessibilityTraits.isSelected : [])
+    }
+
     /// «Justificar falta»: solo Christian, en un día sin entrada que no sea futuro.
     private func justificar(_ row: AttendanceDayRow) -> (() -> Void)? {
         let ofrece = FaltasJustificadas.ofrecerJustificar(
@@ -161,9 +187,9 @@ struct AsistenciasEquipoTab: View {
 
 // MARK: - Fila de una persona
 
-/// Nombre, estado, horas y cronómetro en una fila que se lee de un vistazo. Lo demás
-/// —horas exactas, avisos, correcciones, fotos, mapas y «Justificar falta»— se
-/// despliega al tocarla (Android `PersonaRow`).
+/// Nombre y, debajo, un dato por renglón. Lo demás —horas exactas, avisos,
+/// correcciones, fotos, mapas y «Justificar falta»— se despliega al tocarla
+/// (Android `PersonaRow`).
 private struct PersonaRow: View {
     let row: AttendanceDayRow
     let expandida: Bool
@@ -173,37 +199,54 @@ private struct PersonaRow: View {
 
     @Environment(\.openURL) private var openURL
 
-    private var subtitulo: String {
-        row.member.roleLine.isEmpty ? "—" : row.member.roleLine
+    private var puesto: String {
+        row.member.roleName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var area: String {
+        row.member.department.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var muestraTiempo: Bool {
+        row.estado == .presente || row.estado == .completo
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: onToggle) {
-                HStack(alignment: .center, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
                     avatar
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(row.member.displayName)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(NxColors.fg)
                             .lineLimit(1)
-                        Text("\(row.estado.label) · \(subtitulo)")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(NxColors.muted)
+                        Text(row.estado.label)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(row.estado.color)
                             .lineLimit(1)
+                        if !puesto.isEmpty {
+                            dato(puesto)
+                        }
+                        if !area.isEmpty {
+                            dato(area)
+                        }
+                        if row.checkIn != nil {
+                            dato("Entrada \(AttendanceClock.shortTime(row.checkIn))")
+                        }
+                        if row.checkOut != nil {
+                            dato("Salida \(AttendanceClock.shortTime(row.checkOut))")
+                        }
+                        if muestraTiempo {
+                            cronometro
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text("\(AttendanceClock.shortTime(row.checkIn)) → \(AttendanceClock.shortTime(row.checkOut))")
-                            .font(.system(size: 11.5, design: .monospaced))
-                            .foregroundStyle(NxColors.muted)
-                            .lineLimit(1)
-                        cronometro
-                    }
                     Image(systemName: expandida ? "chevron.up" : "chevron.down")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(NxColors.muted)
                         .frame(width: 20, height: 20)
+                        .padding(.top, 2)
                         .accessibilityLabel(expandida ? "Ocultar detalle" : "Ver detalle")
                 }
                 .padding(.horizontal, 12)
@@ -243,20 +286,25 @@ private struct PersonaRow: View {
 
     @ViewBuilder
     private var cronometro: some View {
-        if row.estado == .ausente || row.estado == .justificada {
-            textoCronometro("—")
-        } else if row.estado == .presente {
+        if row.estado == .presente {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 textoCronometro(AttendanceClock.hms(row.elapsed(now: context.date)))
             }
-        } else {
+        } else if row.estado == .completo {
             textoCronometro(AttendanceClock.hms(row.elapsed(now: Date())))
         }
     }
 
-    private func textoCronometro(_ texto: String) -> some View {
+    private func dato(_ texto: String) -> some View {
         Text(texto)
-            .font(.system(size: 14, weight: .bold, design: .monospaced))
+            .font(.system(size: 13))
+            .foregroundStyle(NxColors.muted)
+            .lineLimit(1)
+    }
+
+    private func textoCronometro(_ texto: String) -> some View {
+        Text("Tiempo \(texto)")
+            .font(.system(size: 13, weight: .semibold, design: .monospaced))
             .foregroundStyle(row.estado.color)
             .lineLimit(1)
     }
@@ -269,8 +317,10 @@ private struct PersonaRow: View {
                 // Ni «sin checada» ni horas en cero: el día está justificado.
                 FaltaJustificadaNota(justificacion: falta)
             } else {
-                HStack(alignment: .top, spacing: 24) {
+                if row.checkIn != nil {
                     horaDetalle("Entrada", row.checkIn)
+                }
+                if row.checkOut != nil {
                     horaDetalle("Salida", row.checkOut)
                 }
             }
@@ -286,7 +336,7 @@ private struct PersonaRow: View {
             }
 
             if row.fotoEntrada != nil || row.fotoSalida != nil {
-                HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     if let url = row.fotoEntrada {
                         foto("Entrada", url: url, systemImage: AsisIcono.entrada, punch: row.entryPunch)
                     }
@@ -300,7 +350,7 @@ private struct PersonaRow: View {
         }
     }
 
-    /// «ENTRADA · 08:15:03».
+    /// «ENTRADA» y, debajo, «08:15:03».
     private func horaDetalle(_ etiqueta: String, _ iso: String?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(etiqueta.uppercased())
@@ -312,9 +362,9 @@ private struct PersonaRow: View {
         }
     }
 
-    /// Foto de 62 con su etiqueta: una cara sin decir si entra o sale no sirve.
+    /// Una foto por renglón, con su etiqueta al lado.
     private func foto(_ etiqueta: String, url: String, systemImage: String, punch: AttendancePunch?) -> some View {
-        VStack(alignment: .center, spacing: 3) {
+        HStack(alignment: .center, spacing: 10) {
             Button {
                 onPhoto(CorePhotoItem(
                     title: "\(CoreFormat.shortName(row.member.displayName)) · \(etiqueta)",
@@ -330,16 +380,17 @@ private struct PersonaRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Foto de \(etiqueta.lowercased())")
-            AsisIconText(text: etiqueta, systemImage: systemImage, fontSize: 10, color: NxColors.muted, iconSize: 13)
+            AsisIconText(text: etiqueta, systemImage: systemImage, fontSize: 13, color: NxColors.muted, iconSize: 15)
+            Spacer(minLength: 0)
         }
     }
 
     /// «Mapa entrada», «Mapa salida», «Justificar falta» y, como en la web, «Ver qué
-    /// está haciendo» (la pizarra de la persona).
+    /// está haciendo» (la pizarra de la persona). Una acción por renglón.
     private var acciones: some View {
         let entrada = AttendanceClock.mapUrl(lat: row.entryPunch?.coords?.lat, lng: row.entryPunch?.coords?.lng)
         let salida = AttendanceClock.mapUrl(lat: row.exitPunch?.coords?.lat, lng: row.exitPunch?.coords?.lng)
-        return AsisFlowLayout(horizontal: 4, vertical: 0) {
+        return VStack(alignment: .leading, spacing: 0) {
             if let entrada {
                 textoBoton("Mapa entrada") { openURL(entrada) }
             }
@@ -354,6 +405,7 @@ private struct PersonaRow: View {
                     .nxBrandNavBar()
             } label: {
                 etiquetaBoton("Ver qué está haciendo", color: NxColors.brand, weight: .regular)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
         }

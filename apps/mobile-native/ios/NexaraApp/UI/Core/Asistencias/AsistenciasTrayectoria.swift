@@ -1,9 +1,9 @@
 import SwiftUI
 import MapKit
 
-/// «Trayectoria» (Android `TrayectoriaTab`): «GPS del equipo» —quién comparte su
-/// ubicación ahora, con coordenadas y «Ver en mapa»— y «Mi trayecto · N puntos» con
-/// «Ver recorrido en Maps». Solo dirección (el API contesta 403 a los demás).
+/// «Trayectoria» (Android `TrayectoriaTab`): quién comparte ubicación ahora, un
+/// dato por renglón, y el recorrido del día. Solo dirección (el API contesta
+/// 403 a los demás).
 struct AsistenciasTrayectoriaSection: View {
     @ObservedObject var vm: AttendanceVM
     @Environment(\.openURL) private var openURL
@@ -17,21 +17,22 @@ struct AsistenciasTrayectoriaSection: View {
                     NxErrorBlock(message: error) { Task { await vm.loadTrajectory() } }
                 }
 
-                NxDenseSectionHeader(title: "GPS del equipo", hint: "Unidades con jornada abierta.")
+                NxDenseSectionHeader(title: "GPS del equipo")
                 if vm.teamGps.isEmpty {
                     NxEmptyState(title: "Sin ubicaciones", subtitle: "Nadie comparte GPS ahora.")
                 } else {
                     equipo
                 }
 
-                NxDenseSectionHeader(
-                    title: "Mi trayecto · \(vm.trajectory.count) puntos",
-                    hint: "Entrada, GPS y salida del día que estás viendo."
-                )
-                .padding(.top, 6)
+                NxDenseSectionHeader(title: "Mi trayecto")
+                    .padding(.top, 6)
                 if vm.trajectory.isEmpty {
                     NxEmptyState(title: "Sin puntos", subtitle: "No hay recorrido registrado para este día.")
                 } else {
+                    Text(etiquetaPuntos)
+                        .font(.system(size: 15))
+                        .foregroundStyle(NxColors.fg)
+                        .lineLimit(1)
                     let puntos = vm.routePoints
                     if puntos.count > 1 {
                         // El recorrido dibujado, como la vista previa de la web.
@@ -55,6 +56,10 @@ struct AsistenciasTrayectoriaSection: View {
             }
             Spacer(minLength: 24)
         }
+    }
+
+    private var etiquetaPuntos: String {
+        vm.trajectory.count == 1 ? "1 punto" : "\(vm.trajectory.count) puntos"
     }
 
     /// Una superficie con filas separadas por una línea: nombre, coordenadas y «Ver en mapa».
@@ -81,26 +86,25 @@ private struct GpsEquipoRow: View {
     private var url: URL? { AttendanceClock.mapUrl(lat: punto.latitude, lng: punto.longitude) }
 
     var body: some View {
-        let fila = HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(punto.nombre.isEmpty ? "Usuario #\(punto.usuarioId)" : punto.nombre)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(NxColors.fg)
-                    .lineLimit(1)
-                Text(coordenadas)
-                    .font(.system(size: 11.5, design: .monospaced))
-                    .foregroundStyle(NxColors.muted)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        let fila = VStack(alignment: .leading, spacing: 2) {
+            Text(punto.nombre.isEmpty ? "Usuario #\(punto.usuarioId)" : punto.nombre)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(NxColors.fg)
+                .lineLimit(1)
+            Text(coordenadas)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(NxColors.muted)
+                .lineLimit(1)
             if url != nil {
                 Text("Ver en mapa")
-                    .font(.system(size: 12.5))
+                    .font(.system(size: 13))
                     .foregroundStyle(NxColors.brand)
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
 
         if let url {
@@ -112,7 +116,7 @@ private struct GpsEquipoRow: View {
     }
 
     private var coordenadas: String {
-        guard let lat = punto.latitude, let lng = punto.longitude else { return "Sin coordenadas" }
+        guard let lat = punto.latitude, let lng = punto.longitude else { return "Sin coordenadas." }
         return String(format: "%.5f, %.5f", lat, lng)
     }
 }
