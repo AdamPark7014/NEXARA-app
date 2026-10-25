@@ -687,6 +687,24 @@ const tituloCorto = (texto: string) => {
   return linea.length > 110 ? `${linea.slice(0, 110)}…` : linea;
 };
 
+/**
+ * A 390 px, marca, modelo, veces y precio de cada sugerencia van en su renglón.
+ * En escritorio siguen en una sola línea, separados con « · ».
+ */
+const ESTILO_DETALLE_SUGERENCIA = `
+@media (max-width: 390px) {
+  .nx-cot-sugerencia-detalle {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .nx-cot-sugerencia-sep {
+    display: none;
+  }
+}
+`;
+
 type Sugerencia =
   | { clave: string; tipo: "usada"; usada: PartidaFrecuente }
   | { clave: string; tipo: "catalogo"; oferta: SmartOffer };
@@ -922,6 +940,7 @@ function FilaNueva({
             formatoMoneda(s.oferta.sellPriceSuggested || s.oferta.precio),
             s.oferta.stockTotal > 0 ? "en stock" : "sobre pedido",
           ];
+    const partes = detalle.filter(Boolean);
     return (
       <li
         key={s.clave}
@@ -937,7 +956,14 @@ function FilaNueva({
         onMouseEnter={() => setActiva(s.clave)}
       >
         <span>{s.tipo === "usada" ? tituloCorto(s.usada.name) : s.oferta.nombre ?? s.oferta.clave}</span>
-        <small>{detalle.filter(Boolean).join(" · ")}</small>
+        <small className="nx-cot-sugerencia-detalle">
+          {partes.map((parte, i) => (
+            <span key={i}>
+              {i > 0 ? <span className="nx-cot-sugerencia-sep">{" · "}</span> : null}
+              {parte}
+            </span>
+          ))}
+        </small>
       </li>
     );
   };
@@ -968,25 +994,28 @@ function FilaNueva({
           aria-autocomplete="list"
         />
         {sugerencias.length ? (
-          <ul
-            className={styles.sugerencias}
-            role="listbox"
-            aria-label="Sugerencias"
-            onMouseDown={(e) => e.preventDefault()}
-          >
-            {usadas.length ? (
-              <li role="presentation" className={styles.sugerenciasGrupo}>
-                Usadas antes
-              </li>
-            ) : null}
-            {sugerencias.filter((s) => s.tipo === "usada").map(opcion)}
-            {ofertas.length ? (
-              <li role="presentation" className={styles.sugerenciasGrupo}>
-                Catálogo
-              </li>
-            ) : null}
-            {sugerencias.filter((s) => s.tipo === "catalogo").map(opcion)}
-          </ul>
+          <>
+            <style>{ESTILO_DETALLE_SUGERENCIA}</style>
+            <ul
+              className={styles.sugerencias}
+              role="listbox"
+              aria-label="Sugerencias"
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              {usadas.length ? (
+                <li role="presentation" className={styles.sugerenciasGrupo}>
+                  Usadas antes
+                </li>
+              ) : null}
+              {sugerencias.filter((s) => s.tipo === "usada").map(opcion)}
+              {ofertas.length ? (
+                <li role="presentation" className={styles.sugerenciasGrupo}>
+                  Catálogo
+                </li>
+              ) : null}
+              {sugerencias.filter((s) => s.tipo === "catalogo").map(opcion)}
+            </ul>
+          </>
         ) : null}
       </span>
       <span role="cell" data-area="unidad">
