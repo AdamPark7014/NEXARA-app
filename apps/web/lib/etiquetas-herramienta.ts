@@ -127,7 +127,7 @@ export function avisosDeEtiquetas(
     if (modulo == null) {
       avisos.push({
         herramientaId: h.id,
-        mensaje: `${h.toolName}: el código «${codigo}» trae caracteres que no caben en un código de barras. Saldrá solo el texto.`,
+        mensaje: `${h.toolName}: el código «${codigo}» trae caracteres que no caben en un código de barras: saldrá solo el texto.`,
       });
     } else if (modulo < MODULO_MINIMO_MM) {
       avisos.push({
