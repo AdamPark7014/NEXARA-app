@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -25,10 +26,10 @@ import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
 import { toast } from "@/components/Toast";
 import { fetchActivityFeed, type ActivityFeedItem } from "@/lib/activity-feed-api";
+import q from "@/components/erp/pantalla-quieta.module.css";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import {
   detectCurrentPanelId,
@@ -170,8 +171,8 @@ export default function NotificationsCenterPage() {
     try {
       const data = await apiFetch("notifications?limit=80", token);
       setNotifs(Array.isArray(data) ? data : (data.data ?? []));
-    } catch (e: unknown) {
-      setError(formatApiError(e, "No pudimos cargar tus notificaciones."));
+    } catch {
+      setError("No se pudieron cargar las notificaciones.");
     } finally {
       setLoading(false);
     }
@@ -184,8 +185,8 @@ export default function NotificationsCenterPage() {
     try {
       const data = await fetchActivityFeed(token, 60);
       setFeed(data.items);
-    } catch (e: unknown) {
-      setFeedError(formatApiError(e, "No pudimos cargar la actividad reciente."));
+    } catch {
+      setFeedError("No se pudo cargar la actividad.");
     } finally {
       setFeedLoading(false);
     }
@@ -222,7 +223,7 @@ export default function NotificationsCenterPage() {
       await apiFetch(`notifications/${id}/read`, token, { method: "PATCH" });
       setNotifs((prev) => prev?.map((n) => (n.id === id ? { ...n, isRead: true } : n)) ?? prev);
     } catch (e: unknown) {
-      toast.error(`No se pudo marcar como leída. ${formatApiError(e, "")}`.trim());
+      toast.error("No se pudo marcar como leída.");
     }
   };
 
@@ -232,7 +233,7 @@ export default function NotificationsCenterPage() {
       await apiFetch("notifications/read/all", token, { method: "PATCH" });
       setNotifs((prev) => prev?.map((n) => ({ ...n, isRead: true })) ?? prev);
     } catch (e: unknown) {
-      toast.error(`No se pudieron marcar todas como leídas. ${formatApiError(e, "")}`.trim());
+      toast.error("No se pudieron marcar todas como leídas.");
     }
   };
 
@@ -242,7 +243,7 @@ export default function NotificationsCenterPage() {
       await apiFetch(`notifications/${id}`, token, { method: "DELETE" });
       setNotifs((prev) => prev?.filter((n) => n.id !== id) ?? prev);
     } catch (e: unknown) {
-      toast.error(`No se pudo eliminar. ${formatApiError(e, "")}`.trim());
+      toast.error("No se pudo eliminar.");
     }
   };
 
@@ -288,11 +289,10 @@ export default function NotificationsCenterPage() {
   const firstLoad = notifs === null && loading;
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/dashboard" className={q.volver}>‹ Inicio</Link>
       <PageHeader
-        eyebrow="Hoy"
         title="Notificaciones"
-        subtitle="Lo que necesita tu atención primero, y todo lo demás en orden."
         actions={
           <>
             <Button variant="ghost" iconLeft="↻" onClick={() => void (view === "feed" ? loadFeed() : loadNotifs())} loading={view === "feed" ? feedLoading : loading && notifs !== null} disabled={view === "feed" ? feedLoading : loading}>
@@ -359,7 +359,7 @@ export default function NotificationsCenterPage() {
           {error && (
             <InlineAlert
               variant={notifs ? "warning" : "danger"}
-              message={notifs ? `No pudimos actualizar; mostramos lo último que cargó. ${error}` : error}
+              message={notifs ? "No se pudo actualizar." : "No se pudieron cargar las notificaciones."}
               action={<Button size="sm" variant="secondary" onClick={() => void loadNotifs()}>Reintentar</Button>}
             />
           )}
@@ -367,13 +367,11 @@ export default function NotificationsCenterPage() {
             <SkeletonList />
           ) : notifs !== null && sortedNotifs.length === 0 ? (
             <EmptyState
-              icon="🔔"
-              title={view === "action" ? "Nada urgente" : "Sin notificaciones"}
-              description={
+              title={
                 view === "action"
-                  ? "No tienes pendientes que requieran acción inmediata."
+                  ? "No hay pendientes."
                   : category === "all"
-                    ? "Cuando pase algo importante te avisaremos aquí."
+                    ? "No hay notificaciones."
                     : "No hay notificaciones de este tema."
               }
               action={view === "action" && list.length > 0 ? (
@@ -396,8 +394,8 @@ export default function NotificationsCenterPage() {
                     <span className={s.message}>{stripLeadingEmoji(n.message)}</span>
                     <span className={s.meta}>
                       <time dateTime={n.createdAt}>{timeAgo(n.createdAt)}</time>
-                      {!n.isRead && " · Sin leer"}
-                      {n.relatedUrl && <span className={s.open}> · Abrir →</span>}
+                      {!n.isRead && <span>Sin leer</span>}
+                      {n.relatedUrl && <span className={s.open}>Abrir →</span>}
                     </span>
                   </>
                 );
@@ -435,18 +433,18 @@ export default function NotificationsCenterPage() {
       )}
 
       {view === "feed" && (
-        <Section title="Actividad reciente" subtitle="Movimientos del negocio que puedes ver: órdenes, tickets, cotizaciones y compras.">
+        <Section title="Actividad reciente">
           {feedError && (
             <InlineAlert
               variant={feed ? "warning" : "danger"}
-              message={feedError}
+              message={feed ? "No se pudo actualizar." : "No se pudo cargar la actividad."}
               action={<Button size="sm" variant="secondary" onClick={() => void loadFeed()}>Reintentar</Button>}
             />
           )}
           {feed === null && feedLoading ? (
             <SkeletonList />
           ) : feed !== null && feed.length === 0 ? (
-            <EmptyState icon="📡" title="Sin actividad reciente" description="Aún no hay movimientos del negocio en tu alcance." />
+            <p className={q.frase} role="status">No hay actividad.</p>
           ) : (
             <ul className={s.list}>
               {(feed ?? []).map((item) => {
@@ -460,8 +458,8 @@ export default function NotificationsCenterPage() {
                     {item.subtitle && <span className={s.message}>{item.subtitle}</span>}
                     <span className={s.meta}>
                       <time dateTime={item.at}>{timeAgo(item.at)}</time>
-                      {item.actorName && <> · {item.actorName}</>}
-                      {item.deepLink && <span className={s.open}> · Abrir →</span>}
+                      {item.actorName && <span>{item.actorName}</span>}
+                      {item.deepLink && <span className={s.open}>Abrir →</span>}
                     </span>
                   </>
                 );
@@ -481,6 +479,6 @@ export default function NotificationsCenterPage() {
           )}
         </Section>
       )}
-    </>
+    </div>
   );
 }

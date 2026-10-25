@@ -59,7 +59,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
       if (!res.ok) throw new Error(`No se pudo cargar la matriz (${res.status})`);
       setRoles(await res.json());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar la matriz de accesos");
+      setError("No se pudieron cargar los roles.");
     } finally {
       setLoading(false);
     }
@@ -78,17 +78,13 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
 
   const orphanRoles = roles.filter((r) => !r.acceso.recognizedByMatrix);
 
-  if (loading) return <p style={{ color: "var(--text-2)" }}>Cargando matriz de accesos…</p>;
-  if (error) return <p style={{ color: "var(--danger, #b91c1c)" }}>{error}</p>;
+  if (loading) return <p style={{ color: "var(--text-2)" }}>Cargando roles.</p>;
+  if (error) return <p style={{ color: "var(--danger, #b91c1c)" }}>No se pudieron cargar los roles.</p>;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <header>
         <h3 style={{ margin: 0 }}>Qué alcanza cada rol</h3>
-        <p style={{ margin: "4px 0 0", color: "var(--text-2)", fontSize: 14 }}>
-          Resuelto contra la matriz de permisos. Es lo que el sistema aplica de verdad,
-          no lo que dicen las casillas del formulario.
-        </p>
       </header>
 
       {orphanRoles.length > 0 && (
@@ -102,12 +98,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
             fontSize: 14,
           }}
         >
-          <strong>
-            {orphanRoles.length} rol(es) sin plantilla reconocida:{" "}
-            {orphanRoles.map((r) => r.nombre).join(", ")}.
-          </strong>{" "}
-          No tienen línea base de permisos; quien los use no podrá entrar a casi nada.
-          Reasígnalos a una plantilla desde la edición del rol.
+          {`Hay ${orphanRoles.length === 1 ? "un rol" : `${orphanRoles.length} roles`} sin plantilla: ${orphanRoles.map((r) => r.nombre).join(", ")}.`}
         </div>
       )}
 
@@ -130,6 +121,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
               <tr key={role.id} style={{ borderTop: "1px solid var(--border, #e2e8f0)" }}>
                 <th
                   scope="row"
+                  data-dato="Rol"
                   style={{
                     textAlign: "left",
                     padding: "8px 12px",
@@ -159,7 +151,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
                   if (role.acceso.isSuperAdmin) {
                     const s = SCOPE_STYLE.admin;
                     return (
-                      <td key={m} style={{ textAlign: "center", padding: "6px 4px" }}>
+                      <td key={m} data-dato={m} style={{ textAlign: "center", padding: "6px 4px" }}>
                         <span title="Acceso total" style={{ ...chip, background: s.bg, color: s.fg }}>
                           ★
                         </span>
@@ -169,14 +161,14 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
                   const found = role.acceso.modules.find((x) => x.module === m);
                   if (!found) {
                     return (
-                      <td key={m} style={{ textAlign: "center", padding: "6px 4px", color: "var(--text-3, #cbd5e1)" }}>
+                      <td key={m} data-dato={m} style={{ textAlign: "center", padding: "6px 4px", color: "var(--text-3, #cbd5e1)" }}>
                         ·
                       </td>
                     );
                   }
                   const s = SCOPE_STYLE[found.scope] ?? SCOPE_STYLE.read;
                   return (
-                    <td key={m} style={{ textAlign: "center", padding: "6px 4px" }}>
+                    <td key={m} data-dato={m} style={{ textAlign: "center", padding: "6px 4px" }}>
                       <span
                         title={`${SCOPE_LABEL[found.scope] ?? found.scope} · métodos: ${found.methods}`}
                         style={{ ...chip, background: s.bg, color: s.fg }}

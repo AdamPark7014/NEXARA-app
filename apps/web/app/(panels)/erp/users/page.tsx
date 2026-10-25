@@ -22,9 +22,9 @@ import { Avatar } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import AccesoCuentasEnlace from "@/components/team/AccesoCuentasEnlace";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { getOrgRoleLabel } from "@/lib/org-roles";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
+import q from "@/components/erp/pantalla-quieta.module.css";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -477,10 +477,10 @@ export default function UsersPage() {
       if (deptsResult.status === "fulfilled") setDepts(asList<ApiDept>(deptsResult.value));
       else metaProblems.push("los departamentos");
       if (metaProblems.length > 0) {
-        setMetaError(`No se pudieron cargar ${metaProblems.join(" ni ")}. Sin ellos no es posible dar de alta ni editar cuentas.`);
+        setMetaError("No se pudieron cargar los datos del formulario.");
       }
     } catch (e) {
-      setError(formatApiError(e, "No se pudieron cargar los usuarios."));
+      setError("No se pudieron cargar los usuarios.");
     } finally {
       setLoading(false);
     }
@@ -511,7 +511,7 @@ export default function UsersPage() {
       setMfaToken("");
       toast.success("Código generado: agrégalo a tu app de autenticación");
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo iniciar la verificación en dos pasos"));
+      toast.error("No se pudo iniciar la verificación en dos pasos.");
     } finally {
       setMfaBusy(false);
     }
@@ -531,7 +531,7 @@ export default function UsersPage() {
       toast.success("Verificación en dos pasos activada");
       void load();
     } catch (e) {
-      toast.error(formatApiError(e, "El código no es válido"));
+      toast.error("El código no es válido.");
     } finally {
       setMfaBusy(false);
     }
@@ -551,7 +551,7 @@ export default function UsersPage() {
       toast.success("Verificación en dos pasos desactivada");
       void load();
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo desactivar"));
+      toast.error("No se pudo desactivar.");
     } finally {
       setMfaBusy(false);
     }
@@ -572,7 +572,7 @@ export default function UsersPage() {
       setActivity(asList<AuthActivityRow>(act));
       setIntegraSchedule(sched);
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo cargar el detalle de acceso"));
+      toast.error("No se pudo cargar el detalle de acceso.");
     } finally {
       setDrawerLoading(false);
     }
@@ -659,7 +659,7 @@ export default function UsersPage() {
       setRoleTemplates(asList<OrgRoleTemplate>(data));
     } catch (e) {
       setRoleTemplates([]);
-      setSaveErr(formatApiError(e, "No se pudieron cargar las plantillas de rol"));
+      setSaveErr("No se pudieron cargar las plantillas de rol.");
     }
   };
   const closeModal = () => { setModal(null); setTarget(null); setSaveErr(null); };
@@ -729,7 +729,7 @@ export default function UsersPage() {
       }
       closeModal(); void load();
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo guardar el usuario"));
+      setSaveErr("No se pudo guardar el usuario.");
     } finally { setSaving(false); }
   };
 
@@ -743,7 +743,7 @@ export default function UsersPage() {
       closeModal();
       toast.success("Contraseña actualizada");
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo cambiar la contraseña"));
+      setSaveErr("No se pudo cambiar la contraseña.");
     } finally { setSaving(false); }
   };
 
@@ -763,7 +763,7 @@ export default function UsersPage() {
       closeModal();
       void load();
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo crear el rol"));
+      setSaveErr("No se pudo crear el rol.");
     } finally { setSaving(false); }
   };
 
@@ -781,7 +781,7 @@ export default function UsersPage() {
           toast.success(u.isActive ? "Cuenta desactivada" : "Cuenta activada");
           void load();
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo cambiar el estado"));
+          toast.error("No se pudo cambiar el estado.");
         }
       },
     });
@@ -799,7 +799,7 @@ export default function UsersPage() {
           toast.success("Usuario eliminado");
           void load();
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo eliminar el usuario"));
+          toast.error("No se pudo eliminar el usuario.");
         }
       },
     });
@@ -819,7 +819,7 @@ export default function UsersPage() {
           if (drawerUser?.id === u.id) void openDrawer(u, "sessions");
           void load();
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudieron cerrar las sesiones"));
+          toast.error("No se pudieron cerrar las sesiones.");
         }
       },
     });
@@ -838,7 +838,7 @@ export default function UsersPage() {
           setDrawerUser(null);
           void load();
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudieron anonimizar los datos"));
+          toast.error("No se pudieron anonimizar los datos.");
         }
       },
     });
@@ -850,7 +850,7 @@ export default function UsersPage() {
       toast.success("Cuenta desbloqueada");
       void load();
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo desbloquear"));
+      toast.error("No se pudo desbloquear.");
     }
   };
 
@@ -861,7 +861,7 @@ export default function UsersPage() {
       if (drawerUser) void openDrawer(drawerUser, "sessions");
       void load();
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo cerrar la sesión"));
+      toast.error("No se pudo cerrar la sesión.");
     }
   };
 
@@ -884,7 +884,7 @@ export default function UsersPage() {
           setSelected(new Set());
           void load();
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo aplicar la acción masiva"));
+          toast.error("No se pudo aplicar la acción masiva.");
         }
       },
     });
@@ -1054,11 +1054,10 @@ export default function UsersPage() {
   const clearFilters = () => { setUserSearch(""); setFilterActive(""); setFilterRisk(""); };
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/dashboard" className={q.volver}>‹ Inicio</Link>
       <PageHeader
-        eyebrow="Gobierno · Seguridad"
-        title="Usuarios y roles"
-        subtitle="Cuentas, roles, sesiones abiertas y señales de riesgo de acceso."
+        title="Usuarios"
         actions={cfg.canAssign ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {/* Solo el dueño lo ve: restablecer la contraseña de cualquier cuenta volviendo a escribir la suya. */}
@@ -1096,10 +1095,7 @@ export default function UsersPage() {
       )}
 
       {token && (
-        <Section
-          title="Mi seguridad"
-          subtitle="Protege tu cuenta con un código de 6 dígitos de tu app de autenticación además de la contraseña."
-        >
+        <Section title="Mi seguridad">
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end", marginBottom: 8 }}>
             <div style={{ flex: "1 1 260px", minWidth: 0 }}>
               <div style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
@@ -1161,7 +1157,7 @@ export default function UsersPage() {
             </DashPanel>
           </DashCol>
           <DashCol span={4}>
-            <DashPanel title="Intentos fallidos" subtitle="Últimos 14 días · un pico puede indicar un ataque">
+            <DashPanel title="Intentos fallidos" subtitle="Últimos 14 días">
               <MiniBars
                 label="Intentos fallidos"
                 points={insights.trends.loginsFailed14d.map((p) => ({ label: p.date, count: p.count }))}
@@ -1170,7 +1166,7 @@ export default function UsersPage() {
             </DashPanel>
           </DashCol>
           <DashCol span={4}>
-            <DashPanel title="Mayor riesgo" subtitle="Cuentas que conviene revisar primero">
+            <DashPanel title="Mayor riesgo">
               <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 176, overflowY: "auto" }}>
                 {insights.riskTop.slice(0, 6).map((r) => (
                   <button
@@ -1215,10 +1211,10 @@ export default function UsersPage() {
             </DashPanel>
           </DashCol>
           <DashCol span={6}>
-            <DashPanel title="Dispositivos de acceso" subtitle="Último dispositivo con el que entró cada cuenta">
+            <DashPanel title="Dispositivos de acceso">
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {insights.distributions.byDevice.length === 0 && (
-                  <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Aún no hay datos de dispositivos.</span>
+                  <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>No hay dispositivos.</span>
                 )}
                 {insights.distributions.byDevice.map((d) => (
                   <DashPill key={d.name} tone="accent">{d.name}: {d.count}</DashPill>
@@ -1251,8 +1247,7 @@ export default function UsersPage() {
       {error && loaded && (
         <InlineAlert
           variant="warning"
-          title="No se pudo actualizar"
-          message={`${error} Mostramos la última información cargada.`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ margin: "16px 0" }}
         />
@@ -1345,8 +1340,7 @@ export default function UsersPage() {
         {!loaded && !loading && error && (
           <InlineAlert
             variant="danger"
-            title="No se pudieron cargar los usuarios"
-            message={error}
+            message="No se pudieron cargar los usuarios."
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           />
         )}
@@ -1356,8 +1350,8 @@ export default function UsersPage() {
             rows={visibleUsers}
             rowKey={(u) => u.id}
             ariaLabel="Usuarios"
-            emptyTitle={users.length === 0 ? "Aún no hay usuarios" : "Sin coincidencias"}
-            emptyDescription={users.length === 0 ? "Da de alta la primera cuenta para empezar." : "Ninguna cuenta coincide con la búsqueda o los filtros."}
+            emptyTitle={users.length === 0 ? "No hay usuarios." : "Nada coincide con estos filtros."}
+            emptyDescription=""
             emptyAction={
               users.length === 0
                 ? (cfg.canAssign ? <Button size="sm" variant="primary" onClick={openCreate}>Nuevo usuario</Button> : undefined)
@@ -1684,8 +1678,7 @@ export default function UsersPage() {
               </p>
             )}
             <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-              <strong style={{ fontWeight: 600 }}>Horario de acceso físico:</strong> al crear la cuenta o cambiar su rol o estado,
-              se aplica automáticamente la plantilla correspondiente en los lectores. El horario semanal detallado se edita en Personas de acceso físico.
+              El horario de acceso se aplica al crear la cuenta o al cambiar el rol.
             </p>
           </div>
         </FormGrid>
@@ -1826,7 +1819,7 @@ export default function UsersPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }
 

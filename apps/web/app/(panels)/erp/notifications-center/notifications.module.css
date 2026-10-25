@@ -84,10 +84,20 @@ button.body:focus-visible {
 }
 
 .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
   font-size: 11.5px;
   color: var(--text-tertiary);
   margin-top: 5px;
   font-variant-numeric: tabular-nums;
+}
+
+.meta > * + *::before {
+  content: "·";
+  margin-right: 8px;
+  font-weight: 400;
 }
 
 .open { color: var(--primary); font-weight: 600; }
@@ -127,9 +137,12 @@ button.body:focus-visible {
   100% { background-position: -100% 0; }
 }
 
-@media (max-width: 520px) {
-  .item { grid-template-columns: minmax(0, 1fr) auto; }
-  .kindIcon { display: none; }
+@media (max-width: 720px) {
+  .item { grid-template-columns: 1fr; }
+  .head { flex-direction: column; align-items: flex-start; }
+  .actions { justify-content: flex-start; }
+  .meta { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .meta > * + *::before { content: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

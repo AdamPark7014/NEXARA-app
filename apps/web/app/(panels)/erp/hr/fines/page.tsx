@@ -14,14 +14,13 @@ import HrModuleRail from "@/components/hr/HrModuleRail";
 import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
-import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { isPaid, isCancelled, isOutstanding } from '@/lib/operational-status';
+import q from "@/components/erp/pantalla-quieta.module.css";
 
 interface HrStaff {
   id: number;
@@ -117,7 +116,6 @@ function daysLabel(days: number): string {
 export default function FinesPage() {
   const { user } = useUser();
   const cfg = useHrManagementGuard();
-  const viewCfg = useMemo(() => getHrSubmoduleConfig(user, "fines"), [user]);
   const token = user?.token ?? "";
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
@@ -159,7 +157,7 @@ export default function FinesPage() {
       setLoaded(true);
       setLoadError(null);
     } catch (e) {
-      setLoadError(formatApiError(e, "No se pudieron cargar las sanciones."));
+      setLoadError("No se pudieron cargar las multas.");
     } finally {
       setLoading(false);
     }
@@ -240,7 +238,7 @@ export default function FinesPage() {
       }
       setShowForm(false);
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo guardar la sanción."));
+      setSaveErr("No se pudo guardar la multa.");
     } finally {
       setSaving(false);
     }
@@ -257,7 +255,7 @@ export default function FinesPage() {
           await apiFetch(`fines/${f.id}`, token, { method: "DELETE" });
           setItems((prev) => prev.filter((x) => x.id !== f.id));
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo eliminar la sanción."));
+          toast.error("No se pudo eliminar la multa.");
         }
       },
     });
@@ -271,7 +269,7 @@ export default function FinesPage() {
       toast.success(action === "approve" ? "Sanción autorizada" : "Sanción rechazada");
       void load();
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo registrar la autorización."));
+      toast.error("No se pudo registrar la autorización.");
     } finally {
       setBusyId(null);
     }
@@ -423,11 +421,10 @@ export default function FinesPage() {
   };
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/hr" className={q.volver}>‹ Plantilla</Link>
       <PageHeader
-        eyebrow="Recursos Humanos"
-        title={viewCfg.title}
-        subtitle={viewCfg.subtitle}
+        title="Multas"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {visibleItems.length > 0 && (
@@ -452,8 +449,7 @@ export default function FinesPage() {
       {loaded && loadError && (
         <InlineAlert
           variant="warning"
-          title="No se pudo actualizar"
-          message={`${loadError} Mostramos la última información cargada.`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 12 }}
         />
@@ -472,7 +468,7 @@ export default function FinesPage() {
                 onClick: () => setFilterAprobacion("Pendiente"),
               },
               { label: "Aplicadas en nómina", value: stats.paid, onClick: () => setFilterPago("Pagado") },
-              { label: "Monto total", value: <Money value={stats.total} compact />, hint: "Todas las sanciones registradas" },
+              { label: "Monto total", value: <Money value={stats.total} compact /> },
             ]}
           />
         </div>
@@ -524,12 +520,12 @@ export default function FinesPage() {
         resultCount={loaded ? visibleItems.length : null}
       />
 
-      <Section title="Sanciones registradas">
+      <Section title="Multas">
         {highlightId && (
           <InlineAlert
             variant="info"
             dense
-            message="Abriste esta página desde un enlace directo: la sanción indicada aparece primero."
+            message="La multa indicada aparece primero."
             onDismiss={() => setHighlightId(null)}
             style={{ marginBottom: 12 }}
           />
@@ -538,8 +534,7 @@ export default function FinesPage() {
         {!loaded && !loading && loadError && (
           <InlineAlert
             variant="danger"
-            title="No se pudieron cargar las sanciones"
-            message={loadError}
+            message="No se pudieron cargar las multas."
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           />
         )}
@@ -549,8 +544,8 @@ export default function FinesPage() {
             rows={visibleItems}
             rowKey={(f) => f.id}
             ariaLabel="Sanciones"
-            emptyTitle={hasFilters ? "Ninguna sanción coincide" : "Sin sanciones registradas"}
-            emptyDescription={hasFilters ? "Prueba con otra búsqueda o quita los filtros." : "Registra una sanción solo cuando haya una incidencia documentada."}
+            emptyTitle={hasFilters ? "Nada coincide con estos filtros." : "No hay multas."}
+            emptyDescription=""
             emptyAction={hasFilters ? <Button size="sm" variant="secondary" onClick={clearFilters}>Quitar filtros</Button> : undefined}
           />
         )}
@@ -603,10 +598,10 @@ export default function FinesPage() {
               </select>
             </FormField>
           )}
-          <FormField label="Monto a descontar (MXN)" error={montoError} hint="Escribe 0 si solo es una amonestación.">
+          <FormField label="Monto a descontar (MXN)" error={montoError}>
             <input type="number" inputMode="decimal" min={0} step="0.01" value={form.monto} onChange={(e) => patchForm({ monto: +e.target.value })} style={{ ...inp, fontVariantNumeric: "tabular-nums" }} />
           </FormField>
-          <FormField label="Descripción del hecho" fullWidth optional hint="Qué pasó, cuándo y dónde. Ayuda si la persona apela.">
+          <FormField label="Descripción del hecho" fullWidth optional>
             <textarea rows={3} value={form.descripcion} onChange={(e) => patchForm({ descripcion: e.target.value })} style={{ ...inp, resize: "vertical" }} />
           </FormField>
         </FormGrid>
@@ -614,6 +609,6 @@ export default function FinesPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }

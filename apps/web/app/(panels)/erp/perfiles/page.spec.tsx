@@ -31,7 +31,7 @@ describe("Perfiles", () => {
   it("sin permiso muestra el aviso, no el panel de alta", async () => {
     cargarContextoAlta.mockResolvedValue(CONTEXTO_VACIO);
     render(<PerfilesPage />);
-    expect(await screen.findByText("Aquí no hay nada para ti todavía")).toBeTruthy();
+    expect(await screen.findByText("No hay perfiles a tu cargo.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Dar de alta a alguien" })).toBeNull();
   });
 
@@ -44,7 +44,7 @@ describe("Perfiles", () => {
     render(<PerfilesPage />);
     expect(screen.getByRole("heading", { name: "Perfiles" })).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Dar de alta a alguien" })).toBeTruthy();
-    await waitFor(() => expect(screen.queryByText("Aquí no hay nada para ti todavía")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("No hay perfiles a tu cargo.")).toBeNull());
   });
 
   it("«Acceso a cuentas» no aparece para quien no es el dueño", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageChrome from "@/components/ui/PageChrome";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -13,11 +14,11 @@ import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import q from "@/components/erp/pantalla-quieta.module.css";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {
@@ -115,7 +116,7 @@ export default function DocumentsPage() {
       setCats(Array.isArray(catsData) ? catsData : []);
       setLoaded(true);
     } catch (e) {
-      setError(formatApiError(e, "No se pudieron cargar los documentos."));
+      setError("No se pudieron cargar los documentos.");
     } finally { setLoading(false); }
   }, [token]);
 
@@ -188,7 +189,7 @@ export default function DocumentsPage() {
       setForm(next);
       setInitialForm(next);
     } catch (e) {
-      setFormErr(formatApiError(e, "No se pudo cargar el documento completo."));
+      setFormErr("No se pudo cargar el documento completo.");
     }
   };
 
@@ -219,7 +220,7 @@ export default function DocumentsPage() {
       setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      setFormErr(formatApiError(e, "No se pudo guardar el documento."));
+      setFormErr("No se pudo guardar el documento.");
     } finally { setSaving(false); }
   };
 
@@ -231,7 +232,7 @@ export default function DocumentsPage() {
       toast.success("Documento aprobado");
       void load();
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo aprobar el documento"));
+      toast.error("No se pudo aprobar el documento.");
     } finally {
       setApproving(null);
     }
@@ -250,7 +251,7 @@ export default function DocumentsPage() {
           toast.success("Documento archivado");
           void load();
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo archivar el documento"));
+          toast.error("No se pudo archivar el documento.");
         }
       },
     });
@@ -266,10 +267,10 @@ export default function DocumentsPage() {
             <span aria-hidden="true" title={f.label} style={{ fontSize: 20, lineHeight: 1.2 }}>{f.icon}</span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 650, fontSize: 13.5 }}>{d.title}</div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className="nx-meta">
                 <span style={{ fontVariantNumeric: "tabular-nums" }}>{d.documentNumber}</span>
-                <span>· {d.category?.name ?? "Sin categoría"}</span>
-                {d.createdBy?.nombre && <span>· {d.createdBy.nombre}</span>}
+                <span>{d.category?.name ?? "Sin categoría"}</span>
+                {d.createdBy?.nombre && <span>{d.createdBy.nombre}</span>}
               </div>
             </div>
           </div>
@@ -332,10 +333,10 @@ export default function DocumentsPage() {
   const clearFilters = () => { setSearch(""); setFilterStatus(""); setFilterCategory(""); };
 
   return (
+    <div className={q.zona}>
+    <Link href="/erp/dashboard" className={q.volver}>‹ Inicio</Link>
     <PageChrome
-      eyebrow="Gobierno · Documentos"
       title="Documentos"
-      subtitle="Contratos, manuales, certificados y actas con control de versiones y aprobación."
       primaryAction={
         cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo documento</Button> : undefined
       }
@@ -400,8 +401,7 @@ export default function DocumentsPage() {
       {error && loaded && (
         <InlineAlert
           variant="warning"
-          title="No se pudo actualizar"
-          message={`${error} Mostramos la última información cargada.`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 16 }}
         />
@@ -412,8 +412,7 @@ export default function DocumentsPage() {
         {!loaded && !loading && error && (
           <InlineAlert
             variant="danger"
-            title="No se pudieron cargar los documentos"
-            message={error}
+            message="No se pudieron cargar los documentos."
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           />
         )}
@@ -423,8 +422,8 @@ export default function DocumentsPage() {
             rows={filtered}
             rowKey={(d) => d.id}
             ariaLabel="Documentos"
-            emptyTitle={docs.length === 0 ? "Aún no hay documentos" : "Sin coincidencias"}
-            emptyDescription={docs.length === 0 ? "Registra el primer contrato, manual o certificado." : "Ningún documento coincide con la búsqueda o los filtros."}
+            emptyTitle={docs.length === 0 ? "No hay documentos." : "Nada coincide con estos filtros."}
+            emptyDescription=""
             emptyAction={
               docs.length === 0
                 ? (cfg.canCreate ? <Button size="sm" variant="primary" onClick={openNew}>Nuevo documento</Button> : undefined)
@@ -488,5 +487,6 @@ export default function DocumentsPage() {
       </Modal>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </PageChrome>
+    </div>
   );
 }

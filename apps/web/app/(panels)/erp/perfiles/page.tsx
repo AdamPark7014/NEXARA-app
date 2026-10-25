@@ -10,12 +10,13 @@
  * Página propia (no vive dentro de Organigrama): esa es solo el árbol de lectura.
  */
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
-import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import AltaUsuarioPanel from "@/components/team/AltaUsuarioPanel";
 import AccesoCuentasEnlace from "@/components/team/AccesoCuentasEnlace";
 import { cargarContextoAlta } from "@/lib/delegated-users-api";
+import q from "@/components/erp/pantalla-quieta.module.css";
 
 export default function PerfilesPage() {
   const { token } = useUser();
@@ -33,23 +34,17 @@ export default function PerfilesPage() {
   }, [token]);
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/dashboard" className={q.volver}>‹ Inicio</Link>
       <PageHeader
-        eyebrow="Gobierno · Equipo"
         title="Perfiles"
-        subtitle="Da de alta a tu gente, cambia su foto fija y entra a tu propio perfil."
-        // Solo el dueño la ve: la contraseña de cualquiera, volviendo a escribir la suya.
         actions={<AccesoCuentasEnlace />}
       />
       {puede === false ? (
-        <EmptyState
-          icon="👤"
-          title="Aquí no hay nada para ti todavía"
-          description="Este módulo es para quien tiene personal a su cargo con algún tipo concedido. Si crees que deberías verlo, pídeselo a dirección."
-        />
+        <p className={q.frase} role="status">No hay perfiles a tu cargo.</p>
       ) : (
         <AltaUsuarioPanel />
       )}
-    </>
+    </div>
   );
 }

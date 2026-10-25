@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -14,10 +15,10 @@ import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import q from "@/components/erp/pantalla-quieta.module.css";
 
 interface CompanyProfile {
   id: number;
@@ -101,7 +102,7 @@ export default function CompaniesPage() {
       setItems(Array.isArray(data) ? data : []);
       setLoaded(true);
     } catch (e) {
-      setError(formatApiError(e, "No se pudieron cargar las empresas."));
+      setError("No se pudieron cargar las empresas.");
     } finally { setLoading(false); }
   }, [token]);
 
@@ -150,7 +151,7 @@ export default function CompaniesPage() {
       setShowForm(false);
       void load();
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo guardar la empresa."));
+      setSaveErr("No se pudo guardar la empresa.");
     } finally { setSaving(false); }
   };
 
@@ -167,7 +168,7 @@ export default function CompaniesPage() {
           toast.success("Empresa principal actualizada");
           void load();
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo cambiar la empresa principal"));
+          toast.error("No se pudo cambiar la empresa principal.");
         }
       },
     });
@@ -185,7 +186,7 @@ export default function CompaniesPage() {
         toast.success(c.isActive ? "Empresa desactivada" : "Empresa activada");
         void load();
       } catch (e) {
-        toast.error(formatApiError(e, "No se pudo cambiar el estado"));
+        toast.error("No se pudo cambiar el estado.");
       }
     };
     if (!c.isActive) { void run(); return; }
@@ -281,14 +282,12 @@ export default function CompaniesPage() {
   const clearFilters = () => { setSearchQ(""); setFilterActive(""); };
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/settings" className={q.volver}>‹ Configuración</Link>
       <PageHeader
-        eyebrow="Gobierno · Empresas"
         title="Empresas"
-        subtitle="Razones sociales con las que opera tu organización y cuál es la principal."
         actions={
           <>
-            <Button variant="ghost" onClick={() => { window.location.href = "/erp/settings"; }}>Ir a Configuración</Button>
             <Button variant="secondary" iconLeft="↻" loading={loading && loaded} onClick={() => void load()}>Actualizar</Button>
             {cfg.canAssign && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva empresa</Button>}
           </>
@@ -307,7 +306,7 @@ export default function CompaniesPage() {
                 label: "Principal",
                 value: stats.primary ? (stats.primary.tradeName || stats.primary.legalName) : "Sin definir",
                 tone: stats.primary ? "default" : "warning",
-                hint: stats.primary ? stats.primary.rfc : "Elige una razón social principal",
+                hint: stats.primary?.rfc,
               },
             ]}
           />
@@ -317,8 +316,7 @@ export default function CompaniesPage() {
       {error && loaded && (
         <InlineAlert
           variant="warning"
-          title="No se pudo actualizar"
-          message={`${error} Mostramos la última información cargada.`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 16 }}
         />
@@ -356,8 +354,7 @@ export default function CompaniesPage() {
         {!loaded && !loading && error && (
           <InlineAlert
             variant="danger"
-            title="No se pudieron cargar las empresas"
-            message={error}
+            message="No se pudieron cargar las empresas."
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           />
         )}
@@ -367,8 +364,8 @@ export default function CompaniesPage() {
             rows={visibleItems}
             rowKey={(c) => c.id}
             ariaLabel="Empresas"
-            emptyTitle={items.length === 0 ? "Aún no hay empresas" : "Sin coincidencias"}
-            emptyDescription={items.length === 0 ? "Registra la primera razón social para facturar y operar." : "Ninguna empresa coincide con la búsqueda o el filtro."}
+            emptyTitle={items.length === 0 ? "No hay empresas." : "Nada coincide con estos filtros."}
+            emptyDescription=""
             emptyAction={
               items.length === 0
                 ? (cfg.canAssign ? <Button size="sm" variant="primary" onClick={openNew}>Nueva empresa</Button> : undefined)
@@ -456,6 +453,6 @@ export default function CompaniesPage() {
         {saveErr && <InlineAlert message={saveErr} style={{ marginTop: 14 }} />}
       </Modal>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }
