@@ -69,7 +69,9 @@ describe("GuardiasPanel", () => {
     expect(within(sabado).getByText("Joan Sánchez")).toBeTruthy();
     expect(within(sabado).getByText("Cubre CCTV")).toBeTruthy();
     // Domingo vacío y el siguiente fin también.
-    expect(within(sabado).getByText("Nadie de guardia")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Guardias" })).toBeTruthy();
+    expect(screen.queryByText(/solo checa quien tiene guardia/i)).toBeNull();
+    expect(within(sabado).getByText("Nadie de guardia.")).toBeTruthy();
     expect(screen.getByLabelText(/Fin de semana del sáb 10 oct/)).toBeTruthy();
   });
 
@@ -78,6 +80,7 @@ describe("GuardiasPanel", () => {
     render(<GuardiasPanel token="tok" />);
     const form = await screen.findByRole("region", { name: "Programar guardia" });
 
+    expect(within(form).queryByText(/sábado o domingo que le toca/i)).toBeNull();
     const boton = within(form).getByRole("button", { name: "Programar guardia" });
     expect((boton as HTMLButtonElement).disabled).toBe(true);
 
@@ -115,15 +118,24 @@ describe("GuardiasPanel", () => {
   it("quien no tiene gente a su cargo solo ve las suyas; sin guardias, lo dice", async () => {
     api({ lista: rango({ puedeProgramar: false, personas: [], items: [] }) });
     render(<GuardiasPanel token="tok" />);
-    expect(await screen.findByText("No tienes guardias programadas")).toBeTruthy();
+    expect(await screen.findByText("No tienes guardias programadas.")).toBeTruthy();
+    expect(screen.queryByText(/tu encargado te programa/i)).toBeNull();
     expect(screen.queryByRole("region", { name: "Programar guardia" })).toBeNull();
   });
 
   it("si no carga, lo dice y deja reintentar", async () => {
     api({ lista: { message: "Base caída" }, listaOk: false });
     render(<GuardiasPanel token="tok" />);
+    expect(await screen.findByRole("heading", { name: "Guardias" })).toBeTruthy();
     expect(await screen.findByText("Base caída")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeTruthy();
+  });
+
+  it("un error de varias frases se queda en una", async () => {
+    api({ lista: { message: "No se pudo. Revisa la red y vuelve a intentar." }, listaOk: false });
+    render(<GuardiasPanel token="tok" />);
+    expect(await screen.findByText("No se pudieron cargar las guardias.")).toBeTruthy();
+    expect(screen.queryByText(/Revisa la red/)).toBeNull();
   });
 });
 
