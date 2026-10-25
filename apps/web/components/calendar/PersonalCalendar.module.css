@@ -61,6 +61,8 @@
 
 a.event:hover { background: var(--surface-2); border-color: var(--border-strong, var(--border)); }
 
+.eventBody { min-width: 0; }
+
 .eventTitle {
   font-weight: 600;
   font-size: 13.5px;
@@ -76,6 +78,8 @@ a.event:hover { background: var(--surface-2); border-color: var(--border-strong,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.eventOwner + .eventDesc::before { content: " · "; }
 
 .time {
   font-size: 12.5px;
@@ -101,6 +105,29 @@ a.event:hover { background: var(--surface-2); border-color: var(--border-strong,
   .select { font-size: 16px; min-height: 40px; }
   .event { grid-template-columns: minmax(0, 1fr) auto; }
   .event > :first-child { grid-column: 1 / -1; justify-self: start; }
+}
+
+@media (max-width: 390px) {
+  .event {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  .time { white-space: normal; }
+  .eventSub {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+  .eventOwner,
+  .eventDesc {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .eventOwner + .eventDesc::before { content: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
