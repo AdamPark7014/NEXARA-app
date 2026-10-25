@@ -243,8 +243,23 @@
   .titulo {
     font-size: 22px;
   }
+  /* Cada estado en su renglón. En fila se partían y «trabajando», «con
+     retraso» y «libres» compartían la leyenda. */
+  .leyenda {
+    flex-direction: column;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: var(--ui-s2);
+  }
+  .cuenta {
+    flex: 0 0 auto;
+  }
   .rejilla {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    /* Una persona por renglón. `minmax(150px)` metía dos por fila a 390 px.
+       Aquí sí se desplaza: en el teléfono no hay pared, y nadie se corta. */
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    overflow-y: auto;
     gap: var(--ui-s4);
   }
   .nombre {
