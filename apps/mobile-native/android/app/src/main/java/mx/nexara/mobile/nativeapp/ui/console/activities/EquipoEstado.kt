@@ -79,11 +79,16 @@ object EquipoEstado {
         return "Sin actividad asignada"
     }
 
+    /** Un dato por renglón. Lo vacío no ocupa línea. */
+    private fun renglones(partes: List<String?>): String =
+        partes.mapNotNull { it?.trim()?.takeIf { linea -> linea.isNotEmpty() } }.joinToString("\n")
+
     /**
-     * «AN-1042 · Despacho · Atrasado 1 h 20 min» — el contexto, en gris, bajo la
-     * línea de arriba. Sin nada abierto, su jornada de hoy: «Entró 10:05 · sin
-     * nada hace 2 h 15 min», «Salió 18:02» o «Sin entrada hoy» (con la API vieja,
-     * el rótulo del estado, como antes).
+     * Contexto bajo lo que está haciendo: folio, encargo y atraso, cada uno en
+     * su renglón («AN-1042», «Despacho», «Atrasado 1 h 20 min»). Sin nada
+     * abierto, la entrada va aparte del «sin nada hace» («Entró 10:05» y
+     * «sin nada hace 2 h 15 min»), o «Salió 18:02», o «Sin entrada hoy» (con
+     * la API vieja, el rótulo del estado, como antes).
      */
     fun contexto(user: TeamBoardUserDto, ahora: Instant = Instant.now()): String {
         val abierta = user.openActivities.orEmpty().firstOrNull()
@@ -103,24 +108,29 @@ object EquipoEstado {
                 )
             }
         }
-        return partes.joinToString(" · ")
+        return renglones(partes)
     }
 
-    /** «Entró 10:05 · sin nada hace 2 h 15 min» · «Salió 18:02» · «Sin entrada hoy». */
+    /**
+     * «Entró 10:05» y, en el renglón de abajo, «sin nada hace 2 h 15 min».
+     * «Salió 18:02». «Sin entrada hoy».
+     */
     fun jornadaSinNada(user: TeamBoardUserDto, ahora: Instant = Instant.now()): String {
         val entrada = instante(user.entradaHoyAt) ?: return "Sin entrada hoy"
         instante(user.salidaHoyAt)?.let { return "Salió ${hora(it)}" }
         val min = minutosDesde(user.idleSinceAt, ahora)
+        val entro = "Entró ${hora(entrada)}"
         return if (min != null && min >= 1) {
-            "Entró ${hora(entrada)} · sin nada hace ${CoreActivityRules.formatBoardMinutes(min.toDouble())}"
+            renglones(listOf(entro, "sin nada hace ${CoreActivityRules.formatBoardMinutes(min.toDouble())}"))
         } else {
-            "Entró ${hora(entrada)}"
+            entro
         }
     }
 
     /**
-     * Renglón extra de la tarjeta cuando no tiene nada abierto: «Última: AN-0091 ·
-     * ayer 18:11». En «libre» no sale: su contexto ya dice cuándo terminó.
+     * Extra de la tarjeta cuando no tiene nada abierto: folio y hora aparte
+     * («Última: AN-0091» y «ayer 18:11»). En «libre» no sale: su contexto ya
+     * dice cuándo terminó.
      */
     fun ultimaDeTarjeta(user: TeamBoardUserDto, ahora: Instant = Instant.now()): String? {
         if (user.openActivities.orEmpty().isNotEmpty() || user.currentActivity != null) return null
@@ -333,15 +343,15 @@ object EquipoEstado {
             "a tiempo"
         }
 
-    /** «Última: AN-0091 · ayer 18:11». `null` sin nada terminado. */
+    /** «Última: AN-0091» y «ayer 18:11», cada uno en su renglón. `null` sin nada terminado. */
     fun ultimaActividadCorta(user: TeamBoardUserDto, ahora: Instant = Instant.now()): String? {
         val f = user.lastFinished ?: return null
         val que = f.anNumber?.trim()?.takeIf { it.isNotEmpty() } ?: recortar(f.titulo, 24)
-        return listOf("Última: $que", cuandoMx(f.finishedAt, ahora)).filter { it.isNotBlank() }.joinToString(" · ")
+        return renglones(listOf("Última: $que", cuandoMx(f.finishedAt, ahora)))
     }
 
     /**
-     * «Última: AN-0085 · ayer 17:15, a tiempo» (o «…, con 40 min de atraso»).
+     * «Última: AN-0085» y «ayer 17:15, a tiempo» (o «…, con 40 min de atraso»).
      * Sin nada terminado: «Sin actividades terminadas».
      */
     fun ultimaActividad(user: TeamBoardUserDto, ahora: Instant = Instant.now()): String {
@@ -368,9 +378,9 @@ object EquipoEstado {
         /** «Atrasada · 2 h 15 min · no la ha iniciado». */
         val detalle: String,
     ) {
-        /** «AN-0091 · Depurar base de datos»; «Actividad sin datos» sin folio ni título. */
+        /** Folio y título, cada uno en su renglón; «Actividad sin datos» si faltan los dos. */
         val actividad: String
-            get() = listOfNotNull(folio, titulo).joinToString(" · ").ifEmpty { "Actividad sin datos" }
+            get() = renglones(listOf(folio, titulo)).ifEmpty { "Actividad sin datos" }
     }
 
     data class SinNada(
@@ -386,13 +396,13 @@ object EquipoEstado {
         /** Ver [ultimaActividad]. */
         val ultima: String,
     ) {
-        /** «Entró 08:57 · sin nada desde que entró (hace 1 h 50 min)»; vacío con la API vieja. */
-        val jornada: String get() = listOfNotNull(entrada, sinNadaDesde).joinToString(" · ")
+        /** Entrada y tiempo sin actividad, cada uno en su renglón; vacío con la API vieja. */
+        val jornada: String get() = renglones(listOf(entrada, sinNadaDesde))
     }
 
     data class SinEntrada(
         val persona: TeamBoardUserDto,
-        /** «Última: AN-0080 · lun 5 oct 18:38» o «Sin actividades terminadas». */
+        /** «Última: AN-0080» y «lun 5 oct 18:38», o «Sin actividades terminadas». */
         val ultima: String,
         /** Desde su última actividad terminada: «hace 3 días». `null` si nunca terminó nada. */
         val haceCuanto: String?,

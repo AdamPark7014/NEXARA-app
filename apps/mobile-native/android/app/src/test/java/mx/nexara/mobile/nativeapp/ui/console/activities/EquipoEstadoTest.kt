@@ -89,7 +89,7 @@ class EquipoEstadoTest {
     }
 
     @Test
-    fun contextoJuntaFolioCargaYSituacion() {
+    fun contextoSeparaFolioEncargoYAtraso() {
         val u = persona(
             status = "atrasado",
             lateMinutes = 80.0,
@@ -98,7 +98,7 @@ class EquipoEstadoTest {
             ),
         )
         val texto = EquipoEstado.contexto(u, Instant.parse("2026-09-21T10:00:00Z"))
-        assertEquals("AN-1042 · Despacho · Atrasado 1 h 20 min", texto)
+        assertEquals("AN-1042\nDespacho\nAtrasado 1 h 20 min", texto)
     }
 
     @Test
@@ -279,15 +279,15 @@ class EquipoEstadoTest {
     @Test
     fun laUltimaActividadDiceCuandoYComoLaEntrego() {
         val aTiempo = hoy(1, "Luis", ultima = TeamBoardLastFinishedDto(85, "AN-0085", "Depurar base", "2026-10-06T23:15:00Z", 0.0))
-        assertEquals("Última: AN-0085 · ayer 17:15, a tiempo", EquipoEstado.ultimaActividad(aTiempo, ahora))
-        assertEquals("Última: AN-0085 · ayer 17:15", EquipoEstado.ultimaActividadCorta(aTiempo, ahora))
+        assertEquals("Última: AN-0085\nayer 17:15, a tiempo", EquipoEstado.ultimaActividad(aTiempo, ahora))
+        assertEquals("Última: AN-0085\nayer 17:15", EquipoEstado.ultimaActividadCorta(aTiempo, ahora))
 
         val tarde = hoy(2, "Ana", ultima = TeamBoardLastFinishedDto(85, "AN-0085", "Depurar base", "2026-10-06T23:15:00Z", 40.0))
-        assertEquals("Última: AN-0085 · ayer 17:15, con 40 min de atraso", EquipoEstado.ultimaActividad(tarde, ahora))
+        assertEquals("Última: AN-0085\nayer 17:15, con 40 min de atraso", EquipoEstado.ultimaActividad(tarde, ahora))
 
         // Sin límite cuenta a tiempo; sin folio, el título recortado.
         val sinFolio = hoy(3, "Beto", ultima = TeamBoardLastFinishedDto(9, null, "Mantenimiento preventivo de cámaras", "2026-10-07T15:00:00Z", null))
-        assertEquals("Última: Mantenimiento preventiv… · hoy 09:00, a tiempo", EquipoEstado.ultimaActividad(sinFolio, ahora))
+        assertEquals("Última: Mantenimiento preventiv…\nhoy 09:00, a tiempo", EquipoEstado.ultimaActividad(sinFolio, ahora))
 
         assertEquals("Sin actividades terminadas", EquipoEstado.ultimaActividad(hoy(4, "Eva"), ahora))
     }
@@ -319,20 +319,20 @@ class EquipoEstadoTest {
         val a = EquipoEstado.atencionEquipo(equipo, ahora)
 
         assertEquals(listOf("Pedro", "Raúl"), a.atrasados.map { it.persona.nombre })
-        assertEquals("AN-0091 · Depurar base de datos", a.atrasados[0].actividad)
+        assertEquals("AN-0091\nDepurar base de datos", a.atrasados[0].actividad)
         assertEquals("Atrasada · 34 h 00 min · pasó su hora límite", a.atrasados[0].detalle)
         assertEquals("Atrasada · 20 min · no la ha iniciado", a.atrasados[1].detalle)
 
         // Más tiempo sin nada primero.
         assertEquals(listOf("Daniela", "Carla"), a.sinNada.map { it.persona.nombre })
-        assertEquals("Entró 08:57 · sin nada desde que entró (hace 3 h 23 min)", a.sinNada[0].jornada)
-        assertEquals("Última: AN-0085 · ayer 17:15, a tiempo", a.sinNada[0].ultima)
-        assertEquals("Entró 10:00 · sin nada desde hace 25 min", a.sinNada[1].jornada)
+        assertEquals("Entró 08:57\nsin nada desde que entró (hace 3 h 23 min)", a.sinNada[0].jornada)
+        assertEquals("Última: AN-0085\nayer 17:15, a tiempo", a.sinNada[0].ultima)
+        assertEquals("Entró 10:00\nsin nada desde hace 25 min", a.sinNada[1].jornada)
         assertEquals("Sin actividades terminadas", a.sinNada[1].ultima)
 
         // Quien ya salió, los libres y los que trabajan no piden nada; sin nada terminado, al final.
         assertEquals(listOf("Eva", "Fer"), a.sinEntrada.map { it.persona.nombre })
-        assertEquals("Última: AN-0080 · lun 5 oct 18:38", a.sinEntrada[0].ultima)
+        assertEquals("Última: AN-0080\nlun 5 oct 18:38", a.sinEntrada[0].ultima)
         assertEquals("hace 2 días", a.sinEntrada[0].haceCuanto)
         assertEquals("Sin actividades terminadas", a.sinEntrada[1].ultima)
         assertNull(a.sinEntrada[1].haceCuanto)
@@ -354,7 +354,7 @@ class EquipoEstadoTest {
         )
         assertEquals(listOf("Sin nada asignado", "Sin entrada hoy"), grupos.map { it.titulo })
         val renglon = grupos.first().renglones.single()
-        assertEquals("Entró 10:00 · sin nada desde hace 25 min", renglon.principal)
+        assertEquals("Entró 10:00\nsin nada desde hace 25 min", renglon.principal)
         assertEquals(CoreActivityRules.NARANJA, renglon.colorPrincipal)
         assertEquals("Sin actividades terminadas", renglon.secundaria)
     }
@@ -362,7 +362,7 @@ class EquipoEstadoTest {
     @Test
     fun laTarjetaSinNadaAbiertoDiceSuJornadaDeHoy() {
         val entro = hoy(1, "Carla", entrada = "2026-10-07T16:05:00Z", idle = "2026-10-07T16:05:00Z")
-        assertEquals("Entró 10:05 · sin nada hace 2 h 15 min", EquipoEstado.contexto(entro, ahora))
+        assertEquals("Entró 10:05\nsin nada hace 2 h 15 min", EquipoEstado.contexto(entro, ahora))
         val salio = hoy(2, "Gil", entrada = "2026-10-07T14:00:00Z", salida = "2026-10-08T00:02:00Z")
         assertEquals("Salió 18:02", EquipoEstado.contexto(salio, ahora))
         assertEquals("Sin entrada hoy", EquipoEstado.contexto(hoy(3, "Fer"), ahora))
@@ -373,7 +373,7 @@ class EquipoEstadoTest {
     @Test
     fun laTarjetaSinNadaAbiertoAgregaLaUltima() {
         val u = hoy(1, "Carla", ultima = TeamBoardLastFinishedDto(91, "AN-0091", "Depurar", "2026-10-07T00:11:00Z", 0.0))
-        assertEquals("Última: AN-0091 · ayer 18:11", EquipoEstado.ultimaDeTarjeta(u, ahora))
+        assertEquals("Última: AN-0091\nayer 18:11", EquipoEstado.ultimaDeTarjeta(u, ahora))
         // En «libre» el contexto ya dice cuándo terminó; con algo abierto, no aplica.
         assertNull(EquipoEstado.ultimaDeTarjeta(u.copy(status = "libre"), ahora))
         assertNull(EquipoEstado.ultimaDeTarjeta(u.copy(currentActivity = TeamBoardActivityDto(id = 2)), ahora))
