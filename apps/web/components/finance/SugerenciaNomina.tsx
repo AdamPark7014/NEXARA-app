@@ -110,6 +110,39 @@ const notaStyle: CSSProperties = {
   lineHeight: 1.5,
 };
 const statusPanelStyle: CSSProperties = { padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" };
+const periodoStyle: CSSProperties = { fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 };
+
+const NOTA_SUGERENCIA =
+  "Es una sugerencia que no genera pagos: las horas productivas solo cuentan lo que cae entre la entrada y la salida.";
+
+/** Etiqueta, fechas y avisos del periodo, en una sola frase. */
+function partesPeriodo(datos: SugerenciaNominaRespuesta): string[] {
+  const p = datos.periodo;
+  const partes = [
+    `${p.origen === "manual" ? "Rango" : "Periodo"} ${p.etiqueta}`,
+    `del ${p.desde} al ${p.hasta}`,
+  ];
+  if (p.enCurso) partes.push(`en curso: lo esperado se cuenta hasta el ${p.calculadoHasta}`);
+  if (p.origen === "por_omision") partes.push("la empresa no tiene calendario de nómina: se asume quincenal");
+  if (datos.scope === "subtree") partes.push("solo tu organigrama");
+  return partes;
+}
+
+/** Una frase en ancho de escritorio; a 390 px, un dato por renglón. */
+function FraseDatos({ partes }: { partes: string[] }) {
+  const ultimo = partes.length - 1;
+  return (
+    <>
+      {partes.map((parte, i) => (
+        <span key={i} className="nx-sn-dato">
+          {i > 0 ? <span className="nx-sn-sep">{i === ultimo && ultimo > 1 ? " y " : ", "}</span> : null}
+          {parte}
+        </span>
+      ))}
+      <span className="nx-sn-sep">.</span>
+    </>
+  );
+}
 
 const dinero = (v: number | null) => (v == null ? <span style={{ color: "var(--text-tertiary)" }}>—</span> : <Money value={v} bold={false} />);
 
@@ -320,9 +353,7 @@ export default function SugerenciaNomina({ token }: { token: string }) {
 
       <div style={notaStyle} role="note">
         <strong style={{ color: "var(--text-primary)" }}>{NOTA_FORMULA}</strong>
-        <div>
-          Es una sugerencia: no genera pagos. Las horas productivas solo cuentan lo que cae entre la entrada y la salida.
-        </div>
+        <div>{NOTA_SUGERENCIA}</div>
         {datos?.formula?.length ? (
           <details style={{ marginTop: 6 }}>
             <summary style={{ cursor: "pointer" }}>¿Cómo se calcula?</summary>
@@ -350,11 +381,8 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       )}
 
       {datos && (
-        <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-          {datos.periodo.origen === "manual" ? "Rango" : "Periodo"} {datos.periodo.etiqueta} ({datos.periodo.desde} al {datos.periodo.hasta})
-          {datos.periodo.enCurso ? ` · en curso: lo esperado se cuenta hasta el ${datos.periodo.calculadoHasta}` : ""}
-          {datos.periodo.origen === "por_omision" ? " · la empresa no tiene calendario de nómina: se asume quincenal" : ""}
-          {datos.scope === "subtree" ? " · solo tu organigrama" : ""}
+        <div style={periodoStyle}>
+          <FraseDatos partes={partesPeriodo(datos)} />
         </div>
       )}
 
@@ -373,7 +401,11 @@ export default function SugerenciaNomina({ token }: { token: string }) {
             {
               label: "Por revisar",
               value: t.revisar + t.sinSueldo + t.sinJornadas,
-              hint: `${t.revisar} baja productividad · ${t.sinSueldo} sin sueldo · ${t.sinJornadas} sin jornadas`,
+              hint: (
+                <FraseDatos
+                  partes={[`${t.revisar} baja productividad`, `${t.sinSueldo} sin sueldo`, `${t.sinJornadas} sin jornadas`]}
+                />
+              ),
               tone: t.revisar + t.sinSueldo + t.sinJornadas > 0 ? "warning" : "default",
             },
           ]}
@@ -397,6 +429,12 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       ) : modo === "rango" && !error ? (
         <div style={statusPanelStyle}>Elige las fechas y pulsa «Aplicar».</div>
       ) : null}
+      <style>{`
+        @media (max-width: 480px) {
+          .nx-sn-dato { display: block; }
+          .nx-sn-sep { display: none; }
+        }
+      `}</style>
     </div>
   );
 }
