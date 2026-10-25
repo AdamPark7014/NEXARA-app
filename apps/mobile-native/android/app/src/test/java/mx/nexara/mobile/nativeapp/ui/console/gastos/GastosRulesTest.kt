@@ -446,4 +446,19 @@ class GastosRulesTest {
         )
         assertTrue(GastosRules.CATEGORIA_POR_OMISION in GastosRules.CATEGORIAS)
     }
+
+    @Test
+    fun `el pie cabe en una frase`() {
+        val viejo =
+            "Registrar, autorizar y pagar. Corregir un gasto ya capturado, borrarlo y " +
+                "sacar el reporte por rango de fechas se hacen desde la computadora."
+        val pie = GastosRules.LIMITE
+        assertFalse(pie.contains(viejo))
+        assertEquals(
+            "Registrar, autorizar y pagar se hacen en el teléfono: corregir un gasto ya capturado, " +
+                "borrarlo y sacar el reporte por rango de fechas se hacen desde la computadora.",
+            pie,
+        )
+        assertEquals(1, pie.count { it == '.' })
+    }
 }
