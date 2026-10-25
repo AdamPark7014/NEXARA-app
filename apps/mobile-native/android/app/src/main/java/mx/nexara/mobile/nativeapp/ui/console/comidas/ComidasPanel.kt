@@ -26,11 +26,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -60,6 +64,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -173,6 +178,9 @@ fun ComidasPanel(
     val eq = equipo
     val tieneEquipo = eq != null && eq.alcance != "propio"
     val filas = ComidasRules.filtrar(eq?.filas.orEmpty(), filtro)
+    val hayTarjeta = dia?.debeRegistrar == true
+    val enBlanco = !hayTarjeta && !tieneEquipo
+    val volver = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
     fun empezar(momento: String, aDestiempo: Boolean) {
         registro = RegistroEnCurso(momento, aDestiempo)
@@ -231,114 +239,110 @@ fun ComidasPanel(
         }
     }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize().background(NxColors.Surface),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        error?.let { msg ->
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(msg, fontSize = 13.5.sp, color = Color(0xFFB91C1C), modifier = Modifier.weight(1f))
-                    OutlinedButton(onClick = { reload++ }) { Text("Reintentar") }
-                }
-            }
-        }
-        aviso?.let { item { SoftNote(text = it, color = CoreActivityRules.VERDE, icon = avisoIcon) } }
+    Column(modifier.fillMaxSize().background(NxColors.Surface)) {
+        ComidasBarraClara(onVolver = {
+            val dispatcher = volver
+            if (dispatcher != null && dispatcher.hasEnabledCallbacks()) dispatcher.onBackPressed()
+        })
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            aviso?.let { item { SoftNote(text = it, color = CoreActivityRules.VERDE, icon = avisoIcon) } }
 
-        if (loading && dia == null && eq == null) {
-            item { NxLoadingBlock("Cargando comidas…") }
-        }
-
-        if (dia?.debeRegistrar == true) {
-            item {
-                MiComidaCard(
-                    mi = dia,
-                    serverNowMs = serverNow,
-                    onRegistrar = ::empezar,
-                    onVerFoto = { url, titulo -> visor = url to titulo },
-                )
+            if (loading && enBlanco) {
+                item { NxLoadingBlock("Cargando comidas…") }
+            } else if (enBlanco && error != null) {
+                item { ComidasFrase("No se pudieron cargar las comidas.") { reload++ } }
+            } else if (enBlanco && !loading) {
+                item { ComidasFrase("No hay comidas en este día.") }
+            } else {
+            if (error != null) {
+                item { ComidasFrase("No se pudieron cargar las comidas.") { reload++ } }
             }
-        }
 
-        if (tieneEquipo && eq != null) {
-            item {
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Comidas de tu equipo", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
-                        Text(
-                            (if (eq.alcance == "todo") "Toda la empresa." else "Tu gente por organigrama.") +
-                                " Horario 3:00 a 4:00 p.m.; lo que sea fuera de esa hora trae justificación y lo apruebas o rechazas.",
-                            fontSize = 13.sp,
-                            color = NxColors.Muted,
-                        )
-                    }
-                    OutlinedButton(onClick = { reload++ }, enabled = !loading) {
-                        Text(if (loading) "Actualizando…" else "↻ Actualizar", fontSize = 13.sp)
-                    }
-                }
-            }
-            val pendientes = eq.resumen?.pendientes ?: 0
-            if (pendientes > 0) {
+            if (hayTarjeta && dia != null) {
                 item {
-                    SoftNote(
-                        text = "Tienes $pendientes comida${if (pendientes == 1) "" else "s"} a destiempo por aprobar.",
-                        color = CoreActivityRules.NARANJA,
-                        icon = NxGlyph.WAITING.icon,
+                    MiComidaCard(
+                        mi = dia,
+                        serverNowMs = serverNow,
+                        onRegistrar = ::empezar,
+                        onVerFoto = { url, titulo -> visor = url to titulo },
                     )
                 }
             }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    ComidasRules.Filtro.entries.forEach { f ->
-                        val on = filtro == f
-                        val n = ComidasRules.conteo(f, eq.resumen)
-                        val shape = RoundedCornerShape(999.dp)
-                        Box(
-                            modifier = Modifier
-                                .heightIn(min = 36.dp)
-                                .clip(shape)
-                                .background(if (on) NxColors.BrandSoft else Color.White)
-                                .border(1.dp, if (on) NxColors.Brand else Color(0xFFE2E8F0), shape)
-                                .clickable { filtro = f }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
+
+            if (tieneEquipo && eq != null) {
+                item {
+                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Comidas de tu equipo", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                             Text(
-                                if (n != null) "${f.label} $n" else f.label,
+                                "Aprueba o rechaza las que fueron fuera de 3:00 a 4:00 p.m.",
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (on) NxColors.Brand else NxColors.Slate,
+                                color = NxColors.Muted,
                             )
+                        }
+                        OutlinedButton(onClick = { reload++ }, enabled = !loading) {
+                            Text(if (loading) "Actualizando…" else "↻ Actualizar", fontSize = 13.sp)
                         }
                     }
                 }
+                val pendientes = eq.resumen?.pendientes ?: 0
+                if (pendientes > 0) {
+                    item {
+                        SoftNote(
+                            text = "Tienes $pendientes comida${if (pendientes == 1) "" else "s"} a destiempo por aprobar.",
+                            color = CoreActivityRules.NARANJA,
+                            icon = NxGlyph.WAITING.icon,
+                        )
+                    }
+                }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        ComidasRules.Filtro.entries.forEach { f ->
+                            val on = filtro == f
+                            val n = ComidasRules.conteo(f, eq.resumen)
+                            val shape = RoundedCornerShape(999.dp)
+                            Box(
+                                modifier = Modifier
+                                    .heightIn(min = 36.dp)
+                                    .clip(shape)
+                                    .background(if (on) NxColors.BrandSoft else Color.White)
+                                    .border(1.dp, if (on) NxColors.Brand else Color(0xFFE2E8F0), shape)
+                                    .clickable { filtro = f }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    if (n != null) "${f.label} $n" else f.label,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (on) NxColors.Brand else NxColors.Slate,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (filas.isEmpty() && error == null) {
+                    item { ComidasFrase("Nadie en este filtro.") }
+                }
+                items(filas, key = { "comida-${it.userId}" }) { fila ->
+                    FilaComidaCard(
+                        fila = fila,
+                        onRevisar = { f, aprobar -> revisando = f to aprobar },
+                        onVerFoto = { url, titulo -> visor = url to titulo },
+                    )
+                }
             }
-            if (filas.isEmpty()) {
-                item { Text("Nadie en este filtro.", fontSize = 13.sp, color = NxColors.Muted) }
-            }
-            items(filas, key = { "comida-${it.userId}" }) { fila ->
-                FilaComidaCard(
-                    fila = fila,
-                    onRevisar = { f, aprobar -> revisando = f to aprobar },
-                    onVerFoto = { url, titulo -> visor = url to titulo },
-                )
-            }
-        }
 
-        if (!loading && !tieneEquipo && dia?.debeRegistrar != true && error == null) {
-            item {
-                Text(
-                    "No tienes comidas que registrar ni gente a tu cargo.",
-                    fontSize = 13.sp,
-                    color = NxColors.Muted,
-                )
             }
+            item { Spacer(Modifier.height(24.dp)) }
         }
-        item { Spacer(Modifier.height(24.dp)) }
     }
 
     val enCurso = registro
@@ -412,6 +416,48 @@ fun ComidasPanel(
                         contentScale = ContentScale.Fit,
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Barra clara: fondo del lienzo, título en tinta y la flecha de volver. */
+@Composable
+private fun ComidasBarraClara(onVolver: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(NxColors.Surface)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onVolver) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = NxColors.Slate,
+                )
+            }
+            Text(
+                "Comidas",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = NxColors.Slate,
+                maxLines = 1,
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEEF2F6)))
+    }
+}
+
+/** Vacío o error en una sola frase. «Reintentar» es el botón, no otra frase. */
+@Composable
+private fun ComidasFrase(texto: String, onReintentar: (() -> Unit)? = null) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(texto, fontSize = 15.sp, color = NxColors.Slate, textAlign = TextAlign.Center)
+        if (onReintentar != null) {
+            TextButton(onClick = onReintentar) {
+                Text("Reintentar", color = NxColors.Brand, fontWeight = FontWeight.SemiBold)
             }
         }
     }
