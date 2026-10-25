@@ -209,7 +209,11 @@ export default function PDFViewer({
           <h3 className={styles.fileName}>📄 {fileName}</h3>
           {pageCount > 0 ? (
             <p className={styles.meta}>
-              {pageCount} {pageCount === 1 ? "página" : "páginas"} · {zoomLabel}
+              <span>
+                {pageCount} {pageCount === 1 ? "página" : "páginas"}
+              </span>
+              <span className={styles.metaSep} aria-hidden="true">{" · "}</span>
+              <span>{zoomLabel}</span>
             </p>
           ) : null}
         </div>
@@ -266,9 +270,12 @@ export default function PDFViewer({
 
       <div className={viewerHeightClass} style={viewerInlineStyle}>
         {error ? (
-          <div className={styles.error}>
-            No se pudo previsualizar el PDF: {error}
-            <div>
+          <div className={styles.error} role="alert">
+            <p className={styles.errorText}>No se pudo previsualizar el PDF.</p>
+            <div className={styles.errorActions}>
+              <button type="button" className={styles.errorOpenBtn} onClick={() => void paint()}>
+                Reintentar
+              </button>
               <button
                 type="button"
                 className={styles.errorOpenBtn}
