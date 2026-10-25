@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -287,6 +288,7 @@ export function DetalleModal({
   const [detalle, setDetalle] = useState<DetalleReporte | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     let vivo = true;
@@ -315,14 +317,19 @@ export function DetalleModal({
     return () => {
       vivo = false;
     };
-  }, [abierto, path, token]);
+  }, [abierto, path, token, intento]);
 
   return (
     <Modal open={abierto} onClose={onClose} title={titulo} maxWidth={900}>
       {error && (
         <InlineAlert
           variant="danger"
-          message={`No se pudo abrir el detalle de esta línea. ${error} Cierra y vuelve a abrirla; si sigue igual, exporta el reporte.`}
+          message="No se pudo abrir el detalle de esta línea; si sigue igual, exporta el reporte."
+          action={
+            <Button size="sm" variant="secondary" onClick={() => setIntento((n) => n + 1)}>
+              Reintentar
+            </Button>
+          }
         />
       )}
       {cargando ? (
