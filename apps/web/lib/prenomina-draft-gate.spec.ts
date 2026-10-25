@@ -3,6 +3,7 @@ import {
   DRAFT_APPROVAL_PREFIX,
   appendDraftApprovalNote,
   buildDraftApprovalStamp,
+  draftGateConfirmCopy,
   needsDraftApprovalConfirm,
 } from "./prenomina-draft-gate";
 
@@ -28,6 +29,24 @@ describe("prenomina-draft-gate", () => {
   it("is idempotent when stamp already present", () => {
     const once = appendDraftApprovalNote("x", "Ada", at);
     expect(appendDraftApprovalNote(once, "Bob", at)).toBe(once);
+  });
+
+  it("deja el aviso en una frase y cita el texto viejo", () => {
+    const textoViejo =
+      "¿Aprobar borrador y marcar como pagado? Se registrará la aprobación en la nota del pago.";
+    expect(textoViejo.split(/(?<=[?!.])\s+/)).toEqual([
+      "¿Aprobar borrador y marcar como pagado?",
+      "Se registrará la aprobación en la nota del pago.",
+    ]);
+    expect(draftGateConfirmCopy.CONFIRM_MESSAGE).toBe(
+      "¿Aprobar borrador y marcar como pagado, registrando la aprobación en la nota del pago?",
+    );
+    expect(draftGateConfirmCopy.CONFIRM_MESSAGE).not.toBe(textoViejo);
+    expect(draftGateConfirmCopy.CONFIRM_MESSAGE.split(/(?<=[?!.])\s+/)).toEqual([
+      "¿Aprobar borrador y marcar como pagado, registrando la aprobación en la nota del pago?",
+    ]);
+    expect(draftGateConfirmCopy.CONFIRM_LABEL).toBe("Aprobar borrador");
+    expect(DRAFT_APPROVAL_PREFIX).toBe("[Aprobado borrador]");
   });
 
   it("needs confirm only for Borrador", () => {
