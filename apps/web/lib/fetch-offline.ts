@@ -70,7 +70,7 @@ export async function fetchWithOfflineQueue(
     } catch {
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
       if (!isMutation || !offline) {
-        throw new Error("No se pudo completar la solicitud. Revisa tu conexión.");
+        throw new Error("No se pudo completar la solicitud: revisa tu conexión.");
       }
       const formParts = await serializeFormDataBody(init.body);
       const headerObj: Record<string, string> = {};
@@ -101,7 +101,7 @@ export async function fetchWithOfflineQueue(
   } catch {
     const offline = typeof navigator !== "undefined" && !navigator.onLine;
     if (!isMutation || !offline) {
-      throw new Error("No se pudo completar la solicitud. Revisa tu conexión.");
+      throw new Error("No se pudo completar la solicitud: revisa tu conexión.");
     }
     if (init.body instanceof Blob || init.body instanceof ArrayBuffer) {
       throw new Error("Sin conexión: este tipo de envío requiere internet.");
