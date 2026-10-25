@@ -196,6 +196,13 @@ export default function ActivityIssuesPanel({
 
   return (
     <div className={s.panel}>
+      <style>{`
+        .incidencia-meta > span + span::before { content: " · "; }
+        @media (max-width: 480px) {
+          .incidencia-meta { display: grid; gap: 2px; }
+          .incidencia-meta > span + span::before { content: none; }
+        }
+      `}</style>
       {/* ── Incidencias ──────────────────────────────────────────────── */}
       <section className={s.bloque} aria-label="Incidencias">
         <div className={s.cabeza}>
@@ -209,11 +216,7 @@ export default function ActivityIssuesPanel({
           )}
         </div>
 
-        <p className={s.ayuda}>
-          Lo que impidió o retrasó el trabajo. Tipificarlo permite contar: si
-          &ldquo;faltó material&rdquo; encabeza la lista del mes, el problema está en almacén,
-          no en campo.
-        </p>
+        <p className={s.ayuda}>Lo que impidió el trabajo.</p>
 
         {abriendoIncidencia && (
           <div className={s.alta}>
@@ -310,10 +313,12 @@ export default function ActivityIssuesPanel({
                   </p>
                   <p className={s.itemD}>{i.descripcion}</p>
                   {i.accionTomada && <p className={s.itemA}>Acción: {i.accionTomada}</p>}
-                  <p className={s.itemM}>
-                    {i.reportadoPor ? `Reportó ${i.reportadoPor.nombre}` : "Sin reportante"}
-                    {Number(i.horasPerdidas ?? 0) > 0 && ` · ${Number(i.horasPerdidas)} h perdidas`}
-                    {i.resueltoAt && ` · resuelta${i.resueltoPor ? ` por ${i.resueltoPor.nombre}` : ""}`}
+                  <p className={`${s.itemM} incidencia-meta`}>
+                    <span>{i.reportadoPor ? `Reportó ${i.reportadoPor.nombre}` : "Sin reportante"}</span>
+                    {Number(i.horasPerdidas ?? 0) > 0 ? <span>{Number(i.horasPerdidas)} h perdidas</span> : null}
+                    {i.resueltoAt ? (
+                      <span>Resuelta{i.resueltoPor ? ` por ${i.resueltoPor.nombre}` : ""}</span>
+                    ) : null}
                   </p>
                 </div>
                 {canManage && (
@@ -344,10 +349,7 @@ export default function ActivityIssuesPanel({
           )}
         </div>
 
-        <p className={s.ayuda}>
-          Lo que hay que cambiar y el técnico ve en sitio. Al enlazarse con una
-          cotización, llega a Ventas en vez de quedarse en el reporte.
-        </p>
+        <p className={s.ayuda}>Lo que hay que cambiar.</p>
 
         {abriendoRec && (
           <div className={s.alta}>
@@ -415,14 +417,19 @@ export default function ActivityIssuesPanel({
                   <p className={s.itemT}>
                     {RECOMMENDATION_TYPE_LABEL[r.tipo]}
                     <Badge tone="outline" size="sm">
-                      {PRIORITY_LABEL[r.prioridad]} · {RECOMMENDATION_STATUS_LABEL[r.estado]}
+                      {PRIORITY_LABEL[r.prioridad]}
+                    </Badge>
+                    <Badge tone="outline" size="sm">
+                      {RECOMMENDATION_STATUS_LABEL[r.estado]}
                     </Badge>
                   </p>
                   <p className={s.itemD}>{r.descripcion}</p>
-                  <p className={s.itemM}>
-                    {r.creadoPor ? `Propuso ${r.creadoPor.nombre}` : "Sin autor"}
-                    {Number(r.costoEstimado ?? 0) > 0 && ` · estimado $${Number(r.costoEstimado).toLocaleString("es-MX")}`}
-                    {r.cotizacion && ` · cotización ${r.cotizacion.quoteNumber}`}
+                  <p className={`${s.itemM} incidencia-meta`}>
+                    <span>{r.creadoPor ? `Propuso ${r.creadoPor.nombre}` : "Sin autor"}</span>
+                    {Number(r.costoEstimado ?? 0) > 0 ? (
+                      <span>Estimado ${Number(r.costoEstimado).toLocaleString("es-MX")}</span>
+                    ) : null}
+                    {r.cotizacion ? <span>Cotización {r.cotizacion.quoteNumber}</span> : null}
                   </p>
                 </div>
                 {canManage && r.estado === "ABIERTA" && (

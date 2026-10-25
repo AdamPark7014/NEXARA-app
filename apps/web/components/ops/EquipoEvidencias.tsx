@@ -257,7 +257,7 @@ export function FotoProtegida({
   const foto = useArchivoProtegido(url);
   const [rota, setRota] = useState(false);
   if (foto.estado === "cargando") return <SinArchivo alto={alto} icono={HourglassTopIcon} texto="Cargando foto…" />;
-  if (foto.estado === "error" || rota) return <SinArchivo alto={alto} texto="Esta foto ya no está en el servidor" />;
+  if (foto.estado === "error" || rota) return <SinArchivo alto={alto} texto="Esta foto ya no está." />;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={foto.url} alt={alt} style={style} className={className} onError={() => setRota(true)} />;
 }
@@ -305,7 +305,7 @@ export function VisorPdf({
   }, [ruta]);
 
   if (pdf.error) {
-    return <SinArchivo alto={140} texto="El PDF ya no está en el servidor: hay que pedir que lo vuelva a subir." />;
+    return <SinArchivo alto={140} texto="El PDF ya no está." />;
   }
   if (!pdf.datos) return <SinArchivo alto={140} icono={HourglassTopIcon} texto="Cargando PDF…" />;
   return <PDFViewer pdfUrl={ruta} pdfData={pdf.datos} fileName="Hoja de servicio.pdf" height={alto} />;
@@ -717,7 +717,7 @@ function SalidasDeZona({
                   {justificada ? "Justificada" : "Abierta"}
                 </Chip>
               </div>
-              <div className={s.datos}>
+              <div className={`${s.datos} equipo-datos`}>
                 <span>
                   Hasta <strong>{formatoDistancia(a.maxDistanciaM)}</strong> del punto de inicio (máx. {a.radioM} m)
                 </span>
@@ -813,9 +813,7 @@ function RevisionModal({
         data,
         decision === "aprobar"
           ? `Aprobaste la evidencia de ${nombre}.`
-          : todo
-            ? `Devolviste toda la evidencia a ${nombre}: la rehace desde cero.`
-            : `Devolviste ${marcados.length} paso${marcados.length === 1 ? "" : "s"} a ${nombre}.`,
+          : `Devolviste la evidencia a ${nombre}.`,
       );
     } catch (e) {
       setError(formatApiError(e, "No se pudo guardar la revisión"));
@@ -849,7 +847,6 @@ function RevisionModal({
             <h3 id="revision-titulo" className={s.dialogoT}>
               Revisar a {nombre}
             </h3>
-            <p className={s.dialogoD}>Tu decisión, la calificación y tus observaciones le llegan y quedan en el historial.</p>
           </div>
         </header>
 
@@ -880,7 +877,7 @@ function RevisionModal({
               <input type="radio" name="alcance" checked={!todo} onChange={() => setTodo(false)} className={s.radio} />
               <span>
                 <strong>Solo algunos pasos</strong>
-                <span className={s.opcionD}>Corrige únicamente lo que marques; lo demás se queda.</span>
+                <span className={s.opcionD}>Solo los pasos que marques.</span>
               </span>
             </label>
             {!todo ? (
@@ -901,9 +898,7 @@ function RevisionModal({
               <input type="radio" name="alcance" checked={todo} onChange={() => setTodo(true)} className={s.radio} />
               <span>
                 <strong>Toda la actividad</strong>
-                <span className={s.opcionD}>
-                  Sus evidencias se vacían y las vuelve a subir desde cero. Lo que había queda guardado en el historial.
-                </span>
+                <span className={s.opcionD}>Se vuelven a subir todas las evidencias.</span>
               </span>
             </label>
           </fieldset>
@@ -1042,21 +1037,27 @@ function TarjetaPersona({
         </Button>
       </header>
 
-      <div className={s.datos}>
+              <div className={`${s.datos} equipo-datos`}>
         <IconLabel icon={MoveToInboxOutlinedIcon} size={16} gap={4}>
           Recibió {fmt(m.asignadoAt) ?? ""}
           {m.asignadoPor && m.asignadoPor !== m.nombre ? ` de ${corto(m.asignadoPor)}` : ""}
         </IconLabel>
         {m.pasadaA ? (
-          <IconLabel icon={SendOutlinedIcon} size={16} gap={4}>
-            {m.pasadaA.por ? `${corto(m.pasadaA.por)} la pasó` : "Se la pasaron"} a {corto(m.pasadaA.nombre)} · {fmt(m.pasadaA.at)}
-            {m.pasadaA.motivo ? ` · Motivo: ${m.pasadaA.motivo}` : ""}
-          </IconLabel>
+          <>
+            <IconLabel icon={SendOutlinedIcon} size={16} gap={4}>
+              {m.pasadaA.por ? `${corto(m.pasadaA.por)} la pasó` : "Se la pasaron"} a {corto(m.pasadaA.nombre)}
+            </IconLabel>
+            {m.pasadaA.at ? <span>{fmt(m.pasadaA.at)}</span> : null}
+            {m.pasadaA.motivo ? <span>Motivo: {m.pasadaA.motivo}</span> : null}
+          </>
         ) : null}
         {m.pasoA.map((p) => (
-          <IconLabel key={`${p.nombre}-${p.at}`} icon={SendOutlinedIcon} size={16} gap={4}>
-            La pasó a {corto(p.nombre)} · {fmt(p.at)}
-          </IconLabel>
+          <Fragment key={`${p.nombre}-${p.at}`}>
+            <IconLabel icon={SendOutlinedIcon} size={16} gap={4}>
+              La pasó a {corto(p.nombre)}
+            </IconLabel>
+            {p.at ? <span>{fmt(p.at)}</span> : null}
+          </Fragment>
         ))}
         {ev?.completedAt && ev.status === "COMPLETED" ? (
           <IconLabel icon={Inventory2OutlinedIcon} size={16} gap={4}>
@@ -1080,18 +1081,13 @@ function TarjetaPersona({
             </span>
           }
         >
-          {esCorreccion ? (
-            <>
-              Corrigió lo que se le devolvió
-              {corregidos.length && ultimaDevolucion?.decision !== "DEVUELTA_TODO"
-                ? ` (${corregidos.map((x) => etiquetaDePaso(x, coreKind)).join(", ")})`
-                : " (rehízo toda la actividad)"}
-              {ev?.correctionSubmittedAt ? ` · ${fmt(ev.correctionSubmittedAt)}` : ""}. Revisa la corrección y apruébala o
-              devuélvela de nuevo.
-            </>
-          ) : (
-            <>Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela.</>
-          )}
+          {esCorreccion
+            ? `Corrigió lo que se le devolvió${
+                corregidos.length && ultimaDevolucion?.decision !== "DEVUELTA_TODO"
+                  ? ` (${corregidos.map((x) => etiquetaDePaso(x, coreKind)).join(", ")})`
+                  : ""
+              }.`
+            : "Ya envió su evidencia."}
         </Alert>
       ) : null}
 
@@ -1099,8 +1095,10 @@ function TarjetaPersona({
         <div className={s.aprobada}>
           <span className={s.aprobadaT}>
             <IconoTexto icon={TaskAltIcon} color={VERDE} />
-            Aprobada{ev.reviewedBy ? ` por ${corto(ev.reviewedBy)}` : ""}
-            {ev.reviewedAt ? ` · ${fmt(ev.reviewedAt)}` : ""}. ¿Encontraste algo mal?
+            <span className="equipo-aprobada">
+              <span>Aprobada{ev.reviewedBy ? ` por ${corto(ev.reviewedBy)}` : ""}.</span>
+              {ev.reviewedAt ? <span>{fmt(ev.reviewedAt)}</span> : null}
+            </span>
           </span>
           <Button size="sm" variant="secondary" onClick={() => onRevisar(m, { decision: "devolver" })} iconStart={<UndoIcon fontSize="inherit" />}>
             Devolver
@@ -1111,9 +1109,8 @@ function TarjetaPersona({
       {corrigiendo.length ? (
         <p className={s.corrigiendo}>
           <IconoTexto icon={UndoIcon} color={NARANJA} />
-          Está corrigiendo: <strong>{corrigiendo.map((x) => etiquetaDePaso(x, coreKind)).join(", ")}</strong>
-          {ev?.reviewNotes ? ` · «${ev.reviewNotes}»` : ""}
-          {m.puedoRevisar || m.revisiones.length ? ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez." : ""}
+          Está corrigiendo: <strong>{corrigiendo.map((x) => etiquetaDePaso(x, coreKind)).join(", ")}</strong>.
+          {ev?.reviewNotes ? <span className="equipo-nota">«{ev.reviewNotes}»</span> : null}
         </p>
       ) : null}
 
@@ -1127,9 +1124,7 @@ function TarjetaPersona({
           ) : null}
 
           {m.reparte ? (
-            <p className={s.muted}>
-              Su parte fue repartirla{m.pasoA.length ? "" : " (todavía no la pasa a nadie)"}; no sube evidencias.
-            </p>
+            <p className={s.muted}>Su parte fue repartirla.</p>
           ) : !ev ? (
             <p className={s.muted}>Aún no empieza a subir evidencias.</p>
           ) : (
@@ -1236,6 +1231,13 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
   if (compact) {
     return (
       <div className={s.compacto}>
+        <style>{`
+          @media (max-width: 480px) {
+            .equipo-fila { flex-direction: column; align-items: flex-start; }
+            .equipo-meta { display: grid; gap: 2px; }
+            .equipo-meta .punto { display: none; }
+          }
+        `}</style>
         <div className={s.chips}>
           <Chip tone={estadoActividad.tone} icon={estadoActividad.icon}>
             {estadoActividad.label}
@@ -1274,14 +1276,14 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
                 ...(ev?.serviceSheetCompletedAt ? [{ key: "form", icon: FactCheckOutlinedIcon, texto: "Formulario" }] : []),
               ];
               return (
-                <li key={m.userId} className={s.fila}>
+                <li key={m.userId} className={`${s.fila} equipo-fila`}>
                   <Avatar nombre={m.nombre} url={m.avatarUrl} size={34} />
                   <div className={s.filaQuien}>
                     <div className={s.filaNombre}>
                       {corto(m.nombre)}
                       {m.eficienciaScore ? <Estrellas valor={m.eficienciaScore} size={12} /> : null}
                     </div>
-                    <div className={s.filaM}>
+                    <div className={`${s.filaM} equipo-meta`}>
                       {m.reparte ? (
                         <IconLabel icon={SendOutlinedIcon} size={14} gap={4}>
                           {m.pasoA.length ? `La pasó a ${m.pasoA.map((p) => corto(p.nombre)).join(", ")}` : "La reparte"}
@@ -1289,13 +1291,13 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
                       ) : (
                         partes.map((p, i) => (
                           <Fragment key={p.key}>
-                            {i ? " · " : null}
+                            {i ? <span className="punto"> · </span> : null}
                             {p.icon ? (
                               <IconLabel icon={p.icon} size={14} gap={4}>
                                 {p.texto}
                               </IconLabel>
                             ) : (
-                              p.texto
+                              <span>{p.texto}</span>
                             )}
                           </Fragment>
                         ))
@@ -1316,7 +1318,7 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
         )}
         {verMasHref ? (
           <ButtonLink href={verMasHref} size="sm" variant={resumen.porRevisarMias ? "tonal" : "tertiary"} className={s.inicio}>
-            {resumen.porRevisarMias ? "Revisar evidencias →" : "Ver fotos, PDF y formularios →"}
+            {resumen.porRevisarMias ? "Revisar evidencias" : "Ver evidencias"}
           </ButtonLink>
         ) : null}
       </div>
@@ -1332,6 +1334,15 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
 
   return (
     <section className={s.completo} aria-labelledby="equipo-evidencias-titulo">
+      <style>{`
+        .equipo-nota { display: block; }
+        .equipo-aprobada > span + span::before { content: " · "; }
+        @media (max-width: 480px) {
+          .equipo-datos { flex-direction: column; align-items: flex-start; }
+          .equipo-aprobada { display: grid; gap: 2px; }
+          .equipo-aprobada > span + span::before { content: none; }
+        }
+      `}</style>
       <div className={s.completoCabeza}>
         <div className={s.completoTexto}>
           <h2 id="equipo-evidencias-titulo" className={s.completoT}>
@@ -1344,8 +1355,7 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
                 {`${cadena.join(" → ")} · `}
               </>
             ) : null}
-            {alcanceTexto}
-            {data.soloLectura && alcance !== "propio" ? " Solo lectura: puedes ver todo, no revisar." : ""}
+            {data.soloLectura && alcance !== "propio" ? "Solo lectura." : alcanceTexto}
           </p>
           <div className={s.chips}>
             <Chip tone={estadoActividad.tone} icon={estadoActividad.icon}>
@@ -1371,8 +1381,7 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
 
       {resumen.porRevisarMias ? (
         <Alert tone="warning" icon={<RateReviewOutlinedIcon fontSize="inherit" />}>
-          Tienes {resumen.porRevisarMias} evidencia{resumen.porRevisarMias === 1 ? "" : "s"} por revisar. La actividad queda
-          finalizada cuando se aprueba la de todos.
+          Tienes {resumen.porRevisarMias} evidencia{resumen.porRevisarMias === 1 ? "" : "s"} por revisar.
         </Alert>
       ) : null}
 
