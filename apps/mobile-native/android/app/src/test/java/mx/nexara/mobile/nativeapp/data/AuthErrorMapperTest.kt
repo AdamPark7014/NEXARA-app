@@ -75,7 +75,7 @@ class AuthErrorMapperTest {
     @Test
     fun loginMessage_httpMessage_isFiltered() {
         val msg = AuthErrorMapper.loginMessage(IllegalStateException("HTTP 400 Bad Request"))
-        assertEquals("No se pudo iniciar sesión. Intenta de nuevo.", msg)
+        assertEquals("No se pudo iniciar sesión, intenta de nuevo.", msg)
     }
 
     @Test

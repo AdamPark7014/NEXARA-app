@@ -33,7 +33,7 @@ object AuthErrorMapper {
                 ?: "Tu cuenta no tiene acceso a esta aplicación."
             429 -> "Demasiados intentos, espera ${esperaLegible(throwable)} e intenta de nuevo."
             in 500..599 -> "El servidor no está disponible en este momento, intenta más tarde."
-            else -> "No se pudo iniciar sesión. Intenta de nuevo."
+            else -> "No se pudo iniciar sesión, intenta de nuevo."
         }
         is UnknownHostException, is SSLException ->
             "Sin conexión a internet, revisa tu red e intenta de nuevo."
@@ -43,7 +43,7 @@ object AuthErrorMapper {
             "Problema de conexión, revisa tu internet e intenta de nuevo."
         else -> throwable.message
             ?.takeIf { it.isNotBlank() && !it.contains("HTTP", ignoreCase = true) }
-            ?: "No se pudo iniciar sesión. Intenta de nuevo."
+            ?: "No se pudo iniciar sesión, intenta de nuevo."
     }
 
     // Moshi y no `org.json`: en los tests de JVM `org.json` es un stub de Android

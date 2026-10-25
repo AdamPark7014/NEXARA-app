@@ -26,7 +26,7 @@ enum AuthErrorMapper {
     static let sinConexion = "Sin conexión a internet, revisa tu red e intenta de nuevo."
     static let tiempoAgotado = "La conexión tardó demasiado, comprueba tu internet e intenta de nuevo."
     static let problemaDeConexion = "Problema de conexión, revisa tu internet e intenta de nuevo."
-    static let generico = "No se pudo iniciar sesión. Intenta de nuevo."
+    static let generico = "No se pudo iniciar sesión, intenta de nuevo."
 
     static func loginMessage(_ error: Error) -> String {
         if let api = error as? ApiError {
