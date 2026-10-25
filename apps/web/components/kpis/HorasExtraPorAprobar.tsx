@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
-import { Alert, Badge, Button, Card, CardHead, EmptyState, InfoPopover, SkeletonRows, fieldClass, tabla } from "@/components/base";
+import { Alert, Badge, Button, Card, CardHead, EmptyState, SkeletonRows, fieldClass, tabla } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import {
   ESTADO_EXTRA_ETIQUETA,
@@ -12,6 +12,7 @@ import {
   type EstadoExtra,
 } from "@/lib/asistencia-confiable-api";
 import estilo from "@/components/asistencias/asistencia-confiable.module.css";
+import s from "./kpis.module.css";
 
 /**
  * Horas extra por aprobar.
@@ -74,7 +75,7 @@ export default function HorasExtraPorAprobar({
       setDecisiones(await fetchDecisionesExtra(token, rango, userId));
     } catch (e) {
       setDecisiones(null);
-      setError(formatApiError(e, "No se pudieron cargar las decisiones"));
+      setError(formatApiError(e, "No se pudieron cargar las decisiones."));
     }
   }, [token, rango, userId]);
 
@@ -105,7 +106,7 @@ export default function HorasExtraPorAprobar({
       await cargar();
       onDecidido?.();
     } catch (e) {
-      setError(formatApiError(e, "No se pudo guardar la decisión"));
+      setError(formatApiError(e, "No se pudo guardar la decisión."));
     } finally {
       setOcupado(null);
     }
@@ -117,36 +118,28 @@ export default function HorasExtraPorAprobar({
     <Card>
       <CardHead
         title="Horas extra"
-        actions={
-          <>
-            {pendientes ? <Badge tone="warning">{pendientes} por decidir</Badge> : null}
-            <InfoPopover label="¿Por qué hay que aprobarlas?" title="Horas extra">
-              <p style={{ margin: "0 0 8px" }}>
-                El sistema <strong style={{ color: "var(--ui-fg)" }}>calcula</strong> el tiempo extra de cada día,
-                pero calculado no es autorizado: alguien puede quedarse de más por su cuenta.
-              </p>
-              <ul>
-                <li>A la pre-nómina solo llegan los minutos aprobados.</li>
-                <li>Se puede autorizar menos de lo que salió: escribe los minutos antes de aprobar.</li>
-                <li>Lo aprobado se queda como se aprobó; corregir después una checada no lo cambia solo.</li>
-                <li>Un día rechazado ya se miró: deja de contar como pendiente y no se paga.</li>
-              </ul>
-            </InfoPopover>
-          </>
-        }
+        actions={pendientes ? <Badge tone="warning">{pendientes} por decidir</Badge> : undefined}
       />
 
       {error ? (
-        <Alert tone="danger" role="alert">
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        >
           {error}
         </Alert>
       ) : null}
 
-      {!decisiones ? (
+      {!decisiones && !error ? (
         <SkeletonRows rows={3} label="Cargando decisiones" />
-      ) : conExtra.length ? (
+      ) : decisiones && conExtra.length ? (
         <div className={tabla.tabla} role="table" aria-label="Horas extra por aprobar">
-          <div className={`${tabla.cabeza} ${estilo.extra}`} role="row">
+          <div className={`${tabla.cabeza} ${s.extraFila} ${s.extraCabeza}`} role="row">
             <span role="columnheader">Día</span>
             <span role="columnheader" className={tabla.num}>
               Calculado
@@ -161,7 +154,7 @@ export default function HorasExtraPorAprobar({
             const decision = porFecha.get(d.fecha);
             const trabajando = ocupado === d.fecha;
             return (
-              <div key={d.fecha} className={`${tabla.fila} ${estilo.extra}`} role="row">
+              <div key={d.fecha} className={`${tabla.fila} ${s.extraFila}`} role="row">
                 <span className={tabla.celda} role="cell">
                   <span className={tabla.fuerte}>{diaLegible(d.fecha)}</span>
                   {d.persona ? <span className={tabla.tenue}>{d.persona}</span> : null}
@@ -218,13 +211,9 @@ export default function HorasExtraPorAprobar({
             );
           })}
         </div>
-      ) : (
-        <EmptyState
-          icon={<TaskAltOutlinedIcon />}
-          title="Sin tiempo extra en estas fechas"
-          description="Nadie pasó de su jornada ordinaria."
-        />
-      )}
+      ) : decisiones ? (
+        <EmptyState icon={<TaskAltOutlinedIcon />} title="Sin tiempo extra en estas fechas." />
+      ) : null}
     </Card>
   );
 }

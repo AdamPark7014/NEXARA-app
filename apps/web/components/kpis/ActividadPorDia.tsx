@@ -96,21 +96,14 @@ export default function ActividadPorDia({
 
   return (
     <Card>
-      <CardHead
-        title="Actividad por día"
-        subtitle="Cuántas actividades tocó cada quien cada día (con su reloj corriendo o entregadas ese día). Arriba, quien menos."
-      />
+      <CardHead title="Actividad por día" />
       {resumen ? (
         <div className={s.resumen}>
-          <strong className={s.resumenDia}>{etiquetaDia(resumen.fecha, true)}:</strong>{" "}
-          {resumen.ninguna.length ? (
-            <span className={s.malo}>
-              sin ninguna actividad — {resumen.ninguna.join(", ")}.
-            </span>
-          ) : (
-            <span>todos tocaron al menos una actividad.</span>
-          )}{" "}
-          {resumen.una.length ? <span className={s.regular}>Solo una — {resumen.una.join(", ")}.</span> : null}
+          <div className={s.resumenDia}>{etiquetaDia(resumen.fecha, true)}</div>
+          <div className={resumen.ninguna.length ? s.malo : undefined}>
+            {resumen.ninguna.length ? `Sin ninguna: ${resumen.ninguna.join(", ")}.` : "Todos con al menos una."}
+          </div>
+          {resumen.una.length ? <div className={s.regular}>Solo una: {resumen.una.join(", ")}.</div> : null}
         </div>
       ) : null}
       <div className={s.contenedor} role="region" aria-label="Actividades por persona y día" tabIndex={0}>
@@ -125,7 +118,7 @@ export default function ActividadPorDia({
                   {etiquetaDia(f)}
                 </th>
               ))}
-              <th scope="col" className={s.colResumen} title="Días sin ninguna actividad · días con solo una · promedio por día">
+              <th scope="col" className={s.colResumen}>
                 Sin · Una · Prom.
               </th>
             </tr>

@@ -58,33 +58,33 @@
   color: var(--ui-fg-3);
 }
 
-.lectura {
-  flex: 1 1 360px;
+.datos {
+  flex: 1 1 280px;
+  display: grid;
+  gap: 6px;
+  margin: 0;
   min-width: 0;
 }
 
-.lecturaTexto {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--ui-fg);
-}
-
-.datos {
+.dato {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-s1) var(--ui-s4);
-  margin-top: 10px;
-  font-size: var(--ui-text-xs);
-  color: var(--ui-fg-3);
-}
-
-.popParrafo {
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--ui-s4);
   margin: 0;
+  font-size: var(--ui-text-sm);
 }
 
-.fuerte {
+.dato dt {
+  margin: 0;
+  font-weight: 400;
+  color: var(--ui-fg-2);
+}
+
+.dato dd {
+  margin: 0;
   color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
 }
 
 .num {
@@ -162,28 +162,40 @@
 }
 
 @media (max-width: 720px) {
-  .lectura {
-    flex-basis: 100%;
+  .partes {
+    grid-template-columns: minmax(0, 1fr);
   }
   .entCabeza {
     display: none !important;
   }
   .entFila {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "act act"
-      "limite estado"
-      "entregada revision"
-      "tiempo tiempo";
+      "act"
+      "limite"
+      "entregada"
+      "estado"
+      "revision"
+      "tiempo";
     row-gap: 4px;
   }
   .entFila > :nth-child(1) { grid-area: act; }
   .entFila > :nth-child(2) { grid-area: limite; }
   .entFila > :nth-child(3) { grid-area: entregada; }
-  .entFila > :nth-child(4) { grid-area: estado; justify-self: end; }
-  .entFila > :nth-child(5) { grid-area: revision; justify-self: end; }
-  .entFila > :nth-child(6) { grid-area: tiempo; }
-  .entFila > :nth-child(6)::before { content: "Tiempo "; }
+  .entFila > :nth-child(4) { grid-area: estado; justify-self: start; }
+  .entFila > :nth-child(5) { grid-area: revision; justify-self: start; }
+  .entFila > :nth-child(6) { grid-area: tiempo; justify-self: start; text-align: left; }
+  .entFila > :nth-child(2):not([data-sin-limite])::before,
+  .entFila > :nth-child(3)::before,
+  .entFila > :nth-child(4)::before,
+  .entFila > :nth-child(5)::before,
+  .entFila > :nth-child(6)::before {
+    color: var(--ui-fg-3);
+    font-weight: 400;
+  }
   .entFila > :nth-child(2):not([data-sin-limite])::before { content: "Límite "; }
   .entFila > :nth-child(3)::before { content: "Entregó "; }
+  .entFila > :nth-child(4)::before { content: "Estado "; }
+  .entFila > :nth-child(5)::before { content: "Revisión "; }
+  .entFila > :nth-child(6)::before { content: "Tiempo "; }
 }
