@@ -110,6 +110,29 @@
   font-feature-settings: var(--ui-numeric);
 }
 
+/*
+ * Teléfono: un paso por renglón (barra, etiqueta y hora).
+ * En escritorio siguen los cinco en columnas; la versión de tabla
+ * (solo barras) no cambia.
+ */
+@media (max-width: 640px) {
+  .timeline:not(.compactBars) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ui-s3);
+  }
+
+  .timeline:not(.compactBars) .step {
+    text-align: start;
+  }
+
+  .timeline:not(.compactBars) .label,
+  .timeline:not(.compactBars) .stamp {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bar {
     transition: none;
