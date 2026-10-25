@@ -1,0 +1,39 @@
+/* En escritorio folio y título, o estatus y sucursal, siguen en una línea con « · ».
+   En teléfono, un dato por renglón. El corte es el mismo en que las tarjetas ya
+   ocupan el ancho (390 px cabe holgado). */
+
+.linea {
+  min-width: 0;
+}
+
+.fuerte {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.meta {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.dato {
+  min-width: 0;
+}
+
+.sep {
+  white-space: pre;
+}
+
+@media (max-width: 720px) {
+  .linea {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .sep {
+    display: none;
+  }
+}
