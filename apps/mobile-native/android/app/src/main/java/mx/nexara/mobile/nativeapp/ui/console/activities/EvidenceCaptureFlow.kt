@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -698,7 +698,7 @@ fun EvidenceCaptureFlow(
                 label = if (busy) "Guardando…" else "Siguiente paso · ${drafts.size} de $photoRequired",
                 enabled = !busy,
                 icon = null,
-                hint = "Ya tienes las fotos. Puedes tomar más antes de seguir.",
+                hint = "Ya tienes las fotos y puedes tomar más antes de seguir.",
                 onPrimary = { savePhotos() },
                 secondaryLabel = "Tomar otra",
                 secondaryIcon = NxGlyph.PHOTO.icon,
@@ -716,7 +716,7 @@ fun EvidenceCaptureFlow(
                 label = if (busy) "Subiendo…" else "Seleccionar PDF",
                 enabled = !busy,
                 icon = if (busy) null else NxGlyph.PROCEDURE.icon,
-                hint = "Carga la hoja de servicio firmada. Solo PDF.",
+                hint = "Carga solo el PDF de la hoja de servicio firmada.",
                 onPrimary = {
                     success = null
                     error = null
@@ -870,9 +870,9 @@ fun EvidenceCaptureFlow(
                 step == STEP_ENTRY -> StepCard(
                     title = "$stepPrefix: ${CoreActivityRules.stepLabel(STEP_ENTRY, coreKind)}",
                     description = if (comercial) {
-                        "Tómala al iniciar la actividad. Se guarda con tu ubicación GPS (obligatoria)."
+                        "Tómala al iniciar la actividad, con tu ubicación GPS obligatoria."
                     } else {
-                        "Tómala al llegar al sitio. Se guarda con tu ubicación GPS (obligatoria)."
+                        "Tómala al llegar al sitio, con tu ubicación GPS obligatoria."
                     },
                     icon = NxGlyph.ENTRY.icon,
                 ) {
@@ -893,8 +893,7 @@ fun EvidenceCaptureFlow(
                 step == STEP_PHOTOS && porCampos -> StepCard(
                     title = "$stepPrefix: Fotos por campo",
                     description = "Toma o adjunta las fotos de cada campo en la lista de arriba " +
-                        "(${CoreActivityRules.camposResumen(campos)}). Las de «Después» " +
-                        "puedes dejarlas para cuando termines.",
+                        "(${CoreActivityRules.camposResumen(campos)}) y deja las de «Después» para cuando termines.",
                     icon = NxGlyph.PHOTO.icon,
                 ) {
                     if (dockHost == null) {
@@ -906,8 +905,7 @@ fun EvidenceCaptureFlow(
 
                 step == STEP_PHOTOS -> StepCard(
                     title = "$stepPrefix: Fotos en sitio (${drafts.size}/$photoRequired)",
-                    description = "Toma o adjunta al menos $photoRequired fotos del trabajo. " +
-                        "Adjuntar abre la galería o un archivo que ya tengas. Si hay GPS, se guarda; si no, la foto igual vale.",
+                    description = "Toma o adjunta al menos $photoRequired fotos del trabajo, con o sin GPS.",
                     icon = NxGlyph.PHOTO.icon,
                 ) {
                     DraftGrid(
@@ -964,7 +962,7 @@ fun EvidenceCaptureFlow(
 
                 step == STEP_PDF -> StepCard(
                     title = "$stepPrefix: Hoja de servicio (PDF)",
-                    description = "Carga el PDF de la hoja de servicio firmada. Solo PDF.",
+                    description = "Carga solo el PDF de la hoja de servicio firmada.",
                     icon = NxGlyph.PROCEDURE.icon,
                 ) {
                     if (dockHost == null) {
@@ -1009,10 +1007,9 @@ fun EvidenceCaptureFlow(
                 step == STEP_EXIT -> StepCard(
                     title = "$stepPrefix: ${CoreActivityRules.stepLabel(STEP_EXIT, coreKind)}",
                     description = if (comercial) {
-                        "Tómala al concluir la actividad. Tu ubicación GPS es obligatoria para cerrar; " +
-                            "no tiene que ser donde iniciaste."
+                        "Tómala al concluir la actividad, con tu ubicación GPS obligatoria y sin tener que ser donde iniciaste."
                     } else {
-                        "Tómala en el sitio al terminar. Tu ubicación GPS es obligatoria para cerrar."
+                        "Tómala en el sitio al terminar, con tu ubicación GPS obligatoria para cerrar."
                     },
                     icon = NxGlyph.EXIT.icon,
                 ) {
@@ -1367,57 +1364,52 @@ private fun DraftGrid(
 ) {
     if (drafts.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        drafts.withIndex().chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (index, draft) ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF0F172A)),
-                    ) {
-                        val thumb = draft.thumb
-                        if (thumb != null) {
-                            Image(
-                                bitmap = thumb.asImageBitmap(),
-                                contentDescription = "Evidencia ${index + 1}",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        } else {
-                            ProtectedImage(
-                                url = draft.url,
-                                contentDescription = "Evidencia ${index + 1}",
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x99000000))
-                                .clickable(enabled = enabled) { onRemove(index) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Quitar", tint = Color.White, modifier = Modifier.size(16.dp))
-                        }
-                        Text(
-                            CoreActivityRules.fotoEvidenciaLabel(index + 1),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(4.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x99000000))
-                                .padding(horizontal = 5.dp, vertical = 1.dp),
-                        )
-                    }
+        drafts.forEachIndexed { index, draft ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF0F172A)),
+            ) {
+                val thumb = draft.thumb
+                if (thumb != null) {
+                    Image(
+                        bitmap = thumb.asImageBitmap(),
+                        contentDescription = "Evidencia ${index + 1}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    ProtectedImage(
+                        url = draft.url,
+                        contentDescription = "Evidencia ${index + 1}",
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x99000000))
+                        .clickable(enabled = enabled) { onRemove(index) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Quitar", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+                Text(
+                    CoreActivityRules.fotoEvidenciaLabel(index + 1),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x99000000))
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                )
             }
         }
     }
@@ -1490,7 +1482,7 @@ private fun CamposEvidenciaCard(
                         if (listo) CoreActivityRules.VERDE else CoreActivityRules.NARANJA,
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     momentos.forEach { momento ->
                         CampoSlot(
                             momento = momento,
@@ -1499,12 +1491,8 @@ private fun CamposEvidenciaCard(
                             enabled = enabled && campo.id != null,
                             onClick = { campo.id?.let { onTomar(it, momento) } },
                             onAdjuntar = { campo.id?.let { onAdjuntar(it, momento) } },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    }
-                    // Los campos con menos de tres momentos no estiran los huecos.
-                    repeat(CoreActivityRules.MOMENTOS.size - momentos.size) {
-                        Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -1528,7 +1516,7 @@ private fun CampoSlot(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .height(96.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(if (tomada) Color(0xFF0F172A) else Color(0xFFE2E8F0))
                 .border(
@@ -1579,22 +1567,22 @@ private fun CampoSlot(
             fontWeight = FontWeight.SemiBold,
             color = if (tomada) NxColors.Slate else NxColors.Muted,
         )
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             OutlinedButton(
                 onClick = onClick,
                 enabled = enabled,
-                modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
             ) {
-                Text("Tomar foto", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                Text("Tomar foto", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
             OutlinedButton(
                 onClick = onAdjuntar,
                 enabled = enabled,
-                modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
             ) {
                 Text("Adjuntar", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -1638,10 +1626,10 @@ private fun CorrectionBanner(rejected: List<String>, steps: List<String>, notes:
             color = NxColors.Slate,
         )
         NxIconText(
-            text = "Corrige el paso actual. " + if (rejected.size > 1) {
-                "Luego sigues con los demás pasos indicados."
+            text = if (rejected.size > 1) {
+                "Corrige el paso actual y sigue con los demás pasos indicados."
             } else {
-                "Al terminar, se envía de nuevo a revisión."
+                "Corrige el paso actual para enviarla de nuevo a revisión."
             },
             icon = Icons.Outlined.Lightbulb,
             fontSize = 12.5.sp,
@@ -1657,7 +1645,7 @@ private fun CompletedCard(locked: Boolean, reviewStatus: String?) {
             Triple("Evidencia aprobada", "Tu superior ya la revisó y la aprobó.", NxGlyph.APPROVED.icon)
         locked -> Triple(
             "Evidencias enviadas a revisión",
-            "Tus pasos están guardados. Tu superior la aprueba o te la devuelve con observaciones.",
+            "Tus pasos están guardados y tu superior la aprueba o te la devuelve con observaciones.",
             NxGlyph.IN_PROGRESS.icon,
         )
         else -> Triple("¡Listo!", "Todos los pasos quedaron guardados.", NxGlyph.APPROVED.icon)
