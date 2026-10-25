@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -13,11 +14,11 @@ import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import s from "./kb.module.css";
 
 interface KbCategory { id: number; name: string; slug: string }
 interface KbArticle {
@@ -102,8 +103,8 @@ export default function KbPage() {
       setArticles(Array.isArray(artData) ? artData : (artData?.data ?? []));
       setCats(Array.isArray(catData) ? catData : []);
       setLoaded(true);
-    } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar la base de conocimiento."));
+    } catch {
+      setError("No se pudo cargar la base de conocimiento.");
     } finally { setLoading(false); }
   }, [token]);
 
@@ -173,8 +174,8 @@ export default function KbPage() {
       };
       setForm(next);
       setInitialForm(next);
-    } catch (e) {
-      setFormErr(formatApiError(e, "No se pudo cargar el contenido del artículo."));
+    } catch {
+      setFormErr("No se pudo cargar el artículo.");
     } finally {
       setLoadingEdit(false);
     }
@@ -214,8 +215,8 @@ export default function KbPage() {
       setEditing(null);
       setForm({ ...emptyForm });
       void load();
-    } catch (e) {
-      setFormErr(formatApiError(e, "No se pudo guardar el artículo."));
+    } catch {
+      setFormErr("No se pudo guardar el artículo.");
     } finally { setSaving(false); }
   };
 
@@ -223,7 +224,7 @@ export default function KbPage() {
     if (!token) return;
     setConfirmState({
       title: "Eliminar artículo",
-      message: `Se eliminará «${a.title}». Esta acción no se puede deshacer.`,
+      message: `¿Eliminar «${a.title}»?`,
       confirmLabel: "Eliminar",
       danger: true,
       fn: async () => {
@@ -231,8 +232,8 @@ export default function KbPage() {
           await apiFetch(`kb/articles/${a.id}`, token, { method: "DELETE" });
           setArticles((prev) => prev.filter((x) => x.id !== a.id));
           toast.success("Artículo eliminado");
-        } catch (e) {
-          toast.error(formatApiError(e, "No se pudo eliminar el artículo"));
+        } catch {
+          toast.error("No se pudo eliminar el artículo.");
         }
       },
     });
@@ -245,8 +246,8 @@ export default function KbPage() {
       await apiFetch(`kb/articles/${a.id}`, token, { method: "PATCH", body: JSON.stringify({ status: nextStatus }) });
       setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, status: nextStatus } : x)));
       toast.success(nextStatus === "PUBLISHED" ? "Artículo publicado" : "Artículo movido a borradores");
-    } catch (e) {
-      toast.error(formatApiError(e, "No se pudo cambiar el estado"));
+    } catch {
+      toast.error("No se pudo cambiar el estado.");
     }
   };
 
@@ -315,11 +316,11 @@ export default function KbPage() {
   const clearFilters = () => { setSearch(""); setFilterStatus(""); setFilterVisibility(""); setFilterCategory(""); };
 
   return (
-    <>
+    <div className={s.zona}>
+      <Link href="/erp/pizarra" className={s.volver}>‹ Pizarra</Link>
       <PageHeader
-        eyebrow="Gobierno · Base de conocimiento"
         title="Base de conocimiento"
-        subtitle="Procedimientos, manuales técnicos, listas de verificación y políticas internas, con búsqueda y control de quién puede verlos."
+        density="ops"
         actions={
           <>
             <Button variant="secondary" iconLeft="↻" loading={loading && loaded} onClick={() => void load()}>Actualizar</Button>
@@ -345,8 +346,7 @@ export default function KbPage() {
       {error && loaded && (
         <InlineAlert
           variant="warning"
-          title="No se pudo actualizar"
-          message={`${error} Mostramos la última información cargada.`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 16 }}
         />
@@ -400,8 +400,7 @@ export default function KbPage() {
         {!loaded && !loading && error && (
           <InlineAlert
             variant="danger"
-            title="No se pudo cargar la base de conocimiento"
-            message={error}
+            message="No se pudo cargar la base de conocimiento."
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           />
         )}
@@ -411,8 +410,8 @@ export default function KbPage() {
             rows={filtered}
             rowKey={(a) => a.id}
             ariaLabel="Artículos"
-            emptyTitle={articles.length === 0 ? "Aún no hay artículos" : "Sin coincidencias"}
-            emptyDescription={articles.length === 0 ? "Documenta el primer procedimiento para que el equipo lo consulte." : "Ningún artículo coincide con la búsqueda o los filtros."}
+            emptyTitle={articles.length === 0 ? "No hay artículos." : "Nada coincide con estos filtros."}
+            emptyDescription=""
             emptyAction={
               articles.length === 0
                 ? (cfg.canCreate ? <Button size="sm" variant="primary" onClick={openNew}>Nuevo artículo</Button> : undefined)
@@ -437,11 +436,6 @@ export default function KbPage() {
           </>
         }
       >
-        {!editing && (
-          <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-            Procedimiento o guía para el equipo. Se publica de inmediato.
-          </p>
-        )}
         <FormGrid>
           <FormField label="Título" fullWidth error={titleError}>
             <input
@@ -493,6 +487,6 @@ export default function KbPage() {
         {formErr && <InlineAlert message={formErr} style={{ marginTop: 14 }} />}
       </Modal>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import MetricStrip from "@/components/ui/MetricStrip";
@@ -13,7 +14,6 @@ import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
@@ -108,8 +108,8 @@ export default function ComunicacionesInternasPage() {
       const qs = q ? `?search=${encodeURIComponent(q)}` : "";
       const data = await apiFetch(`newsletter${qs}`, token);
       setSubs(Array.isArray(data) ? data : (data?.data ?? []));
-    } catch (e) {
-      setSubsErr(formatApiError(e, "No pudimos cargar la lista de suscriptores."));
+    } catch {
+      setSubsErr("No se pudieron cargar los suscriptores.");
     } finally {
       setSubsLoading(false);
     }
@@ -128,8 +128,8 @@ export default function ComunicacionesInternasPage() {
     try {
       const data = await apiFetch("internal-comunicados?limit=50", token);
       setItems(Array.isArray(data) ? data : (data.data ?? []));
-    } catch (e: unknown) {
-      setError(formatApiError(e, "No pudimos cargar los comunicados."));
+    } catch {
+      setError("No se pudieron cargar los comunicados.");
     } finally {
       setLoading(false);
     }
@@ -164,8 +164,8 @@ export default function ComunicacionesInternasPage() {
         estado: full.estado ?? c.estado,
         scheduledAt: full.scheduledAt?.slice(0, 16) ?? "",
       });
-    } catch (e) {
-      setFormError(`No pudimos cargar el texto completo. ${formatApiError(e, "")}`.trim());
+    } catch {
+      setFormError("No se pudo cargar el comunicado.");
     }
   };
 
@@ -190,8 +190,8 @@ export default function ComunicacionesInternasPage() {
         toast.success("Comunicado creado.");
       }
       setShowForm(false);
-    } catch (e: unknown) {
-      setFormError(formatApiError(e, "No se pudo guardar. Intenta de nuevo."));
+    } catch {
+      setFormError("No se pudo guardar el comunicado.");
     } finally {
       setSaving(false);
     }
@@ -206,8 +206,8 @@ export default function ComunicacionesInternasPage() {
           const updated = await apiFetch(`internal-comunicados/${c.id}/enviar`, token, { method: "PATCH" });
           setItems((prev) => prev?.map((x) => (x.id === c.id ? { ...x, ...updated } : x)) ?? prev);
           toast.success("Comunicado enviado.");
-        } catch (e: unknown) {
-          toast.error(`No se pudo enviar. ${formatApiError(e, "")}`.trim());
+        } catch {
+          toast.error("No se pudo enviar el comunicado.");
         }
       },
     });
@@ -215,13 +215,13 @@ export default function ComunicacionesInternasPage() {
 
   const remove = (c: Comunicado) => {
     setConfirmState({
-      message: `¿Eliminar «${c.titulo}»? Esta acción no se puede deshacer.`,
+      message: `¿Eliminar «${c.titulo}»?`,
       fn: async () => {
         try {
           await apiFetch(`internal-comunicados/${c.id}`, token, { method: "DELETE" });
           setItems((prev) => prev?.filter((x) => x.id !== c.id) ?? prev);
-        } catch (e: unknown) {
-          toast.error(`No se pudo eliminar. ${formatApiError(e, "")}`.trim());
+        } catch {
+          toast.error("No se pudo eliminar el comunicado.");
         }
       },
     });
@@ -314,12 +314,12 @@ export default function ComunicacionesInternasPage() {
   ], []);
 
   return (
-    <>
+    <div className={s.zona}>
+      <Link href="/erp/pizarra" className={s.volver}>‹ Pizarra</Link>
       <PageHeader
-        eyebrow="Hoy"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
-        actions={cfg.canCreate ? <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button> : undefined}
+        title="Comunicados"
+        density="ops"
+        actions={cfg.canCreate ? <Button variant="primary" onClick={openNew}>Nuevo comunicado</Button> : undefined}
       />
 
       {items !== null && (
@@ -347,11 +347,11 @@ export default function ComunicacionesInternasPage() {
       />
 
       {tab === "comunicados" ? (
-        <Section title="Comunicados internos" subtitle="Avisos para el equipo. Usa «Enviar» para mandarlos al momento.">
+        <Section title="Comunicados">
           {error && (
             <InlineAlert
               variant={items ? "warning" : "danger"}
-              message={items ? `No pudimos actualizar; mostramos la última versión. ${error}` : error}
+              message={items ? "No se pudo actualizar." : "No se pudieron cargar los comunicados."}
               action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
             />
           )}
@@ -377,18 +377,18 @@ export default function ComunicacionesInternasPage() {
           />
           {items === null && loading ? (
             <div className={s.skeleton} aria-busy="true" aria-label="Cargando comunicados" />
-          ) : (
+          ) : items === null ? null : (
             <DataTable
               columns={columns}
               rows={visibleComunicados}
               rowKey={(c) => c.id}
-              emptyTitle={rows.length > 0 ? "Sin coincidencias" : "Aún no hay comunicados"}
-              emptyDescription={rows.length > 0 ? "Prueba con otra búsqueda o quita los filtros." : cfg.canCreate ? "Crea el primero con «Nuevo comunicado»." : "Cuando haya avisos para el equipo aparecerán aquí."}
+              emptyTitle={rows.length > 0 ? "Nada coincide con estos filtros." : "No hay comunicados."}
+              emptyDescription=""
             />
           )}
         </Section>
       ) : (
-        <Section title="Suscriptores del boletín" subtitle="Personas registradas desde el formulario del sitio web. Exporta la lista para tu próximo envío.">
+        <Section title="Suscriptores">
           <FilterToolbar
             search={{ value: subSearch, onChange: setSubSearch, placeholder: "Buscar por correo o nombre…" }}
             onClear={() => setSubSearch("")}
@@ -411,13 +411,13 @@ export default function ComunicacionesInternasPage() {
           )}
           {subs === null && subsLoading ? (
             <div className={s.skeleton} aria-busy="true" aria-label="Cargando suscriptores" />
-          ) : (
+          ) : subs === null ? null : (
             <DataTable
               columns={subColumns}
               rows={subs ?? []}
               rowKey={(x) => x.id}
-              emptyTitle={subSearch ? "Sin coincidencias" : "Sin suscriptores"}
-              emptyDescription={subSearch ? "Nadie coincide con esa búsqueda." : "Aún nadie se ha registrado desde el sitio web."}
+              emptyTitle={subSearch ? "Nada coincide con la búsqueda." : "No hay suscriptores."}
+              emptyDescription=""
             />
           )}
         </Section>
@@ -453,7 +453,7 @@ export default function ComunicacionesInternasPage() {
               {PRIORIDADES.map((p) => <option key={p}>{p}</option>)}
             </select>
           </FormField>
-          <FormField label="Programar envío" optional hint="Déjalo vacío para enviarlo manualmente." fullWidth>
+          <FormField label="Programar envío" optional fullWidth>
             <input type="datetime-local" className={s.input} value={form.scheduledAt} onChange={field("scheduledAt")} />
           </FormField>
           <FormField label="Mensaje" fullWidth>
@@ -463,6 +463,6 @@ export default function ComunicacionesInternasPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }
