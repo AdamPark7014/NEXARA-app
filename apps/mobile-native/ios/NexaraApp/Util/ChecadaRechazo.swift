@@ -16,7 +16,7 @@ enum ChecadaRechazo {
 
     /// Qué hacer después del 422 por GPS falso.
     static let mockAyuda =
-        "Tu checada no se registró y tus jefes recibieron el aviso. Desactiva la app de "
+        "Tu checada no se registró y tus jefes recibieron el aviso: desactiva la app de "
         + "ubicación simulada en Ajustes, reinicia la app y vuelve a intentarlo."
 
     /// ¿El error es un rechazo del servidor y no un fallo de red o de datos?
@@ -42,7 +42,7 @@ enum ChecadaRechazo {
 
     /// Para rechazos que la app todavía no conoce: no se culpa al GPS sin saberlo.
     static let ayudaGenerica =
-        "Tu checada no se registró. Lee el motivo de arriba; si crees que es un error, "
+        "Tu checada no se registró: lee el motivo de arriba y, si crees que es un error, "
         + "avisa a tu jefe para que la revise."
 
     /// Sábado y domingo el servidor solo deja checar a quien tiene guardia; la app no
@@ -55,19 +55,19 @@ enum ChecadaRechazo {
     static func ayuda(_ mensaje: String?) -> String {
         let t = (mensaje ?? "").lowercased()
         if t.contains("ubicación vieja") || t.contains("ubicacion vieja") {
-            return "Tu teléfono mandó la última posición que tenía guardada. Sal al aire libre "
-                + "o asómate a una ventana unos segundos para que el GPS mida de nuevo, y vuelve a intentarlo."
+            return "Tu teléfono mandó la última posición que tenía guardada, así que sal al aire libre "
+                + "o asómate a una ventana unos segundos para que el GPS mida de nuevo y vuelve a intentarlo."
         }
         if t.contains("distancia imposible") {
-            return "Tu ubicación no cuadra con tu checada anterior. Si de verdad te trasladaste, "
-                + "avisa a tu jefe para que la registre él; tu checada no se guardó."
+            return "Tu ubicación no cuadra con tu checada anterior, así que, si de verdad te trasladaste, "
+                + "avisa a tu jefe para que la registre él, porque tu checada no se guardó."
         }
         if t.contains("app nexara") {
-            return "Las checadas solo se registran desde esta app. Si no puedes usar tu teléfono, "
+            return "Las checadas solo se registran desde esta app, y si no puedes usar tu teléfono, "
                 + "tu jefe puede registrarla por ti."
         }
         if esFinDeSemanaSinGuardia(t) {
-            return "Sábado y domingo solo checa quien tiene guardia ese día. Si hoy te toca trabajar, "
+            return "Sábado y domingo solo checa quien tiene guardia ese día, así que, si hoy te toca trabajar, "
                 + "pídele a tu encargado que te programe la guardia y vuelve a intentarlo."
         }
         if t.isEmpty || t.contains("simulada") || t.contains("gps falso") {
