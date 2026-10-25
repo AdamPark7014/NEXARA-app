@@ -239,12 +239,17 @@ enum ActivityAdjuntosRules {
         return "\(base) \(anio)"
     }
 
-    /// «2.3 MB · Luis Joel · hoy 13:39» (lo que falte no se escribe).
-    static func meta(_ adjunto: ActivityAdjunto, ahora: Date = Date()) -> String {
+    /// Tamaño, quién lo subió y la hora, en ese orden. Lo que falte no se escribe.
+    /// La fila pinta cada elemento en su propio renglón.
+    static func lineas(_ adjunto: ActivityAdjunto, ahora: Date = Date()) -> [String] {
         let quien = CoreFormat.shortName(adjunto.subidoPor?.nombre)
         return [tamano(adjunto.sizeBytes), quien, cuando(adjunto.createdAt, ahora: ahora)]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
-            .joined(separator: " · ")
+    }
+
+    /// Los mismos datos en una frase. La pantalla no la usa: va un dato por renglón.
+    static func meta(_ adjunto: ActivityAdjunto, ahora: Date = Date()) -> String {
+        lineas(adjunto, ahora: ahora).joined(separator: " · ")
     }
 }
