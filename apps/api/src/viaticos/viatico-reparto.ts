@@ -56,13 +56,13 @@ export function normalizarPartes(raw: unknown): Parte[] {
     const actividadId = Number(entrada?.actividadId);
     if (!Number.isInteger(actividadId) || actividadId <= 0) {
       throw new Error(
-        `La parte ${i + 1} del reparto no indica a qué actividad se carga. Elige una actividad.`,
+        `La parte ${i + 1} del reparto no indica a qué actividad se carga: elige una actividad.`,
       );
     }
     const monto = Number(entrada?.monto);
     if (!Number.isFinite(monto)) {
       throw new Error(
-        `La parte ${i + 1} del reparto no trae un importe válido. Captura cuánto carga esa actividad.`,
+        `La parte ${i + 1} del reparto no trae un importe válido: captura cuánto carga esa actividad.`,
       );
     }
     const nota = typeof entrada?.nota === 'string' ? entrada.nota.trim().slice(0, 255) : '';
@@ -100,8 +100,8 @@ export function validarReparto(partes: Parte[], total: unknown): ResultadoRepart
       return {
         ok: false,
         mensaje:
-          `La actividad #${parte.actividadId} aparece dos veces en el reparto. ` +
-          'Junta las dos partes en una sola con el monto sumado.',
+          `La actividad #${parte.actividadId} aparece dos veces en el reparto: ` +
+          'junta las dos partes en una sola con el monto sumado.',
       };
     }
     vistas.add(parte.actividadId);
@@ -111,8 +111,8 @@ export function validarReparto(partes: Parte[], total: unknown): ResultadoRepart
       return {
         ok: false,
         mensaje:
-          `La parte de la actividad #${parte.actividadId} es de ${pesos(cent || 0)}. ` +
-          'Cada parte tiene que ser mayor que cero; si esa actividad no carga nada, quítala del reparto.',
+          `La parte de la actividad #${parte.actividadId} es de ${pesos(cent || 0)}: ` +
+          'cada parte tiene que ser mayor que cero; si esa actividad no carga nada, quítala del reparto.',
       };
     }
   }
@@ -126,8 +126,8 @@ export function validarReparto(partes: Parte[], total: unknown): ResultadoRepart
     ok: false,
     mensaje:
       `El reparto suma ${pesos(sumaCent)} y el viático es de ${pesos(totalCent)}: ` +
-      `${falta ? 'faltan' : 'sobran'} ${pesos(Math.abs(diferencia))}. ` +
-      `${falta ? 'Reparte lo que falta' : 'Baja alguna parte'} o corrige el monto del viático.`,
+      `${falta ? 'faltan' : 'sobran'} ${pesos(Math.abs(diferencia))}: ` +
+      `${falta ? 'reparte lo que falta' : 'baja alguna parte'} o corrige el monto del viático.`,
   };
 }
 

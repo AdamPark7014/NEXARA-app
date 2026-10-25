@@ -131,6 +131,100 @@ describe('reparto de un viático entre actividades — la regla del cuadre', () 
     expect(validarReparto(partes, 1200).ok).toBe(false);
   });
 
+  it('cita el texto viejo y deja cada aviso del reparto en una frase', () => {
+    // El número y el monto salen del dato: actividad 12 y parte en cero.
+    const actividadId = 12;
+    const montoCero = 0;
+
+    const duplicada = validarReparto(
+      normalizarPartes([
+        { actividadId, monto: 600 },
+        { actividadId, monto: 600 },
+      ]),
+      1200,
+    );
+    const textoViejoDuplicada =
+      'La actividad #12 aparece dos veces en el reparto. Junta las dos partes en una sola con el monto sumado.';
+    expect(duplicada).toEqual({
+      ok: false,
+      mensaje: `La actividad #${actividadId} aparece dos veces en el reparto: junta las dos partes en una sola con el monto sumado.`,
+    });
+    expect(duplicada).not.toEqual({ ok: false, mensaje: textoViejoDuplicada });
+    expect((duplicada as { mensaje: string }).mensaje).toContain('aparece dos veces en el reparto');
+    expect((duplicada as { mensaje: string }).mensaje).toContain(
+      'junta las dos partes en una sola con el monto sumado',
+    );
+
+    const enCero = validarReparto(
+      normalizarPartes([
+        { actividadId, monto: montoCero },
+        { actividadId: 13, monto: 1200 },
+      ]),
+      1200,
+    );
+    const textoViejoCero =
+      'La parte de la actividad #12 es de $0.00. Cada parte tiene que ser mayor que cero; si esa actividad no carga nada, quítala del reparto.';
+    expect(enCero).toEqual({
+      ok: false,
+      mensaje: `La parte de la actividad #${actividadId} es de $0.00: cada parte tiene que ser mayor que cero; si esa actividad no carga nada, quítala del reparto.`,
+    });
+    expect(enCero).not.toEqual({ ok: false, mensaje: textoViejoCero });
+    expect((enCero as { mensaje: string }).mensaje).toContain(`#${actividadId}`);
+    expect((enCero as { mensaje: string }).mensaje).toContain('$0.00');
+    expect((enCero as { mensaje: string }).mensaje).toContain('cada parte tiene que ser mayor que cero');
+    expect((enCero as { mensaje: string }).mensaje).toContain('quítala del reparto');
+
+    const textoViejoSinActividad =
+      'La parte 1 del reparto no indica a qué actividad se carga. Elige una actividad.';
+    expect(() => normalizarPartes([{ monto: 1200 }])).toThrow(
+      'La parte 1 del reparto no indica a qué actividad se carga: elige una actividad.',
+    );
+    expect(textoViejoSinActividad).toContain('no indica a qué actividad se carga');
+
+    const textoViejoImporte =
+      'La parte 1 del reparto no trae un importe válido. Captura cuánto carga esa actividad.';
+    expect(() => normalizarPartes([{ actividadId }])).toThrow(
+      'La parte 1 del reparto no trae un importe válido: captura cuánto carga esa actividad.',
+    );
+    expect(textoViejoImporte).toContain('no trae un importe válido');
+
+    const corto = validarReparto(
+      normalizarPartes([
+        { actividadId, monto: 700 },
+        { actividadId: 13, monto: 300 },
+      ]),
+      1200,
+    );
+    const textoViejoFaltan =
+      'El reparto suma $1,000.00 y el viático es de $1,200.00: faltan $200.00. Reparte lo que falta o corrige el monto del viático.';
+    expect(corto).toEqual({
+      ok: false,
+      mensaje:
+        'El reparto suma $1,000.00 y el viático es de $1,200.00: faltan $200.00: reparte lo que falta o corrige el monto del viático.',
+    });
+    expect(corto).not.toEqual({ ok: false, mensaje: textoViejoFaltan });
+    expect((corto as { mensaje: string }).mensaje).toContain('faltan');
+    expect((corto as { mensaje: string }).mensaje).toContain('200.00');
+
+    const largo = validarReparto(
+      normalizarPartes([
+        { actividadId, monto: 900 },
+        { actividadId: 13, monto: 500 },
+      ]),
+      1200,
+    );
+    const textoViejoSobran =
+      'El reparto suma $1,400.00 y el viático es de $1,200.00: sobran $200.00. Baja alguna parte o corrige el monto del viático.';
+    expect(largo).toEqual({
+      ok: false,
+      mensaje:
+        'El reparto suma $1,400.00 y el viático es de $1,200.00: sobran $200.00: baja alguna parte o corrige el monto del viático.',
+    });
+    expect(largo).not.toEqual({ ok: false, mensaje: textoViejoSobran });
+    expect((largo as { mensaje: string }).mensaje).toContain('sobran');
+    expect((largo as { mensaje: string }).mensaje).toContain('200.00');
+  });
+
   it('sin partes no hay reparto: el viático sigue siendo de una sola actividad', () => {
     expect(validarReparto([], 1200)).toEqual({ ok: true });
   });
