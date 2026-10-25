@@ -39,6 +39,26 @@ describe("mensajeFotoNoGuardada", () => {
     expect(mensajeFotoNoGuardada(new TypeError("Failed to fetch"), "x", "quitar")).toMatch(/NO se quitó/);
   });
 
+  it("sin conexión, cada error es una frase y volver a enviar se queda", () => {
+    const red = new TypeError("Failed to fetch");
+    const guardar = mensajeFotoNoGuardada(red, "x");
+    const quitar = mensajeFotoNoGuardada(red, "x", "quitar");
+    const viejoGuardar =
+      "Sin conexión: la foto NO se guardó. Sigue aquí en la vista previa; cuando tengas señal toca enviar otra vez.";
+    const viejoQuitar = "Sin conexión: la foto NO se quitó. Intenta de nuevo cuando tengas señal.";
+
+    expect(guardar).toBe(
+      "Sin conexión: la foto NO se guardó: sigue aquí en la vista previa; cuando tengas señal toca enviar otra vez.",
+    );
+    expect(quitar).toBe("Sin conexión: la foto NO se quitó: intenta de nuevo cuando tengas señal.");
+    expect(guardar).not.toBe(viejoGuardar);
+    expect(quitar).not.toBe(viejoQuitar);
+    expect(guardar).toMatch(/enviar otra vez/);
+    expect(quitar).toMatch(/intenta de nuevo/);
+    expect(guardar.match(/\./g)).toEqual(["."]);
+    expect(quitar.match(/\./g)).toEqual(["."]);
+  });
+
   it("navegador sin red aunque el error sea otro", () => {
     vi.stubGlobal("navigator", { onLine: false });
     expect(esErrorDeRed(new Error("algo"))).toBe(true);
