@@ -143,7 +143,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
     try {
       await cancelActivity(token, activityId, motivo.trim());
       setDialogo(null);
-      setAviso("La actividad quedó cancelada. Avisamos al equipo, a sus jefes y a Christian.");
+      setAviso("La actividad quedó cancelada.");
       await cargar();
       onDone();
     } catch (e) {
@@ -160,7 +160,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
     try {
       await registrarIncumplimiento(token, activityId, causa, motivo.trim());
       setDialogo(null);
-      setAviso("Quedó registrada como no cumplida. Avisamos a quienes la tenían, al responsable y a sus jefes.");
+      setAviso("Quedó registrada como no cumplida.");
       await cargar();
       onDone();
     } catch (e) {
@@ -178,7 +178,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
     try {
       await reprogramarNoCumplida(token, activityId, new Date(fecha).toISOString(), motivo.trim());
       setDialogo(null);
-      setAviso("La actividad se reabrió con la nueva fecha. El incumplimiento queda en su historial.");
+      setAviso("La actividad se reabrió con la nueva fecha.");
       await cargar();
       onDone();
     } catch (e) {
@@ -200,7 +200,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
       });
       const nuevo = companeros.find((c) => c.id === Number(aUsuarioId))?.nombre ?? "tu compañero";
       setDialogo(null);
-      setAviso(`La actividad pasó a ${nuevo}. Continuará donde se quedó con sus propias fotos de entrada y salida.`);
+      setAviso(`La actividad pasó a ${nuevo}.`);
       await cargar();
       onDone();
     } catch (e) {
@@ -295,10 +295,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
         }
       >
         <div className={s.cuerpo}>
-          <p className={s.nota}>
-            La actividad quedará como «Cancelada» con tu motivo en el historial. Se avisa a quienes la ejecutan, al
-            responsable, a sus jefes y a Christian.
-          </p>
+          <p className={s.nota}>La actividad quedará como «Cancelada» con tu motivo en el historial.</p>
           <Field label="Motivo" required hint={contador}>
             <Textarea
               value={motivo}
@@ -339,8 +336,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
         <div className={s.cuerpo}>
           <p className={s.nota}>
             La actividad se cierra como «No cumplida» y cuenta en los indicadores de cumplimiento de quienes no la
-            entregaron. Queda en su historial con la causa y tus observaciones; si el trabajo sigue pendiente, después
-            puedes reprogramarla.
+            entregaron.
           </p>
           <Field label="Causa" required>
             <Select value={causa} onChange={(e) => setCausa(e.target.value)}>
@@ -390,10 +386,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
         }
       >
         <div className={s.cuerpo}>
-          <p className={s.nota}>
-            Se reabre con la nueva fecha y el equipo recibe el aviso. El incumplimiento anterior no se borra: sigue
-            contando en los indicadores.
-          </p>
+          <p className={s.nota}>Se reabre con la nueva fecha y el equipo recibe el aviso.</p>
           <Field label="Nueva fecha y hora" required>
             <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </Field>
@@ -436,8 +429,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
       >
         <div className={s.cuerpo}>
           <p className={s.nota}>
-            Quien la recibe continúa donde se quedó: ve el avance anterior y toma sus propias fotos de entrada y
-            salida. El avance de quien sale queda guardado.
+            Quien la recibe continúa donde se quedó: ve el avance anterior y toma sus propias fotos de entrada y salida.
           </p>
           <Field label="Quién la deja" required>
             <Select value={deUsuarioId} onChange={(e) => setDeUsuarioId(e.target.value ? Number(e.target.value) : "")}>
