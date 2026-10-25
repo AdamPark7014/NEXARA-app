@@ -52,8 +52,7 @@ enum ActivityGeofence {
 
     /// Mismo texto con el que el API rechaza la foto de salida (`mensajeSalidaFueraDeZona`).
     static func mensajeSalidaFueraDeZona(distancia: Int, radioM: Int = ActivityGeofence.radioM) -> String {
-        "La salida se registra donde iniciaste la actividad: estás a \(distancia) m y el máximo es \(radioM) m. "
-            + "Regresa al punto de inicio para tomar la foto de salida."
+        "La salida se registra donde iniciaste la actividad: estás a \(distancia) m y el máximo es \(radioM) m, regresa al punto de inicio para tomar la foto de salida."
     }
 
     /// Distancia de un punto al inicio de la geocerca, o `nil` si no hay contra qué

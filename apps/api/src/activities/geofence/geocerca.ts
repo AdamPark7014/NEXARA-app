@@ -38,8 +38,5 @@ export function fueraDeZona(origen: Punto, punto: Punto, radioM = RADIO_ACTIVIDA
 
 /** Mensaje al bloquear la foto de salida. */
 export function mensajeSalidaFueraDeZona(distancia: number, radioM = RADIO_ACTIVIDAD_M): string {
-  return (
-    `La salida se registra donde iniciaste la actividad: estás a ${distancia} m y el máximo es ${radioM} m. ` +
-    'Regresa al punto de inicio para tomar la foto de salida.'
-  );
+  return `La salida se registra donde iniciaste la actividad: estás a ${distancia} m y el máximo es ${radioM} m, regresa al punto de inicio para tomar la foto de salida.`;
 }
