@@ -61,12 +61,6 @@ const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm")
   loading: () => <SkeletonRows rows={3} label="Cargando formulario" />,
 });
 
-/** Ayuda de cada encargo en palabras de campo (el título se queda igual). */
-const CHARGE_HELP: Record<AssignmentCharge, string> = {
-  ejecucion: `${CHARGE_LABEL.ejecucion}: queda a su cargo y la realiza en persona.`,
-  despacho: "La reparte a su gente: queda a su cargo coordinar quién la hace.",
-};
-
 type PasoId = "tipo" | "encargo" | "tiempo" | "equipo" | "datos";
 
 const ID_PASO: Record<PasoId, string> = {
@@ -93,7 +87,7 @@ function EquipoPendienteBox({
     return (
       <div role="status" aria-busy={sumando} className={a.sumando}>
         <SkeletonRows rows={1} label="Sumando al equipo" />
-        <span className={c.tenue}>Actividad creada. Sumando al equipo…</span>
+        <span className={c.tenue}>Sumando al equipo.</span>
       </div>
     );
   }
@@ -101,20 +95,18 @@ function EquipoPendienteBox({
     <Alert
       tone="warning"
       role="alert"
-      title="La actividad ya se creó"
       action={
         <span className={c.fila}>
           <Button variant="primary" size="sm" className={c.tap} onClick={onRetry}>
             Reintentar
           </Button>
           <ButtonLink href={`/erp/actividades/${activityId}`} size="sm" className={c.tap} iconEnd={<ArrowForwardIcon />}>
-            Abrir la actividad
+            Abrir
           </ButtonLink>
         </span>
       }
     >
-      , pero no se pudo sumar a todo el equipo: {error}
-      <span className={a.nota}>«Reintentar» solo suma a quien faltó; no crea otra actividad.</span>
+      No se pudo sumar al equipo.
     </Alert>
   );
 }
@@ -416,7 +408,6 @@ export default function AsignarActividadPage() {
     );
   }
 
-  const displayName = person?.nombre ?? "Cargando…";
   const nombreCorto = person ? shortName(person.nombre) : "esta persona";
 
   // Pasos en el orden en que aparecen: se numeran seguidos, sin saltos.
@@ -437,7 +428,7 @@ export default function AsignarActividadPage() {
   // Lista de la derecha: qué ya quedó y qué falta, en el mismo orden que los pasos.
   const tiempoTexto = planValido
     ? [planHoras > 0 ? `${planHoras} h` : "", planMinutos > 0 ? `${planMinutos} min` : ""].filter(Boolean).join(" ")
-    : "falta el tiempo estimado";
+    : "falta";
   const pendientes: PendingItem[] = [
     {
       id: "tipo",
@@ -451,7 +442,7 @@ export default function AsignarActividadPage() {
           {
             id: "encargo",
             label: "Encargo",
-            hint: effectiveCharge ? CHARGE_LABEL[effectiveCharge] : "la hace o la reparte",
+            hint: effectiveCharge ? CHARGE_LABEL[effectiveCharge] : "elige",
             done: chargeReady,
             fieldId: ID_PASO.encargo,
           },
@@ -474,7 +465,7 @@ export default function AsignarActividadPage() {
           {
             id: "equipo",
             label: "Equipo",
-            hint: extraIds.length ? `${nombreCorto} y ${extraIds.length} más` : `${nombreCorto} (sumar más es opcional)`,
+            hint: extraIds.length ? `${nombreCorto} y ${extraIds.length} más` : nombreCorto,
             done: true,
             fieldId: ID_PASO.equipo,
           },
@@ -485,7 +476,7 @@ export default function AsignarActividadPage() {
           {
             id: "datos",
             label: "Datos de la actividad",
-            hint: "título, lugar y fecha",
+            hint: "título y fecha",
             done: Boolean(pendiente),
             fieldId: ID_PASO.datos,
           },
@@ -496,19 +487,12 @@ export default function AsignarActividadPage() {
   return (
     <div className={a.pagina}>
       <PageHead
-        breadcrumbs={[
-          { label: "Actividades", href: "/erp/pizarra" },
-          { label: person ? shortName(person.nombre) : "Persona", href: `/erp/pizarra/${userId}` },
-          { label: "Asignar" },
-        ]}
-        back={{ href: `/erp/pizarra/${userId}`, label: "Volver al perfil" }}
-        eyebrow="Asignar actividad a"
-        icon={<Avatar name={person?.nombre ?? "?"} avatarUrl={person?.avatarUrl} size={40} />}
-        title={displayName}
-        description={person?.puesto || "Elige el tipo y completa los datos"}
+        back={{ href: `/erp/pizarra/${userId}`, label: person ? shortName(person.nombre) : "Pizarra" }}
+        icon={person ? <Avatar name={person.nombre} avatarUrl={person.avatarUrl} size={40} /> : undefined}
+        title={person ? `Asignar a ${shortName(person.nombre)}` : "Asignar"}
       />
 
-      {loadError ? (
+          {loadError ? (
         <Alert
           tone="danger"
           role="alert"
@@ -519,7 +503,7 @@ export default function AsignarActividadPage() {
             </Button>
           }
         >
-          {loadError}
+          No se pudo cargar a la persona.
         </Alert>
       ) : null}
 
@@ -529,8 +513,7 @@ export default function AsignarActividadPage() {
             id={ID_PASO.tipo}
             step={paso("tipo")}
             done={Boolean(kind)}
-            title="Tipo de actividad"
-            description={person ? `Solo ves los tipos que ${nombreCorto} puede recibir.` : undefined}
+            title="Tipo"
           >
             {!person && !loadError ? (
               <div className={a.esqueletos} aria-busy="true" aria-label="Cargando tipos">
@@ -549,7 +532,6 @@ export default function AsignarActividadPage() {
                     onClick={() => setKind(id)}
                     icon={<ActivityKindIcon kind={opt.icon} variant="badge" size={36} />}
                     title={opt.title}
-                    help={opt.help}
                   />
                 );
               })}
@@ -561,12 +543,7 @@ export default function AsignarActividadPage() {
               id={ID_PASO.encargo}
               step={paso("encargo")}
               done
-              title={`Encargo a ${nombreCorto}`}
-              description={
-                isServicioBridgeEmail(person?.email)
-                  ? `Se la dejas a ${nombreCorto}. Él elige al ingeniero de su equipo. Tú no eliges quién la ejecuta.`
-                  : "La reparte a su gente. En servicios le dejas la actividad y cuántas personas ocupas; él se la manda a Antonio y Antonio elige al soporte."
-              }
+              title="Encargo"
               actions={
                 <Badge tone="brand" dot>
                   Despacho a equipo
@@ -601,8 +578,7 @@ export default function AsignarActividadPage() {
               id={ID_PASO.encargo}
               step={paso("encargo")}
               done
-              title={`Encargo a ${nombreCorto}`}
-              description={`${CHARGE_LABEL.ejecucion}, sin repartirla a nadie más.`}
+              title="Encargo"
               actions={
                 <Badge tone="brand" dot>
                   Ejecución directa
@@ -625,8 +601,7 @@ export default function AsignarActividadPage() {
               id={ID_PASO.encargo}
               step={paso("encargo")}
               done={charge != null}
-              title={`Encargo a ${nombreCorto}`}
-              description="¿La hace en persona o la reparte a su gente?"
+              title="Encargo"
             >
               <RejillaOpciones min={220} ariaLabel={`Encargo a ${nombreCorto}`}>
                 {(Object.keys(ASSIGNMENT_CHARGES) as AssignmentCharge[]).map((id) => {
@@ -637,7 +612,6 @@ export default function AsignarActividadPage() {
                       selected={charge === id}
                       onClick={() => setCharge(id)}
                       title={opt.title}
-                      help={CHARGE_HELP[id]}
                     />
                   );
                 })}
@@ -649,7 +623,6 @@ export default function AsignarActividadPage() {
             <Alert
               tone="warning"
               role="status"
-              title="Los servicios van primero a Antonio."
               action={
                 antonioOnBoard ? (
                   <Button
@@ -658,16 +631,12 @@ export default function AsignarActividadPage() {
                     iconEnd={<ArrowForwardIcon />}
                     onClick={() => router.push(`/erp/pizarra/${antonioOnBoard.id}/asignar`)}
                   >
-                    Ir a asignar a {shortName(antonioOnBoard.nombre)}
+                    Asignar a {shortName(antonioOnBoard.nombre)}
                   </Button>
                 ) : undefined
               }
             >
-              {" "}
-              Él agenda el día y la hora con Carolina o Alejandro.
-              {antonioOnBoard ? null : (
-                <span className={a.nota}>No encontramos a Antonio en el tablero. Avísale a dirección.</span>
-              )}
+              {antonioOnBoard ? "Los servicios se asignan a Antonio." : "No está Antonio en el tablero."}
             </Alert>
           )}
 
@@ -678,10 +647,9 @@ export default function AsignarActividadPage() {
               done={planValido}
               title={
                 <>
-                  ¿Cuánto tiempo toma? <RequiredMark />
+                  Tiempo <RequiredMark />
                 </>
               }
-              description="Cuánto debería tomarle. Gira las ruedas de horas y minutos — no hace falta hacer la cuenta mental."
               className={planValido ? undefined : a.seccionAviso}
             >
               <DurationWheelPicker
@@ -695,15 +663,10 @@ export default function AsignarActividadPage() {
                 maxHoras={12}
                 topeMinutos={720}
                 minuteStep={5}
-                hint={
-                  !planValido
-                    ? "Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede."
-                    : "Máximo 12 h. Si lleva más días, se reanuda cada día."
-                }
               />
               {!planValido ? (
                 <p className={a.faltaTiempo} role="status">
-                  Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede.
+                  Falta el tiempo.
                 </p>
               ) : null}
             </FormSection>
@@ -716,24 +679,7 @@ export default function AsignarActividadPage() {
                   id={ID_PASO.equipo}
                   step={paso("equipo")}
                   done={extraIds.length > 0}
-                  title={effectiveCharge === "despacho" ? "¿Quién la hace?" : "¿Alguien más ayuda?"}
-                  description={
-                    effectiveCharge === "despacho"
-                      ? kind === "proyecto"
-                        ? `Puedes sumar instaladores y soporte. Si mezclas a los dos equipos, también se avisa al otro encargado (por ejemplo Antonio), además de ${nombreCorto}.`
-                        : `Suma a quien la hará con ${nombreCorto}. Si no eliges a nadie, ${nombreCorto} la reparte después.`
-                      : kind === "servicio" && isServicioBridgeEmail(person?.email)
-                        ? "Suma a Carolina o Alejandro (el día y la hora van en el formulario)."
-                        : kind === "servicio"
-                          ? "Solo soporte (Antonio, Carolina, Alejandro)."
-                          : kind === "obra"
-                            ? "Solo instaladores de campo (Joan, Israel, Juan José)."
-                            : kind === "proyecto"
-                              ? "Soporte e instaladores pueden colaborar. Si hay gente de los dos lados, se avisa a los dos encargados."
-                              : effectiveCharge === "ejecucion"
-                                ? `${nombreCorto} la hace. Si quieres, suma a alguien de apoyo.`
-                                : `${nombreCorto} queda como responsable. Si quieres, suma a alguien de apoyo.`
-                  }
+                  title="Equipo"
                   actions={
                     effectiveCharge === "despacho" ? undefined : (
                       <Badge tone="outline" size="sm">
@@ -744,15 +690,12 @@ export default function AsignarActividadPage() {
                 >
                   <div className={c.pila}>
                     {autoPeerCoordinators.length > 0 ? (
-                      <Alert tone="info" role="status" title="Se suman encargados:">
-                        {" "}
-                        además de {nombreCorto}, también se avisará a{" "}
-                        {autoPeerCoordinators.map((u) => shortName(u.nombre)).join(", ")} para coordinar (hay gente de
-                        instalación y de soporte).
+                      <Alert tone="info" role="status">
+                        También se avisa a {autoPeerCoordinators.map((u) => shortName(u.nombre)).join(", ")}.
                       </Alert>
                     ) : null}
                     {teamForExtras.length === 0 ? (
-                      <p className={c.pista}>No hay más personas disponibles para sumar ahora.</p>
+                      <p className={c.pista}>No hay más personas.</p>
                     ) : (
                       <>
                         <div className={a.personas} role="group" aria-label="Personas para sumar">
@@ -814,7 +757,6 @@ export default function AsignarActividadPage() {
                     </span>
                   </span>
                 }
-                description="Título, lugar, día y hora. Al guardar, se suma al equipo y vuelves a su ficha."
               >
                 {pendiente ? (
                   <EquipoPendienteBox
@@ -844,11 +786,11 @@ export default function AsignarActividadPage() {
               </FormSection>
             </>
           ) : bridgeNeeded ? null : kindMeta && chargeReady && !planValido ? (
-            <p className={a.siguiente}>Indica el tiempo estimado para continuar.</p>
+            <p className={a.siguiente}>Falta el tiempo.</p>
           ) : kindMeta && offerCharge && !charge ? (
-            <p className={a.siguiente}>Elige si la hace {nombreCorto} o si la reparte a su equipo para continuar.</p>
+            <p className={a.siguiente}>Elige el encargo.</p>
           ) : person ? (
-            <p className={a.siguiente}>Elige un tipo para continuar.</p>
+            <p className={a.siguiente}>Elige un tipo.</p>
           ) : null}
         </div>
 

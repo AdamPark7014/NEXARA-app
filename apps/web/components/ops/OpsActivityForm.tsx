@@ -83,6 +83,7 @@ import { quickCreateOperationalProject } from "@/lib/ops-operational-api";
 import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
 import { aInputFecha, hoyISO } from "@/lib/proyecto-plan";
 import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-periodo";
+import o from "@/components/pizarra/Opciones.module.css";
 import coreCss from "./OpsActivityFormCore.module.css";
 import s from "./OpsActivityForm.module.css";
 
@@ -780,11 +781,10 @@ export default function OpsActivityForm({
     return (
       <EmptyState
         tone="warning"
-        title="Sin permisos"
-        description={tone === "core" ? "No puedes asignar actividades." : "No tienes permiso para crear o asignar OT."}
+        title={tone === "core" ? "No puedes asignar actividades." : "No puedes crear órdenes de trabajo."}
         action={
           <ButtonLink href={tone === "core" ? "/erp/pizarra" : "/ops/activities"} variant="secondary">
-            ← Volver
+            {tone === "core" ? "‹ Pizarra" : "‹ Actividades"}
           </ButtonLink>
         }
       />
@@ -860,12 +860,6 @@ export default function OpsActivityForm({
   }
 
   const hayDonde = form.projectMode === "with_project" || needsClientPicker || Boolean(pendingRequestId);
-  const textoSinProyecto =
-    tone === "core"
-      ? needsClientPicker
-        ? "Elige el cliente de este padrón."
-        : "Trabajo del día sin proyecto."
-      : "Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo.";
   let paso = 0;
   const siguiente = () => ++paso;
 
@@ -881,13 +875,6 @@ export default function OpsActivityForm({
     : isCore
       ? "Datos de la actividad"
       : "Nueva orden de trabajo";
-  const subtitulo = isCore
-    ? form.projectMode === "with_project"
-      ? "Elige proyecto, prioridad y agenda. El cliente sale del proyecto."
-      : "Qué hay que hacer, qué tan urgente es y para cuándo."
-    : form.projectMode === "with_project"
-      ? "OT con proyecto operativo: el cliente sale del proyecto."
-      : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto.";
 
   const duracion = (cual: "tiempoEstimadoMin" | "tiempoMaximoMin") => ({
     horas: splitMinutes(Number(form[cual]) || 0).horas,
@@ -901,20 +888,19 @@ export default function OpsActivityForm({
       <FormPage
         title={titulo}
         head={
-          <header className={s.cabeza}>
-            <div>
-              <h2 className={s.cabezaT}>{titulo}</h2>
-              <p className={s.cabezaD}>
-                {subtitulo} Los campos con <b className={s.req}>*</b> son obligatorios.
-              </p>
-            </div>
-            {!isEdit && !isCore ? (
-              <Badge tone="outline">AN sugerido: {nextAn || (nextAnLoaded ? "No disponible" : "Calculando…")}</Badge>
-            ) : null}
-          </header>
+          isCore ? null : (
+            <header className={s.cabeza}>
+              <div>
+                <h2 className={s.cabezaT}>{titulo}</h2>
+              </div>
+              {!isEdit ? (
+                <Badge tone="outline">AN sugerido: {nextAn || (nextAnLoaded ? "No disponible" : "Calculando…")}</Badge>
+              ) : null}
+            </header>
+          )
         }
         pending={pendientes}
-        pendingTitle={isEdit ? "Antes de guardar" : "Antes de crear"}
+        pendingTitle="Falta"
         footer={
           <FormFooter
             start={
@@ -979,8 +965,7 @@ export default function OpsActivityForm({
         <FormSection
           step={siguiente()}
           done={tituloOk && tipoTareaOk}
-          title="¿Qué se va a hacer?"
-          description={hayDonde ? "El tipo y el título son lo primero que ve quien la ejecuta." : textoSinProyecto}
+          title="Qué hacer"
         >
           <div className={s.cuerpo}>
             {!(hideProjectModePicker || forcedProjectMode) && (
@@ -1027,7 +1012,7 @@ export default function OpsActivityForm({
                 <span className={s.etiqueta}>
                   Tipo de tarea <b className={s.req}>*</b>
                 </span>
-                <div className={s.chips} role="group" aria-label="Tipo de tarea">
+                <div className={o.tipos} role="group" aria-label="Tipo de tarea">
                   {TAREA_TIPOS.map((t, i) => {
                     const on = tareaTipo === t.id;
                     return (
@@ -1093,8 +1078,7 @@ export default function OpsActivityForm({
                 label={isCore ? "Título" : "Título de la OT"}
                 required
                 fullWidth={isCore || isEdit}
-                hint="Lo que verá quien la ejecute en su lista."
-                error={intentado && !tituloOk ? "Escribe qué hay que hacer." : null}
+                error={intentado && !tituloOk ? "Escribe el título." : null}
               >
                 <Input
                   id="oaf-titulo"
@@ -1137,7 +1121,7 @@ export default function OpsActivityForm({
                 {isCore ? (
                   <Textarea
                     rows={3}
-                    placeholder="Qué deben saber todos los que la hagan: acceso, material, contacto…"
+                    placeholder="Indicaciones"
                     value={form.indicaciones}
                     onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
                   />
@@ -1159,8 +1143,7 @@ export default function OpsActivityForm({
             id="oaf-donde"
             step={siguiente()}
             done={proyectoOk && clienteServicioOk && (form.projectMode === "with_project" || !needsClientPicker || Boolean(form.clientId))}
-            title="¿Dónde y para quién?"
-            description={form.projectMode === "with_project" ? "El cliente sale del proyecto." : textoSinProyecto}
+            title="Dónde"
           >
             <div className={s.cuerpo}>
               {form.projectMode === "with_project" ? (
@@ -1200,7 +1183,7 @@ export default function OpsActivityForm({
                   </FieldGrid>
                   <div className={s.grupo}>
                     <Button variant="link" className={s.linkInicio} onClick={() => setAltaProyectoAbierta((v) => !v)}>
-                      {altaProyectoAbierta ? "Cerrar alta de proyecto" : "¿No está el proyecto? Créalo aquí"}
+                      {altaProyectoAbierta ? "Cerrar" : "Crear proyecto"}
                     </Button>
                     {altaProyectoAbierta ? (
                       <div className={s.alta}>
@@ -1243,9 +1226,8 @@ export default function OpsActivityForm({
                             loading={creandoProyecto}
                             onClick={() => void crearProyectoRapido()}
                           >
-                            {creandoProyecto ? "Creando…" : "Crear y usar este proyecto"}
+                            {creandoProyecto ? "Creando…" : "Crear y usar"}
                           </Button>
-                          <p className={s.nota}>Fechas, alcance y equipo se completan después en Proyectos.</p>
                         </div>
                       </div>
                     ) : null}
@@ -1349,8 +1331,7 @@ export default function OpsActivityForm({
         <FormSection
           step={siguiente()}
           done={responsableOk && agendaOk && periodoOk}
-          title="¿Quién y cuándo?"
-          description="Prioridad, agenda y cuánto tiempo toma."
+          title="Cuándo"
         >
           <div className={s.cuerpo}>
             <FieldGrid>
@@ -1393,7 +1374,7 @@ export default function OpsActivityForm({
                   required={requireSchedule}
                 />
               </Field>
-              <Field label="Al (último día, si dura varios)" optional>
+              <Field label="Hasta" optional>
                 <DateInput
                   id="oaf-al"
                   value={form.periodoFin}
@@ -1439,13 +1420,15 @@ export default function OpsActivityForm({
                 </Select>
               </Field>
             ) : null}
-            <p id={`${periodoId}-resumen`} className={periodoMal ? `${s.resumen} ${s.resumenMal}` : s.resumen}>
-              {form.periodoFin && form.fecha
-                ? form.periodoFin < form.fecha
-                  ? "El último día no puede ser anterior al primero."
-                  : `${resumenDelRango({ inicio: form.fecha, fin: form.periodoFin })}. Se queda en la pizarra cada día hasta terminarla y no cuenta como atrasada antes del último día.`
-                : "Sin último día es de un solo momento (día y hora). Si el trabajo dura varios días, pon hasta cuándo: así no hay que cargarla cada día."}
-            </p>
+            {form.periodoFin && form.fecha ? (
+              <p id={`${periodoId}-resumen`} className={periodoMal ? `${s.resumen} ${s.resumenMal}` : s.resumen}>
+                {form.periodoFin < form.fecha
+                  ? "El último día queda antes del primero."
+                  : resumenDelRango({ inicio: form.fecha, fin: form.periodoFin })}
+              </p>
+            ) : (
+              <p id={`${periodoId}-resumen`} className={s.resumen} hidden />
+            )}
             {form.fecha && form.responsableId ? (
               <AvisoGuardia
                 token={token}
@@ -1460,14 +1443,12 @@ export default function OpsActivityForm({
             ) : null}
             <div className={s.duraciones}>
               <div className={s.grupo}>
-                <span className={s.etiqueta}>{isCore ? "¿Cuánto tiempo toma?" : "Tiempo esperado"}</span>
+                <span className={s.etiqueta}>{isCore ? "Tiempo" : "Tiempo esperado"}</span>
                 <DurationWheelPicker
                   {...duracion("tiempoEstimadoMin")}
-                  // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
                   maxHoras={12}
                   topeMinutos={720}
                   minuteStep={5}
-                  hint={isCore ? "Gira las ruedas. Máximo 12 h: si lleva más días, se reanuda cada día." : undefined}
                 />
               </div>
               <div className={s.grupo}>
@@ -1483,14 +1464,7 @@ export default function OpsActivityForm({
           <FormSection
             id="oaf-campos"
             step={siguiente()}
-            title="Evidencia que se pedirá"
-            description={
-              puedeDefinirCampos
-                ? campos.length
-                  ? "Quien la ejecute verá estos puntos en la app y no podrá avanzar sin la foto de cada momento marcado. Las fotos libres quedan como extra."
-                  : "Define cada cosa que se debe documentar (Cámara 1, Rack, Canalización…) y en qué momento se pide la foto: antes, en progreso o después. Si no defines nada, se piden fotos libres como hasta ahora."
-                : "Cuántas fotos de evidencia sube cada persona."
-            }
+            title="Evidencia"
           >
             <div className={s.cuerpo}>
               {isCore ? (
@@ -1561,8 +1535,7 @@ export default function OpsActivityForm({
           <FormSection
             id="oaf-herramientas"
             step={siguiente()}
-            title={<span id={herramientasTituloId}>Herramientas a llevar</span>}
-            description="Quien ejecuta palomea cada herramienta antes de salir; con pendientes la app no deja iniciar."
+            title={<span id={herramientasTituloId}>Herramientas</span>}
             actions={
               <Badge tone="outline" size="sm">
                 Opcional
@@ -1586,43 +1559,33 @@ export default function OpsActivityForm({
         ) : null}
 
         {camposPendiente ? (
-          <Alert
-            tone="warning"
-            role="alert"
-            title={tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}
-          >
+          <Alert tone="warning" role="alert">
             <span className={s.reintento}>
-              <span>Pero no se guardó qué hay que fotografiar: {camposPendiente.error}</span>
+              <span>No se guardó la evidencia.</span>
               <span className={s.reintentoAcciones}>
                 <Button size="sm" variant="primary" onClick={() => void reintentarCampos()} loading={saving}>
-                  Reintentar guardar los puntos
+                  Reintentar
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => void seguirSinCampos()} disabled={saving}>
-                  Seguir sin puntos
+                  Seguir
                 </Button>
               </span>
-              <span className={s.nota}>Si sigues sin puntos, puedes definirlos después desde el detalle de la actividad.</span>
             </span>
           </Alert>
         ) : null}
 
         {herramientasPendiente ? (
-          <Alert
-            tone="warning"
-            role="alert"
-            title={tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}
-          >
+          <Alert tone="warning" role="alert">
             <span className={s.reintento}>
-              <span>Pero no se guardaron las herramientas a llevar: {herramientasPendiente.error}</span>
+              <span>No se guardaron las herramientas.</span>
               <span className={s.reintentoAcciones}>
                 <Button size="sm" variant="primary" onClick={() => void reintentarHerramientas()} loading={saving}>
-                  Reintentar guardar las herramientas
+                  Reintentar
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => void seguirSinHerramientas()} disabled={saving}>
-                  Seguir sin herramientas
+                  Seguir
                 </Button>
               </span>
-              <span className={s.nota}>Si sigues sin herramientas, puedes definirlas después desde el detalle de la actividad.</span>
             </span>
           </Alert>
         ) : null}
