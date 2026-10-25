@@ -482,7 +482,7 @@ type FetchInit = RequestInit & {
 
 const getErrorMessage = (payload: unknown, fallback: string, status?: number) => {
   const serviceUnavailableMessage =
-    "Servicio temporalmente no disponible (502/5xx). Intenta de nuevo en unos minutos.";
+    "Servicio temporalmente no disponible (502/5xx): intenta de nuevo en unos minutos.";
 
   if (typeof payload === "string" && payload.trim()) {
     const text = payload.trim();
