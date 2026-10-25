@@ -26,3 +26,26 @@
   font-weight: var(--ui-fw-section);
   color: var(--ui-fg);
 }
+
+/* En escritorio las cifras siguen en una línea, con « · ». En teléfono, una por renglón.
+   El corte es 720 px: el mismo en que la franja de cifras pasa a dos columnas. */
+.pista {
+  min-width: 0;
+}
+
+.dato {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .pista {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .sep {
+    display: none;
+  }
+}
