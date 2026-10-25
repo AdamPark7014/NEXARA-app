@@ -50,7 +50,7 @@ export default function ActaIA({
   const leerArchivo = async (file: File | undefined) => {
     if (!file) return;
     if (file.size > 2_000_000) {
-      setError("El archivo es muy grande. Sube la transcripción en texto (.txt, .vtt o .srt).");
+      setError("El archivo es muy grande: usa un texto .txt, .vtt o .srt.");
       return;
     }
     setTexto(limpiarTranscripcion(await file.text()));
@@ -93,9 +93,7 @@ export default function ActaIA({
       <p className={s.minutaTitle}>Minuta con IA</p>
       {!pegando ? (
         <>
-          <p className={s.hint} style={{ margin: 0 }}>
-            Graba la junta: la IA toma notas mientras hablan y al concluir escribe la minuta completa en PDF, con los acuerdos listos para asignar.
-          </p>
+          <p className={s.hint} style={{ margin: 0 }}>Graba la junta o pega la transcripción.</p>
           <div className={s.minutaActions}>
             {estado.disponible ? (
               <Button variant="primary" iconLeft="●" onClick={() => onGrabar()}>

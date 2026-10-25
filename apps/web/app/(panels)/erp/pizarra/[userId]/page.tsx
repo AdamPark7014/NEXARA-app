@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
@@ -32,7 +33,6 @@ import {
   Tabs,
   buttonClass,
   type RecordFact,
-  type RecordMetaItem,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
@@ -61,6 +61,7 @@ import { FotoProtegida, VisorPdf } from "@/components/ops/EquipoEvidencias";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import c from "@/components/pizarra/comun.module.css";
+import b from "@/components/base/base.module.css";
 import f from "./ficha.module.css";
 
 type Pestana = "ahora" | "historial";
@@ -185,30 +186,40 @@ export default function PizarraPersonaPage() {
     };
   }, [token, load]);
 
-  if (loading && !user && !error) return <FichaCargando />;
+  const volver = (
+    <Link href="/erp/pizarra" className={b.headBack}>
+      ‹ Pizarra
+    </Link>
+  );
+
+  if (loading && !user && !error) {
+    return (
+      <div className={f.ficha}>
+        {volver}
+        <FichaCargando />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
-      <div className={f.noEncontrada}>
-        <Card>
-          <EmptyState
-            icon={<PersonOffOutlinedIcon />}
-            tone="danger"
-            titleAs="h2"
-            title="No pudimos abrir este perfil"
-            description={error || "No encontramos a esta persona."}
-            action={
-              <Button variant="primary" className={c.tap} onClick={() => void load()} loading={loading}>
-                {loading ? "Cargando…" : "Reintentar"}
-              </Button>
-            }
-            secondaryAction={
-              <ButtonLink href="/erp/pizarra" className={c.tap}>
-                Volver al equipo
-              </ButtonLink>
-            }
-          />
-        </Card>
+      <div className={f.ficha}>
+        {volver}
+        <div className={f.noEncontrada}>
+          <Card>
+            <EmptyState
+              icon={<PersonOffOutlinedIcon />}
+              tone="danger"
+              titleAs="h2"
+              title={error || "No encontramos a esta persona."}
+              action={
+                <Button variant="primary" className={c.tap} onClick={() => void load()} loading={loading}>
+                  {loading ? "Cargando…" : "Reintentar"}
+                </Button>
+              }
+            />
+          </Card>
+        </div>
       </div>
     );
   }
@@ -226,46 +237,42 @@ export default function PizarraPersonaPage() {
     hasPermission(me, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
   const espera = user.enEsperaAprobacion ?? 0;
 
-  const meta: RecordMetaItem[] = [
-    { icon: <WorkOutlineIcon aria-hidden="true" />, label: user.puesto || "Equipo NEXARA" },
-    {
-      icon: <LoginIcon aria-hidden="true" />,
-      label: user.clockInAt ? `Entrada ${formatClock(user.clockInAt)}` : "Sin entrada registrada",
-    },
-    ...(updatedAt
-      ? [{ icon: <ScheduleIcon aria-hidden="true" />, label: `Actualizado ${formatHourMinute(updatedAt)}` }]
-      : []),
-  ];
+  const dato = (icon: ReactNode, label: string) => (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {icon}
+      {label}
+    </span>
+  );
+
+  const meta = (
+    <span className="ficha-apilar" style={{ display: "contents" }}>
+      {dato(<WorkOutlineIcon aria-hidden="true" />, user.puesto || "Equipo NEXARA")}
+      {dato(<LoginIcon aria-hidden="true" />, user.clockInAt ? `Entrada ${formatClock(user.clockInAt)}` : "Sin entrada registrada")}
+      {updatedAt ? dato(<ScheduleIcon aria-hidden="true" />, `Actualizado ${formatHourMinute(updatedAt)}`) : null}
+    </span>
+  );
 
   const facts: RecordFact[] = [
     {
       label: preset === "hoy" ? "Entrada hoy" : "Última entrada",
       value: formatClock(user.clockInAt),
-      hint: user.clockInAt ? "Entrada registrada" : "Sin registro",
     },
-    { label: "Horas trabajadas", value: formatMinutes(user.workedMinutes), hint: "Entrada a salida, sin la comida" },
+    { label: "Horas trabajadas", value: formatMinutes(user.workedMinutes) },
     {
       label: "En actividad",
-      value: formatMinutes(user.activityElapsedMinutes),
-      hint: actAbierta?.enPausa
+      value: actAbierta?.enPausa
         ? "En pausa"
         : user.activityStartedAt
-          ? `Desde las ${formatClock(user.activityStartedAt)}`
-          : "Sin actividad iniciada",
+          ? `${formatMinutes(user.activityElapsedMinutes)} desde las ${formatClock(user.activityStartedAt)}`
+          : formatMinutes(user.activityElapsedMinutes),
     },
     ...(user.kpis
-      ? [
-          {
-            label: "Horas productivas",
-            value: formatMinutes(user.kpis.minutosEnActividad),
-            hint: "Con una actividad corriendo, dentro de su jornada",
-          },
-        ]
+      ? [{ label: "Horas productivas", value: formatMinutes(user.kpis.minutosEnActividad) }]
       : []),
   ];
 
   const pestanas = (
-    <div className={f.pestanas}>
+    <div className={`${f.pestanas} ficha-apilar`}>
       <Tabs
         ariaLabel="Secciones de la ficha"
         items={[
@@ -306,7 +313,7 @@ export default function PizarraPersonaPage() {
               </Button>
             }
           >
-            No se pudo actualizar. Ves lo de las {formatHourMinute(updatedAt)}.
+            No se pudo actualizar y sigues viendo las {formatHourMinute(updatedAt)}.
           </Alert>
         ) : null}
       </div>
@@ -341,7 +348,7 @@ export default function PizarraPersonaPage() {
                 Abrir actividad
               </ButtonLink>
             </div>
-            <div className={f.insignias}>
+            <div className={`${f.insignias} ficha-apilar`}>
               <StatusBadge size="sm" label={actEstatus.label} tone={actEstatus.tone ?? "neutral"} />
               {actAbierta?.enPausa ? (
                 <Badge size="sm" dot tone="warning">
@@ -410,15 +417,14 @@ export default function PizarraPersonaPage() {
         <EmptyState
           icon={<HistoryIcon />}
           tone="neutral"
-          title="Todavía no tiene actividades registradas"
-          description="Cuando cierre su primera actividad, aquí quedan sus fotos, su hoja y sus tiempos."
+          title="Todavía no tiene actividades registradas."
         />
       ) : (
         <ul className={f.historial}>
           {historyError ? (
             <li>
               <Alert tone="warning" role="status" dense>
-                {historyError}. Se muestra lo último que cargó.
+                {historyError}
               </Alert>
             </li>
           ) : null}
@@ -445,9 +451,8 @@ export default function PizarraPersonaPage() {
                   </span>
                   <span className={f.itemTexto}>
                     <span className={f.itemTitulo}>{h.titulo}</span>
-                    <span className={c.folio}>
-                      {h.anNumber} · {kindLabel(h)}
-                    </span>
+                    <span className={c.folio}>{h.anNumber}</span>
+                    <span className={c.folio}>{kindLabel(h)}</span>
                   </span>
                   {ev ? (
                     <span className={f.itemFlecha} aria-hidden="true">
@@ -455,7 +460,7 @@ export default function PizarraPersonaPage() {
                     </span>
                   ) : null}
                 </span>
-                <span className={f.insignias}>
+                <span className={`${f.insignias} ficha-apilar`}>
                   <StatusBadge size="sm" label={est.label} tone={est.tone ?? "neutral"} />
                   {encargo ? (
                     <Badge size="sm" tone="outline">
@@ -468,7 +473,11 @@ export default function PizarraPersonaPage() {
                       Ya no está en el equipo
                     </Badge>
                   ) : null}
-                  {meta.length ? <span className={c.pista}>{meta.join(" · ")}</span> : null}
+                  {meta.map((linea) => (
+                    <span key={linea} className={c.pista}>
+                      {linea}
+                    </span>
+                  ))}
                 </span>
               </>
             );
@@ -575,12 +584,9 @@ export default function PizarraPersonaPage() {
 
   return (
     <div className={f.ficha}>
+      <style>{`@media (max-width: 480px) { .ficha-apilar { display: grid !important; justify-items: start; gap: 6px; width: 100%; } }`}</style>
+      {volver}
       <RecordPage
-        breadcrumbs={[
-          { label: "Actividades", href: "/erp/pizarra" },
-          { label: "Mi equipo", href: "/erp/pizarra?vista=equipo" },
-          { label: user.nombre },
-        ]}
         icon={
           <AvatarAro
             nombre={user.nombre}
