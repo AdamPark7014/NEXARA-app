@@ -1036,12 +1036,12 @@ export class ToolRequestsService {
     const elegibles = vivas.length > 0 ? vivas : candidatas;
     if (elegibles.length === 0) {
       throw new NotFoundException(
-        `Ninguna herramienta tiene la etiqueta «${code}». Si es una herramienta anterior a la nomenclatura, pide a almacén «Completar códigos» en el inventario.`,
+        `Ninguna herramienta tiene la etiqueta «${code}»: si es anterior a la nomenclatura, pide a almacén «Completar códigos» en el inventario.`,
       );
     }
     if (elegibles.length > 1) {
       throw new ConflictException(
-        `Hay ${elegibles.length} herramientas con el código «${code}». Corrige el código de una de ellas en el inventario.`,
+        `Hay ${elegibles.length} herramientas con el código «${code}»: corrige el código de una de ellas en el inventario.`,
       );
     }
     const item = elegibles[0];
