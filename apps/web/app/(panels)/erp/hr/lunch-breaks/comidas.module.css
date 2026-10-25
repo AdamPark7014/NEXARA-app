@@ -1,0 +1,145 @@
+/* Comidas: lista con filtros y, en el teléfono, un dato por renglón. Solo tokens --ui-*. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.hoy {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-s3) var(--ui-s5);
+  margin: 0;
+}
+
+.dato {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dato dt {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.dato dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.tarde {
+  color: var(--ui-warning-text);
+}
+
+.pasado {
+  color: var(--ui-danger-text);
+}
+
+.tarjeta {
+  min-width: 0;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  overflow: clip;
+}
+
+.cabecera,
+.fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 0.9fr) minmax(7rem, 0.7fr) minmax(7rem, 0.7fr) minmax(5.5rem, 0.6fr);
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.cabecera {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+
+.filas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+
+.fila:last-child {
+  border-bottom: 0;
+}
+
+.fila[data-resaltada="true"] {
+  background: color-mix(in srgb, var(--ui-brand) 7%, var(--ui-surface));
+}
+
+.nombre {
+  display: block;
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.area,
+.tenue {
+  display: block;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.hora,
+.duracion {
+  font-variant-numeric: tabular-nums;
+}
+
+.historial {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (max-width: 720px) {
+  .datos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cabecera {
+    display: none;
+  }
+
+  .fila {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+
+  .persona,
+  .nombre,
+  .area,
+  .estado,
+  .hora,
+  .duracion {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+}
