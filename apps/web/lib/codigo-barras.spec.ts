@@ -53,6 +53,20 @@ describe("codigo-barras (web)", () => {
     expect(motivoCodigoInvalido("CÓDIGO-Ñ")).toMatch(/caracteres/);
   });
 
+  it("el dígito que no cuadra cabe en una frase", () => {
+    const viejo =
+      "Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo.";
+    const aviso = motivoCodigoInvalido("036000291453");
+    expect(aviso).toBe(
+      "Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo.",
+    );
+    expect(aviso).not.toBe(viejo);
+    expect(aviso).toMatch(/escanearlo/);
+    expect(aviso!.split(".").filter((parte) => parte.trim()).length).toBe(1);
+    expect(esGtinValido("036000291453")).toBe(false);
+    expect(esGtinValido("036000291452")).toBe(true);
+  });
+
   it("UPC-A y su EAN-13 con cero delante son el mismo artículo", () => {
     expect(variantesDeBusqueda("036000291452")).toEqual(["036000291452", "0036000291452"]);
     expect(variantesDeBusqueda("0036000291452")).toEqual(["0036000291452", "036000291452"]);
