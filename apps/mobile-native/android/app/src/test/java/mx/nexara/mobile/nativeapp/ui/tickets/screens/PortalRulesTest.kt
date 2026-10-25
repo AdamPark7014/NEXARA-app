@@ -178,4 +178,22 @@ class PortalRulesTest {
         assertEquals("La latitud va de -90 a 90", branchCoordinatesError("91", ""))
         assertEquals("La longitud va de -180 a 180", branchCoordinatesError("", "-181"))
     }
+
+    @Test
+    fun `coordenada invalida es una frase con el mismo ejemplo`() {
+        val lat = branchCoordinatesError("x", "")
+        val lng = branchCoordinatesError("", "-")
+        val latVieja = "Latitud inválida. Ejemplo: 19.0414"
+        val lngVieja = "Longitud inválida. Ejemplo: -98.2063"
+        assertEquals("Latitud inválida, ejemplo: 19.0414", lat)
+        assertEquals("Longitud inválida, ejemplo: -98.2063", lng)
+        assertTrue(lat != latVieja)
+        assertTrue(lng != lngVieja)
+        assertEquals(1, lat!!.count { it == '.' })
+        assertEquals(1, lng!!.count { it == '.' })
+        assertTrue(lat.startsWith("Latitud"))
+        assertTrue(lng.startsWith("Longitud"))
+        assertTrue(lat.contains("19.0414"))
+        assertTrue(lng.contains("-98.2063"))
+    }
 }
