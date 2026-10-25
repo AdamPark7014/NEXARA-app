@@ -68,9 +68,9 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 
 /**
- * El día de una persona del equipo (/erp/pizarra/:userId): entrada, tiempo en
- * sitio, actividad en curso, despachos por repartir (si eres tú) e historial
- * con sus evidencias.
+ * El día de una persona del equipo (/erp/pizarra/:userId). Cada KPI y cada
+ * cifra (entrada, tiempo en sitio, actividad) van en su renglón. Siguen la
+ * actividad en curso, los despachos por repartir (si eres tú) y el historial.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -195,42 +195,37 @@ fun BoardPersonScreen(
                 )
             }
 
-            // Contrato C: a tiempo, eficiencia, productividad y cerradas del rango.
+            // Contrato C: a tiempo, eficiencia, productividad y cerradas, una por renglón.
             val tiles = BoardKpis.tiles(p.kpis)
             if (tiles.isNotEmpty()) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tiles.chunked(2).forEach { fila ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                fila.forEach { tile ->
-                                    KpiTile(tile = tile, modifier = Modifier.weight(1f))
-                                }
-                                if (fila.size == 1) Spacer(Modifier.weight(1f))
-                            }
+                        tiles.forEach { tile ->
+                            KpiTile(tile = tile, modifier = Modifier.fillMaxWidth())
                         }
                     }
                 }
             }
 
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     PersonStat(
                         label = "Entrada hoy",
                         value = if (p.clockInAt != null) CoreActivityRules.formatClock(p.clockInAt) else "Sin entrada",
                         hint = if (p.clockInAt != null) "Check-in" else "Sin registro",
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     PersonStat(
                         label = "Tiempo en sitio",
                         value = CoreActivityRules.formatBoardMinutes(p.workedMinutes),
                         hint = "Desde la entrada",
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     PersonStat(
                         label = "En actividad",
                         value = CoreActivityRules.formatBoardMinutes(p.activityElapsedMinutes),
                         hint = p.activityStartedAt?.let { "Desde ${CoreActivityRules.formatClock(it)}" } ?: "Sin actividad",
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }

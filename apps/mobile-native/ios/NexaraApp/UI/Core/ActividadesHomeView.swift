@@ -156,8 +156,8 @@ struct ActividadesHomeView: View {
 
 // MARK: - Pizarra del equipo
 
-/// Android `TeamBoardContent`: rango y filtros en la MISMA fila, tira de cifras
-/// que también filtra, «Para atender hoy» (solo con «Hoy»), rejilla de personas y
+/// Pizarra del equipo: el rango en su control, cada filtro y cada cifra en su
+/// renglón, una persona por renglón, «Para atender hoy» (solo con «Hoy») y
 /// «Asignadas por mí».
 struct TeamBoardView: View {
     let users: [TeamBoardUser]
@@ -183,19 +183,13 @@ struct TeamBoardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NxFilterBar {
-                NxSegmented(
-                    options: ActividadesRango.allCases.map(\.etiqueta),
-                    selectedIndex: rangoIndice,
-                    onSelect: { i in rango = ActividadesRango.allCases[i] }
-                )
-                ForEach(ActividadesEquipo.filtros(users), id: \.etiqueta) { f in
-                    NxFilterPill(label: f.etiqueta, count: f.conteo, selected: filtro == f.aro, color: f.color) {
-                        // Tocar el filtro activo vuelve a «Todos».
-                        filtro = filtro == f.aro ? nil : f.aro
-                    }
-                }
-            }
+            NxSegmented(
+                options: ActividadesRango.allCases.map(\.etiqueta),
+                selectedIndex: rangoIndice,
+                onSelect: { i in rango = ActividadesRango.allCases[i] }
+            )
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, 16)
             .padding(.vertical, 10)
 
             ScrollView {
@@ -226,14 +220,8 @@ struct TeamBoardView: View {
                 onAction: { Task { await onRefresh() } }
             )
         case .contenido:
-            NxMetricStrip(
-                items: ActividadesEquipo.metricas(users),
-                seleccion: filtro?.clave,
-                onSelect: { clave in
-                    let aro = ActividadesAro.allCases.first { $0.clave == clave }
-                    filtro = filtro == aro ? nil : aro
-                }
-            )
+            filtros
+            cifrasEquipo
             // «Desde hace cuánto» es de hoy: con otros rangos el panel no aplica (web).
             if rango == .hoy {
                 AtencionEquipoPanel(users: users, onOpenPerson: onOpenPerson)
@@ -246,19 +234,131 @@ struct TeamBoardView: View {
                     onAction: { filtro = nil }
                 )
             } else {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 150), spacing: 10, alignment: .top)],
-                    spacing: 10
-                ) {
-                    ForEach(visibles) { user in
-                        Button { onOpenPerson(user) } label: {
-                            PersonBoardCard(user: user, meId: meId)
-                        }
-                        .buttonStyle(NxPressableStyle())
-                    }
-                }
+                personas
             }
         }
+    }
+
+    /// Un filtro por renglón. Tocar el activo vuelve a «Todos».
+    private var filtros: some View {
+        let lista = ActividadesEquipo.filtros(users)
+        return VStack(spacing: 0) {
+            ForEach(Array(lista.enumerated()), id: \.element.etiqueta) { indice, f in
+                if indice > 0 {
+                    Rectangle().fill(NxColors.borderSubtle).frame(height: 1)
+                }
+                let activo = filtro == f.aro
+                Button {
+                    filtro = activo ? nil : f.aro
+                } label: {
+                    HStack(spacing: 8) {
+                        if let color = f.color {
+                            Circle().fill(color).frame(width: 8, height: 8)
+                        }
+                        Text(f.etiqueta)
+                            .font(.system(size: 15, weight: activo ? .semibold : .regular))
+                            .foregroundStyle(NxColors.fg)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Text("\(f.conteo)")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(NxColors.muted)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .background(activo ? NxColors.brandSoft : Color.clear)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(activo ? AccessibilityTraits.isSelected : [])
+            }
+        }
+        .background(NxColors.card)
+        .clipShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                .strokeBorder(NxColors.border, lineWidth: 1)
+        )
+    }
+
+    /// Una cifra por renglón. Tocar filtra por ese aro; tocar otra vez vuelve a todos.
+    @ViewBuilder
+    private var cifrasEquipo: some View {
+        let items = ActividadesEquipo.metricas(users)
+        if !items.isEmpty {
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { indice, metric in
+                    if indice > 0 {
+                        Rectangle().fill(NxColors.borderSubtle).frame(height: 1)
+                    }
+                    cifraEquipo(metric)
+                }
+            }
+            .background(NxColors.card)
+            .clipShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                    .strokeBorder(NxColors.border, lineWidth: 1)
+            )
+        }
+    }
+
+    private func cifraEquipo(_ metric: NxMetric) -> some View {
+        let activa = filtro?.clave == metric.clave
+        return Button {
+            let aro = ActividadesAro.allCases.first { $0.clave == metric.clave }
+            filtro = filtro == aro ? nil : aro
+        } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(metric.etiqueta)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(NxColors.fg2)
+                    .lineLimit(1)
+                Text(metric.valor)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(metric.color ?? NxColors.fg)
+                    .lineLimit(1)
+                if let pista = metric.pista, !pista.isEmpty {
+                    Text(pista)
+                        .font(.system(size: 11))
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(max(metric.pistaLineas, 1))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(activa ? NxColors.brandSoft.opacity(0.55) : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(activa ? AccessibilityTraits.isSelected : [])
+    }
+
+    /// Una persona por renglón, en una sola superficie.
+    private var personas: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(visibles.enumerated()), id: \.element.id) { indice, user in
+                if indice > 0 {
+                    Rectangle().fill(NxColors.borderSubtle).frame(height: 1)
+                }
+                Button { onOpenPerson(user) } label: {
+                    PersonBoardCard(user: user, meId: meId)
+                }
+                .buttonStyle(NxPressableStyle())
+            }
+        }
+        .background(NxColors.card)
+        .clipShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                .strokeBorder(NxColors.border, lineWidth: 1)
+        )
     }
 
     /// Contrato C: lo que yo asigné en el rango, con persona, estado y semáforo.
@@ -534,8 +634,8 @@ private struct AtencionFila: View {
     }
 }
 
-/// Una persona en la pizarra: el aro de color dice el estado, y debajo se lee en
-/// dos renglones qué está haciendo y en qué situación está.
+/// Una persona del equipo, en un solo renglón. El aro dice el estado; lo demás
+/// baja en líneas, sin pastillas juntas.
 private struct PersonBoardCard: View {
     let user: TeamBoardUser
     let meId: Int?
@@ -543,58 +643,57 @@ private struct PersonBoardCard: View {
     private var aro: ActividadesAro { ActividadesEquipo.aro(user.status) }
     private var esYo: Bool { meId != nil && user.id == meId }
     private var marcas: [ActividadesEquipo.Marca] { ActividadesEquipo.marcas(user, meId: meId) }
-    private var forma: RoundedRectangle { RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous) }
 
     var body: some View {
-        VStack(spacing: 6) {
-            // El aro ES el estado: no hace falta además un punto, una pastilla y una leyenda.
-            NxAvatar(nombre: user.nombre, url: user.avatarUrl, size: 58)
-                .padding(4)
-                .overlay(Circle().strokeBorder(aro.color, lineWidth: 3))
-            Text(user.nombre.isEmpty ? "—" : user.nombre)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(NxColors.fg)
-                .lineLimit(1)
-            if let puesto = ActividadesTexto.limpio(user.puesto) {
-                Text(puesto)
-                    .font(.system(size: 11))
-                    .foregroundStyle(NxColors.muted)
+        HStack(alignment: .top, spacing: 12) {
+            NxAvatar(nombre: user.nombre, url: user.avatarUrl, size: 40)
+                .padding(2)
+                .overlay(Circle().strokeBorder(aro.color, lineWidth: 2))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(user.nombre.isEmpty ? "—" : user.nombre)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
                     .lineLimit(1)
-            }
-            Text(ActividadesEquipo.queHace(user))
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(NxColors.fg)
-                .lineLimit(2)
-            Text(ActividadesEquipo.contexto(user))
-                .font(.system(size: 11))
-                .foregroundStyle(aro == .retraso ? aro.color : NxColors.muted)
-                .lineLimit(2)
-            // Sin nada abierto: folio y cuándo terminó lo último («Última: AN-0091 · ayer 18:11»).
-            if let ultima = ActividadesEquipo.ultimaEnTarjeta(user) {
-                Text(ultima)
-                    .font(.system(size: 11))
-                    .foregroundStyle(NxColors.muted)
-                    .lineLimit(1)
-            }
-            // El avance de lo que trae entre manos: es dato, no adorno.
-            if let pct = user.openActivities?.first?.progressPct {
-                ActBarraAvance(pct: pct)
-            }
-            if !marcas.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(marcas, id: \.texto) { marca in
-                        NxStatusDot(text: marca.texto, color: marca.color, fontSize: 11)
-                    }
+                if let puesto = ActividadesTexto.limpio(user.puesto) {
+                    Text(puesto)
+                        .font(.system(size: 13))
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(1)
+                }
+                Text(ActividadesEquipo.queHace(user))
+                    .font(.system(size: 15))
+                    .foregroundStyle(NxColors.fg)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text(ActividadesEquipo.contexto(user))
+                    .font(.system(size: 13))
+                    .foregroundStyle(aro == .retraso ? aro.color : NxColors.muted)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if let ultima = ActividadesEquipo.ultimaEnTarjeta(user) {
+                    Text(ultima)
+                        .font(.system(size: 13))
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(1)
+                }
+                if let pct = user.openActivities?.first?.progressPct {
+                    ActBarraAvance(pct: pct)
+                        .padding(.top, 4)
+                }
+                ForEach(marcas, id: \.texto) { marca in
+                    Text(marca.texto)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(marca.color)
+                        .lineLimit(1)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 14)
-        .background(NxColors.card, in: forma)
-        .overlay(forma.strokeBorder(esYo ? NxColors.brand.opacity(0.55) : NxColors.border, lineWidth: 1))
-        .contentShape(forma)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(esYo ? NxColors.brandSoft.opacity(0.45) : Color.clear)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("Abre el día de \(esYo ? "ti" : CoreFormat.shortName(user.nombre))")
     }
@@ -602,9 +701,9 @@ private struct PersonBoardCard: View {
 
 // MARK: - Día de una persona (GET me/board/:userId + history)
 
-/// Android `BoardPersonScreen`: cabecera con aro de estado, rango, KPI, tres
-/// cifras del día, lo que trae en curso, el reloj de sus actividades, despachos
-/// pendientes (uno mismo), historial y «Asignar actividad».
+/// Android `BoardPersonScreen`: cabecera, rango, un KPI por renglón, entrada,
+/// tiempo en sitio y actividad cada uno en el suyo, lo que trae en curso, el
+/// reloj, despachos pendientes (uno mismo), historial y «Asignar actividad».
 struct TeamMemberDetailView: View {
     let userId: Int
     let nombre: String
@@ -734,15 +833,12 @@ struct TeamMemberDetailView: View {
         }
     }
 
-    /// Contrato C: a tiempo, eficiencia, productividad y cerradas del rango.
+    /// Contrato C: a tiempo, eficiencia, productividad y cerradas, una por renglón.
     @ViewBuilder
     private func kpis(_ p: TeamBoardUser) -> some View {
         let tiles = ActividadesKpis.tiles(p.kpis)
         if !tiles.isEmpty {
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
-                spacing: 8
-            ) {
+            VStack(spacing: 8) {
                 ForEach(tiles, id: \.etiqueta) { tile in
                     ActKpiTile(tile: tile)
                 }
@@ -750,8 +846,9 @@ struct TeamMemberDetailView: View {
         }
     }
 
+    /// Entrada, tiempo en sitio y actividad: una cifra por renglón.
     private func cifras(_ p: TeamBoardUser) -> some View {
-        HStack(alignment: .top, spacing: 8) {
+        VStack(spacing: 8) {
             ActPersonStat(
                 label: "Entrada hoy",
                 value: p.clockInAt != nil ? ActividadesTexto.hora(p.clockInAt) : "Sin entrada",
@@ -960,7 +1057,7 @@ private struct ActKpiTile: View {
                 .lineLimit(2)
         }
         .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
@@ -990,9 +1087,9 @@ private struct ActPersonStat: View {
                 .foregroundStyle(NxColors.muted)
                 .lineLimit(2)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
