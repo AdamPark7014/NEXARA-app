@@ -150,6 +150,14 @@ function Visor({ foto, onClose }: { foto: { url: string; titulo: string }; onClo
   );
 }
 
+/** Una frase al guardar la foto. El registro se queda. */
+export function avisoRegistro(momento: "salida" | "regreso", pideMotivo: boolean): string {
+  if (momento === "salida" && pideMotivo) return "Registraste tu salida a comer: tu justificación quedó por aprobar.";
+  if (momento === "salida") return "Registraste tu salida a comer: ¡buen provecho!";
+  if (pideMotivo) return "Registraste tu regreso: tu justificación quedó por aprobar.";
+  return "Registraste tu regreso de comer.";
+}
+
 /** Cámara en vivo → vista previa → (justificación si es a destiempo) → registrar. */
 function RegistroModal({
   momento,
@@ -240,15 +248,7 @@ function RegistroModal({
           body: JSON.stringify({ checkoutTime: ahora, checkoutPhotoUrl: foto, justificacion: texto || undefined }),
         });
       }
-      onDone(
-        momento === "salida"
-          ? pideMotivo
-            ? "Registraste tu salida a comer. Tu justificación quedó por aprobar."
-            : "Registraste tu salida a comer. ¡Buen provecho!"
-          : pideMotivo
-            ? "Registraste tu regreso. Tu justificación quedó por aprobar."
-            : "Registraste tu regreso de comer.",
-      );
+      onDone(avisoRegistro(momento, pideMotivo));
     } catch (e) {
       const msg = formatApiError(e, "No se pudo registrar tu comida");
       // La API decide con su hora: si dice que ya es a destiempo, se pide el motivo.

@@ -97,9 +97,9 @@ object ComidasRules {
         Regex("horario|hora de regreso|por qué", RegexOption.IGNORE_CASE).containsMatchIn(mensaje.orEmpty())
 
     fun mensajeRegistro(momento: String, conMotivo: Boolean): String = when {
-        momento == SALIDA && conMotivo -> "Registraste tu salida a comer. Tu justificación quedó por aprobar."
-        momento == SALIDA -> "Registraste tu salida a comer. ¡Buen provecho!"
-        conMotivo -> "Registraste tu regreso. Tu justificación quedó por aprobar."
+        momento == SALIDA && conMotivo -> "Registraste tu salida a comer: tu justificación quedó por aprobar."
+        momento == SALIDA -> "Registraste tu salida a comer: ¡buen provecho!"
+        conMotivo -> "Registraste tu regreso: tu justificación quedó por aprobar."
         else -> "Registraste tu regreso de comer."
     }
 

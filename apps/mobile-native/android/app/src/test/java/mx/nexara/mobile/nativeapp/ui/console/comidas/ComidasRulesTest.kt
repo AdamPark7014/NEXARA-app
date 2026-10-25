@@ -101,9 +101,50 @@ class ComidasRulesTest {
         assertEquals("— rechazó: «No avisaste»", ComidasRules.decisionEquipo(rechazada))
         assertNull(ComidasRules.decisionPropia(ComidaRegistroDto(id = 3, revisionEstado = "PENDIENTE")))
         assertEquals(
-            "Registraste tu salida a comer. Tu justificación quedó por aprobar.",
+            "Registraste tu salida a comer: tu justificación quedó por aprobar.",
             ComidasRules.mensajeRegistro(ComidasRules.SALIDA, conMotivo = true),
         )
         assertEquals("Registraste tu regreso de comer.", ComidasRules.mensajeRegistro(ComidasRules.REGRESO, conMotivo = false))
     }
+
+    @Test
+    fun elAvisoDeLaComidaCabeEnUnaFrase() {
+        val casos = listOf(
+            Caso(
+                ComidasRules.SALIDA,
+                true,
+                "Registraste tu salida a comer: tu justificación quedó por aprobar.",
+                "Registraste tu salida a comer. Tu justificación quedó por aprobar.",
+            ),
+            Caso(
+                ComidasRules.SALIDA,
+                false,
+                "Registraste tu salida a comer: ¡buen provecho!",
+                "Registraste tu salida a comer. ¡Buen provecho!",
+            ),
+            Caso(
+                ComidasRules.REGRESO,
+                true,
+                "Registraste tu regreso: tu justificación quedó por aprobar.",
+                "Registraste tu regreso. Tu justificación quedó por aprobar.",
+            ),
+        )
+        for (caso in casos) {
+            val aviso = ComidasRules.mensajeRegistro(caso.momento, caso.conMotivo)
+            assertEquals(caso.aviso, aviso)
+            assertEquals(listOf(aviso), oraciones(aviso))
+            assertEquals(2, oraciones(caso.viejo).size)
+            assertTrue(aviso.startsWith("Registraste"))
+            assertFalse(aviso == caso.viejo)
+        }
+        assertEquals(
+            "Registraste tu regreso de comer.",
+            ComidasRules.mensajeRegistro(ComidasRules.REGRESO, conMotivo = false),
+        )
+    }
+
+    private data class Caso(val momento: String, val conMotivo: Boolean, val aviso: String, val viejo: String)
+
+    private fun oraciones(texto: String): List<String> =
+        texto.split(Regex("(?<=[.!?])\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
 }
