@@ -353,7 +353,6 @@ private fun androidx.compose.foundation.lazy.LazyListScope.partidasDeCotizacion(
     item(key = "partidas-cabecera") {
         MoreCabecera(
             titulo = "Partidas",
-            subtitulo = "Equipos, materiales y mano de obra",
             trailing = CotizacionesRules.totalPartidas(cotizacion).takeIf { it > 0 }?.toString(),
         )
     }
@@ -362,8 +361,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.partidasDeCotizacion(
         item(key = "partidas-vacio") {
             NxEmptyState(
                 title = "Sin partidas",
-                subtitle = "Esta cotización todavía no tiene conceptos capturados. " +
-                    "Se agregan desde la computadora.",
+                subtitle = "Esta cotización todavía no tiene conceptos capturados.",
             )
         }
         return
@@ -486,7 +484,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.terminosDeCotizacion(
                         color = NxColors.Slate,
                     )
                     Text(
-                        "Lo que se le prometió al cliente · ${partes.size}",
+                        if (partes.size == 1) "1 condición" else "${partes.size} condiciones",
                         style = MaterialTheme.typography.labelSmall,
                         color = NxColors.Muted,
                     )
