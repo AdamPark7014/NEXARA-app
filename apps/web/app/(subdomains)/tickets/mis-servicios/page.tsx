@@ -251,13 +251,11 @@ export default function MisServiciosPage() {
   return (
     <div style={{ padding: "24px max(16px, 4vw)", maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ margin: 0 }}>🛎️ Mis servicios con NEXARA</h1>
-          <p style={{ color: "var(--text-secondary)", margin: 0 }}>
-            Visión 360° de tus proyectos activos, contratos de mantenimiento y tickets recientes.
-          </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, minHeight: 52, borderBottom: "1px solid rgba(0,0,0,0.08)", paddingBottom: 8 }}>
+          <a href="/tickets" style={{ color: "#1d1d1f", textDecoration: "none", fontSize: 15 }}>Volver</a>
+          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Servicios</h1>
         </div>
-        <button type="button" onClick={refresh} style={btnPrimary}>🔄 Actualizar</button>
+        <button type="button" onClick={refresh} style={btnPrimary}>Actualizar</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginTop: 16 }}>
@@ -271,7 +269,7 @@ export default function MisServiciosPage() {
         <Kpi label="Encuestas pendientes" value={s.pendingFeedbacks} color={s.pendingFeedbacks > 0 ? "#dc2626" : "#16a34a"} />
       </div>
 
-      <Section title="🏗️ Proyectos en ejecución">
+      <Section title="Proyectos">
         {data.projects.length === 0 ? (
           <Empty>Sin proyectos activos.</Empty>
         ) : (
@@ -290,7 +288,7 @@ export default function MisServiciosPage() {
                 )}
                 {p.startDate && (
                   <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6 }}>
-                    📅 {new Date(p.startDate).toLocaleDateString("es-MX")}
+                    {new Date(p.startDate).toLocaleDateString("es-MX")}
                     {p.endDate && ` → ${new Date(p.endDate).toLocaleDateString("es-MX")}`}
                   </div>
                 )}
@@ -300,7 +298,7 @@ export default function MisServiciosPage() {
         )}
       </Section>
 
-      <Section title="📑 Contratos de mantenimiento recurrente">
+      <Section title="Contratos">
         {data.contracts.length === 0 ? (
           <Empty>Sin contratos vigentes.</Empty>
         ) : (
@@ -327,7 +325,7 @@ export default function MisServiciosPage() {
                 </div>
                 {c.nextVisitDate && (
                   <div style={{ marginTop: 8, padding: 6, background: "var(--bg-secondary)", borderRadius: 6, fontSize: 11 }}>
-                    📅 Próxima visita: <strong>{new Date(c.nextVisitDate).toLocaleDateString("es-MX")}</strong>
+                    <strong>{new Date(c.nextVisitDate).toLocaleDateString("es-MX")}</strong>
                   </div>
                 )}
               </div>
@@ -337,7 +335,7 @@ export default function MisServiciosPage() {
       </Section>
 
       {quotes && quotes.length > 0 && (
-        <Section title="📋 Cotizaciones">
+        <Section title="Cotizaciones">
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -377,7 +375,7 @@ export default function MisServiciosPage() {
       )}
 
       {invoices && invoices.length > 0 && (
-        <Section title="🧾 Facturas">
+        <Section title="Facturas">
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -430,7 +428,7 @@ export default function MisServiciosPage() {
         </Section>
       )}
 
-      <Section title="⏰ Próximas visitas (30 días)">
+      <Section title="Visitas">
         {data.upcomingVisits.length === 0 ? (
           <Empty>Sin visitas programadas.</Empty>
         ) : (
@@ -460,7 +458,7 @@ export default function MisServiciosPage() {
         )}
       </Section>
 
-      <Section title="🎫 Tickets recientes (30 días)">
+      <Section title="Tickets">
         {data.recentTickets.length === 0 ? (
           <Empty>Sin tickets en el periodo.</Empty>
         ) : (

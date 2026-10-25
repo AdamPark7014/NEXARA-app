@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -43,12 +42,11 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSecondaryButton
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
@@ -147,7 +145,7 @@ fun TicketsInventoriesScreen(
                 itemCount = 5,
                 modifier = Modifier.fillMaxWidth().padding(NxSpacing.ListPadding),
             )
-            !state.loaded && !state.error.isNullOrBlank() -> NxErrorState(message = state.error, onRetry = vm::refresh)
+            !state.loaded && !state.error.isNullOrBlank() -> PortalFrase(state.error!!, onRetry = vm::refresh)
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = NxSpacing.ListPadding,
@@ -165,12 +163,6 @@ fun TicketsInventoriesScreen(
                         NxRefreshErrorBanner(message = msg, onRetry = vm::refresh, onDismiss = vm::dismissError)
                     }
                 }
-                item(key = "header") {
-                    NxSectionHeader(
-                        title = "Inventarios",
-                        subtitle = "Equipos registrados en tus sucursales.",
-                    )
-                }
                 item(key = "report") {
                     NxSecondaryButton(
                         text = if (state.downloading) "Descargando reporte…" else "Descargar reporte PDF",
@@ -182,11 +174,7 @@ fun TicketsInventoriesScreen(
                 }
                 if (state.inventories.isEmpty()) {
                     item(key = "empty") {
-                        NxEmptyState(
-                            title = "Sin inventarios",
-                            subtitle = "Todavía no hay inventarios disponibles para tu empresa.",
-                            icon = Icons.Outlined.Inventory2,
-                        )
+                        PortalFrase("No hay inventarios.")
                     }
                 } else {
                     items(state.inventories, key = { it.id }, contentType = { "inventory" }) { inv ->
@@ -217,7 +205,7 @@ private fun InventoryRow(inv: ClientPortalInventorySnapshotDto, onOpen: () -> Un
                         inv.title?.takeIf { it.isNotBlank() } ?: "Inventario #${inv.id}",
                         style = MaterialTheme.typography.titleSmall,
                         color = NxColors.Slate,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
@@ -225,14 +213,9 @@ private fun InventoryRow(inv: ClientPortalInventorySnapshotDto, onOpen: () -> Un
                         NxStatusChip(NxStatusLabels.label(it), NxStatusLabels.tone(it))
                     }
                 }
-                val meta = buildList {
-                    inv.branch?.name?.takeIf { it.isNotBlank() }?.let { add(it) }
-                    val count = inv.currentCount ?: inv.items?.size
-                    if (count != null) add(if (count == 1) "1 equipo" else "$count equipos")
-                }.joinToString(" · ")
-                if (meta.isNotBlank()) {
-                    Text(meta, color = NxColors.Muted, style = MaterialTheme.typography.bodySmall)
-                }
+                inv.branch?.name?.takeIf { it.isNotBlank() }?.let { PortalLinea(it) }
+                val count = inv.currentCount ?: inv.items?.size
+                if (count != null) PortalLinea(if (count == 1) "1 equipo" else "$count equipos")
             }
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,

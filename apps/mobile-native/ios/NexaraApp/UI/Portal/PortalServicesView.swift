@@ -26,7 +26,7 @@ struct PortalServicesView: View {
                         .padding(NxSpacing.l)
                 }
             } else if !loaded, let error {
-                NxErrorState(message: error) { Task { await reload() } }
+                PortalFrase(text: error, retry: { Task { await reload() } })
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: NxSpacing.listGap) {
@@ -76,10 +76,6 @@ struct PortalServicesView: View {
                 onDismiss: { self.error = nil }
             )
         }
-        NxSectionHeader(
-            title: "Mis servicios",
-            subtitle: "Proyectos, contratos, visitas y documentos en un solo lugar."
-        )
         NxKpiGrid(items: [
             NxKpi(label: "Proyectos activos", value: portalServicesCount(stats, "activeProjects"), tone: .info),
             NxKpi(label: "Contratos", value: portalServicesCount(stats, "activeContracts"), tone: .brand),
@@ -93,11 +89,7 @@ struct PortalServicesView: View {
         invoicesSection
         quotesSection
         if isEmpty {
-            NxEmptyState(
-                title: "Sin servicios",
-                subtitle: "Tus proyectos y documentos aparecerán aquí.",
-                systemImage: "shippingbox"
-            )
+            PortalFrase(text: "No hay servicios.")
         }
     }
 

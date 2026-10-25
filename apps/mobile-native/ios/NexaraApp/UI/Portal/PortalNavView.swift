@@ -19,23 +19,24 @@ enum PortalRoute: Hashable {
     case help
 
     /// Título de la barra en el inicio del portal.
-    static let homeTitle = "Tickets / Portal"
+    static let homeTitle = "Portal"
 
-    /// Títulos de Android (`TicketsNavHost`); lo que Android no nombra (editar
-    /// sucursal y los detalles) cae en «Tickets / Portal», igual que allá.
+    /// Títulos de Android (`TicketsNavHost`).
     var title: String {
         switch self {
-        case .profile: return "Mi perfil"
-        case .branches: return "Mis sucursales"
+        case .profile: return "Perfil"
+        case .branches: return "Sucursales"
         case .branchNew: return "Nueva sucursal"
+        case .branchEdit: return "Sucursal"
         case .requests: return "Solicitudes"
         case .requestNew: return "Nueva solicitud"
         case .tickets: return "Tickets"
-        case .feedback: return "Feedback pendiente"
+        case .ticketDetail: return "Ticket"
+        case .feedback: return "Confirmación"
         case .inventories: return "Inventarios"
-        case .services: return "Mis servicios"
-        case .help: return "Centro de ayuda"
-        case .branchEdit, .ticketDetail, .inventoryDetail: return Self.homeTitle
+        case .inventoryDetail: return "Inventario"
+        case .services: return "Servicios"
+        case .help: return "Ayuda"
         }
     }
 
@@ -56,7 +57,7 @@ enum PortalRoute: Hashable {
 }
 
 /// Pila del portal (Android `TicketsNavHost`): inicio con tarjetas de módulos,
-/// barra teal con volver y cerrar sesión en todas las pantallas.
+/// barra clara con volver y cerrar sesión en todas las pantallas.
 struct PortalNavView: View {
     let onExit: () -> Void
     @State private var path: [PortalRoute] = []
@@ -192,19 +193,16 @@ struct PortalHomeView: View {
 
     @ViewBuilder
     private var content: some View {
-        if let error {
-            NxErrorBlock(message: error, onRetry: { Task { await refresh(initial: true) } })
-        }
-        if let message {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(message)
-                    .font(NxType.bodyLarge)
-                    .foregroundStyle(NxColors.brand)
-                Button("Cerrar aviso") { self.message = nil }
-                    .buttonStyle(PortalButtons.outlined)
-            }
-        }
         if let p = profile, !p.name.trimmingCharacters(in: .whitespaces).isEmpty {
+            if let error {
+                PortalFrase(text: error, retry: { Task { await refresh(initial: false) } })
+            }
+            if let message {
+                Text(message)
+                    .font(NxType.bodySmall)
+                    .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
+            }
             header(p)
             NxKpiGrid(items: [
                 NxKpi(label: "Tickets", value: "\(stats.totalTickets)", tone: .brand),
@@ -214,18 +212,14 @@ struct PortalHomeView: View {
                 NxKpi(label: "Solicitudes", value: "\(stats.openRequests)",
                       tone: stats.openRequests > 0 ? .info : .neutral),
             ])
-            NxSectionHeader(title: "Módulos", subtitle: "Acceso rápido al portal")
             modules(p)
-            Button { onExit() } label: {
-                Text("Cerrar sesión").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PortalButtons.outlined)
         } else {
-            Text("No se encontró perfil del portal.")
-                .font(NxType.bodyLarge)
-                .foregroundStyle(NxColors.danger)
-            Button("Cerrar sesión") { onExit() }
-                .buttonStyle(PortalButtons.outlined)
+            PortalFrase(
+                text: error ?? "No hay perfil del portal.",
+                retry: { Task { await refresh(initial: true) } },
+                actionLabel: "Cerrar sesión",
+                onAction: onExit
+            )
         }
     }
 
@@ -239,59 +233,54 @@ struct PortalHomeView: View {
                 Spacer().frame(height: 8)
             }
             Text(p.name)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(NxColors.fg)
+                .lineLimit(1)
             if p.isBranch && !p.branchNumber.isEmpty {
-                Text("Sucursal: \(p.branchNumber)")
-                    .font(NxType.bodyMedium)
+                Text(p.branchNumber)
+                    .font(NxType.bodySmall)
                     .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
             }
-            Text("Seguimiento de servicio y soporte")
-                .font(NxType.bodySmall)
-                .foregroundStyle(NxColors.muted)
         }
     }
 
     @ViewBuilder
     private func modules(_ p: PortalClientProfile) -> some View {
         PortalNavCard(
-            title: "Estado de tickets",
-            subtitle: "\(stats.pendingTickets) en proceso · \(stats.closedTickets) cerrados",
+            title: "Tickets",
+            subtitle: "\(stats.pendingTickets) en proceso",
             onClick: { onNavigate(.tickets) }
         )
         PortalNavCard(
             title: "Solicitudes",
-            subtitle: stats.openRequests > 0 ? "\(stats.openRequests) activas" : "Levantar o revisar solicitudes",
+            subtitle: stats.openRequests > 0 ? "\(stats.openRequests) activas" : "",
             badge: stats.openRequests > 0 ? "\(stats.openRequests)" : nil,
             onClick: { onNavigate(.requests) }
         )
         if isClient && stats.pendingFeedback > 0 {
             PortalNavCard(
-                title: "Confirmación de servicio",
-                subtitle: "Evalúa servicios finalizados",
+                title: "Confirmación",
+                subtitle: "\(stats.pendingFeedback) por confirmar",
                 badge: "\(stats.pendingFeedback)",
                 tone: .warning,
                 onClick: { onNavigate(.feedback) }
             )
         }
         if isClient {
-            PortalNavCard(
-                title: "Mis servicios",
-                subtitle: "Contratos, facturas y cotizaciones",
-                onClick: { onNavigate(.services) }
-            )
+            PortalNavCard(title: "Servicios", subtitle: "", onClick: { onNavigate(.services) })
         }
-        PortalNavCard(title: "Inventarios", subtitle: "Snapshots y mantenimiento", onClick: { onNavigate(.inventories) })
-        PortalNavCard(title: "Centro de ayuda", subtitle: "Preguntas frecuentes y guías", onClick: { onNavigate(.help) })
-        PortalNavCard(title: "Mi perfil", subtitle: "Datos corporativos", onClick: { onNavigate(.profile) })
+        PortalNavCard(title: "Inventarios", subtitle: "", onClick: { onNavigate(.inventories) })
+        PortalNavCard(title: "Ayuda", subtitle: "", onClick: { onNavigate(.help) })
+        PortalNavCard(title: "Perfil", subtitle: "", onClick: { onNavigate(.profile) })
         if isClient {
-            PortalNavCard(title: "Sucursales", subtitle: "Gestión de sitios", onClick: { onNavigate(.branches) })
+            PortalNavCard(title: "Sucursales", subtitle: "", onClick: { onNavigate(.branches) })
             if stats.pendingFeedback == 0 {
-                PortalNavCard(title: "Feedback", subtitle: "Sin pendientes", onClick: { onNavigate(.feedback) })
+                PortalNavCard(title: "Confirmación", subtitle: "Sin pendientes", onClick: { onNavigate(.feedback) })
             }
             PortalNavCard(
-                title: "Reporte del portal",
-                subtitle: downloadingPortalReport ? "Descargando…" : "PDF de actividad y tickets",
+                title: "Reporte",
+                subtitle: downloadingPortalReport ? "Descargando…" : "",
                 onClick: { if !downloadingPortalReport { Task { await downloadPortalReport() } } }
             )
         }

@@ -47,7 +47,6 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 
 import androidx.compose.material3.OutlinedButton
@@ -77,8 +76,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 
 import androidx.compose.ui.Modifier
-
-import androidx.compose.ui.text.font.FontWeight
 
 import androidx.compose.ui.text.input.ImeAction
 
@@ -111,7 +108,7 @@ import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
 
@@ -494,25 +491,9 @@ fun TicketsRequestNewScreen(
 
                 ) {
 
-                    Text("Nueva solicitud", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-                    Text(
-
-                        "Describe el problema o solicita mantenimiento preventivo",
-
-                        style = MaterialTheme.typography.bodySmall,
-
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-
-
                     if (!state.error.isNullOrBlank()) {
 
-                        NxErrorBlock(state.error!!) { vm.refreshBranches(initial = true) }
+                        PortalFrase(state.error!!, onRetry = { vm.refreshBranches(initial = true) })
 
                         Spacer(Modifier.height(10.dp))
 

@@ -161,7 +161,7 @@ struct PortalRequestsView: View {
             PortalSkeletonScreen(itemCount: 5, itemHeight: 120)
         } else if vm.requests.isEmpty, let error = vm.error {
             ScrollView {
-                NxErrorState(message: error) { Task { await vm.refresh(.initial) } }
+                PortalFrase(text: error, retry: { Task { await vm.refresh(.initial) } })
             }
             .refreshable { await vm.refresh(.pull) }
         } else {
@@ -191,10 +191,6 @@ struct PortalRequestsView: View {
                 onDismiss: { vm.error = nil }
             )
         }
-        NxSectionHeader(
-            title: "Solicitudes",
-            subtitle: "Levanta tickets y revisa el estatus de cada solicitud."
-        )
         NxKpiGrid(items: kpis, columns: 3)
         NxSearchField(text: $query, placeholder: "Buscar descripción o sucursal")
         NxFilterBar(horizontalPadding: 0) {
@@ -206,12 +202,10 @@ struct PortalRequestsView: View {
         }
         let rows = filtered
         if rows.isEmpty {
-            NxEmptyState(
-                title: vm.requests.isEmpty ? "Sin solicitudes" : "Sin resultados",
-                subtitle: vm.requests.isEmpty
-                    ? "Cuando levantes una solicitud aparecerá aquí."
-                    : "Ninguna solicitud coincide con el filtro o la búsqueda.",
-                systemImage: "tray"
+            PortalFrase(
+                text: vm.requests.isEmpty
+                    ? "No hay solicitudes."
+                    : "Ninguna solicitud coincide con la búsqueda."
             )
         } else {
             ForEach(rows) { request in
@@ -484,14 +478,8 @@ struct PortalRequestNewView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PortalScreenTitle(
-                title: "Nueva solicitud",
-                subtitle: "Describe el problema o solicita mantenimiento preventivo"
-            )
-            PortalGap(12)
-
             if let error = vm.error {
-                NxErrorBlock(message: error, onRetry: { Task { await vm.refreshBranches(initial: true) } })
+                PortalFrase(text: error, retry: { Task { await vm.refreshBranches(initial: true) } })
                 PortalGap(10)
             }
 

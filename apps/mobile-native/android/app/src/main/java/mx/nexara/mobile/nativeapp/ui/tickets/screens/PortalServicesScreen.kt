@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,8 +31,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
@@ -41,7 +40,6 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSecondaryButton
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
@@ -124,7 +122,7 @@ fun PortalServicesScreen(onBack: () -> Unit) {
                 itemCount = 5,
                 modifier = Modifier.fillMaxWidth().padding(NxSpacing.ListPadding),
             )
-            !loaded && error != null -> NxErrorState(message = error, onRetry = ::reload)
+            !loaded && error != null -> PortalFrase(error!!, onRetry = ::reload)
             else -> {
                 val stats = summary["summary"] as? Map<*, *> ?: emptyMap<String, Any?>()
                 val projects = remember(summary) { mapListFromSummary(summary, "projects") }
@@ -141,12 +139,6 @@ fun PortalServicesScreen(onBack: () -> Unit) {
                         item(key = "refresh-error") {
                             NxRefreshErrorBanner(message = error, onRetry = ::reload, onDismiss = { error = null })
                         }
-                    }
-                    item(key = "header") {
-                        NxSectionHeader(
-                            title = "Mis servicios",
-                            subtitle = "Proyectos, contratos, visitas y documentos en un solo lugar.",
-                        )
                     }
                     item(key = "kpis") {
                         NxKpiGrid(
@@ -182,7 +174,7 @@ fun PortalServicesScreen(onBack: () -> Unit) {
                                     portalStr(c, "slaResolutionHours").takeIf { it.isNotBlank() }?.let { add("Solución ${it} h") }
                                     portalStr(c, "frequency").takeIf { it.isNotBlank() }?.let { add(NxStatusLabels.label(it)) }
                                 }
-                                if (sla.isNotEmpty()) Meta(sla.joinToString(" · "))
+                                sla.forEach { Meta(it) }
                                 val next = portalStr(c, "nextVisitDate")
                                 if (next.isNotBlank()) Meta("Próxima visita: ${NxFormat.date(next)}")
                             }
@@ -206,10 +198,8 @@ fun PortalServicesScreen(onBack: () -> Unit) {
                             NxPanelShell {
                                 val number = portalStr(t, "anNumber")
                                 val title = portalStr(t, "titulo", "title")
-                                TitleWithStatus(
-                                    listOf(number, title).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Ticket" },
-                                    portalStr(t, "estatus", "status"),
-                                )
+                                TitleWithStatus(number.ifBlank { title }.ifBlank { "Ticket" }, portalStr(t, "estatus", "status"))
+                                if (number.isNotBlank() && title.isNotBlank()) PortalLinea(title)
                             }
                         }
                     }
@@ -264,11 +254,7 @@ fun PortalServicesScreen(onBack: () -> Unit) {
                     }
                     if (projects.isEmpty() && contracts.isEmpty() && visits.isEmpty() && tickets.isEmpty() && invoices.isEmpty() && quotes.isEmpty()) {
                         item(key = "empty") {
-                            NxEmptyState(
-                                title = "Sin servicios",
-                                subtitle = "Tus proyectos y documentos aparecerán aquí.",
-                                icon = Icons.Default.Inventory2,
-                            )
+                            PortalFrase("No hay servicios.")
                         }
                     }
                 }
@@ -298,7 +284,7 @@ private fun TitleWithStatus(title: String, status: String?) {
             title,
             style = MaterialTheme.typography.titleSmall,
             color = NxColors.Slate,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
@@ -324,6 +310,8 @@ private fun Meta(text: String) {
         text,
         style = MaterialTheme.typography.bodySmall,
         color = NxColors.Muted,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.padding(top = NxSpacing.Xxs),
     )
 }

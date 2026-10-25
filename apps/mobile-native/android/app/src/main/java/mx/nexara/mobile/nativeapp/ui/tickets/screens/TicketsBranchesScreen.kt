@@ -80,9 +80,9 @@ import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
@@ -255,29 +255,19 @@ fun TicketsBranchesScreen(
 
             ) {
 
-                item {
-
-                    Text("Mis sucursales", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-                    Text(
-
-                        "Administra ubicaciones y accesos del portal",
-
-                        style = MaterialTheme.typography.bodySmall,
-
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-
-                    )
-
-                }
-
-
-
-                if (!state.error.isNullOrBlank()) {
+                if (!state.error.isNullOrBlank() && state.branches.isEmpty()) {
 
                     item {
 
-                        NxErrorBlock(state.error!!) { vm.refresh(initial = true) }
+                        PortalFrase(state.error!!, onRetry = { vm.refresh(initial = true) })
+
+                    }
+
+                } else if (!state.error.isNullOrBlank()) {
+
+                    item {
+
+                        PortalFrase(state.error!!, onRetry = { vm.refresh(initial = false) })
 
                     }
 
@@ -289,17 +279,7 @@ fun TicketsBranchesScreen(
 
                     item {
 
-                        NxEmptyState(
-
-                            title = "Sin sucursales",
-
-                            subtitle = "Registra tu primera sucursal para habilitar el portal por ubicación.",
-
-                            actionLabel = "+ Nueva sucursal",
-
-                            onAction = onCreate,
-
-                        )
+                        PortalFrase("No hay sucursales.", actionLabel = "Nueva sucursal", onAction = onCreate)
 
                     }
 
@@ -311,7 +291,14 @@ fun TicketsBranchesScreen(
 
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
 
-                                Text(b.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                Text(
+                                    b.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
 
                                 val active = b.isActive
 
@@ -329,27 +316,17 @@ fun TicketsBranchesScreen(
 
                             }
 
-                            val meta = buildList {
+                            b.branchNumber?.takeIf { it.isNotBlank() }?.let { PortalLinea(it) }
 
-                                b.branchNumber?.takeIf { it.isNotBlank() }?.let { add("Sucursal: $it") }
+                            b.city?.takeIf { it.isNotBlank() }?.let { city ->
 
-                                b.city?.takeIf { it.isNotBlank() }?.let { c ->
+                                val st = b.state?.takeIf { it.isNotBlank() }
 
-                                    val st = b.state?.takeIf { it.isNotBlank() }
-
-                                    add(if (st != null) "$c, $st" else c)
-
-                                }
-
-                                b.address?.takeIf { it.isNotBlank() }?.let { add(it) }
-
-                            }.joinToString(" · ")
-
-                            if (meta.isNotBlank()) {
-
-                                Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                PortalLinea(if (st != null) "$city, $st" else city)
 
                             }
+
+                            b.address?.takeIf { it.isNotBlank() }?.let { PortalLinea(it) }
 
                             Spacer(Modifier.height(4.dp))
 

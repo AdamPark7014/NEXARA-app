@@ -67,12 +67,10 @@ export default function MyBranchesPage() {
       <div className={`card ${styles.gradientHeader}`}>
         <div className={styles.headerSplit}>
           <div>
-            <h1 style={{ margin: "0 0 4px 0", fontSize: 28, fontWeight: 700, color: "var(--primary)" }}>
-              Mis sucursales
-            </h1>
-            <p className={styles.mutedText} style={{ margin: 0, fontSize: 13 }}>
-              Administra todas las sucursales de tu empresa en una vista centralizada
-            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <a href="/tickets" style={{ color: "#1d1d1f", textDecoration: "none", fontSize: 15 }}>Volver</a>
+              <h1 className={styles.quietTitle}>Sucursales</h1>
+            </div>
           </div>
           {profile && (
             <div className={styles.companyBox}>

@@ -103,9 +103,8 @@ import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 
@@ -671,24 +670,6 @@ fun TicketsInventoryDetailScreen(
 
             ) {
 
-                item {
-
-                    Text("Detalle inventario", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-                    Text(
-
-                        "Revisa items, sincroniza cambios y aprueba el conteo",
-
-                        style = MaterialTheme.typography.bodySmall,
-
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-
-                    )
-
-                }
-
-
-
                 if (!state.message.isNullOrBlank()) {
 
                     item {
@@ -696,8 +677,6 @@ fun TicketsInventoryDetailScreen(
                         NxPanelShell(contentPadding = PaddingValues(12.dp)) {
 
                             Text(state.message!!, color = MaterialTheme.colorScheme.primary)
-
-                            OutlinedButton(onClick = vm::dismissMessage) { Text("Cerrar aviso") }
 
                         }
 
@@ -711,7 +690,7 @@ fun TicketsInventoryDetailScreen(
 
                     item {
 
-                        NxErrorBlock(state.error!!) { vm.load(inventoryId, initial = true) }
+                        PortalFrase(state.error!!, onRetry = { vm.load(inventoryId, initial = true) })
 
                     }
 
@@ -725,13 +704,7 @@ fun TicketsInventoryDetailScreen(
 
                     item {
 
-                        NxEmptyState(
-
-                            title = "Inventario no encontrado",
-
-                            subtitle = "No hay datos para este inventario.",
-
-                        )
+                        PortalFrase("No hay datos de este inventario.")
 
                     }
 
@@ -911,7 +884,11 @@ fun TicketsInventoryDetailScreen(
 
                 item {
 
-                    Text("Items (${items.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        if (items.size == 1) "1 equipo" else "${items.size} equipos",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = NxColors.Slate,
+                    )
 
                 }
 
@@ -921,13 +898,7 @@ fun TicketsInventoryDetailScreen(
 
                     item {
 
-                        NxEmptyState(
-
-                            title = "Sin items",
-
-                            subtitle = "Este inventario no tiene equipos registrados.",
-
-                        )
+                        PortalFrase("Este inventario no tiene equipos.")
 
                     }
 

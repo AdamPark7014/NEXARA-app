@@ -46,7 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPrimaryButton
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
@@ -206,17 +206,9 @@ fun TicketsProfileScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Top,
             ) {
-                Text("Perfil del portal", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    if (editable) "Actualiza datos de contacto y dirección" else "Perfil de sucursal (solo lectura)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-
                 if (!state.error.isNullOrBlank()) {
                     if (state.profile == null) {
-                        NxErrorBlock(state.error!!) { vm.refresh(initial = true) }
+                        PortalFrase(state.error!!, onRetry = { vm.refresh(initial = true) })
                     } else {
                         NxRefreshErrorBanner(message = state.error, onRetry = { vm.refresh(initial = false) })
                     }

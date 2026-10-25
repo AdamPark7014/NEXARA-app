@@ -98,9 +98,9 @@ import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalFrase
+import mx.nexara.mobile.nativeapp.ui.tickets.PortalLinea
 
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 
@@ -441,15 +441,10 @@ fun TicketsTicketDetailScreen(
 
                     ) {
 
-                        if (!state.error.isNullOrBlank()) {
-
-                            NxErrorBlock(state.error!!) { vm.load(ticketId, initial = true) }
-
-                        } else {
-
-                            NxEmptyState("Ticket no encontrado", "No hay datos para este ticket.")
-
-                        }
+                        PortalFrase(
+                            state.error?.takeIf { it.isNotBlank() } ?: "No hay datos de este ticket.",
+                            onRetry = if (!state.error.isNullOrBlank()) ({ vm.load(ticketId, initial = true) }) else null,
+                        )
 
                     }
 
@@ -489,7 +484,7 @@ fun TicketsTicketDetailScreen(
 
                         if (!state.error.isNullOrBlank()) {
 
-                            item { NxErrorBlock(state.error!!) { vm.load(ticketId, initial = true) } }
+                            item { PortalFrase(state.error!!, onRetry = { vm.load(ticketId, initial = true) }) }
 
                         }
 
@@ -501,21 +496,14 @@ fun TicketsTicketDetailScreen(
 
                                 Column(Modifier.weight(1f)) {
 
-                                    Text(t.titulo ?: "Ticket #${t.id}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
                                     Text(
-
-                                        listOfNotNull(
-
-                                            t.anNumber?.takeIf { it.isNotBlank() },
-
-                                        ).joinToString(" · "),
-
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-
-                                        style = MaterialTheme.typography.bodySmall,
-
+                                        t.titulo ?: "Ticket #${t.id}",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                     )
+                                    t.anNumber?.takeIf { it.isNotBlank() }?.let { PortalLinea(it) }
 
                                 }
 

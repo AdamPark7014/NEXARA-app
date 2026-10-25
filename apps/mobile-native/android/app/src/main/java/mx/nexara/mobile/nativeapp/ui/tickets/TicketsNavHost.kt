@@ -5,10 +5,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,16 +19,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.Column
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLightStatusBarIcons
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
@@ -97,49 +98,56 @@ fun TicketsNavHost(
 
     val title = remember(route) {
         when (route) {
-            TicketsRoutes.Profile -> "Mi perfil"
-            TicketsRoutes.Branches -> "Mis sucursales"
+            TicketsRoutes.Profile -> "Perfil"
+            TicketsRoutes.Branches -> "Sucursales"
             TicketsRoutes.BranchNew -> "Nueva sucursal"
+            TicketsRoutes.BranchEdit -> "Sucursal"
             TicketsRoutes.Requests -> "Solicitudes"
             TicketsRoutes.RequestNew -> "Nueva solicitud"
             TicketsRoutes.Tickets -> "Tickets"
-            TicketsRoutes.FeedbackPending -> "Feedback pendiente"
+            TicketsRoutes.TicketDetail -> "Ticket"
+            TicketsRoutes.FeedbackPending -> "Confirmación"
             TicketsRoutes.Inventories -> "Inventarios"
-            TicketsRoutes.Services -> "Mis servicios"
-            TicketsRoutes.Help -> "Centro de ayuda"
-            else -> "Tickets / Portal"
+            TicketsRoutes.InventoryDetail -> "Inventario"
+            TicketsRoutes.Services -> "Servicios"
+            TicketsRoutes.Help -> "Ayuda"
+            else -> "Portal"
         }
     }
 
     val showBack = route != TicketsRoutes.Portal
 
-    NxLightStatusBarIcons()
+    PortalClearStatusBarIcons()
     Scaffold(
+        containerColor = NxColors.Surface,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                colors = NxBrandTopAppBarColors(),
-                navigationIcon = {
-                    if (showBack) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    colors = portalClearTopAppBarColors(),
+                    navigationIcon = {
+                        if (showBack) {
+                            TextButton(onClick = { navController.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                                Text("Volver")
+                            }
                         }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar sesión")
-                    }
-                },
-            )
+                    },
+                    actions = {
+                        IconButton(onClick = onLogout) {
+                            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar sesión")
+                        }
+                    },
+                )
+                HorizontalDivider(color = androidx.compose.ui.graphics.Color(0xFFE6E6E8))
+            }
         },
     ) { inner ->
         NavHost(
