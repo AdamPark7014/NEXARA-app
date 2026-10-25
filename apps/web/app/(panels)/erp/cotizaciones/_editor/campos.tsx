@@ -220,6 +220,7 @@ export function ListaEditable({
 export function Ayuda({ titulo, children }: { titulo: string; children: ReactNode }) {
   const [abierta, setAbierta] = useState(false);
   const caja = useRef<HTMLSpanElement>(null);
+  const globo = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!abierta) return;
     const fuera = (e: MouseEvent) => {
@@ -227,6 +228,25 @@ export function Ayuda({ titulo, children }: { titulo: string; children: ReactNod
     };
     document.addEventListener("mousedown", fuera);
     return () => document.removeEventListener("mousedown", fuera);
+  }, [abierta]);
+  // El globo sale del ⓘ hacia la derecha. Si el botón está al borde, se corre
+  // a la izquierda lo justo para que el texto quepa en la pantalla.
+  useLayoutEffect(() => {
+    const el = globo.current;
+    if (!abierta || !el) return;
+    const margen = 16;
+    const caber = () => {
+      el.style.translate = "";
+      const r = el.getBoundingClientRect();
+      const limite = window.innerWidth - margen;
+      let dx = 0;
+      if (r.right > limite) dx -= r.right - limite;
+      if (r.left + dx < margen) dx += margen - (r.left + dx);
+      el.style.translate = dx ? `${Math.round(dx)}px 0` : "";
+    };
+    caber();
+    window.addEventListener("resize", caber);
+    return () => window.removeEventListener("resize", caber);
   }, [abierta]);
   return (
     <span
@@ -246,7 +266,7 @@ export function Ayuda({ titulo, children }: { titulo: string; children: ReactNod
         <InfoOutlinedIcon aria-hidden="true" />
       </button>
       {abierta ? (
-        <span role="note" className={styles.ayudaGlobo}>
+        <span ref={globo} role="note" className={styles.ayudaGlobo}>
           {children}
         </span>
       ) : null}
