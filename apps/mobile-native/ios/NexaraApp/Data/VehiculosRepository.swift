@@ -6,6 +6,14 @@ import Foundation
 /// Todo campo que el API pueda mandar en `null` se decodifica con valor por
 /// omisión: un registro raro deja la tarjeta incompleta, nunca tumba la pantalla.
 
+/// Un dato por renglón: el nombre y, si vienen, las placas debajo.
+/// Sin nombre, «Vehículo». Sin placas, solo el nombre.
+private func tituloNombreYPlacas(nombre: String, placas: String?) -> String {
+    let base = nombre.isEmpty ? "Vehículo" : nombre
+    guard let placas, !placas.isEmpty else { return base }
+    return "\(base)\n\(placas)"
+}
+
 // MARK: - DTOs
 
 /// El vehículo, tal como lo nombra la asignación activa.
@@ -23,12 +31,7 @@ struct VehiculoRef: Decodable, Hashable {
         placas = try? c.decode(String.self, forKey: .placas)
     }
 
-    /// «Ranger · ABC-123» / «Ranger» si no hay placas.
-    var titulo: String {
-        let base = nombre.isEmpty ? "Vehículo" : nombre
-        guard let placas, !placas.isEmpty else { return base }
-        return "\(base) · \(placas)"
-    }
+    var titulo: String { tituloNombreYPlacas(nombre: nombre, placas: placas) }
 }
 
 struct ConductorRef: Decodable, Hashable {
@@ -107,11 +110,7 @@ struct SolicitudResumen: Decodable, Identifiable, Hashable {
         fechaFinSolicitada = try? c.decode(String.self, forKey: .fechaFinSolicitada)
     }
 
-    var titulo: String {
-        let base = (nombreVehiculo ?? "").isEmpty ? "Vehículo" : (nombreVehiculo ?? "")
-        guard let placas = placasVehiculo, !placas.isEmpty else { return base }
-        return "\(base) · \(placas)"
-    }
+    var titulo: String { tituloNombreYPlacas(nombre: nombreVehiculo ?? "", placas: placasVehiculo) }
 
     var aprobada: Bool {
         ["aprobada", "aprobado"].contains(estatusAprobacion.lowercased())
@@ -160,11 +159,7 @@ struct VehiculoFlota: Decodable, Identifiable, Hashable {
         tieneRastreador = (try? c.decode(Bool.self, forKey: .tieneRastreador)) ?? false
     }
 
-    var titulo: String {
-        let base = nombre.isEmpty ? "Vehículo" : nombre
-        guard let placas, !placas.isEmpty else { return base }
-        return "\(base) · \(placas)"
-    }
+    var titulo: String { tituloNombreYPlacas(nombre: nombre, placas: placas) }
 }
 
 /// `GET vehicles/mis-vehiculos`.
