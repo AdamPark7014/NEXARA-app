@@ -72,7 +72,7 @@ export class TranscriptorService {
     } catch (error) {
       this.ultimoPing = { at: Date.now(), ok: false };
       this.logger.error(`no responde: ${(error as Error).message}`);
-      throw new ServiceUnavailableException('El transcriptor no respondió. Intenta de nuevo.');
+      throw new ServiceUnavailableException('El transcriptor no respondió: intenta de nuevo.');
     }
     const cuerpo = await respuesta.text();
     if (!respuesta.ok) {
