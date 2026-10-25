@@ -70,7 +70,7 @@ export class AccountAccessService {
     const dueno = await this.dueno(sesion);
     if (dueno.lockedUntil && dueno.lockedUntil.getTime() > Date.now()) {
       const mins = Math.ceil((dueno.lockedUntil.getTime() - Date.now()) / 60_000);
-      throw new UnauthorizedException(`Cuenta bloqueada temporalmente. Reintenta en ${mins} min.`);
+      throw new UnauthorizedException(`Cuenta bloqueada temporalmente: reintenta en ${mins} min.`);
     }
     const bien = typeof password === 'string' && password.length > 0 && (await bcrypt.compare(password, dueno.passwordHash));
     if (!bien) {
