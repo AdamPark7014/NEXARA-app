@@ -18,11 +18,15 @@ const base = (over: Partial<Celebracion>): Celebracion => ({
 });
 
 describe("texto del aviso de celebraciones", () => {
-  it("quien cumple años ve su felicitación con el primer nombre", () => {
-    expect(textoCelebracion(base({ soyYo: true }))).toEqual({
-      titulo: "¡Feliz cumpleaños, Carolina! 🎂",
-      detalle: "Todo el equipo te desea un gran día",
+  it("quien cumple años ve su felicitación con el primer nombre, en una frase", () => {
+    const viejo = "¡Feliz cumpleaños, Carolina! 🎂 Todo el equipo te desea un gran día";
+    const aviso = textoCelebracion(base({ soyYo: true }));
+    expect(aviso).toEqual({
+      titulo: "¡Feliz cumpleaños, Carolina: todo el equipo te desea un gran día! 🎂",
+      detalle: null,
     });
+    expect(aviso.titulo).not.toBe(viejo);
+    expect(aviso.titulo.match(/[!?.]/g)).toEqual(["!"]);
   });
 
   it("el resto del equipo ve de quién es el cumpleaños", () => {
@@ -46,10 +50,37 @@ describe("texto del aviso de celebraciones", () => {
     expect(textoCelebracion(base({ nombre: "Ana López", tipo: "aniversario", anios: 1 })).titulo).toBe(
       "Ana López cumple 1 año en NEXARA 🎉",
     );
-    expect(textoCelebracion(base({ nombre: "Ana López", tipo: "aniversario", anios: 2, soyYo: true }))).toEqual({
-      titulo: "¡Felicidades, Ana! 🎉",
-      detalle: "Hoy cumples 2 años en NEXARA",
+    const viejo = "¡Felicidades, Carolina! 🎉 Hoy cumples 3 años en NEXARA";
+    const propio = textoCelebracion(
+      base({ nombre: "Carolina Juárez Álvarez", tipo: "aniversario", anios: 3, soyYo: true }),
+    );
+    expect(propio).toEqual({
+      titulo: "¡Felicidades, Carolina: hoy cumples 3 años en NEXARA! 🎉",
+      detalle: null,
     });
+    expect(propio.titulo).not.toBe(viejo);
+    expect(propio.titulo.match(/[!?.]/g)).toEqual(["!"]);
+    expect(textoCelebracion(base({ nombre: "Ana López", tipo: "aniversario", anios: 2, soyYo: true }))).toEqual({
+      titulo: "¡Felicidades, Ana: hoy cumples 2 años en NEXARA! 🎉",
+      detalle: null,
+    });
+  });
+
+  it("en iOS la segunda frase ya no viaja suelta: el aviso de la web tampoco la repite", () => {
+    const viejos = [
+      "Mándale una felicitación.",
+      "Gracias por todo lo que aportas al equipo.",
+      "Felicítale por su aniversario.",
+    ];
+    const avisos = [
+      textoCelebracion(base({ soyYo: true })).titulo,
+      textoCelebracion(base({ nombre: "Carolina Juárez", tipo: "aniversario", anios: 3, soyYo: true })).titulo,
+      textoCelebracion(base({ nombre: "Carolina Juárez" })).titulo,
+      textoCelebracion(base({ nombre: "Carolina Juárez", tipo: "aniversario", anios: 3 })).titulo,
+    ];
+    for (const aviso of avisos) {
+      for (const viejo of viejos) expect(aviso).not.toContain(viejo);
+    }
   });
 
   it("primer nombre y orden: lo propio primero", () => {

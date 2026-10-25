@@ -43,26 +43,24 @@ struct CelebracionHoy: Decodable, Identifiable, Hashable {
         return String(primero.prefix(1)).uppercased() + String(primero.dropFirst())
     }
 
-    /// Renglón principal del aviso.
+    /// Una frase. El deseo, el agradecimiento o la invitación a felicitar van en la misma oración.
     var titulo: String {
         if esCumpleanos {
             if soyYo {
                 let quien = Self.primerNombre(nombre)
-                return quien.isEmpty ? "¡Feliz cumpleaños! 🎂" : "¡Feliz cumpleaños, \(quien)! 🎂"
+                let saludo = quien.isEmpty ? "¡Feliz cumpleaños" : "¡Feliz cumpleaños, \(quien)"
+                return "\(saludo): todo el equipo te desea un gran día! 🎂"
             }
-            return "Hoy es cumpleaños de \(nombre.isEmpty ? "alguien del equipo" : nombre) 🎂"
+            let quien = nombre.isEmpty ? "alguien del equipo" : nombre
+            return "Hoy es cumpleaños de \(quien): mándale una felicitación. 🎂"
         }
         let n = max(1, anios ?? 1)
         let tiempo = n == 1 ? "1 año" : "\(n) años"
-        return "\(nombre.isEmpty ? "Alguien del equipo" : nombre) cumple \(tiempo) en NEXARA 🎉"
-    }
-
-    /// Renglón secundario, sin edad.
-    var detalle: String {
-        if esCumpleanos {
-            return soyYo ? "Todo el equipo de NEXARA te desea un gran día." : "Mándale una felicitación."
+        let quien = nombre.isEmpty ? "Alguien del equipo" : nombre
+        if soyYo {
+            return "\(quien) cumple \(tiempo) en NEXARA: gracias por todo lo que aportas al equipo. 🎉"
         }
-        return soyYo ? "Gracias por todo lo que aportas al equipo." : "Felicítale por su aniversario."
+        return "\(quien) cumple \(tiempo) en NEXARA: felicítale por su aniversario. 🎉"
     }
 }
 
