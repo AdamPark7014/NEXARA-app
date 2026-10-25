@@ -38,10 +38,14 @@ export default function FirmarCotizacionPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [signed, setSigned] = useState(false);
+  const [failure, setFailure] = useState<"load" | "sign" | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!token) return;
     setLoading(true);
+    setError(null);
+    setFailure(null);
     fetch(buildApiUrl(`cotizaciones/public/${token}`))
       .then((res) => {
         if (!res.ok) throw new Error("not found");
@@ -52,43 +56,62 @@ export default function FirmarCotizacionPage() {
         setName(data.clientName || "");
         setEmail(data.clientEmail || "");
       })
-      .catch(() => setError("No se encontro la cotizacion."))
+      .catch(() => {
+        setFailure("load");
+        setError("No se encontro la cotizacion.");
+      })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, reloadKey]);
 
   const handleSign = async () => {
     if (!token) return;
     if (!name || !email) {
+      setFailure(null);
       setError("Nombre y email son requeridos.");
       return;
     }
     setError(null);
-    const res = await fetch(buildApiUrl(`cotizaciones/public/${token}/sign`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email }),
-    });
-    if (!res.ok) {
+    setFailure(null);
+    try {
+      const res = await fetch(buildApiUrl(`cotizaciones/public/${token}/sign`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      });
+      if (!res.ok) {
+        setFailure("sign");
+        setError("No se pudo firmar la cotizacion.");
+        return;
+      }
+      setSigned(true);
+    } catch {
+      setFailure("sign");
       setError("No se pudo firmar la cotizacion.");
-      return;
     }
-    setSigned(true);
   };
 
-  if (loading) {
-    return <main className="quoteShell" aria-label="Firma de cotización">Cargando cotizacion...</main>;
-  }
+  const retry = () => {
+    if (failure === "sign") {
+      void handleSign();
+      return;
+    }
+    setReloadKey((n) => n + 1);
+  };
 
-  if (error) {
-    return <main className="quoteShell" aria-label="Firma de cotización">{error}</main>;
-  }
-
-  if (!quote) {
-    return <main className="quoteShell" aria-label="Firma de cotización">Cotizacion no disponible.</main>;
-  }
+  const blocking = failure === "load" || failure === "sign";
 
   return (
     <main className="quoteShell" aria-label="Firma de cotización">
+      {loading ? (
+        "Cargando cotizacion..."
+      ) : blocking && error ? (
+        <div className="errorBox">
+          <p role="alert">{error}</p>
+          <button type="button" onClick={retry}>Reintentar</button>
+        </div>
+      ) : !quote ? (
+        "Cotizacion no disponible."
+      ) : (
       <div className="quoteCard">
         <header className="quoteHeader">
           <div>
@@ -161,6 +184,7 @@ export default function FirmarCotizacionPage() {
             <p role="status" aria-live="polite">Gracias, tu firma quedo registrada.</p>
           ) : (
             <>
+              {error ? <p role="alert">{error}</p> : null}
               <label htmlFor="quote-signer-name">
                 Nombre completo
                 <input id="quote-signer-name" type="text" autoComplete="name" aria-required="true" value={name} onChange={(e) => setName(e.target.value)} />
@@ -174,6 +198,7 @@ export default function FirmarCotizacionPage() {
           )}
         </div>
       </div>
+      )}
 
       <style jsx>{`
         .quoteShell {
@@ -246,6 +271,12 @@ export default function FirmarCotizacionPage() {
           padding: 12px;
           font-size: 12px;
           color: rgba(230, 240, 255, 0.7);
+        }
+
+        @media (max-width: 390px) {
+          .metaRow {
+            grid-template-columns: 1fr;
+          }
         }
 
         .metaRow strong {
@@ -328,7 +359,19 @@ export default function FirmarCotizacionPage() {
           font-family: inherit;
         }
 
-        .signCard button {
+        .errorBox {
+          width: min(860px, 100%);
+          display: grid;
+          gap: 12px;
+          justify-items: start;
+        }
+
+        .errorBox p {
+          margin: 0;
+        }
+
+        .signCard button,
+        .errorBox button {
           border: none;
           border-radius: 12px;
           padding: 10px 16px;
