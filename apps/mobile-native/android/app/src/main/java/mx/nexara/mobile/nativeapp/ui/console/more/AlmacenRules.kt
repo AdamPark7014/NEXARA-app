@@ -79,14 +79,14 @@ object AlmacenRules {
         return nombre ?: sku ?: "Producto sin nombre"
     }
 
-    /** «SKU-123 · Bodega central · Pasillo 3». */
+    /** SKU, bodega y pasillo, uno por renglón. */
     fun ubicacionTexto(nivel: StockLevelDto): String {
         val partes = listOfNotNull(
             nivel.product?.sku?.trim()?.ifEmpty { null },
             nivel.warehouse?.name?.trim()?.ifEmpty { null } ?: nivel.warehouse?.code?.trim()?.ifEmpty { null },
             nivel.location?.name?.trim()?.ifEmpty { null } ?: nivel.location?.code?.trim()?.ifEmpty { null },
         )
-        return if (partes.isEmpty()) "Sin almacén asignado" else partes.joinToString(" · ")
+        return if (partes.isEmpty()) "Sin almacén asignado" else partes.joinToString("\n")
     }
 
     /**
@@ -103,7 +103,7 @@ object AlmacenRules {
             partes += "${formato(apartado)} apartado"
             partes += "${formato(disponible(nivel))} libre"
         }
-        return partes.joinToString(" · ")
+        return partes.joinToString("\n")
     }
 
     /** Las dos vistas de la pantalla. La primera es la que se abre. */
@@ -144,7 +144,7 @@ object AlmacenRules {
     fun ordenarPorNombre(niveles: List<StockLevelDto>): List<StockLevelDto> =
         niveles.sortedWith(compareBy({ titulo(it).lowercase() }, { ubicacionTexto(it).lowercase() }))
 
-    /** «3 agotados · 11 bajo mínimo» para la cabecera; `null` si todo está bien. */
+    /** «sin existencia» y «bajo mínimo», uno por renglón; `null` si todo está bien. */
     fun resumenAlertas(bajoMinimo: List<StockLevelDto>): String? {
         if (bajoMinimo.isEmpty()) return null
         val agotados = bajoMinimo.count { agotado(it) }
@@ -152,7 +152,7 @@ object AlmacenRules {
         if (agotados > 0) partes += "$agotados sin existencia"
         val restantes = bajoMinimo.size - agotados
         if (restantes > 0) partes += "$restantes bajo mínimo"
-        return partes.joinToString(" · ")
+        return partes.joinToString("\n")
     }
 
     /** Qué no hace esta pantalla. */
