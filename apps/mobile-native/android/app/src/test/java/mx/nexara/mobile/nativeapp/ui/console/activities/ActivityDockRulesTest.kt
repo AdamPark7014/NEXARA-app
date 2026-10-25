@@ -5,6 +5,7 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.ActivityDockRules.Kind
 import mx.nexara.mobile.nativeapp.ui.console.activities.ActivityDockRules.PasoEstado
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -61,11 +62,23 @@ class ActivityDockRulesTest {
     @Test
     fun fotosEnSitioCuentaLasQueFaltan() {
         val flow = EvidenceFlowDto(status = "EVIDENCE_PHOTOS", entryPhotoUrl = "u", evidencePhotos = listOf("a", "b"))
-        val d = dock(flow = flow)
-        assertEquals("Tomar fotos · 2 de 4", d?.label)
-        assertEquals("Faltan 2 fotos para seguir.", d?.hint)
-        val listo = dock(flow = flow.copy(evidencePhotos = listOf("a", "b", "c", "d")))
-        assertEquals("Enviar fotos · 4 de 4", listo?.label)
+        val tomar = dock(flow = flow)
+        assertNotEquals("Tomar fotos · 2 de 4", tomar?.label)
+        assertEquals("Tomar fotos\n2 de 4", tomar?.label)
+        assertEquals(listOf("Tomar fotos", "2 de 4"), tomar!!.label.split("\n"))
+        assertEquals("Faltan 2 fotos para seguir.", tomar.hint)
+
+        val enviar = dock(flow = flow.copy(evidencePhotos = listOf("a", "b", "c", "d")))
+        assertNotEquals("Enviar fotos · 2 de 4", enviar?.label)
+        assertNotEquals("Enviar fotos · 4 de 4", enviar?.label)
+        assertEquals("Enviar fotos\n4 de 4", enviar?.label)
+        assertEquals(listOf("Enviar fotos", "4 de 4"), enviar!!.label.split("\n"))
+
+        val correccion = dock(flow = flow.copy(reviewStatus = "REJECTED", rejectedStep = "EVIDENCE_PHOTOS"))
+        assertNotEquals("Corregir · Tomar fotos · 2 de 4", correccion?.label)
+        assertEquals("Corregir · Tomar fotos\n2 de 4", correccion?.label)
+        assertEquals(listOf("Corregir · Tomar fotos", "2 de 4"), correccion!!.label.split("\n"))
+        assertEquals("Faltan 2 fotos para seguir.", correccion.hint)
     }
 
     @Test

@@ -395,7 +395,7 @@ fun ActivityDock(
                     Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (secondary.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
