@@ -1,22 +1,22 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import FilterToolbar from "@/components/FilterToolbar";
 import { SkeletonList } from "@/components/PageState";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
+import q from "@/components/erp/pantalla-quieta.module.css";
 
 type Severity = "info" | "warning" | "critical";
 
@@ -186,7 +186,7 @@ export default function AuditPage() {
       setRows(Array.isArray(data) ? data : (data?.data ?? []));
       setLoaded(true);
     } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar la bitácora de auditoría."));
+      setError("No se pudo cargar la bitácora de auditoría.");
     } finally {
       setLoading(false);
     }
@@ -245,11 +245,10 @@ export default function AuditPage() {
   const initialLoading = loading && !loaded;
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/dashboard" className={q.volver}>‹ Inicio</Link>
       <PageHeader
-        eyebrow="Gobierno · Auditoría"
-        title="Bitácora de auditoría"
-        subtitle="Registro permanente de los cambios sensibles en el sistema. El borrado de datos personales se solicita desde Usuarios y roles."
+        title="Auditoría"
         actions={
           <Button variant="secondary" iconLeft="↻" loading={loading && loaded} onClick={() => void load()}>
             Actualizar
@@ -258,16 +257,15 @@ export default function AuditPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Eventos de hoy" value={initialLoading ? "—" : stats.today} icon="📋" variant="accent" hint="Todos los módulos" />
+        <KpiCard label="Eventos de hoy" value={initialLoading ? "—" : stats.today} icon="📋" variant="accent" />
         <KpiCard
           label="Críticos (24 h)"
           value={initialLoading ? "—" : stats.criticals24h}
           icon="🚨"
           variant={stats.criticals24h > 0 ? "danger" : "positive"}
-          hint={stats.criticals24h > 0 ? "Conviene revisarlos" : "Sin alertas"}
         />
-        <KpiCard label="Requieren atención (24 h)" value={initialLoading ? "—" : stats.warnings24h} icon="⚠️" variant="warning" hint="Aprobaciones y cambios" />
-        <KpiCard label="Personas activas" value={initialLoading ? "—" : stats.uniqueActors} icon="👥" hint="Incluye procesos automáticos" />
+        <KpiCard label="Requieren atención (24 h)" value={initialLoading ? "—" : stats.warnings24h} icon="⚠️" variant="warning" />
+        <KpiCard label="Personas activas" value={initialLoading ? "—" : stats.uniqueActors} icon="👥" />
       </div>
 
       {rows.length > 0 && (
@@ -330,8 +328,7 @@ export default function AuditPage() {
       {error && loaded && (
         <InlineAlert
           variant="warning"
-          title="No se pudo actualizar"
-          message={`${error} Mostramos la última información cargada.`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 16 }}
         />
@@ -340,23 +337,22 @@ export default function AuditPage() {
       <Section title={initialLoading ? "Cargando eventos" : `${filtered.length.toLocaleString("es-MX")} ${filtered.length === 1 ? "evento" : "eventos"}`}>
         {initialLoading && !error && <SkeletonList rows={6} tableLike />}
         {!loaded && !loading && error && (
-          <EmptyState
-            icon="⚠️"
-            title="No se pudo cargar la bitácora"
-            description={error}
+          <InlineAlert
+            variant="danger"
+            message="No se pudo cargar la auditoría."
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           />
         )}
         {loaded && grouped.length === 0 && (
           rows.length === 0 ? (
-            <EmptyState icon="📋" title="Aún no hay eventos" description="Cuando alguien cree, edite o elimine información sensible, aparecerá aquí." />
+            <p className={q.frase} role="status">No hay eventos.</p>
           ) : (
-            <EmptyState
-              icon="🔎"
-              title="Sin coincidencias"
-              description="Ningún evento coincide con la búsqueda o los filtros."
-              action={<Button size="sm" variant="secondary" onClick={() => { setQuery(""); setSevFilter(""); setPanelFilter(""); }}>Limpiar filtros</Button>}
-            />
+            <>
+              <p className={q.frase} role="status">Nada coincide con estos filtros.</p>
+              <div style={{ textAlign: "center" }}>
+                <Button size="sm" variant="secondary" onClick={() => { setQuery(""); setSevFilter(""); setPanelFilter(""); }}>Limpiar filtros</Button>
+              </div>
+            </>
           )
         )}
         {loaded && grouped.map(([day, events]) => (
@@ -386,6 +382,7 @@ export default function AuditPage() {
                       onClick={() => setExpanded(isExpanded ? null : e.id)}
                       aria-expanded={isExpanded}
                       aria-controls={detailId}
+                      className="nx-fila"
                       style={{
                         display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", gap: 12,
                         padding: "10px 14px", minHeight: 44, background: "transparent", border: "none", cursor: "pointer",
@@ -412,7 +409,7 @@ export default function AuditPage() {
                         id={detailId}
                         style={{ margin: "0 14px", padding: "10px 0 12px", borderTop: "1px solid var(--border)", fontSize: 12.5, color: "var(--text-secondary)", display: "grid", gap: 8 }}
                       >
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 18px" }}>
+                        <div className={q.datos}>
                           <span>Fecha: <strong style={{ fontWeight: 600 }}>{new Date(e.createdAt).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</strong></span>
                           <span>Registro: <strong style={{ fontWeight: 600 }}>{entityLabel(e.entityType)} #{e.entityId}</strong></span>
                           {e.user?.email && <span>Correo: <strong style={{ fontWeight: 600 }}>{e.user.email}</strong></span>}
@@ -433,6 +430,6 @@ export default function AuditPage() {
           </section>
         ))}
       </Section>
-    </>
+    </div>
   );
 }

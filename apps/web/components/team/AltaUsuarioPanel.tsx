@@ -196,8 +196,8 @@ export default function AltaUsuarioPanel() {
     setConfirmActivo({
       title: activo ? "Desactivar perfil" : "Activar perfil",
       message: activo
-        ? `${p.nombre} ya no podrá entrar al sistema ni se le podrá asignar nada. Todo su historial se conserva y puedes reactivarlo cuando quieras.`
-        : `${p.nombre} volverá a poder entrar con sus mismos accesos y a recibir asignaciones.`,
+        ? `${p.nombre} deja de entrar y de recibir asignaciones; el historial se conserva.`
+        : `${p.nombre} vuelve a entrar y a recibir asignaciones.`,
       confirmLabel: activo ? "Desactivar" : "Activar",
       danger: activo,
       fn: async () => {
@@ -231,15 +231,12 @@ export default function AltaUsuarioPanel() {
 
       {ctx.equipo.length > 0 ? (
         <div style={{ display: "grid", gap: 8, padding: "0 0 16px" }}>
-          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Perfiles de tu equipo. Edita foto, nombre y teléfono; la foto es la fija, la misma que se ve en actividades y en el celular.{puedeActivar ? " Desactivar a alguien corta su acceso y su asignación sin borrar su historial; lo puedes reactivar." : ""}
-          </span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          <div className="nx-equipo" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {ctx.equipo.map((p) => {
               const src = resolveUserAvatarUrl(p.avatarUrl);
               const activo = p.activo !== false;
               return (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, opacity: activo ? 1 : 0.6 }}>
+                <div key={p.id} className="nx-persona" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, opacity: activo ? 1 : 0.6 }}>
                   <span style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "var(--surface-2)", flex: "0 0 auto", filter: activo ? undefined : "grayscale(1)" }}>
                     {src ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -282,7 +279,9 @@ export default function AltaUsuarioPanel() {
             })}
           </div>
         </div>
-      ) : null}
+      ) : (
+        <p style={{ margin: "8px 0 16px", fontSize: 15, fontWeight: 650, textAlign: "center" }}>No hay perfiles.</p>
+      )}
 
       {avisoActivo ? <InlineAlert variant="danger" message={avisoActivo} /> : null}
       <ConfirmDialog state={confirmActivo} onClose={() => setConfirmActivo(null)} />
@@ -309,8 +308,7 @@ export default function AltaUsuarioPanel() {
               </div>
             </div>
             <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-              Entrégasela a la persona en privado. <strong>Esta es la única vez que se muestra aquí</strong>: el sistema
-              no la guarda de forma que se pueda volver a ver.
+              Esta es la única vez que se muestra la contraseña.
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => void copiar()}>

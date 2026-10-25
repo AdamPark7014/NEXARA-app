@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import MetricStrip from "@/components/ui/MetricStrip";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
 import { FormField, FormGrid } from "@/components/ui/FormField";
@@ -16,8 +15,8 @@ import { SkeletonList, Skeleton } from "@/components/PageState";
 import { Avatar } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
+import q from "@/components/erp/pantalla-quieta.module.css";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 
 interface EmployeeDetail {
@@ -77,7 +76,6 @@ const PUNCH_LABEL: Record<string, string> = { entrada: "Entrada", salida: "Salid
 export default function EmployeeDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const router = useRouter();
   const { user } = useUser();
   const token = user?.token ?? "";
 
@@ -114,7 +112,7 @@ export default function EmployeeDetailPage() {
       }
       setError(null);
     } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar la ficha de esta persona."));
+      setError("No se pudo cargar la ficha.");
     } finally {
       setLoading(false);
     }
@@ -154,7 +152,7 @@ export default function EmployeeDetailPage() {
       setEditing(false);
       toast.success("Cambios guardados");
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudieron guardar los cambios."));
+      setSaveErr("No se pudieron guardar los cambios.");
     } finally { setSaving(false); }
   };
 
@@ -172,19 +170,10 @@ export default function EmployeeDetailPage() {
     return months < 1 ? "Menos de 1 mes" : `${months} ${months === 1 ? "mes" : "meses"}`;
   }, [employee]);
 
-  const punchStats = useMemo(() => {
-    let entradas = 0, salidas = 0, conFoto = 0;
-    for (const p of punches) {
-      if (p.type === "entrada") entradas++;
-      else if (p.type === "salida") salidas++;
-      if (p.photoUrl) conFoto++;
-    }
-    return { entradas, salidas, conFoto, total: punches.length };
-  }, [punches]);
-
   if (loading && !employee) {
     return (
-      <div aria-busy="true" aria-label="Cargando ficha">
+      <div className={q.zona} aria-busy="true" aria-label="Cargando ficha">
+        <Link href="/erp/hr" className={q.volver}>‹ Plantilla</Link>
         <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "8px 0 24px" }}>
           <Skeleton width={56} height={56} radius={999} />
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -198,17 +187,13 @@ export default function EmployeeDetailPage() {
   }
   if (!employee) {
     return (
-      <EmptyState
-        icon="⚠️"
-        title="No se pudo cargar la ficha"
-        description={error ?? "No encontramos a esta persona."}
-        action={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
-            <Button size="sm" variant="ghost" onClick={() => router.push("/erp/hr")}>Volver a Plantilla</Button>
-          </div>
-        }
-      />
+      <div className={q.zona}>
+        <Link href="/erp/hr" className={q.volver}>‹ Plantilla</Link>
+        <p className={q.frase} role="status">{error ? "No se pudo cargar la ficha." : "No hay ficha."}</p>
+        <div style={{ textAlign: "center" }}>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
+        </div>
+      </div>
     );
   }
 
@@ -225,11 +210,10 @@ export default function EmployeeDetailPage() {
   ];
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/hr" className={q.volver}>‹ Plantilla</Link>
       <PageHeader
-        eyebrow="Recursos Humanos · Ficha"
         title={employee.nombre}
-        subtitle={[employee.puesto, employee.department?.nombre].filter(Boolean).join(" · ") || "Colaborador"}
         meta={
           <>
             <Avatar url={employee.avatarUrl} name={employee.nombre} size={28} />
@@ -240,7 +224,6 @@ export default function EmployeeDetailPage() {
         }
         actions={
           <>
-            <Button variant="ghost" onClick={() => router.push("/erp/hr")}>← Plantilla</Button>
             <Button variant="primary" onClick={openEdit}>Editar ficha</Button>
           </>
         }
@@ -249,8 +232,7 @@ export default function EmployeeDetailPage() {
       {error && (
         <InlineAlert
           variant="warning"
-          title="No se pudo actualizar"
-          message={`${error} Mostramos la última información cargada.`}
+          message="No se pudo actualizar."
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 12 }}
         />
@@ -280,29 +262,21 @@ export default function EmployeeDetailPage() {
       </Section>
 
       <Section
-        eyebrow="Asistencia"
         title="Últimas checadas"
-        subtitle={punchStats.total > 0
-          ? `${punchStats.entradas} ${punchStats.entradas === 1 ? "entrada" : "entradas"} · ${punchStats.salidas} ${punchStats.salidas === 1 ? "salida" : "salidas"} · ${punchStats.conFoto} con foto`
-          : "Entradas y salidas registradas desde la app, con foto cuando exista."}
-        actions={<Link href="/erp/hr/attendance" style={{ fontSize: 13, color: "var(--primary)", padding: "8px 0", display: "inline-block" }}>Ver asistencia del equipo →</Link>}
+        actions={<Link href="/erp/hr/attendance" style={{ fontSize: 13, color: "var(--primary)", padding: "8px 0", display: "inline-block" }}>Asistencias</Link>}
       >
         {punchesError && (
           <InlineAlert
             variant="warning"
             dense
-            message={punches.length ? "No se pudieron actualizar las checadas. Mostramos las últimas cargadas." : "No se pudieron cargar las checadas."}
+            message={punches.length ? "No se pudo actualizar." : "No se pudieron cargar las checadas."}
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
             style={{ marginBottom: 12 }}
           />
         )}
         {punches.length === 0 ? (
           !punchesError && (
-            <EmptyState
-              icon="📷"
-              title="Sin checadas recientes"
-              description="Cuando registre entrada o salida con la app, aquí verás la hora y la foto."
-            />
+            <p className={q.frase} role="status">No hay checadas.</p>
           )
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 160px), 1fr))", gap: 12 }}>
@@ -395,6 +369,6 @@ export default function EmployeeDetailPage() {
         </FormGrid>
         {saveErr && <InlineAlert message={saveErr} style={{ marginTop: 14 }} />}
       </Modal>
-    </>
+    </div>
   );
 }

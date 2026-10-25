@@ -20,8 +20,8 @@ import { Avatar } from "@/components/base";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { getHrSectionConfig } from "@/lib/section-views";
+import q from "@/components/erp/pantalla-quieta.module.css";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 type HrEmpleado = {
@@ -260,7 +260,7 @@ export default function HrPage() {
       setLoaded(true);
       setLoadError(null);
     } catch (e) {
-      setLoadError(formatApiError(e, "No se pudo cargar la plantilla."));
+      setLoadError("No se pudo cargar la plantilla.");
     } finally {
       setLoading(false);
     }
@@ -339,7 +339,7 @@ export default function HrPage() {
       setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, ...editForm } : i)));
       setEditing(null);
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudieron guardar los cambios."));
+      setSaveErr("No se pudieron guardar los cambios.");
     } finally {
       setSaving(false);
     }
@@ -356,7 +356,7 @@ export default function HrPage() {
       });
       setItems((prev) => prev.map((i) => i.id === e.id ? { ...i, isActive: next, estadoRRHH: next ? "Activo" : "Baja" } : i));
     } catch (err) {
-      setActionErr(formatApiError(err, next ? "No se pudo reactivar a la persona." : "No se pudo dar de baja a la persona."));
+      setActionErr(next ? "No se pudo reactivar a la persona." : "No se pudo dar de baja a la persona.");
     } finally {
       setBusyId(null);
     }
@@ -414,7 +414,7 @@ export default function HrPage() {
       if (created) setItems((prev) => [created, ...prev]);
       setCreating(false);
     } catch (e) {
-      setCreateErr(formatApiError(e, "No se pudo dar de alta a la persona."));
+      setCreateErr("No se pudo dar de alta a la persona.");
     } finally {
       setSaving(false);
     }
@@ -431,7 +431,7 @@ export default function HrPage() {
           await apiFetch(`users/${e.id}`, user.token, { method: "DELETE" });
           setItems((prev) => prev.filter((i) => i.id !== e.id));
         } catch (err) {
-          setActionErr(formatApiError(err, "No se pudo eliminar a la persona."));
+          setActionErr("No se pudo eliminar a la persona.");
         }
       },
     });
@@ -450,7 +450,7 @@ export default function HrPage() {
       setLeavesLoaded(true);
       setLeavesError(null);
     } catch (e) {
-      setLeavesError(formatApiError(e, "No se pudieron cargar las solicitudes de permiso."));
+      setLeavesError("No se pudieron cargar los permisos.");
     } finally {
       setLeavesLoading(false);
     }
@@ -486,7 +486,7 @@ export default function HrPage() {
       setShowLeaveForm(false);
       setLeaveForm({ ...emptyLeaveForm });
     } catch (e) {
-      setLeaveSaveErr(formatApiError(e, "No se pudo crear la solicitud."));
+      setLeaveSaveErr("No se pudo crear la solicitud.");
     } finally {
       setLeaveSaving(false);
     }
@@ -499,7 +499,7 @@ export default function HrPage() {
       const updated = await apiFetch(`hr/leaves/${leave.id}/approve`, user.token, { method: "PATCH" });
       setLeaves((prev) => prev.map((l) => (l.id === leave.id ? { ...l, ...updated } : l)));
     } catch (e) {
-      setActionErr(formatApiError(e, "No se pudo aprobar la solicitud."));
+      setActionErr("No se pudo aprobar la solicitud.");
     } finally {
       setBusyId(null);
     }
@@ -519,7 +519,7 @@ export default function HrPage() {
           });
           setLeaves((prev) => prev.map((l) => (l.id === leave.id ? { ...l, ...updated } : l)));
         } catch (e) {
-          setActionErr(formatApiError(e, "No se pudo rechazar la solicitud."));
+          setActionErr("No se pudo rechazar la solicitud.");
         }
       },
     });
@@ -535,7 +535,7 @@ export default function HrPage() {
       setReviewsLoaded(true);
       setReviewsError(null);
     } catch (e) {
-      setReviewsError(formatApiError(e, "No se pudieron cargar las evaluaciones."));
+      setReviewsError("No se pudieron cargar las evaluaciones.");
     } finally {
       setReviewsLoading(false);
     }
@@ -574,7 +574,7 @@ export default function HrPage() {
       setShowReviewForm(false);
       setReviewForm({ ...emptyReviewForm, reviewDate: isoLocal() });
     } catch (e) {
-      setReviewSaveErr(formatApiError(e, "No se pudo crear la evaluación."));
+      setReviewSaveErr("No se pudo crear la evaluación.");
     } finally {
       setReviewSaving(false);
     }
@@ -587,7 +587,7 @@ export default function HrPage() {
       const updated = await apiFetch(`hr/reviews/${review.id}/submit`, user.token, { method: "PATCH" });
       setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, ...updated } : r)));
     } catch (e) {
-      setActionErr(formatApiError(e, "No se pudo enviar la evaluación."));
+      setActionErr("No se pudo enviar la evaluación.");
     } finally {
       setBusyId(null);
     }
@@ -600,7 +600,7 @@ export default function HrPage() {
       const updated = await apiFetch(`hr/reviews/${review.id}/acknowledge`, user.token, { method: "PATCH" });
       setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, ...updated } : r)));
     } catch (e) {
-      setActionErr(formatApiError(e, "No se pudo confirmar la evaluación."));
+      setActionErr("No se pudo confirmar la evaluación.");
     } finally {
       setBusyId(null);
     }
@@ -615,7 +615,7 @@ export default function HrPage() {
       setDashboard(data);
       setDashboardError(null);
     } catch (e) {
-      setDashboardError(formatApiError(e, "No se pudo cargar el resumen."));
+      setDashboardError("No se pudo cargar el resumen.");
     } finally {
       setDashboardLoading(false);
     }
@@ -815,11 +815,10 @@ export default function HrPage() {
   const staffOptions = items.map((emp) => <option key={emp.id} value={emp.id}>{emp.nombre}</option>);
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/dashboard" className={q.volver}>‹ Inicio</Link>
       <PageHeader
-        eyebrow="Recursos Humanos"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title="Plantilla"
         density="ops"
         meta={
           loaded ? (
@@ -867,8 +866,7 @@ export default function HrPage() {
           {loaded && loadError && (
             <InlineAlert
               variant="warning"
-              title="No se pudo actualizar"
-              message={`${loadError} Mostramos la última información cargada.`}
+              message="No se pudo actualizar."
               action={<Button size="sm" variant="secondary" onClick={() => void fetchStaff()}>Reintentar</Button>}
               style={{ marginBottom: 12 }}
             />
@@ -879,16 +877,15 @@ export default function HrPage() {
               <MetricStrip
                 ariaLabel="Resumen de plantilla"
                 metrics={[
-                  { label: "Plantilla total", value: stats.total, hint: `${stats.activos} activas`, onClick: () => setFilterEstado("") },
-                  { label: "De vacaciones", value: stats.vac, hint: "Según su ficha", onClick: () => setFilterEstado("Vacaciones") },
+                  { label: "Plantilla total", value: stats.total, onClick: () => setFilterEstado("") },
+                  { label: "De vacaciones", value: stats.vac, onClick: () => setFilterEstado("Vacaciones") },
                   {
                     label: "Con incidencia",
                     value: stats.incidencias,
                     tone: stats.incidencias > 0 ? "warning" : "success",
-                    hint: stats.incidencias > 0 ? "Ver quiénes" : "Ninguna abierta",
                     onClick: () => setFilterEstado("Incidencia"),
                   },
-                  { label: "Por honorarios", value: stats.honorarios, hint: "Sin prestaciones" },
+                  { label: "Por honorarios", value: stats.honorarios },
                 ]}
               />
               {stats.byDept.length > 0 && (
@@ -955,8 +952,7 @@ export default function HrPage() {
             {!loaded && !loading && loadError && (
               <InlineAlert
                 variant="danger"
-                title="No se pudo cargar la plantilla"
-                message={loadError}
+                message="No se pudo cargar la plantilla."
                 action={<Button size="sm" variant="secondary" onClick={() => void fetchStaff()}>Reintentar</Button>}
               />
             )}
@@ -967,8 +963,8 @@ export default function HrPage() {
                 rowKey={(e) => e.id}
                 onRowClick={(e) => openEdit(e)}
                 ariaLabel="Plantilla de personal"
-                emptyTitle={items.length === 0 ? "Aún no hay personas registradas" : "Nadie coincide con los filtros"}
-                emptyDescription={items.length === 0 ? "Da de alta a la primera persona para empezar." : "Prueba con otro nombre o quita los filtros."}
+                emptyTitle={items.length === 0 ? "No hay personas." : "Nada coincide con estos filtros."}
+                emptyDescription=""
                 emptyAction={items.length === 0 && cfg.canCreate
                   ? <Button size="sm" variant="primary" onClick={openCreate}>Alta de personal</Button>
                   : items.length > 0
@@ -982,8 +978,7 @@ export default function HrPage() {
 
       {tab === "permisos" && (
         <Section
-          title="Solicitudes de permiso"
-          subtitle="Vacaciones, incapacidades y otros permisos, con aprobación de Recursos Humanos."
+          title="Permisos"
           actions={cfg.canCreate ? (
             <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setLeaveForm({ ...emptyLeaveForm }); setLeaveSaveErr(null); setShowLeaveForm(true); }}>
               Nueva solicitud
@@ -1025,8 +1020,7 @@ export default function HrPage() {
           {leavesError && (
             <InlineAlert
               variant={leavesLoaded ? "warning" : "danger"}
-              title={leavesLoaded ? "No se pudo actualizar" : "No se pudieron cargar los permisos"}
-              message={leavesLoaded ? `${leavesError} Mostramos la última información cargada.` : leavesError}
+              message={leavesLoaded ? "No se pudo actualizar." : "No se pudieron cargar los permisos."}
               action={<Button size="sm" variant="secondary" onClick={() => void loadLeaves()}>Reintentar</Button>}
               style={{ marginBottom: 12 }}
             />
@@ -1039,8 +1033,8 @@ export default function HrPage() {
               rows={leaves}
               rowKey={(l) => l.id}
               ariaLabel="Solicitudes de permiso"
-              emptyTitle="Sin solicitudes"
-              emptyDescription={leaveStatusFilter || leaveTypeFilter ? "No hay solicitudes con estos filtros." : "Aún no se ha registrado ninguna solicitud de permiso."}
+              emptyTitle={leaveStatusFilter || leaveTypeFilter ? "Nada coincide con estos filtros." : "No hay permisos."}
+              emptyDescription=""
             />
           ) : null}
         </Section>
@@ -1048,8 +1042,7 @@ export default function HrPage() {
 
       {tab === "evaluaciones" && (
         <Section
-          title="Evaluaciones de desempeño"
-          subtitle="Calificación general, fortalezas, áreas de mejora y metas de cada persona."
+          title="Evaluaciones"
           actions={cfg.canCreate ? (
             <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setReviewForm({ ...emptyReviewForm, reviewDate: isoLocal() }); setReviewSaveErr(null); setShowReviewForm(true); }}>
               Nueva evaluación
@@ -1059,8 +1052,7 @@ export default function HrPage() {
           {reviewsError && (
             <InlineAlert
               variant={reviewsLoaded ? "warning" : "danger"}
-              title={reviewsLoaded ? "No se pudo actualizar" : "No se pudieron cargar las evaluaciones"}
-              message={reviewsLoaded ? `${reviewsError} Mostramos la última información cargada.` : reviewsError}
+              message={reviewsLoaded ? "No se pudo actualizar." : "No se pudieron cargar las evaluaciones."}
               action={<Button size="sm" variant="secondary" onClick={() => void loadReviews()}>Reintentar</Button>}
               style={{ marginBottom: 12 }}
             />
@@ -1073,20 +1065,19 @@ export default function HrPage() {
               rows={reviews}
               rowKey={(r) => r.id}
               ariaLabel="Evaluaciones de desempeño"
-              emptyTitle="Sin evaluaciones"
-              emptyDescription="Registra la primera evaluación de desempeño."
+              emptyTitle="No hay evaluaciones."
+              emptyDescription=""
             />
           ) : null}
         </Section>
       )}
 
       {tab === "dashboard" && (
-        <Section title="Resumen de Recursos Humanos" subtitle="Permisos y evaluaciones de toda la organización.">
+        <Section title="Resumen">
           {dashboardError && (
             <InlineAlert
               variant={dashboard ? "warning" : "danger"}
-              title={dashboard ? "No se pudo actualizar" : "No se pudo cargar el resumen"}
-              message={dashboard ? `${dashboardError} Mostramos la última información cargada.` : dashboardError}
+              message={dashboard ? "No se pudo actualizar." : "No se pudo cargar el resumen."}
               action={<Button size="sm" variant="secondary" onClick={() => void loadDashboard()}>Reintentar</Button>}
               style={{ marginBottom: 12 }}
             />
@@ -1306,6 +1297,6 @@ export default function HrPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }

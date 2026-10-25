@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -11,9 +12,9 @@ import { FormField, FormGrid } from "@/components/ui/FormField";
 import { useUser } from "@/components/UserContext";
 import { isCeoEquivalentEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import PhoneField from "@/components/PhoneField";
 import s from "./profile.module.css";
+import q from "@/components/erp/pantalla-quieta.module.css";
 
 interface Profile {
   telefono?: string | null;
@@ -137,8 +138,8 @@ export default function MyProfilePage() {
         });
       }
       setDirty(false);
-    } catch (e) {
-      setError(formatApiError(e, "No pudimos cargar tu perfil."));
+    } catch {
+      setError("No se pudo cargar el perfil.");
     } finally {
       setLoading(false);
     }
@@ -171,7 +172,7 @@ export default function MyProfilePage() {
       setDirty(false);
       void load();
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo guardar tu perfil. Intenta de nuevo."));
+      setSaveErr("No se pudo guardar el perfil.");
     } finally {
       setSaving(false);
     }
@@ -199,11 +200,10 @@ export default function MyProfilePage() {
   const employeeNumber = identity?.user.employeeNumber || identity?.user.companyEmployeeNumber || profile?.employeeNumber || null;
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/dashboard" className={q.volver}>‹ Inicio</Link>
       <PageHeader
-        eyebrow="Mi cuenta"
         title="Mi perfil"
-        subtitle={cuentaDireccion ? "Tus datos de contacto." : "Tus datos personales, contacto de emergencia y documentos de identidad."}
         meta={profile && (
           <>
             {profile.role?.nombre && <Tag variant="accent" dot>{profile.role.nombre}</Tag>}
@@ -221,9 +221,7 @@ export default function MyProfilePage() {
 
       {!profile && !loading && error && (
         <EmptyState
-          icon="⚠️"
-          title="No pudimos cargar tu perfil"
-          description={error}
+          title="No se pudo cargar el perfil."
           action={<Button variant="primary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
@@ -233,7 +231,7 @@ export default function MyProfilePage() {
           {error && (
             <InlineAlert
               variant="warning"
-              message={`No pudimos actualizar tus datos. ${error}`}
+              message="No se pudo actualizar."
               action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
             />
           )}
@@ -279,38 +277,33 @@ export default function MyProfilePage() {
           </Section>
 
           {!cuentaDireccion && (
-            <Section title="Tu asistencia de hoy" subtitle="El checador de la app es el que cuenta para tu nómina.">
+            <Section title="Tu asistencia de hoy">
               <dl className={s.facts}>
                 <div className={s.fact}>
-                  <dt>Checador de la app</dt>
-                  <dd className={s.mono}>
-                    {entrada ? `Entrada ${entrada}` : "Sin entrada"}
-                    {salida ? ` · Salida ${salida}` : ""}
-                  </dd>
+                  <dt>Entrada</dt>
+                  <dd className={s.mono}>{entrada ?? "Sin entrada"}</dd>
                 </div>
                 <div className={s.fact}>
-                  <dt>Pases en puertas</dt>
-                  <dd className={s.mono}>
-                    {primerPase
-                      ? `${hoy?.acs?.passes ?? 0} ${hoy?.acs?.passes === 1 ? "pase" : "pases"} · desde ${primerPase}${hoy?.acs?.firstDoor ? ` · ${hoy.acs.firstDoor}` : ""}`
-                      : identity?.status === "linked"
-                        ? "Sin pases hoy"
-                        : "Sin vincular"}
-                  </dd>
+                  <dt>Salida</dt>
+                  <dd className={s.mono}>{salida ?? "Sin salida"}</dd>
+                </div>
+                <div className={s.fact}>
+                  <dt>Pases</dt>
+                  <dd className={s.mono}>{hoy?.acs?.passes ?? 0}</dd>
+                </div>
+                <div className={s.fact}>
+                  <dt>Primer pase</dt>
+                  <dd className={s.mono}>{primerPase ?? "Sin pases"}</dd>
+                </div>
+                <div className={s.fact}>
+                  <dt>Puerta</dt>
+                  <dd>{hoy?.acs?.firstDoor || "—"}</dd>
                 </div>
               </dl>
-              {identity?.status !== "linked" && (
-                <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  Pide a RH que vincule tu número de empleado con el control de acceso.
-                </p>
-              )}
             </Section>
           )}
 
-          <Section
-            title={cuentaDireccion ? "Contacto" : "Datos personales"}
-            subtitle={cuentaDireccion ? undefined : "Solo tú, RH y Dirección pueden ver esta información."}
-          >
+          <Section title={cuentaDireccion ? "Contacto" : "Datos personales"}>
             <FormGrid>
               <FormField label="Teléfono">
                 <PhoneField value={form.telefono ?? ""} onChange={(telefono) => update("telefono", telefono)} />
@@ -352,7 +345,7 @@ export default function MyProfilePage() {
             </FormGrid>
           </Section>
 
-          <Section title="Contacto de emergencia" subtitle="A quién llamamos si te pasa algo en el trabajo.">
+          <Section title="Contacto de emergencia">
             <FormGrid>
               <FormField label="Nombre">
                 <input autoComplete="off" {...text("contactoEmergenciaNombre")} />
@@ -374,7 +367,7 @@ export default function MyProfilePage() {
             </Button>
             {saved ? (
               <span className={`${s.saveNote} ${s.saveOk}`} role="status">
-                ✓ {cuentaDireccion ? "Guardado" : "Guardado. RH revisará los cambios."}
+                Guardado.
               </span>
             ) : dirty ? (
               <span className={s.saveNote}>Tienes cambios sin guardar.</span>
@@ -382,6 +375,6 @@ export default function MyProfilePage() {
           </div>
         </>
       )}
-    </>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
+import Link from "next/link";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
 import { todayStamp } from "@/components/finance/download";
 import ReceiptCapture from "@/components/finance/ReceiptCapture";
@@ -22,9 +23,9 @@ import {
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getApiAssetOrigin } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { exportToExcel } from "@/lib/export-excel";
 import { filterRowsByScope, getErpExpensesSectionConfig } from "@/lib/section-views";
+import q from "@/components/erp/pantalla-quieta.module.css";
 import {
   EXPENSE_CATEGORIES,
   approveExpense,
@@ -254,7 +255,7 @@ function BreakdownTable({
           </table>
           {rows.length > limit && (
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>
-              Se muestran los {limit} primeros de {rows.length}. El PDF trae el desglose completo.
+              Se muestran {limit} de {rows.length}.
             </div>
           )}
         </>
@@ -312,7 +313,7 @@ export default function ExpensesPage() {
       // Antes salía en silencio y la pantalla se quedaba en «Cargando gastos…»
       // para siempre. Ahora dice qué pasa y qué hacer.
       setLoading(false);
-      setError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión para ver los gastos.");
+      setError("Vuelve a iniciar sesión.");
       return;
     }
     setLoading(true);
@@ -325,7 +326,7 @@ export default function ExpensesPage() {
       // Un fallo al refrescar NO borra lo que ya estaba en pantalla: se avisa
       // arriba y la tabla sigue mostrando la última lista buena. Vaciarla
       // convertía un timeout en «no tienes gastos», que es mentira.
-      setError(formatApiError(e, "No se pudieron cargar los gastos"));
+      setError("No se pudieron cargar los gastos.");
     } finally {
       setLoading(false);
     }
@@ -333,7 +334,7 @@ export default function ExpensesPage() {
 
   const loadAnalytics = useCallback(async () => {
     if (!token) {
-      setAnalyticsError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión.");
+      setAnalyticsError("Vuelve a iniciar sesión.");
       return;
     }
     setAnalyticsLoading(true);
@@ -346,7 +347,7 @@ export default function ExpensesPage() {
       setAnalytics(data);
     } catch (e) {
       // Antes solo salía un toast y la pestaña quedaba en blanco sin explicación.
-      setAnalyticsError(formatApiError(e, "No se pudo calcular el resumen del periodo"));
+      setAnalyticsError("No se pudo calcular el resumen.");
     } finally {
       setAnalyticsLoading(false);
     }
@@ -477,7 +478,7 @@ export default function ExpensesPage() {
     if (saving) return;
     if (!token) {
       // Pulsar «Registrar gasto» sin token ya no es un no-op mudo.
-      setSaveErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión e inténtalo otra vez.");
+      setSaveErr("Vuelve a iniciar sesión.");
       return;
     }
     // Regla 5: la validación se contesta bajo el campo, no en un aviso suelto.
@@ -512,7 +513,7 @@ export default function ExpensesPage() {
       setShowForm(false);
       toast.success(editing ? "Gasto actualizado" : "Gasto registrado");
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo guardar el gasto"));
+      setSaveErr("No se pudo guardar el gasto.");
     } finally {
       setSaving(false);
     }
@@ -532,9 +533,7 @@ export default function ExpensesPage() {
           );
           toast.success("Gasto autorizado");
         } catch (err) {
-          setActionError(
-            `No se pudo autorizar "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
-          );
+          setActionError("No se pudo autorizar el gasto.");
         }
       },
     });
@@ -543,7 +542,7 @@ export default function ExpensesPage() {
   const submitReject = async () => {
     if (rejecting) return;
     if (!token || !rejectTarget) {
-      setRejectErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión e inténtalo otra vez.");
+      setRejectErr("Vuelve a iniciar sesión.");
       return;
     }
     setRejecting(true);
@@ -559,7 +558,7 @@ export default function ExpensesPage() {
       setRejectNote("");
       toast.success("Gasto rechazado");
     } catch (err) {
-      setRejectErr(formatApiError(err, "No se pudo rechazar el gasto"));
+      setRejectErr("No se pudo rechazar el gasto.");
     } finally {
       setRejecting(false);
     }
@@ -568,7 +567,7 @@ export default function ExpensesPage() {
   const runMarkPagado = (e: Expense) => {
     if (rowBusyId != null) return;
     setConfirmState({
-      message: `¿Marcar como pagado "${e.concepto}"? Se registra la salida de dinero.`,
+      message: `¿Marcar como pagado "${e.concepto}"?`,
       confirmLabel: "Marcar pagado",
       danger: false,
       fn: async () => {
@@ -581,9 +580,7 @@ export default function ExpensesPage() {
           );
           toast.success("Marcado como pagado");
         } catch (err) {
-          setActionError(
-            `No se pudo marcar pagado "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
-          );
+          setActionError("No se pudo marcar el gasto como pagado.");
         } finally {
           setRowBusyId(null);
         }
@@ -604,9 +601,7 @@ export default function ExpensesPage() {
           setItems((prev) => prev.filter((x) => x.id !== e.id));
           toast.success("Gasto eliminado");
         } catch (err) {
-          setActionError(
-            `No se pudo eliminar "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
-          );
+          setActionError("No se pudo eliminar el gasto.");
         } finally {
           setRowBusyId(null);
         }
@@ -617,7 +612,7 @@ export default function ExpensesPage() {
   const downloadPdf = async () => {
     if (pdfBusy) return;
     if (!token) {
-      setAnalyticsError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión.");
+      setAnalyticsError("Vuelve a iniciar sesión.");
       return;
     }
     setPdfBusy(true);
@@ -628,7 +623,7 @@ export default function ExpensesPage() {
       });
       toast.success("PDF generado");
     } catch (e) {
-      setAnalyticsError(formatApiError(e, "No se pudo generar el PDF"));
+      setAnalyticsError("No se pudo generar el PDF.");
     } finally {
       setPdfBusy(false);
     }
@@ -666,10 +661,28 @@ export default function ExpensesPage() {
             <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>
               {e.concepto ?? "—"}
             </div>
+            {narrow ? (
+              <div style={{ display: "grid", gap: 2, marginTop: 2, fontSize: 11, color: "var(--text-tertiary)" }}>
+                <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} />
+                {meta.map((linea) => (
+                  <span key={linea}>{linea}</span>
+                ))}
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Ver comprobante de ${e.concepto ?? "el gasto"}`}
+                    style={{ color: "var(--primary)", textDecoration: "none" }}
+                  >
+                    Ver comprobante
+                  </a>
+                ) : (
+                  <span style={rowMetaWarnStyle}>Sin comprobante</span>
+                )}
+              </div>
+            ) : (
             <div style={rowMetaStyle}>
-              {/* En móvil el estado deja de ser columna y baja aquí: antes
-                  empujaba la tabla más allá del ancho de la pantalla. */}
-              {narrow ? <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} /> : null}
               <span>{meta.join(" · ")}</span>
               {href ? (
                 <span>
@@ -688,6 +701,7 @@ export default function ExpensesPage() {
                 <span style={rowMetaWarnStyle}>· Sin comprobante</span>
               )}
             </div>
+            )}
           </div>
         );
       },
@@ -843,17 +857,18 @@ export default function ExpensesPage() {
   );
 
   return (
-    <>
+    <div className={q.zona}>
+      <Link href="/erp/contabilidad" className={q.volver}>‹ Contabilidad</Link>
       {highlightId && (
         <InlineAlert
           variant="info"
-          message={`Mostrando el gasto #${highlightId} desde un enlace directo.`}
+          message={`Gasto #${highlightId}.`}
         />
       )}
       <FinanceModuleShell
         variant="flat"
-        title={cfg.title || "Gastos · Admin"}
-        subtitle={cfg.subtitle}
+        title="Gastos"
+        actions={primaryAction}
         kpis={showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de gastos" /> : undefined}
         tabs={[
           { id: "lista", label: "Lista" },
@@ -887,7 +902,6 @@ export default function ExpensesPage() {
                     {analyticsLoading ? "Calculando…" : "Aplicar"}
                   </Button>
                   <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
-                  {primaryAction}
                 </>
               }
             />
@@ -906,12 +920,12 @@ export default function ExpensesPage() {
             )}
             {analyticsLoading && (
               <div style={statusPanelStyle} role="status" aria-live="polite">
-                Calculando el resumen del periodo…
+                Calculando el resumen.
               </div>
             )}
             {!analyticsLoading && !analytics && !analyticsError && (
               <div style={statusPanelStyle}>
-                Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
+                Pulsa Aplicar para ver el periodo.
               </div>
             )}
             {/* Regla 7 en el periodo: si no hubo ni un gasto, la tira de ceros
@@ -919,7 +933,7 @@ export default function ExpensesPage() {
                 enseña: un periodo que cerró en cero es información. */}
             {!analyticsLoading && analytics && analytics.count === 0 && (
               <div style={statusPanelStyle}>
-                En el periodo elegido no hay ningún gasto registrado.
+                No hay gastos en este periodo.
               </div>
             )}
             {!analyticsLoading && analytics && analytics.count > 0 && (
@@ -975,7 +989,6 @@ export default function ExpensesPage() {
                   <>
                     {refreshAction}
                     <ListExportActions onExcel={exportExcel} excelDisabled={visibleItems.length === 0} />
-                    {primaryAction}
                   </>
                 }
               />
@@ -1005,7 +1018,7 @@ export default function ExpensesPage() {
             )}
             {firstLoad ? (
               <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
-                Cargando gastos…
+                Cargando gastos.
               </div>
             ) : error && items.length === 0 ? null : (
               <DataTable
@@ -1014,25 +1027,14 @@ export default function ExpensesPage() {
                 rowKey={(e) => e.id}
                 density="compact"
                 ariaLabel="Gastos administrativos"
-                emptyTitle={hasFilters ? "Ningún gasto coincide" : "Todavía no hay gastos"}
-                emptyDescription={
-                  hasFilters
-                    ? "Ningún gasto coincide con los filtros aplicados."
-                    : cfg.canCreate
-                      ? "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Registra el primero y queda listo para autorizar."
-                      : "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Los captura el equipo administrativo."
-                }
+                emptyTitle={hasFilters ? "Nada coincide con estos filtros." : "No hay gastos."}
+                emptyDescription=""
                 emptyAction={
                   hasFilters ? (
                     <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
                       Limpiar filtros
                     </Button>
-                  ) : (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                      {primaryAction}
-                      {refreshAction}
-                    </div>
-                  )
+                  ) : undefined
                 }
               />
             )}
@@ -1265,6 +1267,6 @@ export default function ExpensesPage() {
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </div>
   );
 }
