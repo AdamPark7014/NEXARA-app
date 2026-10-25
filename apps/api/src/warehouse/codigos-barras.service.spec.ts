@@ -194,6 +194,30 @@ describe('asignarCodigo', () => {
     expect(prisma.product.update).toHaveBeenCalledTimes(1);
   });
 
+  it('deja el aviso de reemplazo en una frase y cita el texto viejo', async () => {
+    // Dos frases, con punto y «Si» en mayúscula. El número es el código que ya tiene el producto.
+    const textoViejo =
+      'El producto ya tiene el código 7501031311309. Si cambió de empaque, confirma que quieres reemplazarlo.';
+    const { service, prisma } = build();
+    const conEan = { ...PRODUCTO, ean: '7501031311309' };
+    prisma.product.findFirst.mockResolvedValueOnce(conEan).mockResolvedValueOnce(null);
+
+    const fallo = await service.asignarCodigo(31, { codigo: EAN }, EMPRESA).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(fallo).toBeInstanceOf(ConflictException);
+    const mensaje = fallo instanceof ConflictException ? fallo.message : '';
+    expect(mensaje).toBe(
+      `El producto ya tiene el código ${conEan.ean}: si cambió de empaque, confirma que quieres reemplazarlo.`,
+    );
+    expect(mensaje).not.toBe(textoViejo);
+    expect(textoViejo).toContain('. Si cambió de empaque');
+    expect(mensaje).not.toContain('. Si cambió de empaque');
+    expect(prisma.product.update).not.toHaveBeenCalled();
+  });
+
   it('producto de otra empresa → 404', async () => {
     const { service } = build();
     await expect(service.asignarCodigo(31, { codigo: UPC }, EMPRESA)).rejects.toBeInstanceOf(
