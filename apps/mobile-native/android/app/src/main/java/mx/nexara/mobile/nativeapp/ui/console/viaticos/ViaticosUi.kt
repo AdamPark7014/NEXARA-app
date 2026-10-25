@@ -204,14 +204,14 @@ fun explicacionLiquidacion(liquidacion: ViaticoLiquidacionDto?): String? {
     val saldo = abs(Dinero.deApi(liquidacion.saldo))
     return when (estado) {
         "SIN_COMPROBAR" -> "Todavía no subes tickets contra este anticipo."
-        "CUADRADO" -> "Los tickets cuadran con lo que se entregó. No hay nada pendiente."
+        "CUADRADO" -> "Los tickets cuadran con lo entregado y no hay nada pendiente."
         "POR_DEVOLVER" -> "Sobraron ${Dinero.pesos(saldo)}: hay que devolverlos a la empresa."
         "POR_REEMBOLSAR" -> "Gastaste ${Dinero.pesos(saldo)} de más: la empresa te los debe."
         else -> null
     }
 }
 
-/** Dos importes lado a lado, grandes y con su etiqueta arriba. */
+/** Un importe por renglón, grande y con su etiqueta arriba. */
 @Composable
 fun ParDeImportes(
     izquierdaLabel: String,
@@ -221,12 +221,12 @@ fun ParDeImportes(
     derechaTono: NxTone = NxTone.Neutral,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Importe(izquierdaLabel, izquierdaCentavos, NxTone.Neutral, Modifier.weight(1f))
-        Importe(derechaLabel, derechaCentavos, derechaTono, Modifier.weight(1f))
+        Importe(izquierdaLabel, izquierdaCentavos, NxTone.Neutral, Modifier.fillMaxWidth())
+        Importe(derechaLabel, derechaCentavos, derechaTono, Modifier.fillMaxWidth())
     }
 }
 
