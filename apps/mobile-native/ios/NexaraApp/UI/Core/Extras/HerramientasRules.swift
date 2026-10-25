@@ -298,14 +298,20 @@ enum HerramientasReglas {
             ?? "Herramienta sin nombre"
     }
 
-    /// «MUL-12345 · Makita HP1640 · Serie 4419B» — con lo que haya, en ese orden.
-    static func identificacionPieza(_ asignacion: KitAsignacion) -> String {
+    /// Código, modelo y serie, cada uno listo para su renglón y en ese orden.
+    /// Vacío si no hay nada: la pantalla pone entonces «Sin identificación registrada».
+    static func renglonesPieza(_ asignacion: KitAsignacion) -> [String] {
         let item = asignacion.inventoryItem
-        let partes = [
+        return [
             item?.codigoInterno?.nilSiVacio,
             item?.model?.nilSiVacio,
             item?.serialNumber?.nilSiVacio.map { "Serie \($0)" },
         ].compactMap { $0 }
+    }
+
+    /// «MUL-12345 · Makita HP1640 · Serie 4419B» — la misma identificación, dicha de un tirón.
+    static func identificacionPieza(_ asignacion: KitAsignacion) -> String {
+        let partes = renglonesPieza(asignacion)
         return partes.isEmpty ? "Sin identificación registrada" : partes.joined(separator: " · ")
     }
 
@@ -314,11 +320,16 @@ enum HerramientasReglas {
         prestamo.toolName?.nilSiVacio ?? prestamo.model?.nilSiVacio ?? "Herramienta sin nombre"
     }
 
-    static func identificacionPrestamo(_ prestamo: PrestamoHerramienta) -> String {
-        let partes = [
+    /// Modelo y serie del préstamo, cada uno en su renglón. El préstamo no trae código interno.
+    static func renglonesPrestamo(_ prestamo: PrestamoHerramienta) -> [String] {
+        [
             prestamo.model?.nilSiVacio,
             prestamo.serialNumber?.nilSiVacio.map { "Serie \($0)" },
         ].compactMap { $0 }
+    }
+
+    static func identificacionPrestamo(_ prestamo: PrestamoHerramienta) -> String {
+        let partes = renglonesPrestamo(prestamo)
         return partes.isEmpty ? "Sin identificación registrada" : partes.joined(separator: " · ")
     }
 
