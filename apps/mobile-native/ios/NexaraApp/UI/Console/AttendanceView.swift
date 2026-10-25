@@ -476,10 +476,12 @@ struct AttendanceView: View {
     @ObservedObject private var pedida = AsistenciasPestanaPedida.shared
     @State private var photoType: String?
     @State private var photo: CorePhotoItem?
+    @State private var muestraGuardias = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(spacing: 0) {
+            GuardiasEntrada { muestraGuardias = true }
             // Las pestañas primero: son la navegación. El día es un filtro y vive debajo.
             NxUnderlineTabs(
                 tabs: vm.tabs.map { NxUnderlineTab(id: $0, title: vm.title(for: $0)) },
@@ -496,6 +498,7 @@ struct AttendanceView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .nxScreenBackground()
+        .fullScreenCover(isPresented: $muestraGuardias) { GuardiasView() }
         .onAppear {
             applyInitialTab()
             consumirPestanaPedida()

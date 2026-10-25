@@ -531,6 +531,8 @@ fun ConsoleAttendanceScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     /** `comidas` abre la pestaña de hora de comida (/erp/asistencias?tab=comidas). */
     initialTab: String? = null,
+    /** Abre la pantalla de guardias. Null: el renglón no se muestra. */
+    onOpenGuardias: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val vm: ConsoleAttendanceViewModel = viewModel()
@@ -571,6 +573,9 @@ fun ConsoleAttendanceScreen(
     }
 
     Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+        if (onOpenGuardias != null) {
+            mx.nexara.mobile.nativeapp.ui.console.guardias.GuardiasEntrada(onClick = onOpenGuardias)
+        }
         // Las pestañas primero: son la navegación. El día es un filtro y vive con los filtros.
         TabRow(
             selectedTabIndex = indice,

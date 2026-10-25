@@ -71,6 +71,7 @@ import mx.nexara.mobile.nativeapp.ui.console.gastos.GastosScreen
 import mx.nexara.mobile.nativeapp.ui.console.herramientas.HerramientasScreen
 import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioScreen
 import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioViewModel
+import mx.nexara.mobile.nativeapp.ui.console.guardias.GuardiasScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
@@ -100,6 +101,9 @@ internal object ConsoleRoutes {
     const val Inicio = "console/inicio"
     const val Activities = "console/activities"
     const val Attendance = "console/attendance"
+
+    /** Guardias de fin de semana. Se empuja desde Asistencias y trae su barra clara. */
+    const val Guardias = "console/guardias"
     const val Chat = "console/chat"
     const val Clients = "console/clients"
 
@@ -489,14 +493,18 @@ fun ConsoleNavHost(
     /** Inicio trae su propia cabecera (saludo, fecha y campana): sin barra superior. */
     val enInicio = (currentRoute ?: startRoute) == ConsoleRoutes.Inicio
     /** El detalle de actividad lleva su dock con la acción grande: ahí la barra inferior estorba. */
-    val conBarraInferior = currentRoute != ConsoleRoutes.ActivityDetail
+    val conBarraInferior = currentRoute != ConsoleRoutes.ActivityDetail && currentRoute != ConsoleRoutes.Guardias
+    /** Guardias pinta su propia barra clara y el volver; el shell no le pone la teal. */
+    val enGuardias = currentRoute == ConsoleRoutes.Guardias
 
     // La barra superior es teal con letras blancas: iconos claros en la barra de
     // estado mientras se ve. En Inicio el fondo es claro y vuelven los oscuros.
-    if (!enInicio) NxLightStatusBarIcons()
+    // Guardias también es clara: los iconos los pone esa pantalla.
+    if (!enInicio && !enGuardias) NxLightStatusBarIcons()
     Scaffold(
+        containerColor = if (enGuardias) Color.White else MaterialTheme.colorScheme.background,
         topBar = {
-            if (!enInicio) TopAppBar(
+            if (!enInicio && !enGuardias) TopAppBar(
                 title = {
                     Text(
                         currentTitle,
@@ -630,9 +638,17 @@ fun ConsoleNavHost(
             }
             nxComposable(ConsoleRoutes.Attendance) {
                 val tab = attendanceTab
-                ConsoleAttendanceScreen(initialTab = tab)
+                ConsoleAttendanceScreen(
+                    initialTab = tab,
+                    onOpenGuardias = {
+                        navController.navigate(ConsoleRoutes.Guardias) { launchSingleTop = true }
+                    },
+                )
                 // Se consume una vez: al volver a Asistencias después, abre en su pestaña normal.
                 LaunchedEffect(tab) { if (tab != null) attendanceTab = null }
+            }
+            nxComposable(ConsoleRoutes.Guardias, style = NxNavAnimStyle.Push) {
+                GuardiasScreen(onBack = { navController.popBackStack() })
             }
             nxComposable(ConsoleRoutes.Chat) {
                 ChatScreen(
