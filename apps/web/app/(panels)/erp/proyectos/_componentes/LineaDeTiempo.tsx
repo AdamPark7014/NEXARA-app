@@ -31,7 +31,8 @@ export type EtapaEnLinea = {
 /**
  * Cronograma tipo Gantt hecho con CSS: una fila para el plan del proyecto y una por etapa.
  * Cada etapa va desde que termina la anterior hasta su fecha planeada. La barra es solo
- * apoyo visual (`aria-hidden`): la etiqueta de cada fila ya dice la fecha y el estado.
+ * apoyo visual (`aria-hidden`). El plan y lo real van en renglones aparte; en cada etapa,
+ * la fecha, el responsable y el estado también.
  */
 export default function LineaDeTiempo({
   inicio,
@@ -105,8 +106,12 @@ export default function LineaDeTiempo({
           Proyecto
           <span className={styles.etiquetaSub}>
             Plan: {formatoFecha(inicio, false)} → {fin ? formatoFecha(fin, false) : "sin fin"}
-            {inicioReal ? ` · Real: ${formatoFecha(inicioReal, false)} → ${finReal ? formatoFecha(finReal, false) : "en curso"}` : ""}
           </span>
+          {inicioReal ? (
+            <span className={styles.etiquetaSub}>
+              Real: {formatoFecha(inicioReal, false)} → {finReal ? formatoFecha(finReal, false) : "en curso"}
+            </span>
+          ) : null}
         </span>
         <div className={styles.pista} aria-hidden="true">
           {dInicio !== null && dFin !== null ? (
@@ -144,9 +149,9 @@ export default function LineaDeTiempo({
               {etapa.nombre}
               <span className={styles.etiquetaSub}>
                 {etapa.plannedDate ? formatoFecha(etapa.plannedDate, false) : "Sin fecha"}
-                {etapa.responsable ? ` · ${etapa.responsable}` : ""}
-                {estadoTexto ? ` · ${estadoTexto}` : ""}
               </span>
+              {etapa.responsable ? <span className={styles.etiquetaSub}>{etapa.responsable}</span> : null}
+              {estadoTexto ? <span className={styles.etiquetaSub}>{estadoTexto}</span> : null}
             </span>
             <div className={styles.pista} aria-hidden="true">
               {tramo && tramo.desde !== null && tramo.hasta !== null ? (
