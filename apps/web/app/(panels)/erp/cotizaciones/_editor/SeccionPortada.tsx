@@ -271,7 +271,7 @@ export default function SeccionPortada({
       titulo="Portada"
       icono={<DescriptionOutlinedIcon />}
       descripcion="Proyecto, cliente y datos fiscales: lo primero que ve el cliente."
-      ayuda="Lo primero que ve el cliente: el título del proyecto, para quién es, la fecha y la versión. El folio lo emite el servidor al guardar."
+      ayuda="Título del proyecto, cliente, fecha y versión: el folio lo emite el servidor al guardar."
     >
       <div className={styles.campos}>
         <Campo etiqueta="Título del proyecto" htmlFor="cot-proyecto">

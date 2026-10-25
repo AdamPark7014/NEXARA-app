@@ -128,7 +128,7 @@ export default function PanelPersonalizar({
 
       {abierto ? (
         <div id="personalizar-cuerpo" className={`${styles.hojaCuerpo} ${styles.opcionesCuerpo}`}>
-          <Grupo titulo="Secciones incluidas" ayuda="Lo que se apaga no se imprime; en el editor queda su cabecera con «Incluir». La portada y la cotización van siempre.">
+          <Grupo titulo="Secciones incluidas" ayuda="Lo que se apaga no se imprime y en el editor queda su cabecera con «Incluir»; la portada y la cotización van siempre.">
             <div className={styles.rejillaInterruptores}>
               <Interruptor activo bloqueado etiqueta="Portada" ayuda="Siempre va" />
               {SECCIONES_OPCIONALES.map((s) => (
@@ -145,7 +145,7 @@ export default function PanelPersonalizar({
             </div>
           </Grupo>
 
-          <Grupo titulo="Columnas de la tabla" ayuda="Marca y modelo, imagen del producto y descuento se agregan a la tabla del PDF. Con el precio unitario apagado, el cliente solo ve el total de cada renglón (a precio alzado).">
+          <Grupo titulo="Columnas de la tabla" ayuda="Marca y modelo, imagen del producto y descuento se agregan a la tabla, y sin precio unitario el cliente solo ve el total de cada renglón (a precio alzado).">
             <div className={styles.rejillaInterruptores}>
               {COLUMNAS_OPCIONALES.map((c) => (
                 <Interruptor
@@ -216,7 +216,7 @@ export default function PanelPersonalizar({
 
           <Grupo
             titulo="Condiciones comerciales"
-            ayuda="Alimentan los términos del PDF: la forma de pago completa el renglón del anticipo, y el tiempo de entrega y la garantía salen como renglones propios. Lo que dejes vacío no se imprime."
+            ayuda="La forma de pago completa el renglón del anticipo, el tiempo de entrega y la garantía salen como renglones propios, y lo que dejes vacío no se imprime."
             accion={
               editable && sugeridas ? (
                 <LinkButton
@@ -316,7 +316,7 @@ export default function PanelPersonalizar({
             </div>
           </Grupo>
 
-          <Grupo titulo="Moneda" ayuda="Cambia la moneda de toda la cotización. En dólares conviene dejar escrito el tipo de cambio que aplica al pagar.">
+          <Grupo titulo="Moneda" ayuda="Cambia la moneda de toda la cotización, y en dólares conviene anotar el tipo de cambio que aplica al pagar.">
             <Segmentado
               etiqueta="Moneda"
               opciones={[
@@ -343,7 +343,7 @@ export default function PanelPersonalizar({
             ) : null}
           </Grupo>
 
-          <Grupo titulo="Firmas" ayuda="«Elaboró» es quien hizo la cotización (déjalo vacío para usar su nombre y su puesto). «Autorizó» es opcional y sugiere a quienes intervinieron.">
+          <Grupo titulo="Firmas" ayuda="«Elaboró» usa el nombre y el puesto de quien la hizo si lo dejas vacío, y «Autorizó» es opcional y sugiere a quienes intervinieron.">
             <datalist id={listaPersonas}>
               {personas.map((p) => (
                 <option key={`${p.userId ?? p.nombre}`} value={p.nombre}>
@@ -429,7 +429,7 @@ export default function PanelPersonalizar({
             ) : null}
           </Grupo>
 
-          <Grupo titulo="Plantilla" ayuda="Guarda los textos, las secciones, las columnas y los términos de esta cotización para empezar otras desde aquí. No guarda cliente ni folio; con «Con partidas» también guarda los precios.">
+          <Grupo titulo="Plantilla" ayuda="Guarda textos, secciones, columnas y términos para empezar otras, sin cliente ni folio, y con «Con partidas» también los precios.">
             <div className={styles.filaPlantilla}>
               <Input
                 wrapperClassName={styles.filaPlantillaNombre}

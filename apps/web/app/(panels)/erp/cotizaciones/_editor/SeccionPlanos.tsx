@@ -186,7 +186,7 @@ export default function SeccionPlanos({
       numero="03"
       titulo="Planos"
       descripcion="Anexos: plano CAD, sembrado de cámaras o fotos del levantamiento."
-      ayuda="Plano CAD, sembrado de cámaras o fotos del levantamiento: cada imagen sale a página completa, en este orden. Acepta PNG, JPG o PDF hasta 20 MB; si la cotización está ligada a la actividad comercial, su evidencia entra sola."
+      ayuda="Cada imagen sale a página completa en este orden, acepta PNG, JPG o PDF de hasta 20 MB, y la evidencia de la actividad comercial entra sola."
     >
       <label
         className={`${styles.zona} ${encima ? styles.zonaActiva : ""} ${puede ? "" : styles.zonaDeshabilitada}`}

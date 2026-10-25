@@ -109,7 +109,7 @@ export default function SeccionAlcance({
       numero="02"
       titulo="Alcance del proyecto"
       descripcion="Qué se hace, subsección por subsección."
-      ayuda="Qué se hace, subsección por subsección: título, párrafos y viñetas. El PDF las numera; una subsección sin título sale como párrafo suelto. Sin subsecciones, el documento remite a la sección 04."
+      ayuda="El PDF numera cada subsección con título, párrafos y viñetas; sin título sale como párrafo suelto y sin subsecciones remite a la sección 04."
       acciones={
         editable ? (
           <Button size="sm" iconStart={<LibraryAddOutlinedIcon />} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>
