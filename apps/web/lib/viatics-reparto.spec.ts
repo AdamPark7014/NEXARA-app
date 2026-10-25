@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { centavosViatico, pesosViatico, revisarCuadreReparto } from "./viatics-display";
+import { centavosViatico, frasePartesSuman, pesosViatico, revisarCuadreReparto } from "./viatics-display";
 import { listViaticsForActivity } from "./ops-activities-api";
 
 const parte = (actividadId: string, monto: string) => ({ actividadId, monto, nota: "" });
@@ -55,6 +55,16 @@ describe("cuadre del reparto en la pantalla", () => {
     expect(aviso).toContain("completa la que falta o quítala");
     expect(aviso).not.toContain("Faltan");
     expect(aviso).not.toContain("Sobran");
+  });
+
+  it("con una parte dice «la parte suma» y con más, «las N partes suman»", () => {
+    const viejo = "las 1 partes suman";
+    expect(frasePartesSuman(1)).toBe("la parte suma");
+    expect(frasePartesSuman(1)).not.toContain(viejo);
+    expect(`Cuadra: ${frasePartesSuman(1)} $1,200.00.`).toBe("Cuadra: la parte suma $1,200.00.");
+    expect(`Cuadra: ${frasePartesSuman(1)} $1,200.00.`).not.toContain(viejo);
+    expect(frasePartesSuman(2)).toBe("las 2 partes suman");
+    expect(frasePartesSuman(4)).toBe("las 4 partes suman");
   });
 
   it("cuenta en centavos enteros", () => {

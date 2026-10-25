@@ -83,6 +83,11 @@ export function pesosViatico(centavos: number): string {
 /** Una fila del editor de reparto, todavía como texto de formulario. */
 export type ParteForm = { actividadId: string; monto: string; nota: string };
 
+/** Concordancia de la pista: una parte suma; de dos en adelante, las N partes suman. */
+export function frasePartesSuman(cuantas: number): string {
+  return cuantas === 1 ? "la parte suma" : `las ${cuantas} partes suman`;
+}
+
 /**
  * ¿Cuadra el reparto con el total del viático?
  *
