@@ -1,11 +1,9 @@
 package mx.nexara.mobile.nativeapp.ui.console.more
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,24 +26,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.fg
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxFriendlyError
 
 /**
  * Proyectos (`/erp/proyectos`) en el teléfono.
  *
- * La web trae una tabla con título, cliente, responsable, estado, salud, fechas,
- * avance, hitos y documentos. Nueve columnas en 375 px no se leen, así que cada
- * proyecto es una tarjeta con la jerarquía invertida respecto de la tabla: lo
- * primero es **la salud** —el semáforo que pidió dirección—, luego qué toca
- * (el próximo hito) y cuánto va, y al final cliente y responsable.
- *
- * Los filtros y los textos viven en [ProyectosRules], que se prueba sin Android.
+ * Cada dato de la tarjeta va en su renglón. El vacío y el error caben en una
+ * frase. Los filtros y los textos viven en [ProyectosRules], que se prueba sin Android.
  */
 @Composable
 fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
@@ -87,7 +80,14 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
             }
 
             state.error?.takeIf { !state.hayDatos }?.let { error ->
-                item(key = "error") { NxErrorBlock(error, onRetry = vm::reintentar) }
+                item(key = "error") {
+                    NxEmptyState(
+                        title = unaFrase(nxFriendlyError(error)),
+                        subtitle = "",
+                        actionLabel = "Reintentar",
+                        onAction = vm::reintentar,
+                    )
+                }
             }
 
             if (state.hayDatos) {
@@ -104,25 +104,18 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
                 if (visibles.isEmpty()) {
                     item(key = "vacio") {
                         if (todos.isEmpty()) {
-                            NxEmptyState(
-                                title = "Sin proyectos",
-                                subtitle = "Todavía no hay proyectos dados de alta en esta empresa.",
-                            )
+                            NxEmptyState(title = "Sin proyectos", subtitle = "")
                         } else if (consulta.isNotBlank()) {
                             NxEmptyState(
                                 title = "Sin coincidencias",
-                                subtitle = "Ningún proyecto coincide con «$consulta».",
+                                subtitle = "",
                                 actionLabel = "Limpiar búsqueda",
                                 onAction = { vm.buscar("") },
                             )
                         } else {
                             NxEmptyState(
                                 title = "Nada en «${filtro.etiqueta.lowercase()}»",
-                                subtitle = if (filtro == ProyectosRules.Filtro.ATENCION) {
-                                    "Ningún proyecto está retrasado ni en riesgo. Buena señal."
-                                } else {
-                                    "No hay proyectos en este filtro."
-                                },
+                                subtitle = "",
                                 actionLabel = "Ver todos",
                                 onAction = { vm.cambiarFiltro(ProyectosRules.Filtro.TODOS) },
                             )
@@ -132,7 +125,6 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
                     item(key = "cabecera") {
                         MoreCabecera(
                             titulo = filtro.etiqueta,
-                            subtitulo = "Primero lo que va tarde",
                             trailing = "${visibles.size}",
                         )
                     }
@@ -147,7 +139,7 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
     }
 }
 
-/** Un proyecto: salud arriba, qué toca en medio, contexto abajo. */
+/** Un proyecto: un dato por renglón. El porcentaje desconocido no se pinta como cero. */
 @Composable
 private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto) {
     val salud = ProyectosRules.saludDe(proyecto)
@@ -162,58 +154,51 @@ private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto) {
     val avance = ProyectosRules.avancePct(proyecto)
 
     MoreTarjeta {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    proyecto.title?.trim()?.ifEmpty { null } ?: "Proyecto sin título",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = NxColors.Slate,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    ProyectosRules.contextoTexto(proyecto),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxColors.Muted,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            NxStatusChip(ProyectosRules.etiquetaSalud(proyecto), tono)
-        }
-
-        MoreBarra(
-            progreso = avance?.let { it / 100f },
-            etiqueta = buildString {
-                append(if (avance != null) "$avance % · " else "Avance desconocido · ")
-                append(ProyectosRules.avanceTexto(proyecto))
-            },
-            tono = tono,
+        Text(
+            proyecto.title?.trim()?.ifEmpty { null } ?: "Proyecto sin título",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = NxColors.Slate,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Text(
+            ProyectosRules.contextoTexto(proyecto),
+            style = MaterialTheme.typography.bodySmall,
+            color = NxColors.Muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        NxStatusChip(ProyectosRules.etiquetaSalud(proyecto), tono)
+        if (avance != null) {
             Text(
-                ProyectosRules.plazoTexto(proyecto),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = if (tono == NxTone.Danger || tono == NxTone.Warning) tono.fg() else NxColors.Muted,
-                modifier = Modifier.weight(1f),
+                "$avance %",
+                style = MaterialTheme.typography.labelMedium,
+                color = NxColors.Muted,
+                maxLines = 1,
             )
-            val equipo = proyecto.equipoCount ?: 0
-            if (equipo > 0) {
-                Text(
-                    "$equipo en el equipo",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxColors.Muted,
-                )
-            }
+        }
+        Text(
+            ProyectosRules.avanceTexto(proyecto),
+            style = MaterialTheme.typography.labelSmall,
+            color = NxColors.Muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            ProyectosRules.plazoTexto(proyecto),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = if (tono == NxTone.Danger || tono == NxTone.Warning) tono.fg() else NxColors.Muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val equipo = proyecto.equipoCount ?: 0
+        if (equipo > 0) {
+            Text(
+                "$equipo en el equipo",
+                style = MaterialTheme.typography.labelSmall,
+                color = NxColors.Muted,
+                maxLines = 1,
+            )
         }
 
         ProyectosRules.proximoHitoTexto(proyecto)?.let { hito ->
@@ -231,7 +216,7 @@ private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto) {
                     hito,
                     style = MaterialTheme.typography.labelMedium,
                     color = NxColors.Slate,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -243,7 +228,17 @@ private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto) {
                 "Requerimientos: ${req.cumplidos ?: 0} de ${req.total} cumplidos",
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColors.Muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
+}
+
+/** La primera oración. El vacío y el error de esta pantalla no siguen con otra. */
+private fun unaFrase(texto: String): String {
+    val limpio = texto.trim()
+    val corte = limpio.indexOfAny(charArrayOf('.', '!', '?'))
+    if (corte < 0 || corte == limpio.lastIndex) return limpio
+    return if (limpio.substring(corte + 1).isBlank()) limpio else limpio.substring(0, corte + 1)
 }
