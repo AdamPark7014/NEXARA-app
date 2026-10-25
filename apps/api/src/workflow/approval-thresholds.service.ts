@@ -101,7 +101,7 @@ export class ApprovalThresholdService {
           `No se pudo pedir la autorización de ${p.tipo} #${p.entityId}: ${error instanceof Error ? error.message : String(error)}`,
         );
         throw new ConflictException(
-          `${ETIQUETA_TOPE[p.tipo]} supera el tope de aprobación de esta empresa y no se pudo pedir la autorización a dirección. Avísale a dirección.`,
+          `${ETIQUETA_TOPE[p.tipo]} supera el tope de aprobación de esta empresa y no se pudo pedir la autorización a dirección: avísale a dirección.`,
         );
       }
     }
