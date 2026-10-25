@@ -6,8 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -57,9 +55,9 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 /*
  * Piezas del detalle de actividad v2 (`.ai/ui-maquetas/movil-actividad.html`):
- * cabecera con chips y título grande, tarjeta del sitio, tira de datos, lista
- * de pasos de evidencia y el dock inferior. Todas leen el tema ([NxTheme]) para
- * que el modo oscuro funcione.
+ * cabecera con un dato por renglón y título grande, tarjeta del sitio, tira de
+ * datos, lista de pasos de evidencia y el dock inferior. Todas leen el tema
+ * ([NxTheme]) para que el modo oscuro funcione.
  */
 
 /** Color de categoría por tipo de actividad (acentos del logotipo; es color de TIPO, no de estado). */
@@ -94,8 +92,7 @@ fun NxChip(
     }
 }
 
-/** Cabecera: tipo · estado · semáforo, título a 22 sp y folio. */
-@OptIn(ExperimentalLayoutApi::class)
+/** Cabecera: tipo, estado, semáforo, urgente y despacho, cada uno en su renglón; título a 22 sp y folio. */
 @Composable
 fun ActivityHeaderV2(
     detail: ActivityDto,
@@ -119,16 +116,20 @@ fun ActivityHeaderV2(
     }
     val luz = ActivitySemaforo.luz(detail.semaforo)
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            NxChip(
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            ActivityHeaderLine(
                 text = CoreActivityRules.kindLabel(detail.coreKind, detail.ticketTypeCustom),
                 color = kindColor,
                 icon = CoreActivityRules.kindGlyph(detail.coreKind).icon,
             )
-            NxChip(text = estado.first, color = estado.second, dot = true)
-            luz?.let { NxChip(text = it.etiqueta, color = Color(it.color)) }
-            if (CoreActivityRules.isUrgent(detail.prioridad)) NxChip(text = "Urgente", color = c.danger)
-            if (detail.assignmentCharge == "despacho") NxChip(text = "Despacho", color = c.categoryMagenta, icon = NxGlyph.DISPATCH.icon)
+            ActivityHeaderLine(text = estado.first, color = estado.second, dot = true)
+            luz?.let { ActivityHeaderLine(text = it.etiqueta, color = Color(it.color), dot = true) }
+            if (CoreActivityRules.isUrgent(detail.prioridad)) {
+                ActivityHeaderLine(text = "Urgente", color = c.danger, dot = true)
+            }
+            if (detail.assignmentCharge == "despacho") {
+                ActivityHeaderLine(text = "Despacho", color = c.categoryMagenta, icon = NxGlyph.DISPATCH.icon)
+            }
         }
         Text(
             detail.titulo?.takeIf { it.isNotBlank() }
@@ -149,6 +150,32 @@ fun ActivityHeaderV2(
         if (meta.isNotBlank()) {
             Text(meta, fontSize = 13.sp, color = c.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/** Un dato de la cabecera, en su renglón: punto o icono y la palabra, sin pastilla. */
+@Composable
+private fun ActivityHeaderLine(
+    text: String,
+    color: Color,
+    icon: ImageVector? = null,
+    dot: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (dot) Box(Modifier.size(6.dp).clip(CircleShape).background(color))
+        if (icon != null) Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+        Text(
+            text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

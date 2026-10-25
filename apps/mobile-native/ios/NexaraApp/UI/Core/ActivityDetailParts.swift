@@ -335,8 +335,8 @@ enum ActivityDetailRules {
 
 // MARK: - Cabecera
 
-/// Cabecera (`ActivityHeaderV2`): tipo · estado · semáforo · urgente · despacho,
-/// título a 22 Bold y «Folio X · Asignada por Y · Plan/Real».
+/// Cabecera (`ActivityHeaderV2`): tipo, estado, semáforo, urgente y despacho,
+/// cada uno en su renglón; título a 22 Bold y «Folio X · Asignada por Y · Plan/Real».
 struct ActivityHeaderV2: View {
     let activityId: Int
     let titulo: String
@@ -374,21 +374,21 @@ struct ActivityHeaderV2: View {
     var body: some View {
         let estado = ActivityDetailRules.estado(estatus: estatus, sesion: sesion)
         VStack(alignment: .leading, spacing: 8) {
-            CoreFlowLayout(spacing: 6) {
-                NxChip(
+            VStack(alignment: .leading, spacing: 4) {
+                ActivityHeaderLine(
                     text: CoreStatusUI.kind(coreKind, ticketTypeCustom: ticketTypeCustom),
                     color: NxBrand.category(coreKind),
                     systemImage: ActivityDetailRules.kindSymbol(coreKind)
                 )
-                NxChip(text: estado.label, color: estado.color, dot: true)
+                ActivityHeaderLine(text: estado.label, color: estado.color, dot: true)
                 if let luz = ActivityDetailRules.luz(semaforo) {
-                    NxChip(text: luz.etiqueta, color: luz.color)
+                    ActivityHeaderLine(text: luz.etiqueta, color: luz.color, dot: true)
                 }
                 if ActivityDetailRules.isUrgent(prioridad) {
-                    NxChip(text: "Urgente", color: NxColors.danger)
+                    ActivityHeaderLine(text: "Urgente", color: NxColors.danger, dot: true)
                 }
                 if isDespacho {
-                    NxChip(text: "Despacho", color: NxColors.categoryMagenta, systemImage: "paperplane")
+                    ActivityHeaderLine(text: "Despacho", color: NxColors.categoryMagenta, systemImage: "paperplane")
                 }
             }
             Text(tituloMostrado)
@@ -407,6 +407,33 @@ struct ActivityHeaderV2: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Un dato de la cabecera, en su renglón: punto o icono y la palabra, sin pastilla.
+private struct ActivityHeaderLine: View {
+    let text: String
+    let color: Color
+    var systemImage: String? = nil
+    var dot: Bool = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            if dot {
+                Circle().fill(color).frame(width: 6, height: 6)
+            }
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 14, height: 14)
+            }
+            Text(text)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(color)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
