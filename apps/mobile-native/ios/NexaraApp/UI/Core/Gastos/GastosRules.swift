@@ -375,8 +375,8 @@ enum GastosRules {
 
     /// Qué no hace esta pantalla, al pie y sin botón que eche al navegador.
     static let limite =
-        "Registrar, autorizar y pagar se hacen en el teléfono: corregir un gasto ya capturado, " +
-        "borrarlo y sacar el reporte por rango de fechas se hacen desde la computadora."
+        "Registrar, autorizar y pagar: corregir un gasto ya capturado, borrarlo y " +
+        "sacar el reporte por rango de fechas se hacen desde la computadora."
 
     // MARK: Utilidades
 

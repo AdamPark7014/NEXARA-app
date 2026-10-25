@@ -454,9 +454,10 @@ class GastosRulesTest {
                 "sacar el reporte por rango de fechas se hacen desde la computadora."
         val pie = GastosRules.LIMITE
         assertFalse(pie.contains(viejo))
+        assertFalse(pie.contains("teléfono"))
         assertEquals(
-            "Registrar, autorizar y pagar se hacen en el teléfono: corregir un gasto ya capturado, " +
-                "borrarlo y sacar el reporte por rango de fechas se hacen desde la computadora.",
+            "Registrar, autorizar y pagar: corregir un gasto ya capturado, borrarlo y " +
+                "sacar el reporte por rango de fechas se hacen desde la computadora.",
             pie,
         )
         assertEquals(1, pie.count { it == '.' })
