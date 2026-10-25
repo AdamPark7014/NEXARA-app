@@ -116,6 +116,36 @@ describe('BranchesForm · validación de alta de sucursal', () => {
     await waitFor(() => expect(onBranchSaved).toHaveBeenCalled());
   });
 
+  it('el vacío y el correo inválido caben en una frase', async () => {
+    const vacioViejo = 'No tienes sucursales aún. Crea una para comenzar.';
+    const correoViejo = 'El email de acceso no es válido. Ejemplo: usuario@empresa.com';
+    const vacio = 'No tienes sucursales aún: crea una para comenzar.';
+    const correo = 'El email de acceso no es válido, ejemplo: usuario@empresa.com';
+    const oraciones = (texto: string) =>
+      texto
+        .replace('usuario@empresa.com', 'usuario@empresa·com')
+        .split(/(?<=[.!?])\s+/)
+        .map((parte) => parte.trim())
+        .filter(Boolean);
+
+    expect(oraciones(vacioViejo)).toHaveLength(2);
+    expect(oraciones(correoViejo)).toHaveLength(2);
+    expect(oraciones(vacio)).toHaveLength(1);
+    expect(oraciones(correo)).toHaveLength(1);
+    expect(vacio.endsWith('crea una para comenzar.')).toBe(true);
+    expect(correo.endsWith('ejemplo: usuario@empresa.com')).toBe(true);
+
+    renderForm();
+    expect(screen.getByText(vacio)).toBeInTheDocument();
+    expect(screen.queryByText(vacioViejo)).not.toBeInTheDocument();
+
+    await rellenar(undefined, 'sucursal-arroba-cliente');
+    await userEvent.click(guardar());
+    expect(await screen.findByText(correo)).toBeInTheDocument();
+    expect(screen.queryByText(correoViejo)).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('lista las sucursales que recibe por props', () => {
     renderForm([SUCURSAL]);
     expect(screen.getByText('Centro')).toBeInTheDocument();
