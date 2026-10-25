@@ -25,7 +25,7 @@ struct JustificarOrdenSheet: View {
                 Section {
                     Text(aviso)
                         .font(.subheadline)
-                    Text("Puedes seguir sin escribir nada. Si dices por qué, queda guardado junto a la actividad y tus jefes lo ven.")
+                    Text("Puedes seguir sin escribir nada: si dices por qué, queda guardado junto a la actividad y tus jefes lo ven.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } header: {

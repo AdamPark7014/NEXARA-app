@@ -28,6 +28,15 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
  * entrada; el servidor marca `saltoPrioridad` y avisa a los jefes, pero no
  * bloquea a nadie — quien está en campo sabrá por qué lo hace.
  */
+object JustificarOrdenTexto {
+    /**
+     * Una frase. Se puede seguir sin escribir; si se dice por qué, queda junto
+     * a la actividad y los jefes lo ven.
+     */
+    const val AVISO_OPCIONAL =
+        "Puedes seguir sin escribir nada: si dices por qué, queda guardado junto a la actividad y tus jefes lo ven."
+}
+
 @Composable
 fun JustificarOrdenDialog(
     aviso: String,
@@ -48,8 +57,7 @@ fun JustificarOrdenDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(aviso, fontSize = 13.5.sp, color = NxColors.Slate)
                 Text(
-                    "Puedes seguir sin escribir nada. Si dices por qué, queda guardado junto a la " +
-                        "actividad y tus jefes lo ven.",
+                    JustificarOrdenTexto.AVISO_OPCIONAL,
                     fontSize = 12.5.sp,
                     color = NxColors.Muted,
                 )
