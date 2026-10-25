@@ -36,7 +36,7 @@ export default function PublicError({
       >
         <h1 style={{ margin: "0 0 12px", fontSize: "1.6rem" }}>Ocurrio un error al cargar la pagina</h1>
         <p style={{ margin: "0 0 18px", opacity: 0.8 }}>
-          Intenta recargar. Si el problema continua, limpia cache del navegador y vuelve a entrar.
+          Intenta recargar, y si el problema continua, limpia cache del navegador y vuelve a entrar.
         </p>
         <button
           type="button"
