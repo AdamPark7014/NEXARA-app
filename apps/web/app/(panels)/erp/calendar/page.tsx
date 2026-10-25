@@ -18,7 +18,7 @@ export default function CalendarRedirectPage() {
         variant="page"
         icon="📅"
         title="Abriendo tu agenda…"
-        description={<>La agenda ahora vive en Reuniones. Si no avanza, <Link href={TARGET}>ábrela aquí</Link>.</>}
+        description={<>Si no avanza, <Link href={TARGET}>ábrela en Reuniones</Link>.</>}
       />
     </div>
   );

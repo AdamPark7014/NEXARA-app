@@ -18,7 +18,7 @@ export default function ChatPage() {
         variant="page"
         icon="💬"
         title="Chat del equipo"
-        description="Tu sesión no está activa. Vuelve a iniciar sesión para conversar con tu equipo."
+        description="Inicia sesión para conversar con tu equipo."
         action={<Button variant="primary" onClick={() => router.replace("/login")}>Iniciar sesión</Button>}
       />
     );
