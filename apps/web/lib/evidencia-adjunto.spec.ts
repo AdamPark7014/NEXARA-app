@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bordeEscalado,
   bytesDeDataUrl,
+  dataUrlDeImagen,
   mensajeAdjuntoInvalido,
   primerArchivo,
   puntoDeFoto,
@@ -41,6 +42,31 @@ describe("evidencia adjunta", () => {
     expect(puntoDeFoto(0, 0)).toBeNull();
     expect(puntoDeFoto(null, -99)).toBeNull();
     expect(puntoDeFoto(91, 0.1)).toBeNull();
+  });
+
+  it("si no se puede leer la imagen, el aviso cabe en una frase", async () => {
+    const viejo = "No se pudo leer la imagen. Usa JPG o PNG.";
+    const anterior = globalThis.createImageBitmap;
+    globalThis.createImageBitmap = (async () =>
+      ({
+        width: 0,
+        height: 0,
+        close() {},
+      }) as ImageBitmap) as typeof createImageBitmap;
+    try {
+      let aviso = "";
+      try {
+        await dataUrlDeImagen(new Blob([Uint8Array.from([0xff, 0xd8])], { type: "image/jpeg" }));
+      } catch (err) {
+        aviso = err instanceof Error ? err.message : String(err);
+      }
+      expect(aviso).toBe("No se pudo leer la imagen: usa JPG o PNG.");
+      expect(aviso).not.toBe(viejo);
+      expect(aviso).toMatch(/JPG o PNG/);
+      expect(aviso.split(".").filter((parte) => parte.trim()).length).toBe(1);
+    } finally {
+      globalThis.createImageBitmap = anterior;
+    }
   });
 
   it("toma la primera imagen del drop y estima el peso del data URL", () => {
