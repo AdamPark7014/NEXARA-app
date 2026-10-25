@@ -23,7 +23,6 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
   const [isMobile, setIsMobile] = useState(false);
-  const [isSmallMobile, setIsSmallMobile] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -198,8 +197,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   React.useEffect(() => {
     const updateViewport = () => {
       if (typeof window === 'undefined') return;
-      setIsMobile(window.innerWidth <= 640);
-      setIsSmallMobile(window.innerWidth <= 430);
+      setIsMobile(window.innerWidth <= 720);
     };
 
     updateViewport();
@@ -207,22 +205,19 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
-  const lunchStatus = isCheckin ? 'De Entrada a Comida' : 'De Regreso al Trabajo';
-  const lunchEmoji = isCheckin ? '🍽️ Entrada' : '✅ Regreso';
-
   return (
-    <div className={`card ${styles.cardWrap} ${isMobile ? styles.cardWrapMobile : ''}`}>
-      <h2 className={styles.title}>
-        {lunchEmoji} - Hora de Comida
-      </h2>
+    <div className={`${styles.cardWrap} ${isMobile ? styles.cardWrapMobile : ''}`}>
+      <p className={styles.title}>
+        {isCheckin ? "Toma la foto al salir a comer." : "Toma la foto al regresar."}
+      </p>
 
       {step === 'camera' ? (
         <>
           <div className={styles.cameraSection}>
             <p className={styles.subtitle}>
               {isCheckin
-                ? 'Tómate una foto clara mostrando tu escritorio limpio y listo para el descanso'
-                : 'Tómate una foto mostrando que comenzaste a laborar nuevamente'}
+                ? "La foto muestra tu lugar, listo para el descanso."
+                : "La foto muestra que ya regresaste a trabajar."}
             </p>
 
             <video
@@ -242,22 +237,12 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
             {error && !cameraReady && <div className={styles.errorText}>{error}</div>}
 
-            <div
-              className={`${styles.captureActions} ${isMobile ? styles.captureActionsMobile : ''} ${isSmallMobile ? styles.captureActionsSmall : ''}`}
-            >
-              <button
-                className={`button-primary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
-                type="button"
-                onClick={capturePhoto}
-              >
-                📷 Capturar Foto
+            <div className={styles.captureActions}>
+              <button className={`button-primary ${styles.captureBtn}`} type="button" onClick={capturePhoto}>
+                Tomar foto
               </button>
-              <button
-                className={`button-secondary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
-                type="button"
-                onClick={flipCamera}
-              >
-                🔄 Voltear
+              <button className={`button-secondary ${styles.captureBtn}`} type="button" onClick={flipCamera}>
+                Voltear cámara
               </button>
             </div>
           </div>
@@ -265,7 +250,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
       ) : (
         <>
           <div className={styles.previewSection}>
-            <h3 className={styles.previewTitle}>Vista Previa</h3>
+            <p className={styles.previewTitle}>Así se va a guardar.</p>
             {photoPreview && (
               <img
                 src={photoPreview}
@@ -275,9 +260,9 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
             )}
           </div>
 
-          <div className={`${styles.confirmActions} ${isMobile ? styles.confirmActionsMobile : ''}`}>
+          <div className={styles.confirmActions}>
             <button
-              className={`button-secondary ${styles.confirmBtn} ${isMobile ? styles.confirmBtnMobile : ''}`}
+              className={`button-secondary ${styles.confirmBtn}`}
               type="button"
               onClick={() => {
                 setStep('camera');
@@ -287,16 +272,16 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               }}
               disabled={loading}
             >
-              ↻ Nueva Foto
+              Otra foto
             </button>
 
             <button
-              className={`button-primary ${styles.confirmBtn} ${isMobile ? styles.confirmBtnMobile : ''}`}
+              className={`button-primary ${styles.confirmBtn}`}
               type="button"
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Registrando...' : '✓ Confirmar'}
+              {loading ? "Registrando…" : "Confirmar"}
             </button>
           </div>
         </>
