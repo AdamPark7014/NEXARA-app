@@ -54,7 +54,7 @@ export class AsistenteActividadesService {
     const acciones = datos.acciones.slice(0, 10);
     return {
       propuestas: acciones.map((a) => construirPropuesta(a, catalogos, { creadoPorId: Number(user.id), ahora, instruccion })),
-      aclaracion: datos?.aclaracion ?? (acciones.length ? null : 'No encontré ninguna actividad en el texto. ¿Qué hay que hacer y quién?'),
+      aclaracion: datos?.aclaracion ?? (acciones.length ? null : 'No encontré ninguna actividad en el texto: ¿qué hay que hacer y quién?'),
       uso,
     };
   }
