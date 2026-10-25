@@ -225,6 +225,15 @@ export default function ControlNominaSemanal({
   const etiqueta = etiquetaSemana(semana);
   const hoyLunes = semanaActual();
   const pasada = semanaPasada();
+  const avisoError = error
+    ? `${error.trim().replace(/[.…]+$/u, "")}; se muestra la última versión que cargó.`
+    : null;
+  const restoCerrada = puedeReabrir
+    ? "ya no se edita, sus pagos en Borrador están en la pestaña «Lista» y, si hay que corregir algo, se reabre."
+    : "ya no se edita y sus pagos en Borrador están en la pestaña «Lista».";
+  const avisoCerrada = estado?.detalle
+    ? `${estado.detalle}; ${restoCerrada}`
+    : `${restoCerrada.charAt(0).toUpperCase()}${restoCerrada.slice(1)}`;
 
   /** Corre un cambio, recarga la semana (la API recalcula todo) y avisa si falla. */
   const mutar = async (clave: string, fn: () => Promise<unknown>, falla: string, exito?: string): Promise<boolean> => {
@@ -520,12 +529,12 @@ export default function ControlNominaSemanal({
             </Button>
           }
         >
-          {error} Se muestra la última versión que cargó.
+          {avisoError}
         </Alert>
       ) : null}
       {vigente && !verMontos ? (
         <Alert tone="info" title="Montos ocultos">
-          Con tu acceso ves las horas y el lugar de cada día, sin sueldos ni importes. Los montos los ve quien tiene
+          Con tu acceso ves las horas y el lugar de cada día, sin sueldos ni importes; los montos los ve quien tiene
           Pagos a empleados.
         </Alert>
       ) : null}
@@ -542,8 +551,7 @@ export default function ControlNominaSemanal({
             ) : undefined
           }
         >
-          {estado?.detalle ? `${estado.detalle}. ` : ""}Ya no se edita; sus pagos en Borrador están en la pestaña «Lista».
-          {puedeReabrir ? " Si hay que corregir algo, reábrela." : ""}
+          {avisoCerrada}
         </Alert>
       ) : null}
 
