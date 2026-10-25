@@ -76,6 +76,36 @@ describe('validarPickup', () => {
   it('sin fecha de vencimiento no caduca', () => {
     expect(validarPickup({ ...vigente, pickupExpiresAt: null }, 'AC3F7K', AHORA).valido).toBe(true);
   });
+
+  it('cada error cabe en una frase y deja atrás el texto viejo', () => {
+    const ya = validarPickup({ ...vigente, pickedUpAt: EN_HORAS(-2) }, 'AC3F7K', AHORA);
+    const sin = validarPickup({ pickupCode: null, pickupExpiresAt: null, pickedUpAt: null }, 'X', AHORA);
+    const vencido = validarPickup({ ...vigente, pickupExpiresAt: EN_HORAS(-1) }, 'AC3F7K', AHORA);
+
+    const viejoYaRecogida = 'Esta solicitud ya se recogió. Pide una nueva si necesitas la herramienta otra vez.';
+    const viejoSinCodigo = 'La solicitud no tiene código de recolección. Debe aprobarse primero.';
+    const viejoVencido = 'El código venció. Pide a tu supervisor que vuelva a aprobar la solicitud.';
+
+    expect(ya).toEqual({
+      valido: false,
+      motivo: 'YA_RECOGIDA',
+      mensaje: 'Esta solicitud ya se recogió: pide una nueva si necesitas la herramienta otra vez.',
+    });
+    expect(sin).toEqual({
+      valido: false,
+      motivo: 'SIN_CODIGO',
+      mensaje: 'La solicitud no tiene código de recolección: debe aprobarse primero.',
+    });
+    expect(vencido).toEqual({
+      valido: false,
+      motivo: 'VENCIDO',
+      mensaje: 'El código venció: pide a tu supervisor que vuelva a aprobar la solicitud.',
+    });
+
+    if (!ya.valido) expect(ya.mensaje).not.toBe(viejoYaRecogida);
+    if (!sin.valido) expect(sin.mensaje).not.toBe(viejoSinCodigo);
+    if (!vencido.valido) expect(vencido.mensaje).not.toBe(viejoVencido);
+  });
 });
 
 describe('horasRestantesPickup', () => {
