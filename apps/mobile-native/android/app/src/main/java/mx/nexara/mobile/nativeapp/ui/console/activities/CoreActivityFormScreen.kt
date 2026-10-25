@@ -306,16 +306,6 @@ private fun AssignFlow(
     // ── 1 · Tipo ────────────────────────────────────────────────────────────
     StepLabel(if (selfAssign) "1 · ¿Qué tipo de actividad es?" else "1 · Tipo de actividad")
     KindGrid(kinds = allowedKinds, selected = kind, onPick = { changeKind(it) })
-    if (!selfAssign) {
-        Text(
-            "Solo se muestran tipos válidos para $displayName. Campo David: tarea/proyecto/obra · Soporte " +
-                "Antonio: tarea/proyecto/servicio · Josué (obra): todo menos servicio · Daniela/Mónica: " +
-                "tarea/comercial · Encargados: + comercial.",
-            fontSize = 12.sp,
-            color = NxColors.Muted,
-            lineHeight = 16.sp,
-        )
-    }
 
     // ── 2 · Encargo ─────────────────────────────────────────────────────────
     if (kind != null && despachoOnly && !bridgeNeeded) {
@@ -715,9 +705,9 @@ private fun ActivityFormPanel(
                 Spacer(Modifier.height(8.dp))
                 Text("Tipo de tarea *", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
                 Spacer(Modifier.height(6.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     k.TAREA_TIPOS.forEach { t ->
                         Pill(
@@ -920,23 +910,18 @@ private fun StepLabel(text: String, icon: ImageVector? = null) {
 
 @Composable
 private fun KindGrid(kinds: List<String>, selected: String?, onPick: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        kinds.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { id ->
-                    val m = CoreActivityKinds.meta(id)
-                    if (m != null) {
-                        ChoiceCard(
-                            icon = m.glyph.icon,
-                            title = m.title,
-                            help = m.help,
-                            selected = selected == id,
-                            onClick = { onPick(id) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        kinds.forEach { id ->
+            val m = CoreActivityKinds.meta(id)
+            if (m != null) {
+                ChoiceCard(
+                    icon = m.glyph.icon,
+                    title = m.title,
+                    help = m.help,
+                    selected = selected == id,
+                    onClick = { onPick(id) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
