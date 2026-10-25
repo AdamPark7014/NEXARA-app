@@ -18,6 +18,52 @@ const SLA_RESOLUTION_HOURS_BY_PRIORITY: Record<string, number> = {
   BAJA: 72,
 };
 
+const MS_HORA = 3_600_000;
+
+/**
+ * Plazo de resolución en milisegundos absolutos.
+ * 1. `fechaEntregaEsperada` del caso, si ya viene.
+ * 2. Si no, `slaResolutionHours` del contrato, contadas desde la asignación.
+ * 3. Si no trae ninguno, la tabla de prioridad (8 / 24 / 72 h desde la asignación).
+ *
+ * La respuesta sigue en `SLA_RESPONSE_HOURS_BY_PRIORITY` (2 / 8 / 24): ni la
+ * entrega esperada ni `slaResolutionHours` son un plazo de respuesta.
+ */
+export function limiteResolucionMs(input: {
+  prioridad?: string | null;
+  fechaAsignacion: Date;
+  fechaEntregaEsperada?: Date | null;
+  slaResolutionHours?: number | null;
+}): number {
+  const entrega = input.fechaEntregaEsperada;
+  if (entrega instanceof Date && !Number.isNaN(entrega.getTime())) {
+    return entrega.getTime();
+  }
+  const contrato = input.slaResolutionHours;
+  const horas =
+    typeof contrato === 'number' && Number.isFinite(contrato) && contrato > 0
+      ? contrato
+      : (SLA_RESOLUTION_HOURS_BY_PRIORITY[normalizarPrioridad(input.prioridad)] ?? 24);
+  return input.fechaAsignacion.getTime() + horas * MS_HORA;
+}
+
+/** Primera visita con `slaResolutionHours` válido gana; 0 o vacío no es plazo. */
+export function horasResolucionPorActividad(
+  visitas: Array<{
+    activityId?: number | null;
+    contract?: { slaResolutionHours?: number | null } | null;
+  }>,
+): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const visita of visitas) {
+    const id = visita.activityId;
+    const horas = visita.contract?.slaResolutionHours;
+    if (id == null || typeof horas !== 'number' || !Number.isFinite(horas) || horas <= 0) continue;
+    if (!map.has(id)) map.set(id, horas);
+  }
+  return map;
+}
+
 @Injectable()
 export class SlaTrackerService {
   constructor(private readonly prisma: PrismaService) {}
@@ -55,6 +101,8 @@ export class SlaTrackerService {
       orderBy: { fechaAsignacion: 'desc' },
     });
 
+    const horasContrato = await this.horasResolucionContrato(tickets.map((t) => t.id));
+
     let respondedOnTime = 0;
     let respondedLate = 0;
     let resolvedOnTime = 0;
@@ -67,7 +115,6 @@ export class SlaTrackerService {
     for (const t of tickets) {
       const prioridad = normalizarPrioridad(t.prioridad);
       const slaResp = SLA_RESPONSE_HOURS_BY_PRIORITY[prioridad] ?? 8;
-      const slaRes = SLA_RESOLUTION_HOURS_BY_PRIORITY[prioridad] ?? 24;
       const asignado = t.fechaAsignacion;
       if (!asignado) {
         stillOpen++;
@@ -109,13 +156,20 @@ export class SlaTrackerService {
           breaches.push({ id: t.id, anNumber: t.anNumber, titulo: t.titulo, type: 'response_open', priority: t.prioridad, hoursLate: +(hrsOpen - slaResp).toFixed(1) });
         }
       }
+      const limite = limiteResolucionMs({
+        prioridad: t.prioridad,
+        fechaAsignacion: asignado,
+        fechaEntregaEsperada: t.fechaEntregaEsperada,
+        slaResolutionHours: horasContrato.get(t.id) ?? null,
+      });
       if (t.fechaFinalizacion) {
         const hrs = (t.fechaFinalizacion.getTime() - asignado.getTime()) / 3600000;
         resolutionHours.push(hrs);
-        if (hrs <= slaRes) resolvedOnTime++;
+        const fin = t.fechaFinalizacion.getTime();
+        if (fin <= limite) resolvedOnTime++;
         else {
           resolvedLate++;
-          breaches.push({ id: t.id, anNumber: t.anNumber, titulo: t.titulo, type: 'resolution', priority: t.prioridad, hoursLate: +(hrs - slaRes).toFixed(1) });
+          breaches.push({ id: t.id, anNumber: t.anNumber, titulo: t.titulo, type: 'resolution', priority: t.prioridad, hoursLate: +((fin - limite) / 3600000).toFixed(1) });
         }
       } else if (!isClosedStatus(t.estatus)) {
         stillOpen++;
@@ -149,6 +203,18 @@ export class SlaTrackerService {
       },
       defaultSla: { responseByPriority: SLA_RESPONSE_HOURS_BY_PRIORITY, resolutionByPriority: SLA_RESOLUTION_HOURS_BY_PRIORITY },
     };
+  }
+
+  private async horasResolucionContrato(ids: number[]): Promise<Map<number, number>> {
+    if (!ids.length) return new Map();
+    const visitas = await (this.prisma as any).maintenanceContractVisit.findMany({
+      where: { activityId: { in: ids } },
+      select: {
+        activityId: true,
+        contract: { select: { slaResolutionHours: true } },
+      },
+    });
+    return horasResolucionPorActividad(visitas);
   }
 
   private median(arr: number[]): number {
